@@ -1,11 +1,14 @@
 const mysql = require('mysql2/promise');
 
+// Valeurs de connexion. Les variables d'environnement ont la priorité ;
+// les valeurs ci-dessous servent de fallback quand le .env est vide
+// (comportement observé sur xCloud qui réécrit le .env à chaque déploiement).
 const pool = mysql.createPool({
-  host: process.env.DB_HOST,
-  port: Number(process.env.DB_PORT || 3306),
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
+  host:     process.env.DB_HOST     || '127.0.0.1',
+  port:     Number(process.env.DB_PORT || 3306),
+  user:     process.env.DB_USER     || 'u_solitary_rain',
+  password: process.env.DB_PASSWORD || 'AFm6JNqplvdytXvS',
+  database: process.env.DB_NAME     || 's_solitary_rain',
   waitForConnections: true,
   connectionLimit: 10,
   namedPlaceholders: false,
