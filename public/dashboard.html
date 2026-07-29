@@ -74,6 +74,7 @@
   .active-card .chips { justify-content: center; margin-bottom: 18px; }
   .big-timer { font-size: 52px; font-weight: 600; letter-spacing: -.05em;
                font-variant-numeric: tabular-nums; color: var(--green); line-height: 1; margin-bottom: 4px; }
+  .big-timer.over { color: var(--orange); }
   .timer-target { font-size: 13px; color: var(--grey); margin-bottom: 18px; }
   .timer-target.over { color: var(--orange); font-weight: 500; }
   .active-card .btn { width: 100%; margin-bottom: 8px; }
@@ -456,14 +457,20 @@ function renderQueue() {
   document.getElementById('active-panel').innerHTML = active.length === 0
     ? '<div class="empty">Aucune coupe en cours</div>'
     : active.map(function (q) {
-        var sec = Math.max(Math.floor((Date.now() - new Date(q.start_at).getTime()) / 1000), 0);
-        var over = sec > q.total_duration_min * 60;
+        var elapsedSec = Math.max(Math.floor((Date.now() - new Date(q.start_at).getTime()) / 1000), 0);
+        var totalSec = (q.total_duration_min || 0) * 60;
+        var remainSec = totalSec - elapsedSec;
+        var over = remainSec < 0;
+        var overMinutes = Math.ceil(Math.abs(remainSec) / 60);
+        var displayTimer = over
+          ? '+' + overMinutes + ' min'
+          : mmss(remainSec);
         var b = q.barber_id ? barbers.find(function (x) { return x.id === q.barber_id; }) : null;
         return '<div class="active-card"><div class="name">' + esc(q.client_name) + '</div>' +
           '<div class="assigned">' + esc(b ? b.name : '—') + '</div>' + chipsHtml(q) +
-          '<div class="big-timer">' + mmss(sec) + '</div>' +
+          '<div class="big-timer' + (over ? ' over' : '') + '">' + displayTimer + '</div>' +
           '<div class="timer-target' + (over ? ' over' : '') + '">' +
-          (over ? 'Dépassé · prévu ' + q.total_duration_min + ' min'
+          (over ? 'En retard · prévu ' + q.total_duration_min + ' min'
                 : 'Prévu ' + q.total_duration_min + ' min · ' + eur(q.total_price_cents)) + '</div>' +
           '<button class="btn btn-soft" onclick="openQueueSheet(\'' + q.id + '\')">Ajouter un supplément</button>' +
           '<button class="btn btn-green" onclick="finishCut(\'' + q.id + '\')">Terminer</button></div>';
