@@ -351,10 +351,13 @@ document.getElementById('tabs').addEventListener('click', function (e) {
 
 /* ============ Chargement ============ */
 function boot() {
-  loadCatalog().then(refresh).then(function () {
-    setInterval(function () { renderQueue(); }, 1000);
-    subscribeQueue(refresh);
-  });
+  loadCatalog()
+    .then(loadBarbers)
+    .then(refreshQueue)
+    .then(function () {
+      setInterval(function () { renderQueue(); }, 1000);
+      subscribeQueue(refreshQueue);
+    });
 }
 
 function loadCatalog() {
@@ -367,17 +370,29 @@ function loadCatalog() {
   });
 }
 
-function refresh() {
+// Coiffeurs + horaires : ne se recharge QUE sur une action explicite
+// (ajout, renommage, sauvegarde des horaires...), jamais via le polling
+// automatique — sinon des horaires en cours de modification se font
+// écraser par la dernière version enregistrée en base avant que
+// l'utilisateur ait cliqué "Enregistrer".
+function loadBarbers() {
+  return api('/api/barbers?all=1').then(function (r) {
+    barbers = r.items; onDuty = r.on_duty;
+    if (!me && barbers.length) me = barbers[0].id;
+    document.getElementById('s-duty').textContent = onDuty;
+    renderSeg(); renderBarbers();
+  }).catch(function (err) { toast(err.message, true); });
+}
+
+// File d'attente + stats : c'est ça que le polling toutes les 4s rafraîchit.
+function refreshQueue() {
   return Promise.all([
     api('/api/queue'),
-    api('/api/barbers?all=1'),
     api('/api/queue/stats/today')
   ]).then(function (r) {
-    queue = r[0].queue; barbers = r[1].items; onDuty = r[1].on_duty;
-    if (!me && barbers.length) me = barbers[0].id;
-    document.getElementById('s-rev').textContent = eur(r[2].revenue_cents);
-    document.getElementById('s-duty').textContent = onDuty;
-    renderSeg(); renderQueue(); renderBarbers();
+    queue = r[0].queue;
+    document.getElementById('s-rev').textContent = eur(r[1].revenue_cents);
+    renderQueue();
   }).catch(function (err) { toast(err.message, true); });
 }
 
@@ -445,16 +460,16 @@ function renderQueue() {
 function startCut(id) {
   if (!me) { toast('Sélectionnez qui vous êtes', true); return; }
   api('/api/queue/' + id + '/start', { method: 'POST', body: { barber_id: me } })
-    .then(refresh).catch(function (e) { toast(e.message, true); });
+    .then(refreshQueue).catch(function (e) { toast(e.message, true); });
 }
 function finishCut(id) {
   api('/api/queue/' + id + '/finish', { method: 'POST', body: {} })
-    .then(refresh).catch(function (e) { toast(e.message, true); });
+    .then(refreshQueue).catch(function (e) { toast(e.message, true); });
 }
 function cancelCut(id) {
   if (!confirm('Marquer ce client comme absent ?')) return;
   api('/api/queue/' + id + '/cancel', { method: 'POST', body: {} })
-    .then(refresh).catch(function (e) { toast(e.message, true); });
+    .then(refreshQueue).catch(function (e) { toast(e.message, true); });
 }
 
 /* ============ Feuille prestation d'un client ============ */
@@ -500,7 +515,7 @@ function toggleDraftExtra(id) {
 }
 function saveQueueSheet() {
   api('/api/queue/' + editingQ.id, { method: 'PUT', body: { service_id: draftSvc, extras: draftExt } })
-    .then(function () { closeSheet('sheet-queue'); return refresh(); })
+    .then(function () { closeSheet('sheet-queue'); return refreshQueue(); })
     .then(function () { toast('Enregistré'); })
     .catch(function (e) { toast(e.message, true); });
 }
@@ -614,7 +629,7 @@ function saveSchedule(id) {
     };
   });
   api('/api/barbers/' + id + '/schedule', { method: 'PUT', body: { schedules: schedules } })
-    .then(refresh).then(function () { toast('Horaires enregistrés'); })
+    .then(loadBarbers).then(function () { toast('Horaires enregistrés'); })
     .catch(function (e) { toast(e.message, true); });
 }
 
@@ -622,7 +637,7 @@ function addBarber() {
   var name = prompt('Nom du coiffeur');
   if (!name) return;
   api('/api/barbers', { method: 'POST', body: { name: name } })
-    .then(refresh).then(function () { toast('Coiffeur ajouté'); })
+    .then(loadBarbers).then(function () { toast('Coiffeur ajouté'); })
     .catch(function (e) { toast(e.message, true); });
 }
 function renameBarber(id) {
@@ -630,16 +645,16 @@ function renameBarber(id) {
   var name = prompt('Nouveau nom', b.name);
   if (!name) return;
   api('/api/barbers/' + id, { method: 'PUT', body: { name: name } })
-    .then(refresh).catch(function (e) { toast(e.message, true); });
+    .then(loadBarbers).catch(function (e) { toast(e.message, true); });
 }
 function archiveBarber(id) {
   if (!confirm('Désactiver ce coiffeur ?')) return;
   api('/api/barbers/' + id, { method: 'DELETE' })
-    .then(refresh).catch(function (e) { toast(e.message, true); });
+    .then(loadBarbers).catch(function (e) { toast(e.message, true); });
 }
 function restoreBarber(id) {
   api('/api/barbers/' + id, { method: 'PUT', body: { active: true } })
-    .then(refresh).catch(function (e) { toast(e.message, true); });
+    .then(loadBarbers).catch(function (e) { toast(e.message, true); });
 }
 
 /* ============ Réglages ============ */
