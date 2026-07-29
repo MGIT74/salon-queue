@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard</title>
+<link rel="stylesheet" href="/app.css">
+<style>
+  .wrap { max-width: 1240px; margin: 0 auto; padding: clamp(20px,3vw,44px); }
+  h1 { font-size: clamp(28px,3.2vw,40px); font-weight: 600; letter-spacing: -.035em; margin: 0 0 20px; }
+
+  /* Connexion */
+  .login { max-width: 380px; margin: 14vh auto; text-align: center; }
+  .login h1 { margin-bottom: 8px; }
+  .login p { color: var(--grey); font-size: 15px; margin: 0 0 24px; }
+
+  /* Onglets */
+  .tabs { display: flex; gap: 4px; background: var(--fill); border-radius: 999px;
+          padding: 4px; margin-bottom: 26px; overflow-x: auto; }
+  .tabs button { border: none; background: none; color: var(--ink); font-family: inherit;
+                 font-size: 15px; font-weight: 500; padding: 10px 20px; border-radius: 999px;
+                 cursor: pointer; white-space: nowrap; transition: background .18s ease; }
+  .tabs button.on { background: var(--card); font-weight: 600; box-shadow: var(--shadow); }
+  [data-theme="dark"] .tabs button.on { background: #48484a; }
+
+  .tab-panel { display: none; }
+  .tab-panel.on { display: block; }
+
+  /* Stats */
+  .stats { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 24px; }
+  .stat { background: var(--card); border-radius: 14px; padding: 14px 20px;
+          box-shadow: var(--shadow); min-width: 120px; transition: background .25s ease; }
+  .stat .v { font-size: clamp(20px,2.2vw,27px); font-weight: 600; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 13px; color: var(--grey); margin-top: 2px; }
+
+  .who { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 26px; }
+  .who-label { font-size: 14px; color: var(--grey); }
+  .seg { display: flex; background: var(--fill); border-radius: 999px; padding: 4px; gap: 2px; flex-wrap: wrap; }
+  .seg button { border: none; background: none; color: var(--ink); font-family: inherit;
+                font-size: 15px; font-weight: 500; padding: 9px 20px; border-radius: 999px; cursor: pointer; }
+  .seg button.on { background: var(--card); font-weight: 600; box-shadow: var(--shadow); }
+  [data-theme="dark"] .seg button.on { background: #48484a; }
+
+  .cols { display: grid; grid-template-columns: 1fr 350px; gap: clamp(16px,2vw,26px); align-items: start; }
+  .section-label { font-size: 12px; font-weight: 600; letter-spacing: .06em;
+                   text-transform: uppercase; color: var(--grey); margin: 0 0 12px 4px; }
+  .aside { position: sticky; top: 24px; }
+
+  .row { background: var(--card); border-radius: 16px; padding: 16px 18px;
+         margin-bottom: 10px; box-shadow: var(--shadow); transition: background .25s ease; }
+  .row-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+  .row-left { display: flex; align-items: flex-start; gap: 13px; min-width: 0; flex: 1; }
+  .pos { width: 34px; height: 34px; border-radius: 50%; background: var(--fill);
+         display: flex; align-items: center; justify-content: center; font-size: 14px;
+         font-weight: 600; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+  .name { font-size: 17px; font-weight: 600; letter-spacing: -.02em; }
+  .assigned { font-size: 13px; color: var(--grey); margin-top: 1px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+  .chip { font-size: 12.5px; font-weight: 500; padding: 5px 11px; border-radius: 999px;
+          background: var(--fill); color: var(--ink); }
+  .chip.main { background: var(--blue-soft); color: var(--blue); font-weight: 600; }
+  .chip.add { color: var(--grey); }
+  .row-meta { text-align: right; flex-shrink: 0; }
+  .row-meta .dur { font-size: 16px; font-weight: 600; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .row-meta .price { font-size: 13px; color: var(--grey); margin-top: 1px; }
+  .row-meta .wait { font-size: 12.5px; color: var(--orange); margin-top: 4px; font-weight: 500; }
+  .row-actions { display: flex; gap: 8px; margin-top: 13px; flex-wrap: wrap; }
+  .row-actions .btn { font-size: 14.5px; padding: 11px 20px; }
+  .row-actions .btn-primary { flex: 1; }
+
+  .active-card { background: var(--card); border-radius: 18px; padding: 22px;
+                 box-shadow: var(--shadow); text-align: center; margin-bottom: 10px; transition: background .25s ease; }
+  .active-card .name { font-size: 20px; margin-bottom: 2px; }
+  .active-card .chips { justify-content: center; margin-bottom: 18px; }
+  .big-timer { font-size: 52px; font-weight: 600; letter-spacing: -.05em;
+               font-variant-numeric: tabular-nums; color: var(--green); line-height: 1; margin-bottom: 4px; }
+  .timer-target { font-size: 13px; color: var(--grey); margin-bottom: 18px; }
+  .timer-target.over { color: var(--orange); font-weight: 500; }
+  .active-card .btn { width: 100%; margin-bottom: 8px; }
+  .active-card .btn-green { padding: 15px; font-size: 16px; }
+
+  .empty { background: var(--card); border-radius: 16px; padding: 36px 20px; text-align: center;
+           color: var(--grey); font-size: 15px; box-shadow: var(--shadow); }
+
+  /* Tables d'administration */
+  .admin-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+  .admin-head h2 { font-size: 21px; font-weight: 600; letter-spacing: -.03em; margin: 0; }
+  .item { background: var(--card); border-radius: 14px; padding: 14px 18px; margin-bottom: 8px;
+          display: flex; align-items: center; gap: 14px; box-shadow: var(--shadow); flex-wrap: wrap; transition: background .25s ease; }
+  .item.off { opacity: .5; }
+  .item-main { flex: 1; min-width: 160px; }
+  .item-name { font-size: 16px; font-weight: 600; letter-spacing: -.015em; }
+  .item-meta { font-size: 13px; color: var(--grey); margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .item-actions { display: flex; gap: 6px; }
+  .item-actions .btn { font-size: 14px; padding: 9px 16px; }
+
+  .card-box { background: var(--card); border-radius: 16px; padding: 22px; box-shadow: var(--shadow);
+              margin-bottom: 14px; transition: background .25s ease; }
+  .card-box h3 { font-size: 17px; font-weight: 600; letter-spacing: -.02em; margin: 0 0 4px; }
+  .card-box .hint { font-size: 13.5px; color: var(--grey); margin: 0 0 18px; line-height: 1.5; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+  /* Horaires */
+  .day-row { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--sep); flex-wrap: wrap; }
+  .day-row:last-child { border-bottom: none; }
+  .day-name { width: 92px; font-size: 15px; font-weight: 500; flex-shrink: 0; }
+  .day-row input[type="time"] { padding: 9px 11px; border: none; border-radius: 9px;
+                                background: var(--fill); color: var(--ink); font-family: inherit;
+                                font-size: 15px; outline: 2px solid transparent; outline-offset: -2px; }
+  .day-row input[type="time"]:focus { outline-color: var(--blue); }
+  .day-row .to { color: var(--grey); font-size: 14px; }
+  .day-row.off input[type="time"], .day-row.off .to { opacity: .35; pointer-events: none; }
+  .switch { position: relative; width: 46px; height: 28px; background: var(--sep);
+            border-radius: 999px; cursor: pointer; flex-shrink: 0; transition: background .2s ease; }
+  .switch.on { background: var(--green); }
+  .switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px;
+                   border-radius: 50%; background: #fff; transition: transform .2s ease; }
+  .switch.on::after { transform: translateX(18px); }
+
+  /* Feuille modale */
+  .backdrop { position: fixed; inset: 0; z-index: 70; background: rgba(0,0,0,.35);
+              backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+              display: none; align-items: center; justify-content: center; padding: 20px; }
+  .backdrop.on { display: flex; }
+  .sheet { background: var(--card); border-radius: 22px; width: 100%; max-width: 460px;
+           max-height: 88vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: var(--shadow-lg); }
+  .sheet-head { padding: 20px 22px 16px; border-bottom: 1px solid var(--sep);
+                display: flex; align-items: center; justify-content: space-between; }
+  .sheet-head h2 { font-size: 19px; font-weight: 600; letter-spacing: -.025em; margin: 0; }
+  .sheet-head .x { background: var(--fill); border: none; width: 30px; height: 30px;
+                   border-radius: 50%; color: var(--grey); cursor: pointer; font-size: 15px; }
+  .sheet-body { padding: 18px 22px; overflow-y: auto; flex: 1; }
+  .grp-label { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+               color: var(--grey); margin: 0 0 10px; }
+  .opt-list + .grp-label { margin-top: 24px; }
+  .opt-list { display: flex; flex-direction: column; gap: 6px; }
+  .opt { display: flex; align-items: center; gap: 12px; padding: 13px 14px; border-radius: 12px;
+         background: var(--fill); cursor: pointer; transition: background .15s ease; }
+  .opt:hover { background: var(--fill-2); }
+  .opt.sel { background: var(--blue-soft); }
+  .box { width: 22px; height: 22px; flex-shrink: 0; border-radius: 50%; border: 2px solid var(--sep);
+         display: flex; align-items: center; justify-content: center; transition: background .15s, border-color .15s; }
+  .box.square { border-radius: 7px; }
+  .opt.sel .box { background: var(--blue); border-color: var(--blue); }
+  .box svg { width: 12px; height: 12px; opacity: 0; }
+  .opt.sel .box svg { opacity: 1; }
+  .opt-name { font-size: 15.5px; font-weight: 500; letter-spacing: -.01em; }
+  .opt.sel .opt-name { font-weight: 600; }
+  .opt-meta { font-size: 13px; color: var(--grey); margin-top: 1px; font-variant-numeric: tabular-nums; }
+  .sheet-foot { padding: 16px 22px 20px; border-top: 1px solid var(--sep); }
+  .totals { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 14px; }
+  .totals .lab { font-size: 14px; color: var(--grey); }
+  .totals .val { font-size: 19px; font-weight: 600; letter-spacing: -.025em; font-variant-numeric: tabular-nums; }
+  .sheet-foot .btn { width: 100%; padding: 15px; font-size: 16px; }
+
+  @media (max-width: 900px) { .cols { grid-template-columns: 1fr; } .aside { position: static; } .grid2 { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<!-- Connexion -->
+<div class="wrap login" id="login">
+  <h1>Dashboard</h1>
+  <p>Entrez le mot de passe du salon</p>
+  <div class="fld"><input id="pw" type="password" placeholder="Mot de passe"
+       onkeydown="if(event.key==='Enter') doLogin()"></div>
+  <button class="btn btn-primary" style="width:100%;padding:15px;font-size:16px" onclick="doLogin()">Entrer</button>
+</div>
+
+<!-- Application -->
+<div class="wrap" id="app" style="display:none">
+  <h1>Dashboard</h1>
+
+  <div class="tabs" id="tabs">
+    <button class="on" data-t="queue">File d'attente</button>
+    <button data-t="services">Prestations</button>
+    <button data-t="extras">Suppléments</button>
+    <button data-t="barbers">Coiffeurs</button>
+    <button data-t="settings">Réglages</button>
+  </div>
+
+  <!-- ===== Onglet file ===== -->
+  <div class="tab-panel on" id="t-queue">
+    <div class="stats">
+      <div class="stat"><div class="v" id="s-wait">0</div><div class="l">en attente</div></div>
+      <div class="stat"><div class="v" id="s-queue">0 min</div><div class="l">de file</div></div>
+      <div class="stat"><div class="v" id="s-rev">0,00 €</div><div class="l">encaissé aujourd'hui</div></div>
+      <div class="stat"><div class="v" id="s-duty">0</div><div class="l">coiffeurs en poste</div></div>
+    </div>
+    <div class="who">
+      <span class="who-label">Je suis</span>
+      <div class="seg" id="seg"></div>
+    </div>
+    <div class="cols">
+      <main>
+        <div class="section-label">En attente</div>
+        <div id="waiting-list"></div>
+      </main>
+      <aside class="aside">
+        <div class="section-label">Au fauteuil</div>
+        <div id="active-panel"></div>
+      </aside>
+    </div>
+  </div>
+
+  <!-- ===== Onglet prestations ===== -->
+  <div class="tab-panel" id="t-services">
+    <div class="admin-head">
+      <h2>Prestations</h2>
+      <button class="btn btn-primary" onclick="openCatalogForm('services')">+ Ajouter</button>
+    </div>
+    <div id="services-list"></div>
+  </div>
+
+  <!-- ===== Onglet suppléments ===== -->
+  <div class="tab-panel" id="t-extras">
+    <div class="admin-head">
+      <h2>Suppléments</h2>
+      <button class="btn btn-primary" onclick="openCatalogForm('extras')">+ Ajouter</button>
+    </div>
+    <div id="extras-list"></div>
+  </div>
+
+  <!-- ===== Onglet coiffeurs ===== -->
+  <div class="tab-panel" id="t-barbers">
+    <div class="admin-head">
+      <h2>Coiffeurs et horaires</h2>
+      <button class="btn btn-primary" onclick="addBarber()">+ Ajouter</button>
+    </div>
+    <div id="barbers-list"></div>
+  </div>
+
+  <!-- ===== Onglet réglages ===== -->
+  <div class="tab-panel" id="t-settings">
+    <div class="card-box">
+      <h3>Général</h3>
+      <p class="hint">Le nom affiché sur la borne et dans les emails.</p>
+      <div class="grid2">
+        <div class="fld"><label for="set-salon">Nom du salon</label><input id="set-salon" type="text"></div>
+        <div class="fld"><label for="set-notify">Prévenir le client X minutes avant son tour</label>
+          <input id="set-notify" type="number" min="5" max="120"></div>
+      </div>
+    </div>
+
+    <div class="card-box">
+      <h3>Envoi des emails (SMTP)</h3>
+      <p class="hint">Ces identifiants viennent de votre fournisseur d'envoi (Brevo, Mailjet, OVH, Gmail…).
+        Sans configuration SMTP, les clients ne reçoivent pas d'email — le reste de l'app fonctionne normalement.</p>
+      <div class="grid2">
+        <div class="fld"><label for="set-host">Serveur SMTP</label>
+          <input id="set-host" type="text" placeholder="smtp-relay.brevo.com"></div>
+        <div class="fld"><label for="set-port">Port</label>
+          <input id="set-port" type="number" placeholder="587"></div>
+        <div class="fld"><label for="set-user">Identifiant</label>
+          <input id="set-user" type="text" autocomplete="off"></div>
+        <div class="fld"><label for="set-pass">Mot de passe <span id="pass-state" style="color:var(--green)"></span></label>
+          <input id="set-pass" type="password" placeholder="Laisser vide pour ne pas changer" autocomplete="new-password"></div>
+      </div>
+      <div class="fld"><label for="set-from">Adresse d'expédition</label>
+        <input id="set-from" type="text" placeholder="Le Salon &lt;contact@mondomaine.fr&gt;"></div>
+
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px">
+        <button class="btn btn-primary" onclick="saveSettings()">Enregistrer</button>
+        <button class="btn btn-soft" onclick="testSmtp()">Envoyer un email de test</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Feuille prestation + suppléments d'un client -->
+<div class="backdrop" id="sheet-queue" onclick="if(event.target===this) closeSheet('sheet-queue')">
+  <div class="sheet">
+    <div class="sheet-head"><h2 id="sq-title">Prestation</h2>
+      <button class="x" onclick="closeSheet('sheet-queue')">✕</button></div>
+    <div class="sheet-body">
+      <div class="grp-label">Prestation principale</div>
+      <div class="opt-list" id="sq-services"></div>
+      <div class="grp-label">Suppléments</div>
+      <div class="opt-list" id="sq-extras"></div>
+    </div>
+    <div class="sheet-foot">
+      <div class="totals"><span class="lab">Durée · total</span>
+        <span class="val"><span id="sq-dur">0</span> min · <span id="sq-price">0,00 €</span></span></div>
+      <button class="btn btn-primary" onclick="saveQueueSheet()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Feuille création/édition d'une prestation ou d'un supplément -->
+<div class="backdrop" id="sheet-catalog" onclick="if(event.target===this) closeSheet('sheet-catalog')">
+  <div class="sheet">
+    <div class="sheet-head"><h2 id="sc-title">Nouvelle prestation</h2>
+      <button class="x" onclick="closeSheet('sheet-catalog')">✕</button></div>
+    <div class="sheet-body">
+      <div class="fld"><label for="sc-name">Nom</label><input id="sc-name" type="text" placeholder="Coupe dégradée"></div>
+      <div class="grid2">
+        <div class="fld"><label for="sc-dur">Durée (minutes)</label><input id="sc-dur" type="number" min="0" value="30"></div>
+        <div class="fld"><label for="sc-price">Prix (€)</label><input id="sc-price" type="number" min="0" step="0.5" value="20"></div>
+      </div>
+    </div>
+    <div class="sheet-foot"><button class="btn btn-primary" onclick="saveCatalog()">Enregistrer</button></div>
+  </div>
+</div>
+
+<script src="/app.js"></script>
+<script>
+mountThemeButton();
+
+var services = [], extras = [], barbers = [], queue = [], me = null, onDuty = 0;
+var DAYS = ['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
+var CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
+
+/* ============ Connexion ============ */
+function doLogin() {
+  var pw = document.getElementById('pw').value;
+  if (!pw) return;
+  setAdminPw(pw);
+  api('/api/login', { method: 'POST', body: {} }).then(function () {
+    try { sessionStorage.setItem('pw', pw); } catch (e) {}
+    document.getElementById('login').style.display = 'none';
+    document.getElementById('app').style.display = '';
+    boot();
+  }).catch(function (err) {
+    setAdminPw('');
+    toast(err.message, true);
+  });
+}
+
+(function autoLogin() {
+  var saved = null;
+  try { saved = sessionStorage.getItem('pw'); } catch (e) {}
+  if (!saved) return;
+  setAdminPw(saved);
+  api('/api/login', { method: 'POST', body: {} }).then(function () {
+    document.getElementById('login').style.display = 'none';
+    document.getElementById('app').style.display = '';
+    boot();
+  }).catch(function () { setAdminPw(''); });
+})();
+
+/* ============ Onglets ============ */
+document.getElementById('tabs').addEventListener('click', function (e) {
+  var b = e.target.closest('button');
+  if (!b) return;
+  document.querySelectorAll('#tabs button').forEach(function (x) { x.classList.remove('on'); });
+  b.classList.add('on');
+  document.querySelectorAll('.tab-panel').forEach(function (p) { p.classList.remove('on'); });
+  document.getElementById('t-' + b.dataset.t).classList.add('on');
+  if (b.dataset.t === 'settings') loadSettings();
+});
+
+/* ============ Chargement ============ */
+function boot() {
+  loadCatalog().then(refresh).then(function () {
+    setInterval(function () { renderQueue(); }, 1000);
+    subscribeQueue(refresh);
+  });
+}
+
+function loadCatalog() {
+  return Promise.all([
+    api('/api/catalog/services?all=1'),
+    api('/api/catalog/extras?all=1')
+  ]).then(function (r) {
+    services = r[0].items; extras = r[1].items;
+    renderCatalog('services'); renderCatalog('extras');
+  });
+}
+
+function refresh() {
+  return Promise.all([
+    api('/api/queue'),
+    api('/api/barbers?all=1'),
+    api('/api/queue/stats/today')
+  ]).then(function (r) {
+    queue = r[0].queue; barbers = r[1].items; onDuty = r[1].on_duty;
+    if (!me && barbers.length) me = barbers[0].id;
+    document.getElementById('s-rev').textContent = eur(r[2].revenue_cents);
+    document.getElementById('s-duty').textContent = onDuty;
+    renderSeg(); renderQueue(); renderBarbers();
+  }).catch(function (err) { toast(err.message, true); });
+}
+
+function svcById(id) { return services.find(function (s) { return s.id === id; }); }
+function extById(id) { return extras.find(function (e) { return e.id === id; }); }
+
+/* ============ Onglet file ============ */
+function renderSeg() {
+  document.getElementById('seg').innerHTML = barbers.filter(function (b) { return b.active; })
+    .map(function (b) {
+      return '<button class="' + (me === b.id ? 'on' : '') + '" onclick="me=\'' + b.id + '\';renderSeg()">' +
+             esc(b.name) + '</button>';
+    }).join('') || '<span style="color:var(--grey);font-size:14px;padding:9px">Aucun coiffeur — ajoutez-en un dans l\'onglet Coiffeurs</span>';
+}
+
+function chipsHtml(q) {
+  return '<div class="chips"><span class="chip main">' + esc(q.service.name) + '</span>' +
+    q.extras.map(function (x) { return '<span class="chip add">+ ' + esc(x.name) + '</span>'; }).join('') + '</div>';
+}
+
+function renderQueue() {
+  var active = queue.filter(function (q) { return q.status === 'in_progress'; });
+  var waiting = queue.filter(function (q) { return q.status === 'waiting'; });
+
+  document.getElementById('s-wait').textContent = waiting.length;
+  document.getElementById('s-queue').textContent =
+    hm(waiting.reduce(function (a, q) { return a + q.total_duration_min; }, 0));
+
+  document.getElementById('waiting-list').innerHTML = waiting.length === 0
+    ? '<div class="empty">Personne en attente</div>'
+    : waiting.map(function (q, i) {
+        var b = q.barber_id ? barbers.find(function (x) { return x.id === q.barber_id; }) : null;
+        return '<div class="row"><div class="row-top"><div class="row-left">' +
+          '<div class="pos">' + (q.position || i + 1) + '</div><div style="min-width:0">' +
+          '<div class="name">' + esc(q.client_name) + '</div>' +
+          '<div class="assigned">' + esc(b ? b.name : 'Premier disponible') + '</div>' +
+          chipsHtml(q) + '</div></div><div class="row-meta">' +
+          '<div class="dur">' + q.total_duration_min + ' min</div>' +
+          '<div class="price">' + eur(q.total_price_cents) + '</div>' +
+          '<div class="wait">dans ~' + (q.estimated_wait_min || 0) + ' min</div></div></div>' +
+          '<div class="row-actions">' +
+          '<button class="btn btn-soft" onclick="openQueueSheet(\'' + q.id + '\')">Modifier</button>' +
+          '<button class="btn btn-primary" onclick="startCut(\'' + q.id + '\')">Commencer</button>' +
+          '<button class="btn btn-ghost" onclick="cancelCut(\'' + q.id + '\')">Absent</button>' +
+          '</div></div>';
+      }).join('');
+
+  document.getElementById('active-panel').innerHTML = active.length === 0
+    ? '<div class="empty">Aucune coupe en cours</div>'
+    : active.map(function (q) {
+        var sec = Math.max(Math.floor((Date.now() - new Date(q.start_at).getTime()) / 1000), 0);
+        var over = sec > q.total_duration_min * 60;
+        var b = q.barber_id ? barbers.find(function (x) { return x.id === q.barber_id; }) : null;
+        return '<div class="active-card"><div class="name">' + esc(q.client_name) + '</div>' +
+          '<div class="assigned">' + esc(b ? b.name : '—') + '</div>' + chipsHtml(q) +
+          '<div class="big-timer">' + mmss(sec) + '</div>' +
+          '<div class="timer-target' + (over ? ' over' : '') + '">' +
+          (over ? 'Dépassé · prévu ' + q.total_duration_min + ' min'
+                : 'Prévu ' + q.total_duration_min + ' min · ' + eur(q.total_price_cents)) + '</div>' +
+          '<button class="btn btn-soft" onclick="openQueueSheet(\'' + q.id + '\')">Ajouter un supplément</button>' +
+          '<button class="btn btn-green" onclick="finishCut(\'' + q.id + '\')">Terminer</button></div>';
+      }).join('');
+}
+
+function startCut(id) {
+  if (!me) { toast('Sélectionnez qui vous êtes', true); return; }
+  api('/api/queue/' + id + '/start', { method: 'POST', body: { barber_id: me } })
+    .then(refresh).catch(function (e) { toast(e.message, true); });
+}
+function finishCut(id) {
+  api('/api/queue/' + id + '/finish', { method: 'POST', body: {} })
+    .then(refresh).catch(function (e) { toast(e.message, true); });
+}
+function cancelCut(id) {
+  if (!confirm('Marquer ce client comme absent ?')) return;
+  api('/api/queue/' + id + '/cancel', { method: 'POST', body: {} })
+    .then(refresh).catch(function (e) { toast(e.message, true); });
+}
+
+/* ============ Feuille prestation d'un client ============ */
+var editingQ = null, draftSvc = null, draftExt = [];
+
+function openQueueSheet(id) {
+  editingQ = queue.find(function (q) { return q.id === id; });
+  draftSvc = editingQ.service_id;
+  draftExt = editingQ.extras.map(function (x) { return x.id; });
+  document.getElementById('sq-title').textContent = editingQ.client_name;
+  renderQueueSheet();
+  document.getElementById('sheet-queue').classList.add('on');
+}
+function closeSheet(id) { document.getElementById(id).classList.remove('on'); }
+
+function renderQueueSheet() {
+  document.getElementById('sq-services').innerHTML = services.filter(function (s) { return s.active; })
+    .map(function (s) {
+      return '<div class="opt' + (draftSvc === s.id ? ' sel' : '') + '" onclick="draftSvc=\'' + s.id + '\';renderQueueSheet()">' +
+        '<div class="box">' + CHECK + '</div><div><div class="opt-name">' + esc(s.name) + '</div>' +
+        '<div class="opt-meta">' + s.duration_min + ' min · ' + eur(s.price_cents) + '</div></div></div>';
+    }).join('');
+
+  document.getElementById('sq-extras').innerHTML = extras.filter(function (e) { return e.active; })
+    .map(function (e) {
+      var on = draftExt.indexOf(e.id) !== -1;
+      return '<div class="opt' + (on ? ' sel' : '') + '" onclick="toggleDraftExtra(\'' + e.id + '\')">' +
+        '<div class="box square">' + CHECK + '</div><div><div class="opt-name">' + esc(e.name) + '</div>' +
+        '<div class="opt-meta">+ ' + e.duration_min + ' min · + ' + eur(e.price_cents) + '</div></div></div>';
+    }).join('') || '<div style="color:var(--grey);font-size:14px">Aucun supplément configuré</div>';
+
+  var s = svcById(draftSvc);
+  if (!s) return;
+  var d = s.duration_min + draftExt.reduce(function (a, id) { return a + extById(id).duration_min; }, 0);
+  var c = s.price_cents + draftExt.reduce(function (a, id) { return a + extById(id).price_cents; }, 0);
+  document.getElementById('sq-dur').textContent = d;
+  document.getElementById('sq-price').textContent = eur(c);
+}
+function toggleDraftExtra(id) {
+  var i = draftExt.indexOf(id);
+  if (i === -1) draftExt.push(id); else draftExt.splice(i, 1);
+  renderQueueSheet();
+}
+function saveQueueSheet() {
+  api('/api/queue/' + editingQ.id, { method: 'PUT', body: { service_id: draftSvc, extras: draftExt } })
+    .then(function () { closeSheet('sheet-queue'); return refresh(); })
+    .then(function () { toast('Enregistré'); })
+    .catch(function (e) { toast(e.message, true); });
+}
+
+/* ============ Catalogue ============ */
+function renderCatalog(table) {
+  var list = table === 'services' ? services : extras;
+  document.getElementById(table + '-list').innerHTML = list.length === 0
+    ? '<div class="empty">Rien pour le moment</div>'
+    : list.map(function (x) {
+        return '<div class="item' + (x.active ? '' : ' off') + '">' +
+          '<div class="item-main"><div class="item-name">' + esc(x.name) + '</div>' +
+          '<div class="item-meta">' + (table === 'extras' ? '+ ' : '') + x.duration_min + ' min · ' +
+          (table === 'extras' ? '+ ' : '') + eur(x.price_cents) + (x.active ? '' : ' · archivé') + '</div></div>' +
+          '<div class="item-actions">' +
+          '<button class="btn btn-soft" onclick="openCatalogForm(\'' + table + '\',\'' + x.id + '\')">Modifier</button>' +
+          (x.active
+            ? '<button class="btn btn-ghost" onclick="archiveCatalog(\'' + table + '\',\'' + x.id + '\')">Archiver</button>'
+            : '<button class="btn btn-soft" onclick="restoreCatalog(\'' + table + '\',\'' + x.id + '\')">Réactiver</button>') +
+          '</div></div>';
+      }).join('');
+}
+
+var editingCat = null;
+
+function openCatalogForm(table, id) {
+  var item = id ? (table === 'services' ? services : extras).find(function (x) { return x.id === id; }) : null;
+  editingCat = { table: table, id: id || null };
+  var label = table === 'services' ? 'prestation' : 'supplément';
+  document.getElementById('sc-title').textContent = (item ? 'Modifier la ' : 'Nouvelle ') + label;
+  document.getElementById('sc-name').value = item ? item.name : '';
+  document.getElementById('sc-dur').value = item ? item.duration_min : (table === 'services' ? 30 : 10);
+  document.getElementById('sc-price').value = item ? (item.price_cents / 100) : (table === 'services' ? 20 : 5);
+  document.getElementById('sheet-catalog').classList.add('on');
+}
+
+function saveCatalog() {
+  var name = document.getElementById('sc-name').value.trim();
+  if (!name) { toast('Le nom est requis', true); return; }
+  var body = {
+    name: name,
+    duration_min: Number(document.getElementById('sc-dur').value) || 0,
+    price_cents: Math.round((Number(document.getElementById('sc-price').value) || 0) * 100)
+  };
+  var p = editingCat.id
+    ? api('/api/catalog/' + editingCat.table + '/' + editingCat.id, { method: 'PUT', body: body })
+    : api('/api/catalog/' + editingCat.table, { method: 'POST', body: body });
+
+  p.then(function () { closeSheet('sheet-catalog'); return loadCatalog(); })
+   .then(function () { toast('Enregistré'); })
+   .catch(function (e) { toast(e.message, true); });
+}
+
+function archiveCatalog(table, id) {
+  if (!confirm('Archiver cet élément ? Il ne sera plus proposé à la borne.')) return;
+  api('/api/catalog/' + table + '/' + id, { method: 'DELETE' })
+    .then(loadCatalog).then(function () { toast('Archivé'); })
+    .catch(function (e) { toast(e.message, true); });
+}
+function restoreCatalog(table, id) {
+  api('/api/catalog/' + table + '/' + id, { method: 'PUT', body: { active: true } })
+    .then(loadCatalog).then(function () { toast('Réactivé'); })
+    .catch(function (e) { toast(e.message, true); });
+}
+
+/* ============ Coiffeurs et horaires ============ */
+function renderBarbers() {
+  document.getElementById('barbers-list').innerHTML = barbers.length === 0
+    ? '<div class="empty">Aucun coiffeur. Ajoutez-en un pour que la file fonctionne.</div>'
+    : barbers.map(function (b) {
+        var days = DAYS.map(function (dn, wd) {
+          var s = (b.schedules || []).find(function (x) { return x.weekday === wd; });
+          var on = Boolean(s);
+          return '<div class="day-row' + (on ? '' : ' off') + '" data-day="' + wd + '">' +
+            '<div class="switch' + (on ? ' on' : '') + '" onclick="toggleDay(this)"></div>' +
+            '<span class="day-name">' + dn + '</span>' +
+            '<input type="time" value="' + (s ? s.start_time.slice(0, 5) : '09:00') + '">' +
+            '<span class="to">à</span>' +
+            '<input type="time" value="' + (s ? s.end_time.slice(0, 5) : '19:00') + '">' +
+            '</div>';
+        }).join('');
+
+        return '<div class="card-box" data-barber="' + b.id + '">' +
+          '<div class="admin-head"><h3 style="font-size:19px">' + esc(b.name) + (b.active ? '' : ' · inactif') + '</h3>' +
+          '<div class="item-actions">' +
+          '<button class="btn btn-soft" onclick="renameBarber(\'' + b.id + '\')">Renommer</button>' +
+          (b.active
+            ? '<button class="btn btn-ghost" onclick="archiveBarber(\'' + b.id + '\')">Désactiver</button>'
+            : '<button class="btn btn-soft" onclick="restoreBarber(\'' + b.id + '\')">Réactiver</button>') +
+          '</div></div>' +
+          days +
+          '<button class="btn btn-primary" style="margin-top:16px" onclick="saveSchedule(\'' + b.id + '\')">Enregistrer les horaires</button>' +
+          '</div>';
+      }).join('');
+}
+
+function toggleDay(el) {
+  el.classList.toggle('on');
+  el.closest('.day-row').classList.toggle('off', !el.classList.contains('on'));
+}
+
+function saveSchedule(id) {
+  var box = document.querySelector('[data-barber="' + id + '"]');
+  var schedules = Array.prototype.map.call(box.querySelectorAll('.day-row'), function (row) {
+    var times = row.querySelectorAll('input[type="time"]');
+    return {
+      weekday: Number(row.dataset.day),
+      active: row.querySelector('.switch').classList.contains('on'),
+      start_time: times[0].value,
+      end_time: times[1].value
+    };
+  });
+  api('/api/barbers/' + id + '/schedule', { method: 'PUT', body: { schedules: schedules } })
+    .then(refresh).then(function () { toast('Horaires enregistrés'); })
+    .catch(function (e) { toast(e.message, true); });
+}
+
+function addBarber() {
+  var name = prompt('Nom du coiffeur');
+  if (!name) return;
+  api('/api/barbers', { method: 'POST', body: { name: name } })
+    .then(refresh).then(function () { toast('Coiffeur ajouté'); })
+    .catch(function (e) { toast(e.message, true); });
+}
+function renameBarber(id) {
+  var b = barbers.find(function (x) { return x.id === id; });
+  var name = prompt('Nouveau nom', b.name);
+  if (!name) return;
+  api('/api/barbers/' + id, { method: 'PUT', body: { name: name } })
+    .then(refresh).catch(function (e) { toast(e.message, true); });
+}
+function archiveBarber(id) {
+  if (!confirm('Désactiver ce coiffeur ?')) return;
+  api('/api/barbers/' + id, { method: 'DELETE' })
+    .then(refresh).catch(function (e) { toast(e.message, true); });
+}
+function restoreBarber(id) {
+  api('/api/barbers/' + id, { method: 'PUT', body: { active: true } })
+    .then(refresh).catch(function (e) { toast(e.message, true); });
+}
+
+/* ============ Réglages ============ */
+function loadSettings() {
+  api('/api/settings').then(function (r) {
+    var s = r.settings;
+    document.getElementById('set-salon').value = s.salon_name || '';
+    document.getElementById('set-notify').value = s.notify_before_min || 30;
+    document.getElementById('set-host').value = s.smtp_host || '';
+    document.getElementById('set-port').value = s.smtp_port || 587;
+    document.getElementById('set-user').value = s.smtp_user || '';
+    document.getElementById('set-from').value = s.smtp_from || '';
+    document.getElementById('set-pass').value = '';
+    document.getElementById('pass-state').textContent = r.smtp_pass_set ? '· déjà enregistré' : '';
+  }).catch(function (e) { toast(e.message, true); });
+}
+
+function saveSettings() {
+  api('/api/settings', { method: 'PUT', body: {
+    salon_name: document.getElementById('set-salon').value,
+    notify_before_min: document.getElementById('set-notify').value,
+    smtp_host: document.getElementById('set-host').value,
+    smtp_port: document.getElementById('set-port').value,
+    smtp_user: document.getElementById('set-user').value,
+    smtp_pass: document.getElementById('set-pass').value,
+    smtp_from: document.getElementById('set-from').value
+  }}).then(function () { toast('Réglages enregistrés'); loadSettings(); })
+    .catch(function (e) { toast(e.message, true); });
+}
+
+function testSmtp() {
+  var to = prompt('Envoyer un email de test à quelle adresse ?');
+  if (!to) return;
+  toast('Envoi en cours…');
+  api('/api/settings/smtp/test', { method: 'POST', body: { to: to } })
+    .then(function () { toast('Email envoyé à ' + to); })
+    .catch(function (e) { toast(e.message, true); });
+}
+</script>
+</body>
+</html>

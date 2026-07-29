@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>File d'attente</title>
+<link rel="stylesheet" href="/app.css">
+<style>
+  html, body { height: 100%; overflow: hidden; }
+  .kiosk { width: 100vw; height: 100vh; display: grid; grid-template-columns: 34% 1fr;
+           gap: clamp(14px,1.6vw,24px); padding: clamp(14px,1.8vw,26px); }
+  .board { background: var(--card); border-radius: clamp(18px,1.8vw,26px);
+           padding: clamp(20px,2.6vh,32px) clamp(18px,1.8vw,28px);
+           display: flex; flex-direction: column; box-shadow: var(--shadow); transition: background .25s ease; }
+  .board-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: clamp(20px,2.6vh,30px); }
+  .logo { font-size: clamp(16px,1.5vw,20px); font-weight: 600; letter-spacing: -.02em; }
+  .clock { font-size: clamp(13px,1.2vw,15px); color: var(--grey); font-weight: 500; font-variant-numeric: tabular-nums; }
+  .board-label { font-size: clamp(11px,1vw,13px); font-weight: 600; letter-spacing: .06em;
+                 text-transform: uppercase; color: var(--grey); margin-bottom: clamp(10px,1.4vh,14px); }
+  .serving { display: flex; flex-direction: column; gap: 8px; flex: 1; overflow-y: auto; }
+  .serve-row { background: var(--fill); border-radius: clamp(12px,1.2vw,16px);
+               padding: clamp(13px,1.7vh,17px) clamp(13px,1.3vw,17px);
+               display: flex; align-items: center; justify-content: space-between; gap: 12px; transition: background .25s ease; }
+  .serve-who { min-width: 0; display: flex; align-items: center; gap: 10px; }
+  .status { width: 8px; height: 8px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+  .serve-row.idle .status { background: var(--sep); }
+  .serve-barber { font-size: clamp(14px,1.3vw,16px); font-weight: 600; letter-spacing: -.01em; }
+  .serve-client { font-size: clamp(12px,1.15vw,14px); color: var(--grey); margin-top: 1px; }
+  .serve-timer { font-size: clamp(17px,1.8vw,22px); font-weight: 600; font-variant-numeric: tabular-nums;
+                 letter-spacing: -.02em; flex-shrink: 0; }
+  .serve-row.idle .serve-timer { font-size: clamp(12px,1.15vw,14px); font-weight: 500; color: var(--grey); }
+  .board-foot { margin-top: clamp(16px,2vh,22px); padding-top: clamp(16px,2vh,22px);
+                border-top: 1px solid var(--sep); display: flex; align-items: baseline; gap: 8px; }
+  .board-foot .n { font-size: clamp(26px,2.6vw,36px); font-weight: 600; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+  .board-foot .l { font-size: clamp(13px,1.2vw,15px); color: var(--grey); }
+
+  .stage { background: var(--card); border-radius: clamp(18px,1.8vw,26px);
+           padding: clamp(26px,3.4vh,52px) clamp(26px,3.6vw,64px);
+           display: flex; flex-direction: column; justify-content: center;
+           overflow-y: auto; box-shadow: var(--shadow); transition: background .25s ease; }
+  .panel { display: none; }
+  .panel.on { display: block; }
+
+  .eyebrow { font-size: clamp(12px,1.15vw,15px); font-weight: 500; color: var(--grey); margin-bottom: clamp(6px,1vh,12px); }
+  .hero { display: flex; align-items: baseline; gap: clamp(6px,.8vw,12px); line-height: .9; }
+  .hero .v { font-size: clamp(76px,11vw,158px); font-weight: 600; letter-spacing: -.05em; font-variant-numeric: tabular-nums; }
+  .hero .u { font-size: clamp(20px,2.2vw,32px); font-weight: 500; color: var(--grey); letter-spacing: -.02em; }
+  .hero-sub { font-size: clamp(15px,1.5vw,19px); color: var(--grey);
+              margin: clamp(10px,1.4vh,16px) 0 clamp(22px,3vh,38px); letter-spacing: -.01em; }
+  .hero-sub b { color: var(--ink); font-weight: 600; }
+
+  .plates { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: clamp(22px,3vh,38px); }
+  .plate { border: none; background: var(--fill); color: var(--ink); border-radius: 999px;
+           padding: clamp(12px,1.6vh,16px) clamp(18px,1.8vw,24px); cursor: pointer;
+           display: flex; align-items: baseline; gap: 9px; font-family: inherit; transition: background .18s ease, color .18s ease; }
+  .plate .pn { font-size: clamp(14px,1.3vw,16px); font-weight: 600; letter-spacing: -.01em; }
+  .plate .pt { font-size: clamp(13px,1.2vw,15px); color: var(--grey); font-variant-numeric: tabular-nums; }
+  .plate.sel { background: var(--blue); color: #fff; }
+  .plate.sel .pt { color: rgba(255,255,255,.75); }
+
+  .go { display: block; width: 100%; background: var(--blue); color: #fff; border: none;
+        border-radius: 999px; padding: clamp(17px,2.3vh,24px); font-family: inherit;
+        font-size: clamp(16px,1.6vw,20px); font-weight: 600; letter-spacing: -.01em; cursor: pointer; }
+  .go:hover:not(:disabled) { background: var(--blue-hover); }
+  .go:disabled { opacity: .5; }
+
+  .ftitle { font-size: clamp(26px,3vw,40px); font-weight: 600; letter-spacing: -.035em; margin: 0 0 clamp(18px,2.6vh,28px); }
+  .row2 { display: flex; gap: clamp(12px,1.4vw,18px); }
+  .row2 > * { flex: 1; }
+  .back { background: none; border: none; padding: 0; font-family: inherit; font-size: clamp(14px,1.3vw,16px);
+          color: var(--blue); font-weight: 500; cursor: pointer; margin-bottom: clamp(12px,1.8vh,18px); }
+
+  .extras-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
+  .xchip { border: none; background: var(--fill); color: var(--ink); border-radius: 999px;
+           padding: 11px 17px; cursor: pointer; font-family: inherit; font-size: 14.5px;
+           font-weight: 500; display: flex; align-items: baseline; gap: 8px; transition: background .15s ease; }
+  .xchip .xm { font-size: 13px; color: var(--grey); font-variant-numeric: tabular-nums; }
+  .xchip.sel { background: var(--blue); color: #fff; font-weight: 600; }
+  .xchip.sel .xm { color: rgba(255,255,255,.75); }
+  .total-line { display: flex; justify-content: space-between; align-items: baseline;
+                margin: 18px 0; padding-top: 16px; border-top: 1px solid var(--sep); }
+  .total-line .lab { font-size: 14px; color: var(--grey); }
+  .total-line .val { font-size: 19px; font-weight: 600; letter-spacing: -.025em; font-variant-numeric: tabular-nums; }
+
+  .ticket { background: var(--fill); border-radius: clamp(18px,1.8vw,24px); max-width: 460px;
+            margin: 0 auto; overflow: hidden; transition: background .25s ease; }
+  .ticket-top { padding: clamp(15px,2vh,20px) clamp(20px,2vw,28px); display: flex;
+                justify-content: space-between; align-items: center; font-size: clamp(13px,1.2vw,15px);
+                font-weight: 600; letter-spacing: -.01em; border-bottom: 1px solid var(--sep); }
+  .ticket-top .tt { color: var(--grey); font-weight: 500; font-variant-numeric: tabular-nums; }
+  .ticket-body { padding: clamp(24px,3.2vh,36px) clamp(20px,2vw,28px); text-align: center; }
+  .t-check { width: clamp(44px,4.4vw,56px); height: clamp(44px,4.4vw,56px); border-radius: 50%;
+             background: var(--green); display: flex; align-items: center; justify-content: center;
+             margin: 0 auto clamp(14px,2vh,20px); }
+  .t-check svg { width: 52%; height: 52%; }
+  .t-name { font-size: clamp(21px,2.2vw,28px); font-weight: 600; letter-spacing: -.03em; margin-bottom: 3px; }
+  .t-service { font-size: clamp(13px,1.25vw,15px); color: var(--grey); margin-bottom: clamp(18px,2.6vh,28px); }
+  .t-num { font-size: clamp(60px,7.5vw,98px); font-weight: 600; line-height: .9; letter-spacing: -.05em; font-variant-numeric: tabular-nums; }
+  .t-numlabel { font-size: clamp(12px,1.15vw,14px); color: var(--grey); margin-top: 8px; }
+  .perf { position: relative; height: 0; border-top: 1px dashed var(--sep); }
+  .perf::before, .perf::after { content: ''; position: absolute; top: -11px; width: 22px; height: 22px;
+                                border-radius: 50%; background: var(--card); transition: background .25s ease; }
+  .perf::before { left: -11px; } .perf::after { right: -11px; }
+  .ticket-foot { padding: clamp(20px,2.6vh,28px) clamp(20px,2vw,28px); text-align: center; }
+  .t-wait { font-size: clamp(19px,2vw,25px); font-weight: 600; letter-spacing: -.025em;
+            font-variant-numeric: tabular-nums; margin-bottom: 6px; }
+  .t-note { font-size: clamp(13px,1.2vw,15px); color: var(--grey); line-height: 1.55; letter-spacing: -.01em; }
+  .t-note b { color: var(--ink); font-weight: 500; }
+  .next-btn { margin-top: clamp(16px,2.2vh,24px); background: none; border: none;
+              padding: 12px 26px; font-family: inherit; font-size: clamp(15px,1.4vw,17px);
+              font-weight: 500; color: var(--blue); cursor: pointer; }
+
+  @media (max-aspect-ratio: 9/10), (max-width: 780px) {
+    .kiosk { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+    .serving { flex: none; }
+    .stage { justify-content: flex-start; }
+  }
+</style>
+</head>
+<body>
+<div class="kiosk">
+
+  <aside class="board">
+    <div class="board-head">
+      <div class="logo" id="salon-name">Le Salon</div>
+      <div class="clock" id="clock">--:--</div>
+    </div>
+    <div class="board-label">En cours</div>
+    <div class="serving" id="serving"></div>
+    <div class="board-foot">
+      <span class="n" id="wait-count">0</span>
+      <span class="l">en attente</span>
+    </div>
+  </aside>
+
+  <main class="stage">
+
+    <section class="panel on" id="p-home">
+      <div class="eyebrow">Prochaine place libre dans</div>
+      <div class="hero"><span class="v" id="hero-wait">—</span><span class="u">min</span></div>
+      <p class="hero-sub" id="hero-sub">Avec le premier coiffeur disponible.</p>
+      <div class="plates" id="plates"></div>
+      <button class="go" onclick="show('p-form')">Rejoindre la file</button>
+    </section>
+
+    <section class="panel" id="p-form">
+      <button class="back" onclick="show('p-home')">‹ Retour</button>
+      <h1 class="ftitle">Vos informations</h1>
+      <div class="row2">
+        <div class="fld"><label for="f-name">Prénom</label>
+          <input id="f-name" type="text" placeholder="Mehdi" autocomplete="given-name"></div>
+        <div class="fld"><label for="f-mail">Email — pour être prévenu avant votre tour</label>
+          <input id="f-mail" type="email" placeholder="vous@exemple.com" autocomplete="email"></div>
+      </div>
+      <div class="fld"><label for="f-service">Prestation</label><select id="f-service"></select></div>
+      <div class="fld"><label>Suppléments (optionnel)</label>
+        <div class="extras-grid" id="extras-grid"></div></div>
+      <div class="total-line">
+        <span class="lab">Durée · total</span>
+        <span class="val"><span id="tot-dur">0</span> min · <span id="tot-price">0,00 €</span></span>
+      </div>
+      <button class="go" id="submit-btn" onclick="submitForm()">Confirmer</button>
+    </section>
+
+    <section class="panel" id="p-ticket">
+      <div class="ticket">
+        <div class="ticket-top"><span id="t-salon">Le Salon</span><span class="tt" id="t-time">--:--</span></div>
+        <div class="ticket-body">
+          <div class="t-check"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+          <div class="t-name" id="t-name">—</div>
+          <div class="t-service" id="t-service">—</div>
+          <div class="t-num" id="t-num">—</div>
+          <div class="t-numlabel">Votre place dans la file</div>
+        </div>
+        <div class="perf"></div>
+        <div class="ticket-foot">
+          <div class="t-wait">Environ <span id="t-wait">—</span> min d'attente</div>
+          <p class="t-note" id="t-note"></p>
+          <button class="next-btn" onclick="resetForm()">Client suivant</button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script src="/app.js"></script>
+<script>
+mountThemeButton();
+
+var services = [], extras = [], barbers = [], queue = [], salonName = 'Le Salon';
+var selBarber = null, selExtras = [];
+
+function svcById(id) { return services.find(function (s) { return s.id === id; }); }
+function extById(id) { return extras.find(function (e) { return e.id === id; }); }
+
+function show(id) {
+  document.querySelectorAll('.panel').forEach(function (p) { p.classList.remove('on'); });
+  document.getElementById(id).classList.add('on');
+}
+
+/* ---------- Chargement ---------- */
+function loadCatalog() {
+  return Promise.all([
+    api('/api/catalog/services'),
+    api('/api/catalog/extras'),
+    api('/api/settings/public')
+  ]).then(function (r) {
+    services = r[0].items; extras = r[1].items;
+    salonName = r[2].salon_name;
+    document.getElementById('salon-name').textContent = salonName;
+    document.getElementById('t-salon').textContent = salonName;
+
+    document.getElementById('f-service').innerHTML = services.map(function (s) {
+      return '<option value="' + s.id + '">' + esc(s.name) + ' — ' + s.duration_min + ' min · ' + eur(s.price_cents) + '</option>';
+    }).join('');
+    document.getElementById('f-service').onchange = renderTotals;
+
+    document.getElementById('extras-grid').innerHTML = extras.map(function (e) {
+      return '<button class="xchip" data-id="' + e.id + '" onclick="toggleExtra(\'' + e.id + '\')">' +
+             '<span>' + esc(e.name) + '</span><span class="xm">+' + e.duration_min + ' min · ' + eur(e.price_cents) + '</span></button>';
+    }).join('');
+    renderTotals();
+  });
+}
+
+function refresh() {
+  return Promise.all([api('/api/queue'), api('/api/barbers')]).then(function (r) {
+    queue = r[0].queue; barbers = r[1].items;
+    renderBoard(); renderPlates();
+  }).catch(function (err) { toast(err.message, true); });
+}
+
+/* ---------- Panneau gauche ---------- */
+function renderBoard() {
+  var active = queue.filter(function (q) { return q.status === 'in_progress'; });
+  var waiting = queue.filter(function (q) { return q.status === 'waiting'; });
+  document.getElementById('wait-count').textContent = waiting.length;
+
+  document.getElementById('serving').innerHTML = barbers.map(function (b) {
+    var cut = active.find(function (a) { return a.barber_id === b.id; });
+    if (cut) {
+      var sec = Math.floor((Date.now() - new Date(cut.start_at).getTime()) / 1000);
+      return '<div class="serve-row"><div class="serve-who"><span class="status"></span><div>' +
+             '<div class="serve-barber">' + esc(b.name) + '</div>' +
+             '<div class="serve-client">' + esc(cut.client_name) + ' · ' + esc(cut.service.name.toLowerCase()) + '</div>' +
+             '</div></div><div class="serve-timer">' + mmss(Math.max(sec, 0)) + '</div></div>';
+    }
+    return '<div class="serve-row idle"><div class="serve-who"><span class="status"></span><div>' +
+           '<div class="serve-barber">' + esc(b.name) + '</div>' +
+           '<div class="serve-client">Poste libre</div></div></div>' +
+           '<div class="serve-timer">Disponible</div></div>';
+  }).join('') || '<div class="serve-row idle"><div class="serve-who"><div class="serve-client">Aucun coiffeur configuré</div></div></div>';
+}
+
+/* ---------- Choix du coiffeur ---------- */
+function waitForBarber(barberId) {
+  var waiting = queue.filter(function (q) { return q.status === 'waiting'; });
+  var active = queue.filter(function (q) { return q.status === 'in_progress'; });
+
+  if (!barberId) {
+    var w = waiting.length ? Math.min.apply(null, waiting.map(function (q) { return q.estimated_wait_min || 0; })) : 0;
+    if (!waiting.length && active.length < barbers.length) return 0;
+    return w;
+  }
+  var mine = waiting.filter(function (q) { return q.barber_id === barberId; });
+  var cur = active.find(function (q) { return q.barber_id === barberId; });
+  var total = mine.reduce(function (a, q) { return a + (q.total_duration_min || 0); }, 0);
+  if (cur) {
+    var elapsed = (Date.now() - new Date(cur.start_at).getTime()) / 60000;
+    total += Math.max((cur.total_duration_min || 0) - elapsed, 0);
+  }
+  return Math.round(total);
+}
+
+function renderPlates() {
+  var html = '<button class="plate' + (selBarber === null ? ' sel' : '') + '" onclick="pickBarber(null)">' +
+             '<span class="pn">Premier libre</span><span class="pt">' + waitForBarber(null) + ' min</span></button>';
+  html += barbers.map(function (b) {
+    return '<button class="plate' + (selBarber === b.id ? ' sel' : '') + '" onclick="pickBarber(\'' + b.id + '\')">' +
+           '<span class="pn">' + esc(b.name) + '</span><span class="pt">' + waitForBarber(b.id) + ' min</span></button>';
+  }).join('');
+  document.getElementById('plates').innerHTML = html;
+
+  var w = waitForBarber(selBarber);
+  document.getElementById('hero-wait').textContent = w;
+  var b = selBarber ? barbers.find(function (x) { return x.id === selBarber; }) : null;
+  document.getElementById('hero-sub').innerHTML = b
+    ? 'Avec <b>' + esc(b.name) + '</b>. Choisissez « Premier libre » pour être servi plus vite.'
+    : 'Avec le premier coiffeur disponible. Choisissez quelqu\'un en particulier si vous préférez.';
+}
+
+function pickBarber(id) { selBarber = id; renderPlates(); }
+
+/* ---------- Suppléments ---------- */
+function toggleExtra(id) {
+  var i = selExtras.indexOf(id);
+  if (i === -1) selExtras.push(id); else selExtras.splice(i, 1);
+  document.querySelectorAll('.xchip').forEach(function (c) {
+    c.classList.toggle('sel', selExtras.indexOf(c.dataset.id) !== -1);
+  });
+  renderTotals();
+}
+
+function renderTotals() {
+  var s = svcById(document.getElementById('f-service').value);
+  if (!s) return;
+  var dur = s.duration_min + selExtras.reduce(function (a, id) { return a + extById(id).duration_min; }, 0);
+  var cents = s.price_cents + selExtras.reduce(function (a, id) { return a + extById(id).price_cents; }, 0);
+  document.getElementById('tot-dur').textContent = dur;
+  document.getElementById('tot-price').textContent = eur(cents);
+}
+
+/* ---------- Envoi ---------- */
+function submitForm() {
+  var name = document.getElementById('f-name').value.trim();
+  var mail = document.getElementById('f-mail').value.trim();
+  if (!name) { toast('Merci d\'indiquer votre prénom', true); return; }
+
+  var btn = document.getElementById('submit-btn');
+  btn.disabled = true; btn.textContent = 'Enregistrement…';
+
+  api('/api/queue/checkin', {
+    method: 'POST',
+    body: {
+      client_name: name,
+      email: mail || null,
+      service_id: document.getElementById('f-service').value,
+      barber_id: selBarber,
+      extras: selExtras
+    }
+  }).then(function (r) {
+    var e = r.entry;
+    document.getElementById('t-name').textContent = e.client_name;
+    var b = e.barber_id ? barbers.find(function (x) { return x.id === e.barber_id; }) : null;
+    document.getElementById('t-service').textContent =
+      e.service.name + (e.extras.length ? ' + ' + e.extras.map(function (x) { return x.name; }).join(', ') : '') +
+      ' · ' + (b ? b.name : 'Premier disponible');
+    document.getElementById('t-num').textContent = e.position;
+    document.getElementById('t-wait').textContent = e.estimated_wait_min;
+    document.getElementById('t-note').innerHTML = mail
+      ? 'On vous écrit à <b>' + esc(mail) + '</b> avant votre tour. Vous pouvez sortir, votre place est gardée.'
+      : 'Sans email, pensez à surveiller l\'écran de la salle d\'attente.';
+    show('p-ticket');
+    refresh();
+  }).catch(function (err) {
+    toast(err.message, true);
+  }).finally(function () {
+    btn.disabled = false; btn.textContent = 'Confirmer';
+  });
+}
+
+function resetForm() {
+  document.getElementById('f-name').value = '';
+  document.getElementById('f-mail').value = '';
+  selExtras = []; selBarber = null;
+  document.querySelectorAll('.xchip').forEach(function (c) { c.classList.remove('sel'); });
+  renderTotals(); renderPlates();
+  show('p-home');
+}
+
+/* ---------- Horloge ---------- */
+function tick() {
+  var d = new Date();
+  var t = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  document.getElementById('clock').textContent = t;
+  document.getElementById('t-time').textContent = t;
+  renderBoard();
+}
+
+loadCatalog().then(refresh).then(function () {
+  tick();
+  setInterval(tick, 1000);
+  subscribeQueue(refresh);
+}).catch(function (err) { toast(err.message, true); });
+</script>
+</body>
+</html>

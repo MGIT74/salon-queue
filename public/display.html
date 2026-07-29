@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Salle d'attente</title>
+<link rel="stylesheet" href="/app.css">
+<style>
+  html, body { height: 100%; overflow: hidden; }
+  .screen { width: 100vw; height: 100vh; display: flex; flex-direction: column;
+            padding: clamp(18px,2.2vw,36px); gap: clamp(14px,1.6vw,24px); }
+  .head { display: flex; align-items: baseline; justify-content: space-between;
+          padding: 0 clamp(6px,.8vw,12px); flex-shrink: 0; }
+  .head h1 { font-size: clamp(26px,2.8vw,40px); font-weight: 600; letter-spacing: -.035em; margin: 0; }
+  .head .meta { display: flex; align-items: baseline; gap: clamp(16px,2vw,30px);
+                color: var(--grey); font-size: clamp(14px,1.4vw,18px); font-weight: 500; }
+  .head .live { display: flex; align-items: center; gap: 8px; }
+  .pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+  .head .clock { font-variant-numeric: tabular-nums; }
+
+  .cols { flex: 1; display: grid; grid-template-columns: 38% 1fr; gap: clamp(14px,1.6vw,24px); min-height: 0; }
+  .card { background: var(--card); border-radius: clamp(18px,1.8vw,26px);
+          padding: clamp(22px,2.6vh,34px) clamp(20px,2vw,30px); box-shadow: var(--shadow);
+          display: flex; flex-direction: column; min-height: 0; transition: background .25s ease; }
+  .card-label { font-size: clamp(12px,1.1vw,14px); font-weight: 600; letter-spacing: .06em;
+                text-transform: uppercase; color: var(--grey); margin-bottom: clamp(14px,1.8vh,20px); flex-shrink: 0; }
+
+  .chairs { display: flex; flex-direction: column; gap: clamp(10px,1.2vh,14px); overflow-y: auto; }
+  .chair { background: var(--fill); border-radius: clamp(14px,1.4vw,18px);
+           padding: clamp(16px,2vh,22px) clamp(16px,1.6vw,22px); display: flex;
+           align-items: center; justify-content: space-between; gap: 14px; transition: background .25s ease; }
+  .chair-who { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+  .chair.idle .dot { background: var(--sep); }
+  .chair-barber { font-size: clamp(16px,1.6vw,21px); font-weight: 600; letter-spacing: -.02em; }
+  .chair-client { font-size: clamp(13px,1.25vw,16px); color: var(--grey); margin-top: 2px; }
+  .chair-timer { font-size: clamp(22px,2.3vw,32px); font-weight: 600; font-variant-numeric: tabular-nums;
+                 letter-spacing: -.03em; flex-shrink: 0; }
+  .chair.idle .chair-timer { font-size: clamp(13px,1.25vw,16px); font-weight: 500; color: var(--grey); }
+
+  .queue { overflow-y: auto; display: flex; flex-direction: column; gap: clamp(8px,1vh,12px); }
+  .queue::-webkit-scrollbar { width: 0; }
+  .q-row { display: flex; align-items: center; gap: clamp(14px,1.6vw,22px);
+           padding: clamp(14px,1.8vh,20px) clamp(16px,1.6vw,22px); background: var(--fill);
+           border-radius: clamp(14px,1.4vw,18px); transition: background .25s ease; }
+  .q-row.next { background: var(--blue); color: #fff; }
+  .q-pos { width: clamp(34px,3.2vw,44px); height: clamp(34px,3.2vw,44px); border-radius: 50%;
+           background: var(--card); display: flex; align-items: center; justify-content: center;
+           font-size: clamp(15px,1.5vw,19px); font-weight: 600; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+  .q-row.next .q-pos { background: rgba(255,255,255,.22); color: #fff; }
+  .q-info { flex: 1; min-width: 0; }
+  .q-name { font-size: clamp(16px,1.6vw,21px); font-weight: 600; letter-spacing: -.02em; }
+  .q-service { font-size: clamp(13px,1.2vw,15px); color: var(--grey); margin-top: 2px;
+               overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .q-row.next .q-service { color: rgba(255,255,255,.75); }
+  .q-wait { text-align: right; flex-shrink: 0; }
+  .q-wait .n { font-size: clamp(20px,2.1vw,28px); font-weight: 600; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+  .q-wait .l { font-size: clamp(11px,1.05vw,13px); color: var(--grey); margin-top: 1px; }
+  .q-row.next .q-wait .l { color: rgba(255,255,255,.75); }
+  .empty { color: var(--grey); text-align: center; padding: clamp(40px,6vh,70px) 0; font-size: clamp(15px,1.5vw,19px); }
+
+  @media (max-aspect-ratio: 9/10), (max-width: 820px) { .cols { grid-template-columns: 1fr; grid-template-rows: auto 1fr; } }
+</style>
+</head>
+<body>
+<div class="screen">
+  <header class="head">
+    <h1>File d'attente</h1>
+    <div class="meta">
+      <span class="live"><span class="pulse"></span> En direct</span>
+      <span class="clock" id="clock">--:--</span>
+    </div>
+  </header>
+  <div class="cols">
+    <section class="card">
+      <div class="card-label">Aux fauteuils</div>
+      <div class="chairs" id="chairs"></div>
+    </section>
+    <section class="card">
+      <div class="card-label">En attente · <span id="count">0</span></div>
+      <div class="queue" id="queue"></div>
+    </section>
+  </div>
+</div>
+
+<script src="/app.js"></script>
+<script>
+mountThemeButton();
+
+var queue = [], barbers = [];
+
+function refresh() {
+  return Promise.all([api('/api/queue'), api('/api/barbers')]).then(function (r) {
+    queue = r[0].queue; barbers = r[1].items;
+    render();
+  }).catch(function (err) { toast(err.message, true); });
+}
+
+function render() {
+  var active = queue.filter(function (q) { return q.status === 'in_progress'; });
+  var waiting = queue.filter(function (q) { return q.status === 'waiting'; });
+  document.getElementById('count').textContent = waiting.length;
+
+  document.getElementById('chairs').innerHTML = barbers.map(function (b) {
+    var cut = active.find(function (a) { return a.barber_id === b.id; });
+    if (cut) {
+      var sec = Math.max(Math.floor((Date.now() - new Date(cut.start_at).getTime()) / 1000), 0);
+      return '<div class="chair"><div class="chair-who"><span class="dot"></span><div>' +
+             '<div class="chair-barber">' + esc(b.name) + '</div>' +
+             '<div class="chair-client">' + esc(cut.client_name) + ' · ' + esc(cut.service.name.toLowerCase()) + '</div>' +
+             '</div></div><div class="chair-timer">' + mmss(sec) + '</div></div>';
+    }
+    return '<div class="chair idle"><div class="chair-who"><span class="dot"></span><div>' +
+           '<div class="chair-barber">' + esc(b.name) + '</div>' +
+           '<div class="chair-client">Poste libre</div></div></div>' +
+           '<div class="chair-timer">Disponible</div></div>';
+  }).join('') || '<div class="empty">Aucun coiffeur configuré</div>';
+
+  document.getElementById('queue').innerHTML = waiting.length === 0
+    ? '<div class="empty">Personne en attente pour le moment</div>'
+    : waiting.map(function (q, i) {
+        var b = q.barber_id ? barbers.find(function (x) { return x.id === q.barber_id; }) : null;
+        var detail = q.service.name + (q.extras.length ? ' + ' + q.extras.map(function (x) { return x.name; }).join(', ') : '');
+        return '<div class="q-row' + (i === 0 ? ' next' : '') + '">' +
+          '<div class="q-pos">' + (q.position || i + 1) + '</div>' +
+          '<div class="q-info"><div class="q-name">' + esc(q.client_name) + '</div>' +
+          '<div class="q-service">' + esc(detail) + ' · ' + esc(b ? b.name : 'Premier libre') + '</div></div>' +
+          '<div class="q-wait"><div class="n">' + (q.estimated_wait_min || 0) + ' min</div>' +
+          '<div class="l">d\'attente</div></div></div>';
+      }).join('');
+}
+
+function tick() {
+  var d = new Date();
+  document.getElementById('clock').textContent =
+    String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  render();
+}
+
+refresh().then(function () {
+  tick();
+  setInterval(tick, 1000);
+  subscribeQueue(refresh);
+});
+</script>
+</body>
+</html>
