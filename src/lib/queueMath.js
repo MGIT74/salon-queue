@@ -72,9 +72,15 @@ async function recompute() {
   const lanes = new Array(await activeBarberCount()).fill(0);
   const now = Date.now();
 
+  // Marge minimale affichée tant qu'une coupe est en cours, même en cas de
+  // dépassement de la durée prévue : afficher "0 min" laisserait croire que
+  // le coiffeur est déjà libre alors qu'il est encore en train de couper.
+  const OVERRUN_BUFFER_MIN = 5;
+
   rows.filter((r) => r.status === 'in_progress').forEach((r) => {
     const elapsedMin = r.start_at ? (now - new Date(r.start_at).getTime()) / 60000 : 0;
-    const left = Math.max(r.total_duration_min - elapsedMin, 0);
+    const remaining = r.total_duration_min - elapsedMin;
+    const left = remaining > 0 ? remaining : OVERRUN_BUFFER_MIN;
     const i = lanes.indexOf(Math.min(...lanes));
     lanes[i] += left;
   });

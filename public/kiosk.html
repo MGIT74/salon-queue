@@ -254,22 +254,34 @@ function renderBoard() {
 }
 
 /* ---------- Choix du coiffeur ---------- */
+// Marge minimale tant qu'une coupe est en cours, même en cas de dépassement
+// de la durée prévue — sinon l'aperçu laisse croire que le coiffeur est
+// déjà libre alors qu'il est encore en train de couper.
+var OVERRUN_BUFFER_MIN = 5;
+
+function remainingForCut(cur) {
+  if (!cur) return 0;
+  var elapsed = (Date.now() - new Date(cur.start_at).getTime()) / 60000;
+  var remaining = (cur.total_duration_min || 0) - elapsed;
+  return remaining > 0 ? remaining : OVERRUN_BUFFER_MIN;
+}
+
 function waitForBarber(barberId) {
   var waiting = queue.filter(function (q) { return q.status === 'waiting'; });
   var active = queue.filter(function (q) { return q.status === 'in_progress'; });
 
   if (!barberId) {
-    var w = waiting.length ? Math.min.apply(null, waiting.map(function (q) { return q.estimated_wait_min || 0; })) : 0;
-    if (!waiting.length && active.length < barbers.length) return 0;
-    return w;
+    // "Premier disponible" : le plus petit temps avant qu'un coiffeur se libère
+    var mins = barbers.map(function (b) {
+      var cur = active.find(function (q) { return q.barber_id === b.id; });
+      return remainingForCut(cur);
+    });
+    return mins.length ? Math.round(Math.min.apply(null, mins)) : 0;
   }
   var mine = waiting.filter(function (q) { return q.barber_id === barberId; });
   var cur = active.find(function (q) { return q.barber_id === barberId; });
   var total = mine.reduce(function (a, q) { return a + (q.total_duration_min || 0); }, 0);
-  if (cur) {
-    var elapsed = (Date.now() - new Date(cur.start_at).getTime()) / 60000;
-    total += Math.max((cur.total_duration_min || 0) - elapsed, 0);
-  }
+  total += remainingForCut(cur);
   return Math.round(total);
 }
 
