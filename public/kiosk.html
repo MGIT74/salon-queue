@@ -285,20 +285,33 @@ function waitForBarber(barberId) {
   return Math.round(total);
 }
 
+function isOverrun(barberId) {
+  if (!barberId) return false;
+  var active = queue.filter(function (q) { return q.status === 'in_progress'; });
+  var cur = active.find(function (q) { return q.barber_id === barberId; });
+  if (!cur) return false;
+  var elapsed = (Date.now() - new Date(cur.start_at).getTime()) / 60000;
+  return elapsed > (cur.total_duration_min || 0);
+}
+
 function renderPlates() {
   var html = '<button class="plate' + (selBarber === null ? ' sel' : '') + '" onclick="pickBarber(null)">' +
              '<span class="pn">Premier libre</span><span class="pt">' + waitForBarber(null) + ' min</span></button>';
   html += barbers.map(function (b) {
+    var over = isOverrun(b.id);
     return '<button class="plate' + (selBarber === b.id ? ' sel' : '') + '" onclick="pickBarber(\'' + b.id + '\')">' +
-           '<span class="pn">' + esc(b.name) + '</span><span class="pt">' + waitForBarber(b.id) + ' min</span></button>';
+           '<span class="pn">' + esc(b.name) + '</span><span class="pt">' + (over ? '~' : '') + waitForBarber(b.id) + ' min</span></button>';
   }).join('');
   document.getElementById('plates').innerHTML = html;
 
   var w = waitForBarber(selBarber);
-  document.getElementById('hero-wait').textContent = w;
+  var overSel = isOverrun(selBarber);
+  document.getElementById('hero-wait').textContent = (overSel ? '~' : '') + w;
   var b = selBarber ? barbers.find(function (x) { return x.id === selBarber; }) : null;
   document.getElementById('hero-sub').innerHTML = b
-    ? 'Avec <b>' + esc(b.name) + '</b>. Choisissez « Premier libre » pour être servi plus vite.'
+    ? (overSel
+        ? 'La coupe en cours chez <b>' + esc(b.name) + '</b> touche à sa fin. Temps estimé.'
+        : 'Avec <b>' + esc(b.name) + '</b>. Choisissez « Premier libre » pour être servi plus vite.')
     : 'Avec le premier coiffeur disponible. Choisissez quelqu\'un en particulier si vous préférez.';
 }
 

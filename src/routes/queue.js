@@ -108,4 +108,37 @@ router.get('/stats/today', requireAdmin, wrap(async (req, res) => {
   res.json({ ok: true, done: Number(row.done_count), revenue_cents: Number(row.revenue_cents) });
 }));
 
+// --- Coiffeur : historique complet des clients (tous statuts) -----------
+router.get('/history', requireAdmin, wrap(async (req, res) => {
+  const [rows] = await pool.query(
+    `SELECT q.*, s.name AS service_name
+     FROM queue q LEFT JOIN services s ON s.id = q.service_id
+     ORDER BY q.checkin_at DESC LIMIT 200`
+  );
+  const ids = rows.map((r) => r.id);
+  let extrasByQueue = {};
+  if (ids.length) {
+    const [links] = await pool.query(
+      `SELECT qe.queue_id, e.name FROM queue_extras qe
+       JOIN extras e ON e.id = qe.extra_id WHERE qe.queue_id IN (?)`,
+      [ids]
+    );
+    links.forEach((l) => {
+      (extrasByQueue[l.queue_id] = extrasByQueue[l.queue_id] || []).push(l.name);
+    });
+  }
+  const items = rows.map((r) => Object.assign({}, r, {
+    position: r.queue_position,
+    extra_names: extrasByQueue[r.id] || []
+  }));
+  res.json({ ok: true, items });
+}));
+
+// --- Coiffeur : suppression définitive (nettoyage de données test) ------
+router.delete('/:id', requireAdmin, wrap(async (req, res) => {
+  await pool.query('DELETE FROM queue WHERE id = ?', [req.params.id]);
+  await recompute();
+  res.json({ ok: true, deleted: true });
+}));
+
 module.exports = router;

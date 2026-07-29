@@ -176,6 +176,7 @@
     <button data-t="services">Prestations</button>
     <button data-t="extras">Suppléments</button>
     <button data-t="barbers">Coiffeurs</button>
+    <button data-t="clients">Clients</button>
     <button data-t="settings">Réglages</button>
   </div>
 
@@ -228,6 +229,17 @@
       <button class="btn btn-primary" onclick="addBarber()">+ Ajouter</button>
     </div>
     <div id="barbers-list"></div>
+  </div>
+
+  <!-- ===== Onglet clients ===== -->
+  <div class="tab-panel" id="t-clients">
+    <div class="admin-head">
+      <h2>Clients</h2>
+      <input id="client-search" type="text" placeholder="Rechercher un nom…"
+             style="max-width:260px;padding:11px 16px;border:none;border-radius:999px;background:var(--fill);color:var(--ink);font-family:inherit;font-size:14px;outline:none">
+    </div>
+    <p class="hint" style="margin:-6px 0 16px">Historique des 200 derniers passages. « Forcer la clôture » sert à débloquer une fiche restée coincée « en cours » (ex. test, oubli), sans attendre.</p>
+    <div id="clients-list"></div>
   </div>
 
   <!-- ===== Onglet réglages ===== -->
@@ -347,6 +359,7 @@ document.getElementById('tabs').addEventListener('click', function (e) {
   document.querySelectorAll('.tab-panel').forEach(function (p) { p.classList.remove('on'); });
   document.getElementById('t-' + b.dataset.t).classList.add('on');
   if (b.dataset.t === 'settings') loadSettings();
+  if (b.dataset.t === 'clients') loadClients();
 });
 
 /* ============ Chargement ============ */
@@ -655,6 +668,80 @@ function archiveBarber(id) {
 function restoreBarber(id) {
   api('/api/barbers/' + id, { method: 'PUT', body: { active: true } })
     .then(loadBarbers).catch(function (e) { toast(e.message, true); });
+}
+
+/* ============ Clients (historique) ============ */
+var clientHistory = [];
+
+var STATUS_LABEL = {
+  waiting: 'En attente',
+  in_progress: 'En cours',
+  done: 'Terminé',
+  cancelled: 'Absent / annulé'
+};
+
+function loadClients() {
+  return api('/api/queue/history').then(function (r) {
+    clientHistory = r.items;
+    renderClients();
+  }).catch(function (e) { toast(e.message, true); });
+}
+
+document.getElementById('client-search').addEventListener('input', renderClients);
+
+function renderClients() {
+  var q = (document.getElementById('client-search').value || '').trim().toLowerCase();
+  var rows = clientHistory.filter(function (c) {
+    return !q || c.client_name.toLowerCase().indexOf(q) !== -1;
+  });
+
+  document.getElementById('clients-list').innerHTML = rows.length === 0
+    ? '<div class="empty">Aucun client trouvé</div>'
+    : rows.map(function (c) {
+        var when = new Date(c.checkin_at).toLocaleString('fr-FR', {
+          day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
+        });
+        var detail = (c.service_name || 'Prestation') +
+          (c.extra_names.length ? ' + ' + c.extra_names.join(', ') : '');
+        var stuck = c.status === 'in_progress' &&
+          (Date.now() - new Date(c.start_at || c.checkin_at).getTime()) > 90 * 60000;
+
+        var actions = '';
+        if (c.status === 'waiting' || c.status === 'in_progress') {
+          actions += '<button class="btn btn-soft" onclick="forceCloseClient(\'' + c.id + '\')">' +
+            (stuck ? 'Forcer la clôture' : 'Terminer') + '</button>';
+        }
+        actions += '<button class="btn btn-ghost" onclick="deleteClient(\'' + c.id + '\')">Supprimer</button>';
+
+        return '<div class="item' + (stuck ? '' : '') + '">' +
+          '<div class="item-main">' +
+            '<div class="item-name">' + esc(c.client_name) +
+              ' <span class="chip' + (c.status === 'in_progress' ? ' main' : '') + '" style="margin-left:6px;font-size:11px">' +
+              esc(STATUS_LABEL[c.status] || c.status) + '</span>' +
+              (stuck ? ' <span class="chip" style="background:var(--orange);color:#fff;font-size:11px">bloqué</span>' : '') +
+            '</div>' +
+            '<div class="item-meta">' + esc(detail) + ' · ' + when +
+              (c.email ? ' · ' + esc(c.email) : '') +
+              (c.total_price_cents ? ' · ' + eur(c.total_price_cents) : '') + '</div>' +
+          '</div>' +
+          '<div class="item-actions">' + actions + '</div>' +
+        '</div>';
+      }).join('');
+}
+
+function forceCloseClient(id) {
+  api('/api/queue/' + id + '/finish', { method: 'POST', body: {} })
+    .then(loadClients).then(refreshQueue)
+    .then(function () { toast('Clôturé'); })
+    .catch(function (e) { toast(e.message, true); });
+}
+
+function deleteClient(id) {
+  if (!confirm('Supprimer définitivement cette fiche ? Cette action est irréversible.')) return;
+  api('/api/queue/' + id, { method: 'DELETE' })
+    .then(loadClients).then(refreshQueue)
+    .then(function () { toast('Supprimé'); })
+    .catch(function (e) { toast(e.message, true); });
 }
 
 /* ============ Réglages ============ */
