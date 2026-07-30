@@ -7,15 +7,12 @@ function clean(v) {
   return typeof v === 'string' ? v.replace(/[\r\n]+$/, '').trim() : v;
 }
 
-// Valeurs de connexion. Les variables d'environnement ont la priorité ;
-// les valeurs ci-dessous servent de fallback quand le .env est vide
-// (comportement observé sur xCloud qui réécrit le .env à chaque déploiement).
 const pool = mysql.createPool({
-  host:     clean(process.env.DB_HOST)     || '127.0.0.1',
-  port:     Number(clean(process.env.DB_PORT) || 3306),
-  user:     clean(process.env.DB_USER)     || 'u_solitary_rain',
-  password: clean(process.env.DB_PASSWORD) || 'AFm6JNqplvdytXvS',
-  database: clean(process.env.DB_NAME)     || 's_solitary_rain',
+  host: clean(process.env.DB_HOST) || '127.0.0.1',
+  port: Number(clean(process.env.DB_PORT) || 3306),
+  user: clean(process.env.DB_USER),
+  password: clean(process.env.DB_PASSWORD),
+  database: clean(process.env.DB_NAME),
   waitForConnections: true,
   connectionLimit: 10,
   namedPlaceholders: false,

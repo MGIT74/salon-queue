@@ -1,3 +1,15 @@
+const path = require('path');
+const fs = require('fs');
+const os = require('os');
+
+// xCloud réécrit le .env du dépôt à chaque déploiement (constaté
+// empiriquement) — on charge donc en priorité un fichier situé HORS du
+// dossier du site, que le déploiement ne touche jamais, puis le .env du
+// dépôt en second (dotenv ne remplace pas les valeurs déjà définies).
+const externalEnvPath = path.join(os.homedir(), '.env.salon-queue');
+if (fs.existsSync(externalEnvPath)) {
+  require('dotenv').config({ path: externalEnvPath });
+}
 require('dotenv').config();
 const path = require('path');
 const express = require('express');
