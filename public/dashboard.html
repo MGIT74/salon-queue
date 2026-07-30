@@ -741,7 +741,7 @@ function extById(id) { return extras.find(function (e) { return e.id === id; });
 function renderSeg() {
   document.getElementById('seg').innerHTML = barbers.filter(function (b) { return b.active; })
     .map(function (b) {
-      return '<button class="' + (me === b.id ? 'on' : '') + '" onclick="me=\'' + b.id + '\';renderSeg()">' +
+      return '<button class="' + (me === b.id ? 'on' : '') + '" onclick="me=\'' + b.id + '\';renderSeg();renderQueue()">' +
              esc(b.name) + '</button>';
     }).join('') || '<span style="color:var(--grey);font-size:14px;padding:9px">Aucun coiffeur — ajoutez-en un dans l\'onglet Coiffeurs</span>';
 }
@@ -752,8 +752,15 @@ function chipsHtml(q) {
 }
 
 function renderQueue() {
-  var active = queue.filter(function (q) { return q.status === 'in_progress'; });
-  var waiting = queue.filter(function (q) { return q.status === 'waiting'; });
+  var allActive = queue.filter(function (q) { return q.status === 'in_progress'; });
+  var allWaiting = queue.filter(function (q) { return q.status === 'waiting'; });
+
+  // "Je suis X" filtre la vue : uniquement les clients de X + les
+  // non-assignés ("premier disponible"), qui restent visibles par tout
+  // le monde puisque n'importe quel coiffeur peut les prendre.
+  function mine(q) { return !q.barber_id || q.barber_id === me; }
+  var active = me ? allActive.filter(mine) : allActive;
+  var waiting = me ? allWaiting.filter(mine) : allWaiting;
 
   document.getElementById('s-wait').textContent = waiting.length;
   document.getElementById('s-queue').textContent =
