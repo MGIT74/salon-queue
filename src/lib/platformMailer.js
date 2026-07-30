@@ -41,4 +41,14 @@ async function sendPasswordReset(to, resetUrl) {
   });
 }
 
-module.exports = { sendPasswordReset };
+async function sendTestEmail(to) {
+  const { tx, from } = getTransport();
+  await tx.sendMail({
+    from,
+    to,
+    subject: 'Test SMTP — plateforme',
+    text: 'Si vous lisez ceci, la configuration SMTP de la plateforme fonctionne.'
+  });
+}
+
+module.exports = { sendPasswordReset, sendTestEmail };

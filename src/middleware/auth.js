@@ -1,6 +1,8 @@
 const { verifyPassword } = require('../lib/password');
+const { validateToken } = require('../lib/impersonation');
 
-// Protection par mot de passe propre à chaque salon. Deux modes coexistent :
+// Protection par mot de passe propre à chaque salon. Trois modes coexistent :
+// - Jeton d'assistance (super admin, court terme, pour du dépannage)
 // - Compte créé par inscription (email + mot de passe) : vérifié via hash
 //   (owners.password_hash), jamais en clair.
 // - Ancien mode "mot de passe partagé" (super admin / ajout manuel de
@@ -12,6 +14,12 @@ module.exports = async function requireAdmin(req, res, next) {
     if (!req.salon) {
       return res.status(500).json({ error: 'Salon non résolu (resolveSalon manquant en amont)' });
     }
+
+    const impersonateToken = req.get('X-Impersonate-Token');
+    if (impersonateToken && validateToken(impersonateToken, req.salon.id)) {
+      return next();
+    }
+
     const given = req.get('X-Admin-Password') || req.query.pw || '';
 
     if (req.salon.owner_password_hash) {

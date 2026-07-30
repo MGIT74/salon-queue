@@ -65,6 +65,9 @@ function toast(msg, isError) {
 var ADMIN_PW = '';
 function setAdminPw(pw) { ADMIN_PW = pw || ''; }
 
+var IMPERSONATE_TOKEN = '';
+function setImpersonateToken(t) { IMPERSONATE_TOKEN = t || ''; }
+
 var SALON_SLUG = (function () {
   try { return new URLSearchParams(window.location.search).get('salon') || ''; }
   catch (e) { return ''; }
@@ -87,6 +90,7 @@ function api(path, opts) {
   opts = opts || {};
   var headers = { 'Content-Type': 'application/json' };
   if (ADMIN_PW) headers['X-Admin-Password'] = ADMIN_PW;
+  if (IMPERSONATE_TOKEN) headers['X-Impersonate-Token'] = IMPERSONATE_TOKEN;
   if (SALON_SLUG) headers['X-Salon-Slug'] = SALON_SLUG;
   return fetch(path, {
     method: opts.method || 'GET',

@@ -1,5 +1,6 @@
 const { pool } = require('../db');
 const { verifyPassword } = require('../lib/password');
+const { validateToken } = require('../lib/impersonation');
 
 // Autorise soit le mot de passe admin du salon courant (contrôle total),
 // soit une authentification coiffeur par code PIN — limitée à son propre
@@ -9,6 +10,11 @@ const { verifyPassword } = require('../lib/password');
 module.exports = async function requireAdminOrBarber(req, res, next) {
   if (!req.salon) {
     return res.status(500).json({ error: 'Salon non résolu (resolveSalon manquant en amont)' });
+  }
+
+  const impersonateToken = req.get('X-Impersonate-Token');
+  if (impersonateToken && validateToken(impersonateToken, req.salon.id)) {
+    return next();
   }
 
   const given = req.get('X-Admin-Password') || req.query.pw || '';

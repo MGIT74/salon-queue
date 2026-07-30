@@ -3,42 +3,62 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Super Admin — Salons</title>
+<title>Super Admin</title>
 <link rel="stylesheet" href="/app.css">
 <style>
-  .wrap { max-width: 900px; margin: 0 auto; padding: clamp(20px,3vw,44px); }
+  .wrap { max-width: 980px; margin: 0 auto; padding: clamp(20px,3vw,44px); }
   .login { max-width: 380px; margin: 14vh auto; text-align: center; }
   .login h1 { font-size: 26px; font-weight: 600; margin-bottom: 8px; }
   .login p { color: var(--grey); font-size: 14px; margin: 0 0 24px; }
 
-  h1.title { font-size: clamp(28px,3.2vw,40px); font-weight: 600; letter-spacing: -.035em; margin: 0 0 26px; }
+  h1.title { font-size: clamp(28px,3.2vw,40px); font-weight: 600; letter-spacing: -.035em; margin: 0 0 22px; }
 
-  .card-box {
-    background: var(--card); border-radius: 16px; padding: 22px;
-    box-shadow: var(--shadow); margin-bottom: 14px; transition: background .25s ease;
-  }
+  .tabs { display: flex; gap: 4px; background: var(--fill); border-radius: 999px; padding: 4px; margin-bottom: 24px; overflow-x: auto; }
+  .tabs button { border: none; background: none; color: var(--ink); font-family: inherit; font-size: 14px;
+                 font-weight: 500; padding: 10px 18px; border-radius: 999px; cursor: pointer; white-space: nowrap; }
+  .tabs button.on { background: var(--card); font-weight: 600; box-shadow: var(--shadow); }
+  [data-theme="dark"] .tabs button.on { background: #48484a; }
+  .tab-panel { display: none; }
+  .tab-panel.on { display: block; }
+
+  .card-box { background: var(--card); border-radius: 16px; padding: 22px; box-shadow: var(--shadow); margin-bottom: 14px; }
   .card-box h3 { font-size: 17px; font-weight: 600; margin: 0 0 4px; }
   .card-box .hint { font-size: 13.5px; color: var(--grey); margin: 0 0 18px; }
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 
-  .salon-item {
-    background: var(--card); border-radius: 14px; padding: 18px 20px;
-    box-shadow: var(--shadow); margin-bottom: 10px;
-  }
-  .salon-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
-  .salon-name { font-size: 17px; font-weight: 600; }
-  .salon-slug { font-size: 13px; color: var(--grey); font-family: monospace; }
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px,1fr)); gap: 12px; margin-bottom: 20px; }
+  .kpi-tile { background: var(--card); border-radius: 16px; padding: 20px; box-shadow: var(--shadow); }
+  .kpi-tile .v { font-size: 28px; font-weight: 600; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+  .kpi-tile .l { font-size: 12.5px; color: var(--grey); margin-top: 4px; }
+
+  .owner-item { background: var(--card); border-radius: 14px; padding: 18px 20px; box-shadow: var(--shadow); margin-bottom: 10px; }
+  .owner-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .owner-name { font-size: 17px; font-weight: 600; }
+  .owner-email { font-size: 13px; color: var(--grey); }
   .badge { font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 999px; background: var(--fill); color: var(--grey); }
   .badge.on { background: var(--blue-soft); color: var(--blue); }
   .badge.off { background: rgba(255,59,48,0.12); color: var(--red); }
 
-  .links { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
-  .links a {
-    font-size: 12.5px; font-weight: 500; text-decoration: none; color: var(--blue);
-    background: var(--fill); padding: 7px 12px; border-radius: 999px;
+  .owner-salons { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .owner-salon-row { background: var(--fill); border-radius: 12px; padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .owner-salon-name { font-size: 14px; font-weight: 600; }
+  .owner-salon-slug { font-size: 12px; color: var(--grey); font-family: monospace; }
+  .owner-salon-links { display: flex; gap: 6px; flex-wrap: wrap; }
+  .owner-salon-links a, .owner-salon-links button {
+    font-size: 12px; font-weight: 500; text-decoration: none; color: var(--blue);
+    background: var(--card); padding: 6px 11px; border-radius: 999px; border: none; cursor: pointer; font-family: inherit;
   }
-  .salon-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-  .salon-actions .btn { font-size: 13px; padding: 8px 14px; }
+
+  .owner-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .owner-actions .btn { font-size: 13px; padding: 8px 14px; }
+
+  .activity-row { display: flex; align-items: center; gap: 12px; background: var(--card); border-radius: 12px;
+                  padding: 13px 16px; margin-bottom: 8px; box-shadow: var(--shadow); }
+  .activity-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .activity-dot.signup { background: var(--blue); }
+  .activity-dot.salon_created { background: var(--green); }
+  .activity-label { font-size: 14px; font-weight: 500; flex: 1; }
+  .activity-time { font-size: 12.5px; color: var(--grey); }
 
   .empty { background: var(--card); border-radius: 14px; padding: 30px; text-align: center; color: var(--grey); font-size: 14px; box-shadow: var(--shadow); }
 </style>
@@ -47,27 +67,59 @@
 
 <div class="wrap login" id="login-screen">
   <h1>Super Admin</h1>
-  <p>Gestion des salons</p>
+  <p>Gestion de la plateforme</p>
   <div class="fld"><input id="pw" type="password" placeholder="Mot de passe super admin"
        onkeydown="if(event.key==='Enter') doLogin()"></div>
   <button class="btn btn-primary" style="width:100%;padding:15px;font-size:16px" onclick="doLogin()">Entrer</button>
 </div>
 
 <div class="wrap" id="app-screen" style="display:none">
-  <h1 class="title">Salons</h1>
+  <h1 class="title">Super Admin</h1>
 
-  <div class="card-box">
-    <h3>Ajouter un salon</h3>
-    <p class="hint">Un catalogue de départ (4 prestations, 6 suppléments) est créé automatiquement.</p>
-    <div class="grid2">
-      <div class="fld"><label for="new-name">Nom du salon</label><input id="new-name" type="text" placeholder="Salon Rive Gauche"></div>
-      <div class="fld"><label for="new-slug">Identifiant (dans l'URL)</label><input id="new-slug" type="text" placeholder="salon-2" pattern="[a-z0-9-]+"></div>
-    </div>
-    <div class="fld"><label for="new-pw">Mot de passe admin de ce salon</label><input id="new-pw" type="text" placeholder="Généré automatiquement si vide"></div>
-    <button class="btn btn-primary" onclick="createSalon()">Créer le salon</button>
+  <div class="tabs" id="tabs">
+    <button class="on" data-t="overview">Vue d'ensemble</button>
+    <button data-t="owners">Enseignes</button>
+    <button data-t="email">Email plateforme</button>
+    <button data-t="activity">Journal</button>
   </div>
 
-  <div id="salons-list"></div>
+  <div class="tab-panel on" id="t-overview">
+    <div class="kpi-grid" id="kpi-grid">
+      <div class="kpi-tile"><div class="v">—</div><div class="l">enseignes</div></div>
+      <div class="kpi-tile"><div class="v">—</div><div class="l">salons actifs</div></div>
+      <div class="kpi-tile"><div class="v">—</div><div class="l">coiffeurs actifs</div></div>
+      <div class="kpi-tile"><div class="v">—</div><div class="l">clients aujourd'hui</div></div>
+      <div class="kpi-tile"><div class="v">—</div><div class="l">clients cette semaine</div></div>
+      <div class="kpi-tile"><div class="v">—</div><div class="l">inscriptions (30j)</div></div>
+    </div>
+  </div>
+
+  <div class="tab-panel" id="t-owners">
+    <div class="card-box">
+      <h3>Ajouter une enseigne</h3>
+      <p class="hint">Crée un propriétaire et son premier salon, avec un catalogue de départ.</p>
+      <div class="grid2">
+        <div class="fld"><label for="new-name">Nom</label><input id="new-name" type="text" placeholder="Salon Rive Gauche"></div>
+        <div class="fld"><label for="new-slug">Identifiant (dans l'URL)</label><input id="new-slug" type="text" placeholder="salon-2" pattern="[a-z0-9-]+"></div>
+      </div>
+      <div class="fld"><label for="new-pw">Mot de passe admin</label><input id="new-pw" type="text" placeholder="Généré automatiquement si vide"></div>
+      <button class="btn btn-primary" onclick="createSalon()">Créer l'enseigne</button>
+    </div>
+    <div id="owners-list"></div>
+  </div>
+
+  <div class="tab-panel" id="t-email">
+    <div class="card-box">
+      <h3>Email de la plateforme</h3>
+      <p class="hint">Distinct du SMTP de chaque salon (qui prévient les clients) — celui-ci sert aux emails envoyés par la plateforme elle-même aux enseignes (ex: réinitialisation de mot de passe). Se configure via les variables d'environnement PLATFORM_SMTP_*.</p>
+      <div class="fld"><label for="test-email-to">Envoyer un email de test à</label><input id="test-email-to" type="email" placeholder="vous@exemple.com"></div>
+      <button class="btn btn-primary" onclick="sendTestEmail()">Envoyer</button>
+    </div>
+  </div>
+
+  <div class="tab-panel" id="t-activity">
+    <div id="activity-list"><div class="empty">Chargement…</div></div>
+  </div>
 </div>
 
 <script src="/app.js"></script>
@@ -85,7 +137,7 @@ function doLogin() {
       try { sessionStorage.setItem('super-pw', pw); } catch (e) {}
       document.getElementById('login-screen').style.display = 'none';
       document.getElementById('app-screen').style.display = 'block';
-      loadSalons();
+      boot();
     })
     .catch(function (e) { toast(e.message, true); SUPER_PW = ''; });
 }
@@ -99,7 +151,7 @@ function doLogin() {
     .then(function () {
       document.getElementById('login-screen').style.display = 'none';
       document.getElementById('app-screen').style.display = 'block';
-      loadSalons();
+      boot();
     })
     .catch(function () { SUPER_PW = ''; });
 })();
@@ -120,37 +172,78 @@ function superApi(path, opts) {
   });
 }
 
-var salons = [];
+function boot() {
+  loadOverview();
+  loadOwners();
+}
 
-function loadSalons() {
-  return superApi('/api/super/salons').then(function (r) {
-    salons = r.items;
-    renderSalons();
+document.getElementById('tabs').addEventListener('click', function (e) {
+  var b = e.target.closest('button');
+  if (!b) return;
+  document.querySelectorAll('#tabs button').forEach(function (x) { x.classList.remove('on'); });
+  b.classList.add('on');
+  document.querySelectorAll('.tab-panel').forEach(function (p) { p.classList.remove('on'); });
+  document.getElementById('t-' + b.dataset.t).classList.add('on');
+  if (b.dataset.t === 'overview') loadOverview();
+  if (b.dataset.t === 'activity') loadActivity();
+});
+
+function loadOverview() {
+  superApi('/api/super/overview').then(function (r) {
+    document.getElementById('kpi-grid').innerHTML =
+      tile(r.owners_count, 'enseignes') +
+      tile(r.salons_count, 'salons actifs') +
+      tile(r.barbers_count, 'coiffeurs actifs') +
+      tile(r.clients_today, "clients aujourd'hui") +
+      tile(r.clients_week, 'clients cette semaine') +
+      tile(r.signups_last_30d, 'inscriptions (30j)');
+  }).catch(function (e) { toast(e.message, true); });
+}
+function tile(v, l) {
+  return '<div class="kpi-tile"><div class="v">' + v + '</div><div class="l">' + l + '</div></div>';
+}
+
+var owners = [];
+
+function loadOwners() {
+  return superApi('/api/super/owners').then(function (r) {
+    owners = r.items;
+    renderOwners();
   }).catch(function (e) { toast(e.message, true); });
 }
 
-function renderSalons() {
-  document.getElementById('salons-list').innerHTML = salons.length === 0
-    ? '<div class="empty">Aucun salon</div>'
-    : salons.map(function (s) {
-        var pages = ['kiosk.html', 'display.html', 'dashboard.html', 'poste.html'];
-        var links = pages.map(function (p) {
-          return '<a href="/' + p + '?salon=' + encodeURIComponent(s.slug) + '" target="_blank">' + p.replace('.html', '') + '</a>';
+function renderOwners() {
+  document.getElementById('owners-list').innerHTML = owners.length === 0
+    ? '<div class="empty">Aucune enseigne</div>'
+    : owners.map(function (o) {
+        var salonsHtml = o.salons.map(function (s) {
+          var pages = ['kiosk.html', 'display.html', 'poste.html'];
+          var links = pages.map(function (p) {
+            return '<a href="/' + p + '?salon=' + encodeURIComponent(s.slug) + '" target="_blank">' + p.replace('.html', '') + '</a>';
+          }).join('');
+          return '<div class="owner-salon-row">' +
+            '<div><div class="owner-salon-name">' + esc(s.name) + (s.is_default ? ' <span class="badge on">défaut</span>' : '') +
+            (s.active ? '' : ' <span class="badge off">désactivé</span>') + '</div>' +
+            '<div class="owner-salon-slug">?salon=' + esc(s.slug) + '</div></div>' +
+            '<div class="owner-salon-links">' + links +
+            '<button onclick="impersonate(\'' + s.id + '\',\'' + esc(s.slug) + '\')">🛠 Assistance</button>' +
+            '</div></div>';
         }).join('');
-        return '<div class="salon-item">' +
-          '<div class="salon-head">' +
-          '<div><span class="salon-name">' + esc(s.name) + '</span> ' +
-          '<span class="badge' + (s.is_default ? ' on' : '') + '">' + (s.is_default ? 'par défaut' : 'salon') + '</span> ' +
-          '<span class="badge' + (s.active ? ' on' : ' off') + '">' + (s.active ? 'actif' : 'désactivé') + '</span>' +
-          '<div class="salon-slug">?salon=' + esc(s.slug) + '</div></div>' +
-          '</div>' +
-          '<div class="links">' + links + '</div>' +
-          '<div class="salon-actions">' +
-          '<button class="btn btn-soft" onclick="renameSalon(\'' + s.id + '\')">Renommer</button>' +
-          '<button class="btn btn-soft" onclick="resetSalonPassword(\'' + s.id + '\',\'' + esc(s.name).replace(/'/g, "\\'") + '\')">Changer le mot de passe</button>' +
-          (s.active
-            ? '<button class="btn btn-ghost" onclick="toggleSalon(\'' + s.id + '\', false)">Désactiver</button>'
-            : '<button class="btn btn-soft" onclick="toggleSalon(\'' + s.id + '\', true)">Réactiver</button>') +
+
+        return '<div class="owner-item">' +
+          '<div class="owner-head">' +
+          '<div><span class="owner-name">' + esc(o.name || 'Sans nom') + '</span> ' +
+          '<span class="badge' + (o.active ? ' on' : ' off') + '">' + (o.active ? 'active' : 'suspendue') + '</span>' +
+          (o.email ? '<div class="owner-email">' + esc(o.email) + '</div>' : '') +
+          '</div></div>' +
+          '<div class="owner-salons">' + (salonsHtml || '<div class="hint">Aucun salon</div>') + '</div>' +
+          '<div class="owner-actions">' +
+          '<button class="btn btn-soft" onclick="renameOwner(\'' + o.id + '\')">Renommer</button>' +
+          '<button class="btn btn-soft" onclick="resetOwnerPassword(\'' + o.id + '\',\'' + esc(o.name || '').replace(/'/g, "\\'") + '\')">Changer le mot de passe</button>' +
+          (o.active
+            ? '<button class="btn btn-ghost" onclick="toggleOwner(\'' + o.id + '\', false)">Suspendre</button>'
+            : '<button class="btn btn-soft" onclick="toggleOwner(\'' + o.id + '\', true)">Réactiver</button>') +
+          '<button class="btn btn-ghost" onclick="deleteOwner(\'' + o.id + '\',\'' + esc(o.name || '').replace(/'/g, "\\'") + '\')">Supprimer</button>' +
           '</div></div>';
       }).join('');
 }
@@ -167,31 +260,84 @@ function createSalon() {
       document.getElementById('new-name').value = '';
       document.getElementById('new-slug').value = '';
       document.getElementById('new-pw').value = '';
-      loadSalons();
-      alert('Salon "' + name + '" créé.\n\nMot de passe admin de ce salon : ' + pw + '\n\nNotez-le maintenant, transmettez-le au gérant de ce salon.');
+      return loadOwners();
+    })
+    .then(function () {
+      return showAlert('Mot de passe admin : ' + pw + '\n\nNotez-le maintenant, transmettez-le au gérant de cette enseigne.', { title: 'Enseigne "' + name + '" créée' });
     })
     .catch(function (e) { toast(e.message, true); });
 }
 
-function renameSalon(id) {
-  var s = salons.find(function (x) { return x.id === id; });
-  var name = prompt('Nouveau nom', s.name);
-  if (!name) return;
-  superApi('/api/super/salons/' + id, { method: 'PUT', body: { name: name } })
-    .then(loadSalons).catch(function (e) { toast(e.message, true); });
+function renameOwner(id) {
+  var o = owners.find(function (x) { return x.id === id; });
+  showPrompt('', { title: 'Renommer', defaultValue: o.name || '' }).then(function (name) {
+    if (!name) return;
+    superApi('/api/super/owners/' + id, { method: 'PUT', body: { name: name } })
+      .then(loadOwners).catch(function (e) { toast(e.message, true); });
+  });
 }
 
-function resetSalonPassword(id, name) {
+function resetOwnerPassword(id, name) {
   var pw = Math.random().toString(36).slice(2, 10);
-  if (!confirm('Nouveau mot de passe pour ' + name + ' : ' + pw + '\n\nNotez-le maintenant. Appliquer ?')) return;
-  superApi('/api/super/salons/' + id, { method: 'PUT', body: { admin_password: pw } })
-    .then(function () { toast('Mot de passe mis à jour pour ' + name); })
+  showConfirm('Nouveau mot de passe pour ' + name + ' : ' + pw + '\n\nNotez-le maintenant.', { title: 'Réinitialiser le mot de passe', confirmLabel: 'Appliquer' })
+    .then(function (ok) {
+      if (!ok) return;
+      superApi('/api/super/owners/' + id + '/password', { method: 'PUT', body: { admin_password: pw } })
+        .then(function () { toast('Mot de passe mis à jour pour ' + name); })
+        .catch(function (e) { toast(e.message, true); });
+    });
+}
+
+function toggleOwner(id, active) {
+  var msg = active ? 'Réactiver cette enseigne ?' : "Suspendre cette enseigne ? Elle perdra immédiatement l'accès à tous ses salons.";
+  showConfirm(msg, { title: active ? 'Réactiver' : 'Suspendre', danger: !active }).then(function (ok) {
+    if (!ok) return;
+    superApi('/api/super/owners/' + id, { method: 'PUT', body: { active: active } })
+      .then(loadOwners).catch(function (e) { toast(e.message, true); });
+  });
+}
+
+function deleteOwner(id, name) {
+  showPrompt(
+    'Tous ses salons, coiffeurs, prestations et clients seront supprimés avec elle. Cette action est irréversible.\n\nTapez SUPPRIMER en majuscules pour confirmer :',
+    { title: 'Supprimer "' + name + '" ?', requireExact: 'SUPPRIMER', danger: true, confirmLabel: 'Supprimer définitivement' }
+  ).then(function (typed) {
+    if (!typed) return;
+    superApi('/api/super/owners/' + id, { method: 'DELETE' })
+      .then(loadOwners)
+      .then(function () { toast('Enseigne supprimée'); })
+      .catch(function (e) { toast(e.message, true); });
+  });
+}
+
+function impersonate(salonId, slug) {
+  superApi('/api/super/impersonate', { method: 'POST', body: { salon_id: salonId } }).then(function (r) {
+    var url = '/dashboard.html?salon=' + encodeURIComponent(slug) + '&impersonate=' + encodeURIComponent(r.token);
+    window.open(url, '_blank');
+  }).catch(function (e) { toast(e.message, true); });
+}
+
+function sendTestEmail() {
+  var to = document.getElementById('test-email-to').value.trim();
+  if (!to) { toast('Adresse requise', true); return; }
+  toast('Envoi en cours…');
+  superApi('/api/super/test-email', { method: 'POST', body: { to: to } })
+    .then(function () { toast('Email envoyé à ' + to); })
     .catch(function (e) { toast(e.message, true); });
 }
 
-function toggleSalon(id, active) {
-  superApi('/api/super/salons/' + id, { method: 'PUT', body: { active: active } })
-    .then(loadSalons).catch(function (e) { toast(e.message, true); });
+function loadActivity() {
+  superApi('/api/super/activity').then(function (r) {
+    document.getElementById('activity-list').innerHTML = r.items.length === 0
+      ? '<div class="empty">Aucune activité</div>'
+      : r.items.map(function (a) {
+          var label = a.type === 'signup' ? 'Nouvelle enseigne : ' + esc(a.label) : 'Salon créé : ' + esc(a.label);
+          var when = new Date(a.created_at).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+          return '<div class="activity-row"><span class="activity-dot ' + a.type + '"></span>' +
+            '<span class="activity-label">' + label + '</span>' +
+            '<span class="activity-time">' + when + '</span></div>';
+        }).join('');
+  }).catch(function (e) { toast(e.message, true); });
 }
 </script>
 </body>

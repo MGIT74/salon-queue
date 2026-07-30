@@ -467,6 +467,16 @@ function doLogin() {
 }
 
 (function autoLogin() {
+  // Lien d'assistance du super admin : accès temporaire sans mot de passe.
+  var impersonateToken = new URLSearchParams(window.location.search).get('impersonate');
+  if (impersonateToken) {
+    setImpersonateToken(impersonateToken);
+    document.getElementById('login').style.display = 'none';
+    document.getElementById('app').style.display = '';
+    boot();
+    return;
+  }
+
   var saved = null;
   try { saved = sessionStorage.getItem('pw'); } catch (e) {}
   if (!saved) return;
