@@ -1,7 +1,7 @@
 const express = require('express');
 const crypto = require('crypto');
-const { pool } = require('../db');
-const { sendTestEmail } = require('../lib/platformMailer');
+const { pool, getPlatformSettings, setPlatformSettings } = require('../db');
+const { sendTestEmail, invalidateTransport } = require('../lib/platformMailer');
 const { createToken } = require('../lib/impersonation');
 
 const router = express.Router();
@@ -200,9 +200,36 @@ router.delete('/owners/:id', requireSuperAdmin, wrap(async (req, res) => {
 }));
 
 /**
- * Email de test pour vérifier la configuration SMTP de la PLATEFORME
- * (distincte du SMTP par salon, qui sert à prévenir les clients).
+ * Configuration SMTP de la plateforme, modifiable depuis le dashboard
+ * super admin plutôt que par variables d'environnement uniquement.
  */
+router.get('/smtp', requireSuperAdmin, wrap(async (req, res) => {
+  const s = await getPlatformSettings();
+  res.json({
+    ok: true,
+    settings: {
+      smtp_host: s.smtp_host || '',
+      smtp_port: s.smtp_port || '587',
+      smtp_user: s.smtp_user || '',
+      smtp_from: s.smtp_from || ''
+    },
+    smtp_pass_set: Boolean(s.smtp_pass)
+  });
+}));
+
+router.put('/smtp', requireSuperAdmin, wrap(async (req, res) => {
+  const patch = {};
+  ['smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_from'].forEach((k) => {
+    if (req.body[k] !== undefined && req.body[k] !== null) patch[k] = req.body[k];
+  });
+  // Champ mot de passe laissé vide = on conserve l'ancien
+  if (patch.smtp_pass === '') delete patch.smtp_pass;
+
+  await setPlatformSettings(patch);
+  invalidateTransport();
+  res.json({ ok: true });
+}));
+
 router.post('/test-email', requireSuperAdmin, wrap(async (req, res) => {
   const to = req.body.to;
   if (!to) return res.status(400).json({ error: 'Adresse de destination requise' });

@@ -1,34 +1,42 @@
 const nodemailer = require('nodemailer');
+const { pool } = require('../db');
 
 // Distinct du mailer par salon (src/lib/mailer.js, qui prévient les CLIENTS
 // d'un salon avant leur tour). Celui-ci envoie des emails transactionnels
 // de la PLATEFORME elle-même aux propriétaires de salon (réinitialisation
-// de mot de passe...) — configuré via des variables d'environnement dédiées,
-// pas depuis les Réglages d'un salon.
+// de mot de passe...) — configuré depuis le dashboard super admin, stocké
+// en base (table platform_settings), pas dans le fichier .env.
 let cached = null;
 
-function getTransport() {
+async function getTransport() {
   if (cached) return cached;
-  const host = process.env.PLATFORM_SMTP_HOST;
-  if (!host) {
-    throw new Error("Email de la plateforme non configuré (PLATFORM_SMTP_HOST manquant dans l'environnement)");
+
+  const [rows] = await pool.query('SELECT `key`, value FROM platform_settings');
+  const s = {};
+  rows.forEach((r) => { s[r.key] = r.value; });
+
+  if (!s.smtp_host) {
+    throw new Error("Email de la plateforme non configuré (Super Admin > Email plateforme)");
   }
+
   cached = {
-    from: process.env.PLATFORM_SMTP_FROM || process.env.PLATFORM_SMTP_USER,
+    from: s.smtp_from || s.smtp_user,
     tx: nodemailer.createTransport({
-      host,
-      port: Number(process.env.PLATFORM_SMTP_PORT || 587),
-      secure: Number(process.env.PLATFORM_SMTP_PORT) === 465,
-      auth: process.env.PLATFORM_SMTP_USER
-        ? { user: process.env.PLATFORM_SMTP_USER, pass: process.env.PLATFORM_SMTP_PASS }
-        : undefined
+      host: s.smtp_host,
+      port: Number(s.smtp_port || 587),
+      secure: Number(s.smtp_port) === 465,
+      auth: s.smtp_user ? { user: s.smtp_user, pass: s.smtp_pass } : undefined
     })
   };
   return cached;
 }
 
+function invalidateTransport() {
+  cached = null;
+}
+
 async function sendPasswordReset(to, resetUrl) {
-  const { tx, from } = getTransport();
+  const { tx, from } = await getTransport();
   await tx.sendMail({
     from,
     to,
@@ -42,7 +50,7 @@ async function sendPasswordReset(to, resetUrl) {
 }
 
 async function sendTestEmail(to) {
-  const { tx, from } = getTransport();
+  const { tx, from } = await getTransport();
   await tx.sendMail({
     from,
     to,
@@ -51,4 +59,4 @@ async function sendTestEmail(to) {
   });
 }
 
-module.exports = { sendPasswordReset, sendTestEmail };
+module.exports = { sendPasswordReset, sendTestEmail, invalidateTransport };

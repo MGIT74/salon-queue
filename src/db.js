@@ -59,4 +59,26 @@ async function setSettings(salonId, obj) {
   );
 }
 
-module.exports = { pool, getSettings, setSettings, utcIso };
+// Réglages globaux de la plateforme (pas liés à un salon), ex: SMTP
+// utilisé pour les emails de la plateforme elle-même.
+async function getPlatformSettings() {
+  const [rows] = await pool.query('SELECT `key`, value FROM platform_settings');
+  const out = {};
+  rows.forEach((r) => { out[r.key] = r.value; });
+  return out;
+}
+
+async function setPlatformSettings(obj) {
+  const entries = Object.entries(obj);
+  if (!entries.length) return;
+  const placeholders = entries.map(() => '(?, ?, NOW())').join(', ');
+  const params = [];
+  entries.forEach(([k, v]) => { params.push(k, v == null ? '' : String(v)); });
+  await pool.query(
+    `INSERT INTO platform_settings (\`key\`, value, updated_at) VALUES ${placeholders}
+     ON DUPLICATE KEY UPDATE value = VALUES(value), updated_at = VALUES(updated_at)`,
+    params
+  );
+}
+
+module.exports = { pool, getSettings, setSettings, getPlatformSettings, setPlatformSettings, utcIso };

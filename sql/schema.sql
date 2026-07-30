@@ -160,6 +160,15 @@ CREATE TABLE IF NOT EXISTS settings (
   FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Réglages globaux de la plateforme (pas liés à un salon en particulier),
+-- ex: SMTP utilisé pour les emails envoyés par la plateforme elle-même
+-- (réinitialisation de mot de passe...), distinct du SMTP par salon.
+CREATE TABLE IF NOT EXISTS platform_settings (
+  `key` VARCHAR(100) PRIMARY KEY,
+  value TEXT,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- ---------- Données de départ pour le salon par défaut ----------
 SET @default_salon_id = (SELECT id FROM salons WHERE is_default = 1 LIMIT 1);
 
@@ -196,3 +205,12 @@ SELECT @default_salon_id, v.k, v.val FROM (
   UNION ALL SELECT 'smtp_from', ''
 ) v
 ON DUPLICATE KEY UPDATE `key` = VALUES(`key`);
+
+-- Réglages de la PLATEFORME elle-même (pas d'un salon en particulier) —
+-- pour l'instant, uniquement le SMTP utilisé pour les emails
+-- transactionnels envoyés aux propriétaires de salon.
+CREATE TABLE IF NOT EXISTS platform_settings (
+  `key` VARCHAR(100) PRIMARY KEY,
+  value TEXT,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

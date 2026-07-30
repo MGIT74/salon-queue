@@ -110,9 +110,23 @@
 
   <div class="tab-panel" id="t-email">
     <div class="card-box">
-      <h3>Email de la plateforme</h3>
-      <p class="hint">Distinct du SMTP de chaque salon (qui prévient les clients) — celui-ci sert aux emails envoyés par la plateforme elle-même aux enseignes (ex: réinitialisation de mot de passe). Se configure via les variables d'environnement PLATFORM_SMTP_*.</p>
-      <div class="fld"><label for="test-email-to">Envoyer un email de test à</label><input id="test-email-to" type="email" placeholder="vous@exemple.com"></div>
+      <h3>Configuration SMTP de la plateforme</h3>
+      <p class="hint">Distinct du SMTP de chaque salon (qui prévient les clients) — celui-ci sert aux emails envoyés par la plateforme elle-même aux enseignes (ex: réinitialisation de mot de passe).</p>
+      <div class="grid2">
+        <div class="fld"><label for="smtp-host">Serveur SMTP</label><input id="smtp-host" type="text" placeholder="smtp.hostinger.com"></div>
+        <div class="fld"><label for="smtp-port">Port</label><input id="smtp-port" type="number" placeholder="465"></div>
+      </div>
+      <div class="grid2">
+        <div class="fld"><label for="smtp-user">Identifiant</label><input id="smtp-user" type="text" placeholder="contact@tondomaine.com"></div>
+        <div class="fld"><label for="smtp-pass">Mot de passe <span id="smtp-pass-hint" style="color:var(--grey);font-weight:400"></span></label><input id="smtp-pass" type="password" placeholder="Laisser vide pour ne pas changer"></div>
+      </div>
+      <div class="fld"><label for="smtp-from">Expéditeur affiché</label><input id="smtp-from" type="text" placeholder="Ton App &lt;contact@tondomaine.com&gt;"></div>
+      <button class="btn btn-primary" onclick="saveSmtp()">Enregistrer</button>
+    </div>
+
+    <div class="card-box">
+      <h3>Envoyer un email de test</h3>
+      <div class="fld"><label for="test-email-to">Adresse de destination</label><input id="test-email-to" type="email" placeholder="vous@exemple.com"></div>
       <button class="btn btn-primary" onclick="sendTestEmail()">Envoyer</button>
     </div>
   </div>
@@ -186,6 +200,7 @@ document.getElementById('tabs').addEventListener('click', function (e) {
   document.getElementById('t-' + b.dataset.t).classList.add('on');
   if (b.dataset.t === 'overview') loadOverview();
   if (b.dataset.t === 'activity') loadActivity();
+  if (b.dataset.t === 'email') loadSmtp();
 });
 
 function loadOverview() {
@@ -315,6 +330,33 @@ function impersonate(salonId, slug) {
     var url = '/dashboard.html?salon=' + encodeURIComponent(slug) + '&impersonate=' + encodeURIComponent(r.token);
     window.open(url, '_blank');
   }).catch(function (e) { toast(e.message, true); });
+}
+
+function loadSmtp() {
+  superApi('/api/super/smtp').then(function (r) {
+    document.getElementById('smtp-host').value = r.settings.smtp_host;
+    document.getElementById('smtp-port').value = r.settings.smtp_port;
+    document.getElementById('smtp-user').value = r.settings.smtp_user;
+    document.getElementById('smtp-from').value = r.settings.smtp_from;
+    document.getElementById('smtp-pass-hint').textContent = r.smtp_pass_set ? '(déjà défini — laisser vide pour conserver)' : '(non défini)';
+  }).catch(function (e) { toast(e.message, true); });
+}
+
+function saveSmtp() {
+  var body = {
+    smtp_host: document.getElementById('smtp-host').value.trim(),
+    smtp_port: document.getElementById('smtp-port').value.trim(),
+    smtp_user: document.getElementById('smtp-user').value.trim(),
+    smtp_pass: document.getElementById('smtp-pass').value,
+    smtp_from: document.getElementById('smtp-from').value.trim()
+  };
+  superApi('/api/super/smtp', { method: 'PUT', body: body })
+    .then(function () {
+      toast('Configuration SMTP enregistrée');
+      document.getElementById('smtp-pass').value = '';
+      loadSmtp();
+    })
+    .catch(function (e) { toast(e.message, true); });
 }
 
 function sendTestEmail() {
