@@ -314,16 +314,29 @@ function computeLanes() {
 }
 
 function waitForBarber(barberId) {
-  if (!barbers.length) return 0;
-  var lanes = computeLanes();
+  var waiting = queue.filter(function (q) { return q.status === 'waiting'; });
+  var active = queue.filter(function (q) { return q.status === 'in_progress'; });
 
-  if (!barberId) return Math.round(Math.min.apply(null, lanes));
+  if (!barberId) {
+    if (!barbers.length) return 0;
+    // "Premier disponible" : simule la répartition de TOUTE la file
+    // (assignée ou non) pour estimer un temps réaliste si un nouveau
+    // client rejoint maintenant sans préférence de coiffeur.
+    var lanes = computeLanes();
+    return Math.round(Math.min.apply(null, lanes));
+  }
 
-  // Même un coiffeur choisi explicitement hérite de sa part de la file
-  // générale : les clients "premier disponible" déjà présents ont la
-  // priorité, un coiffeur ne saute pas la queue pour un nouvel arrivant.
-  var idx = barbers.findIndex(function (b) { return b.id === barberId; });
-  return idx === -1 ? 0 : Math.round(lanes[idx]);
+  // Un coiffeur nommé précisément affiche SON propre temps réel : sa
+  // coupe en cours (s'il en a une) + les clients qui lui sont déjà
+  // spécifiquement assignés. La file "premier disponible" ne lui est
+  // pas réservée tant qu'aucun client n'a explicitement choisi son
+  // nom — sinon un coiffeur au fauteuil vide semblerait "occupé"
+  // alors qu'il peut prendre un nouveau client à l'instant.
+  var mine = waiting.filter(function (q) { return q.barber_id === barberId; });
+  var cur = active.find(function (q) { return q.barber_id === barberId; });
+  var total = mine.reduce(function (a, q) { return a + (q.total_duration_min || 0); }, 0);
+  total += remainingForCut(cur);
+  return Math.round(total);
 }
 
 function isOverrun(barberId) {
