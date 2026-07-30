@@ -13,7 +13,7 @@ module.exports = async function requireAdminOrBarber(req, res, next) {
   }
 
   const impersonateToken = req.get('X-Impersonate-Token');
-  if (impersonateToken && validateToken(impersonateToken, req.salon.id)) {
+  if (impersonateToken && validateToken(impersonateToken, req.ownerId)) {
     return next();
   }
 

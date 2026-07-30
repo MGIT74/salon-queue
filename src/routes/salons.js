@@ -275,10 +275,10 @@ router.post('/impersonate', requireSuperAdmin, wrap(async (req, res) => {
   const { salon_id } = req.body;
   if (!salon_id) return res.status(400).json({ error: 'salon_id requis' });
 
-  const [[salon]] = await pool.query('SELECT id, slug FROM salons WHERE id = ?', [salon_id]);
+  const [[salon]] = await pool.query('SELECT id, slug, owner_id FROM salons WHERE id = ?', [salon_id]);
   if (!salon) return res.status(404).json({ error: 'Salon introuvable' });
 
-  const token = createToken(salon.id);
+  const token = createToken(salon.owner_id);
   res.json({ ok: true, token, slug: salon.slug });
 }));
 
