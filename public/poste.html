@@ -348,9 +348,10 @@ function saveExtras(id) {
   barberApi('/api/queue/' + id, { method: 'PUT', body: { extras: ids } })
     .then(function () {
       extrasPickerOpen = false;
-      return refresh();
+      renderActive(); // ferme le panneau tout de suite, sans attendre le réseau
+      toast('Suppléments mis à jour');
+      return refresh(); // données à jour ensuite, en arrière-plan
     })
-    .then(function () { toast('Suppléments mis à jour'); })
     .catch(function (e) {
       extrasPickerOpen = false;
       renderActive();
