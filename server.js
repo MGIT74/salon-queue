@@ -58,7 +58,7 @@ app.post('/api/login', requireAdmin, (req, res) => res.json({ ok: true }));
 app.get('/healthz', (req, res) => res.json({ ok: true, uptime: process.uptime() }));
 
 // Raccourcis de navigation
-app.get('/', (req, res) => res.redirect('/kiosk.html'));
+app.get('/', (req, res) => res.redirect('/dashboard.html'));
 
 app.listen(PORT, () => {
   console.log('Serveur démarré sur le port ' + PORT);
