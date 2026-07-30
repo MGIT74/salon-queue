@@ -205,6 +205,7 @@
 <!-- Connexion -->
 <div class="wrap login" id="login">
   <h1>Dashboard</h1>
+  <p id="login-salon-name" style="font-weight:600;color:var(--blue)">Chargement…</p>
   <p>Entrez le mot de passe du salon</p>
   <div class="fld"><input id="pw" type="password" placeholder="Mot de passe"
        onkeydown="if(event.key==='Enter') doLogin()"></div>
@@ -214,7 +215,10 @@
 
 <!-- Application -->
 <div class="wrap" id="app" style="display:none">
-  <h1>Dashboard</h1>
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:20px">
+    <h1 style="margin:0">Dashboard</h1>
+    <span class="chip main" id="app-salon-badge" style="font-size:13px;padding:6px 14px">…</span>
+  </div>
 
   <div class="tabs" id="tabs">
     <button class="on" data-t="queue">File d'attente</button>
@@ -412,6 +416,25 @@ mountThemeButton();
 var services = [], extras = [], barbers = [], queue = [], me = null, onDuty = 0;
 var DAYS = ['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
 var CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
+
+/* ============ Nom du salon actif — toujours visible, pour ne jamais
+   se tromper de salon (login OU une fois connecté) ============ */
+function loadCurrentSalonName() {
+  fetch('/api/settings/public', {
+    headers: SALON_SLUG ? { 'X-Salon-Slug': SALON_SLUG } : {}
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      var name = d.salon_name || 'Le Salon';
+      document.title = name + ' — Dashboard';
+      var loginEl = document.getElementById('login-salon-name');
+      var appEl = document.getElementById('app-salon-badge');
+      if (loginEl) loginEl.textContent = name;
+      if (appEl) appEl.textContent = name;
+    })
+    .catch(function () {});
+}
+loadCurrentSalonName();
 
 /* ============ Connexion ============ */
 function doLogin() {
@@ -1261,8 +1284,11 @@ function renderSalonsList() {
       return '<a href="/' + p + '?salon=' + encodeURIComponent(s.slug) + '" target="_blank" style="font-size:12.5px;color:var(--blue);background:var(--fill);padding:6px 11px;border-radius:999px;text-decoration:none;margin-right:6px">' +
         p.replace('.html', '') + '</a>';
     }).join('');
-    return '<div class="item"><div class="item-main">' +
-      '<div class="item-name">' + esc(s.name) + (s.is_default ? ' <span class="chip main">actuel par défaut</span>' : '') +
+    var isCurrent = SALON_SLUG ? s.slug === SALON_SLUG : Boolean(s.is_default);
+    return '<div class="item"' + (isCurrent ? ' style="outline:2px solid var(--blue);outline-offset:-2px"' : '') + '><div class="item-main">' +
+      '<div class="item-name">' + esc(s.name) +
+      (isCurrent ? ' <span class="chip main">📍 vous êtes ici</span>' : '') +
+      (s.is_default ? ' <span class="chip">par défaut</span>' : '') +
       (s.active ? '' : ' <span class="chip">désactivé</span>') + '</div>' +
       '<div class="item-meta">?salon=' + esc(s.slug) + '</div>' +
       '<div style="margin-top:8px">' + links + '</div>' +
