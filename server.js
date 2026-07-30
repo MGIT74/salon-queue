@@ -1,16 +1,21 @@
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const dotenv = require('dotenv');
 
-// xCloud réécrit le .env du dépôt à chaque déploiement (constaté
-// empiriquement) — on charge donc en priorité un fichier situé HORS du
-// dossier du site, que le déploiement ne touche jamais, puis le .env du
-// dépôt en second (dotenv ne remplace pas les valeurs déjà définies).
+// xCloud réécrit le .env du dépôt à chaque déploiement ET injecte ses
+// propres variables via PM2/ecosystem.config.cjs directement dans
+// process.env avant même le démarrage de l'app. dotenv.config() classique
+// ne remplace jamais une variable déjà définie — donc ces valeurs
+// (fausses) gagnaient toujours. On force ici explicitement les valeurs
+// d'un fichier externe (hors du dossier du site, jamais touché par les
+// déploiements), qui doit donc toujours avoir le dernier mot.
 const externalEnvPath = path.join(os.homedir(), '.env.salon-queue');
 if (fs.existsSync(externalEnvPath)) {
-  require('dotenv').config({ path: externalEnvPath });
+  const forced = dotenv.parse(fs.readFileSync(externalEnvPath));
+  Object.keys(forced).forEach((k) => { process.env[k] = forced[k]; });
 }
-require('dotenv').config();
+dotenv.config(); // .env du dépôt, ne comble que ce qui manque encore
 const express = require('express');
 
 const queueRoutes = require('./src/routes/queue');
