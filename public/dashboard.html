@@ -716,7 +716,6 @@ function loadCatalog() {
 function loadBarbers() {
   return api('/api/barbers?all=1').then(function (r) {
     barbers = r.items; onDuty = r.on_duty;
-    if (!me && barbers.length) me = barbers[0].id;
     document.getElementById('s-duty').textContent = onDuty;
     renderSeg(); renderBarbers();
   }).catch(function (err) { toast(err.message, true); });
@@ -739,11 +738,17 @@ function extById(id) { return extras.find(function (e) { return e.id === id; });
 
 /* ============ Onglet file ============ */
 function renderSeg() {
-  document.getElementById('seg').innerHTML = barbers.filter(function (b) { return b.active; })
+  var barberButtons = barbers.filter(function (b) { return b.active; })
     .map(function (b) {
       return '<button class="' + (me === b.id ? 'on' : '') + '" onclick="me=\'' + b.id + '\';renderSeg();renderQueue()">' +
              esc(b.name) + '</button>';
-    }).join('') || '<span style="color:var(--grey);font-size:14px;padding:9px">Aucun coiffeur — ajoutez-en un dans l\'onglet Coiffeurs</span>';
+    }).join('');
+
+  var allButton = '<button class="' + (!me ? 'on' : '') + '" onclick="me=null;renderSeg();renderQueue()">Tout</button>';
+
+  document.getElementById('seg').innerHTML = barbers.filter(function (b) { return b.active; }).length
+    ? allButton + barberButtons
+    : '<span style="color:var(--grey);font-size:14px;padding:9px">Aucun coiffeur — ajoutez-en un dans l\'onglet Coiffeurs</span>';
 }
 
 function chipsHtml(q) {
