@@ -141,4 +141,75 @@ router.put('/:id/schedule', requireAdmin, wrap(async (req, res) => {
   res.json({ ok: true, saved: rows.length });
 }));
 
+/**
+ * Statistiques d'un coiffeur sur une période donnée. Le client calcule
+ * lui-même les bornes (start/end en ISO UTC) à partir de son fuseau
+ * local — le serveur se contente de filtrer, évitant tout décalage
+ * jour/heure entre le fuseau du serveur et celui du salon.
+ */
+router.get('/:id/stats', requireAdmin, wrap(async (req, res) => {
+  const { start, end } = req.query;
+  if (!start || !end) return res.status(400).json({ error: 'start et end requis (ISO)' });
+
+  const [[owned]] = await pool.query(
+    'SELECT id FROM barbers WHERE id = ? AND salon_id = ?',
+    [req.params.id, req.salon.id]
+  );
+  if (!owned) return res.status(404).json({ error: 'Coiffeur introuvable' });
+
+  const startSql = new Date(start).toISOString().slice(0, 19).replace('T', ' ');
+  const endSql = new Date(end).toISOString().slice(0, 19).replace('T', ' ');
+
+  const [[row]] = await pool.query(
+    `SELECT COUNT(*) AS done_count, COALESCE(SUM(total_price_cents), 0) AS revenue_cents
+     FROM queue
+     WHERE barber_id = ? AND salon_id = ? AND status = 'done'
+     AND end_at >= ? AND end_at < ?`,
+    [req.params.id, req.salon.id, startSql, endSql]
+  );
+
+  res.json({ ok: true, done_count: Number(row.done_count), revenue_cents: Number(row.revenue_cents) });
+}));
+
+/**
+ * Congés / absences ponctuelles d'un coiffeur.
+ */
+router.get('/:id/leaves', requireAdmin, wrap(async (req, res) => {
+  const [rows] = await pool.query(
+    `SELECT bl.id, bl.start_date, bl.end_date, bl.note
+     FROM barber_leaves bl JOIN barbers b ON b.id = bl.barber_id
+     WHERE bl.barber_id = ? AND b.salon_id = ? ORDER BY bl.start_date DESC`,
+    [req.params.id, req.salon.id]
+  );
+  res.json({ ok: true, items: rows });
+}));
+
+router.post('/:id/leaves', requireAdmin, wrap(async (req, res) => {
+  const { start_date, end_date, note } = req.body;
+  if (!start_date || !end_date) return res.status(400).json({ error: 'Dates de début et de fin requises' });
+  if (end_date < start_date) return res.status(400).json({ error: 'La date de fin doit suivre la date de début' });
+
+  const [[owned]] = await pool.query(
+    'SELECT id FROM barbers WHERE id = ? AND salon_id = ?',
+    [req.params.id, req.salon.id]
+  );
+  if (!owned) return res.status(404).json({ error: 'Coiffeur introuvable' });
+
+  const id = crypto.randomUUID();
+  await pool.query(
+    'INSERT INTO barber_leaves (id, barber_id, start_date, end_date, note) VALUES (?, ?, ?, ?, ?)',
+    [id, req.params.id, start_date, end_date, note || null]
+  );
+  res.json({ ok: true, item: { id, start_date, end_date, note: note || null } });
+}));
+
+router.delete('/:id/leaves/:leaveId', requireAdmin, wrap(async (req, res) => {
+  await pool.query(
+    `DELETE bl FROM barber_leaves bl JOIN barbers b ON b.id = bl.barber_id
+     WHERE bl.id = ? AND bl.barber_id = ? AND b.salon_id = ?`,
+    [req.params.leaveId, req.params.id, req.salon.id]
+  );
+  res.json({ ok: true });
+}));
+
 module.exports = router;

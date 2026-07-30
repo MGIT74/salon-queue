@@ -111,6 +111,49 @@
   .day-row input[type="time"]:focus { outline-color: var(--blue); }
   .day-row .to { color: var(--grey); font-size: 14px; }
   .day-row.off input[type="time"], .day-row.off .to { opacity: .35; pointer-events: none; }
+
+  /* Fiche coiffeur repliable */
+  .barber-card { background: var(--card); border-radius: 16px; margin-bottom: 10px;
+                 box-shadow: var(--shadow); overflow: hidden; transition: background .25s ease; }
+  .barber-head { display: flex; align-items: center; gap: 14px; padding: 16px 18px; cursor: pointer; }
+  .barber-avatar { width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0;
+                    display: flex; align-items: center; justify-content: center;
+                    font-weight: 600; color: var(--grey); background: var(--fill); }
+  .barber-head-info { flex: 1; min-width: 0; }
+  .barber-head-info .name { font-size: 16px; font-weight: 600; letter-spacing: -.02em; }
+  .barber-head-info .sub { font-size: 12.5px; color: var(--grey); margin-top: 1px; }
+  .barber-chevron { color: var(--grey); flex-shrink: 0; transition: transform .18s ease; }
+  .barber-chevron.open { transform: rotate(180deg); }
+
+  .barber-detail { border-top: 1px solid var(--sep); padding: 18px; }
+  .subtabs { display: flex; gap: 4px; background: var(--fill); border-radius: 999px; padding: 4px; margin-bottom: 18px; }
+  .subtabs button { flex: 1; border: none; background: none; color: var(--ink); font-family: inherit;
+                     font-size: 13.5px; font-weight: 500; padding: 9px 12px; border-radius: 999px; cursor: pointer;
+                     transition: background .15s ease; }
+  .subtabs button.on { background: var(--card); font-weight: 600; box-shadow: var(--shadow); }
+  [data-theme="dark"] .subtabs button.on { background: #48484a; }
+
+  .stats-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+  .stats-nav-btn { width: 36px; height: 36px; border-radius: 50%; border: none; background: var(--fill);
+                    color: var(--ink); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .stats-nav-btn:disabled { opacity: .35; cursor: default; }
+  .stats-period-label { font-size: 14.5px; font-weight: 600; text-align: center; }
+  .period-picker { display: flex; gap: 4px; background: var(--fill); border-radius: 999px; padding: 4px; margin-bottom: 16px; }
+  .period-picker button { flex: 1; border: none; background: none; color: var(--ink); font-family: inherit;
+                           font-size: 13px; font-weight: 500; padding: 8px; border-radius: 999px; cursor: pointer; }
+  .period-picker button.on { background: var(--card); font-weight: 600; box-shadow: var(--shadow); }
+  [data-theme="dark"] .period-picker button.on { background: #48484a; }
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .stat-tile { background: var(--fill); border-radius: 14px; padding: 18px; text-align: center; }
+  .stat-tile .v { font-size: 26px; font-weight: 600; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+  .stat-tile .l { font-size: 12.5px; color: var(--grey); margin-top: 3px; }
+
+  .leave-row { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+               background: var(--fill); border-radius: 12px; padding: 13px 15px; margin-bottom: 8px; }
+  .leave-dates { font-size: 14px; font-weight: 600; }
+  .leave-note { font-size: 12.5px; color: var(--grey); margin-top: 2px; }
+  .leave-form { display: flex; gap: 10px; align-items: flex-end; margin-bottom: 18px; flex-wrap: wrap; }
+  .leave-form .fld { margin-bottom: 0; flex: 1; min-width: 130px; }
   .switch { position: relative; width: 46px; height: 28px; background: var(--sep);
             border-radius: 999px; cursor: pointer; flex-shrink: 0; transition: background .2s ease; }
   .switch.on { background: var(--green); }
@@ -736,49 +779,221 @@ function restoreCatalog(table, id) {
 }
 
 /* ============ Coiffeurs et horaires ============ */
+var expandedBarberId = null;
+var barberDetailTab = {};   // { [barberId]: 'horaires'|'stats'|'conges' }
+var barberStatsState = {};  // { [barberId]: { period, offset } }
+var barberLeaves = {};      // { [barberId]: [...] }
+
 function renderBarbers() {
   document.getElementById('barbers-list').innerHTML = barbers.length === 0
     ? '<div class="empty">Aucun coiffeur. Ajoutez-en un pour que la file fonctionne.</div>'
     : barbers.map(function (b) {
-        var days = DAYS.map(function (dn, wd) {
-          var s = (b.schedules || []).find(function (x) { return x.weekday === wd; });
-          var on = Boolean(s);
-          return '<div class="day-row' + (on ? '' : ' off') + '" data-day="' + wd + '">' +
-            '<div class="switch' + (on ? ' on' : '') + '" onclick="toggleDay(this)"></div>' +
-            '<span class="day-name">' + dn + '</span>' +
-            '<input type="time" value="' + (s ? s.start_time.slice(0, 5) : '09:00') + '">' +
-            '<span class="to">à</span>' +
-            '<input type="time" value="' + (s ? s.end_time.slice(0, 5) : '19:00') + '">' +
-            '</div>';
-        }).join('');
-
-        return '<div class="card-box" data-barber="' + b.id + '">' +
-          '<div class="admin-head">' +
-          '<div style="display:flex;align-items:center;gap:14px">' +
-          '<div onclick="document.getElementById(\'photo-input-' + b.id + '\').click()" ' +
-          'style="width:48px;height:48px;border-radius:50%;cursor:pointer;flex-shrink:0;' +
-          'background:' + (b.photo_url ? 'url(&quot;' + esc(b.photo_url) + '&quot;) center/cover' : 'var(--fill)') + ';' +
-          'display:flex;align-items:center;justify-content:center;font-weight:600;color:var(--grey)" ' +
-          'title="Changer la photo">' + (b.photo_url ? '' : esc(b.name.charAt(0).toUpperCase())) + '</div>' +
-          '<input type="file" accept="image/*" id="photo-input-' + b.id + '" style="display:none" onchange="uploadBarberPhoto(\'' + b.id + '\', this)">' +
-          '<h3 style="font-size:19px">' + esc(b.name) + (b.active ? '' : ' · inactif') + '</h3>' +
+        var open = expandedBarberId === b.id;
+        var photoStyle = b.photo_url ? 'background:url(&quot;' + esc(b.photo_url) + '&quot;) center/cover' : '';
+        return '<div class="barber-card" data-barber="' + b.id + '">' +
+          '<div class="barber-head" onclick="toggleBarberExpand(\'' + b.id + '\')">' +
+          '<div class="barber-avatar" style="' + photoStyle + '">' + (b.photo_url ? '' : esc(b.name.charAt(0).toUpperCase())) + '</div>' +
+          '<div class="barber-head-info">' +
+          '<div class="name">' + esc(b.name) + (b.active ? '' : ' · inactif') + '</div>' +
+          '<div class="sub">' + (b.has_pin ? 'Code PIN configuré' : 'Aucun code PIN') + '</div>' +
           '</div>' +
-          '<div class="item-actions">' +
-          '<button class="btn btn-soft" onclick="renameBarber(\'' + b.id + '\')">Renommer</button>' +
-          (b.active
-            ? '<button class="btn btn-ghost" onclick="archiveBarber(\'' + b.id + '\')">Désactiver</button>'
-            : '<button class="btn btn-soft" onclick="restoreBarber(\'' + b.id + '\')">Réactiver</button>') +
-          '</div></div>' +
-          '<div style="display:flex;align-items:center;gap:10px;margin-bottom:18px">' +
-          '<span class="chip' + (b.has_pin ? ' main' : '') + '">' +
-          (b.has_pin ? '🔒 Code PIN configuré' : 'Aucun code PIN') + '</span>' +
-          '<button class="btn btn-soft" style="font-size:13px;padding:8px 14px" onclick="setBarberPin(\'' + b.id + '\',\'' + esc(b.name).replace(/'/g, "\\'") + '\')">' +
-          (b.has_pin ? 'Changer le code' : 'Définir un code') + '</button>' +
+          '<svg class="barber-chevron' + (open ? ' open' : '') + '" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>' +
           '</div>' +
-          days +
-          '<button class="btn btn-primary" style="margin-top:16px" onclick="saveSchedule(\'' + b.id + '\')">Enregistrer les horaires</button>' +
+          (open ? renderBarberDetail(b) : '') +
           '</div>';
       }).join('');
+}
+
+function toggleBarberExpand(id) {
+  expandedBarberId = expandedBarberId === id ? null : id;
+  if (expandedBarberId && !barberDetailTab[expandedBarberId]) barberDetailTab[expandedBarberId] = 'horaires';
+  if (expandedBarberId && !barberStatsState[expandedBarberId]) barberStatsState[expandedBarberId] = { period: 'day', offset: 0 };
+  renderBarbers();
+  if (expandedBarberId && barberDetailTab[expandedBarberId] === 'stats') loadBarberStats(expandedBarberId);
+  if (expandedBarberId && barberDetailTab[expandedBarberId] === 'conges') loadBarberLeaves(expandedBarberId);
+}
+
+function switchBarberTab(id, tab) {
+  barberDetailTab[id] = tab;
+  renderBarbers();
+  if (tab === 'stats') loadBarberStats(id);
+  if (tab === 'conges') loadBarberLeaves(id);
+}
+
+function renderBarberDetail(b) {
+  var tab = barberDetailTab[b.id] || 'horaires';
+  var body =
+    tab === 'horaires' ? renderScheduleTab(b) :
+    tab === 'stats' ? renderStatsTab(b) :
+    renderLeavesTab(b);
+
+  return '<div class="barber-detail">' +
+    '<div class="item-actions" style="margin-bottom:16px">' +
+    '<button class="btn btn-soft" onclick="event.stopPropagation();renameBarber(\'' + b.id + '\')">Renommer</button>' +
+    (b.active
+      ? '<button class="btn btn-ghost" onclick="event.stopPropagation();archiveBarber(\'' + b.id + '\')">Désactiver</button>'
+      : '<button class="btn btn-soft" onclick="event.stopPropagation();restoreBarber(\'' + b.id + '\')">Réactiver</button>') +
+    '<button class="btn btn-soft" onclick="event.stopPropagation();document.getElementById(\'photo-input-' + b.id + '\').click()">Photo</button>' +
+    '<input type="file" accept="image/*" id="photo-input-' + b.id + '" style="display:none" onchange="event.stopPropagation();uploadBarberPhoto(\'' + b.id + '\', this)">' +
+    '<button class="btn btn-soft" onclick="event.stopPropagation();setBarberPin(\'' + b.id + '\',\'' + esc(b.name).replace(/'/g, "\\'") + '\')">' +
+    (b.has_pin ? 'Changer le code' : 'Définir un code') + '</button>' +
+    '</div>' +
+    '<div class="subtabs" onclick="event.stopPropagation()">' +
+    '<button class="' + (tab === 'horaires' ? 'on' : '') + '" onclick="switchBarberTab(\'' + b.id + '\',\'horaires\')">Horaires</button>' +
+    '<button class="' + (tab === 'stats' ? 'on' : '') + '" onclick="switchBarberTab(\'' + b.id + '\',\'stats\')">Statistiques</button>' +
+    '<button class="' + (tab === 'conges' ? 'on' : '') + '" onclick="switchBarberTab(\'' + b.id + '\',\'conges\')">Congés</button>' +
+    '</div>' +
+    '<div onclick="event.stopPropagation()">' + body + '</div>' +
+    '</div>';
+}
+
+function renderScheduleTab(b) {
+  var days = DAYS.map(function (dn, wd) {
+    var s = (b.schedules || []).find(function (x) { return x.weekday === wd; });
+    var on = Boolean(s);
+    return '<div class="day-row' + (on ? '' : ' off') + '" data-day="' + wd + '">' +
+      '<div class="switch' + (on ? ' on' : '') + '" onclick="toggleDay(this)"></div>' +
+      '<span class="day-name">' + dn + '</span>' +
+      '<input type="time" value="' + (s ? s.start_time.slice(0, 5) : '09:00') + '">' +
+      '<span class="to">à</span>' +
+      '<input type="time" value="' + (s ? s.end_time.slice(0, 5) : '19:00') + '">' +
+      '</div>';
+  }).join('');
+  return days + '<button class="btn btn-primary" style="margin-top:16px" onclick="saveSchedule(\'' + b.id + '\')">Enregistrer les horaires</button>';
+}
+
+function renderStatsTab(b) {
+  var st = barberStatsState[b.id] || { period: 'day', offset: 0 };
+  return '<div class="period-picker">' +
+    ['day', 'week', 'month'].map(function (p) {
+      var label = p === 'day' ? 'Jour' : p === 'week' ? 'Semaine' : 'Mois';
+      return '<button class="' + (st.period === p ? 'on' : '') + '" onclick="setStatsPeriod(\'' + b.id + '\',\'' + p + '\')">' + label + '</button>';
+    }).join('') +
+    '</div>' +
+    '<div class="stats-nav">' +
+    '<button class="stats-nav-btn" onclick="navStats(\'' + b.id + '\',-1)">‹</button>' +
+    '<div class="stats-period-label" id="stats-label-' + b.id + '">…</div>' +
+    '<button class="stats-nav-btn" id="stats-next-' + b.id + '" onclick="navStats(\'' + b.id + '\',1)">›</button>' +
+    '</div>' +
+    '<div class="stats-grid" id="stats-grid-' + b.id + '">' +
+    '<div class="stat-tile"><div class="v">—</div><div class="l">coupes terminées</div></div>' +
+    '<div class="stat-tile"><div class="v">—</div><div class="l">encaissé</div></div>' +
+    '</div>';
+}
+
+function renderLeavesTab(b) {
+  var today = new Date().toISOString().slice(0, 10);
+  return '<div class="leave-form">' +
+    '<div class="fld"><label>Du</label><input type="date" id="leave-start-' + b.id + '" value="' + today + '"></div>' +
+    '<div class="fld"><label>Au</label><input type="date" id="leave-end-' + b.id + '" value="' + today + '"></div>' +
+    '<div class="fld" style="flex:2"><label>Motif (optionnel)</label><input type="text" id="leave-note-' + b.id + '" placeholder="Congés, formation…"></div>' +
+    '<button class="btn btn-primary" onclick="addLeave(\'' + b.id + '\')">Ajouter</button>' +
+    '</div>' +
+    '<div id="leaves-list-' + b.id + '"><div class="empty">Chargement…</div></div>';
+}
+
+function periodRange(period, offset) {
+  var now = new Date();
+  var start, end, label;
+
+  if (period === 'day') {
+    start = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset);
+    end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 1);
+    var todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    label = offset === 0 ? "Aujourd'hui" : start.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
+  } else if (period === 'week') {
+    var day = now.getDay() === 0 ? 7 : now.getDay(); // lundi = 1 ... dimanche = 7
+    var monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (day - 1));
+    start = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + offset * 7);
+    end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 7);
+    var endIncl = new Date(end.getFullYear(), end.getMonth(), end.getDate() - 1);
+    label = (offset === 0 ? 'Cette semaine · ' : '') +
+      start.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) + ' – ' +
+      endIncl.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+  } else {
+    start = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+    end = new Date(now.getFullYear(), now.getMonth() + offset + 1, 1);
+    label = start.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+    label = label.charAt(0).toUpperCase() + label.slice(1);
+  }
+
+  return { start: start, end: end, label: label };
+}
+
+function setStatsPeriod(id, period) {
+  barberStatsState[id] = { period: period, offset: 0 };
+  renderBarbers();
+  loadBarberStats(id);
+}
+
+function navStats(id, dir) {
+  var st = barberStatsState[id];
+  if (st.offset + dir > 0) return; // pas de navigation vers le futur
+  st.offset += dir;
+  loadBarberStats(id);
+}
+
+function loadBarberStats(id) {
+  var st = barberStatsState[id];
+  var range = periodRange(st.period, st.offset);
+  var labelEl = document.getElementById('stats-label-' + id);
+  var nextBtn = document.getElementById('stats-next-' + id);
+  if (labelEl) labelEl.textContent = range.label;
+  if (nextBtn) nextBtn.disabled = st.offset >= 0;
+
+  api('/api/barbers/' + id + '/stats?start=' + range.start.toISOString() + '&end=' + range.end.toISOString())
+    .then(function (r) {
+      var grid = document.getElementById('stats-grid-' + id);
+      if (!grid) return;
+      grid.innerHTML =
+        '<div class="stat-tile"><div class="v">' + r.done_count + '</div><div class="l">coupes terminées</div></div>' +
+        '<div class="stat-tile"><div class="v">' + eur(r.revenue_cents) + '</div><div class="l">encaissé</div></div>';
+    })
+    .catch(function (e) { toast(e.message, true); });
+}
+
+function loadBarberLeaves(id) {
+  api('/api/barbers/' + id + '/leaves').then(function (r) {
+    barberLeaves[id] = r.items;
+    renderLeavesList(id);
+  }).catch(function (e) { toast(e.message, true); });
+}
+
+function renderLeavesList(id) {
+  var list = document.getElementById('leaves-list-' + id);
+  if (!list) return;
+  var items = barberLeaves[id] || [];
+  list.innerHTML = items.length === 0
+    ? '<div class="empty">Aucun congé enregistré</div>'
+    : items.map(function (l) {
+        var start = new Date(l.start_date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+        var end = new Date(l.end_date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+        return '<div class="leave-row">' +
+          '<div><div class="leave-dates">' + start + (l.start_date !== l.end_date ? ' → ' + end : '') + '</div>' +
+          (l.note ? '<div class="leave-note">' + esc(l.note) + '</div>' : '') + '</div>' +
+          '<button class="btn btn-ghost" onclick="deleteLeave(\'' + id + '\',\'' + l.id + '\')">Supprimer</button>' +
+          '</div>';
+      }).join('');
+}
+
+function addLeave(id) {
+  var start = document.getElementById('leave-start-' + id).value;
+  var end = document.getElementById('leave-end-' + id).value;
+  var note = document.getElementById('leave-note-' + id).value.trim();
+  if (!start || !end) { toast('Dates requises', true); return; }
+
+  api('/api/barbers/' + id + '/leaves', { method: 'POST', body: { start_date: start, end_date: end, note: note } })
+    .then(function () { toast('Congé ajouté'); return loadBarberLeaves(id); })
+    .catch(function (e) { toast(e.message, true); });
+}
+
+function deleteLeave(barberId, leaveId) {
+  showConfirm('Supprimer ce congé ?', { title: 'Supprimer' }).then(function (ok) {
+    if (!ok) return;
+    api('/api/barbers/' + barberId + '/leaves/' + leaveId, { method: 'DELETE' })
+      .then(function () { toast('Supprimé'); return loadBarberLeaves(barberId); })
+      .catch(function (e) { toast(e.message, true); });
+  });
 }
 
 // Redimensionne l'image côté navigateur avant envoi (évite de stocker des

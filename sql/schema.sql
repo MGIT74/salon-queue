@@ -64,6 +64,18 @@ CREATE TABLE IF NOT EXISTS barber_schedules (
   FOREIGN KEY (barber_id) REFERENCES barbers(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Congés / absences ponctuelles (distinct des horaires hebdomadaires
+-- récurrents) : une période où le coiffeur ne travaille pas du tout.
+CREATE TABLE IF NOT EXISTS barber_leaves (
+  id CHAR(36) PRIMARY KEY,
+  barber_id CHAR(36) NOT NULL,
+  start_date DATE NOT NULL,
+  end_date DATE NOT NULL,
+  note VARCHAR(255) NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (barber_id) REFERENCES barbers(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS services (
   id VARCHAR(60) PRIMARY KEY,
   salon_id CHAR(36) NOT NULL,

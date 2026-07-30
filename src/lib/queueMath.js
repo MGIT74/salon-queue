@@ -51,24 +51,33 @@ async function loadQueue(salonId) {
  * d'après leurs horaires. Sans horaire, tous les coiffeurs actifs comptent.
  */
 async function activeBarberCount(salonId) {
-  const [[barbers], [schedules]] = await Promise.all([
+  const [[barbers], [schedules], [leaves]] = await Promise.all([
     pool.query('SELECT id FROM barbers WHERE salon_id = ? AND active = 1', [salonId]),
     pool.query(
       `SELECT bs.* FROM barber_schedules bs
        JOIN barbers b ON b.id = bs.barber_id
        WHERE b.salon_id = ? AND bs.active = 1`,
       [salonId]
+    ),
+    pool.query(
+      `SELECT bl.barber_id FROM barber_leaves bl
+       JOIN barbers b ON b.id = bl.barber_id
+       WHERE b.salon_id = ? AND CURDATE() BETWEEN bl.start_date AND bl.end_date`,
+      [salonId]
     )
   ]);
 
-  if (barbers.length === 0) return 1;
-  if (schedules.length === 0) return barbers.length;
+  const onLeaveIds = new Set(leaves.map((l) => l.barber_id));
+  const available = barbers.filter((b) => !onLeaveIds.has(b.id));
+
+  if (available.length === 0) return 1;
+  if (schedules.length === 0) return available.length;
 
   const now = new Date();
   const weekday = now.getDay();
   const hhmm = now.toTimeString().slice(0, 8);
 
-  const onDuty = barbers.filter((b) =>
+  const onDuty = available.filter((b) =>
     schedules.some((s) =>
       s.barber_id === b.id && s.weekday === weekday && s.start_time <= hhmm && hhmm < s.end_time
     )
