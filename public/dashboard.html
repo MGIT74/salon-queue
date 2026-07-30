@@ -216,6 +216,12 @@
 <!-- Application -->
 <div class="wrap" id="app" style="display:none">
   <h1>Dashboard</h1>
+  <div style="margin:-10px 0 20px">
+    <select id="salon-switcher" onchange="switchSalon(this.value)"
+            style="padding:10px 16px;border:none;border-radius:999px;background:var(--fill);color:var(--ink);font-family:inherit;font-size:14px;font-weight:500;max-width:100%">
+      <option value="">Chargement…</option>
+    </select>
+  </div>
 
   <div class="tabs" id="tabs">
     <button class="on" data-t="queue">File d'attente</button>
@@ -478,6 +484,7 @@ document.getElementById('tabs').addEventListener('click', function (e) {
 
 /* ============ Chargement ============ */
 function boot() {
+  loadSalonSwitcher();
   loadCatalog()
     .then(loadBarbers)
     .then(refreshQueue)
@@ -485,6 +492,38 @@ function boot() {
       setInterval(function () { renderQueue(); }, 1000);
       subscribeQueue(refreshQueue);
     });
+}
+
+function loadSalonSwitcher() {
+  return api('/api/owner/salons').then(function (r) {
+    var sel = document.getElementById('salon-switcher');
+    sel.innerHTML = r.items.map(function (s) {
+      return '<option value="' + esc(s.slug) + '">' + esc(s.name) + '</option>';
+    }).join('');
+    var current = SALON_SLUG || (r.items.find(function (s) { return s.is_default; }) || {}).slug || '';
+    sel.value = current;
+  }).catch(function () {});
+}
+
+// Change de salon depuis le sélecteur, sans recharger la page : réinitialise
+// tout l'état (file, coiffeurs, catalogue), remet l'onglet "File d'attente"
+// pour éviter tout sous-onglet qui referencerait encore l'ancien salon.
+function switchSalon(newSlug) {
+  if (newSlug === SALON_SLUG) return;
+  setSalonSlug(newSlug);
+
+  queue = []; barbers = []; services = []; extras = [];
+  expandedBarberId = null; barberDetailTab = {}; barberStatsState = {};
+  barberCapabilities = {}; barberLeaves = {};
+  me = null;
+
+  document.querySelectorAll('#tabs button').forEach(function (x) { x.classList.remove('on'); });
+  document.querySelector('#tabs button[data-t="queue"]').classList.add('on');
+  document.querySelectorAll('.tab-panel').forEach(function (p) { p.classList.remove('on'); });
+  document.getElementById('t-queue').classList.add('on');
+
+  loadCurrentSalonName();
+  loadCatalog().then(loadBarbers).then(refreshQueue).then(function () { toast('Salon changé'); });
 }
 
 function loadCatalog() {

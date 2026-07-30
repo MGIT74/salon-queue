@@ -70,6 +70,19 @@ var SALON_SLUG = (function () {
   catch (e) { return ''; }
 })();
 
+// Change de salon SANS recharger la page : met à jour l'en-tête envoyé à
+// chaque appel API, et l'URL (pour rester partageable/rafraîchissable),
+// sans navigation complète.
+function setSalonSlug(slug) {
+  SALON_SLUG = slug || '';
+  try {
+    var url = new URL(window.location.href);
+    if (SALON_SLUG) url.searchParams.set('salon', SALON_SLUG);
+    else url.searchParams.delete('salon');
+    window.history.replaceState({}, '', url.toString());
+  } catch (e) {}
+}
+
 function api(path, opts) {
   opts = opts || {};
   var headers = { 'Content-Type': 'application/json' };
