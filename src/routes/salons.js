@@ -59,8 +59,8 @@ router.post('/salons', requireSuperAdmin, wrap(async (req, res) => {
 
   const id = crypto.randomUUID();
   await pool.query(
-    'INSERT INTO salons (id, owner_id, name, slug) VALUES (?, ?, ?, ?)',
-    [id, ownerId, name, slug]
+    'INSERT INTO salons (id, owner_id, name, slug, admin_password) VALUES (?, ?, ?, ?, ?)',
+    [id, ownerId, name, slug, admin_password]
   );
 
   // Catalogue de départ, comme pour le tout premier salon — sinon la

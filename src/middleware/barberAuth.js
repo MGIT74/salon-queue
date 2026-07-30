@@ -1,4 +1,5 @@
 const { pool } = require('../db');
+const { verifyPassword } = require('../lib/password');
 
 // Autorise soit le mot de passe admin du salon courant (contrôle total),
 // soit une authentification coiffeur par code PIN — limitée à son propre
@@ -10,10 +11,13 @@ module.exports = async function requireAdminOrBarber(req, res, next) {
     return res.status(500).json({ error: 'Salon non résolu (resolveSalon manquant en amont)' });
   }
 
-  const adminPw = (req.salon.admin_password || '').replace(/[\r\n]+$/, '').trim();
-  const given = req.get('X-Admin-Password') || req.query.pw;
-  if (adminPw && given === adminPw) {
-    return next();
+  const given = req.get('X-Admin-Password') || req.query.pw || '';
+
+  if (req.salon.owner_password_hash) {
+    if (await verifyPassword(given, req.salon.owner_password_hash)) return next();
+  } else {
+    const adminPw = (req.salon.admin_password || '').replace(/[\r\n]+$/, '').trim();
+    if (adminPw && given === adminPw) return next();
   }
 
   const barberId = req.get('X-Barber-Id');

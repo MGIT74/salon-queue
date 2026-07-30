@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Créer mon salon</title>
+<link rel="stylesheet" href="/app.css">
+<style>
+  .wrap { max-width: 460px; margin: 0 auto; padding: clamp(20px,3vw,44px); }
+  .head { text-align: center; margin-bottom: 30px; }
+  .head .mark { font-size: 13px; font-weight: 600; color: var(--grey); letter-spacing: .06em; text-transform: uppercase; margin-bottom: 8px; }
+  .head h1 { font-size: 28px; font-weight: 600; letter-spacing: -.03em; margin: 0; }
+  .head p { color: var(--grey); font-size: 14.5px; margin: 8px 0 0; }
+
+  .card-box { background: var(--card); border-radius: 18px; padding: 26px; box-shadow: var(--shadow); }
+  .row2 { display: flex; gap: 12px; }
+  .row2 > * { flex: 1; }
+
+  .success { text-align: center; padding: 40px 10px; }
+  .success .check {
+    width: 56px; height: 56px; border-radius: 50%; background: var(--green);
+    display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;
+  }
+  .success h2 { font-size: 22px; font-weight: 600; margin: 0 0 8px; }
+  .success p { color: var(--grey); font-size: 14.5px; margin: 0 0 24px; }
+  .success .btn { width: 100%; padding: 15px; font-size: 16px; }
+
+  .login-link { text-align: center; margin-top: 18px; font-size: 14px; color: var(--grey); }
+  .login-link a { color: var(--blue); text-decoration: none; font-weight: 500; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="head">
+    <div class="mark">LE SALON</div>
+    <h1>Créer votre salon</h1>
+    <p>Un compte, un mot de passe — vous gérez ensuite tout depuis votre dashboard.</p>
+  </div>
+
+  <div class="card-box" id="form-card">
+    <div class="fld"><label for="f-salon">Nom du salon</label>
+      <input id="f-salon" type="text" placeholder="Le Salon" autocomplete="organization"></div>
+    <div class="fld"><label for="f-slug">Identifiant (dans les liens de votre salon)</label>
+      <input id="f-slug" type="text" placeholder="mon-salon" pattern="[a-z0-9-]+"></div>
+    <div class="fld"><label for="f-email">Email</label>
+      <input id="f-email" type="email" placeholder="vous@exemple.com" autocomplete="email"></div>
+    <div class="row2">
+      <div class="fld"><label for="f-pw">Mot de passe</label>
+        <input id="f-pw" type="password" placeholder="6 caractères minimum" autocomplete="new-password"></div>
+      <div class="fld"><label for="f-pw2">Confirmer</label>
+        <input id="f-pw2" type="password" autocomplete="new-password"></div>
+    </div>
+    <button class="btn btn-primary" id="submit-btn" style="width:100%;padding:15px;font-size:16px" onclick="doSignup()">Créer mon salon</button>
+  </div>
+
+  <div class="card-box success" id="success-card" style="display:none">
+    <div class="check"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+    <h2>Salon créé !</h2>
+    <p>Connectez-vous à votre dashboard avec l'email et le mot de passe que vous venez de définir.</p>
+    <a class="btn btn-primary" id="dashboard-link" href="#">Aller à mon dashboard</a>
+  </div>
+
+  <div class="login-link">Déjà un salon ? <a href="/dashboard.html">Se connecter</a></div>
+</div>
+
+<script src="/app.js"></script>
+<script>
+mountThemeButton();
+
+function slugifyLive(v) {
+  return v.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
+document.getElementById('f-salon').addEventListener('input', function () {
+  var slugField = document.getElementById('f-slug');
+  if (!slugField.dataset.touched) slugField.value = slugifyLive(this.value);
+});
+document.getElementById('f-slug').addEventListener('input', function () {
+  this.dataset.touched = '1';
+  this.value = slugifyLive(this.value);
+});
+
+function doSignup() {
+  var salon = document.getElementById('f-salon').value.trim();
+  var slug = document.getElementById('f-slug').value.trim();
+  var email = document.getElementById('f-email').value.trim();
+  var pw = document.getElementById('f-pw').value;
+  var pw2 = document.getElementById('f-pw2').value;
+
+  if (!salon || !slug || !email || !pw) { toast('Tous les champs sont requis', true); return; }
+  if (pw !== pw2) { toast('Les mots de passe ne correspondent pas', true); return; }
+  if (pw.length < 6) { toast('Le mot de passe doit contenir au moins 6 caractères', true); return; }
+
+  var btn = document.getElementById('submit-btn');
+  btn.disabled = true; btn.textContent = 'Création…';
+
+  fetch('/api/signup', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ salon_name: salon, slug: slug, email: email, password: pw })
+  }).then(function (r) {
+    return r.json().then(function (d) {
+      if (!r.ok) throw new Error(d.error || 'Erreur');
+      return d;
+    });
+  }).then(function (d) {
+    document.getElementById('form-card').style.display = 'none';
+    document.getElementById('success-card').style.display = 'block';
+    document.getElementById('dashboard-link').href = '/dashboard.html?salon=' + encodeURIComponent(d.slug);
+  }).catch(function (e) {
+    toast(e.message, true);
+    btn.disabled = false; btn.textContent = 'Créer mon salon';
+  });
+}
+</script>
+</body>
+</html>

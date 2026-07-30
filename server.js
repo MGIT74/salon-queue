@@ -24,6 +24,7 @@ const barberRoutes = require('./src/routes/barbers');
 const settingsRoutes = require('./src/routes/settings');
 const salonRoutes = require('./src/routes/salons');
 const ownerRoutes = require('./src/routes/owner');
+const signupRoutes = require('./src/routes/signup');
 const requireAdmin = require('./src/middleware/auth');
 const resolveSalon = require('./src/middleware/resolveSalon');
 const { startNotifyJob } = require('./src/cron/notify');
@@ -37,6 +38,10 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Gestion des salons (super admin) — jamais scopée à un salon particulier,
 // donc montée AVANT resolveSalon.
 app.use('/api/super', salonRoutes);
+
+// Inscription d'un nouveau propriétaire de salon : crée son propre salon,
+// donc ne peut pas dépendre d'un salon déjà résolu.
+app.use('/api/signup', signupRoutes);
 
 // Toutes les routes ci-dessous sont scopées au salon résolu depuis
 // l'en-tête X-Salon-Slug (ou le salon par défaut si absent).
