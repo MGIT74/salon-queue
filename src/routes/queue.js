@@ -143,7 +143,7 @@ router.post('/:id/cancel', requireAdmin, wrap(async (req, res) => {
 // --- Coiffeur : modifier prestation et suppléments en cours de route -----
 router.put('/:id', requireAdminOrBarber, wrap(async (req, res) => {
   const [[existing]] = await pool.query(
-    'SELECT barber_id FROM queue WHERE id = ? AND salon_id = ?',
+    'SELECT barber_id, status FROM queue WHERE id = ? AND salon_id = ?',
     [req.params.id, req.salon.id]
   );
   if (!existing) return res.status(404).json({ error: 'Client introuvable' });
@@ -153,6 +153,29 @@ router.put('/:id', requireAdminOrBarber, wrap(async (req, res) => {
   }
 
   const { service_id, extras, barber_id } = req.body;
+
+  // Un coiffeur ne peut pas ajouter un supplément à une coupe EN COURS
+  // s'il y a déjà quelqu'un qui attend son tour derrière lui — ça le
+  // retarderait sans qu'il le sache à l'avance. On ne bloque que
+  // l'AJOUT (la liste s'agrandit), pas le retrait d'un supplément.
+  if (req.barberId && Array.isArray(extras) && existing.status === 'in_progress') {
+    const [[{ n: currentExtrasCount }]] = await pool.query(
+      'SELECT COUNT(*) AS n FROM queue_extras WHERE queue_id = ?', [req.params.id]
+    );
+    if (extras.length > currentExtrasCount) {
+      const [[nextWaiting]] = await pool.query(
+        `SELECT id FROM queue WHERE salon_id = ? AND status = 'waiting'
+         AND (barber_id IS NULL OR barber_id = ?) LIMIT 1`,
+        [req.salon.id, req.barberId]
+      );
+      if (nextWaiting) {
+        return res.status(409).json({
+          error: 'Un client attend déjà son tour — ajouter un supplément le retarderait.'
+        });
+      }
+    }
+  }
+
   const sets = [];
   const params = [];
   if (service_id) { sets.push('service_id = ?'); params.push(service_id); }

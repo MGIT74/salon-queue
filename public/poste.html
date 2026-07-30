@@ -324,11 +324,25 @@ function toggleExtrasPicker() {
   if (el) el.style.display = extrasPickerOpen ? 'block' : 'none';
 }
 
+function hasNextWaitingForMe() {
+  return queue.some(function (q) {
+    return q.status === 'waiting' && (!q.barber_id || q.barber_id === me.id);
+  });
+}
+
 function saveExtras(id) {
   var ids = Array.prototype.map.call(
     document.querySelectorAll('#extras-picker input[type="checkbox"]:checked'),
     function (c) { return c.value; }
   );
+
+  var cur = myActive();
+  var isAdding = cur && ids.length > cur.extras.length;
+  if (isAdding && hasNextWaitingForMe()) {
+    toast('Un client attend déjà son tour — ajouter un supplément le retarderait.', true);
+    return;
+  }
+
   barberApi('/api/queue/' + id, { method: 'PUT', body: { extras: ids } })
     .then(refresh)
     .then(function () { toast('Suppléments mis à jour'); })
