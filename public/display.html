@@ -119,6 +119,16 @@ function render() {
              '<div class="chair-client">' + esc(cut.client_name) + ' · ' + esc(cut.service.name.toLowerCase()) + '</div>' +
              '</div></div><div class="chair-timer' + (t.over ? ' over' : '') + '">' + t.text + '</div></div>';
     }
+
+    var mine = waiting.filter(function (w) { return w.barber_id === b.id; });
+    if (mine.length > 0) {
+      var totalWait = mine.reduce(function (a, w) { return a + (w.total_duration_min || 0); }, 0);
+      return '<div class="chair idle"><div class="chair-who"><span class="dot"></span><div>' +
+             '<div class="chair-barber">' + esc(b.name) + '</div>' +
+             '<div class="chair-client">' + mine.length + ' en attente</div></div></div>' +
+             '<div class="chair-timer">~' + totalWait + ' min</div></div>';
+    }
+
     return '<div class="chair idle"><div class="chair-who"><span class="dot"></span><div>' +
            '<div class="chair-barber">' + esc(b.name) + '</div>' +
            '<div class="chair-client">Poste libre</div></div></div>' +

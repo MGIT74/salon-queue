@@ -254,6 +254,20 @@ function renderBoard() {
              '<div class="serve-client">' + esc(cut.client_name) + ' · ' + esc(cut.service.name.toLowerCase()) + '</div>' +
              '</div></div><div class="serve-timer' + (t.over ? ' over' : '') + '">' + t.text + '</div></div>';
     }
+
+    // Le fauteuil est vide mais des clients attendent déjà spécifiquement
+    // ce coiffeur (ex: il encaisse le précédent, pas encore cliqué
+    // "Commencer" pour le suivant) — ne pas afficher "Disponible" dans ce
+    // cas, ça tromperait un nouveau client qui arrive sur la borne.
+    var mine = waiting.filter(function (w) { return w.barber_id === b.id; });
+    if (mine.length > 0) {
+      var totalWait = mine.reduce(function (a, w) { return a + (w.total_duration_min || 0); }, 0);
+      return '<div class="serve-row idle"><div class="serve-who"><span class="status"></span><div>' +
+             '<div class="serve-barber">' + esc(b.name) + '</div>' +
+             '<div class="serve-client">' + mine.length + ' en attente</div></div></div>' +
+             '<div class="serve-timer">~' + totalWait + ' min</div></div>';
+    }
+
     return '<div class="serve-row idle"><div class="serve-who"><span class="status"></span><div>' +
            '<div class="serve-barber">' + esc(b.name) + '</div>' +
            '<div class="serve-client">Poste libre</div></div></div>' +
