@@ -7,6 +7,17 @@
 <link rel="stylesheet" href="/app.css">
 <style>
   .wrap { max-width: none; margin: 0; padding: clamp(20px,2.2vw,36px); }
+
+  #impersonate-banner {
+    display: none; position: fixed; top: 0; left: 0; right: 0; z-index: 999;
+    background: #ff9500; color: #1a1a1a; font-size: 13.5px; font-weight: 600;
+    padding: 11px 20px; align-items: center; justify-content: center; gap: 16px; flex-wrap: wrap;
+  }
+  #impersonate-banner button {
+    background: rgba(0,0,0,0.15); color: inherit; border: none; padding: 6px 16px;
+    border-radius: 999px; font-family: inherit; font-weight: 700; font-size: 13px; cursor: pointer;
+  }
+  body.impersonating .wrap { padding-top: calc(clamp(20px,2.2vw,36px) + 46px); }
   h1 { font-size: clamp(28px,3.2vw,40px); font-weight: 600; letter-spacing: -.035em; margin: 0 0 20px; }
 
   /* Connexion */
@@ -232,6 +243,13 @@
 </style>
 </head>
 <body>
+
+<div id="impersonate-banner">
+  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 10-5.4 5.4L2 19v3h3l7.3-7.3a4 4 0 005.4-5.4l-2.8 2.8-2-2z"/></svg>
+  <span>Mode assistance — connecté en tant que super admin sur l'enseigne de <b id="imp-salon-name">…</b></span>
+  <span id="imp-countdown"></span>
+  <button onclick="exitImpersonation()">Quitter</button>
+</div>
 
 <!-- Connexion -->
 <div class="wrap login" id="login">
@@ -519,6 +537,8 @@ function loadCurrentSalonName() {
       if (loginEl) loginEl.textContent = name;
       var brandEl = document.getElementById('app-salon-badge');
       if (brandEl) brandEl.textContent = name;
+      var impNameEl = document.getElementById('imp-salon-name');
+      if (impNameEl) impNameEl.textContent = name;
       var logoPreview = document.getElementById('salon-logo-preview');
       if (logoPreview) {
         if (currentSalonLogo) {
@@ -565,6 +585,31 @@ function logout() {
   window.location.reload();
 }
 
+var impersonateCountdownInterval = null;
+
+function startImpersonateBanner() {
+  document.body.classList.add('impersonating');
+  document.getElementById('impersonate-banner').style.display = 'flex';
+
+  var remaining = 10 * 60; // correspond à la durée de vie du jeton côté serveur
+  var countdownEl = document.getElementById('imp-countdown');
+
+  function tick() {
+    var m = Math.floor(remaining / 60);
+    var s = remaining % 60;
+    countdownEl.textContent = '(expire dans ' + m + ':' + (s < 10 ? '0' : '') + s + ')';
+    if (remaining <= 0) { exitImpersonation(); return; }
+    remaining--;
+  }
+  tick();
+  impersonateCountdownInterval = setInterval(tick, 1000);
+}
+
+function exitImpersonation() {
+  if (impersonateCountdownInterval) clearInterval(impersonateCountdownInterval);
+  window.location.href = '/super-admin.html';
+}
+
 (function autoLogin() {
   // Lien d'assistance du super admin : accès temporaire sans mot de passe.
   var impersonateToken = new URLSearchParams(window.location.search).get('impersonate');
@@ -572,6 +617,7 @@ function logout() {
     setImpersonateToken(impersonateToken);
     document.getElementById('login').style.display = 'none';
     document.getElementById('app').style.display = '';
+    startImpersonateBanner();
     boot();
     return;
   }
