@@ -293,13 +293,31 @@ function waitForBarber(barberId) {
   var active = queue.filter(function (q) { return q.status === 'in_progress'; });
 
   if (!barberId) {
-    // "Premier disponible" : le plus petit temps avant qu'un coiffeur se libère
-    var mins = barbers.map(function (b) {
-      var cur = active.find(function (q) { return q.barber_id === b.id; });
+    if (!barbers.length) return 0;
+
+    // Simule la répartition de TOUS les clients en attente (assignés à un
+    // coiffeur précis ou non) sur les postes, pour estimer le temps si un
+    // nouveau client rejoint la file maintenant sans préférence. Sans ça,
+    // des clients en attente "premier disponible" étaient ignorés du
+    // calcul, faisant croire à tort qu'un poste était libre immédiatement.
+    var lanes = barbers.map(function (b) {
+      var cur = active.find(function (a) { return a.barber_id === b.id; });
       return remainingForCut(cur);
     });
-    return mins.length ? Math.round(Math.min.apply(null, mins)) : 0;
+
+    barbers.forEach(function (b, i) {
+      waiting.filter(function (w) { return w.barber_id === b.id; })
+        .forEach(function (w) { lanes[i] += (w.total_duration_min || 0); });
+    });
+
+    waiting.filter(function (w) { return !w.barber_id; }).forEach(function (w) {
+      var idx = lanes.indexOf(Math.min.apply(null, lanes));
+      lanes[idx] += (w.total_duration_min || 0);
+    });
+
+    return Math.round(Math.min.apply(null, lanes));
   }
+
   var mine = waiting.filter(function (q) { return q.barber_id === barberId; });
   var cur = active.find(function (q) { return q.barber_id === barberId; });
   var total = mine.reduce(function (a, q) { return a + (q.total_duration_min || 0); }, 0);
