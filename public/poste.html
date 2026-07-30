@@ -339,6 +339,8 @@ function saveExtras(id) {
   var cur = myActive();
   var isAdding = cur && ids.length > cur.extras.length;
   if (isAdding && hasNextWaitingForMe()) {
+    extrasPickerOpen = false;
+    renderActive();
     toast('Un client attend déjà son tour — ajouter un supplément le retarderait.', true);
     return;
   }
@@ -349,7 +351,11 @@ function saveExtras(id) {
       return refresh();
     })
     .then(function () { toast('Suppléments mis à jour'); })
-    .catch(function (e) { toast(e.message, true); });
+    .catch(function (e) {
+      extrasPickerOpen = false;
+      renderActive();
+      toast(e.message, true);
+    });
 }
 
 function saveNote(id) {
