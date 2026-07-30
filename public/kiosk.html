@@ -29,6 +29,7 @@
   .serve-timer { font-size: clamp(17px,1.8vw,22px); font-weight: 600; font-variant-numeric: tabular-nums;
                  letter-spacing: -.02em; flex-shrink: 0; }
   .serve-row.idle .serve-timer { font-size: clamp(12px,1.15vw,14px); font-weight: 500; color: var(--grey); }
+  .serve-timer.over { color: var(--orange); }
   .board-foot { margin-top: clamp(16px,2vh,22px); padding-top: clamp(16px,2vh,22px);
                 border-top: 1px solid var(--sep); display: flex; align-items: baseline; gap: 8px; }
   .board-foot .n { font-size: clamp(26px,2.6vw,36px); font-weight: 600; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
@@ -232,6 +233,13 @@ function refresh() {
 }
 
 /* ---------- Panneau gauche ---------- */
+function cutTimerDisplay(cut) {
+  var elapsedSec = Math.max(Math.floor((Date.now() - new Date(cut.start_at).getTime()) / 1000), 0);
+  var remainSec = (cut.total_duration_min || 0) * 60 - elapsedSec;
+  if (remainSec >= 0) return { text: mmss(remainSec), over: false };
+  return { text: '+' + Math.ceil(Math.abs(remainSec) / 60) + ' min', over: true };
+}
+
 function renderBoard() {
   var active = queue.filter(function (q) { return q.status === 'in_progress'; });
   var waiting = queue.filter(function (q) { return q.status === 'waiting'; });
@@ -240,11 +248,11 @@ function renderBoard() {
   document.getElementById('serving').innerHTML = barbers.map(function (b) {
     var cut = active.find(function (a) { return a.barber_id === b.id; });
     if (cut) {
-      var sec = Math.floor((Date.now() - new Date(cut.start_at).getTime()) / 1000);
+      var t = cutTimerDisplay(cut);
       return '<div class="serve-row"><div class="serve-who"><span class="status"></span><div>' +
              '<div class="serve-barber">' + esc(b.name) + '</div>' +
              '<div class="serve-client">' + esc(cut.client_name) + ' · ' + esc(cut.service.name.toLowerCase()) + '</div>' +
-             '</div></div><div class="serve-timer">' + mmss(Math.max(sec, 0)) + '</div></div>';
+             '</div></div><div class="serve-timer' + (t.over ? ' over' : '') + '">' + t.text + '</div></div>';
     }
     return '<div class="serve-row idle"><div class="serve-who"><span class="status"></span><div>' +
            '<div class="serve-barber">' + esc(b.name) + '</div>' +
