@@ -1350,9 +1350,14 @@ function renderChainBarbers() {
 
 function moveBarber(barberId, salonId) {
   api('/api/owner/barbers/' + barberId + '/salon', { method: 'PUT', body: { salon_id: salonId } })
-    .then(loadChainBarbers)
+    .then(function () {
+      // Le coiffeur peut sortir ou entrer dans le salon actuellement affiché :
+      // on resynchronise partout (Coiffeurs, "Je suis" dans File d'attente),
+      // pas seulement la liste de l'onglet Mes salons.
+      return Promise.all([loadChainBarbers(), loadBarbers()]);
+    })
     .then(function () { toast('Coiffeur déplacé'); })
-    .catch(function (e) { toast(e.message, true); loadChainBarbers(); });
+    .catch(function (e) { toast(e.message, true); loadChainBarbers(); loadBarbers(); });
 }
 
 function loadChainClients() {
