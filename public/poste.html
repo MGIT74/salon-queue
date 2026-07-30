@@ -63,7 +63,7 @@
 
 <div class="wrap">
   <div class="login" id="login-screen">
-    <div class="mark">LE SALON</div>
+    <div class="mark" id="salon-mark">LE SALON</div>
     <h1>Mon poste</h1>
     <div class="pin-dots" id="pin-dots">
       <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
@@ -79,7 +79,10 @@
 
   <div id="app-screen" style="display:none">
     <div class="topbar">
-      <h1 id="my-name">—</h1>
+      <div>
+        <div id="salon-name-tag" style="font-size:12px;font-weight:600;color:var(--grey);letter-spacing:.04em;text-transform:uppercase;margin-bottom:2px"></div>
+        <h1 id="my-name">—</h1>
+      </div>
       <button class="logout-btn" onclick="logout()">Déconnexion</button>
     </div>
     <div id="active-zone"></div>
@@ -101,6 +104,23 @@ var SALON_SLUG = (function () {
   try { return new URLSearchParams(window.location.search).get('salon') || ''; }
   catch (e) { return ''; }
 })();
+
+function loadSalonName() {
+  var headers = {};
+  if (SALON_SLUG) headers['X-Salon-Slug'] = SALON_SLUG;
+  fetch('/api/settings/public', { headers: headers })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      var name = d.salon_name || 'Le Salon';
+      document.title = name + ' — Mon poste';
+      var mark = document.getElementById('salon-mark');
+      if (mark) mark.textContent = name.toUpperCase();
+      var tag = document.getElementById('salon-name-tag');
+      if (tag) tag.textContent = name;
+    })
+    .catch(function () {});
+}
+loadSalonName();
 
 /* ---------- API avec authentification par PIN ---------- */
 function barberApi(path, opts) {
