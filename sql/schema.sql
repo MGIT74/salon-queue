@@ -76,6 +76,24 @@ CREATE TABLE IF NOT EXISTS barber_leaves (
   FOREIGN KEY (barber_id) REFERENCES barbers(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Par défaut, un coiffeur fait TOUTES les prestations/suppléments du
+-- salon. Ces tables ne listent que les EXCLUSIONS explicites (opt-out),
+-- pour qu'un nouveau coiffeur ne se retrouve jamais "sans rien à faire"
+-- tant que personne n'a rien configuré.
+CREATE TABLE IF NOT EXISTS barber_service_exclusions (
+  barber_id CHAR(36) NOT NULL,
+  service_id VARCHAR(60) NOT NULL,
+  PRIMARY KEY (barber_id, service_id),
+  FOREIGN KEY (barber_id) REFERENCES barbers(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS barber_extra_exclusions (
+  barber_id CHAR(36) NOT NULL,
+  extra_id VARCHAR(60) NOT NULL,
+  PRIMARY KEY (barber_id, extra_id),
+  FOREIGN KEY (barber_id) REFERENCES barbers(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS services (
   id VARCHAR(60) PRIMARY KEY,
   salon_id CHAR(36) NOT NULL,

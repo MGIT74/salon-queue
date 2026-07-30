@@ -258,17 +258,35 @@ function loadCatalog() {
     document.getElementById('salon-name').textContent = salonName;
     document.getElementById('t-salon').textContent = salonName;
 
-    document.getElementById('f-service').innerHTML = services.map(function (s) {
-      return '<option value="' + s.id + '">' + esc(s.name) + ' — ' + s.duration_min + ' min · ' + eur(s.price_cents) + '</option>';
-    }).join('');
     document.getElementById('f-service').onchange = renderTotals;
-
-    document.getElementById('extras-grid').innerHTML = extras.map(function (e) {
-      return '<button class="xchip" data-id="' + e.id + '" onclick="toggleExtra(\'' + e.id + '\')">' +
-             '<span>' + esc(e.name) + '</span><span class="xm">+' + e.duration_min + ' min · ' + eur(e.price_cents) + '</span></button>';
-    }).join('');
-    renderTotals();
+    renderFormOptions();
   });
+}
+
+// Filtre les prestations/suppléments affichés dans le formulaire selon ce
+// que le coiffeur choisi réalise ou non (par défaut tout est proposé,
+// tant qu'aucun coiffeur n'est encore sélectionné).
+function renderFormOptions() {
+  var b = selBarber ? barbers.find(function (x) { return x.id === selBarber; }) : null;
+  var disabledSvc = (b && b.disabled_service_ids) || [];
+  var disabledExt = (b && b.disabled_extra_ids) || [];
+
+  var availableServices = services.filter(function (s) { return disabledSvc.indexOf(s.id) === -1; });
+  var availableExtras = extras.filter(function (e) { return disabledExt.indexOf(e.id) === -1; });
+
+  document.getElementById('f-service').innerHTML = availableServices.map(function (s) {
+    return '<option value="' + s.id + '">' + esc(s.name) + ' — ' + s.duration_min + ' min · ' + eur(s.price_cents) + '</option>';
+  }).join('') || '<option value="">Aucune prestation disponible</option>';
+
+  document.getElementById('extras-grid').innerHTML = availableExtras.map(function (e) {
+    return '<button class="xchip' + (selExtras.indexOf(e.id) !== -1 ? ' sel' : '') + '" data-id="' + e.id + '" onclick="toggleExtra(\'' + e.id + '\')">' +
+           '<span>' + esc(e.name) + '</span><span class="xm">+' + e.duration_min + ' min · ' + eur(e.price_cents) + '</span></button>';
+  }).join('');
+
+  // Retire de la sélection les suppléments devenus indisponibles avec ce coiffeur
+  selExtras = selExtras.filter(function (id) { return availableExtras.some(function (e) { return e.id === id; }); });
+
+  renderTotals();
 }
 
 function refresh() {
@@ -419,7 +437,7 @@ function pickBarberAndGo(id) {
   document.getElementById('chosen-barber-note').innerHTML = b
     ? 'Avec <b>' + esc(b.name) + '</b>'
     : '';
-  renderTotals();
+  renderFormOptions();
   show('p-form');
 }
 

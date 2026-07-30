@@ -811,6 +811,7 @@ function toggleBarberExpand(id) {
   renderBarbers();
   if (expandedBarberId && barberDetailTab[expandedBarberId] === 'stats') loadBarberStats(expandedBarberId);
   if (expandedBarberId && barberDetailTab[expandedBarberId] === 'conges') loadBarberLeaves(expandedBarberId);
+  if (expandedBarberId && barberDetailTab[expandedBarberId] === 'prestations') loadBarberCapabilities(expandedBarberId);
 }
 
 function switchBarberTab(id, tab) {
@@ -818,6 +819,7 @@ function switchBarberTab(id, tab) {
   renderBarbers();
   if (tab === 'stats') loadBarberStats(id);
   if (tab === 'conges') loadBarberLeaves(id);
+  if (tab === 'prestations') loadBarberCapabilities(id);
 }
 
 function renderBarberDetail(b) {
@@ -825,6 +827,7 @@ function renderBarberDetail(b) {
   var body =
     tab === 'horaires' ? renderScheduleTab(b) :
     tab === 'stats' ? renderStatsTab(b) :
+    tab === 'prestations' ? renderCapabilitiesTab(b) :
     renderLeavesTab(b);
 
   return '<div class="barber-detail">' +
@@ -840,6 +843,7 @@ function renderBarberDetail(b) {
     '</div>' +
     '<div class="subtabs" onclick="event.stopPropagation()">' +
     '<button class="' + (tab === 'horaires' ? 'on' : '') + '" onclick="switchBarberTab(\'' + b.id + '\',\'horaires\')">Horaires</button>' +
+    '<button class="' + (tab === 'prestations' ? 'on' : '') + '" onclick="switchBarberTab(\'' + b.id + '\',\'prestations\')">Prestations</button>' +
     '<button class="' + (tab === 'stats' ? 'on' : '') + '" onclick="switchBarberTab(\'' + b.id + '\',\'stats\')">Statistiques</button>' +
     '<button class="' + (tab === 'conges' ? 'on' : '') + '" onclick="switchBarberTab(\'' + b.id + '\',\'conges\')">Congés</button>' +
     '</div>' +
@@ -890,6 +894,63 @@ function renderLeavesTab(b) {
     '<button class="btn btn-primary" onclick="addLeave(\'' + b.id + '\')">Ajouter</button>' +
     '</div>' +
     '<div id="leaves-list-' + b.id + '"><div class="empty">Chargement…</div></div>';
+}
+
+function renderCapabilitiesTab(b) {
+  return '<p class="hint" style="margin:0 0 16px">Décochez ce que ' + esc(b.name) + ' ne réalise pas. Tout est activé par défaut.</p>' +
+    '<div class="grp-label">Prestations</div>' +
+    '<div class="opt-list" id="cap-services-' + b.id + '" style="margin-bottom:22px"><div class="empty">Chargement…</div></div>' +
+    '<div class="grp-label">Suppléments</div>' +
+    '<div class="opt-list" id="cap-extras-' + b.id + '"><div class="empty">Chargement…</div></div>' +
+    '<button class="btn btn-primary" style="margin-top:18px" onclick="saveCapabilities(\'' + b.id + '\')">Enregistrer</button>';
+}
+
+var barberCapabilities = {}; // { [barberId]: { services:[{id,name,enabled}], extras:[...] } }
+
+function loadBarberCapabilities(id) {
+  api('/api/barbers/' + id + '/capabilities').then(function (r) {
+    barberCapabilities[id] = { services: r.services, extras: r.extras };
+    renderCapabilitiesLists(id);
+  }).catch(function (e) { toast(e.message, true); });
+}
+
+function renderCapabilitiesLists(id) {
+  var caps = barberCapabilities[id];
+  if (!caps) return;
+  var svcEl = document.getElementById('cap-services-' + id);
+  var extEl = document.getElementById('cap-extras-' + id);
+  if (!svcEl || !extEl) return;
+
+  function row(item, kind) {
+    return '<div class="opt' + (item.enabled ? ' sel' : '') + '" onclick="toggleCapability(\'' + id + '\',\'' + kind + '\',\'' + item.id + '\')">' +
+      '<div class="box square">' + CHECK + '</div><div><div class="opt-name">' + esc(item.name) + '</div></div></div>';
+  }
+
+  svcEl.innerHTML = caps.services.length
+    ? caps.services.map(function (s) { return row(s, 'services'); }).join('')
+    : '<div class="empty">Aucune prestation configurée</div>';
+  extEl.innerHTML = caps.extras.length
+    ? caps.extras.map(function (e) { return row(e, 'extras'); }).join('')
+    : '<div class="empty">Aucun supplément configuré</div>';
+}
+
+function toggleCapability(barberId, kind, itemId) {
+  var list = barberCapabilities[barberId][kind];
+  var item = list.find(function (x) { return x.id === itemId; });
+  item.enabled = !item.enabled;
+  renderCapabilitiesLists(barberId);
+}
+
+function saveCapabilities(id) {
+  var caps = barberCapabilities[id];
+  var disabledServiceIds = caps.services.filter(function (s) { return !s.enabled; }).map(function (s) { return s.id; });
+  var disabledExtraIds = caps.extras.filter(function (e) { return !e.enabled; }).map(function (e) { return e.id; });
+
+  api('/api/barbers/' + id + '/capabilities', {
+    method: 'PUT',
+    body: { disabled_service_ids: disabledServiceIds, disabled_extra_ids: disabledExtraIds }
+  }).then(function () { toast('Prestations mises à jour'); })
+    .catch(function (e) { toast(e.message, true); });
 }
 
 function periodRange(period, offset) {

@@ -33,9 +33,24 @@ router.get('/', wrap(async (req, res) => {
      WHERE b.salon_id = ?`,
     [req.salon.id]
   );
+  const [svcExcl] = await pool.query(
+    `SELECT bse.* FROM barber_service_exclusions bse
+     JOIN barbers b ON b.id = bse.barber_id WHERE b.salon_id = ?`,
+    [req.salon.id]
+  );
+  const [extExcl] = await pool.query(
+    `SELECT bee.* FROM barber_extra_exclusions bee
+     JOIN barbers b ON b.id = bee.barber_id WHERE b.salon_id = ?`,
+    [req.salon.id]
+  );
 
+  // Identifiants de prestations/suppléments NON réalisés par ce coiffeur —
+  // pas un secret (les catalogues sont déjà publics), utile au kiosk pour
+  // filtrer le formulaire une fois le coiffeur choisi.
   const items = barbers.map((b) => Object.assign({}, stripSecrets(b), {
-    schedules: schedules.filter((s) => s.barber_id === b.id).sort((a, c) => a.weekday - c.weekday)
+    schedules: schedules.filter((s) => s.barber_id === b.id).sort((a, c) => a.weekday - c.weekday),
+    disabled_service_ids: svcExcl.filter((e) => e.barber_id === b.id).map((e) => e.service_id),
+    disabled_extra_ids: extExcl.filter((e) => e.barber_id === b.id).map((e) => e.extra_id)
   }));
 
   res.json({ ok: true, items, on_duty: await activeBarberCount(req.salon.id) });
@@ -209,6 +224,70 @@ router.delete('/:id/leaves/:leaveId', requireAdmin, wrap(async (req, res) => {
      WHERE bl.id = ? AND bl.barber_id = ? AND b.salon_id = ?`,
     [req.params.leaveId, req.params.id, req.salon.id]
   );
+  res.json({ ok: true });
+}));
+
+/**
+ * Prestations et suppléments qu'un coiffeur réalise ou non.
+ * Par défaut tout est activé ; on ne stocke que les exclusions.
+ */
+router.get('/:id/capabilities', requireAdmin, wrap(async (req, res) => {
+  const [[owned]] = await pool.query(
+    'SELECT id FROM barbers WHERE id = ? AND salon_id = ?',
+    [req.params.id, req.salon.id]
+  );
+  if (!owned) return res.status(404).json({ error: 'Coiffeur introuvable' });
+
+  const [services] = await pool.query(
+    'SELECT id, name FROM services WHERE salon_id = ? AND active = 1 ORDER BY sort_order, name',
+    [req.salon.id]
+  );
+  const [extras] = await pool.query(
+    'SELECT id, name FROM extras WHERE salon_id = ? AND active = 1 ORDER BY sort_order, name',
+    [req.salon.id]
+  );
+  const [svcExcl] = await pool.query(
+    'SELECT service_id FROM barber_service_exclusions WHERE barber_id = ?', [req.params.id]
+  );
+  const [extExcl] = await pool.query(
+    'SELECT extra_id FROM barber_extra_exclusions WHERE barber_id = ?', [req.params.id]
+  );
+  const disabledSvc = new Set(svcExcl.map((r) => r.service_id));
+  const disabledExt = new Set(extExcl.map((r) => r.extra_id));
+
+  res.json({
+    ok: true,
+    services: services.map((s) => Object.assign({}, s, { enabled: !disabledSvc.has(s.id) })),
+    extras: extras.map((e) => Object.assign({}, e, { enabled: !disabledExt.has(e.id) }))
+  });
+}));
+
+router.put('/:id/capabilities', requireAdmin, wrap(async (req, res) => {
+  const [[owned]] = await pool.query(
+    'SELECT id FROM barbers WHERE id = ? AND salon_id = ?',
+    [req.params.id, req.salon.id]
+  );
+  if (!owned) return res.status(404).json({ error: 'Coiffeur introuvable' });
+
+  const disabledServiceIds = Array.isArray(req.body.disabled_service_ids) ? req.body.disabled_service_ids : [];
+  const disabledExtraIds = Array.isArray(req.body.disabled_extra_ids) ? req.body.disabled_extra_ids : [];
+
+  await pool.query('DELETE FROM barber_service_exclusions WHERE barber_id = ?', [req.params.id]);
+  await pool.query('DELETE FROM barber_extra_exclusions WHERE barber_id = ?', [req.params.id]);
+
+  if (disabledServiceIds.length) {
+    await pool.query(
+      'INSERT INTO barber_service_exclusions (barber_id, service_id) VALUES ?',
+      [disabledServiceIds.map((id) => [req.params.id, id])]
+    );
+  }
+  if (disabledExtraIds.length) {
+    await pool.query(
+      'INSERT INTO barber_extra_exclusions (barber_id, extra_id) VALUES ?',
+      [disabledExtraIds.map((id) => [req.params.id, id])]
+    );
+  }
+
   res.json({ ok: true });
 }));
 
