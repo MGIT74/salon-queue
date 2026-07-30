@@ -38,9 +38,19 @@ router.put('/', requireAdmin, wrap(async (req, res) => {
   // Champ mot de passe laissé vide = on conserve l'ancien
   if (patch.smtp_pass === '') delete patch.smtp_pass;
 
+  // Un expéditeur sans adresse email valide n'est pas un en-tête From
+  // exploitable — les fournisseurs comme Gmail rejettent silencieusement
+  // ces messages. On corrige automatiquement en y accolant l'email
+  // authentifié.
+  if (patch.smtp_from && !patch.smtp_from.includes('@')) {
+    const existing = await getSettings(req.salon.id);
+    const email = patch.smtp_user || existing.smtp_user;
+    if (email) patch.smtp_from = `${patch.smtp_from} <${email}>`;
+  }
+
   await setSettings(req.salon.id, patch);
   invalidateTransport(req.salon.id);
-  res.json({ ok: true });
+  res.json({ ok: true, smtp_from: patch.smtp_from });
 }));
 
 router.post('/smtp/test', requireAdmin, wrap(async (req, res) => {

@@ -225,9 +225,20 @@ router.put('/smtp', requireSuperAdmin, wrap(async (req, res) => {
   // Champ mot de passe laissé vide = on conserve l'ancien
   if (patch.smtp_pass === '') delete patch.smtp_pass;
 
+  // Un expéditeur sans adresse email valide (ex: juste "Barber Pass") est
+  // un en-tête From invalide : Hostinger le laisse passer en interne avec
+  // un affichage cassé, mais Gmail et consorts rejettent silencieusement
+  // le message (SPF/DKIM ne peuvent rien vérifier). On corrige
+  // automatiquement en y accolant l'email authentifié.
+  if (patch.smtp_from && !patch.smtp_from.includes('@')) {
+    const existing = await getPlatformSettings();
+    const email = patch.smtp_user || existing.smtp_user;
+    if (email) patch.smtp_from = `${patch.smtp_from} <${email}>`;
+  }
+
   await setPlatformSettings(patch);
   invalidateTransport();
-  res.json({ ok: true });
+  res.json({ ok: true, smtp_from: patch.smtp_from });
 }));
 
 router.post('/test-email', requireSuperAdmin, wrap(async (req, res) => {
