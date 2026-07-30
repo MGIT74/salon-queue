@@ -1,14 +1,21 @@
 const mysql = require('mysql2/promise');
 
+// xCloud a tendance à réécrire le .env avec des fins de ligne Windows (\r\n)
+// et laisse parfois un \r collé à la fin des valeurs — ce qui casse la
+// résolution DNS/host silencieusement. On nettoie systématiquement.
+function clean(v) {
+  return typeof v === 'string' ? v.replace(/[\r\n]+$/, '').trim() : v;
+}
+
 // Valeurs de connexion. Les variables d'environnement ont la priorité ;
 // les valeurs ci-dessous servent de fallback quand le .env est vide
 // (comportement observé sur xCloud qui réécrit le .env à chaque déploiement).
 const pool = mysql.createPool({
-  host:     process.env.DB_HOST     || '127.0.0.1',
-  port:     Number(process.env.DB_PORT || 3306),
-  user:     process.env.DB_USER     || 'u_solitary_rain',
-  password: process.env.DB_PASSWORD || 'AFm6JNqplvdytXvS',
-  database: process.env.DB_NAME     || 's_solitary_rain',
+  host:     clean(process.env.DB_HOST)     || '127.0.0.1',
+  port:     Number(clean(process.env.DB_PORT) || 3306),
+  user:     clean(process.env.DB_USER)     || 'u_solitary_rain',
+  password: clean(process.env.DB_PASSWORD) || 'AFm6JNqplvdytXvS',
+  database: clean(process.env.DB_NAME)     || 's_solitary_rain',
   waitForConnections: true,
   connectionLimit: 10,
   namedPlaceholders: false,

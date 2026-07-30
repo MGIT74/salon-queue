@@ -2,7 +2,7 @@
 // Suffisant pour une tablette posée dans le salon ; pour du multi-utilisateur
 // avec traçabilité, passer à un système d'authentification par compte.
 module.exports = function requireAdmin(req, res, next) {
-  const expected = process.env.ADMIN_PASSWORD;
+  const expected = (process.env.ADMIN_PASSWORD || '').replace(/[\r\n]+$/, '').trim();
   if (!expected) {
     return res.status(500).json({ error: 'ADMIN_PASSWORD non défini côté serveur' });
   }

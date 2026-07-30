@@ -10,7 +10,7 @@ const requireAdmin = require('./src/middleware/auth');
 const { startNotifyJob } = require('./src/cron/notify');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = Number((process.env.PORT || '3000').toString().replace(/[\r\n]+$/, '').trim());
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
