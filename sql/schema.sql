@@ -5,21 +5,35 @@
 --  voir sql/migration-multi-salon.sql a la place.
 -- ============================================================
 
-CREATE TABLE IF NOT EXISTS salons (
+CREATE TABLE IF NOT EXISTS owners (
   id CHAR(36) PRIMARY KEY,
-  name VARCHAR(255) NOT NULL,
-  slug VARCHAR(80) NOT NULL UNIQUE,
+  name VARCHAR(255) NULL,
   admin_password VARCHAR(255) NOT NULL,
-  is_default TINYINT(1) NOT NULL DEFAULT 0,
-  active TINYINT(1) NOT NULL DEFAULT 1,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Le salon par defaut : sert de secours quand une page est ouverte sans
--- ?salon=... dans l'URL (retro-compatibilite avec les bornes deja
--- configurees avant l'ajout du multi-salon).
-INSERT INTO salons (id, name, slug, admin_password, is_default)
-SELECT UUID(), 'Le Salon', 'le-salon', 'change-moi', 1
+CREATE TABLE IF NOT EXISTS salons (
+  id CHAR(36) PRIMARY KEY,
+  owner_id CHAR(36) NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  slug VARCHAR(80) NOT NULL UNIQUE,
+  is_default TINYINT(1) NOT NULL DEFAULT 0,
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (owner_id) REFERENCES owners(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Le propriétaire et le salon par défaut : sert de secours quand une page
+-- est ouverte sans ?salon=... dans l'URL (rétro-compatibilité avec les
+-- bornes déjà configurées avant l'ajout du multi-salon).
+INSERT INTO owners (id, name, admin_password)
+SELECT UUID(), 'Le Salon', 'change-moi'
+WHERE NOT EXISTS (SELECT 1 FROM salons WHERE is_default = 1);
+
+SET @seed_owner_id = (SELECT id FROM owners ORDER BY created_at DESC LIMIT 1);
+
+INSERT INTO salons (id, owner_id, name, slug, is_default)
+SELECT UUID(), @seed_owner_id, 'Le Salon', 'le-salon', 1
 WHERE NOT EXISTS (SELECT 1 FROM salons WHERE is_default = 1);
 
 CREATE TABLE IF NOT EXISTS barbers (

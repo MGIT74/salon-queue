@@ -51,10 +51,16 @@ router.post('/salons', requireSuperAdmin, wrap(async (req, res) => {
   const [[existing]] = await pool.query('SELECT id FROM salons WHERE slug = ?', [slug]);
   if (existing) return res.status(409).json({ error: 'Cet identifiant est déjà utilisé' });
 
+  const ownerId = crypto.randomUUID();
+  await pool.query(
+    'INSERT INTO owners (id, name, admin_password) VALUES (?, ?, ?)',
+    [ownerId, name, admin_password]
+  );
+
   const id = crypto.randomUUID();
   await pool.query(
-    'INSERT INTO salons (id, name, slug, admin_password) VALUES (?, ?, ?, ?)',
-    [id, name, slug, admin_password]
+    'INSERT INTO salons (id, owner_id, name, slug) VALUES (?, ?, ?, ?)',
+    [id, ownerId, name, slug]
   );
 
   // Catalogue de départ, comme pour le tout premier salon — sinon la
@@ -99,10 +105,17 @@ router.put('/salons/:id', requireSuperAdmin, wrap(async (req, res) => {
   const params = [];
   if (req.body.name !== undefined) { sets.push('name = ?'); params.push(req.body.name); }
   if (req.body.active !== undefined) { sets.push('active = ?'); params.push(req.body.active ? 1 : 0); }
-  if (req.body.admin_password) { sets.push('admin_password = ?'); params.push(req.body.admin_password); }
-  if (!sets.length) return res.json({ ok: true });
-  params.push(req.params.id);
-  await pool.query(`UPDATE salons SET ${sets.join(', ')} WHERE id = ?`, params);
+  if (sets.length) {
+    params.push(req.params.id);
+    await pool.query(`UPDATE salons SET ${sets.join(', ')} WHERE id = ?`, params);
+  }
+
+  if (req.body.admin_password) {
+    const [[salon]] = await pool.query('SELECT owner_id FROM salons WHERE id = ?', [req.params.id]);
+    if (!salon) return res.status(404).json({ error: 'Salon introuvable' });
+    await pool.query('UPDATE owners SET admin_password = ? WHERE id = ?', [req.body.admin_password, salon.owner_id]);
+  }
+
   res.json({ ok: true });
 }));
 
