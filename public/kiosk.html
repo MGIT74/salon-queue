@@ -288,41 +288,42 @@ function remainingForCut(cur) {
   return remaining > 0 ? remaining : OVERRUN_BUFFER_MIN;
 }
 
-function waitForBarber(barberId) {
+function computeLanes() {
   var waiting = queue.filter(function (q) { return q.status === 'waiting'; });
   var active = queue.filter(function (q) { return q.status === 'in_progress'; });
 
-  if (!barberId) {
-    if (!barbers.length) return 0;
+  var lanes = barbers.map(function (b) {
+    var cur = active.find(function (a) { return a.barber_id === b.id; });
+    return remainingForCut(cur);
+  });
 
-    // Simule la répartition de TOUS les clients en attente (assignés à un
-    // coiffeur précis ou non) sur les postes, pour estimer le temps si un
-    // nouveau client rejoint la file maintenant sans préférence. Sans ça,
-    // des clients en attente "premier disponible" étaient ignorés du
-    // calcul, faisant croire à tort qu'un poste était libre immédiatement.
-    var lanes = barbers.map(function (b) {
-      var cur = active.find(function (a) { return a.barber_id === b.id; });
-      return remainingForCut(cur);
-    });
+  // Les clients qui ont choisi un coiffeur précis restent sur sa voie...
+  barbers.forEach(function (b, i) {
+    waiting.filter(function (w) { return w.barber_id === b.id; })
+      .forEach(function (w) { lanes[i] += (w.total_duration_min || 0); });
+  });
 
-    barbers.forEach(function (b, i) {
-      waiting.filter(function (w) { return w.barber_id === b.id; })
-        .forEach(function (w) { lanes[i] += (w.total_duration_min || 0); });
-    });
+  // ...et ceux en "premier disponible" se répartissent sur la voie la
+  // moins chargée à chaque étape, comme le ferait le salon en pratique.
+  waiting.filter(function (w) { return !w.barber_id; }).forEach(function (w) {
+    var idx = lanes.indexOf(Math.min.apply(null, lanes));
+    lanes[idx] += (w.total_duration_min || 0);
+  });
 
-    waiting.filter(function (w) { return !w.barber_id; }).forEach(function (w) {
-      var idx = lanes.indexOf(Math.min.apply(null, lanes));
-      lanes[idx] += (w.total_duration_min || 0);
-    });
+  return lanes;
+}
 
-    return Math.round(Math.min.apply(null, lanes));
-  }
+function waitForBarber(barberId) {
+  if (!barbers.length) return 0;
+  var lanes = computeLanes();
 
-  var mine = waiting.filter(function (q) { return q.barber_id === barberId; });
-  var cur = active.find(function (q) { return q.barber_id === barberId; });
-  var total = mine.reduce(function (a, q) { return a + (q.total_duration_min || 0); }, 0);
-  total += remainingForCut(cur);
-  return Math.round(total);
+  if (!barberId) return Math.round(Math.min.apply(null, lanes));
+
+  // Même un coiffeur choisi explicitement hérite de sa part de la file
+  // générale : les clients "premier disponible" déjà présents ont la
+  // priorité, un coiffeur ne saute pas la queue pour un nouvel arrivant.
+  var idx = barbers.findIndex(function (b) { return b.id === barberId; });
+  return idx === -1 ? 0 : Math.round(lanes[idx]);
 }
 
 function isOverrun(barberId) {
