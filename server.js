@@ -11,7 +11,6 @@ if (fs.existsSync(externalEnvPath)) {
   require('dotenv').config({ path: externalEnvPath });
 }
 require('dotenv').config();
-const path = require('path');
 const express = require('express');
 
 const queueRoutes = require('./src/routes/queue');
