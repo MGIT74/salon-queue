@@ -9,12 +9,14 @@ CREATE TABLE IF NOT EXISTS barbers (
   active TINYINT(1) NOT NULL DEFAULT 1,
   sort_order INT NOT NULL DEFAULT 0,
   pin_code VARCHAR(10) NULL,
+  photo_url LONGTEXT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Pour une base deja existante (deploiement precedent) : ajoute la colonne
--- si elle n'existe pas encore, sans casser les donnees existantes.
+-- Pour une base deja existante (deploiement precedent) : ajoute les
+-- colonnes si elles n'existent pas encore, sans casser les donnees.
 ALTER TABLE barbers ADD COLUMN IF NOT EXISTS pin_code VARCHAR(10) NULL;
+ALTER TABLE barbers ADD COLUMN IF NOT EXISTS photo_url LONGTEXT NULL;
 
 -- weekday : 0 = dimanche ... 6 = samedi (comme Date.getDay() en JS)
 CREATE TABLE IF NOT EXISTS barber_schedules (

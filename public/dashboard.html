@@ -715,7 +715,16 @@ function renderBarbers() {
         }).join('');
 
         return '<div class="card-box" data-barber="' + b.id + '">' +
-          '<div class="admin-head"><h3 style="font-size:19px">' + esc(b.name) + (b.active ? '' : ' · inactif') + '</h3>' +
+          '<div class="admin-head">' +
+          '<div style="display:flex;align-items:center;gap:14px">' +
+          '<div onclick="document.getElementById(\'photo-input-' + b.id + '\').click()" ' +
+          'style="width:48px;height:48px;border-radius:50%;cursor:pointer;flex-shrink:0;' +
+          'background:' + (b.photo_url ? 'url(&quot;' + esc(b.photo_url) + '&quot;) center/cover' : 'var(--fill)') + ';' +
+          'display:flex;align-items:center;justify-content:center;font-weight:600;color:var(--grey)" ' +
+          'title="Changer la photo">' + (b.photo_url ? '' : esc(b.name.charAt(0).toUpperCase())) + '</div>' +
+          '<input type="file" accept="image/*" id="photo-input-' + b.id + '" style="display:none" onchange="uploadBarberPhoto(\'' + b.id + '\', this)">' +
+          '<h3 style="font-size:19px">' + esc(b.name) + (b.active ? '' : ' · inactif') + '</h3>' +
+          '</div>' +
           '<div class="item-actions">' +
           '<button class="btn btn-soft" onclick="renameBarber(\'' + b.id + '\')">Renommer</button>' +
           (b.active
@@ -732,6 +741,35 @@ function renderBarbers() {
           '<button class="btn btn-primary" style="margin-top:16px" onclick="saveSchedule(\'' + b.id + '\')">Enregistrer les horaires</button>' +
           '</div>';
       }).join('');
+}
+
+// Redimensionne l'image côté navigateur avant envoi (évite de stocker des
+// photos trop lourdes en base — 300x300 recadré, JPEG compressé).
+function uploadBarberPhoto(id, input) {
+  var file = input.files && input.files[0];
+  if (!file) return;
+
+  var reader = new FileReader();
+  reader.onload = function (e) {
+    var img = new Image();
+    img.onload = function () {
+      var size = 300;
+      var canvas = document.createElement('canvas');
+      canvas.width = size; canvas.height = size;
+      var ctx = canvas.getContext('2d');
+      var side = Math.min(img.width, img.height);
+      var sx = (img.width - side) / 2, sy = (img.height - side) / 2;
+      ctx.drawImage(img, sx, sy, side, side, 0, 0, size, size);
+      var dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+
+      api('/api/barbers/' + id, { method: 'PUT', body: { photo_url: dataUrl } })
+        .then(loadBarbers)
+        .then(function () { toast('Photo mise à jour'); })
+        .catch(function (e) { toast(e.message, true); });
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
 }
 
 function setBarberPin(id, name) {

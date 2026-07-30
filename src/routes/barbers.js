@@ -37,15 +37,15 @@ router.get('/', wrap(async (req, res) => {
 }));
 
 router.post('/', requireAdmin, wrap(async (req, res) => {
-  const { name, sort_order, pin_code } = req.body;
+  const { name, sort_order, pin_code, photo_url } = req.body;
   if (!name) return res.status(400).json({ error: 'Le nom est requis' });
   if (pin_code && !/^\d{4,8}$/.test(pin_code)) {
     return res.status(400).json({ error: 'Le code PIN doit contenir entre 4 et 8 chiffres' });
   }
   const id = crypto.randomUUID();
   await pool.query(
-    'INSERT INTO barbers (id, name, sort_order, pin_code) VALUES (?, ?, ?, ?)',
-    [id, name, Number(sort_order) || 0, pin_code || null]
+    'INSERT INTO barbers (id, name, sort_order, pin_code, photo_url) VALUES (?, ?, ?, ?, ?)',
+    [id, name, Number(sort_order) || 0, pin_code || null, photo_url || null]
   );
   const [[item]] = await pool.query('SELECT * FROM barbers WHERE id = ?', [id]);
   res.json({ ok: true, item: stripSecrets(item) });
@@ -63,6 +63,7 @@ router.put('/:id', requireAdmin, wrap(async (req, res) => {
     }
     sets.push('pin_code = ?'); params.push(req.body.pin_code || null);
   }
+  if (req.body.photo_url !== undefined) { sets.push('photo_url = ?'); params.push(req.body.photo_url || null); }
   if (!sets.length) return res.json({ ok: true });
   params.push(req.params.id);
   await pool.query(`UPDATE barbers SET ${sets.join(', ')} WHERE id = ?`, params);

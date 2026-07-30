@@ -42,15 +42,48 @@
   .panel { display: none; }
   .panel.on { display: block; }
 
-  .eyebrow { font-size: clamp(12px,1.15vw,15px); font-weight: 500; color: var(--grey); margin-bottom: clamp(6px,1vh,12px); }
-  .hero { display: flex; align-items: baseline; gap: clamp(6px,.8vw,12px); line-height: .9; }
-  .hero .v { font-size: clamp(76px,11vw,158px); font-weight: 600; letter-spacing: -.05em; font-variant-numeric: tabular-nums; }
-  .hero .u { font-size: clamp(20px,2.2vw,32px); font-weight: 500; color: var(--grey); letter-spacing: -.02em; }
-  .hero-sub { font-size: clamp(15px,1.5vw,19px); color: var(--grey);
-              margin: clamp(10px,1.4vh,16px) 0 clamp(22px,3vh,38px); letter-spacing: -.01em; }
+  .eyebrow { font-size: clamp(14px,1.3vw,17px); font-weight: 600; color: var(--grey); margin-bottom: clamp(14px,2vh,22px); }
+  .barber-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(clamp(140px,16vw,220px), 1fr));
+    gap: clamp(12px,1.6vw,20px);
+  }
+  .barber-card {
+    aspect-ratio: 1;
+    border: none;
+    border-radius: clamp(16px,1.6vw,22px);
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    background: var(--fill);
+    background-size: cover;
+    background-position: center;
+    padding: 0;
+    font-family: inherit;
+    transition: transform .12s ease;
+  }
+  .barber-card:active { transform: scale(.97); }
+  .barber-fallback {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: clamp(32px,5vw,56px); font-weight: 600; color: var(--grey);
+    background: linear-gradient(160deg, var(--fill), var(--fill-2));
+  }
+  .barber-overlay {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    padding: clamp(12px,1.6vh,18px) clamp(12px,1.4vw,16px) clamp(10px,1.4vh,14px);
+    text-align: left;
+  }
+  .barber-card.has-photo .barber-overlay {
+    background: linear-gradient(0deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0) 100%);
+  }
+  .barber-name { font-size: clamp(15px,1.5vw,19px); font-weight: 700; letter-spacing: -.02em; }
+  .barber-card.has-photo .barber-name { color: #fff; }
+  .barber-wait { font-size: clamp(12px,1.2vw,14px); font-weight: 600; margin-top: 2px; color: var(--grey); }
+  .barber-card.has-photo .barber-wait { color: rgba(255,255,255,0.9); }
+  .barber-wait.free { color: #6fe08a; }
+  .hero-sub { font-size: clamp(14px,1.4vw,17px); color: var(--grey); letter-spacing: -.01em; }
   .hero-sub b { color: var(--ink); font-weight: 600; }
-
-  .plates { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: clamp(22px,3vh,38px); }
   .plate { border: none; background: var(--fill); color: var(--ink); border-radius: 999px;
            padding: clamp(12px,1.6vh,16px) clamp(18px,1.8vw,24px); cursor: pointer;
            display: flex; align-items: baseline; gap: 9px; font-family: inherit; transition: background .18s ease, color .18s ease; }
@@ -137,16 +170,14 @@
   <main class="stage">
 
     <section class="panel on" id="p-home">
-      <div class="eyebrow">Prochaine place libre dans</div>
-      <div class="hero"><span class="v" id="hero-wait">—</span><span class="u">min</span></div>
-      <p class="hero-sub" id="hero-sub">Avec le premier coiffeur disponible.</p>
-      <div class="plates" id="plates"></div>
-      <button class="go" onclick="show('p-form')">Rejoindre la file</button>
+      <div class="eyebrow">Choisissez votre coiffeur</div>
+      <div class="barber-grid" id="barber-grid"></div>
     </section>
 
     <section class="panel" id="p-form">
       <button class="back" onclick="show('p-home')">‹ Retour</button>
       <h1 class="ftitle">Vos informations</h1>
+      <p class="hero-sub" id="chosen-barber-note" style="margin:-8px 0 22px"></p>
       <div class="row2">
         <div class="fld"><label for="f-name">Prénom</label>
           <input id="f-name" type="text" placeholder="Mehdi" autocomplete="given-name"></div>
@@ -228,7 +259,7 @@ function loadCatalog() {
 function refresh() {
   return Promise.all([api('/api/queue'), api('/api/barbers')]).then(function (r) {
     queue = r[0].queue; barbers = r[1].items;
-    renderBoard(); renderPlates();
+    renderBoard(); renderBarberGrid();
   }).catch(function (err) { toast(err.message, true); });
 }
 
@@ -348,28 +379,34 @@ function isOverrun(barberId) {
   return elapsed > (cur.total_duration_min || 0);
 }
 
-function renderPlates() {
-  var html = '<button class="plate' + (selBarber === null ? ' sel' : '') + '" onclick="pickBarber(null)">' +
-             '<span class="pn">Premier libre</span><span class="pt">' + waitForBarber(null) + ' min</span></button>';
-  html += barbers.map(function (b) {
+function renderBarberGrid() {
+  document.getElementById('barber-grid').innerHTML = barbers.map(function (b) {
+    var w = waitForBarber(b.id);
     var over = isOverrun(b.id);
-    return '<button class="plate' + (selBarber === b.id ? ' sel' : '') + '" onclick="pickBarber(\'' + b.id + '\')">' +
-           '<span class="pn">' + esc(b.name) + '</span><span class="pt">' + (over ? '~' : '') + waitForBarber(b.id) + ' min</span></button>';
-  }).join('');
-  document.getElementById('plates').innerHTML = html;
-
-  var w = waitForBarber(selBarber);
-  var overSel = isOverrun(selBarber);
-  document.getElementById('hero-wait').textContent = (overSel ? '~' : '') + w;
-  var b = selBarber ? barbers.find(function (x) { return x.id === selBarber; }) : null;
-  document.getElementById('hero-sub').innerHTML = b
-    ? (overSel
-        ? 'La coupe en cours chez <b>' + esc(b.name) + '</b> touche à sa fin. Temps estimé.'
-        : 'Avec <b>' + esc(b.name) + '</b>. Choisissez « Premier libre » pour être servi plus vite.')
-    : 'Avec le premier coiffeur disponible. Choisissez quelqu\'un en particulier si vous préférez.';
+    var free = w === 0;
+    var waitLabel = free ? 'Disponible' : (over ? '~' : '') + w + ' min';
+    var photoAttr = b.photo_url
+      ? ' style="background-image:url(&quot;' + esc(b.photo_url) + '&quot;)"'
+      : '';
+    return '<button class="barber-card' + (b.photo_url ? ' has-photo' : '') + '"' + photoAttr +
+      ' onclick="pickBarberAndGo(\'' + b.id + '\')">' +
+      (b.photo_url ? '' : '<div class="barber-fallback">' + esc(b.name.charAt(0).toUpperCase()) + '</div>') +
+      '<div class="barber-overlay">' +
+        '<div class="barber-name">' + esc(b.name) + '</div>' +
+        '<div class="barber-wait' + (free ? ' free' : '') + '">' + waitLabel + '</div>' +
+      '</div></button>';
+  }).join('') || '<div class="empty">Aucun coiffeur configuré</div>';
 }
 
-function pickBarber(id) { selBarber = id; renderPlates(); }
+function pickBarberAndGo(id) {
+  selBarber = id;
+  var b = barbers.find(function (x) { return x.id === id; });
+  document.getElementById('chosen-barber-note').innerHTML = b
+    ? 'Avec <b>' + esc(b.name) + '</b>'
+    : '';
+  renderTotals();
+  show('p-form');
+}
 
 /* ---------- Suppléments ---------- */
 function toggleExtra(id) {
@@ -434,7 +471,7 @@ function resetForm() {
   document.getElementById('f-mail').value = '';
   selExtras = []; selBarber = null;
   document.querySelectorAll('.xchip').forEach(function (c) { c.classList.remove('sel'); });
-  renderTotals(); renderPlates();
+  renderTotals(); renderBarberGrid();
   show('p-home');
 }
 
