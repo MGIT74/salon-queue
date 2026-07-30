@@ -97,11 +97,17 @@ var queue = [];
 var barbers = [];
 var pinBuffer = '';
 
+var SALON_SLUG = (function () {
+  try { return new URLSearchParams(window.location.search).get('salon') || ''; }
+  catch (e) { return ''; }
+})();
+
 /* ---------- API avec authentification par PIN ---------- */
 function barberApi(path, opts) {
   opts = opts || {};
   var headers = { 'Content-Type': 'application/json' };
   if (me) { headers['X-Barber-Id'] = me.id; headers['X-Barber-Pin'] = me.pin; }
+  if (SALON_SLUG) headers['X-Salon-Slug'] = SALON_SLUG;
   return fetch(path, {
     method: opts.method || 'GET',
     headers: headers,
@@ -138,9 +144,11 @@ document.getElementById('keypad').addEventListener('click', function (e) {
 });
 
 function attemptLogin() {
+  var headers = { 'Content-Type': 'application/json' };
+  if (SALON_SLUG) headers['X-Salon-Slug'] = SALON_SLUG;
   fetch('/api/barbers/login', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: headers,
     body: JSON.stringify({ pin: pinBuffer })
   }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
     .then(function (res) {

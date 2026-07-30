@@ -31,11 +31,12 @@ async function uniqueId(table, base) {
 }
 
 ['services', 'extras'].forEach((table) => {
+  // Liste — publique (la borne du salon résolu en a besoin)
   router.get('/' + table, wrap(async (req, res) => {
     const sql = req.query.all === '1'
-      ? `SELECT * FROM ${table} ORDER BY sort_order, name`
-      : `SELECT * FROM ${table} WHERE active = 1 ORDER BY sort_order, name`;
-    const [rows] = await pool.query(sql);
+      ? `SELECT * FROM ${table} WHERE salon_id = ? ORDER BY sort_order, name`
+      : `SELECT * FROM ${table} WHERE salon_id = ? AND active = 1 ORDER BY sort_order, name`;
+    const [rows] = await pool.query(sql, [req.salon.id]);
     res.json({ ok: true, items: rows });
   }));
 
@@ -43,9 +44,10 @@ async function uniqueId(table, base) {
     const { name, duration_min, price_cents, sort_order } = req.body;
     if (!name) return res.status(400).json({ error: 'Le nom est requis' });
     const id = await uniqueId(table, slugify(name));
+    const { salon } = req;
     await pool.query(
-      `INSERT INTO ${table} (id, name, duration_min, price_cents, sort_order) VALUES (?, ?, ?, ?, ?)`,
-      [id, name, Number(duration_min) || 0, Number(price_cents) || 0, Number(sort_order) || 0]
+      `INSERT INTO ${table} (id, salon_id, name, duration_min, price_cents, sort_order) VALUES (?, ?, ?, ?, ?, ?)`,
+      [id, salon.id, name, Number(duration_min) || 0, Number(price_cents) || 0, Number(sort_order) || 0]
     );
     const [[item]] = await pool.query(`SELECT * FROM ${table} WHERE id = ?`, [id]);
     res.json({ ok: true, item });
@@ -60,13 +62,13 @@ async function uniqueId(table, base) {
       if (req.body[k] !== undefined) { sets.push(k + ' = ?'); params.push(Number(req.body[k]) || 0); }
     });
     if (!sets.length) return res.json({ ok: true });
-    params.push(req.params.id);
-    await pool.query(`UPDATE ${table} SET ${sets.join(', ')} WHERE id = ?`, params);
+    params.push(req.params.id, req.salon.id);
+    await pool.query(`UPDATE ${table} SET ${sets.join(', ')} WHERE id = ? AND salon_id = ?`, params);
     res.json({ ok: true });
   }));
 
   router.delete('/' + table + '/:id', requireAdmin, wrap(async (req, res) => {
-    await pool.query(`UPDATE ${table} SET active = 0 WHERE id = ?`, [req.params.id]);
+    await pool.query(`UPDATE ${table} SET active = 0 WHERE id = ? AND salon_id = ?`, [req.params.id, req.salon.id]);
     res.json({ ok: true, archived: true });
   }));
 });

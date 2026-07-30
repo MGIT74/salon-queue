@@ -1,17 +1,23 @@
 const { pool, utcIso } = require('../db');
 
 /**
- * Charge la file complète (clients en attente et en cours) avec leur
+ * Charge la file complète d'UN salon (attente + en cours) avec leur
  * prestation, leurs suppléments, la durée totale et le prix total.
  */
-async function loadQueue() {
+async function loadQueue(salonId) {
   const [[rows], [services], [extras], [links]] = await Promise.all([
     pool.query(
-      "SELECT * FROM queue WHERE status IN ('waiting','in_progress') ORDER BY checkin_at"
+      "SELECT * FROM queue WHERE salon_id = ? AND status IN ('waiting','in_progress') ORDER BY checkin_at",
+      [salonId]
     ),
-    pool.query('SELECT * FROM services'),
-    pool.query('SELECT * FROM extras'),
-    pool.query('SELECT * FROM queue_extras')
+    pool.query('SELECT * FROM services WHERE salon_id = ?', [salonId]),
+    pool.query('SELECT * FROM extras WHERE salon_id = ?', [salonId]),
+    pool.query(
+      `SELECT qe.* FROM queue_extras qe
+       JOIN queue q ON q.id = qe.queue_id
+       WHERE q.salon_id = ?`,
+      [salonId]
+    )
   ]);
 
   const svcById = Object.fromEntries(services.map((s) => [s.id, s]));
@@ -29,9 +35,6 @@ async function loadQueue() {
 
     return Object.assign({}, r, {
       position: r.queue_position,
-      // Tagué UTC explicite : sans ça, un navigateur en France (UTC+2)
-      // interprète l'heure MySQL comme si elle était déjà locale, ce qui
-      // décale chaque calcul de temps écoulé/restant de 2h.
       checkin_at: utcIso(r.checkin_at),
       start_at: utcIso(r.start_at),
       end_at: utcIso(r.end_at),
@@ -44,13 +47,18 @@ async function loadQueue() {
 }
 
 /**
- * Nombre de coiffeurs réellement en poste maintenant, d'après les horaires.
- * Si aucun horaire n'est défini, on considère tous les coiffeurs actifs.
+ * Nombre de coiffeurs réellement en poste maintenant pour CE salon,
+ * d'après leurs horaires. Sans horaire, tous les coiffeurs actifs comptent.
  */
-async function activeBarberCount() {
+async function activeBarberCount(salonId) {
   const [[barbers], [schedules]] = await Promise.all([
-    pool.query('SELECT id FROM barbers WHERE active = 1'),
-    pool.query('SELECT * FROM barber_schedules WHERE active = 1')
+    pool.query('SELECT id FROM barbers WHERE salon_id = ? AND active = 1', [salonId]),
+    pool.query(
+      `SELECT bs.* FROM barber_schedules bs
+       JOIN barbers b ON b.id = bs.barber_id
+       WHERE b.salon_id = ? AND bs.active = 1`,
+      [salonId]
+    )
   ]);
 
   if (barbers.length === 0) return 1;
@@ -70,12 +78,13 @@ async function activeBarberCount() {
 }
 
 /**
- * Recalcule position et temps d'attente estimé pour toute la file.
- * Répartit les clients sur la voie (coiffeur) qui se libère le plus tôt.
+ * Recalcule position et temps d'attente estimé pour toute la file d'UN
+ * salon. Répartit les clients sur la voie (coiffeur) qui se libère le
+ * plus tôt.
  */
-async function recompute() {
-  const rows = await loadQueue();
-  const lanes = new Array(await activeBarberCount()).fill(0);
+async function recompute(salonId) {
+  const rows = await loadQueue(salonId);
+  const lanes = new Array(await activeBarberCount(salonId)).fill(0);
   const now = Date.now();
 
   // Marge minimale affichée tant qu'une coupe est en cours, même en cas de
@@ -123,8 +132,8 @@ async function recompute() {
   for (const u of updates) {
     await pool.query(
       `UPDATE queue SET queue_position = ?, estimated_wait_min = ?,
-       total_duration_min = ?, total_price_cents = ? WHERE id = ?`,
-      [u.position, u.estimated_wait_min, u.total_duration_min, u.total_price_cents, u.id]
+       total_duration_min = ?, total_price_cents = ? WHERE id = ? AND salon_id = ?`,
+      [u.position, u.estimated_wait_min, u.total_duration_min, u.total_price_cents, u.id, salonId]
     );
   }
 

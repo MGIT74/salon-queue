@@ -22,15 +22,24 @@ const queueRoutes = require('./src/routes/queue');
 const catalogRoutes = require('./src/routes/catalog');
 const barberRoutes = require('./src/routes/barbers');
 const settingsRoutes = require('./src/routes/settings');
+const salonRoutes = require('./src/routes/salons');
 const requireAdmin = require('./src/middleware/auth');
+const resolveSalon = require('./src/middleware/resolveSalon');
 const { startNotifyJob } = require('./src/cron/notify');
 
 const app = express();
 const PORT = Number((process.env.PORT || '3000').toString().replace(/[\r\n]+$/, '').trim());
 
-app.use(express.json());
+app.use(express.json({ limit: '5mb' })); // limite relevée pour les photos de coiffeurs (base64)
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Gestion des salons (super admin) — jamais scopée à un salon particulier,
+// donc montée AVANT resolveSalon.
+app.use('/api/super', salonRoutes);
+
+// Toutes les routes ci-dessous sont scopées au salon résolu depuis
+// l'en-tête X-Salon-Slug (ou le salon par défaut si absent).
+app.use('/api', resolveSalon);
 app.use('/api/queue', queueRoutes);
 app.use('/api/catalog', catalogRoutes);
 app.use('/api/barbers', barberRoutes);

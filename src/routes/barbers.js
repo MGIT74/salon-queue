@@ -24,16 +24,21 @@ function stripSecrets(b) {
 
 router.get('/', wrap(async (req, res) => {
   const sql = req.query.all === '1'
-    ? 'SELECT * FROM barbers ORDER BY sort_order, name'
-    : 'SELECT * FROM barbers WHERE active = 1 ORDER BY sort_order, name';
-  const [barbers] = await pool.query(sql);
-  const [schedules] = await pool.query('SELECT * FROM barber_schedules');
+    ? 'SELECT * FROM barbers WHERE salon_id = ? ORDER BY sort_order, name'
+    : 'SELECT * FROM barbers WHERE salon_id = ? AND active = 1 ORDER BY sort_order, name';
+  const [barbers] = await pool.query(sql, [req.salon.id]);
+  const [schedules] = await pool.query(
+    `SELECT bs.* FROM barber_schedules bs
+     JOIN barbers b ON b.id = bs.barber_id
+     WHERE b.salon_id = ?`,
+    [req.salon.id]
+  );
 
   const items = barbers.map((b) => Object.assign({}, stripSecrets(b), {
     schedules: schedules.filter((s) => s.barber_id === b.id).sort((a, c) => a.weekday - c.weekday)
   }));
 
-  res.json({ ok: true, items, on_duty: await activeBarberCount() });
+  res.json({ ok: true, items, on_duty: await activeBarberCount(req.salon.id) });
 }));
 
 router.post('/', requireAdmin, wrap(async (req, res) => {
@@ -43,10 +48,17 @@ router.post('/', requireAdmin, wrap(async (req, res) => {
     return res.status(400).json({ error: 'Le code PIN doit contenir entre 4 et 8 chiffres' });
   }
   const id = crypto.randomUUID();
-  await pool.query(
-    'INSERT INTO barbers (id, name, sort_order, pin_code, photo_url) VALUES (?, ?, ?, ?, ?)',
-    [id, name, Number(sort_order) || 0, pin_code || null, photo_url || null]
-  );
+  try {
+    await pool.query(
+      'INSERT INTO barbers (id, salon_id, name, sort_order, pin_code, photo_url) VALUES (?, ?, ?, ?, ?, ?)',
+      [id, req.salon.id, name, Number(sort_order) || 0, pin_code || null, photo_url || null]
+    );
+  } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ error: 'Ce code PIN est déjà utilisé par un autre coiffeur de ce salon' });
+    }
+    throw err;
+  }
   const [[item]] = await pool.query('SELECT * FROM barbers WHERE id = ?', [id]);
   res.json({ ok: true, item: stripSecrets(item) });
 }));
@@ -65,27 +77,35 @@ router.put('/:id', requireAdmin, wrap(async (req, res) => {
   }
   if (req.body.photo_url !== undefined) { sets.push('photo_url = ?'); params.push(req.body.photo_url || null); }
   if (!sets.length) return res.json({ ok: true });
-  params.push(req.params.id);
-  await pool.query(`UPDATE barbers SET ${sets.join(', ')} WHERE id = ?`, params);
+  params.push(req.params.id, req.salon.id);
+  try {
+    await pool.query(`UPDATE barbers SET ${sets.join(', ')} WHERE id = ? AND salon_id = ?`, params);
+  } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ error: 'Ce code PIN est déjà utilisé par un autre coiffeur de ce salon' });
+    }
+    throw err;
+  }
   res.json({ ok: true });
 }));
 
 router.delete('/:id', requireAdmin, wrap(async (req, res) => {
-  await pool.query('UPDATE barbers SET active = 0 WHERE id = ?', [req.params.id]);
+  await pool.query('UPDATE barbers SET active = 0 WHERE id = ? AND salon_id = ?', [req.params.id, req.salon.id]);
   res.json({ ok: true, archived: true });
 }));
 
 /**
  * Connexion d'un coiffeur par code PIN (pour "Mon poste" sur son téléphone).
- * Ne nécessite pas le mot de passe admin : posséder le bon PIN suffit.
+ * Ne nécessite pas le mot de passe admin : posséder le bon PIN pour CE
+ * salon suffit.
  */
 router.post('/login', wrap(async (req, res) => {
   const pin = String(req.body.pin || '').trim();
   if (!pin) return res.status(400).json({ error: 'Code PIN requis' });
 
   const [[barber]] = await pool.query(
-    'SELECT id, name FROM barbers WHERE pin_code = ? AND active = 1 LIMIT 1',
-    [pin]
+    'SELECT id, name FROM barbers WHERE salon_id = ? AND pin_code = ? AND active = 1 LIMIT 1',
+    [req.salon.id, pin]
   );
   if (!barber) return res.status(401).json({ error: 'Code PIN incorrect' });
 
@@ -97,6 +117,12 @@ router.post('/login', wrap(async (req, res) => {
  * Corps attendu : { schedules: [{ weekday, start_time, end_time, active }, ...] }
  */
 router.put('/:id/schedule', requireAdmin, wrap(async (req, res) => {
+  const [[owned]] = await pool.query(
+    'SELECT id FROM barbers WHERE id = ? AND salon_id = ?',
+    [req.params.id, req.salon.id]
+  );
+  if (!owned) return res.status(404).json({ error: 'Coiffeur introuvable' });
+
   const list = Array.isArray(req.body.schedules) ? req.body.schedules : [];
 
   await pool.query('DELETE FROM barber_schedules WHERE barber_id = ?', [req.params.id]);

@@ -1,15 +1,15 @@
 const nodemailer = require('nodemailer');
 const { getSettings } = require('../db');
 
-// Le transport est reconstruit quand les réglages changent (invalidateTransport)
-let cached = null;
+// Un transport par salon, chacun avec sa propre config SMTP.
+const cache = new Map();
 
-async function getTransport() {
-  if (cached) return cached;
-  const s = await getSettings();
+async function getTransport(salonId) {
+  if (cache.has(salonId)) return cache.get(salonId);
+  const s = await getSettings(salonId);
   if (!s.smtp_host) throw new Error('SMTP non configuré (Dashboard > Réglages)');
 
-  cached = {
+  const entry = {
     from: s.smtp_from || s.smtp_user,
     salon: s.salon_name || 'Le Salon',
     tx: nodemailer.createTransport({
@@ -19,13 +19,17 @@ async function getTransport() {
       auth: s.smtp_user ? { user: s.smtp_user, pass: s.smtp_pass } : undefined
     })
   };
-  return cached;
+  cache.set(salonId, entry);
+  return entry;
 }
 
-function invalidateTransport() { cached = null; }
+function invalidateTransport(salonId) {
+  if (salonId) cache.delete(salonId);
+  else cache.clear();
+}
 
-async function sendTurnSoon(to, name, waitMin) {
-  const { tx, from, salon } = await getTransport();
+async function sendTurnSoon(salonId, to, name, waitMin) {
+  const { tx, from, salon } = await getTransport(salonId);
   await tx.sendMail({
     from,
     to,
@@ -39,8 +43,8 @@ async function sendTurnSoon(to, name, waitMin) {
   });
 }
 
-async function sendTest(to) {
-  const { tx, from, salon } = await getTransport();
+async function sendTest(salonId, to) {
+  const { tx, from, salon } = await getTransport(salonId);
   await tx.sendMail({
     from,
     to,

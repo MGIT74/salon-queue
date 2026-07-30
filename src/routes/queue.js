@@ -16,10 +16,10 @@ function wrap(fn) {
   };
 }
 
-// --- Public : état de la file -------------------------------------------
+// --- Public : état de la file (du salon résolu) --------------------------
 router.get('/', wrap(async (req, res) => {
-  await recompute();
-  const rows = await loadQueue();
+  await recompute(req.salon.id);
+  const rows = await loadQueue(req.salon.id);
   rows.sort((a, b) => {
     if (a.status !== b.status) return a.status === 'in_progress' ? -1 : 1;
     return (a.position || 0) - (b.position || 0);
@@ -35,9 +35,9 @@ router.post('/checkin', wrap(async (req, res) => {
 
   const id = crypto.randomUUID();
   await pool.query(
-    `INSERT INTO queue (id, client_name, email, phone, service_id, barber_id, status)
-     VALUES (?, ?, ?, ?, ?, ?, 'waiting')`,
-    [id, client_name, email || null, phone || null, service_id, barber_id || null]
+    `INSERT INTO queue (id, salon_id, client_name, email, phone, service_id, barber_id, status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 'waiting')`,
+    [id, req.salon.id, client_name, email || null, phone || null, service_id, barber_id || null]
   );
 
   if (Array.isArray(extras) && extras.length) {
@@ -45,16 +45,19 @@ router.post('/checkin', wrap(async (req, res) => {
     await pool.query('INSERT INTO queue_extras (queue_id, extra_id) VALUES ?', [values]);
   }
 
-  await recompute();
+  await recompute(req.salon.id);
 
-  const rows = await loadQueue();
+  const rows = await loadQueue(req.salon.id);
   const me = rows.find((r) => r.id === id);
   res.json({ ok: true, entry: me });
 }));
 
 // --- Coiffeur : démarrer, terminer, annuler ------------------------------
 router.post('/:id/start', requireAdminOrBarber, wrap(async (req, res) => {
-  const [[row]] = await pool.query('SELECT id, barber_id, checkin_at FROM queue WHERE id = ?', [req.params.id]);
+  const [[row]] = await pool.query(
+    'SELECT id, barber_id, checkin_at FROM queue WHERE id = ? AND salon_id = ?',
+    [req.params.id, req.salon.id]
+  );
   if (!row) return res.status(404).json({ error: 'Client introuvable' });
 
   // Un coiffeur connecté par PIN (pas admin) ne peut agir qu'en son propre
@@ -70,8 +73,8 @@ router.post('/:id/start', requireAdminOrBarber, wrap(async (req, res) => {
 
   if (barberId) {
     const [[busy]] = await pool.query(
-      "SELECT id, client_name FROM queue WHERE barber_id = ? AND status = 'in_progress' LIMIT 1",
-      [barberId]
+      "SELECT id, client_name FROM queue WHERE barber_id = ? AND salon_id = ? AND status = 'in_progress' LIMIT 1",
+      [barberId, req.salon.id]
     );
     if (busy) {
       return res.status(409).json({
@@ -88,10 +91,10 @@ router.post('/:id/start', requireAdminOrBarber, wrap(async (req, res) => {
     if (!(req.body.force_transfer && !req.barberId)) {
       const [[earlier]] = await pool.query(
         `SELECT client_name FROM queue
-         WHERE status = 'waiting' AND id != ? AND checkin_at < ?
+         WHERE salon_id = ? AND status = 'waiting' AND id != ? AND checkin_at < ?
          AND (barber_id IS NULL OR barber_id = ?)
          ORDER BY checkin_at ASC LIMIT 1`,
-        [req.params.id, row.checkin_at, barberId]
+        [req.salon.id, req.params.id, row.checkin_at, barberId]
       );
       if (earlier) {
         return res.status(409).json({
@@ -101,42 +104,52 @@ router.post('/:id/start', requireAdminOrBarber, wrap(async (req, res) => {
     }
   }
 
-  const params = [barberId, req.params.id];
   await pool.query(
-    "UPDATE queue SET status = 'in_progress', start_at = NOW(), barber_id = COALESCE(?, barber_id) WHERE id = ?",
-    params
+    "UPDATE queue SET status = 'in_progress', start_at = NOW(), barber_id = COALESCE(?, barber_id) WHERE id = ? AND salon_id = ?",
+    [barberId, req.params.id, req.salon.id]
   );
-  await recompute();
+  await recompute(req.salon.id);
   res.json({ ok: true });
 }));
 
 router.post('/:id/finish', requireAdminOrBarber, wrap(async (req, res) => {
   if (req.barberId) {
-    const [[row]] = await pool.query('SELECT barber_id FROM queue WHERE id = ?', [req.params.id]);
+    const [[row]] = await pool.query(
+      'SELECT barber_id FROM queue WHERE id = ? AND salon_id = ?',
+      [req.params.id, req.salon.id]
+    );
     if (!row) return res.status(404).json({ error: 'Client introuvable' });
     if (row.barber_id !== req.barberId) {
       return res.status(403).json({ error: "Ce n'est pas votre client en cours." });
     }
   }
-  await pool.query("UPDATE queue SET status = 'done', end_at = NOW() WHERE id = ?", [req.params.id]);
-  await recompute();
+  await pool.query(
+    "UPDATE queue SET status = 'done', end_at = NOW() WHERE id = ? AND salon_id = ?",
+    [req.params.id, req.salon.id]
+  );
+  await recompute(req.salon.id);
   res.json({ ok: true });
 }));
 
 router.post('/:id/cancel', requireAdmin, wrap(async (req, res) => {
-  await pool.query("UPDATE queue SET status = 'cancelled' WHERE id = ?", [req.params.id]);
-  await recompute();
+  await pool.query(
+    "UPDATE queue SET status = 'cancelled' WHERE id = ? AND salon_id = ?",
+    [req.params.id, req.salon.id]
+  );
+  await recompute(req.salon.id);
   res.json({ ok: true });
 }));
 
 // --- Coiffeur : modifier prestation et suppléments en cours de route -----
 router.put('/:id', requireAdminOrBarber, wrap(async (req, res) => {
-  if (req.barberId) {
-    const [[row]] = await pool.query('SELECT barber_id FROM queue WHERE id = ?', [req.params.id]);
-    if (!row) return res.status(404).json({ error: 'Client introuvable' });
-    if (row.barber_id !== req.barberId) {
-      return res.status(403).json({ error: "Ce n'est pas votre client." });
-    }
+  const [[existing]] = await pool.query(
+    'SELECT barber_id FROM queue WHERE id = ? AND salon_id = ?',
+    [req.params.id, req.salon.id]
+  );
+  if (!existing) return res.status(404).json({ error: 'Client introuvable' });
+
+  if (req.barberId && existing.barber_id !== req.barberId) {
+    return res.status(403).json({ error: "Ce n'est pas votre client." });
   }
 
   const { service_id, extras, barber_id } = req.body;
@@ -146,8 +159,8 @@ router.put('/:id', requireAdminOrBarber, wrap(async (req, res) => {
   if (barber_id !== undefined && !req.barberId) { sets.push('barber_id = ?'); params.push(barber_id || null); }
 
   if (sets.length) {
-    params.push(req.params.id);
-    await pool.query(`UPDATE queue SET ${sets.join(', ')} WHERE id = ?`, params);
+    params.push(req.params.id, req.salon.id);
+    await pool.query(`UPDATE queue SET ${sets.join(', ')} WHERE id = ? AND salon_id = ?`, params);
   }
 
   if (Array.isArray(extras)) {
@@ -158,15 +171,16 @@ router.put('/:id', requireAdminOrBarber, wrap(async (req, res) => {
     }
   }
 
-  await recompute();
+  await recompute(req.salon.id);
   res.json({ ok: true });
 }));
 
-// --- Chiffre d'affaires du jour -----------------------------------------
+// --- Chiffre d'affaires du jour -------------------------------------------
 router.get('/stats/today', requireAdmin, wrap(async (req, res) => {
   const [[row]] = await pool.query(
     `SELECT COUNT(*) AS done_count, COALESCE(SUM(total_price_cents), 0) AS revenue_cents
-     FROM queue WHERE status = 'done' AND end_at >= CURDATE()`
+     FROM queue WHERE salon_id = ? AND status = 'done' AND end_at >= CURDATE()`,
+    [req.salon.id]
   );
   res.json({ ok: true, done: Number(row.done_count), revenue_cents: Number(row.revenue_cents) });
 }));
@@ -176,7 +190,9 @@ router.get('/history', requireAdmin, wrap(async (req, res) => {
   const [rows] = await pool.query(
     `SELECT q.*, s.name AS service_name
      FROM queue q LEFT JOIN services s ON s.id = q.service_id
-     ORDER BY q.checkin_at DESC LIMIT 200`
+     WHERE q.salon_id = ?
+     ORDER BY q.checkin_at DESC LIMIT 200`,
+    [req.salon.id]
   );
   const ids = rows.map((r) => r.id);
   let extrasByQueue = {};
@@ -202,8 +218,8 @@ router.get('/history', requireAdmin, wrap(async (req, res) => {
 
 // --- Coiffeur : suppression définitive (nettoyage de données test) ------
 router.delete('/:id', requireAdmin, wrap(async (req, res) => {
-  await pool.query('DELETE FROM queue WHERE id = ?', [req.params.id]);
-  await recompute();
+  await pool.query('DELETE FROM queue WHERE id = ? AND salon_id = ?', [req.params.id, req.salon.id]);
+  await recompute(req.salon.id);
   res.json({ ok: true, deleted: true });
 }));
 

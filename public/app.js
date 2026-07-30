@@ -59,14 +59,22 @@ function toast(msg, isError) {
   el._t = setTimeout(function () { el.className = 'toast' + (isError ? ' err' : ''); }, 3200);
 }
 
-/* Appels API. Le mot de passe admin est ajouté si présent en mémoire. */
+/* Appels API. Le mot de passe admin est ajouté si présent en mémoire.
+   Le salon courant est déterminé par ?salon=slug dans l'URL de la page ;
+   sans ce paramètre, le serveur retombe sur le salon par défaut. */
 var ADMIN_PW = '';
 function setAdminPw(pw) { ADMIN_PW = pw || ''; }
+
+var SALON_SLUG = (function () {
+  try { return new URLSearchParams(window.location.search).get('salon') || ''; }
+  catch (e) { return ''; }
+})();
 
 function api(path, opts) {
   opts = opts || {};
   var headers = { 'Content-Type': 'application/json' };
   if (ADMIN_PW) headers['X-Admin-Password'] = ADMIN_PW;
+  if (SALON_SLUG) headers['X-Salon-Slug'] = SALON_SLUG;
   return fetch(path, {
     method: opts.method || 'GET',
     headers: headers,

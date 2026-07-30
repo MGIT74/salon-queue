@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Super Admin — Salons</title>
+<link rel="stylesheet" href="/app.css">
+<style>
+  .wrap { max-width: 900px; margin: 0 auto; padding: clamp(20px,3vw,44px); }
+  .login { max-width: 380px; margin: 14vh auto; text-align: center; }
+  .login h1 { font-size: 26px; font-weight: 600; margin-bottom: 8px; }
+  .login p { color: var(--grey); font-size: 14px; margin: 0 0 24px; }
+
+  h1.title { font-size: clamp(28px,3.2vw,40px); font-weight: 600; letter-spacing: -.035em; margin: 0 0 26px; }
+
+  .card-box {
+    background: var(--card); border-radius: 16px; padding: 22px;
+    box-shadow: var(--shadow); margin-bottom: 14px; transition: background .25s ease;
+  }
+  .card-box h3 { font-size: 17px; font-weight: 600; margin: 0 0 4px; }
+  .card-box .hint { font-size: 13.5px; color: var(--grey); margin: 0 0 18px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+  .salon-item {
+    background: var(--card); border-radius: 14px; padding: 18px 20px;
+    box-shadow: var(--shadow); margin-bottom: 10px;
+  }
+  .salon-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .salon-name { font-size: 17px; font-weight: 600; }
+  .salon-slug { font-size: 13px; color: var(--grey); font-family: monospace; }
+  .badge { font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 999px; background: var(--fill); color: var(--grey); }
+  .badge.on { background: var(--blue-soft); color: var(--blue); }
+  .badge.off { background: rgba(255,59,48,0.12); color: var(--red); }
+
+  .links { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+  .links a {
+    font-size: 12.5px; font-weight: 500; text-decoration: none; color: var(--blue);
+    background: var(--fill); padding: 7px 12px; border-radius: 999px;
+  }
+  .salon-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .salon-actions .btn { font-size: 13px; padding: 8px 14px; }
+
+  .empty { background: var(--card); border-radius: 14px; padding: 30px; text-align: center; color: var(--grey); font-size: 14px; box-shadow: var(--shadow); }
+</style>
+</head>
+<body>
+
+<div class="wrap login" id="login-screen">
+  <h1>Super Admin</h1>
+  <p>Gestion des salons</p>
+  <div class="fld"><input id="pw" type="password" placeholder="Mot de passe super admin"
+       onkeydown="if(event.key==='Enter') doLogin()"></div>
+  <button class="btn btn-primary" style="width:100%;padding:15px;font-size:16px" onclick="doLogin()">Entrer</button>
+</div>
+
+<div class="wrap" id="app-screen" style="display:none">
+  <h1 class="title">Salons</h1>
+
+  <div class="card-box">
+    <h3>Ajouter un salon</h3>
+    <p class="hint">Un catalogue de départ (4 prestations, 6 suppléments) est créé automatiquement.</p>
+    <div class="grid2">
+      <div class="fld"><label for="new-name">Nom du salon</label><input id="new-name" type="text" placeholder="Salon Rive Gauche"></div>
+      <div class="fld"><label for="new-slug">Identifiant (dans l'URL)</label><input id="new-slug" type="text" placeholder="salon-2" pattern="[a-z0-9-]+"></div>
+    </div>
+    <div class="fld"><label for="new-pw">Mot de passe admin de ce salon</label><input id="new-pw" type="text" placeholder="Généré automatiquement si vide"></div>
+    <button class="btn btn-primary" onclick="createSalon()">Créer le salon</button>
+  </div>
+
+  <div id="salons-list"></div>
+</div>
+
+<script src="/app.js"></script>
+<script>
+mountThemeButton();
+
+var SUPER_PW = '';
+
+function doLogin() {
+  var pw = document.getElementById('pw').value;
+  if (!pw) return;
+  SUPER_PW = pw;
+  superApi('/api/super/login', { method: 'POST', body: { password: pw } })
+    .then(function () {
+      try { sessionStorage.setItem('super-pw', pw); } catch (e) {}
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('app-screen').style.display = 'block';
+      loadSalons();
+    })
+    .catch(function (e) { toast(e.message, true); SUPER_PW = ''; });
+}
+
+(function autoLogin() {
+  var saved = null;
+  try { saved = sessionStorage.getItem('super-pw'); } catch (e) {}
+  if (!saved) return;
+  SUPER_PW = saved;
+  superApi('/api/super/login', { method: 'POST', body: { password: saved } })
+    .then(function () {
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('app-screen').style.display = 'block';
+      loadSalons();
+    })
+    .catch(function () { SUPER_PW = ''; });
+})();
+
+function superApi(path, opts) {
+  opts = opts || {};
+  var headers = { 'Content-Type': 'application/json' };
+  if (SUPER_PW) headers['X-Super-Admin-Password'] = SUPER_PW;
+  return fetch(path, {
+    method: opts.method || 'GET',
+    headers: headers,
+    body: opts.body ? JSON.stringify(opts.body) : undefined
+  }).then(function (r) {
+    return r.json().then(function (data) {
+      if (!r.ok) throw new Error(data.error || 'Erreur ' + r.status);
+      return data;
+    });
+  });
+}
+
+var salons = [];
+
+function loadSalons() {
+  return superApi('/api/super/salons').then(function (r) {
+    salons = r.items;
+    renderSalons();
+  }).catch(function (e) { toast(e.message, true); });
+}
+
+function renderSalons() {
+  document.getElementById('salons-list').innerHTML = salons.length === 0
+    ? '<div class="empty">Aucun salon</div>'
+    : salons.map(function (s) {
+        var pages = ['kiosk.html', 'display.html', 'dashboard.html', 'poste.html'];
+        var links = pages.map(function (p) {
+          return '<a href="/' + p + '?salon=' + encodeURIComponent(s.slug) + '" target="_blank">' + p.replace('.html', '') + '</a>';
+        }).join('');
+        return '<div class="salon-item">' +
+          '<div class="salon-head">' +
+          '<div><span class="salon-name">' + esc(s.name) + '</span> ' +
+          '<span class="badge' + (s.is_default ? ' on' : '') + '">' + (s.is_default ? 'par défaut' : 'salon') + '</span> ' +
+          '<span class="badge' + (s.active ? ' on' : ' off') + '">' + (s.active ? 'actif' : 'désactivé') + '</span>' +
+          '<div class="salon-slug">?salon=' + esc(s.slug) + '</div></div>' +
+          '</div>' +
+          '<div class="links">' + links + '</div>' +
+          '<div class="salon-actions">' +
+          '<button class="btn btn-soft" onclick="renameSalon(\'' + s.id + '\')">Renommer</button>' +
+          '<button class="btn btn-soft" onclick="resetSalonPassword(\'' + s.id + '\',\'' + esc(s.name).replace(/'/g, "\\'") + '\')">Changer le mot de passe</button>' +
+          (s.active
+            ? '<button class="btn btn-ghost" onclick="toggleSalon(\'' + s.id + '\', false)">Désactiver</button>'
+            : '<button class="btn btn-soft" onclick="toggleSalon(\'' + s.id + '\', true)">Réactiver</button>') +
+          '</div></div>';
+      }).join('');
+}
+
+function createSalon() {
+  var name = document.getElementById('new-name').value.trim();
+  var slug = document.getElementById('new-slug').value.trim().toLowerCase();
+  var pw = document.getElementById('new-pw').value.trim() || Math.random().toString(36).slice(2, 10);
+
+  if (!name || !slug) { toast('Nom et identifiant requis', true); return; }
+
+  superApi('/api/super/salons', { method: 'POST', body: { name: name, slug: slug, admin_password: pw } })
+    .then(function () {
+      document.getElementById('new-name').value = '';
+      document.getElementById('new-slug').value = '';
+      document.getElementById('new-pw').value = '';
+      loadSalons();
+      alert('Salon "' + name + '" créé.\n\nMot de passe admin de ce salon : ' + pw + '\n\nNotez-le maintenant, transmettez-le au gérant de ce salon.');
+    })
+    .catch(function (e) { toast(e.message, true); });
+}
+
+function renameSalon(id) {
+  var s = salons.find(function (x) { return x.id === id; });
+  var name = prompt('Nouveau nom', s.name);
+  if (!name) return;
+  superApi('/api/super/salons/' + id, { method: 'PUT', body: { name: name } })
+    .then(loadSalons).catch(function (e) { toast(e.message, true); });
+}
+
+function resetSalonPassword(id, name) {
+  var pw = Math.random().toString(36).slice(2, 10);
+  if (!confirm('Nouveau mot de passe pour ' + name + ' : ' + pw + '\n\nNotez-le maintenant. Appliquer ?')) return;
+  superApi('/api/super/salons/' + id, { method: 'PUT', body: { admin_password: pw } })
+    .then(function () { toast('Mot de passe mis à jour pour ' + name); })
+    .catch(function (e) { toast(e.message, true); });
+}
+
+function toggleSalon(id, active) {
+  superApi('/api/super/salons/' + id, { method: 'PUT', body: { active: active } })
+    .then(loadSalons).catch(function (e) { toast(e.message, true); });
+}
+</script>
+</body>
+</html>

@@ -1,22 +1,39 @@
 -- ============================================================
---  Salon — file d'attente temps réel — schéma MySQL
---  À exécuter une fois sur la base créée pour l'app.
+--  Salon — file d'attente temps réel — schéma MySQL (multi-salon)
+--  À exécuter une fois sur une base VIERGE.
+--  Pour migrer une base existante (deploiement mono-salon precedent),
+--  voir sql/migration-multi-salon.sql a la place.
 -- ============================================================
+
+CREATE TABLE IF NOT EXISTS salons (
+  id CHAR(36) PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  slug VARCHAR(80) NOT NULL UNIQUE,
+  admin_password VARCHAR(255) NOT NULL,
+  is_default TINYINT(1) NOT NULL DEFAULT 0,
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Le salon par defaut : sert de secours quand une page est ouverte sans
+-- ?salon=... dans l'URL (retro-compatibilite avec les bornes deja
+-- configurees avant l'ajout du multi-salon).
+INSERT INTO salons (id, name, slug, admin_password, is_default)
+SELECT UUID(), 'Le Salon', 'le-salon', 'change-moi', 1
+WHERE NOT EXISTS (SELECT 1 FROM salons WHERE is_default = 1);
 
 CREATE TABLE IF NOT EXISTS barbers (
   id CHAR(36) PRIMARY KEY,
+  salon_id CHAR(36) NOT NULL,
   name VARCHAR(255) NOT NULL,
   active TINYINT(1) NOT NULL DEFAULT 1,
   sort_order INT NOT NULL DEFAULT 0,
   pin_code VARCHAR(10) NULL,
   photo_url LONGTEXT NULL,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE,
+  UNIQUE KEY uniq_salon_pin (salon_id, pin_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- Pour une base deja existante (deploiement precedent) : ajoute les
--- colonnes si elles n'existent pas encore, sans casser les donnees.
-ALTER TABLE barbers ADD COLUMN IF NOT EXISTS pin_code VARCHAR(10) NULL;
-ALTER TABLE barbers ADD COLUMN IF NOT EXISTS photo_url LONGTEXT NULL;
 
 -- weekday : 0 = dimanche ... 6 = samedi (comme Date.getDay() en JS)
 CREATE TABLE IF NOT EXISTS barber_schedules (
@@ -32,24 +49,29 @@ CREATE TABLE IF NOT EXISTS barber_schedules (
 
 CREATE TABLE IF NOT EXISTS services (
   id VARCHAR(60) PRIMARY KEY,
+  salon_id CHAR(36) NOT NULL,
   name VARCHAR(255) NOT NULL,
   duration_min INT NOT NULL DEFAULT 30,
   price_cents INT NOT NULL DEFAULT 0,
   active TINYINT(1) NOT NULL DEFAULT 1,
-  sort_order INT NOT NULL DEFAULT 0
+  sort_order INT NOT NULL DEFAULT 0,
+  FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS extras (
   id VARCHAR(60) PRIMARY KEY,
+  salon_id CHAR(36) NOT NULL,
   name VARCHAR(255) NOT NULL,
   duration_min INT NOT NULL DEFAULT 0,
   price_cents INT NOT NULL DEFAULT 0,
   active TINYINT(1) NOT NULL DEFAULT 1,
-  sort_order INT NOT NULL DEFAULT 0
+  sort_order INT NOT NULL DEFAULT 0,
+  FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS queue (
   id CHAR(36) PRIMARY KEY,
+  salon_id CHAR(36) NOT NULL,
   client_name VARCHAR(255) NOT NULL,
   email VARCHAR(255) NULL,
   phone VARCHAR(50) NULL,
@@ -65,50 +87,62 @@ CREATE TABLE IF NOT EXISTS queue (
   total_price_cents INT NULL,
   notified TINYINT(1) NOT NULL DEFAULT 0,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (service_id) REFERENCES services(id),
-  FOREIGN KEY (barber_id) REFERENCES barbers(id)
+  FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS queue_extras (
   queue_id CHAR(36) NOT NULL,
   extra_id VARCHAR(60) NOT NULL,
   PRIMARY KEY (queue_id, extra_id),
-  FOREIGN KEY (queue_id) REFERENCES queue(id) ON DELETE CASCADE,
-  FOREIGN KEY (extra_id) REFERENCES extras(id)
+  FOREIGN KEY (queue_id) REFERENCES queue(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE INDEX idx_queue_status ON queue(status);
 CREATE INDEX idx_queue_checkin ON queue(checkin_at);
+CREATE INDEX idx_queue_salon ON queue(salon_id);
 
 CREATE TABLE IF NOT EXISTS settings (
-  `key` VARCHAR(100) PRIMARY KEY,
+  salon_id CHAR(36) NOT NULL,
+  `key` VARCHAR(100) NOT NULL,
   value TEXT,
-  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (salon_id, `key`),
+  FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- ---------- Données de départ ----------
-INSERT INTO services (id, name, duration_min, price_cents, sort_order) VALUES
-  ('coupe',       'Coupe',          30, 2000, 1),
-  ('barbe',       'Barbe',          15, 1200, 2),
-  ('coupe_barbe', 'Coupe et barbe', 45, 2800, 3),
-  ('enfant',      'Coupe enfant',   20, 1500, 4)
-ON DUPLICATE KEY UPDATE name = VALUES(name);
+-- ---------- Données de départ pour le salon par défaut ----------
+SET @default_salon_id = (SELECT id FROM salons WHERE is_default = 1 LIMIT 1);
 
-INSERT INTO extras (id, name, duration_min, price_cents, sort_order) VALUES
-  ('shampoing',  'Shampooing',            5,  300, 1),
-  ('serviette',  'Serviette chaude',     10,  800, 2),
-  ('contour',    'Contour / traçage',     5,  500, 3),
-  ('degrade',    'Dégradé américain',    10,  500, 4),
-  ('coloration', 'Coloration',           25, 2000, 5),
-  ('soin',       'Soin barbe à l\'huile', 10, 1000, 6)
-ON DUPLICATE KEY UPDATE name = VALUES(name);
+INSERT INTO services (id, salon_id, name, duration_min, price_cents, sort_order)
+SELECT UUID(), @default_salon_id, v.name, v.duration_min, v.price_cents, v.sort_order
+FROM (
+  SELECT 'Coupe' AS name, 30 AS duration_min, 2000 AS price_cents, 1 AS sort_order
+  UNION ALL SELECT 'Barbe', 15, 1200, 2
+  UNION ALL SELECT 'Coupe et barbe', 45, 2800, 3
+  UNION ALL SELECT 'Coupe enfant', 20, 1500, 4
+) v
+WHERE NOT EXISTS (SELECT 1 FROM services WHERE salon_id = @default_salon_id);
 
-INSERT INTO settings (`key`, value) VALUES
-  ('notify_before_min', '30'),
-  ('salon_name',        'Le Salon'),
-  ('smtp_host',         ''),
-  ('smtp_port',         '587'),
-  ('smtp_user',         ''),
-  ('smtp_pass',         ''),
-  ('smtp_from',         '')
+INSERT INTO extras (id, salon_id, name, duration_min, price_cents, sort_order)
+SELECT UUID(), @default_salon_id, v.name, v.duration_min, v.price_cents, v.sort_order
+FROM (
+  SELECT 'Shampooing' AS name, 5 AS duration_min, 300 AS price_cents, 1 AS sort_order
+  UNION ALL SELECT 'Serviette chaude', 10, 800, 2
+  UNION ALL SELECT 'Contour / traçage', 5, 500, 3
+  UNION ALL SELECT 'Dégradé américain', 10, 500, 4
+  UNION ALL SELECT 'Coloration', 25, 2000, 5
+  UNION ALL SELECT 'Soin barbe à l''huile', 10, 1000, 6
+) v
+WHERE NOT EXISTS (SELECT 1 FROM extras WHERE salon_id = @default_salon_id);
+
+INSERT INTO settings (salon_id, `key`, value)
+SELECT @default_salon_id, v.k, v.val FROM (
+  SELECT 'notify_before_min' AS k, '30' AS val
+  UNION ALL SELECT 'salon_name', 'Le Salon'
+  UNION ALL SELECT 'smtp_host', ''
+  UNION ALL SELECT 'smtp_port', '587'
+  UNION ALL SELECT 'smtp_user', ''
+  UNION ALL SELECT 'smtp_pass', ''
+  UNION ALL SELECT 'smtp_from', ''
+) v
 ON DUPLICATE KEY UPDATE `key` = VALUES(`key`);

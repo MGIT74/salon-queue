@@ -20,7 +20,7 @@ const EDITABLE = [
 ];
 
 router.get('/', requireAdmin, wrap(async (req, res) => {
-  const s = await getSettings();
+  const s = await getSettings(req.salon.id);
   // Le mot de passe SMTP n'est jamais renvoyé en clair : on indique
   // seulement s'il est renseigné.
   res.json({
@@ -38,8 +38,8 @@ router.put('/', requireAdmin, wrap(async (req, res) => {
   // Champ mot de passe laissé vide = on conserve l'ancien
   if (patch.smtp_pass === '') delete patch.smtp_pass;
 
-  await setSettings(patch);
-  invalidateTransport();
+  await setSettings(req.salon.id, patch);
+  invalidateTransport(req.salon.id);
   res.json({ ok: true });
 }));
 
@@ -47,7 +47,7 @@ router.post('/smtp/test', requireAdmin, wrap(async (req, res) => {
   const to = req.body.to;
   if (!to) return res.status(400).json({ error: 'Adresse de destination requise' });
   try {
-    await sendTest(to);
+    await sendTest(req.salon.id, to);
     res.json({ ok: true, sent: true });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -56,7 +56,7 @@ router.post('/smtp/test', requireAdmin, wrap(async (req, res) => {
 
 // Réglages publics utiles à la borne (nom du salon uniquement)
 router.get('/public', wrap(async (req, res) => {
-  const s = await getSettings();
+  const s = await getSettings(req.salon.id);
   res.json({ ok: true, salon_name: s.salon_name || 'Le Salon' });
 }));
 

@@ -38,23 +38,22 @@ function utcIso(v) {
   return v.replace(' ', 'T') + 'Z';
 }
 
-// Lecture / écriture de la table settings (clé -> valeur)
-async function getSettings() {
-  const [rows] = await pool.query('SELECT `key`, value FROM settings');
+// Lecture / écriture de la table settings (clé -> valeur), par salon
+async function getSettings(salonId) {
+  const [rows] = await pool.query('SELECT `key`, value FROM settings WHERE salon_id = ?', [salonId]);
   const out = {};
   rows.forEach((r) => { out[r.key] = r.value; });
   return out;
 }
 
-async function setSettings(obj) {
+async function setSettings(salonId, obj) {
   const entries = Object.entries(obj);
   if (!entries.length) return;
-  const values = entries.map(([, v]) => (v == null ? '' : String(v)));
-  const placeholders = entries.map(() => '(?, ?, NOW())').join(', ');
+  const placeholders = entries.map(() => '(?, ?, ?, NOW())').join(', ');
   const params = [];
-  entries.forEach(([k], i) => { params.push(k, values[i]); });
+  entries.forEach(([k, v]) => { params.push(salonId, k, v == null ? '' : String(v)); });
   await pool.query(
-    `INSERT INTO settings (\`key\`, value, updated_at) VALUES ${placeholders}
+    `INSERT INTO settings (salon_id, \`key\`, value, updated_at) VALUES ${placeholders}
      ON DUPLICATE KEY UPDATE value = VALUES(value), updated_at = VALUES(updated_at)`,
     params
   );
