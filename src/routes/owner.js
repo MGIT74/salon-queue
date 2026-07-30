@@ -91,6 +91,34 @@ router.put('/salons/:id', requireAdmin, wrap(async (req, res) => {
   res.json({ ok: true });
 }));
 
+// Suppression définitive d'un salon de l'enseigne. Le salon par défaut
+// (secours pour les pages ouvertes sans ?salon=...) ne peut jamais être
+// supprimé, sinon les bornes déjà configurées sans ce paramètre casseraient.
+// Les coiffeurs/prestations/suppléments/clients de ce salon disparaissent
+// avec lui (cascade en base) — irréversible.
+router.delete('/salons/:id', requireAdmin, wrap(async (req, res) => {
+  const [[salon]] = await pool.query(
+    'SELECT id, name, is_default FROM salons WHERE id = ? AND owner_id = ?',
+    [req.params.id, req.ownerId]
+  );
+  if (!salon) return res.status(403).json({ error: "Ce salon n'appartient pas à votre enseigne" });
+  if (salon.is_default) {
+    return res.status(400).json({
+      error: 'Ce salon est le salon par défaut, il ne peut pas être supprimé (utilisé quand aucun ?salon= n\'est précisé dans l\'URL).'
+    });
+  }
+
+  const [[{ count }]] = await pool.query(
+    'SELECT COUNT(*) AS count FROM salons WHERE owner_id = ?', [req.ownerId]
+  );
+  if (count <= 1) {
+    return res.status(400).json({ error: 'Impossible de supprimer le seul salon de votre enseigne.' });
+  }
+
+  await pool.query('DELETE FROM salons WHERE id = ?', [req.params.id]);
+  res.json({ ok: true, deleted: true, name: salon.name });
+}));
+
 // --- Coiffeurs de toute l'enseigne, avec leur salon -----------------------
 router.get('/barbers', requireAdmin, wrap(async (req, res) => {
   const [rows] = await pool.query(

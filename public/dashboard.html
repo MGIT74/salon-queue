@@ -971,8 +971,26 @@ function renderSalonsList() {
       (s.active ? '' : ' <span class="chip">désactivé</span>') + '</div>' +
       '<div class="item-meta">?salon=' + esc(s.slug) + '</div>' +
       '<div style="margin-top:8px">' + links + '</div>' +
-      '</div></div>';
+      '</div>' +
+      (s.is_default ? '' : '<div class="item-actions"><button class="btn btn-ghost" onclick="deleteSalon(\'' + s.id + '\',\'' + esc(s.name).replace(/'/g, "\\'") + '\')">Supprimer</button></div>') +
+      '</div>';
   }).join('') || '<div class="empty">Aucun salon</div>';
+}
+
+function deleteSalon(id, name) {
+  var typed = prompt(
+    'Supprimer définitivement "' + name + '" ?\n\n' +
+    'Ses coiffeurs, prestations, suppléments et son historique de clients seront supprimés avec lui. Cette action est irréversible.\n\n' +
+    'Tapez SUPPRIMER en majuscules pour confirmer :'
+  );
+  if (typed !== 'SUPPRIMER') {
+    if (typed !== null) toast('Suppression annulée — le mot tapé ne correspondait pas', true);
+    return;
+  }
+  api('/api/owner/salons/' + id, { method: 'DELETE' })
+    .then(loadChainTab)
+    .then(function () { toast('Salon supprimé'); })
+    .catch(function (e) { toast(e.message, true); });
 }
 
 function addSalon() {
