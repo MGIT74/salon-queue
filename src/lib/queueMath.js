@@ -1,11 +1,18 @@
 const { pool, utcIso } = require('../db');
 
+// Clé de rapprochement d'un client : email en priorité, sinon téléphone,
+// sinon nom — il n'existe pas de fiche client dédiée dans ce modèle,
+// donc on rapproche du mieux possible sur ce qui a été saisi au check-in.
+function clientKey(row) {
+  return String(row.email || row.phone || row.client_name || '').trim().toLowerCase();
+}
+
 /**
  * Charge la file complète d'UN salon (attente + en cours) avec leur
  * prestation, leurs suppléments, la durée totale et le prix total.
  */
 async function loadQueue(salonId) {
-  const [[rows], [services], [extras], [links]] = await Promise.all([
+  const [[rows], [services], [extras], [links], [notes]] = await Promise.all([
     pool.query(
       "SELECT * FROM queue WHERE salon_id = ? AND status IN ('waiting','in_progress') ORDER BY checkin_at",
       [salonId]
@@ -17,11 +24,13 @@ async function loadQueue(salonId) {
        JOIN queue q ON q.id = qe.queue_id
        WHERE q.salon_id = ?`,
       [salonId]
-    )
+    ),
+    pool.query('SELECT client_key, note FROM client_notes WHERE salon_id = ?', [salonId])
   ]);
 
   const svcById = Object.fromEntries(services.map((s) => [s.id, s]));
   const extById = Object.fromEntries(extras.map((e) => [e.id, e]));
+  const noteByKey = Object.fromEntries(notes.map((n) => [n.client_key, n.note]));
 
   return rows.map((r) => {
     const chosen = links
@@ -32,6 +41,7 @@ async function loadQueue(salonId) {
     const service = svcById[r.service_id] || { name: 'Prestation', duration_min: 30, price_cents: 0 };
     const duration = service.duration_min + chosen.reduce((a, e) => a + e.duration_min, 0);
     const price = service.price_cents + chosen.reduce((a, e) => a + e.price_cents, 0);
+    const key = clientKey(r);
 
     return Object.assign({}, r, {
       position: r.queue_position,
@@ -41,7 +51,8 @@ async function loadQueue(salonId) {
       service,
       extras: chosen,
       total_duration_min: duration,
-      total_price_cents: price
+      total_price_cents: price,
+      note: (key && noteByKey[key]) || ''
     });
   });
 }
@@ -149,4 +160,4 @@ async function recompute(salonId) {
   return updates;
 }
 
-module.exports = { loadQueue, recompute, activeBarberCount };
+module.exports = { loadQueue, recompute, activeBarberCount, clientKey };

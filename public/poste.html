@@ -45,6 +45,19 @@
   .timer-sub.over { color: var(--red); font-weight: 500; }
   .active-card .btn { width: 100%; margin-bottom: 8px; padding: 14px; font-size: 15px; }
 
+  #extras-picker { text-align: left; background: var(--fill); border-radius: 14px; padding: 14px; margin-bottom: 12px; }
+  .extra-opt { display: flex; align-items: center; gap: 10px; padding: 8px 2px; font-size: 14.5px; cursor: pointer; }
+  .extra-opt input { width: 18px; height: 18px; }
+  .extra-price { margin-left: auto; color: var(--grey); font-size: 13px; }
+  #extras-picker .btn { margin-top: 6px; }
+
+  .note-block { text-align: left; margin-bottom: 14px; }
+  .note-block label { display: block; font-size: 13px; font-weight: 600; color: var(--grey); margin-bottom: 6px; }
+  .note-block textarea {
+    width: 100%; padding: 12px 14px; border: none; border-radius: 12px; background: var(--fill);
+    color: var(--ink); font-family: inherit; font-size: 14.5px; resize: vertical; margin-bottom: 8px;
+  }
+
   .section-label { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--grey); margin: 0 0 12px 2px; }
   .next-card {
     background: var(--card); border-radius: 16px; padding: 18px; margin-bottom: 10px;
@@ -98,6 +111,7 @@ mountThemeButton();
 var me = null; // { id, name, pin }
 var queue = [];
 var barbers = [];
+var extras = [];
 var pinBuffer = '';
 
 var SALON_SLUG = (function () {
@@ -221,10 +235,12 @@ function boot() {
 function refresh() {
   return Promise.all([
     barberApi('/api/queue'),
-    barberApi('/api/barbers')
+    barberApi('/api/barbers'),
+    extras.length ? Promise.resolve({ items: extras }) : barberApi('/api/catalog/extras')
   ]).then(function (r) {
     queue = r[0].queue;
     barbers = r[1].items;
+    extras = r[2].items;
     renderActive();
     renderNext();
   }).catch(function (e) { toast(e.message, true); });
@@ -246,6 +262,8 @@ function chipsHtml(q) {
     q.extras.map(function (x) { return '<span class="chip">+ ' + esc(x.name) + '</span>'; }).join('') + '</div>';
 }
 
+var extrasPickerOpen = false;
+
 function renderActive() {
   var cur = myActive();
   var zone = document.getElementById('active-zone');
@@ -254,14 +272,74 @@ function renderActive() {
     return;
   }
   var t = cutTimerDisplay(cur);
+
+  // Si l'utilisateur est en train d'interagir dans cette carte (panneau
+  // de suppléments ouvert, note en cours de frappe), on se contente de
+  // rafraîchir le minuteur sans reconstruire tout le HTML — sinon les
+  // cases cochées et le texte tapé seraient perdus à chaque tick.
+  var timerEl = document.getElementById('active-timer-value');
+  var subEl = document.getElementById('active-timer-sub');
+  var userIsEditing = extrasPickerOpen ||
+    (zone.contains(document.activeElement) && document.activeElement !== document.body);
+
+  if (userIsEditing && timerEl) {
+    timerEl.textContent = t.text;
+    timerEl.classList.toggle('over', t.over);
+    if (subEl) {
+      subEl.textContent = t.label + ' · prévu ' + cur.total_duration_min + ' min · ' + eur(cur.total_price_cents);
+      subEl.classList.toggle('over', t.over);
+    }
+    return;
+  }
+
+  var extraIds = cur.extras.map(function (e) { return e.id; });
+  var extrasOptions = extras.map(function (e) {
+    return '<label class="extra-opt"><input type="checkbox" value="' + e.id + '"' +
+      (extraIds.indexOf(e.id) !== -1 ? ' checked' : '') + '> ' + esc(e.name) +
+      ' <span class="extra-price">+' + eur(e.price_cents) + '</span></label>';
+  }).join('');
+
   zone.innerHTML =
     '<div class="active-card">' +
       '<div class="name">' + esc(cur.client_name) + '</div>' +
       chipsHtml(cur) +
-      '<div class="big-timer' + (t.over ? ' over' : '') + '">' + t.text + '</div>' +
-      '<div class="timer-sub' + (t.over ? ' over' : '') + '">' + t.label + ' · prévu ' + cur.total_duration_min + ' min · ' + eur(cur.total_price_cents) + '</div>' +
+      '<div class="big-timer' + (t.over ? ' over' : '') + '" id="active-timer-value">' + t.text + '</div>' +
+      '<div class="timer-sub' + (t.over ? ' over' : '') + '" id="active-timer-sub">' + t.label + ' · prévu ' + cur.total_duration_min + ' min · ' + eur(cur.total_price_cents) + '</div>' +
+      '<button class="btn btn-soft" onclick="toggleExtrasPicker()">Ajouter un supplément</button>' +
+      '<div id="extras-picker" style="display:' + (extrasPickerOpen ? 'block' : 'none') + '">' + extrasOptions +
+        '<button class="btn btn-primary" onclick="saveExtras(\'' + cur.id + '\')">Valider</button>' +
+      '</div>' +
+      '<div class="note-block">' +
+        '<label for="client-note">Note sur ce client</label>' +
+        '<textarea id="client-note" rows="2" placeholder="Ex: préfère dégradé américain, allergie...">' + esc(cur.note || '') + '</textarea>' +
+        '<button class="btn btn-soft" onclick="saveNote(\'' + cur.id + '\')">Enregistrer la note</button>' +
+      '</div>' +
       '<button class="btn btn-green" onclick="finishMine(\'' + cur.id + '\')">Terminer</button>' +
     '</div>';
+}
+
+function toggleExtrasPicker() {
+  extrasPickerOpen = !extrasPickerOpen;
+  var el = document.getElementById('extras-picker');
+  if (el) el.style.display = extrasPickerOpen ? 'block' : 'none';
+}
+
+function saveExtras(id) {
+  var ids = Array.prototype.map.call(
+    document.querySelectorAll('#extras-picker input[type="checkbox"]:checked'),
+    function (c) { return c.value; }
+  );
+  barberApi('/api/queue/' + id, { method: 'PUT', body: { extras: ids } })
+    .then(refresh)
+    .then(function () { toast('Suppléments mis à jour'); })
+    .catch(function (e) { toast(e.message, true); });
+}
+
+function saveNote(id) {
+  var note = document.getElementById('client-note').value;
+  barberApi('/api/queue/' + id + '/note', { method: 'PUT', body: { note: note } })
+    .then(function () { toast('Note enregistrée'); })
+    .catch(function (e) { toast(e.message, true); });
 }
 
 function renderNext() {

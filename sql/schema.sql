@@ -205,3 +205,17 @@ SELECT @default_salon_id, v.k, v.val FROM (
   UNION ALL SELECT 'smtp_from', ''
 ) v
 ON DUPLICATE KEY UPDATE `key` = VALUES(`key`);
+
+-- Notes sur un client (préférences, habitudes...), pour qu'un coiffeur
+-- retrouve l'info la prochaine fois que ce client revient. Rattachées
+-- par une clé calculée (email, sinon téléphone, sinon nom) plutôt qu'à
+-- une fiche client dédiée — il n'en existe pas dans ce modèle de données.
+CREATE TABLE IF NOT EXISTS client_notes (
+  id CHAR(36) PRIMARY KEY,
+  salon_id CHAR(36) NOT NULL,
+  client_key VARCHAR(255) NOT NULL,
+  note TEXT,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_salon_client (salon_id, client_key),
+  FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

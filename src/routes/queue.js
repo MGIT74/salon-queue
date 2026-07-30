@@ -1,7 +1,7 @@
 const express = require('express');
 const crypto = require('crypto');
 const { pool, utcIso } = require('../db');
-const { loadQueue, recompute } = require('../lib/queueMath');
+const { loadQueue, recompute, clientKey } = require('../lib/queueMath');
 const requireAdmin = require('../middleware/auth');
 const requireAdminOrBarber = require('../middleware/barberAuth');
 
@@ -221,6 +221,36 @@ router.delete('/:id', requireAdmin, wrap(async (req, res) => {
   await pool.query('DELETE FROM queue WHERE id = ? AND salon_id = ?', [req.params.id, req.salon.id]);
   await recompute(req.salon.id);
   res.json({ ok: true, deleted: true });
+}));
+
+// Note sur un client (préférences, habitudes...), pour la retrouver la
+// prochaine fois qu'il revient. Un coiffeur connecté par PIN ne peut
+// noter que son propre client en cours.
+router.put('/:id/note', requireAdminOrBarber, wrap(async (req, res) => {
+  const [[row]] = await pool.query(
+    'SELECT client_name, email, phone, barber_id FROM queue WHERE id = ? AND salon_id = ?',
+    [req.params.id, req.salon.id]
+  );
+  if (!row) return res.status(404).json({ error: 'Client introuvable' });
+  if (req.barberId && row.barber_id !== req.barberId) {
+    return res.status(403).json({ error: "Ce n'est pas votre client." });
+  }
+
+  const key = clientKey(row);
+  if (!key) return res.status(400).json({ error: 'Impossible de rattacher une note à ce client' });
+
+  const note = String(req.body.note || '').trim();
+  if (note) {
+    await pool.query(
+      `INSERT INTO client_notes (id, salon_id, client_key, note) VALUES (UUID(), ?, ?, ?)
+       ON DUPLICATE KEY UPDATE note = VALUES(note), updated_at = NOW()`,
+      [req.salon.id, key, note]
+    );
+  } else {
+    await pool.query('DELETE FROM client_notes WHERE salon_id = ? AND client_key = ?', [req.salon.id, key]);
+  }
+
+  res.json({ ok: true });
 }));
 
 module.exports = router;
