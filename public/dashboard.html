@@ -215,10 +215,7 @@
 
 <!-- Application -->
 <div class="wrap" id="app" style="display:none">
-  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:20px">
-    <h1 style="margin:0">Dashboard</h1>
-    <span class="chip main" id="app-salon-badge" style="font-size:13px;padding:6px 14px">…</span>
-  </div>
+  <h1>Dashboard</h1>
 
   <div class="tabs" id="tabs">
     <button class="on" data-t="queue">File d'attente</button>
@@ -419,6 +416,8 @@ var CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.
 
 /* ============ Nom du salon actif — toujours visible, pour ne jamais
    se tromper de salon (login OU une fois connecté) ============ */
+var currentSalonName = '';
+
 function loadCurrentSalonName() {
   fetch('/api/settings/public', {
     headers: SALON_SLUG ? { 'X-Salon-Slug': SALON_SLUG } : {}
@@ -426,11 +425,11 @@ function loadCurrentSalonName() {
     .then(function (r) { return r.json(); })
     .then(function (d) {
       var name = d.salon_name || 'Le Salon';
+      currentSalonName = name;
       document.title = name + ' — Dashboard';
       var loginEl = document.getElementById('login-salon-name');
-      var appEl = document.getElementById('app-salon-badge');
       if (loginEl) loginEl.textContent = name;
-      if (appEl) appEl.textContent = name;
+      renderBarbers();
     })
     .catch(function () {});
 }
@@ -818,7 +817,7 @@ function renderBarbers() {
           '<div class="barber-avatar" style="' + photoStyle + '">' + (b.photo_url ? '' : esc(b.name.charAt(0).toUpperCase())) + '</div>' +
           '<div class="barber-head-info">' +
           '<div class="name">' + esc(b.name) + (b.active ? '' : ' · inactif') + '</div>' +
-          '<div class="sub">' + (b.has_pin ? 'Code PIN configuré' : 'Aucun code PIN') + '</div>' +
+          '<div class="sub">' + (currentSalonName ? esc(currentSalonName) + ' · ' : '') + (b.has_pin ? 'Code PIN configuré' : 'Aucun code PIN') + '</div>' +
           '</div>' +
           '<svg class="barber-chevron' + (open ? ' open' : '') + '" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>' +
           '</div>' +
