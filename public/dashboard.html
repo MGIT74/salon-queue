@@ -492,18 +492,26 @@ function renderQueue() {
 }
 
 function startCut(id) {
-  if (!me) { toast('Sélectionnez qui vous êtes', true); return; }
+  var entry = queue.find(function (q) { return q.id === id; });
+  // Si le client a déjà choisi un coiffeur précis à la borne, on respecte
+  // ce choix — peu importe quel onglet "Je suis" est actif sur le
+  // dashboard. "Je suis" ne sert que pour les clients "premier disponible"
+  // (sans préférence), où celui qui clique devient naturellement le
+  // coiffeur qui les prend.
+  var target = (entry && entry.barber_id) || me;
+
+  if (!target) { toast('Sélectionnez qui vous êtes', true); return; }
 
   var busyIds = queue
     .filter(function (q) { return q.status === 'in_progress'; })
     .map(function (q) { return q.barber_id; });
 
-  if (busyIds.indexOf(me) === -1) {
-    doStart(id, me);
+  if (busyIds.indexOf(target) === -1) {
+    doStart(id, target);
     return;
   }
 
-  // Le coiffeur sélectionné est déjà occupé : on propose un transfert
+  // Le coiffeur cible est déjà occupé : on propose un transfert
   // vers un coiffeur libre plutôt que de bloquer sans solution.
   var free = barbers.filter(function (b) { return b.active && busyIds.indexOf(b.id) === -1; });
 
@@ -512,7 +520,7 @@ function startCut(id) {
     return;
   }
 
-  openTransferSheet(id, free);
+  openTransferSheet(id, free, target);
 }
 
 function doStart(id, barberId) {
@@ -521,10 +529,10 @@ function doStart(id, barberId) {
     .catch(function (e) { toast(e.message, true); });
 }
 
-function openTransferSheet(id, freeBarbers) {
-  var meName = (barbers.find(function (b) { return b.id === me; }) || {}).name || 'Ce coiffeur';
+function openTransferSheet(id, freeBarbers, busyBarberId) {
+  var busyName = (barbers.find(function (b) { return b.id === busyBarberId; }) || {}).name || 'Ce coiffeur';
   document.getElementById('tr-message').textContent =
-    meName + ' a déjà une coupe en cours. Choisissez qui prend ce client à la place :';
+    busyName + ' a déjà une coupe en cours. Choisissez qui prend ce client à la place :';
   document.getElementById('tr-options').innerHTML = freeBarbers.map(function (b) {
     return '<div class="opt" onclick="transferAndStart(\'' + id + '\',\'' + b.id + '\')">' +
       '<div class="box"></div><div><div class="opt-name">' + esc(b.name) + '</div>' +
