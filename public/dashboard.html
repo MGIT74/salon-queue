@@ -507,7 +507,7 @@ function startCut(id) {
     .map(function (q) { return q.barber_id; });
 
   if (busyIds.indexOf(target) === -1) {
-    doStart(id, target);
+    tryStart(id, target);
     return;
   }
 
@@ -521,6 +521,32 @@ function startCut(id) {
   }
 
   openTransferSheet(id, free, target);
+}
+
+// Respecte l'ordre d'arrivée avant de démarrer réellement : un client
+// arrivé plus tôt et éligible au même coiffeur (non-assigné ou assigné
+// à lui) doit être pris en premier, sauf s'il attend spécifiquement
+// quelqu'un d'autre. Réutilisé pour le démarrage direct ET le transfert,
+// puisque le coiffeur final (choisi dans la feuille de transfert) peut
+// différer du coiffeur initialement visé.
+function tryStart(id, targetBarberId) {
+  var entry = queue.find(function (q) { return q.id === id; });
+  if (!entry) return;
+
+  var earlier = queue
+    .filter(function (q) {
+      return q.status === 'waiting' && q.id !== id &&
+        new Date(q.checkin_at) < new Date(entry.checkin_at) &&
+        (!q.barber_id || q.barber_id === targetBarberId);
+    })
+    .sort(function (a, b) { return new Date(a.checkin_at) - new Date(b.checkin_at); })[0];
+
+  if (earlier) {
+    toast(earlier.client_name + ' est arrivé avant et doit être pris en premier.', true);
+    return;
+  }
+
+  doStart(id, targetBarberId);
 }
 
 function doStart(id, barberId) {
@@ -543,7 +569,7 @@ function openTransferSheet(id, freeBarbers, busyBarberId) {
 
 function transferAndStart(id, barberId) {
   closeSheet('sheet-transfer');
-  doStart(id, barberId);
+  tryStart(id, barberId);
 }
 
 function finishCut(id) {

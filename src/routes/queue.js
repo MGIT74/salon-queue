@@ -53,7 +53,10 @@ router.post('/checkin', wrap(async (req, res) => {
 
 // --- Coiffeur : démarrer, terminer, annuler ------------------------------
 router.post('/:id/start', requireAdmin, wrap(async (req, res) => {
-  const barberId = req.body.barber_id || null;
+  const [[row]] = await pool.query('SELECT id, barber_id, checkin_at FROM queue WHERE id = ?', [req.params.id]);
+  if (!row) return res.status(404).json({ error: 'Client introuvable' });
+
+  const barberId = req.body.barber_id || row.barber_id || null;
 
   if (barberId) {
     const [[busy]] = await pool.query(
@@ -63,6 +66,22 @@ router.post('/:id/start', requireAdmin, wrap(async (req, res) => {
     if (busy) {
       return res.status(409).json({
         error: 'Ce coiffeur a déjà une coupe en cours (' + busy.client_name + ').'
+      });
+    }
+
+    // Respect de l'ordre d'arrivée : un client arrivé avant, éligible au
+    // même coiffeur (non-assigné ou assigné à lui), doit être pris en
+    // premier — sauf s'il attend spécifiquement quelqu'un d'autre.
+    const [[earlier]] = await pool.query(
+      `SELECT client_name FROM queue
+       WHERE status = 'waiting' AND id != ? AND checkin_at < ?
+       AND (barber_id IS NULL OR barber_id = ?)
+       ORDER BY checkin_at ASC LIMIT 1`,
+      [req.params.id, row.checkin_at, barberId]
+    );
+    if (earlier) {
+      return res.status(409).json({
+        error: earlier.client_name + ' est arrivé avant et doit être pris en premier.'
       });
     }
   }
