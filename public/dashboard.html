@@ -299,6 +299,20 @@
   </div>
 </div>
 
+<!-- Feuille de transfert vers un coiffeur libre -->
+<div class="backdrop" id="sheet-transfer" onclick="if(event.target===this) closeSheet('sheet-transfer')">
+  <div class="sheet">
+    <div class="sheet-head"><h2>Coiffeur occupé</h2>
+      <button class="x" onclick="closeSheet('sheet-transfer')">✕</button></div>
+    <div class="sheet-body">
+      <p class="hint" id="tr-message" style="margin:0 0 16px">
+        Ce coiffeur a déjà une coupe en cours. Choisissez qui prend ce client à la place :
+      </p>
+      <div class="opt-list" id="tr-options"></div>
+    </div>
+  </div>
+</div>
+
 <!-- Feuille création/édition d'une prestation ou d'un supplément -->
 <div class="backdrop" id="sheet-catalog" onclick="if(event.target===this) closeSheet('sheet-catalog')">
   <div class="sheet">
@@ -479,9 +493,51 @@ function renderQueue() {
 
 function startCut(id) {
   if (!me) { toast('Sélectionnez qui vous êtes', true); return; }
-  api('/api/queue/' + id + '/start', { method: 'POST', body: { barber_id: me } })
-    .then(refreshQueue).catch(function (e) { toast(e.message, true); });
+
+  var busyIds = queue
+    .filter(function (q) { return q.status === 'in_progress'; })
+    .map(function (q) { return q.barber_id; });
+
+  if (busyIds.indexOf(me) === -1) {
+    doStart(id, me);
+    return;
+  }
+
+  // Le coiffeur sélectionné est déjà occupé : on propose un transfert
+  // vers un coiffeur libre plutôt que de bloquer sans solution.
+  var free = barbers.filter(function (b) { return b.active && busyIds.indexOf(b.id) === -1; });
+
+  if (free.length === 0) {
+    toast('Tous les coiffeurs sont occupés pour le moment.', true);
+    return;
+  }
+
+  openTransferSheet(id, free);
 }
+
+function doStart(id, barberId) {
+  api('/api/queue/' + id + '/start', { method: 'POST', body: { barber_id: barberId } })
+    .then(refreshQueue)
+    .catch(function (e) { toast(e.message, true); });
+}
+
+function openTransferSheet(id, freeBarbers) {
+  var meName = (barbers.find(function (b) { return b.id === me; }) || {}).name || 'Ce coiffeur';
+  document.getElementById('tr-message').textContent =
+    meName + ' a déjà une coupe en cours. Choisissez qui prend ce client à la place :';
+  document.getElementById('tr-options').innerHTML = freeBarbers.map(function (b) {
+    return '<div class="opt" onclick="transferAndStart(\'' + id + '\',\'' + b.id + '\')">' +
+      '<div class="box"></div><div><div class="opt-name">' + esc(b.name) + '</div>' +
+      '<div class="opt-meta">Disponible maintenant</div></div></div>';
+  }).join('');
+  document.getElementById('sheet-transfer').classList.add('on');
+}
+
+function transferAndStart(id, barberId) {
+  closeSheet('sheet-transfer');
+  doStart(id, barberId);
+}
+
 function finishCut(id) {
   api('/api/queue/' + id + '/finish', { method: 'POST', body: {} })
     .then(refreshQueue).catch(function (e) { toast(e.message, true); });

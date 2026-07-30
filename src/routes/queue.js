@@ -53,7 +53,21 @@ router.post('/checkin', wrap(async (req, res) => {
 
 // --- Coiffeur : démarrer, terminer, annuler ------------------------------
 router.post('/:id/start', requireAdmin, wrap(async (req, res) => {
-  const params = [req.body.barber_id || null, req.params.id];
+  const barberId = req.body.barber_id || null;
+
+  if (barberId) {
+    const [[busy]] = await pool.query(
+      "SELECT id, client_name FROM queue WHERE barber_id = ? AND status = 'in_progress' LIMIT 1",
+      [barberId]
+    );
+    if (busy) {
+      return res.status(409).json({
+        error: 'Ce coiffeur a déjà une coupe en cours (' + busy.client_name + ').'
+      });
+    }
+  }
+
+  const params = [barberId, req.params.id];
   await pool.query(
     "UPDATE queue SET status = 'in_progress', start_at = NOW(), barber_id = COALESCE(?, barber_id) WHERE id = ?",
     params
