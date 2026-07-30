@@ -339,15 +339,7 @@
       <h2>Coiffeurs et horaires</h2>
       <button class="btn btn-primary" onclick="addBarber()">+ Ajouter</button>
     </div>
-    <div style="margin-bottom:16px">
-      <select id="barbers-scope" onchange="switchBarbersScope(this.value)"
-              style="padding:10px 16px;border:none;border-radius:999px;background:var(--fill);color:var(--ink);font-family:inherit;font-size:14px;font-weight:500">
-        <option value="current">Ce salon uniquement</option>
-        <option value="all">Tous les salons de l'enseigne</option>
-      </select>
-    </div>
     <div id="barbers-list"></div>
-    <div id="barbers-list-all" class="chain-barbers-target" style="display:none"></div>
   </div>
 
   <!-- ===== Onglet clients ===== -->
@@ -1571,25 +1563,6 @@ function renderChainBarbers() {
       }).join('');
 
   document.querySelectorAll('.chain-barbers-target').forEach(function (el) { el.innerHTML = html; });
-}
-
-// Bascule l'onglet Coiffeurs entre "ce salon uniquement" (gestion complète :
-// horaires, PIN, statistiques, congés, prestations) et "tous les salons de
-// l'enseigne" (vue d'ensemble avec déplacement rapide entre salons, comme
-// dans Mes salons — la gestion detaillée d'un coiffeur d'un AUTRE salon se
-// fait en changeant de salon via le sélecteur en haut de la sidebar).
-function switchBarbersScope(scope) {
-  var currentView = document.getElementById('barbers-list');
-  var allView = document.getElementById('barbers-list-all');
-  if (scope === 'all') {
-    currentView.style.display = 'none';
-    allView.style.display = 'block';
-    if (!chainBarbers.length) loadChainBarbers();
-    if (!chainSalons.length) loadSalonsList().then(loadChainBarbers);
-  } else {
-    currentView.style.display = 'block';
-    allView.style.display = 'none';
-  }
 }
 
 function moveBarber(barberId, salonId) {
