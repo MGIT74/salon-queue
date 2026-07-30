@@ -549,8 +549,11 @@ function tryStart(id, targetBarberId) {
   doStart(id, targetBarberId);
 }
 
-function doStart(id, barberId) {
-  api('/api/queue/' + id + '/start', { method: 'POST', body: { barber_id: barberId } })
+function doStart(id, barberId, forceTransfer) {
+  api('/api/queue/' + id + '/start', {
+    method: 'POST',
+    body: { barber_id: barberId, force_transfer: !!forceTransfer }
+  })
     .then(refreshQueue)
     .catch(function (e) { toast(e.message, true); });
 }
@@ -569,7 +572,10 @@ function openTransferSheet(id, freeBarbers, busyBarberId) {
 
 function transferAndStart(id, barberId) {
   closeSheet('sheet-transfer');
-  tryStart(id, barberId);
+  // Le transfert est une décision manuelle et consciente du staff (pas un
+  // clic naïf qui saute la file) : on passe directement, sans repasser
+  // par la vérification stricte de l'ordre d'arrivée.
+  doStart(id, barberId, true);
 }
 
 function finishCut(id) {
@@ -716,10 +722,25 @@ function renderBarbers() {
             ? '<button class="btn btn-ghost" onclick="archiveBarber(\'' + b.id + '\')">Désactiver</button>'
             : '<button class="btn btn-soft" onclick="restoreBarber(\'' + b.id + '\')">Réactiver</button>') +
           '</div></div>' +
+          '<div style="display:flex;align-items:center;gap:10px;margin-bottom:18px">' +
+          '<span class="chip' + (b.has_pin ? ' main' : '') + '">' +
+          (b.has_pin ? '🔒 Code PIN configuré' : 'Aucun code PIN') + '</span>' +
+          '<button class="btn btn-soft" style="font-size:13px;padding:8px 14px" onclick="setBarberPin(\'' + b.id + '\',\'' + esc(b.name).replace(/'/g, "\\'") + '\')">' +
+          (b.has_pin ? 'Changer le code' : 'Définir un code') + '</button>' +
+          '</div>' +
           days +
           '<button class="btn btn-primary" style="margin-top:16px" onclick="saveSchedule(\'' + b.id + '\')">Enregistrer les horaires</button>' +
           '</div>';
       }).join('');
+}
+
+function setBarberPin(id, name) {
+  var pin = String(Math.floor(1000 + Math.random() * 9000));
+  if (!confirm('Nouveau code PIN pour ' + name + ' : ' + pin + '\n\nNotez-le maintenant — il ne sera plus jamais affiché ensuite.\nDonner ce code au coiffeur pour qu\'il se connecte sur /poste.html.\n\nAppliquer ce code ?')) return;
+  api('/api/barbers/' + id, { method: 'PUT', body: { pin_code: pin } })
+    .then(loadBarbers)
+    .then(function () { toast('Code PIN mis à jour pour ' + name); })
+    .catch(function (e) { toast(e.message, true); });
 }
 
 function toggleDay(el) {
@@ -746,8 +767,13 @@ function saveSchedule(id) {
 function addBarber() {
   var name = prompt('Nom du coiffeur');
   if (!name) return;
-  api('/api/barbers', { method: 'POST', body: { name: name } })
-    .then(loadBarbers).then(function () { toast('Coiffeur ajouté'); })
+  var pin = String(Math.floor(1000 + Math.random() * 9000));
+  api('/api/barbers', { method: 'POST', body: { name: name, pin_code: pin } })
+    .then(loadBarbers)
+    .then(function () {
+      toast('Coiffeur ajouté');
+      alert(name + ' peut se connecter sur /poste.html avec le code : ' + pin + '\n\nNotez-le maintenant — il ne sera plus jamais affiché ensuite (vous pourrez en générer un nouveau depuis sa fiche si besoin).');
+    })
     .catch(function (e) { toast(e.message, true); });
 }
 function renameBarber(id) {

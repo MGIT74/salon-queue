@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const { pool, utcIso } = require('../db');
 const { loadQueue, recompute } = require('../lib/queueMath');
 const requireAdmin = require('../middleware/auth');
+const requireAdminOrBarber = require('../middleware/barberAuth');
 
 const router = express.Router();
 
@@ -52,11 +53,20 @@ router.post('/checkin', wrap(async (req, res) => {
 }));
 
 // --- Coiffeur : démarrer, terminer, annuler ------------------------------
-router.post('/:id/start', requireAdmin, wrap(async (req, res) => {
+router.post('/:id/start', requireAdminOrBarber, wrap(async (req, res) => {
   const [[row]] = await pool.query('SELECT id, barber_id, checkin_at FROM queue WHERE id = ?', [req.params.id]);
   if (!row) return res.status(404).json({ error: 'Client introuvable' });
 
-  const barberId = req.body.barber_id || row.barber_id || null;
+  // Un coiffeur connecté par PIN (pas admin) ne peut agir qu'en son propre
+  // nom, et seulement sur un client déjà assigné à lui ou non-assigné —
+  // jamais démarrer le client de quelqu'un d'autre.
+  if (req.barberId) {
+    if (row.barber_id && row.barber_id !== req.barberId) {
+      return res.status(403).json({ error: 'Ce client attend un autre coiffeur.' });
+    }
+  }
+
+  const barberId = req.barberId || req.body.barber_id || row.barber_id || null;
 
   if (barberId) {
     const [[busy]] = await pool.query(
@@ -71,18 +81,23 @@ router.post('/:id/start', requireAdmin, wrap(async (req, res) => {
 
     // Respect de l'ordre d'arrivée : un client arrivé avant, éligible au
     // même coiffeur (non-assigné ou assigné à lui), doit être pris en
-    // premier — sauf s'il attend spécifiquement quelqu'un d'autre.
-    const [[earlier]] = await pool.query(
-      `SELECT client_name FROM queue
-       WHERE status = 'waiting' AND id != ? AND checkin_at < ?
-       AND (barber_id IS NULL OR barber_id = ?)
-       ORDER BY checkin_at ASC LIMIT 1`,
-      [req.params.id, row.checkin_at, barberId]
-    );
-    if (earlier) {
-      return res.status(409).json({
-        error: earlier.client_name + ' est arrivé avant et doit être pris en premier.'
-      });
+    // premier — sauf s'il attend spécifiquement quelqu'un d'autre, ou
+    // si c'est un transfert manuel décidé par le staff (force_transfer,
+    // réservé à l'admin — un coiffeur seul via son PIN ne peut pas
+    // s'auto-attribuer ce contournement).
+    if (!(req.body.force_transfer && !req.barberId)) {
+      const [[earlier]] = await pool.query(
+        `SELECT client_name FROM queue
+         WHERE status = 'waiting' AND id != ? AND checkin_at < ?
+         AND (barber_id IS NULL OR barber_id = ?)
+         ORDER BY checkin_at ASC LIMIT 1`,
+        [req.params.id, row.checkin_at, barberId]
+      );
+      if (earlier) {
+        return res.status(409).json({
+          error: earlier.client_name + ' est arrivé avant et doit être pris en premier.'
+        });
+      }
     }
   }
 
@@ -95,7 +110,14 @@ router.post('/:id/start', requireAdmin, wrap(async (req, res) => {
   res.json({ ok: true });
 }));
 
-router.post('/:id/finish', requireAdmin, wrap(async (req, res) => {
+router.post('/:id/finish', requireAdminOrBarber, wrap(async (req, res) => {
+  if (req.barberId) {
+    const [[row]] = await pool.query('SELECT barber_id FROM queue WHERE id = ?', [req.params.id]);
+    if (!row) return res.status(404).json({ error: 'Client introuvable' });
+    if (row.barber_id !== req.barberId) {
+      return res.status(403).json({ error: "Ce n'est pas votre client en cours." });
+    }
+  }
   await pool.query("UPDATE queue SET status = 'done', end_at = NOW() WHERE id = ?", [req.params.id]);
   await recompute();
   res.json({ ok: true });
@@ -108,12 +130,20 @@ router.post('/:id/cancel', requireAdmin, wrap(async (req, res) => {
 }));
 
 // --- Coiffeur : modifier prestation et suppléments en cours de route -----
-router.put('/:id', requireAdmin, wrap(async (req, res) => {
+router.put('/:id', requireAdminOrBarber, wrap(async (req, res) => {
+  if (req.barberId) {
+    const [[row]] = await pool.query('SELECT barber_id FROM queue WHERE id = ?', [req.params.id]);
+    if (!row) return res.status(404).json({ error: 'Client introuvable' });
+    if (row.barber_id !== req.barberId) {
+      return res.status(403).json({ error: "Ce n'est pas votre client." });
+    }
+  }
+
   const { service_id, extras, barber_id } = req.body;
   const sets = [];
   const params = [];
   if (service_id) { sets.push('service_id = ?'); params.push(service_id); }
-  if (barber_id !== undefined) { sets.push('barber_id = ?'); params.push(barber_id || null); }
+  if (barber_id !== undefined && !req.barberId) { sets.push('barber_id = ?'); params.push(barber_id || null); }
 
   if (sets.length) {
     params.push(req.params.id);

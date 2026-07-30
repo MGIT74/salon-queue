@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Mon poste</title>
+<link rel="stylesheet" href="/app.css">
+<style>
+  html, body { min-height: 100%; }
+  .wrap { max-width: 480px; margin: 0 auto; padding: 20px 18px 40px; }
+
+  /* --- Écran de connexion --- */
+  .login { text-align: center; padding-top: 12vh; }
+  .login .mark { font-size: 15px; font-weight: 600; color: var(--grey); margin-bottom: 6px; }
+  .login h1 { font-size: 28px; font-weight: 600; letter-spacing: -.03em; margin: 0 0 36px; }
+  .pin-dots { display: flex; justify-content: center; gap: 14px; margin-bottom: 32px; }
+  .pin-dot { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--sep); transition: background .1s ease, border-color .1s ease; }
+  .pin-dot.filled { background: var(--blue); border-color: var(--blue); }
+  .keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; max-width: 280px; margin: 0 auto; }
+  .keypad button {
+    aspect-ratio: 1; border: none; border-radius: 50%; background: var(--fill);
+    color: var(--ink); font-size: 24px; font-weight: 500; font-family: inherit; cursor: pointer;
+  }
+  .keypad button:active { background: var(--fill-2); }
+  .keypad .empty { visibility: hidden; }
+  .keypad .del { font-size: 18px; color: var(--grey); }
+  .login-error { color: var(--red); font-size: 14px; margin-top: 18px; min-height: 20px; }
+
+  /* --- Écran principal --- */
+  .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 22px; }
+  .topbar h1 { font-size: 24px; font-weight: 600; letter-spacing: -.03em; margin: 0; }
+  .logout-btn { background: none; border: none; color: var(--grey); font-family: inherit; font-size: 14px; cursor: pointer; padding: 6px 0; }
+
+  .active-card {
+    background: var(--card); border-radius: 20px; padding: 26px 22px; text-align: center;
+    box-shadow: var(--shadow); margin-bottom: 22px;
+  }
+  .active-card .name { font-size: 22px; font-weight: 600; letter-spacing: -.02em; margin-bottom: 6px; }
+  .chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-bottom: 20px; }
+  .chip { font-size: 12.5px; font-weight: 500; padding: 5px 11px; border-radius: 999px; background: var(--fill); color: var(--ink); }
+  .chip.main { background: var(--blue-soft); color: var(--blue); font-weight: 600; }
+  .big-timer { font-size: 48px; font-weight: 600; letter-spacing: -.05em; font-variant-numeric: tabular-nums; color: var(--green); line-height: 1; margin-bottom: 4px; }
+  .big-timer.over { color: var(--red); }
+  .timer-sub { font-size: 13px; color: var(--grey); margin-bottom: 20px; }
+  .timer-sub.over { color: var(--red); font-weight: 500; }
+  .active-card .btn { width: 100%; margin-bottom: 8px; padding: 14px; font-size: 15px; }
+
+  .section-label { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--grey); margin: 0 0 12px 2px; }
+  .next-card {
+    background: var(--card); border-radius: 16px; padding: 18px; margin-bottom: 10px;
+    box-shadow: var(--shadow); display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  }
+  .next-card.locked { opacity: .55; }
+  .next-info .name { font-size: 16px; font-weight: 600; letter-spacing: -.02em; }
+  .next-info .meta { font-size: 13px; color: var(--grey); margin-top: 2px; }
+  .next-card .btn { flex-shrink: 0; padding: 11px 18px; font-size: 14px; }
+  .lock-note { font-size: 12px; color: var(--orange); margin-top: 4px; }
+
+  .empty { background: var(--card); border-radius: 16px; padding: 30px 20px; text-align: center; color: var(--grey); font-size: 14px; box-shadow: var(--shadow); }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="login" id="login-screen">
+    <div class="mark">LE SALON</div>
+    <h1>Mon poste</h1>
+    <div class="pin-dots" id="pin-dots">
+      <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
+    </div>
+    <div class="keypad" id="keypad">
+      <button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button>
+      <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button>
+      <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button>
+      <button class="empty"></button><button data-k="0">0</button><button class="del" data-k="del">⌫</button>
+    </div>
+    <div class="login-error" id="login-error"></div>
+  </div>
+
+  <div id="app-screen" style="display:none">
+    <div class="topbar">
+      <h1 id="my-name">—</h1>
+      <button class="logout-btn" onclick="logout()">Déconnexion</button>
+    </div>
+    <div id="active-zone"></div>
+    <div class="section-label">À suivre</div>
+    <div id="next-zone"></div>
+  </div>
+</div>
+
+<script src="/app.js"></script>
+<script>
+mountThemeButton();
+
+var me = null; // { id, name, pin }
+var queue = [];
+var barbers = [];
+var pinBuffer = '';
+
+/* ---------- API avec authentification par PIN ---------- */
+function barberApi(path, opts) {
+  opts = opts || {};
+  var headers = { 'Content-Type': 'application/json' };
+  if (me) { headers['X-Barber-Id'] = me.id; headers['X-Barber-Pin'] = me.pin; }
+  return fetch(path, {
+    method: opts.method || 'GET',
+    headers: headers,
+    body: opts.body ? JSON.stringify(opts.body) : undefined
+  }).then(function (r) {
+    return r.json().then(function (data) {
+      if (!r.ok) throw new Error(data.error || 'Erreur ' + r.status);
+      return data;
+    });
+  });
+}
+
+/* ---------- Connexion par code PIN ---------- */
+function renderPinDots() {
+  var dots = document.querySelectorAll('.pin-dot');
+  dots.forEach(function (d, i) { d.classList.toggle('filled', i < pinBuffer.length); });
+}
+
+document.getElementById('keypad').addEventListener('click', function (e) {
+  var btn = e.target.closest('button');
+  if (!btn || btn.classList.contains('empty')) return;
+  var k = btn.dataset.k;
+  document.getElementById('login-error').textContent = '';
+
+  if (k === 'del') {
+    pinBuffer = pinBuffer.slice(0, -1);
+    renderPinDots();
+    return;
+  }
+  if (pinBuffer.length >= 4) return;
+  pinBuffer += k;
+  renderPinDots();
+  if (pinBuffer.length === 4) attemptLogin();
+});
+
+function attemptLogin() {
+  fetch('/api/barbers/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pin: pinBuffer })
+  }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
+    .then(function (res) {
+      if (!res.ok) {
+        document.getElementById('login-error').textContent = res.data.error || 'Code incorrect';
+        pinBuffer = '';
+        renderPinDots();
+        return;
+      }
+      me = { id: res.data.barber.id, name: res.data.barber.name, pin: pinBuffer };
+      try { sessionStorage.setItem('poste-session', JSON.stringify(me)); } catch (e) {}
+      showApp();
+    })
+    .catch(function () {
+      document.getElementById('login-error').textContent = 'Connexion impossible';
+      pinBuffer = '';
+      renderPinDots();
+    });
+}
+
+function logout() {
+  me = null;
+  try { sessionStorage.removeItem('poste-session'); } catch (e) {}
+  pinBuffer = '';
+  renderPinDots();
+  document.getElementById('app-screen').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'block';
+}
+
+(function autoLogin() {
+  var saved = null;
+  try { saved = JSON.parse(sessionStorage.getItem('poste-session') || 'null'); } catch (e) {}
+  if (saved && saved.id && saved.pin) { me = saved; showApp(); }
+})();
+
+function showApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app-screen').style.display = 'block';
+  document.getElementById('my-name').textContent = me.name;
+  boot();
+}
+
+/* ---------- Application ---------- */
+function boot() {
+  refresh();
+  setInterval(refresh, 4000);
+  setInterval(renderActive, 1000);
+}
+
+function refresh() {
+  return Promise.all([
+    barberApi('/api/queue'),
+    barberApi('/api/barbers')
+  ]).then(function (r) {
+    queue = r[0].queue;
+    barbers = r[1].items;
+    renderActive();
+    renderNext();
+  }).catch(function (e) { toast(e.message, true); });
+}
+
+function myActive() {
+  return queue.find(function (q) { return q.status === 'in_progress' && q.barber_id === me.id; });
+}
+
+function cutTimerDisplay(cut) {
+  var elapsedSec = Math.max(Math.floor((Date.now() - new Date(cut.start_at).getTime()) / 1000), 0);
+  var remainSec = (cut.total_duration_min || 0) * 60 - elapsedSec;
+  if (remainSec >= 0) return { text: mmss(remainSec), over: false, label: 'Temps restant' };
+  return { text: '+' + Math.ceil(Math.abs(remainSec) / 60) + ' min', over: true, label: 'En retard' };
+}
+
+function chipsHtml(q) {
+  return '<div class="chips"><span class="chip main">' + esc(q.service.name) + '</span>' +
+    q.extras.map(function (x) { return '<span class="chip">+ ' + esc(x.name) + '</span>'; }).join('') + '</div>';
+}
+
+function renderActive() {
+  var cur = myActive();
+  var zone = document.getElementById('active-zone');
+  if (!cur) {
+    zone.innerHTML = '<div class="empty">Aucune coupe en cours</div>';
+    return;
+  }
+  var t = cutTimerDisplay(cur);
+  zone.innerHTML =
+    '<div class="active-card">' +
+      '<div class="name">' + esc(cur.client_name) + '</div>' +
+      chipsHtml(cur) +
+      '<div class="big-timer' + (t.over ? ' over' : '') + '">' + t.text + '</div>' +
+      '<div class="timer-sub' + (t.over ? ' over' : '') + '">' + t.label + ' · prévu ' + cur.total_duration_min + ' min · ' + eur(cur.total_price_cents) + '</div>' +
+      '<button class="btn btn-green" onclick="finishMine(\'' + cur.id + '\')">Terminer</button>' +
+    '</div>';
+}
+
+function renderNext() {
+  var zone = document.getElementById('next-zone');
+  if (myActive()) {
+    zone.innerHTML = '<div class="empty">Terminez la coupe en cours pour passer à la suivante</div>';
+    return;
+  }
+
+  var mine = queue.filter(function (q) {
+    return q.status === 'waiting' && (q.barber_id === me.id || !q.barber_id);
+  }).sort(function (a, b) { return new Date(a.checkin_at) - new Date(b.checkin_at); });
+
+  if (mine.length === 0) {
+    zone.innerHTML = '<div class="empty">Personne en attente pour vous pour le moment</div>';
+    return;
+  }
+
+  zone.innerHTML = mine.map(function (q, i) {
+    var locked = i > 0;
+    var detail = q.service.name + (q.extras.length ? ' + ' + q.extras.map(function (x) { return x.name; }).join(', ') : '');
+    return '<div class="next-card' + (locked ? ' locked' : '') + '">' +
+      '<div class="next-info"><div class="name">' + esc(q.client_name) + '</div>' +
+      '<div class="meta">' + esc(detail) + '</div>' +
+      (locked ? '<div class="lock-note">En attente de son tour</div>' : '') +
+      '</div>' +
+      (locked ? '' : '<button class="btn btn-primary" onclick="startMine(\'' + q.id + '\')">Commencer</button>') +
+      '</div>';
+  }).join('');
+}
+
+function startMine(id) {
+  barberApi('/api/queue/' + id + '/start', { method: 'POST', body: { barber_id: me.id } })
+    .then(refresh)
+    .catch(function (e) { toast(e.message, true); });
+}
+
+function finishMine(id) {
+  barberApi('/api/queue/' + id + '/finish', { method: 'POST', body: {} })
+    .then(refresh)
+    .catch(function (e) { toast(e.message, true); });
+}
+</script>
+</body>
+</html>
