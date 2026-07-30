@@ -95,3 +95,88 @@ function subscribeQueue(onChange) {
 }
 
 initTheme();
+
+/* ============ Fenêtres modales professionnelles ============
+   Remplacent alert()/confirm()/prompt() natifs par des fenêtres stylées
+   cohérentes avec le reste de l'app. Toutes renvoient une Promise. */
+
+function _buildModal(innerHtml) {
+  var overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = '<div class="modal-box">' + innerHtml + '</div>';
+  document.body.appendChild(overlay);
+  requestAnimationFrame(function () { overlay.classList.add('on'); });
+  return overlay;
+}
+
+function _closeModal(overlay) {
+  overlay.classList.remove('on');
+  setTimeout(function () { overlay.remove(); }, 180);
+}
+
+function showAlert(message, opts) {
+  opts = opts || {};
+  return new Promise(function (resolve) {
+    var overlay = _buildModal(
+      (opts.title ? '<div class="modal-title">' + esc(opts.title) + '</div>' : '') +
+      '<div class="modal-message">' + esc(message) + '</div>' +
+      '<div class="modal-actions"><button class="btn btn-primary" id="modal-ok-btn">' +
+      esc(opts.okLabel || 'OK') + '</button></div>'
+    );
+    function close() { _closeModal(overlay); resolve(); }
+    overlay.querySelector('#modal-ok-btn').onclick = close;
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+  });
+}
+
+function showConfirm(message, opts) {
+  opts = opts || {};
+  return new Promise(function (resolve) {
+    var overlay = _buildModal(
+      (opts.title ? '<div class="modal-title">' + esc(opts.title) + '</div>' : '') +
+      '<div class="modal-message">' + esc(message) + '</div>' +
+      '<div class="modal-actions">' +
+      '<button class="btn btn-soft" id="modal-cancel-btn">' + esc(opts.cancelLabel || 'Annuler') + '</button>' +
+      '<button class="btn ' + (opts.danger ? 'modal-danger-btn' : 'btn-primary') + '" id="modal-confirm-btn">' +
+      esc(opts.confirmLabel || 'Confirmer') + '</button>' +
+      '</div>'
+    );
+    overlay.querySelector('#modal-cancel-btn').onclick = function () { _closeModal(overlay); resolve(false); };
+    overlay.querySelector('#modal-confirm-btn').onclick = function () { _closeModal(overlay); resolve(true); };
+  });
+}
+
+function showPrompt(message, opts) {
+  opts = opts || {};
+  return new Promise(function (resolve) {
+    var overlay = _buildModal(
+      (opts.title ? '<div class="modal-title">' + esc(opts.title) + '</div>' : '') +
+      (message ? '<div class="modal-message">' + esc(message) + '</div>' : '') +
+      '<div class="modal-error" id="modal-prompt-error" style="display:none"></div>' +
+      '<input class="modal-input" id="modal-prompt-input" type="text" value="' +
+      esc(opts.defaultValue || '') + '" placeholder="' + esc(opts.placeholder || '') + '">' +
+      '<div class="modal-actions">' +
+      '<button class="btn btn-soft" id="modal-cancel-btn">Annuler</button>' +
+      '<button class="btn ' + (opts.danger ? 'modal-danger-btn' : 'btn-primary') + '" id="modal-confirm-btn">' +
+      esc(opts.confirmLabel || 'Valider') + '</button>' +
+      '</div>'
+    );
+    var input = overlay.querySelector('#modal-prompt-input');
+    var errEl = overlay.querySelector('#modal-prompt-error');
+    setTimeout(function () { input.focus(); input.select(); }, 50);
+
+    function submit() {
+      var val = input.value.trim();
+      if (opts.requireExact && val !== opts.requireExact) {
+        errEl.textContent = 'Le texte tapé ne correspond pas à « ' + opts.requireExact + ' ».';
+        errEl.style.display = 'block';
+        return;
+      }
+      _closeModal(overlay);
+      resolve(val || null);
+    }
+    input.addEventListener('keydown', function (e) { if (e.key === 'Enter') submit(); });
+    overlay.querySelector('#modal-cancel-btn').onclick = function () { _closeModal(overlay); resolve(null); };
+    overlay.querySelector('#modal-confirm-btn').onclick = submit;
+  });
+}

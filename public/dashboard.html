@@ -617,9 +617,11 @@ function finishCut(id) {
     .then(refreshQueue).catch(function (e) { toast(e.message, true); });
 }
 function cancelCut(id) {
-  if (!confirm('Marquer ce client comme absent ?')) return;
-  api('/api/queue/' + id + '/cancel', { method: 'POST', body: {} })
-    .then(refreshQueue).catch(function (e) { toast(e.message, true); });
+  showConfirm('Marquer ce client comme absent ?', { title: 'Client absent', danger: true }).then(function (ok) {
+    if (!ok) return;
+    api('/api/queue/' + id + '/cancel', { method: 'POST', body: {} })
+      .then(refreshQueue).catch(function (e) { toast(e.message, true); });
+  });
 }
 
 /* ============ Feuille prestation d'un client ============ */
@@ -720,10 +722,12 @@ function saveCatalog() {
 }
 
 function archiveCatalog(table, id) {
-  if (!confirm('Archiver cet élément ? Il ne sera plus proposé à la borne.')) return;
-  api('/api/catalog/' + table + '/' + id, { method: 'DELETE' })
-    .then(loadCatalog).then(function () { toast('Archivé'); })
-    .catch(function (e) { toast(e.message, true); });
+  showConfirm('Archiver cet élément ? Il ne sera plus proposé à la borne.', { title: 'Archiver' }).then(function (ok) {
+    if (!ok) return;
+    api('/api/catalog/' + table + '/' + id, { method: 'DELETE' })
+      .then(loadCatalog).then(function () { toast('Archivé'); })
+      .catch(function (e) { toast(e.message, true); });
+  });
 }
 function restoreCatalog(table, id) {
   api('/api/catalog/' + table + '/' + id, { method: 'PUT', body: { active: true } })
@@ -808,11 +812,16 @@ function uploadBarberPhoto(id, input) {
 
 function setBarberPin(id, name) {
   var pin = String(Math.floor(1000 + Math.random() * 9000));
-  if (!confirm('Nouveau code PIN pour ' + name + ' : ' + pin + '\n\nNotez-le maintenant — il ne sera plus jamais affiché ensuite.\nDonner ce code au coiffeur pour qu\'il se connecte sur /poste.html.\n\nAppliquer ce code ?')) return;
-  api('/api/barbers/' + id, { method: 'PUT', body: { pin_code: pin } })
-    .then(loadBarbers)
-    .then(function () { toast('Code PIN mis à jour pour ' + name); })
-    .catch(function (e) { toast(e.message, true); });
+  showConfirm(
+    'Nouveau code PIN pour ' + name + ' : ' + pin + '\n\nNotez-le maintenant — il ne sera plus jamais affiché ensuite.\nDonnez ce code au coiffeur pour qu\'il se connecte sur /poste.html.',
+    { title: 'Nouveau code PIN', confirmLabel: 'Appliquer ce code' }
+  ).then(function (ok) {
+    if (!ok) return;
+    api('/api/barbers/' + id, { method: 'PUT', body: { pin_code: pin } })
+      .then(loadBarbers)
+      .then(function () { toast('Code PIN mis à jour pour ' + name); })
+      .catch(function (e) { toast(e.message, true); });
+  });
 }
 
 function toggleDay(el) {
@@ -837,28 +846,35 @@ function saveSchedule(id) {
 }
 
 function addBarber() {
-  var name = prompt('Nom du coiffeur');
-  if (!name) return;
-  var pin = String(Math.floor(1000 + Math.random() * 9000));
-  api('/api/barbers', { method: 'POST', body: { name: name, pin_code: pin } })
-    .then(loadBarbers)
-    .then(function () {
-      toast('Coiffeur ajouté');
-      alert(name + ' peut se connecter sur /poste.html avec le code : ' + pin + '\n\nNotez-le maintenant — il ne sera plus jamais affiché ensuite (vous pourrez en générer un nouveau depuis sa fiche si besoin).');
-    })
-    .catch(function (e) { toast(e.message, true); });
+  showPrompt('', { title: 'Nouveau coiffeur', placeholder: 'Nom du coiffeur' }).then(function (name) {
+    if (!name) return;
+    var pin = String(Math.floor(1000 + Math.random() * 9000));
+    api('/api/barbers', { method: 'POST', body: { name: name, pin_code: pin } })
+      .then(loadBarbers)
+      .then(function () {
+        toast('Coiffeur ajouté');
+        return showAlert(
+          name + ' peut se connecter sur /poste.html avec le code : ' + pin + '\n\nNotez-le maintenant — il ne sera plus jamais affiché ensuite (vous pourrez en générer un nouveau depuis sa fiche si besoin).',
+          { title: 'Code PIN généré' }
+        );
+      })
+      .catch(function (e) { toast(e.message, true); });
+  });
 }
 function renameBarber(id) {
   var b = barbers.find(function (x) { return x.id === id; });
-  var name = prompt('Nouveau nom', b.name);
-  if (!name) return;
-  api('/api/barbers/' + id, { method: 'PUT', body: { name: name } })
-    .then(loadBarbers).catch(function (e) { toast(e.message, true); });
+  showPrompt('', { title: 'Renommer', defaultValue: b.name }).then(function (name) {
+    if (!name) return;
+    api('/api/barbers/' + id, { method: 'PUT', body: { name: name } })
+      .then(loadBarbers).catch(function (e) { toast(e.message, true); });
+  });
 }
 function archiveBarber(id) {
-  if (!confirm('Désactiver ce coiffeur ?')) return;
-  api('/api/barbers/' + id, { method: 'DELETE' })
-    .then(loadBarbers).catch(function (e) { toast(e.message, true); });
+  showConfirm('Désactiver ce coiffeur ?', { title: 'Désactiver' }).then(function (ok) {
+    if (!ok) return;
+    api('/api/barbers/' + id, { method: 'DELETE' })
+      .then(loadBarbers).catch(function (e) { toast(e.message, true); });
+  });
 }
 function restoreBarber(id) {
   api('/api/barbers/' + id, { method: 'PUT', body: { active: true } })
@@ -932,11 +948,13 @@ function forceCloseClient(id) {
 }
 
 function deleteClient(id) {
-  if (!confirm('Supprimer définitivement cette fiche ? Cette action est irréversible.')) return;
-  api('/api/queue/' + id, { method: 'DELETE' })
-    .then(loadClients).then(refreshQueue)
-    .then(function () { toast('Supprimé'); })
-    .catch(function (e) { toast(e.message, true); });
+  showConfirm('Supprimer définitivement cette fiche ? Cette action est irréversible.', { title: 'Supprimer', danger: true, confirmLabel: 'Supprimer' }).then(function (ok) {
+    if (!ok) return;
+    api('/api/queue/' + id, { method: 'DELETE' })
+      .then(loadClients).then(refreshQueue)
+      .then(function () { toast('Supprimé'); })
+      .catch(function (e) { toast(e.message, true); });
+  });
 }
 
 /* ============ Mes salons (chaîne / enseigne) ============ */
@@ -979,19 +997,16 @@ function renderSalonsList() {
 }
 
 function deleteSalon(id, name) {
-  var typed = prompt(
-    'Supprimer définitivement "' + name + '" ?\n\n' +
-    'Ses coiffeurs, prestations, suppléments et son historique de clients seront supprimés avec lui. Cette action est irréversible.\n\n' +
-    'Tapez SUPPRIMER en majuscules pour confirmer :'
-  );
-  if (typed !== 'SUPPRIMER') {
-    if (typed !== null) toast('Suppression annulée — le mot tapé ne correspondait pas', true);
-    return;
-  }
-  api('/api/owner/salons/' + id, { method: 'DELETE' })
-    .then(loadChainTab)
-    .then(function () { toast('Salon supprimé'); })
-    .catch(function (e) { toast(e.message, true); });
+  showPrompt(
+    'Ses coiffeurs, prestations, suppléments et son historique de clients seront supprimés avec lui. Cette action est irréversible.\n\nTapez SUPPRIMER en majuscules pour confirmer :',
+    { title: 'Supprimer "' + name + '" ?', requireExact: 'SUPPRIMER', danger: true, confirmLabel: 'Supprimer définitivement' }
+  ).then(function (typed) {
+    if (!typed) return;
+    api('/api/owner/salons/' + id, { method: 'DELETE' })
+      .then(loadChainTab)
+      .then(function () { toast('Salon supprimé'); })
+      .catch(function (e) { toast(e.message, true); });
+  });
 }
 
 function addSalon() {
@@ -1098,12 +1113,13 @@ function saveSettings() {
 }
 
 function testSmtp() {
-  var to = prompt('Envoyer un email de test à quelle adresse ?');
-  if (!to) return;
-  toast('Envoi en cours…');
-  api('/api/settings/smtp/test', { method: 'POST', body: { to: to } })
-    .then(function () { toast('Email envoyé à ' + to); })
-    .catch(function (e) { toast(e.message, true); });
+  showPrompt('', { title: 'Email de test', placeholder: 'vous@exemple.com' }).then(function (to) {
+    if (!to) return;
+    toast('Envoi en cours…');
+    api('/api/settings/smtp/test', { method: 'POST', body: { to: to } })
+      .then(function () { toast('Email envoyé à ' + to); })
+      .catch(function (e) { toast(e.message, true); });
+  });
 }
 </script>
 </body>

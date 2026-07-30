@@ -78,3 +78,35 @@ html, body {
 }
 .toast.on { transform: translateX(-50%) translateY(0); }
 .toast.err { background: var(--red); color: #fff; }
+
+/* Fenêtres modales — remplacent alert()/confirm()/prompt() natifs */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(0,0,0,0.42);
+  backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+  opacity: 0; pointer-events: none;
+  transition: opacity .16s ease;
+}
+.modal-overlay.on { opacity: 1; pointer-events: auto; }
+.modal-box {
+  background: var(--card); border-radius: 20px; padding: 26px;
+  max-width: 420px; width: 100%;
+  box-shadow: 0 24px 70px rgba(0,0,0,0.35);
+  transform: translateY(10px) scale(.97);
+  transition: transform .18s cubic-bezier(.2,.9,.3,1.1);
+}
+.modal-overlay.on .modal-box { transform: translateY(0) scale(1); }
+.modal-title { font-size: 18px; font-weight: 600; letter-spacing: -.02em; margin: 0 0 10px; color: var(--ink); }
+.modal-message { font-size: 14.5px; color: var(--grey); line-height: 1.55; margin: 0 0 20px; white-space: pre-line; }
+.modal-input {
+  width: 100%; padding: 13px 15px; border: none; border-radius: 12px;
+  background: var(--fill); color: var(--ink); font-family: inherit; font-size: 15px;
+  outline: 2px solid transparent; outline-offset: -2px; margin-bottom: 16px;
+}
+.modal-input:focus { outline-color: var(--blue); }
+.modal-error { color: var(--red); font-size: 13px; margin: -10px 0 14px; }
+.modal-actions { display: flex; gap: 10px; }
+.modal-actions .btn { flex: 1; padding: 13px; font-size: 14.5px; }
+.modal-danger-btn { background: var(--red) !important; color: #fff !important; }
