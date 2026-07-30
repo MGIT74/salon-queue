@@ -154,7 +154,7 @@ CREATE INDEX idx_queue_salon ON queue(salon_id);
 CREATE TABLE IF NOT EXISTS settings (
   salon_id CHAR(36) NOT NULL,
   `key` VARCHAR(100) NOT NULL,
-  value TEXT,
+  value LONGTEXT,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (salon_id, `key`),
   FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE
@@ -205,12 +205,3 @@ SELECT @default_salon_id, v.k, v.val FROM (
   UNION ALL SELECT 'smtp_from', ''
 ) v
 ON DUPLICATE KEY UPDATE `key` = VALUES(`key`);
-
--- Réglages de la PLATEFORME elle-même (pas d'un salon en particulier) —
--- pour l'instant, uniquement le SMTP utilisé pour les emails
--- transactionnels envoyés aux propriétaires de salon.
-CREATE TABLE IF NOT EXISTS platform_settings (
-  `key` VARCHAR(100) PRIMARY KEY,
-  value TEXT,
-  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -2,6 +2,7 @@ const express = require('express');
 const crypto = require('crypto');
 const { pool, utcIso } = require('../db');
 const requireAdmin = require('../middleware/auth');
+const { hashPassword } = require('../lib/password');
 
 const router = express.Router();
 
@@ -202,6 +203,19 @@ router.put('/email', requireAdmin, wrap(async (req, res) => {
   if (existing) return res.status(409).json({ error: 'Un autre compte utilise déjà cet email' });
 
   await pool.query('UPDATE owners SET email = ? WHERE id = ?', [email, req.ownerId]);
+  res.json({ ok: true });
+}));
+
+// Permet à un compte déjà connecté de changer SON PROPRE mot de passe
+// (celui partagé par toute l'enseigne). requireAdmin ayant déjà vérifié
+// l'accès, on ne redemande pas l'ancien mot de passe.
+router.put('/password', requireAdmin, wrap(async (req, res) => {
+  const { new_password } = req.body;
+  if (!new_password || new_password.length < 6) {
+    return res.status(400).json({ error: 'Le nouveau mot de passe doit contenir au moins 6 caractères' });
+  }
+  const hash = await hashPassword(new_password);
+  await pool.query('UPDATE owners SET password_hash = ? WHERE id = ?', [hash, req.ownerId]);
   res.json({ ok: true });
 }));
 

@@ -14,14 +14,37 @@
   .login h1 { margin-bottom: 8px; }
   .login p { color: var(--grey); font-size: 15px; margin: 0 0 24px; }
 
-  /* Onglets */
-  .tabs { display: flex; gap: 4px; background: var(--fill); border-radius: 999px;
-          padding: 4px; margin-bottom: 26px; overflow-x: auto; }
-  .tabs button { border: none; background: none; color: var(--ink); font-family: inherit;
-                 font-size: 15px; font-weight: 500; padding: 10px 20px; border-radius: 999px;
-                 cursor: pointer; white-space: nowrap; transition: background .18s ease; }
-  .tabs button.on { background: var(--card); font-weight: 600; box-shadow: var(--shadow); }
-  [data-theme="dark"] .tabs button.on { background: #48484a; }
+  /* Disposition en sidebar (comme les applications modernes) */
+  .app-shell { display: flex; align-items: flex-start; gap: 26px; }
+  .sidebar {
+    width: 240px; flex-shrink: 0; background: var(--card); border-radius: 20px;
+    padding: 18px 12px; box-shadow: var(--shadow); position: sticky; top: 20px;
+    transition: background .25s ease;
+  }
+  .sidebar-brand { padding: 4px 10px 16px; margin-bottom: 12px; border-bottom: 1px solid var(--sep); }
+  .sidebar-brand .name { font-size: 15px; font-weight: 600; letter-spacing: -.01em; }
+  .sidebar-brand select {
+    width: 100%; margin-top: 10px; padding: 9px 12px; border: none; border-radius: 10px;
+    background: var(--fill); color: var(--ink); font-family: inherit; font-size: 13px; font-weight: 500;
+  }
+  .main-content { flex: 1; min-width: 0; }
+
+  .tabs { display: flex; flex-direction: column; gap: 2px; background: none; padding: 0; margin: 0; }
+  .tabs button {
+    display: flex; align-items: center; gap: 10px; text-align: left; border: none; background: none;
+    color: var(--ink); font-family: inherit; font-size: 14.5px; font-weight: 500;
+    padding: 11px 14px; border-radius: 12px; cursor: pointer; white-space: nowrap;
+  }
+  .tabs button .ic { font-size: 16px; width: 20px; text-align: center; flex-shrink: 0; }
+  .tabs button.on { background: var(--fill); font-weight: 600; }
+  [data-theme="dark"] .tabs button.on { background: #3a3a3c; }
+
+  @media (max-width: 860px) {
+    .app-shell { flex-direction: column; }
+    .sidebar { width: 100%; position: static; }
+    .tabs { flex-direction: row; overflow-x: auto; }
+    .tabs button { flex-shrink: 0; }
+  }
 
   .tab-panel { display: none; }
   .tab-panel.on { display: block; }
@@ -216,23 +239,27 @@
 
 <!-- Application -->
 <div class="wrap" id="app" style="display:none">
-  <h1>Dashboard</h1>
-  <div style="margin:-10px 0 20px">
-    <select id="salon-switcher" onchange="switchSalon(this.value)"
-            style="padding:10px 16px;border:none;border-radius:999px;background:var(--fill);color:var(--ink);font-family:inherit;font-size:14px;font-weight:500;max-width:100%">
-      <option value="">Chargement…</option>
-    </select>
-  </div>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="name" id="app-salon-badge">Dashboard</div>
+        <select id="salon-switcher" onchange="switchSalon(this.value)">
+          <option value="">Chargement…</option>
+        </select>
+      </div>
+      <nav class="tabs" id="tabs">
+        <button class="on" data-t="queue"><span class="ic">📋</span> File d'attente</button>
+        <button data-t="services"><span class="ic">✂️</span> Prestations</button>
+        <button data-t="extras"><span class="ic">➕</span> Suppléments</button>
+        <button data-t="barbers"><span class="ic">👤</span> Coiffeurs</button>
+        <button data-t="clients"><span class="ic">📇</span> Clients</button>
+        <button data-t="salons"><span class="ic">🏠</span> Mes salons</button>
+        <button data-t="account"><span class="ic">⚙️</span> Compte</button>
+        <button data-t="settings"><span class="ic">🔧</span> Réglages</button>
+      </nav>
+    </aside>
 
-  <div class="tabs" id="tabs">
-    <button class="on" data-t="queue">File d'attente</button>
-    <button data-t="services">Prestations</button>
-    <button data-t="extras">Suppléments</button>
-    <button data-t="barbers">Coiffeurs</button>
-    <button data-t="clients">Clients</button>
-    <button data-t="salons">Mes salons</button>
-    <button data-t="settings">Réglages</button>
-  </div>
+    <div class="main-content">
 
   <!-- ===== Onglet file ===== -->
   <div class="tab-panel on" id="t-queue">
@@ -327,16 +354,44 @@
     <div id="chain-clients-list"></div>
   </div>
 
-  <!-- ===== Onglet réglages ===== -->
-  <div class="tab-panel" id="t-settings">
+  <!-- ===== Onglet compte ===== -->
+  <div class="tab-panel" id="t-account">
     <div class="card-box">
-      <h3>Compte</h3>
+      <h3>Logo du salon</h3>
+      <p class="hint">Affiché à côté du nom du salon dans le dashboard. Une image carrée fonctionne mieux.</p>
+      <div style="display:flex;align-items:center;gap:16px">
+        <div id="salon-logo-preview" onclick="document.getElementById('logo-input').click()"
+             style="width:72px;height:72px;border-radius:16px;cursor:pointer;background:var(--fill);
+             display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;
+             color:var(--grey);font-size:12px;text-align:center;background-size:cover;background-position:center">Ajouter</div>
+        <input type="file" id="logo-input" accept="image/*" style="display:none" onchange="uploadSalonLogo(this)">
+        <div class="hint" style="margin:0">Cliquez sur le cadre pour choisir une image.</div>
+      </div>
+    </div>
+
+    <div class="card-box">
+      <h3>Mot de passe</h3>
+      <p class="hint">Ce mot de passe est partagé par tous les salons de votre enseigne.</p>
+      <div class="grid2">
+        <div class="fld"><label for="acc-new-pw">Nouveau mot de passe</label>
+          <input id="acc-new-pw" type="password" placeholder="6 caractères minimum" autocomplete="new-password"></div>
+        <div class="fld"><label for="acc-new-pw2">Confirmer</label>
+          <input id="acc-new-pw2" type="password" autocomplete="new-password"></div>
+      </div>
+      <button class="btn btn-primary" onclick="changeOwnPassword()">Changer le mot de passe</button>
+    </div>
+
+    <div class="card-box">
+      <h3>Email de récupération</h3>
       <p class="hint">Ajoutez un email pour pouvoir utiliser "mot de passe oublié" en cas de besoin.</p>
       <div class="fld"><label for="set-recovery-email">Email de récupération</label>
         <input id="set-recovery-email" type="email" placeholder="vous@exemple.com"></div>
       <button class="btn btn-primary" onclick="saveRecoveryEmail()">Enregistrer l'email</button>
     </div>
+  </div>
 
+  <!-- ===== Onglet réglages ===== -->
+  <div class="tab-panel" id="t-settings">
     <div class="card-box">
       <h3>Général</h3>
       <p class="hint">Le nom affiché sur la borne et dans les emails.</p>
@@ -368,6 +423,9 @@
         <button class="btn btn-primary" onclick="saveSettings()">Enregistrer</button>
         <button class="btn btn-soft" onclick="testSmtp()">Envoyer un email de test</button>
       </div>
+    </div>
+  </div>
+
     </div>
   </div>
 </div>
@@ -433,6 +491,8 @@ var CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.
    se tromper de salon (login OU une fois connecté) ============ */
 var currentSalonName = '';
 
+var currentSalonLogo = '';
+
 function loadCurrentSalonName() {
   fetch('/api/settings/public', {
     headers: SALON_SLUG ? { 'X-Salon-Slug': SALON_SLUG } : {}
@@ -441,9 +501,22 @@ function loadCurrentSalonName() {
     .then(function (d) {
       var name = d.salon_name || 'Le Salon';
       currentSalonName = name;
+      currentSalonLogo = d.logo_url || '';
       document.title = name + ' — Dashboard';
       var loginEl = document.getElementById('login-salon-name');
       if (loginEl) loginEl.textContent = name;
+      var brandEl = document.getElementById('app-salon-badge');
+      if (brandEl) brandEl.textContent = name;
+      var logoPreview = document.getElementById('salon-logo-preview');
+      if (logoPreview) {
+        if (currentSalonLogo) {
+          logoPreview.style.backgroundImage = 'url("' + currentSalonLogo + '")';
+          logoPreview.textContent = '';
+        } else {
+          logoPreview.style.backgroundImage = '';
+          logoPreview.textContent = 'Ajouter';
+        }
+      }
       renderBarbers();
     })
     .catch(function () {});
@@ -1449,6 +1522,53 @@ function renderChainClients() {
 }
 
 /* ============ Réglages ============ */
+// Redimensionne l'image côté navigateur avant envoi (300x300 recadré,
+// JPEG compressé), même principe que la photo de coiffeur.
+function uploadSalonLogo(input) {
+  var file = input.files && input.files[0];
+  if (!file) return;
+
+  var reader = new FileReader();
+  reader.onload = function (e) {
+    var img = new Image();
+    img.onload = function () {
+      var size = 300;
+      var canvas = document.createElement('canvas');
+      canvas.width = size; canvas.height = size;
+      var ctx = canvas.getContext('2d');
+      var side = Math.min(img.width, img.height);
+      var sx = (img.width - side) / 2, sy = (img.height - side) / 2;
+      ctx.drawImage(img, sx, sy, side, side, 0, 0, size, size);
+      var dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+
+      api('/api/settings', { method: 'PUT', body: { logo_url: dataUrl } })
+        .then(loadCurrentSalonName)
+        .then(function () { toast('Logo mis à jour'); })
+        .catch(function (e) { toast(e.message, true); });
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function changeOwnPassword() {
+  var pw = document.getElementById('acc-new-pw').value;
+  var pw2 = document.getElementById('acc-new-pw2').value;
+  if (!pw) { toast('Mot de passe requis', true); return; }
+  if (pw !== pw2) { toast('Les mots de passe ne correspondent pas', true); return; }
+  if (pw.length < 6) { toast('6 caractères minimum', true); return; }
+
+  api('/api/owner/password', { method: 'PUT', body: { new_password: pw } })
+    .then(function () {
+      toast('Mot de passe changé — reconnectez-vous si besoin');
+      document.getElementById('acc-new-pw').value = '';
+      document.getElementById('acc-new-pw2').value = '';
+      setAdminPw(pw);
+      try { sessionStorage.setItem('pw', pw); } catch (e) {}
+    })
+    .catch(function (e) { toast(e.message, true); });
+}
+
 function saveRecoveryEmail() {
   var email = document.getElementById('set-recovery-email').value.trim();
   if (!email) { toast('Adresse email requise', true); return; }

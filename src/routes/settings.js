@@ -15,7 +15,7 @@ function wrap(fn) {
 }
 
 const EDITABLE = [
-  'salon_name', 'notify_before_min',
+  'salon_name', 'notify_before_min', 'logo_url',
   'smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_from'
 ];
 
@@ -67,7 +67,7 @@ router.post('/smtp/test', requireAdmin, wrap(async (req, res) => {
 // Réglages publics utiles à la borne (nom du salon uniquement)
 router.get('/public', wrap(async (req, res) => {
   const s = await getSettings(req.salon.id);
-  res.json({ ok: true, salon_name: s.salon_name || 'Le Salon' });
+  res.json({ ok: true, salon_name: s.salon_name || 'Le Salon', logo_url: s.logo_url || null });
 }));
 
 module.exports = router;
