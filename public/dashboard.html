@@ -210,7 +210,8 @@
   <div class="fld"><input id="pw" type="password" placeholder="Mot de passe"
        onkeydown="if(event.key==='Enter') doLogin()"></div>
   <button class="btn btn-primary" style="width:100%;padding:15px;font-size:16px" onclick="doLogin()">Entrer</button>
-  <p style="margin-top:16px;font-size:14px;color:var(--grey)">Pas encore de salon ? <a href="/signup.html" style="color:var(--blue);text-decoration:none;font-weight:500">Créer mon salon</a></p>
+  <p style="margin-top:14px;font-size:14px"><a href="/forgot-password.html" style="color:var(--blue);text-decoration:none;font-weight:500">Mot de passe oublié ?</a></p>
+  <p style="margin-top:8px;font-size:14px;color:var(--grey)">Pas encore de salon ? <a href="/signup.html" style="color:var(--blue);text-decoration:none;font-weight:500">Créer mon salon</a></p>
 </div>
 
 <!-- Application -->
@@ -328,6 +329,14 @@
 
   <!-- ===== Onglet réglages ===== -->
   <div class="tab-panel" id="t-settings">
+    <div class="card-box">
+      <h3>Compte</h3>
+      <p class="hint">Ajoutez un email pour pouvoir utiliser "mot de passe oublié" en cas de besoin.</p>
+      <div class="fld"><label for="set-recovery-email">Email de récupération</label>
+        <input id="set-recovery-email" type="email" placeholder="vous@exemple.com"></div>
+      <button class="btn btn-primary" onclick="saveRecoveryEmail()">Enregistrer l'email</button>
+    </div>
+
     <div class="card-box">
       <h3>Général</h3>
       <p class="hint">Le nom affiché sur la borne et dans les emails.</p>
@@ -1430,6 +1439,14 @@ function renderChainClients() {
 }
 
 /* ============ Réglages ============ */
+function saveRecoveryEmail() {
+  var email = document.getElementById('set-recovery-email').value.trim();
+  if (!email) { toast('Adresse email requise', true); return; }
+  api('/api/owner/email', { method: 'PUT', body: { email: email } })
+    .then(function () { toast('Email de récupération enregistré'); })
+    .catch(function (e) { toast(e.message, true); });
+}
+
 function loadSettings() {
   api('/api/settings').then(function (r) {
     var s = r.settings;

@@ -2,6 +2,7 @@ const express = require('express');
 const crypto = require('crypto');
 const { pool } = require('../db');
 const { hashPassword } = require('../lib/password');
+const { sendPasswordReset } = require('../lib/platformMailer');
 
 const router = express.Router();
 
@@ -82,6 +83,57 @@ router.post('/', wrap(async (req, res) => {
   await pool.query('INSERT INTO settings (salon_id, `key`, value) VALUES ?', [settingsRows]);
 
   res.json({ ok: true, slug });
+}));
+
+/**
+ * Demande de réinitialisation. Toujours la même réponse générique,
+ * qu'un compte existe ou non avec cet email (anti-énumération) — les
+ * échecs (email introuvable, SMTP plateforme non configuré...) sont
+ * seulement journalisés côté serveur, jamais renvoyés tels quels.
+ */
+router.post('/forgot-password', wrap(async (req, res) => {
+  const email = String(req.body.email || '').trim();
+  const genericMsg = "Si un compte existe avec cet email, un lien de réinitialisation vient d'être envoyé.";
+
+  if (!email) return res.json({ ok: true, message: genericMsg });
+
+  try {
+    const [[owner]] = await pool.query('SELECT id FROM owners WHERE email = ?', [email]);
+    if (owner) {
+      const token = crypto.randomBytes(32).toString('hex');
+      const expires = new Date(Date.now() + 60 * 60 * 1000);
+      await pool.query(
+        'UPDATE owners SET reset_token = ?, reset_token_expires = ? WHERE id = ?',
+        [token, expires, owner.id]
+      );
+      const resetUrl = String(req.body.base_url || '').replace(/\/$/, '') + '/reset-password.html?token=' + token;
+      await sendPasswordReset(email, resetUrl);
+    }
+  } catch (err) {
+    console.error('[forgot-password]', err.message);
+  }
+
+  res.json({ ok: true, message: genericMsg });
+}));
+
+router.post('/reset-password', wrap(async (req, res) => {
+  const { token, password } = req.body;
+  if (!token || !password) return res.status(400).json({ error: 'Lien et mot de passe requis' });
+  if (password.length < 6) return res.status(400).json({ error: 'Le mot de passe doit contenir au moins 6 caractères' });
+
+  const [[owner]] = await pool.query(
+    'SELECT id FROM owners WHERE reset_token = ? AND reset_token_expires > NOW()',
+    [token]
+  );
+  if (!owner) return res.status(400).json({ error: 'Ce lien est invalide ou a expiré. Refaites une demande.' });
+
+  const passwordHash = await hashPassword(password);
+  await pool.query(
+    'UPDATE owners SET password_hash = ?, reset_token = NULL, reset_token_expires = NULL WHERE id = ?',
+    [passwordHash, owner.id]
+  );
+
+  res.json({ ok: true });
 }));
 
 module.exports = router;

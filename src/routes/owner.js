@@ -189,4 +189,20 @@ router.get('/clients', requireAdmin, wrap(async (req, res) => {
   res.json({ ok: true, items });
 }));
 
+// Permet à un compte déjà connecté (même via l'ancien mot de passe partagé
+// en clair) d'ajouter un email de récupération, pour pouvoir ensuite
+// utiliser "mot de passe oublié". Ne change pas le mot de passe lui-même.
+router.put('/email', requireAdmin, wrap(async (req, res) => {
+  const email = String(req.body.email || '').trim();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ error: 'Adresse email invalide' });
+  }
+
+  const [[existing]] = await pool.query('SELECT id FROM owners WHERE email = ? AND id != ?', [email, req.ownerId]);
+  if (existing) return res.status(409).json({ error: 'Un autre compte utilise déjà cet email' });
+
+  await pool.query('UPDATE owners SET email = ? WHERE id = ?', [email, req.ownerId]);
+  res.json({ ok: true });
+}));
+
 module.exports = router;
