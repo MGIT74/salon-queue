@@ -118,7 +118,8 @@
       </div>
       <div class="grid2">
         <div class="fld"><label for="smtp-user">Identifiant</label><input id="smtp-user" type="text" placeholder="contact@tondomaine.com"></div>
-        <div class="fld"><label for="smtp-pass">Mot de passe <span id="smtp-pass-hint" style="color:var(--grey);font-weight:400"></span></label><input id="smtp-pass" type="password" placeholder="Laisser vide pour ne pas changer"></div>
+        <div class="fld"><label for="smtp-pass">Mot de passe <span id="smtp-pass-badge" class="badge"></span></label>
+          <input id="smtp-pass" type="password" placeholder="Laisser vide pour ne pas changer"></div>
       </div>
       <div class="fld"><label for="smtp-from">Expéditeur affiché</label><input id="smtp-from" type="text" placeholder="Ton App &lt;contact@tondomaine.com&gt;"></div>
       <button class="btn btn-primary" onclick="saveSmtp()">Enregistrer</button>
@@ -338,7 +339,18 @@ function loadSmtp() {
     document.getElementById('smtp-port').value = r.settings.smtp_port;
     document.getElementById('smtp-user').value = r.settings.smtp_user;
     document.getElementById('smtp-from').value = r.settings.smtp_from;
-    document.getElementById('smtp-pass-hint').textContent = r.smtp_pass_set ? '(déjà défini — laisser vide pour conserver)' : '(non défini)';
+
+    var badge = document.getElementById('smtp-pass-badge');
+    var passField = document.getElementById('smtp-pass');
+    if (r.smtp_pass_set) {
+      badge.textContent = '✓ Enregistré';
+      badge.className = 'badge on';
+      passField.placeholder = '•••••••• (déjà enregistré — laisser vide pour conserver)';
+    } else {
+      badge.textContent = 'Non défini';
+      badge.className = 'badge off';
+      passField.placeholder = 'Laisser vide pour ne pas changer';
+    }
   }).catch(function (e) { toast(e.message, true); });
 }
 
