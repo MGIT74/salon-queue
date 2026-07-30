@@ -1,6 +1,6 @@
 const express = require('express');
 const crypto = require('crypto');
-const { pool } = require('../db');
+const { pool, utcIso } = require('../db');
 const { loadQueue, recompute } = require('../lib/queueMath');
 const requireAdmin = require('../middleware/auth');
 
@@ -129,6 +129,9 @@ router.get('/history', requireAdmin, wrap(async (req, res) => {
   }
   const items = rows.map((r) => Object.assign({}, r, {
     position: r.queue_position,
+    checkin_at: utcIso(r.checkin_at),
+    start_at: utcIso(r.start_at),
+    end_at: utcIso(r.end_at),
     extra_names: extrasByQueue[r.id] || []
   }));
   res.json({ ok: true, items });

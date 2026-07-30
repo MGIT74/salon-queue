@@ -1,4 +1,4 @@
-const { pool } = require('../db');
+const { pool, utcIso } = require('../db');
 
 /**
  * Charge la file complète (clients en attente et en cours) avec leur
@@ -29,6 +29,12 @@ async function loadQueue() {
 
     return Object.assign({}, r, {
       position: r.queue_position,
+      // Tagué UTC explicite : sans ça, un navigateur en France (UTC+2)
+      // interprète l'heure MySQL comme si elle était déjà locale, ce qui
+      // décale chaque calcul de temps écoulé/restant de 2h.
+      checkin_at: utcIso(r.checkin_at),
+      start_at: utcIso(r.start_at),
+      end_at: utcIso(r.end_at),
       service,
       extras: chosen,
       total_duration_min: duration,
