@@ -1,5 +1,5 @@
 const express = require('express');
-const { getSettings, setSettings } = require('../db');
+const { pool, getSettings, setSettings } = require('../db');
 const { sendTest, invalidateTransport } = require('../lib/mailer');
 const requireAdmin = require('../middleware/auth');
 
@@ -50,6 +50,17 @@ router.put('/', requireAdmin, wrap(async (req, res) => {
 
   await setSettings(req.salon.id, patch);
   invalidateTransport(req.salon.id);
+
+  // Le nom du salon (Réglages) et salons.name (utilisé dans "Mes salons"
+  // et la liste des enseignes du super admin) ne se synchronisaient
+  // qu'à la création, puis divergeaient silencieusement. On les garde
+  // désormais alignés, sans toucher au nom de l'ENSEIGNE (owners.name),
+  // volontairement distinct — une même enseigne peut avoir plusieurs
+  // salons portant des noms différents.
+  if (patch.salon_name) {
+    await pool.query('UPDATE salons SET name = ? WHERE id = ?', [patch.salon_name, req.salon.id]);
+  }
+
   res.json({ ok: true, smtp_from: patch.smtp_from });
 }));
 
