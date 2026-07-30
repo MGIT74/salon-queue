@@ -264,7 +264,7 @@ function chipsHtml(q) {
 
 var extrasPickerOpen = false;
 
-function renderActive() {
+function renderActive(force) {
   var cur = myActive();
   var zone = document.getElementById('active-zone');
   if (!cur) {
@@ -277,10 +277,13 @@ function renderActive() {
   // de suppléments ouvert, note en cours de frappe), on se contente de
   // rafraîchir le minuteur sans reconstruire tout le HTML — sinon les
   // cases cochées et le texte tapé seraient perdus à chaque tick.
+  // "force" outrepasse cette protection : utilisé juste après avoir
+  // volontairement fermé le panneau, pour que ça se voie tout de suite
+  // même si le bouton cliqué garde encore le focus.
   var timerEl = document.getElementById('active-timer-value');
   var subEl = document.getElementById('active-timer-sub');
-  var userIsEditing = extrasPickerOpen ||
-    (zone.contains(document.activeElement) && document.activeElement !== document.body);
+  var userIsEditing = !force && (extrasPickerOpen ||
+    (zone.contains(document.activeElement) && document.activeElement !== document.body));
 
   if (userIsEditing && timerEl) {
     timerEl.textContent = t.text;
@@ -340,7 +343,8 @@ function saveExtras(id) {
   var isAdding = cur && ids.length > cur.extras.length;
   if (isAdding && hasNextWaitingForMe()) {
     extrasPickerOpen = false;
-    renderActive();
+    if (document.activeElement) document.activeElement.blur();
+    renderActive(true);
     toast('Un client attend déjà son tour — ajouter un supplément le retarderait.', true);
     return;
   }
@@ -348,13 +352,15 @@ function saveExtras(id) {
   barberApi('/api/queue/' + id, { method: 'PUT', body: { extras: ids } })
     .then(function () {
       extrasPickerOpen = false;
-      renderActive(); // ferme le panneau tout de suite, sans attendre le réseau
+      if (document.activeElement) document.activeElement.blur();
+      renderActive(true); // ferme le panneau tout de suite, sans attendre le réseau
       toast('Suppléments mis à jour');
       return refresh(); // données à jour ensuite, en arrière-plan
     })
     .catch(function (e) {
       extrasPickerOpen = false;
-      renderActive();
+      if (document.activeElement) document.activeElement.blur();
+      renderActive(true);
       toast(e.message, true);
     });
 }
