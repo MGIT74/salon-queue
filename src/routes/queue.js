@@ -239,12 +239,17 @@ router.get('/history', requireAdmin, wrap(async (req, res) => {
       (extrasByQueue[l.queue_id] = extrasByQueue[l.queue_id] || []).push(l.name);
     });
   }
+
+  const [notes] = await pool.query('SELECT client_key, note FROM client_notes WHERE salon_id = ?', [req.salon.id]);
+  const noteByKey = Object.fromEntries(notes.map((n) => [n.client_key, n.note]));
+
   const items = rows.map((r) => Object.assign({}, r, {
     position: r.queue_position,
     checkin_at: utcIso(r.checkin_at),
     start_at: utcIso(r.start_at),
     end_at: utcIso(r.end_at),
-    extra_names: extrasByQueue[r.id] || []
+    extra_names: extrasByQueue[r.id] || [],
+    note: noteByKey[clientKey(r)] || ''
   }));
   res.json({ ok: true, items });
 }));

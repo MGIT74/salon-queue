@@ -1479,7 +1479,7 @@ function renderClients() {
         actions += '<button class="btn btn-ghost" onclick="deleteClient(\'' + c.id + '\')">Supprimer</button>';
 
         return '<div class="item' + (stuck ? '' : '') + '">' +
-          '<div class="item-main">' +
+          '<div class="item-main" onclick="openHistoryClientModal(\'' + c.id + '\')" style="cursor:pointer">' +
             '<div class="item-name">' + esc(c.client_name) +
               ' <span class="chip' + (c.status === 'in_progress' ? ' main' : '') + '" style="margin-left:6px;font-size:11px">' +
               esc(STATUS_LABEL[c.status] || c.status) + '</span>' +
@@ -1489,9 +1489,43 @@ function renderClients() {
               (c.email ? ' · ' + esc(c.email) : '') +
               (c.total_price_cents ? ' · ' + eur(c.total_price_cents) : '') + '</div>' +
           '</div>' +
-          '<div class="item-actions">' + actions + '</div>' +
+          '<div class="item-actions" onclick="event.stopPropagation()">' + actions + '</div>' +
         '</div>';
       }).join('');
+}
+
+/**
+ * Même fenêtre modale que dans la file d'attente, pour un client de
+ * l'historique (nom, email, téléphone, note éditable).
+ */
+function openHistoryClientModal(id) {
+  var c = clientHistory.find(function (x) { return x.id === id; });
+  if (!c) return;
+
+  var body =
+    '<div class="modal-title">' + esc(c.client_name) + '</div>' +
+    (c.email ? '<div class="detail-row"><span class="detail-label">Email</span><span class="detail-value">' + esc(c.email) + '</span></div>' : '') +
+    (c.phone ? '<div class="detail-row"><span class="detail-label">Téléphone</span><span class="detail-value">' + esc(c.phone) + '</span></div>' : '') +
+    '<label class="detail-note-label">Note sur ce client</label>' +
+    '<textarea id="modal-history-note" class="modal-input" rows="3" placeholder="Ex: préfère dégradé américain, allergie...">' + esc(c.note || '') + '</textarea>' +
+    '<div class="modal-actions">' +
+    '<button class="btn btn-soft" id="modal-close-history-btn">Fermer</button>' +
+    '<button class="btn btn-primary" id="modal-save-history-note-btn">Enregistrer la note</button>' +
+    '</div>';
+
+  var overlay = _buildModal(body);
+  overlay.querySelector('#modal-close-history-btn').onclick = function () { _closeModal(overlay); };
+  overlay.addEventListener('click', function (e) { if (e.target === overlay) _closeModal(overlay); });
+  overlay.querySelector('#modal-save-history-note-btn').onclick = function () {
+    var note = overlay.querySelector('#modal-history-note').value;
+    api('/api/queue/' + id + '/note', { method: 'PUT', body: { note: note } })
+      .then(function () {
+        c.note = note;
+        toast('Note enregistrée');
+        _closeModal(overlay);
+      })
+      .catch(function (e) { toast(e.message, true); });
+  };
 }
 
 function forceCloseClient(id) {
