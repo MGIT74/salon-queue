@@ -415,6 +415,7 @@
       <div class="fld" style="margin:0"><label for="client-date-to">Au</label><input id="client-date-to" type="date"></div>
       <button class="btn btn-soft" onclick="applyClientDateFilter()">Filtrer</button>
       <button class="btn btn-ghost" onclick="clearClientDateFilter()">Réinitialiser</button>
+      <button class="btn btn-ghost" onclick="selectAllClients()" style="margin-left:auto">Tout sélectionner</button>
     </div>
 
     <div class="clients-export-bar" id="clients-export-bar" style="display:none">
@@ -1623,6 +1624,15 @@ document.getElementById('client-search').addEventListener('input', renderClients
 
 function toggleClientSelect(id, checked) {
   if (checked) selectedClientIds[id] = true; else delete selectedClientIds[id];
+  updateClientsExportBar();
+}
+
+function selectAllClients() {
+  var q = (document.getElementById('client-search').value || '').trim().toLowerCase();
+  clientHistory.forEach(function (c) {
+    if (!q || c.client_name.toLowerCase().indexOf(q) !== -1) selectedClientIds[c.id] = true;
+  });
+  document.querySelectorAll('.client-check').forEach(function (cb) { cb.checked = true; });
   updateClientsExportBar();
 }
 
