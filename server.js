@@ -33,7 +33,19 @@ const app = express();
 const PORT = Number((process.env.PORT || '3000').toString().replace(/[\r\n]+$/, '').trim());
 
 app.use(express.json({ limit: '5mb' })); // limite relevée pour les photos de coiffeurs (base64)
-app.use(express.static(path.join(__dirname, 'public')));
+// Les pages HTML ne doivent jamais rester en cache trop longtemps (le mode
+// "ajouté à l'écran d'accueil" sur iOS est particulièrement collant) - le
+// navigateur doit toujours revalider auprès du serveur avant d'afficher une
+// version potentiellement obsolète. app.css/app.js gardent un cache normal,
+// mais portent un paramètre ?v= mis à jour à chaque changement notable pour
+// forcer un rechargement même sans purge manuelle.
+app.use(express.static(path.join(__dirname, 'public'), {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+    }
+  }
+}));
 
 // Gestion des salons (super admin) — jamais scopée à un salon particulier,
 // donc montée AVANT resolveSalon.
