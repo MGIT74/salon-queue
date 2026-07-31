@@ -291,4 +291,39 @@ router.put('/:id/note', requireAdminOrBarber, wrap(async (req, res) => {
   res.json({ ok: true });
 }));
 
+/**
+ * Tous les passages d'un même client (peu importe le statut), retrouvé
+ * par sa clé de rapprochement — combien de fois il est venu, quand,
+ * pour quelle prestation.
+ */
+router.get('/:id/client-history', requireAdmin, wrap(async (req, res) => {
+  const [[row]] = await pool.query(
+    'SELECT client_name, email, phone FROM queue WHERE id = ? AND salon_id = ?',
+    [req.params.id, req.salon.id]
+  );
+  if (!row) return res.status(404).json({ error: 'Client introuvable' });
+
+  const key = clientKey(row);
+  if (!key) return res.json({ ok: true, items: [] });
+
+  const [allRows] = await pool.query(
+    `SELECT q.id, q.client_name, q.email, q.phone, q.status, q.checkin_at, q.start_at, q.end_at,
+            q.total_price_cents, s.name AS service_name
+     FROM queue q LEFT JOIN services s ON s.id = q.service_id
+     WHERE q.salon_id = ?
+     ORDER BY q.checkin_at DESC LIMIT 1000`,
+    [req.salon.id]
+  );
+
+  const items = allRows
+    .filter((r) => clientKey(r) === key)
+    .map((r) => Object.assign({}, r, {
+      checkin_at: utcIso(r.checkin_at),
+      start_at: utcIso(r.start_at),
+      end_at: utcIso(r.end_at)
+    }));
+
+  res.json({ ok: true, items });
+}));
+
 module.exports = router;

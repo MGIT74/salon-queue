@@ -255,6 +255,29 @@
   .sheet-foot .btn { width: 100%; padding: 15px; font-size: 16px; }
 
   @media (max-width: 900px) { .cols { grid-template-columns: 1fr; } .aside { position: static; } .grid2 { grid-template-columns: 1fr; } }
+/* Panneau latéral (fiche client complète) */
+.client-drawer-backdrop {
+  display: none; position: fixed; inset: 0; z-index: 300; background: rgba(0,0,0,0.4);
+}
+.client-drawer-backdrop.on { display: block; }
+.client-drawer {
+  position: fixed; top: 0; right: 0; bottom: 0; width: min(420px, 92vw);
+  background: var(--card); box-shadow: -10px 0 40px rgba(0,0,0,0.3);
+  transform: translateX(100%); transition: transform .28s cubic-bezier(.2,.9,.3,1.1);
+  z-index: 301; overflow-y: auto; padding: 26px;
+}
+.client-drawer-backdrop.on .client-drawer { transform: translateX(0); }
+.client-drawer-head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 18px; }
+.client-drawer-head h2 { font-size: 21px; margin: 0; letter-spacing: -.02em; }
+.client-drawer .x { background: var(--fill); border: none; width: 32px; height: 32px; border-radius: 50%;
+                     color: var(--grey); font-size: 15px; cursor: pointer; flex-shrink: 0; }
+.client-drawer-section { margin-bottom: 22px; }
+.client-drawer-section h3 { font-size: 13px; font-weight: 600; color: var(--grey); text-transform: uppercase;
+                             letter-spacing: .04em; margin: 0 0 10px; }
+.visit-row { background: var(--fill); border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; }
+.visit-row .visit-date { font-size: 13.5px; font-weight: 600; }
+.visit-row .visit-meta { font-size: 12.5px; color: var(--grey); margin-top: 2px; }
+.visit-count { font-size: 13.5px; color: var(--grey); margin-bottom: 12px; }
 </style>
 </head>
 <body>
@@ -524,6 +547,30 @@
   </div>
 </div>
 
+<!-- Panneau latéral : fiche client complète (infos + historique des passages) -->
+<div class="client-drawer-backdrop" id="client-drawer-backdrop" onclick="if(event.target===this) closeClientDrawer()">
+  <div class="client-drawer">
+    <div class="client-drawer-head">
+      <h2 id="drawer-client-name">—</h2>
+      <button class="x" onclick="closeClientDrawer()">✕</button>
+    </div>
+
+    <div class="client-drawer-section" id="drawer-info-section"></div>
+
+    <div class="client-drawer-section">
+      <h3>Note</h3>
+      <textarea id="drawer-note" class="modal-input" rows="3" placeholder="Ex: préfère dégradé américain, allergie..." style="margin-bottom:8px"></textarea>
+      <button class="btn btn-soft" onclick="saveDrawerNote()">Enregistrer la note</button>
+    </div>
+
+    <div class="client-drawer-section">
+      <h3>Historique des passages</h3>
+      <div id="drawer-visit-count" class="visit-count"></div>
+      <div id="drawer-visits"><div class="empty">Chargement…</div></div>
+    </div>
+  </div>
+</div>
+
 <script src="/app.js"></script>
 <script>
 mountThemeButton();
@@ -768,34 +815,73 @@ function chipsHtml(q) {
  * showConfirm) montrant les infos du client (email, téléphone) et une
  * note éditable, plutôt qu'un panneau qui se dépliait sous la ligne.
  */
-function openClientModal(id) {
-  var q = queue.find(function (x) { return x.id === id; });
-  if (!q) return;
+var drawerClientId = null;
 
-  var body =
-    '<div class="modal-title">' + esc(q.client_name) + '</div>' +
-    (q.email ? '<div class="detail-row"><span class="detail-label">Email</span><span class="detail-value">' + esc(q.email) + '</span></div>' : '') +
-    (q.phone ? '<div class="detail-row"><span class="detail-label">Téléphone</span><span class="detail-value">' + esc(q.phone) + '</span></div>' : '') +
-    '<label class="detail-note-label">Note sur ce client</label>' +
-    '<textarea id="modal-queue-note" class="modal-input" rows="3" placeholder="Ex: préfère dégradé américain, allergie...">' + esc(q.note || '') + '</textarea>' +
-    '<div class="modal-actions">' +
-    '<button class="btn btn-soft" id="modal-close-client-btn">Fermer</button>' +
-    '<button class="btn btn-primary" id="modal-save-note-btn">Enregistrer la note</button>' +
-    '</div>';
+/**
+ * Panneau latéral (fiche client) : infos, note éditable, et historique
+ * complet de tous ses passages (peu importe où le clic est parti — file
+ * d'attente en cours ou historique des clients).
+ */
+function openClientDrawer(id, source) {
+  var c = source === 'queue'
+    ? queue.find(function (x) { return x.id === id; })
+    : clientHistory.find(function (x) { return x.id === id; });
+  if (!c) return;
 
-  var overlay = _buildModal(body);
-  overlay.querySelector('#modal-close-client-btn').onclick = function () { _closeModal(overlay); };
-  overlay.addEventListener('click', function (e) { if (e.target === overlay) _closeModal(overlay); });
-  overlay.querySelector('#modal-save-note-btn').onclick = function () {
-    var note = overlay.querySelector('#modal-queue-note').value;
-    api('/api/queue/' + id + '/note', { method: 'PUT', body: { note: note } })
-      .then(function () {
-        q.note = note;
-        toast('Note enregistrée');
-        _closeModal(overlay);
-      })
-      .catch(function (e) { toast(e.message, true); });
-  };
+  drawerClientId = id;
+  document.getElementById('drawer-client-name').textContent = c.client_name;
+  document.getElementById('drawer-note').value = c.note || '';
+
+  document.getElementById('drawer-info-section').innerHTML =
+    (c.email ? '<div class="detail-row"><span class="detail-label">Email</span><span class="detail-value">' + esc(c.email) + '</span></div>' : '') +
+    (c.phone ? '<div class="detail-row"><span class="detail-label">Téléphone</span><span class="detail-value">' + esc(c.phone) + '</span></div>' : '') +
+    (!c.email && !c.phone ? '<div class="hint" style="margin:0">Aucune coordonnée renseignée</div>' : '');
+
+  document.getElementById('drawer-visits').innerHTML = '<div class="empty">Chargement…</div>';
+  document.getElementById('drawer-visit-count').textContent = '';
+  document.getElementById('client-drawer-backdrop').classList.add('on');
+
+  api('/api/queue/' + id + '/client-history').then(function (r) {
+    renderDrawerVisits(r.items);
+  }).catch(function (e) { toast(e.message, true); });
+}
+
+function renderDrawerVisits(items) {
+  document.getElementById('drawer-visit-count').textContent =
+    items.length + (items.length > 1 ? ' passages au total' : ' passage au total');
+
+  document.getElementById('drawer-visits').innerHTML = items.length === 0
+    ? '<div class="empty">Aucun passage enregistré</div>'
+    : items.map(function (v) {
+        var when = new Date(v.checkin_at).toLocaleString('fr-FR', {
+          day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+        });
+        return '<div class="visit-row">' +
+          '<div class="visit-date">' + when + '</div>' +
+          '<div class="visit-meta">' + esc(v.service_name || 'Prestation') +
+          (v.total_price_cents ? ' · ' + eur(v.total_price_cents) : '') +
+          ' · ' + esc(STATUS_LABEL[v.status] || v.status) + '</div>' +
+        '</div>';
+      }).join('');
+}
+
+function saveDrawerNote() {
+  if (!drawerClientId) return;
+  var note = document.getElementById('drawer-note').value;
+  api('/api/queue/' + drawerClientId + '/note', { method: 'PUT', body: { note: note } })
+    .then(function () {
+      var q = queue.find(function (x) { return x.id === drawerClientId; });
+      if (q) q.note = note;
+      var c = clientHistory.find(function (x) { return x.id === drawerClientId; });
+      if (c) c.note = note;
+      toast('Note enregistrée');
+    })
+    .catch(function (e) { toast(e.message, true); });
+}
+
+function closeClientDrawer() {
+  document.getElementById('client-drawer-backdrop').classList.remove('on');
+  drawerClientId = null;
 }
 
 function renderQueue() {
@@ -817,7 +903,7 @@ function renderQueue() {
     ? '<div class="empty">Personne en attente</div>'
     : waiting.map(function (q, i) {
         var b = q.barber_id ? barbers.find(function (x) { return x.id === q.barber_id; }) : null;
-        return '<div class="row" onclick="openClientModal(\'' + q.id + '\')" style="cursor:pointer"><div class="row-top"><div class="row-left">' +
+        return '<div class="row" onclick="openClientDrawer(\'' + q.id + '\', \'queue\')" style="cursor:pointer"><div class="row-top"><div class="row-left">' +
           '<div class="pos">' + (q.position || i + 1) + '</div><div style="min-width:0">' +
           '<div class="name">' + esc(q.client_name) + '</div>' +
           '<div class="assigned">' + esc(b ? b.name : 'Premier disponible') + '</div>' +
@@ -1479,7 +1565,7 @@ function renderClients() {
         actions += '<button class="btn btn-ghost" onclick="deleteClient(\'' + c.id + '\')">Supprimer</button>';
 
         return '<div class="item' + (stuck ? '' : '') + '">' +
-          '<div class="item-main" onclick="openHistoryClientModal(\'' + c.id + '\')" style="cursor:pointer">' +
+          '<div class="item-main" onclick="openClientDrawer(\'' + c.id + '\', \'history\')" style="cursor:pointer">' +
             '<div class="item-name">' + esc(c.client_name) +
               ' <span class="chip' + (c.status === 'in_progress' ? ' main' : '') + '" style="margin-left:6px;font-size:11px">' +
               esc(STATUS_LABEL[c.status] || c.status) + '</span>' +
@@ -1498,36 +1584,6 @@ function renderClients() {
  * Même fenêtre modale que dans la file d'attente, pour un client de
  * l'historique (nom, email, téléphone, note éditable).
  */
-function openHistoryClientModal(id) {
-  var c = clientHistory.find(function (x) { return x.id === id; });
-  if (!c) return;
-
-  var body =
-    '<div class="modal-title">' + esc(c.client_name) + '</div>' +
-    (c.email ? '<div class="detail-row"><span class="detail-label">Email</span><span class="detail-value">' + esc(c.email) + '</span></div>' : '') +
-    (c.phone ? '<div class="detail-row"><span class="detail-label">Téléphone</span><span class="detail-value">' + esc(c.phone) + '</span></div>' : '') +
-    '<label class="detail-note-label">Note sur ce client</label>' +
-    '<textarea id="modal-history-note" class="modal-input" rows="3" placeholder="Ex: préfère dégradé américain, allergie...">' + esc(c.note || '') + '</textarea>' +
-    '<div class="modal-actions">' +
-    '<button class="btn btn-soft" id="modal-close-history-btn">Fermer</button>' +
-    '<button class="btn btn-primary" id="modal-save-history-note-btn">Enregistrer la note</button>' +
-    '</div>';
-
-  var overlay = _buildModal(body);
-  overlay.querySelector('#modal-close-history-btn').onclick = function () { _closeModal(overlay); };
-  overlay.addEventListener('click', function (e) { if (e.target === overlay) _closeModal(overlay); });
-  overlay.querySelector('#modal-save-history-note-btn').onclick = function () {
-    var note = overlay.querySelector('#modal-history-note').value;
-    api('/api/queue/' + id + '/note', { method: 'PUT', body: { note: note } })
-      .then(function () {
-        c.note = note;
-        toast('Note enregistrée');
-        _closeModal(overlay);
-      })
-      .catch(function (e) { toast(e.message, true); });
-  };
-}
-
 function forceCloseClient(id) {
   api('/api/queue/' + id + '/finish', { method: 'POST', body: {} })
     .then(loadClients).then(refreshQueue)
