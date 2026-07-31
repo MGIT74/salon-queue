@@ -279,6 +279,21 @@
 .visit-row .visit-date { font-size: 13.5px; font-weight: 600; }
 .visit-row .visit-meta { font-size: 12.5px; color: var(--grey); margin-top: 2px; }
 .visit-count { font-size: 13.5px; color: var(--grey); margin-bottom: 12px; }
+
+.clients-toolbar { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.clients-toolbar .fld label { font-size: 12px; color: var(--grey); display: block; margin-bottom: 4px; }
+.clients-toolbar .fld input[type="date"] {
+  padding: 9px 12px; border: none; border-radius: 10px; background: var(--fill);
+  color: var(--ink); font-family: inherit; font-size: 13.5px;
+}
+.clients-pagination { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 18px; }
+.clients-pagination button {
+  border: none; background: var(--fill); color: var(--ink); width: 34px; height: 34px; border-radius: 50%;
+  cursor: pointer; font-size: 14px;
+}
+.clients-pagination button:disabled { opacity: .35; cursor: default; }
+.clients-pagination .page-label { font-size: 13.5px; color: var(--grey); }
+.client-check { width: 18px; height: 18px; margin-right: 12px; flex-shrink: 0; cursor: pointer; }
 </style>
 </head>
 <body>
@@ -388,8 +403,24 @@
       <input id="client-search" type="text" placeholder="Rechercher un nom…"
              style="max-width:260px;padding:11px 16px;border:none;border-radius:999px;background:var(--fill);color:var(--ink);font-family:inherit;font-size:14px;outline:none">
     </div>
-    <p class="hint" style="margin:-6px 0 16px">Historique des 200 derniers passages. « Forcer la clôture » sert à débloquer une fiche restée coincée « en cours » (ex. test, oubli), sans attendre.</p>
+
+    <div class="clients-toolbar">
+      <div class="fld" style="margin:0"><label for="client-date-from">Du</label><input id="client-date-from" type="date"></div>
+      <div class="fld" style="margin:0"><label for="client-date-to">Au</label><input id="client-date-to" type="date"></div>
+      <button class="btn btn-soft" onclick="applyClientDateFilter()">Filtrer</button>
+      <button class="btn btn-ghost" onclick="clearClientDateFilter()">Réinitialiser</button>
+    </div>
+
+    <div class="clients-toolbar" id="clients-export-bar" style="display:none">
+      <span id="clients-selected-count" class="hint" style="margin:0"></span>
+      <button class="btn btn-soft" onclick="exportClientsCsv()">Télécharger CSV</button>
+      <button class="btn btn-soft" onclick="exportClientsPdf()">Télécharger PDF</button>
+      <button class="btn btn-ghost" onclick="clearClientSelection()">Tout désélectionner</button>
+    </div>
+
+    <p class="hint" style="margin:-6px 0 16px">« Forcer la clôture » sert à débloquer une fiche restée coincée « en cours » (ex. test, oubli), sans attendre.</p>
     <div id="clients-list"></div>
+    <div class="clients-pagination" id="clients-pagination"></div>
   </div>
 
   <!-- ===== Onglet Mes salons ===== -->
@@ -1524,6 +1555,12 @@ function restoreBarber(id) {
 
 /* ============ Clients (historique) ============ */
 var clientHistory = [];
+var clientsPage = 1;
+var clientsPerPage = 25;
+var clientsTotalPages = 1;
+var clientsDateFrom = '';
+var clientsDateTo = '';
+var selectedClientIds = {};
 
 var STATUS_LABEL = {
   waiting: 'En attente',
@@ -1533,13 +1570,122 @@ var STATUS_LABEL = {
 };
 
 function loadClients() {
-  return api('/api/queue/history').then(function (r) {
+  var params = 'page=' + clientsPage + '&per_page=' + clientsPerPage;
+  if (clientsDateFrom) params += '&date_from=' + clientsDateFrom;
+  if (clientsDateTo) params += '&date_to=' + clientsDateTo;
+  return api('/api/queue/history?' + params).then(function (r) {
     clientHistory = r.items;
+    clientsPage = r.page;
+    clientsTotalPages = r.total_pages;
     renderClients();
+    renderClientsPagination();
   }).catch(function (e) { toast(e.message, true); });
 }
 
+function applyClientDateFilter() {
+  clientsDateFrom = document.getElementById('client-date-from').value;
+  clientsDateTo = document.getElementById('client-date-to').value;
+  clientsPage = 1;
+  loadClients();
+}
+
+function clearClientDateFilter() {
+  document.getElementById('client-date-from').value = '';
+  document.getElementById('client-date-to').value = '';
+  clientsDateFrom = '';
+  clientsDateTo = '';
+  clientsPage = 1;
+  loadClients();
+}
+
+function goToClientsPage(p) {
+  if (p < 1 || p > clientsTotalPages) return;
+  clientsPage = p;
+  loadClients();
+}
+
+function renderClientsPagination() {
+  document.getElementById('clients-pagination').innerHTML =
+    '<button onclick="goToClientsPage(' + (clientsPage - 1) + ')"' + (clientsPage <= 1 ? ' disabled' : '') + '>‹</button>' +
+    '<span class="page-label">Page ' + clientsPage + ' / ' + clientsTotalPages + '</span>' +
+    '<button onclick="goToClientsPage(' + (clientsPage + 1) + ')"' + (clientsPage >= clientsTotalPages ? ' disabled' : '') + '>›</button>';
+}
+
 document.getElementById('client-search').addEventListener('input', renderClients);
+
+function toggleClientSelect(id, checked) {
+  if (checked) selectedClientIds[id] = true; else delete selectedClientIds[id];
+  updateClientsExportBar();
+}
+
+function clearClientSelection() {
+  selectedClientIds = {};
+  document.querySelectorAll('.client-check').forEach(function (cb) { cb.checked = false; });
+  updateClientsExportBar();
+}
+
+function updateClientsExportBar() {
+  var count = Object.keys(selectedClientIds).length;
+  document.getElementById('clients-export-bar').style.display = count > 0 ? 'flex' : 'none';
+  document.getElementById('clients-selected-count').textContent =
+    count + (count > 1 ? ' clients sélectionnés' : ' client sélectionné');
+}
+
+function getSelectedClients() {
+  return clientHistory.filter(function (c) { return selectedClientIds[c.id]; });
+}
+
+function exportClientsCsv() {
+  var rows = getSelectedClients();
+  if (!rows.length) return;
+
+  var header = ['Nom', 'Email', 'Téléphone', 'Prestation', 'Date', 'Prix', 'Statut', 'Note'];
+  var lines = [header.join(';')];
+  rows.forEach(function (c) {
+    var when = new Date(c.checkin_at).toLocaleString('fr-FR');
+    var vals = [
+      c.client_name, c.email || '', c.phone || '', c.service_name || '',
+      when, c.total_price_cents ? (c.total_price_cents / 100).toFixed(2) : '',
+      STATUS_LABEL[c.status] || c.status, (c.note || '').replace(/[\r\n;]+/g, ' ')
+    ];
+    lines.push(vals.map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(';'));
+  });
+
+  var blob = new Blob(['\uFEFF' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  var link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = 'clients-' + new Date().toISOString().slice(0, 10) + '.csv';
+  link.click();
+  URL.revokeObjectURL(link.href);
+}
+
+function exportClientsPdf() {
+  var rows = getSelectedClients();
+  if (!rows.length) return;
+
+  var html = '<html><head><meta charset="utf-8"><title>Clients</title><style>' +
+    'body{font-family:-apple-system,Arial,sans-serif;padding:24px;color:#111}' +
+    'h1{font-size:18px;margin-bottom:16px}' +
+    'table{width:100%;border-collapse:collapse;font-size:12.5px}' +
+    'th,td{border-bottom:1px solid #ddd;padding:8px 10px;text-align:left}' +
+    'th{background:#f2f2f2}' +
+    '</style></head><body>' +
+    '<h1>Liste clients — ' + new Date().toLocaleDateString('fr-FR') + '</h1>' +
+    '<table><thead><tr><th>Nom</th><th>Email</th><th>Téléphone</th><th>Prestation</th><th>Date</th><th>Prix</th><th>Statut</th></tr></thead><tbody>' +
+    rows.map(function (c) {
+      var when = new Date(c.checkin_at).toLocaleString('fr-FR');
+      return '<tr><td>' + esc(c.client_name) + '</td><td>' + esc(c.email || '') + '</td><td>' + esc(c.phone || '') + '</td>' +
+        '<td>' + esc(c.service_name || '') + '</td><td>' + when + '</td>' +
+        '<td>' + (c.total_price_cents ? eur(c.total_price_cents) : '') + '</td><td>' + esc(STATUS_LABEL[c.status] || c.status) + '</td></tr>';
+    }).join('') +
+    '</tbody></table></body></html>';
+
+  var win = window.open('', '_blank');
+  win.document.write(html);
+  win.document.close();
+  win.focus();
+  setTimeout(function () { win.print(); }, 300);
+}
 
 function renderClients() {
   var q = (document.getElementById('client-search').value || '').trim().toLowerCase();
@@ -1566,6 +1712,8 @@ function renderClients() {
         actions += '<button class="btn btn-ghost" onclick="deleteClient(\'' + c.id + '\')">Supprimer</button>';
 
         return '<div class="item' + (stuck ? '' : '') + '">' +
+          '<input type="checkbox" class="client-check"' + (selectedClientIds[c.id] ? ' checked' : '') +
+          ' onclick="event.stopPropagation()" onchange="toggleClientSelect(\'' + c.id + '\', this.checked)">' +
           '<div class="item-main" onclick="openClientDrawer(\'' + c.id + '\', \'history\')" style="cursor:pointer">' +
             '<div class="item-name">' + esc(c.client_name) +
               ' <span class="chip' + (c.status === 'in_progress' ? ' main' : '') + '" style="margin-left:6px;font-size:11px">' +

@@ -220,13 +220,36 @@ router.get('/stats/today', requireAdmin, wrap(async (req, res) => {
 
 // --- Coiffeur : historique complet des clients (tous statuts) -----------
 router.get('/history', requireAdmin, wrap(async (req, res) => {
+  const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+  const perPage = Math.min(100, Math.max(1, parseInt(req.query.per_page, 10) || 25));
+  const offset = (page - 1) * perPage;
+
+  const conditions = ['q.salon_id = ?'];
+  const params = [req.salon.id];
+
+  if (req.query.date_from) {
+    conditions.push('q.checkin_at >= ?');
+    params.push(req.query.date_from + ' 00:00:00');
+  }
+  if (req.query.date_to) {
+    conditions.push('q.checkin_at <= ?');
+    params.push(req.query.date_to + ' 23:59:59');
+  }
+  const whereClause = conditions.join(' AND ');
+
+  const [[{ total }]] = await pool.query(
+    `SELECT COUNT(*) AS total FROM queue q WHERE ${whereClause}`,
+    params
+  );
+
   const [rows] = await pool.query(
     `SELECT q.*, s.name AS service_name
      FROM queue q LEFT JOIN services s ON s.id = q.service_id
-     WHERE q.salon_id = ?
-     ORDER BY q.checkin_at DESC LIMIT 200`,
-    [req.salon.id]
+     WHERE ${whereClause}
+     ORDER BY q.checkin_at DESC, q.id DESC LIMIT ? OFFSET ?`,
+    [...params, perPage, offset]
   );
+
   const ids = rows.map((r) => r.id);
   let extrasByQueue = {};
   if (ids.length) {
@@ -251,7 +274,14 @@ router.get('/history', requireAdmin, wrap(async (req, res) => {
     extra_names: extrasByQueue[r.id] || [],
     note: noteByKey[clientKey(r)] || ''
   }));
-  res.json({ ok: true, items });
+  res.json({
+    ok: true,
+    items,
+    total,
+    page,
+    per_page: perPage,
+    total_pages: Math.max(1, Math.ceil(total / perPage))
+  });
 }));
 
 // --- Coiffeur : suppression définitive (nettoyage de données test) ------
