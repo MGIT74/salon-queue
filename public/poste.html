@@ -459,10 +459,16 @@ function saveNextNote(id) {
 }
 
 function cancelMine(id) {
-  barberApi('/api/queue/' + id + '/cancel', { method: 'POST', body: {} })
-    .then(refresh)
-    .then(function () { toast('Client marqué absent'); })
-    .catch(function (e) { toast(e.message, true); });
+  var q = queue.find(function (x) { return x.id === id; });
+  var name = q ? q.client_name : 'ce client';
+  showConfirm('Marquer ' + name + ' comme absent ? Il sera retiré de la file.', { title: 'Client absent', danger: true, confirmLabel: 'Marquer absent' })
+    .then(function (ok) {
+      if (!ok) return;
+      barberApi('/api/queue/' + id + '/cancel', { method: 'POST', body: {} })
+        .then(refresh)
+        .then(function () { toast('Client marqué absent'); })
+        .catch(function (e) { toast(e.message, true); });
+    });
 }
 
 function startMine(id) {
