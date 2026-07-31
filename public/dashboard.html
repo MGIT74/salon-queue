@@ -90,6 +90,13 @@
 
   .row { background: var(--card); border-radius: 16px; padding: 16px 18px;
          margin-bottom: 10px; box-shadow: var(--shadow); transition: background .25s ease; }
+  .row-item { margin-bottom: 10px; }
+  .row-item .row { margin-bottom: 6px; }
+  .row-detail { background: var(--fill); border-radius: 16px; padding: 14px 18px 16px; }
+  .row-detail .detail-row { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--sep); }
+  .row-detail .detail-row:last-child { border-bottom: none; }
+  .row-detail .detail-label { font-size: 12.5px; color: var(--grey); flex-shrink: 0; }
+  .row-detail .detail-value { font-size: 13.5px; font-weight: 500; text-align: right; word-break: break-word; }
   .row-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
   .row-left { display: flex; align-items: flex-start; gap: 13px; min-width: 0; flex: 1; }
   .pos { width: 34px; height: 34px; border-radius: 50%; background: var(--fill);
@@ -758,6 +765,13 @@ function chipsHtml(q) {
     q.extras.map(function (x) { return '<span class="chip add">+ ' + esc(x.name) + '</span>'; }).join('') + '</div>';
 }
 
+var queueDetailOpen = {}; // { [queueId]: true }
+
+function toggleQueueDetail(id) {
+  queueDetailOpen[id] = !queueDetailOpen[id];
+  renderQueue();
+}
+
 function renderQueue() {
   var allActive = queue.filter(function (q) { return q.status === 'in_progress'; });
   var allWaiting = queue.filter(function (q) { return q.status === 'waiting'; });
@@ -777,7 +791,8 @@ function renderQueue() {
     ? '<div class="empty">Personne en attente</div>'
     : waiting.map(function (q, i) {
         var b = q.barber_id ? barbers.find(function (x) { return x.id === q.barber_id; }) : null;
-        return '<div class="row"><div class="row-top"><div class="row-left">' +
+        var open = Boolean(queueDetailOpen[q.id]);
+        return '<div class="row-item"><div class="row" onclick="toggleQueueDetail(\'' + q.id + '\')" style="cursor:pointer"><div class="row-top"><div class="row-left">' +
           '<div class="pos">' + (q.position || i + 1) + '</div><div style="min-width:0">' +
           '<div class="name">' + esc(q.client_name) + '</div>' +
           '<div class="assigned">' + esc(b ? b.name : 'Premier disponible') + '</div>' +
@@ -785,8 +800,14 @@ function renderQueue() {
           '<div class="dur">' + q.total_duration_min + ' min</div>' +
           '<div class="price">' + eur(q.total_price_cents) + '</div>' +
           '<div class="wait">dans ~' + (q.estimated_wait_min || 0) + ' min</div></div></div>' +
-          '<div class="row-actions">' +
+          '<div class="row-actions" onclick="event.stopPropagation()">' +
           '<button class="btn btn-ghost" onclick="cancelCut(\'' + q.id + '\')">Absent</button>' +
+          '</div></div>' +
+          '<div class="row-detail" style="display:' + (open ? 'block' : 'none') + '">' +
+          '<div class="detail-row"><span class="detail-label">Client</span><span class="detail-value">' + esc(q.client_name) + '</span></div>' +
+          (q.email ? '<div class="detail-row"><span class="detail-label">Email</span><span class="detail-value">' + esc(q.email) + '</span></div>' : '') +
+          (q.phone ? '<div class="detail-row"><span class="detail-label">Téléphone</span><span class="detail-value">' + esc(q.phone) + '</span></div>' : '') +
+          (q.note ? '<div class="detail-row"><span class="detail-label">Note</span><span class="detail-value">' + esc(q.note) + '</span></div>' : '') +
           '</div></div>';
       }).join('');
 
