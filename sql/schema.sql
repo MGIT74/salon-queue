@@ -219,3 +219,24 @@ CREATE TABLE IF NOT EXISTS client_notes (
   UNIQUE KEY uniq_salon_client (salon_id, client_key),
   FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Prix personnalisé d'un coiffeur pour une prestation/un supplément
+-- précis, qui remplace le prix par défaut du catalogue quand défini.
+-- Pas de ligne = ce coiffeur applique le tarif par défaut.
+CREATE TABLE IF NOT EXISTS barber_service_prices (
+  barber_id CHAR(36) NOT NULL,
+  service_id CHAR(36) NOT NULL,
+  price_cents INT NOT NULL,
+  PRIMARY KEY (barber_id, service_id),
+  FOREIGN KEY (barber_id) REFERENCES barbers(id) ON DELETE CASCADE,
+  FOREIGN KEY (service_id) REFERENCES services(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS barber_extra_prices (
+  barber_id CHAR(36) NOT NULL,
+  extra_id CHAR(36) NOT NULL,
+  price_cents INT NOT NULL,
+  PRIMARY KEY (barber_id, extra_id),
+  FOREIGN KEY (barber_id) REFERENCES barbers(id) ON DELETE CASCADE,
+  FOREIGN KEY (extra_id) REFERENCES extras(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

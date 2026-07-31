@@ -12,7 +12,7 @@ function clientKey(row) {
  * prestation, leurs suppléments, la durée totale et le prix total.
  */
 async function loadQueue(salonId) {
-  const [[rows], [services], [extras], [links], [notes]] = await Promise.all([
+  const [[rows], [services], [extras], [links], [notes], [svcPrices], [extPrices]] = await Promise.all([
     pool.query(
       "SELECT * FROM queue WHERE salon_id = ? AND status IN ('waiting','in_progress') ORDER BY checkin_at",
       [salonId]
@@ -25,22 +25,49 @@ async function loadQueue(salonId) {
        WHERE q.salon_id = ?`,
       [salonId]
     ),
-    pool.query('SELECT client_key, note FROM client_notes WHERE salon_id = ?', [salonId])
+    pool.query('SELECT client_key, note FROM client_notes WHERE salon_id = ?', [salonId]),
+    pool.query(
+      `SELECT bsp.barber_id, bsp.service_id, bsp.price_cents FROM barber_service_prices bsp
+       JOIN barbers b ON b.id = bsp.barber_id WHERE b.salon_id = ?`,
+      [salonId]
+    ),
+    pool.query(
+      `SELECT bep.barber_id, bep.extra_id, bep.price_cents FROM barber_extra_prices bep
+       JOIN barbers b ON b.id = bep.barber_id WHERE b.salon_id = ?`,
+      [salonId]
+    )
   ]);
 
   const svcById = Object.fromEntries(services.map((s) => [s.id, s]));
   const extById = Object.fromEntries(extras.map((e) => [e.id, e]));
   const noteByKey = Object.fromEntries(notes.map((n) => [n.client_key, n.note]));
 
+  // Prix personnalisés par coiffeur (remplace le tarif par défaut du
+  // catalogue quand défini) — clé "barberId:itemId" pour un accès direct.
+  const svcPriceByKey = Object.fromEntries(svcPrices.map((p) => [p.barber_id + ':' + p.service_id, p.price_cents]));
+  const extPriceByKey = Object.fromEntries(extPrices.map((p) => [p.barber_id + ':' + p.extra_id, p.price_cents]));
+
   return rows.map((r) => {
-    const chosen = links
+    const rawChosen = links
       .filter((l) => l.queue_id === r.id)
       .map((l) => extById[l.extra_id])
       .filter(Boolean);
 
     const service = svcById[r.service_id] || { name: 'Prestation', duration_min: 30, price_cents: 0 };
+    const svcOverrideKey = r.barber_id ? r.barber_id + ':' + service.id : null;
+    const svcPrice = (svcOverrideKey && svcPriceByKey[svcOverrideKey] !== undefined)
+      ? svcPriceByKey[svcOverrideKey] : service.price_cents;
+    const effectiveService = Object.assign({}, service, { price_cents: svcPrice });
+
+    const chosen = rawChosen.map((e) => {
+      const extOverrideKey = r.barber_id ? r.barber_id + ':' + e.id : null;
+      const extPrice = (extOverrideKey && extPriceByKey[extOverrideKey] !== undefined)
+        ? extPriceByKey[extOverrideKey] : e.price_cents;
+      return Object.assign({}, e, { price_cents: extPrice });
+    });
+
     const duration = service.duration_min + chosen.reduce((a, e) => a + e.duration_min, 0);
-    const price = service.price_cents + chosen.reduce((a, e) => a + e.price_cents, 0);
+    const price = svcPrice + chosen.reduce((a, e) => a + e.price_cents, 0);
     const key = clientKey(r);
 
     return Object.assign({}, r, {
@@ -48,7 +75,7 @@ async function loadQueue(salonId) {
       checkin_at: utcIso(r.checkin_at),
       start_at: utcIso(r.start_at),
       end_at: utcIso(r.end_at),
-      service,
+      service: effectiveService,
       extras: chosen,
       total_duration_min: duration,
       total_price_cents: price,

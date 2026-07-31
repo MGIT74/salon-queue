@@ -239,11 +239,11 @@ router.get('/:id/capabilities', requireAdmin, wrap(async (req, res) => {
   if (!owned) return res.status(404).json({ error: 'Coiffeur introuvable' });
 
   const [services] = await pool.query(
-    'SELECT id, name FROM services WHERE salon_id = ? AND active = 1 ORDER BY sort_order, name',
+    'SELECT id, name, price_cents FROM services WHERE salon_id = ? AND active = 1 ORDER BY sort_order, name',
     [req.salon.id]
   );
   const [extras] = await pool.query(
-    'SELECT id, name FROM extras WHERE salon_id = ? AND active = 1 ORDER BY sort_order, name',
+    'SELECT id, name, price_cents FROM extras WHERE salon_id = ? AND active = 1 ORDER BY sort_order, name',
     [req.salon.id]
   );
   const [svcExcl] = await pool.query(
@@ -252,13 +252,29 @@ router.get('/:id/capabilities', requireAdmin, wrap(async (req, res) => {
   const [extExcl] = await pool.query(
     'SELECT extra_id FROM barber_extra_exclusions WHERE barber_id = ?', [req.params.id]
   );
+  const [svcPrices] = await pool.query(
+    'SELECT service_id, price_cents FROM barber_service_prices WHERE barber_id = ?', [req.params.id]
+  );
+  const [extPrices] = await pool.query(
+    'SELECT extra_id, price_cents FROM barber_extra_prices WHERE barber_id = ?', [req.params.id]
+  );
   const disabledSvc = new Set(svcExcl.map((r) => r.service_id));
   const disabledExt = new Set(extExcl.map((r) => r.extra_id));
+  const svcPriceById = Object.fromEntries(svcPrices.map((p) => [p.service_id, p.price_cents]));
+  const extPriceById = Object.fromEntries(extPrices.map((p) => [p.extra_id, p.price_cents]));
 
   res.json({
     ok: true,
-    services: services.map((s) => Object.assign({}, s, { enabled: !disabledSvc.has(s.id) })),
-    extras: extras.map((e) => Object.assign({}, e, { enabled: !disabledExt.has(e.id) }))
+    services: services.map((s) => Object.assign({}, s, {
+      enabled: !disabledSvc.has(s.id),
+      default_price_cents: s.price_cents,
+      custom_price_cents: svcPriceById[s.id] !== undefined ? svcPriceById[s.id] : null
+    })),
+    extras: extras.map((e) => Object.assign({}, e, {
+      enabled: !disabledExt.has(e.id),
+      default_price_cents: e.price_cents,
+      custom_price_cents: extPriceById[e.id] !== undefined ? extPriceById[e.id] : null
+    }))
   });
 }));
 
@@ -271,9 +287,14 @@ router.put('/:id/capabilities', requireAdmin, wrap(async (req, res) => {
 
   const disabledServiceIds = Array.isArray(req.body.disabled_service_ids) ? req.body.disabled_service_ids : [];
   const disabledExtraIds = Array.isArray(req.body.disabled_extra_ids) ? req.body.disabled_extra_ids : [];
+  // { [serviceId]: price_cents } — une valeur null/absente remet le tarif par défaut
+  const servicePrices = req.body.service_prices && typeof req.body.service_prices === 'object' ? req.body.service_prices : {};
+  const extraPrices = req.body.extra_prices && typeof req.body.extra_prices === 'object' ? req.body.extra_prices : {};
 
   await pool.query('DELETE FROM barber_service_exclusions WHERE barber_id = ?', [req.params.id]);
   await pool.query('DELETE FROM barber_extra_exclusions WHERE barber_id = ?', [req.params.id]);
+  await pool.query('DELETE FROM barber_service_prices WHERE barber_id = ?', [req.params.id]);
+  await pool.query('DELETE FROM barber_extra_prices WHERE barber_id = ?', [req.params.id]);
 
   if (disabledServiceIds.length) {
     await pool.query(
@@ -286,6 +307,20 @@ router.put('/:id/capabilities', requireAdmin, wrap(async (req, res) => {
       'INSERT INTO barber_extra_exclusions (barber_id, extra_id) VALUES ?',
       [disabledExtraIds.map((id) => [req.params.id, id])]
     );
+  }
+
+  const svcPriceRows = Object.entries(servicePrices)
+    .filter(([, cents]) => cents !== null && cents !== '' && !Number.isNaN(Number(cents)))
+    .map(([serviceId, cents]) => [req.params.id, serviceId, Math.round(Number(cents))]);
+  if (svcPriceRows.length) {
+    await pool.query('INSERT INTO barber_service_prices (barber_id, service_id, price_cents) VALUES ?', [svcPriceRows]);
+  }
+
+  const extPriceRows = Object.entries(extraPrices)
+    .filter(([, cents]) => cents !== null && cents !== '' && !Number.isNaN(Number(cents)))
+    .map(([extraId, cents]) => [req.params.id, extraId, Math.round(Number(cents))]);
+  if (extPriceRows.length) {
+    await pool.query('INSERT INTO barber_extra_prices (barber_id, extra_id, price_cents) VALUES ?', [extPriceRows]);
   }
 
   res.json({ ok: true });

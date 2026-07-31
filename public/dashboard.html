@@ -321,6 +321,13 @@
          background: var(--fill); cursor: pointer; transition: background .15s ease; }
   .opt:hover { background: var(--fill-2); }
   .opt.sel { background: var(--blue-soft); }
+  .opt-main { display: flex; align-items: center; gap: 12px; cursor: pointer; flex: 1; min-width: 0; }
+  .opt-price-wrap { flex-shrink: 0; }
+  .opt-price-input {
+    width: 90px; padding: 8px 10px; border: none; border-radius: 8px; background: var(--card);
+    color: var(--ink); font-family: inherit; font-size: 13.5px; text-align: right;
+  }
+  .opt-price-input::placeholder { color: var(--grey); }
   .box { width: 22px; height: 22px; flex-shrink: 0; border-radius: 50%; border: 2px solid var(--sep);
          display: flex; align-items: center; justify-content: center; transition: background .15s, border-color .15s; }
   .box.square { border-radius: 7px; }
@@ -1426,8 +1433,17 @@ function renderCapabilitiesLists(id) {
   if (!svcEl || !extEl) return;
 
   function row(item, kind) {
-    return '<div class="opt' + (item.enabled ? ' sel' : '') + '" onclick="toggleCapability(\'' + id + '\',\'' + kind + '\',\'' + item.id + '\')">' +
-      '<div class="box square">' + CHECK + '</div><div><div class="opt-name">' + esc(item.name) + '</div></div></div>';
+    var hasCustom = item.custom_price_cents !== null && item.custom_price_cents !== undefined;
+    var priceValue = hasCustom ? (item.custom_price_cents / 100).toFixed(2) : '';
+    var defaultLabel = eur(item.default_price_cents) + ' (défaut)';
+    return '<div class="opt' + (item.enabled ? ' sel' : '') + '">' +
+      '<div class="opt-main" onclick="toggleCapability(\'' + id + '\',\'' + kind + '\',\'' + item.id + '\')">' +
+      '<div class="box square">' + CHECK + '</div><div><div class="opt-name">' + esc(item.name) + '</div></div>' +
+      '</div>' +
+      '<div class="opt-price-wrap" onclick="event.stopPropagation()">' +
+      '<input type="number" step="0.01" min="0" class="opt-price-input" placeholder="' + defaultLabel + '" ' +
+      'value="' + priceValue + '" data-kind="' + kind + '" data-item-id="' + item.id + '"></div>' +
+      '</div>';
   }
 
   svcEl.innerHTML = caps.services.length
@@ -1442,7 +1458,15 @@ function toggleCapability(barberId, kind, itemId) {
   var list = barberCapabilities[barberId][kind];
   var item = list.find(function (x) { return x.id === itemId; });
   item.enabled = !item.enabled;
-  renderCapabilitiesLists(barberId);
+
+  // Bascule juste la classe visuelle sans reconstruire tout le HTML — un
+  // prix personnalisé en cours de frappe ne doit pas être effacé si on
+  // coche une autre case juste avant d'enregistrer.
+  var containerId = kind === 'services' ? 'cap-services-' + barberId : 'cap-extras-' + barberId;
+  var container = document.getElementById(containerId);
+  var input = container && container.querySelector('[data-item-id="' + itemId + '"]');
+  var optDiv = input && input.closest('.opt');
+  if (optDiv) optDiv.classList.toggle('sel', item.enabled);
 }
 
 function saveCapabilities(id) {
@@ -1450,11 +1474,31 @@ function saveCapabilities(id) {
   var disabledServiceIds = caps.services.filter(function (s) { return !s.enabled; }).map(function (s) { return s.id; });
   var disabledExtraIds = caps.extras.filter(function (e) { return !e.enabled; }).map(function (e) { return e.id; });
 
+  // Prix personnalisés : lus directement dans les champs (un champ vide =
+  // pas de tarif personnalisé, retombe sur le prix par défaut du catalogue).
+  var servicePrices = {};
+  var extraPrices = {};
+  document.querySelectorAll('#cap-services-' + id + ' .opt-price-input').forEach(function (input) {
+    var v = input.value.trim();
+    servicePrices[input.dataset.itemId] = v === '' ? null : Math.round(parseFloat(v) * 100);
+  });
+  document.querySelectorAll('#cap-extras-' + id + ' .opt-price-input').forEach(function (input) {
+    var v = input.value.trim();
+    extraPrices[input.dataset.itemId] = v === '' ? null : Math.round(parseFloat(v) * 100);
+  });
+
   api('/api/barbers/' + id + '/capabilities', {
     method: 'PUT',
-    body: { disabled_service_ids: disabledServiceIds, disabled_extra_ids: disabledExtraIds }
-  }).then(function () { toast('Prestations mises à jour'); })
-    .catch(function (e) { toast(e.message, true); });
+    body: {
+      disabled_service_ids: disabledServiceIds,
+      disabled_extra_ids: disabledExtraIds,
+      service_prices: servicePrices,
+      extra_prices: extraPrices
+    }
+  }).then(function () {
+    toast('Prestations mises à jour');
+    loadBarberCapabilities(id);
+  }).catch(function (e) { toast(e.message, true); });
 }
 
 function periodRange(period, offset) {
