@@ -286,6 +286,10 @@
   padding: 9px 12px; border: none; border-radius: 10px; background: var(--fill);
   color: var(--ink); font-family: inherit; font-size: 13.5px;
 }
+.clients-toolbar .fld select {
+  padding: 9px 12px; border: none; border-radius: 10px; background: var(--fill);
+  color: var(--ink); font-family: inherit; font-size: 13.5px;
+}
 .clients-export-bar {
   display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;
   background: var(--fill); border-radius: 14px; padding: 12px 16px; margin-bottom: 16px;
@@ -415,6 +419,15 @@
       <div class="fld" style="margin:0"><label for="client-date-to">Au</label><input id="client-date-to" type="date"></div>
       <button class="btn btn-soft" onclick="applyClientDateFilter()">Filtrer</button>
       <button class="btn btn-ghost" onclick="clearClientDateFilter()">Réinitialiser</button>
+      <div class="fld" style="margin:0"><label for="client-per-page">Par page</label>
+        <select id="client-per-page" onchange="changeClientsPerPage(this.value)">
+          <option value="5">5</option>
+          <option value="10">10</option>
+          <option value="15">15</option>
+          <option value="25" selected>25</option>
+          <option value="50">50</option>
+        </select>
+      </div>
       <button class="btn btn-ghost" onclick="selectAllClients()" style="margin-left:auto">Tout sélectionner</button>
     </div>
 
@@ -1594,6 +1607,12 @@ function loadClients() {
 function applyClientDateFilter() {
   clientsDateFrom = document.getElementById('client-date-from').value;
   clientsDateTo = document.getElementById('client-date-to').value;
+  clientsPage = 1;
+  loadClients();
+}
+
+function changeClientsPerPage(value) {
+  clientsPerPage = Number(value) || 25;
   clientsPage = 1;
   loadClients();
 }
