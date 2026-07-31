@@ -90,18 +90,11 @@
 
   .row { background: var(--card); border-radius: 16px; padding: 16px 18px;
          margin-bottom: 10px; box-shadow: var(--shadow); transition: background .25s ease; }
-  .row-item { margin-bottom: 10px; }
-  .row-item .row { margin-bottom: 6px; }
-  .row-detail { background: var(--fill); border-radius: 16px; padding: 14px 18px 16px; }
-  .row-detail .detail-row { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--sep); }
-  .row-detail .detail-row:last-child { border-bottom: none; }
-  .row-detail .detail-label { font-size: 12.5px; color: var(--grey); flex-shrink: 0; }
-  .row-detail .detail-value { font-size: 13.5px; font-weight: 500; text-align: right; word-break: break-word; }
-  .detail-note-label { display: block; font-size: 12.5px; font-weight: 600; color: var(--grey); margin: 10px 0 6px; }
-  .row-detail textarea {
-    width: 100%; padding: 11px 13px; border: none; border-radius: 10px; background: var(--card);
-    color: var(--ink); font-family: inherit; font-size: 14px; resize: vertical; margin-bottom: 8px; cursor: auto;
-  }
+  .detail-row { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--sep); }
+  .detail-row:last-of-type { border-bottom: none; }
+  .detail-label { font-size: 12.5px; color: var(--grey); flex-shrink: 0; }
+  .detail-value { font-size: 13.5px; font-weight: 500; text-align: right; word-break: break-word; }
+  .detail-note-label { display: block; font-size: 12.5px; font-weight: 600; color: var(--grey); margin: 12px 0 6px; }
   .row-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
   .row-left { display: flex; align-items: flex-start; gap: 13px; min-width: 0; flex: 1; }
   .pos { width: 34px; height: 34px; border-radius: 50%; background: var(--fill);
@@ -770,23 +763,44 @@ function chipsHtml(q) {
     q.extras.map(function (x) { return '<span class="chip add">+ ' + esc(x.name) + '</span>'; }).join('') + '</div>';
 }
 
-var queueDetailOpen = {}; // { [queueId]: true }
+/**
+ * Fenêtre modale (réutilise le système déjà en place — showAlert/
+ * showConfirm) montrant les infos du client (email, téléphone) et une
+ * note éditable, plutôt qu'un panneau qui se dépliait sous la ligne.
+ */
+function openClientModal(id) {
+  var q = queue.find(function (x) { return x.id === id; });
+  if (!q) return;
 
-function toggleQueueDetail(id) {
-  queueDetailOpen[id] = !queueDetailOpen[id];
-  renderQueue();
+  var body =
+    '<div class="modal-title">' + esc(q.client_name) + '</div>' +
+    (q.email ? '<div class="detail-row"><span class="detail-label">Email</span><span class="detail-value">' + esc(q.email) + '</span></div>' : '') +
+    (q.phone ? '<div class="detail-row"><span class="detail-label">Téléphone</span><span class="detail-value">' + esc(q.phone) + '</span></div>' : '') +
+    '<label class="detail-note-label">Note sur ce client</label>' +
+    '<textarea id="modal-queue-note" class="modal-input" rows="3" placeholder="Ex: préfère dégradé américain, allergie...">' + esc(q.note || '') + '</textarea>' +
+    '<div class="modal-actions">' +
+    '<button class="btn btn-soft" id="modal-close-client-btn">Fermer</button>' +
+    '<button class="btn btn-primary" id="modal-save-note-btn">Enregistrer la note</button>' +
+    '</div>';
+
+  var overlay = _buildModal(body);
+  overlay.querySelector('#modal-close-client-btn').onclick = function () { _closeModal(overlay); };
+  overlay.addEventListener('click', function (e) { if (e.target === overlay) _closeModal(overlay); });
+  overlay.querySelector('#modal-save-note-btn').onclick = function () {
+    var note = overlay.querySelector('#modal-queue-note').value;
+    api('/api/queue/' + id + '/note', { method: 'PUT', body: { note: note } })
+      .then(function () {
+        q.note = note;
+        toast('Note enregistrée');
+        _closeModal(overlay);
+      })
+      .catch(function (e) { toast(e.message, true); });
+  };
 }
 
 function renderQueue() {
   var allActive = queue.filter(function (q) { return q.status === 'in_progress'; });
   var allWaiting = queue.filter(function (q) { return q.status === 'waiting'; });
-
-  // Ne pas reconstruire la liste d'attente si l'utilisateur est en train
-  // de taper une note — sinon le tick périodique (chaque seconde)
-  // effacerait la saisie en cours.
-  var waitingListEl = document.getElementById('waiting-list');
-  var userEditingNote = waitingListEl.contains(document.activeElement) &&
-    document.activeElement !== document.body && document.activeElement.tagName === 'TEXTAREA';
 
   // "Je suis X" filtre la vue : uniquement les clients de X + les
   // non-assignés ("premier disponible"), qui restent visibles par tout
@@ -799,12 +813,11 @@ function renderQueue() {
   document.getElementById('s-queue').textContent =
     hm(waiting.reduce(function (a, q) { return a + q.total_duration_min; }, 0));
 
-  if (!userEditingNote) document.getElementById('waiting-list').innerHTML = waiting.length === 0
+  document.getElementById('waiting-list').innerHTML = waiting.length === 0
     ? '<div class="empty">Personne en attente</div>'
     : waiting.map(function (q, i) {
         var b = q.barber_id ? barbers.find(function (x) { return x.id === q.barber_id; }) : null;
-        var open = Boolean(queueDetailOpen[q.id]);
-        return '<div class="row-item"><div class="row" onclick="toggleQueueDetail(\'' + q.id + '\')" style="cursor:pointer"><div class="row-top"><div class="row-left">' +
+        return '<div class="row" onclick="openClientModal(\'' + q.id + '\')" style="cursor:pointer"><div class="row-top"><div class="row-left">' +
           '<div class="pos">' + (q.position || i + 1) + '</div><div style="min-width:0">' +
           '<div class="name">' + esc(q.client_name) + '</div>' +
           '<div class="assigned">' + esc(b ? b.name : 'Premier disponible') + '</div>' +
@@ -814,14 +827,6 @@ function renderQueue() {
           '<div class="wait">dans ~' + (q.estimated_wait_min || 0) + ' min</div></div></div>' +
           '<div class="row-actions" onclick="event.stopPropagation()">' +
           '<button class="btn btn-ghost" onclick="cancelCut(\'' + q.id + '\')">Absent</button>' +
-          '</div></div>' +
-          '<div class="row-detail" style="display:' + (open ? 'block' : 'none') + '" onclick="event.stopPropagation()">' +
-          '<div class="detail-row"><span class="detail-label">Client</span><span class="detail-value">' + esc(q.client_name) + '</span></div>' +
-          (q.email ? '<div class="detail-row"><span class="detail-label">Email</span><span class="detail-value">' + esc(q.email) + '</span></div>' : '') +
-          (q.phone ? '<div class="detail-row"><span class="detail-label">Téléphone</span><span class="detail-value">' + esc(q.phone) + '</span></div>' : '') +
-          '<label class="detail-note-label">Note sur ce client</label>' +
-          '<textarea id="queue-note-' + q.id + '" rows="2" placeholder="Ex: préfère dégradé américain, allergie...">' + esc(q.note || '') + '</textarea>' +
-          '<button class="btn btn-soft" onclick="saveQueueNote(\'' + q.id + '\')">Enregistrer la note</button>' +
           '</div></div>';
       }).join('');
 
@@ -930,16 +935,6 @@ function transferAndStart(id, barberId) {
 function finishCut(id) {
   api('/api/queue/' + id + '/finish', { method: 'POST', body: {} })
     .then(refreshQueue).catch(function (e) { toast(e.message, true); });
-}
-function saveQueueNote(id) {
-  var note = document.getElementById('queue-note-' + id).value;
-  api('/api/queue/' + id + '/note', { method: 'PUT', body: { note: note } })
-    .then(function () {
-      var q = queue.find(function (x) { return x.id === id; });
-      if (q) q.note = note;
-      toast('Note enregistrée');
-    })
-    .catch(function (e) { toast(e.message, true); });
 }
 
 function cancelCut(id) {
