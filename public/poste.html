@@ -59,13 +59,31 @@
   }
 
   .section-label { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--grey); margin: 0 0 12px 2px; }
+  .next-item { margin-bottom: 10px; }
+  .next-swipe-wrap { position: relative; overflow: hidden; border-radius: 16px; }
+  .next-swipe-action {
+    position: absolute; top: 0; right: 0; bottom: 0; width: 84px; border: none;
+    background: var(--red); color: #fff; font-family: inherit; font-weight: 600; font-size: 14px;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+  }
   .next-card {
-    background: var(--card); border-radius: 16px; padding: 18px; margin-bottom: 10px;
+    position: relative; background: var(--card); padding: 18px;
     box-shadow: var(--shadow); display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    touch-action: pan-y;
   }
   .next-card.locked { opacity: .55; }
+  .next-info { cursor: pointer; flex: 1; min-width: 0; }
   .next-info .name { font-size: 16px; font-weight: 600; letter-spacing: -.02em; }
   .next-info .meta { font-size: 13px; color: var(--grey); margin-top: 2px; }
+  .next-detail {
+    background: var(--fill); border-radius: 0 0 16px 16px; padding: 14px 16px 16px; margin-top: -6px;
+    text-align: left;
+  }
+  .next-detail label { display: block; font-size: 12.5px; font-weight: 600; color: var(--grey); margin-bottom: 6px; }
+  .next-detail textarea {
+    width: 100%; padding: 11px 13px; border: none; border-radius: 10px; background: var(--card);
+    color: var(--ink); font-family: inherit; font-size: 14px; resize: vertical; margin-bottom: 8px;
+  }
   .next-card .btn { flex-shrink: 0; padding: 11px 18px; font-size: 14px; }
   .lock-note { font-size: 12px; color: var(--orange); margin-top: 4px; }
 
@@ -230,6 +248,57 @@ function boot() {
   refresh();
   setInterval(refresh, 4000);
   setInterval(renderActive, 1000);
+  attachSwipeHandlers();
+}
+
+/* Glisser une carte vers la gauche révèle "Absent" (comme les listes
+   iOS). Un tap sans déplacement horizontal ouvre/ferme la note. */
+var swipe = { card: null, startX: 0, currentX: 0, moved: false };
+var SWIPE_OPEN_PX = -84;
+
+function attachSwipeHandlers() {
+  var zone = document.getElementById('next-zone');
+
+  zone.addEventListener('touchstart', function (e) {
+    var card = e.target.closest('[data-swipe-card]');
+    if (!card) return;
+    closeOtherSwipes(card);
+    swipe.card = card;
+    swipe.startX = e.touches[0].clientX;
+    swipe.currentX = card.classList.contains('swiped') ? SWIPE_OPEN_PX : 0;
+    swipe.moved = false;
+    card.style.transition = 'none';
+  }, { passive: true });
+
+  zone.addEventListener('touchmove', function (e) {
+    if (!swipe.card) return;
+    var dx = e.touches[0].clientX - swipe.startX;
+    if (Math.abs(dx) > 6) swipe.moved = true;
+    var base = swipe.card.classList.contains('swiped') ? SWIPE_OPEN_PX : 0;
+    var next = Math.min(0, Math.max(base + dx, SWIPE_OPEN_PX));
+    swipe.currentX = next;
+    swipe.card.style.transform = 'translateX(' + next + 'px)';
+  }, { passive: true });
+
+  zone.addEventListener('touchend', function (e) {
+    if (!swipe.card) return;
+    var card = swipe.card;
+    card.style.transition = 'transform .2s ease';
+    var openIt = swipe.currentX < SWIPE_OPEN_PX / 2;
+    card.style.transform = 'translateX(' + (openIt ? SWIPE_OPEN_PX : 0) + 'px)';
+    card.classList.toggle('swiped', openIt);
+    if (swipe.moved) e.preventDefault(); // évite le clic fantôme qui ouvrirait la note
+    swipe.card = null;
+  });
+}
+
+function closeOtherSwipes(exceptCard) {
+  document.querySelectorAll('[data-swipe-card].swiped').forEach(function (c) {
+    if (c === exceptCard) return;
+    c.classList.remove('swiped');
+    c.style.transition = 'transform .2s ease';
+    c.style.transform = 'translateX(0)';
+  });
 }
 
 function refresh() {
@@ -372,12 +441,21 @@ function saveNote(id) {
     .catch(function (e) { toast(e.message, true); });
 }
 
+var nextDetailOpen = {}; // { [queueId]: true }
+
 function renderNext() {
   var zone = document.getElementById('next-zone');
   if (myActive()) {
     zone.innerHTML = '<div class="empty">Terminez la coupe en cours pour passer à la suivante</div>';
     return;
   }
+
+  // Ne pas reconstruire pendant que l'utilisateur interagit (carte glissée
+  // ouverte, note en cours de frappe) — sinon le rafraîchissement
+  // automatique (toutes les 4s) annulerait ces interactions en cours.
+  var userIsEditing = zone.contains(document.activeElement) && document.activeElement !== document.body;
+  var anySwiped = zone.querySelector('[data-swipe-card].swiped');
+  if ((userIsEditing || anySwiped) && zone.children.length) return;
 
   var mine = queue.filter(function (q) {
     return q.status === 'waiting' && (q.barber_id === me.id || !q.barber_id);
@@ -391,14 +469,46 @@ function renderNext() {
   zone.innerHTML = mine.map(function (q, i) {
     var locked = i > 0;
     var detail = q.service.name + (q.extras.length ? ' + ' + q.extras.map(function (x) { return x.name; }).join(', ') : '');
-    return '<div class="next-card' + (locked ? ' locked' : '') + '">' +
-      '<div class="next-info"><div class="name">' + esc(q.client_name) + '</div>' +
-      '<div class="meta">' + esc(detail) + '</div>' +
-      (locked ? '<div class="lock-note">En attente de son tour</div>' : '') +
+    var open = Boolean(nextDetailOpen[q.id]);
+    return '<div class="next-item" data-id="' + q.id + '">' +
+      '<div class="next-swipe-wrap">' +
+        '<div class="next-swipe-action" onclick="cancelMine(\'' + q.id + '\')">Absent</div>' +
+        '<div class="next-card' + (locked ? ' locked' : '') + '" data-swipe-card>' +
+          '<div class="next-info" onclick="toggleNextDetail(\'' + q.id + '\')">' +
+            '<div class="name">' + esc(q.client_name) + '</div>' +
+            '<div class="meta">' + esc(detail) + '</div>' +
+            (locked ? '<div class="lock-note">En attente de son tour</div>' : '') +
+          '</div>' +
+          (locked ? '' : '<button class="btn btn-primary" onclick="event.stopPropagation();startMine(\'' + q.id + '\')">Commencer</button>') +
+        '</div>' +
       '</div>' +
-      (locked ? '' : '<button class="btn btn-primary" onclick="startMine(\'' + q.id + '\')">Commencer</button>') +
-      '</div>';
+      '<div class="next-detail" id="next-detail-' + q.id + '" style="display:' + (open ? 'block' : 'none') + '">' +
+        '<label>Note sur ce client</label>' +
+        '<textarea id="next-note-' + q.id + '" rows="2" placeholder="Ex: préfère dégradé américain, allergie...">' + esc(q.note || '') + '</textarea>' +
+        '<button class="btn btn-soft" onclick="saveNextNote(\'' + q.id + '\')">Enregistrer la note</button>' +
+      '</div>' +
+    '</div>';
   }).join('');
+}
+
+function toggleNextDetail(id) {
+  nextDetailOpen[id] = !nextDetailOpen[id];
+  var el = document.getElementById('next-detail-' + id);
+  if (el) el.style.display = nextDetailOpen[id] ? 'block' : 'none';
+}
+
+function saveNextNote(id) {
+  var note = document.getElementById('next-note-' + id).value;
+  barberApi('/api/queue/' + id + '/note', { method: 'PUT', body: { note: note } })
+    .then(function () { toast('Note enregistrée'); })
+    .catch(function (e) { toast(e.message, true); });
+}
+
+function cancelMine(id) {
+  barberApi('/api/queue/' + id + '/cancel', { method: 'POST', body: {} })
+    .then(refresh)
+    .then(function () { toast('Client marqué absent'); })
+    .catch(function (e) { toast(e.message, true); });
 }
 
 function startMine(id) {

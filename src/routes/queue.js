@@ -131,7 +131,17 @@ router.post('/:id/finish', requireAdminOrBarber, wrap(async (req, res) => {
   res.json({ ok: true });
 }));
 
-router.post('/:id/cancel', requireAdmin, wrap(async (req, res) => {
+router.post('/:id/cancel', requireAdminOrBarber, wrap(async (req, res) => {
+  if (req.barberId) {
+    const [[row]] = await pool.query(
+      'SELECT barber_id FROM queue WHERE id = ? AND salon_id = ?',
+      [req.params.id, req.salon.id]
+    );
+    if (!row) return res.status(404).json({ error: 'Client introuvable' });
+    if (row.barber_id && row.barber_id !== req.barberId) {
+      return res.status(403).json({ error: "Ce n'est pas votre client." });
+    }
+  }
   await pool.query(
     "UPDATE queue SET status = 'cancelled' WHERE id = ? AND salon_id = ?",
     [req.params.id, req.salon.id]
@@ -255,7 +265,7 @@ router.put('/:id/note', requireAdminOrBarber, wrap(async (req, res) => {
     [req.params.id, req.salon.id]
   );
   if (!row) return res.status(404).json({ error: 'Client introuvable' });
-  if (req.barberId && row.barber_id !== req.barberId) {
+  if (req.barberId && row.barber_id && row.barber_id !== req.barberId) {
     return res.status(403).json({ error: "Ce n'est pas votre client." });
   }
 
