@@ -75,9 +75,10 @@
       display: flex; align-items: center; justify-content: space-between; gap: 10px;
       margin: 0; padding: 12px 16px; border-bottom: none; border-radius: 0 0 18px 18px;
       background: var(--card); box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+      overflow: hidden; width: 100%; box-sizing: border-box;
     }
     .sidebar-brand .name { font-size: 14px; flex: 1 1 auto; min-width: 0; }
-    .sidebar-brand select { width: auto; margin: 0; max-width: 42vw; flex-shrink: 0; }
+    .sidebar-brand select { width: auto; margin: 0; max-width: 42vw; flex-shrink: 0; box-sizing: border-box; }
 
     body.impersonating .sidebar-brand { top: 44px; }
 
@@ -96,6 +97,33 @@
 
     .main-content { padding-top: 76px; padding-bottom: 90px; }
     .theme-btn { top: auto; bottom: calc(84px + env(safe-area-inset-bottom, 0px)); right: 14px; z-index: 65; }
+
+    /* Détail coiffeur déplié : tout en une seule colonne, rien en ligne
+       qui pourrait déborder (boutons d'action, sous-onglets, horaires). */
+    .barber-detail { padding: 16px; overflow-x: hidden; }
+    .barber-detail .item-actions {
+      display: flex; flex-direction: column; gap: 8px; width: 100%;
+    }
+    .barber-detail .item-actions .btn { width: 100%; box-sizing: border-box; text-align: center; }
+
+    .subtabs {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
+      overflow-x: visible; background: none; padding: 0;
+    }
+    .subtabs button {
+      flex: none; min-width: 0; background: var(--fill); white-space: normal;
+      box-sizing: border-box;
+    }
+    .subtabs button.on { background: var(--blue); color: #fff; }
+
+    .day-row-times { flex-basis: 100%; justify-content: space-between; margin-top: 4px; }
+    .day-row-times input[type="time"] { flex: 1; min-width: 0; box-sizing: border-box; }
+
+    .leave-form { flex-direction: column; align-items: stretch; }
+    .leave-form .fld { min-width: 0; width: 100%; box-sizing: border-box; }
+    .leave-form .btn { width: 100%; box-sizing: border-box; }
+
+    .stats-grid { grid-template-columns: 1fr; }
   }
 
   .tab-panel { display: none; }
