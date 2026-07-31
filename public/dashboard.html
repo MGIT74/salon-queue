@@ -97,6 +97,11 @@
   .row-detail .detail-row:last-child { border-bottom: none; }
   .row-detail .detail-label { font-size: 12.5px; color: var(--grey); flex-shrink: 0; }
   .row-detail .detail-value { font-size: 13.5px; font-weight: 500; text-align: right; word-break: break-word; }
+  .detail-note-label { display: block; font-size: 12.5px; font-weight: 600; color: var(--grey); margin: 10px 0 6px; }
+  .row-detail textarea {
+    width: 100%; padding: 11px 13px; border: none; border-radius: 10px; background: var(--card);
+    color: var(--ink); font-family: inherit; font-size: 14px; resize: vertical; margin-bottom: 8px; cursor: auto;
+  }
   .row-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
   .row-left { display: flex; align-items: flex-start; gap: 13px; min-width: 0; flex: 1; }
   .pos { width: 34px; height: 34px; border-radius: 50%; background: var(--fill);
@@ -776,6 +781,13 @@ function renderQueue() {
   var allActive = queue.filter(function (q) { return q.status === 'in_progress'; });
   var allWaiting = queue.filter(function (q) { return q.status === 'waiting'; });
 
+  // Ne pas reconstruire la liste d'attente si l'utilisateur est en train
+  // de taper une note — sinon le tick périodique (chaque seconde)
+  // effacerait la saisie en cours.
+  var waitingListEl = document.getElementById('waiting-list');
+  var userEditingNote = waitingListEl.contains(document.activeElement) &&
+    document.activeElement !== document.body && document.activeElement.tagName === 'TEXTAREA';
+
   // "Je suis X" filtre la vue : uniquement les clients de X + les
   // non-assignés ("premier disponible"), qui restent visibles par tout
   // le monde puisque n'importe quel coiffeur peut les prendre.
@@ -787,7 +799,7 @@ function renderQueue() {
   document.getElementById('s-queue').textContent =
     hm(waiting.reduce(function (a, q) { return a + q.total_duration_min; }, 0));
 
-  document.getElementById('waiting-list').innerHTML = waiting.length === 0
+  if (!userEditingNote) document.getElementById('waiting-list').innerHTML = waiting.length === 0
     ? '<div class="empty">Personne en attente</div>'
     : waiting.map(function (q, i) {
         var b = q.barber_id ? barbers.find(function (x) { return x.id === q.barber_id; }) : null;
@@ -803,11 +815,13 @@ function renderQueue() {
           '<div class="row-actions" onclick="event.stopPropagation()">' +
           '<button class="btn btn-ghost" onclick="cancelCut(\'' + q.id + '\')">Absent</button>' +
           '</div></div>' +
-          '<div class="row-detail" style="display:' + (open ? 'block' : 'none') + '">' +
+          '<div class="row-detail" style="display:' + (open ? 'block' : 'none') + '" onclick="event.stopPropagation()">' +
           '<div class="detail-row"><span class="detail-label">Client</span><span class="detail-value">' + esc(q.client_name) + '</span></div>' +
           (q.email ? '<div class="detail-row"><span class="detail-label">Email</span><span class="detail-value">' + esc(q.email) + '</span></div>' : '') +
           (q.phone ? '<div class="detail-row"><span class="detail-label">Téléphone</span><span class="detail-value">' + esc(q.phone) + '</span></div>' : '') +
-          (q.note ? '<div class="detail-row"><span class="detail-label">Note</span><span class="detail-value">' + esc(q.note) + '</span></div>' : '') +
+          '<label class="detail-note-label">Note sur ce client</label>' +
+          '<textarea id="queue-note-' + q.id + '" rows="2" placeholder="Ex: préfère dégradé américain, allergie...">' + esc(q.note || '') + '</textarea>' +
+          '<button class="btn btn-soft" onclick="saveQueueNote(\'' + q.id + '\')">Enregistrer la note</button>' +
           '</div></div>';
       }).join('');
 
@@ -917,6 +931,17 @@ function finishCut(id) {
   api('/api/queue/' + id + '/finish', { method: 'POST', body: {} })
     .then(refreshQueue).catch(function (e) { toast(e.message, true); });
 }
+function saveQueueNote(id) {
+  var note = document.getElementById('queue-note-' + id).value;
+  api('/api/queue/' + id + '/note', { method: 'PUT', body: { note: note } })
+    .then(function () {
+      var q = queue.find(function (x) { return x.id === id; });
+      if (q) q.note = note;
+      toast('Note enregistrée');
+    })
+    .catch(function (e) { toast(e.message, true); });
+}
+
 function cancelCut(id) {
   showConfirm('Marquer ce client comme absent ?', { title: 'Client absent', danger: true }).then(function (ok) {
     if (!ok) return;
