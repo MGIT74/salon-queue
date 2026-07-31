@@ -24,6 +24,9 @@ html, body {
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Inter", "Helvetica Neue", sans-serif;
   -webkit-font-smoothing: antialiased;
   transition: background .25s ease, color .25s ease;
+  overflow-x: hidden; /* filet de sécurité : un élément qui déborde ne doit
+                         jamais rendre toute la page défilable horizontalement */
+  max-width: 100vw;
 }
 
 .theme-btn {
