@@ -71,7 +71,7 @@
     .sidebar-logout .label { display: none; }
 
     .main-content { padding-top: 66px; padding-bottom: 90px; }
-    .theme-btn { top: auto; bottom: 100px; right: 14px; }
+    .theme-btn { top: auto; bottom: calc(84px + env(safe-area-inset-bottom, 0px)); right: 14px; z-index: 65; }
   }
 
   .tab-panel { display: none; }

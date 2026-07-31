@@ -93,7 +93,7 @@
     .sidebar-logout .label { display: none; }
 
     .main-content { padding-top: 76px; padding-bottom: 90px; }
-    .theme-btn { top: auto; bottom: 100px; right: 14px; }
+    .theme-btn { top: auto; bottom: calc(84px + env(safe-area-inset-bottom, 0px)); right: 14px; z-index: 65; }
   }
 
   .tab-panel { display: none; }
@@ -190,8 +190,10 @@
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 
   /* Horaires */
-  .day-row { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--sep); flex-wrap: wrap; }
+  .day-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--sep); flex-wrap: wrap; }
   .day-row:last-child { border-bottom: none; }
+  .day-row-label { display: flex; align-items: center; gap: 12px; }
+  .day-row-times { display: flex; align-items: center; gap: 10px; }
   .day-name { width: 92px; font-size: 15px; font-weight: 500; flex-shrink: 0; }
   .day-row input[type="time"] { padding: 9px 11px; border: none; border-radius: 9px;
                                 background: var(--fill); color: var(--ink); font-family: inherit;
@@ -199,6 +201,11 @@
   .day-row input[type="time"]:focus { outline-color: var(--blue); }
   .day-row .to { color: var(--grey); font-size: 14px; }
   .day-row.off input[type="time"], .day-row.off .to { opacity: .35; pointer-events: none; }
+
+  @media (max-width: 480px) {
+    .day-row-times { flex-basis: 100%; justify-content: space-between; margin-top: 4px; }
+    .day-row-times input[type="time"] { flex: 1; min-width: 0; }
+  }
 
   /* Fiche coiffeur repliable */
   .barber-card { background: var(--card); border-radius: 16px; margin-bottom: 10px;
@@ -1305,11 +1312,15 @@ function renderScheduleTab(b) {
     var s = (b.schedules || []).find(function (x) { return x.weekday === wd; });
     var on = Boolean(s);
     return '<div class="day-row' + (on ? '' : ' off') + '" data-day="' + wd + '">' +
-      '<div class="switch' + (on ? ' on' : '') + '" onclick="toggleDay(this)"></div>' +
-      '<span class="day-name">' + dn + '</span>' +
-      '<input type="time" value="' + (s ? s.start_time.slice(0, 5) : '09:00') + '">' +
-      '<span class="to">à</span>' +
-      '<input type="time" value="' + (s ? s.end_time.slice(0, 5) : '19:00') + '">' +
+      '<div class="day-row-label">' +
+        '<div class="switch' + (on ? ' on' : '') + '" onclick="toggleDay(this)"></div>' +
+        '<span class="day-name">' + dn + '</span>' +
+      '</div>' +
+      '<div class="day-row-times">' +
+        '<input type="time" value="' + (s ? s.start_time.slice(0, 5) : '09:00') + '">' +
+        '<span class="to">à</span>' +
+        '<input type="time" value="' + (s ? s.end_time.slice(0, 5) : '19:00') + '">' +
+      '</div>' +
       '</div>';
   }).join('');
   return days + '<button class="btn btn-primary" style="margin-top:16px" onclick="saveSchedule(\'' + b.id + '\')">Enregistrer les horaires</button>';
