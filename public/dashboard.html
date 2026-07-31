@@ -137,6 +137,9 @@
     .leave-form .btn { width: 100%; box-sizing: border-box; }
 
     .stats-grid { grid-template-columns: 1fr; }
+
+    .opt { flex-wrap: wrap; }
+    .opt-tariff-btn { white-space: normal; text-align: center; width: 100%; box-sizing: border-box; }
   }
 
   .tab-panel { display: none; }
@@ -322,12 +325,12 @@
   .opt:hover { background: var(--fill-2); }
   .opt.sel { background: var(--blue-soft); }
   .opt-main { display: flex; align-items: center; gap: 12px; cursor: pointer; flex: 1; min-width: 0; }
-  .opt-price-wrap { flex-shrink: 0; }
-  .opt-price-input {
-    width: 90px; padding: 8px 10px; border: none; border-radius: 8px; background: var(--card);
-    color: var(--ink); font-family: inherit; font-size: 13.5px; text-align: right;
+  .opt-tariff-btn {
+    flex-shrink: 0; border: none; background: var(--card); color: var(--ink); font-family: inherit;
+    font-size: 12.5px; font-weight: 500; padding: 8px 12px; border-radius: 999px; cursor: pointer;
+    white-space: nowrap;
   }
-  .opt-price-input::placeholder { color: var(--grey); }
+  .opt-tariff-btn:hover { background: var(--fill-2); }
   .box { width: 22px; height: 22px; flex-shrink: 0; border-radius: 50%; border: 2px solid var(--sep);
          display: flex; align-items: center; justify-content: center; transition: background .15s, border-color .15s; }
   .box.square { border-radius: 7px; }
@@ -1433,16 +1436,15 @@ function renderCapabilitiesLists(id) {
   if (!svcEl || !extEl) return;
 
   function row(item, kind) {
-    var hasCustom = item.custom_price_cents !== null && item.custom_price_cents !== undefined;
-    var priceValue = hasCustom ? (item.custom_price_cents / 100).toFixed(2) : '';
-    var defaultLabel = eur(item.default_price_cents) + ' (défaut)';
+    var priceLabel = item.custom_price_cents !== null ? eur(item.custom_price_cents) : eur(item.default_price_cents) + ' (défaut)';
+    var durationLabel = item.custom_duration_min !== null ? item.custom_duration_min + ' min' : item.default_duration_min + ' min (défaut)';
     return '<div class="opt' + (item.enabled ? ' sel' : '') + '">' +
       '<div class="opt-main" onclick="toggleCapability(\'' + id + '\',\'' + kind + '\',\'' + item.id + '\')">' +
       '<div class="box square">' + CHECK + '</div><div><div class="opt-name">' + esc(item.name) + '</div></div>' +
       '</div>' +
-      '<div class="opt-price-wrap" onclick="event.stopPropagation()">' +
-      '<input type="number" step="0.01" min="0" class="opt-price-input" placeholder="' + defaultLabel + '" ' +
-      'value="' + priceValue + '" data-kind="' + kind + '" data-item-id="' + item.id + '"></div>' +
+      '<button type="button" class="opt-tariff-btn" data-item-id="' + item.id + '" onclick="event.stopPropagation();openTariffModal(\'' + id + '\',\'' + kind + '\',\'' + item.id + '\')">' +
+      esc(priceLabel) + ' · ' + esc(durationLabel) +
+      '</button>' +
       '</div>';
   }
 
@@ -1454,18 +1456,57 @@ function renderCapabilitiesLists(id) {
     : '<div class="empty">Aucun supplément configuré</div>';
 }
 
+/**
+ * Fenêtre modale pour personnaliser le prix ET la durée d'une prestation
+ * ou d'un supplément, pour CE coiffeur précis. Ne fait que mettre à jour
+ * l'état en mémoire — l'enregistrement réel se fait via le bouton
+ * "Enregistrer" du bas, comme pour les cases à cocher.
+ */
+function openTariffModal(barberId, kind, itemId) {
+  var item = barberCapabilities[barberId][kind].find(function (x) { return x.id === itemId; });
+  if (!item) return;
+
+  var body =
+    '<div class="modal-title">' + esc(item.name) + '</div>' +
+    '<div class="grid2">' +
+      '<div class="fld"><label>Prix personnalisé</label>' +
+        '<input type="number" step="0.01" min="0" id="tariff-price" class="modal-input" ' +
+        'placeholder="' + eur(item.default_price_cents) + ' (défaut)" ' +
+        'value="' + (item.custom_price_cents !== null ? (item.custom_price_cents / 100).toFixed(2) : '') + '"></div>' +
+      '<div class="fld"><label>Durée personnalisée (min)</label>' +
+        '<input type="number" step="1" min="1" id="tariff-duration" class="modal-input" ' +
+        'placeholder="' + item.default_duration_min + ' min (défaut)" ' +
+        'value="' + (item.custom_duration_min !== null ? item.custom_duration_min : '') + '"></div>' +
+    '</div>' +
+    '<p class="hint">Laissez un champ vide pour garder le tarif ou la durée par défaut du catalogue.</p>' +
+    '<div class="modal-actions">' +
+      '<button class="btn btn-soft" id="tariff-cancel-btn">Annuler</button>' +
+      '<button class="btn btn-primary" id="tariff-save-btn">Enregistrer</button>' +
+    '</div>';
+
+  var overlay = _buildModal(body);
+  overlay.querySelector('#tariff-cancel-btn').onclick = function () { _closeModal(overlay); };
+  overlay.addEventListener('click', function (e) { if (e.target === overlay) _closeModal(overlay); });
+  overlay.querySelector('#tariff-save-btn').onclick = function () {
+    var priceVal = overlay.querySelector('#tariff-price').value.trim();
+    var durationVal = overlay.querySelector('#tariff-duration').value.trim();
+    item.custom_price_cents = priceVal === '' ? null : Math.round(parseFloat(priceVal) * 100);
+    item.custom_duration_min = durationVal === '' ? null : Math.round(parseFloat(durationVal));
+    renderCapabilitiesLists(barberId);
+    _closeModal(overlay);
+  };
+}
+
 function toggleCapability(barberId, kind, itemId) {
   var list = barberCapabilities[barberId][kind];
   var item = list.find(function (x) { return x.id === itemId; });
   item.enabled = !item.enabled;
 
-  // Bascule juste la classe visuelle sans reconstruire tout le HTML — un
-  // prix personnalisé en cours de frappe ne doit pas être effacé si on
-  // coche une autre case juste avant d'enregistrer.
+  // Bascule juste la classe visuelle sans reconstruire tout le HTML.
   var containerId = kind === 'services' ? 'cap-services-' + barberId : 'cap-extras-' + barberId;
   var container = document.getElementById(containerId);
-  var input = container && container.querySelector('[data-item-id="' + itemId + '"]');
-  var optDiv = input && input.closest('.opt');
+  var btn = container && container.querySelector('[data-item-id="' + itemId + '"]');
+  var optDiv = btn && btn.closest('.opt');
   if (optDiv) optDiv.classList.toggle('sel', item.enabled);
 }
 
@@ -1474,17 +1515,14 @@ function saveCapabilities(id) {
   var disabledServiceIds = caps.services.filter(function (s) { return !s.enabled; }).map(function (s) { return s.id; });
   var disabledExtraIds = caps.extras.filter(function (e) { return !e.enabled; }).map(function (e) { return e.id; });
 
-  // Prix personnalisés : lus directement dans les champs (un champ vide =
-  // pas de tarif personnalisé, retombe sur le prix par défaut du catalogue).
-  var servicePrices = {};
-  var extraPrices = {};
-  document.querySelectorAll('#cap-services-' + id + ' .opt-price-input').forEach(function (input) {
-    var v = input.value.trim();
-    servicePrices[input.dataset.itemId] = v === '' ? null : Math.round(parseFloat(v) * 100);
+  var servicePrices = {}, serviceDurations = {}, extraPrices = {}, extraDurations = {};
+  caps.services.forEach(function (s) {
+    servicePrices[s.id] = s.custom_price_cents;
+    serviceDurations[s.id] = s.custom_duration_min;
   });
-  document.querySelectorAll('#cap-extras-' + id + ' .opt-price-input').forEach(function (input) {
-    var v = input.value.trim();
-    extraPrices[input.dataset.itemId] = v === '' ? null : Math.round(parseFloat(v) * 100);
+  caps.extras.forEach(function (e) {
+    extraPrices[e.id] = e.custom_price_cents;
+    extraDurations[e.id] = e.custom_duration_min;
   });
 
   api('/api/barbers/' + id + '/capabilities', {
@@ -1493,7 +1531,9 @@ function saveCapabilities(id) {
       disabled_service_ids: disabledServiceIds,
       disabled_extra_ids: disabledExtraIds,
       service_prices: servicePrices,
-      extra_prices: extraPrices
+      extra_prices: extraPrices,
+      service_durations: serviceDurations,
+      extra_durations: extraDurations
     }
   }).then(function () {
     toast('Prestations mises à jour');

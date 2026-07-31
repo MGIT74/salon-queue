@@ -240,3 +240,11 @@ CREATE TABLE IF NOT EXISTS barber_extra_prices (
   FOREIGN KEY (barber_id) REFERENCES barbers(id) ON DELETE CASCADE,
   FOREIGN KEY (extra_id) REFERENCES extras(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Ajout de la durée personnalisée aux tarifs par coiffeur (prix ET durée
+-- deviennent chacun optionnels indépendamment - une ligne peut ne
+-- personnaliser que l'un des deux).
+ALTER TABLE barber_service_prices MODIFY price_cents INT NULL;
+ALTER TABLE barber_service_prices ADD COLUMN IF NOT EXISTS duration_min INT NULL;
+ALTER TABLE barber_extra_prices MODIFY price_cents INT NULL;
+ALTER TABLE barber_extra_prices ADD COLUMN IF NOT EXISTS duration_min INT NULL;

@@ -27,12 +27,12 @@ async function loadQueue(salonId) {
     ),
     pool.query('SELECT client_key, note FROM client_notes WHERE salon_id = ?', [salonId]),
     pool.query(
-      `SELECT bsp.barber_id, bsp.service_id, bsp.price_cents FROM barber_service_prices bsp
+      `SELECT bsp.barber_id, bsp.service_id, bsp.price_cents, bsp.duration_min FROM barber_service_prices bsp
        JOIN barbers b ON b.id = bsp.barber_id WHERE b.salon_id = ?`,
       [salonId]
     ),
     pool.query(
-      `SELECT bep.barber_id, bep.extra_id, bep.price_cents FROM barber_extra_prices bep
+      `SELECT bep.barber_id, bep.extra_id, bep.price_cents, bep.duration_min FROM barber_extra_prices bep
        JOIN barbers b ON b.id = bep.barber_id WHERE b.salon_id = ?`,
       [salonId]
     )
@@ -42,10 +42,10 @@ async function loadQueue(salonId) {
   const extById = Object.fromEntries(extras.map((e) => [e.id, e]));
   const noteByKey = Object.fromEntries(notes.map((n) => [n.client_key, n.note]));
 
-  // Prix personnalisés par coiffeur (remplace le tarif par défaut du
-  // catalogue quand défini) — clé "barberId:itemId" pour un accès direct.
-  const svcPriceByKey = Object.fromEntries(svcPrices.map((p) => [p.barber_id + ':' + p.service_id, p.price_cents]));
-  const extPriceByKey = Object.fromEntries(extPrices.map((p) => [p.barber_id + ':' + p.extra_id, p.price_cents]));
+  // Prix/durée personnalisés par coiffeur (remplacent le tarif par défaut
+  // du catalogue quand définis) — clé "barberId:itemId" pour un accès direct.
+  const svcOverrideByKey = Object.fromEntries(svcPrices.map((p) => [p.barber_id + ':' + p.service_id, p]));
+  const extOverrideByKey = Object.fromEntries(extPrices.map((p) => [p.barber_id + ':' + p.extra_id, p]));
 
   return rows.map((r) => {
     const rawChosen = links
@@ -54,19 +54,19 @@ async function loadQueue(salonId) {
       .filter(Boolean);
 
     const service = svcById[r.service_id] || { name: 'Prestation', duration_min: 30, price_cents: 0 };
-    const svcOverrideKey = r.barber_id ? r.barber_id + ':' + service.id : null;
-    const svcPrice = (svcOverrideKey && svcPriceByKey[svcOverrideKey] !== undefined)
-      ? svcPriceByKey[svcOverrideKey] : service.price_cents;
-    const effectiveService = Object.assign({}, service, { price_cents: svcPrice });
+    const svcOverride = r.barber_id ? svcOverrideByKey[r.barber_id + ':' + service.id] : null;
+    const svcPrice = (svcOverride && svcOverride.price_cents !== null) ? svcOverride.price_cents : service.price_cents;
+    const svcDuration = (svcOverride && svcOverride.duration_min !== null) ? svcOverride.duration_min : service.duration_min;
+    const effectiveService = Object.assign({}, service, { price_cents: svcPrice, duration_min: svcDuration });
 
     const chosen = rawChosen.map((e) => {
-      const extOverrideKey = r.barber_id ? r.barber_id + ':' + e.id : null;
-      const extPrice = (extOverrideKey && extPriceByKey[extOverrideKey] !== undefined)
-        ? extPriceByKey[extOverrideKey] : e.price_cents;
-      return Object.assign({}, e, { price_cents: extPrice });
+      const extOverride = r.barber_id ? extOverrideByKey[r.barber_id + ':' + e.id] : null;
+      const extPrice = (extOverride && extOverride.price_cents !== null) ? extOverride.price_cents : e.price_cents;
+      const extDuration = (extOverride && extOverride.duration_min !== null) ? extOverride.duration_min : e.duration_min;
+      return Object.assign({}, e, { price_cents: extPrice, duration_min: extDuration });
     });
 
-    const duration = service.duration_min + chosen.reduce((a, e) => a + e.duration_min, 0);
+    const duration = svcDuration + chosen.reduce((a, e) => a + e.duration_min, 0);
     const price = svcPrice + chosen.reduce((a, e) => a + e.price_cents, 0);
     const key = clientKey(r);
 

@@ -239,11 +239,11 @@ router.get('/:id/capabilities', requireAdmin, wrap(async (req, res) => {
   if (!owned) return res.status(404).json({ error: 'Coiffeur introuvable' });
 
   const [services] = await pool.query(
-    'SELECT id, name, price_cents FROM services WHERE salon_id = ? AND active = 1 ORDER BY sort_order, name',
+    'SELECT id, name, price_cents, duration_min FROM services WHERE salon_id = ? AND active = 1 ORDER BY sort_order, name',
     [req.salon.id]
   );
   const [extras] = await pool.query(
-    'SELECT id, name, price_cents FROM extras WHERE salon_id = ? AND active = 1 ORDER BY sort_order, name',
+    'SELECT id, name, price_cents, duration_min FROM extras WHERE salon_id = ? AND active = 1 ORDER BY sort_order, name',
     [req.salon.id]
   );
   const [svcExcl] = await pool.query(
@@ -252,29 +252,39 @@ router.get('/:id/capabilities', requireAdmin, wrap(async (req, res) => {
   const [extExcl] = await pool.query(
     'SELECT extra_id FROM barber_extra_exclusions WHERE barber_id = ?', [req.params.id]
   );
-  const [svcPrices] = await pool.query(
-    'SELECT service_id, price_cents FROM barber_service_prices WHERE barber_id = ?', [req.params.id]
+  const [svcOverrides] = await pool.query(
+    'SELECT service_id, price_cents, duration_min FROM barber_service_prices WHERE barber_id = ?', [req.params.id]
   );
-  const [extPrices] = await pool.query(
-    'SELECT extra_id, price_cents FROM barber_extra_prices WHERE barber_id = ?', [req.params.id]
+  const [extOverrides] = await pool.query(
+    'SELECT extra_id, price_cents, duration_min FROM barber_extra_prices WHERE barber_id = ?', [req.params.id]
   );
   const disabledSvc = new Set(svcExcl.map((r) => r.service_id));
   const disabledExt = new Set(extExcl.map((r) => r.extra_id));
-  const svcPriceById = Object.fromEntries(svcPrices.map((p) => [p.service_id, p.price_cents]));
-  const extPriceById = Object.fromEntries(extPrices.map((p) => [p.extra_id, p.price_cents]));
+  const svcOverrideById = Object.fromEntries(svcOverrides.map((p) => [p.service_id, p]));
+  const extOverrideById = Object.fromEntries(extOverrides.map((p) => [p.extra_id, p]));
 
   res.json({
     ok: true,
-    services: services.map((s) => Object.assign({}, s, {
-      enabled: !disabledSvc.has(s.id),
-      default_price_cents: s.price_cents,
-      custom_price_cents: svcPriceById[s.id] !== undefined ? svcPriceById[s.id] : null
-    })),
-    extras: extras.map((e) => Object.assign({}, e, {
-      enabled: !disabledExt.has(e.id),
-      default_price_cents: e.price_cents,
-      custom_price_cents: extPriceById[e.id] !== undefined ? extPriceById[e.id] : null
-    }))
+    services: services.map((s) => {
+      const o = svcOverrideById[s.id];
+      return Object.assign({}, s, {
+        enabled: !disabledSvc.has(s.id),
+        default_price_cents: s.price_cents,
+        default_duration_min: s.duration_min,
+        custom_price_cents: o && o.price_cents !== null ? o.price_cents : null,
+        custom_duration_min: o && o.duration_min !== null ? o.duration_min : null
+      });
+    }),
+    extras: extras.map((e) => {
+      const o = extOverrideById[e.id];
+      return Object.assign({}, e, {
+        enabled: !disabledExt.has(e.id),
+        default_price_cents: e.price_cents,
+        default_duration_min: e.duration_min,
+        custom_price_cents: o && o.price_cents !== null ? o.price_cents : null,
+        custom_duration_min: o && o.duration_min !== null ? o.duration_min : null
+      });
+    })
   });
 }));
 
@@ -287,9 +297,13 @@ router.put('/:id/capabilities', requireAdmin, wrap(async (req, res) => {
 
   const disabledServiceIds = Array.isArray(req.body.disabled_service_ids) ? req.body.disabled_service_ids : [];
   const disabledExtraIds = Array.isArray(req.body.disabled_extra_ids) ? req.body.disabled_extra_ids : [];
-  // { [serviceId]: price_cents } — une valeur null/absente remet le tarif par défaut
+  // { [itemId]: valeur } — une valeur null/absente remet le tarif ou la
+  // durée par défaut. Un item n'a une ligne enregistrée que si AU MOINS
+  // un des deux (prix ou durée) est personnalisé.
   const servicePrices = req.body.service_prices && typeof req.body.service_prices === 'object' ? req.body.service_prices : {};
   const extraPrices = req.body.extra_prices && typeof req.body.extra_prices === 'object' ? req.body.extra_prices : {};
+  const serviceDurations = req.body.service_durations && typeof req.body.service_durations === 'object' ? req.body.service_durations : {};
+  const extraDurations = req.body.extra_durations && typeof req.body.extra_durations === 'object' ? req.body.extra_durations : {};
 
   await pool.query('DELETE FROM barber_service_exclusions WHERE barber_id = ?', [req.params.id]);
   await pool.query('DELETE FROM barber_extra_exclusions WHERE barber_id = ?', [req.params.id]);
@@ -309,18 +323,32 @@ router.put('/:id/capabilities', requireAdmin, wrap(async (req, res) => {
     );
   }
 
-  const svcPriceRows = Object.entries(servicePrices)
-    .filter(([, cents]) => cents !== null && cents !== '' && !Number.isNaN(Number(cents)))
-    .map(([serviceId, cents]) => [req.params.id, serviceId, Math.round(Number(cents))]);
-  if (svcPriceRows.length) {
-    await pool.query('INSERT INTO barber_service_prices (barber_id, service_id, price_cents) VALUES ?', [svcPriceRows]);
+  function toNum(v) {
+    return (v !== null && v !== undefined && v !== '' && !Number.isNaN(Number(v))) ? Math.round(Number(v)) : null;
   }
 
-  const extPriceRows = Object.entries(extraPrices)
-    .filter(([, cents]) => cents !== null && cents !== '' && !Number.isNaN(Number(cents)))
-    .map(([extraId, cents]) => [req.params.id, extraId, Math.round(Number(cents))]);
-  if (extPriceRows.length) {
-    await pool.query('INSERT INTO barber_extra_prices (barber_id, extra_id, price_cents) VALUES ?', [extPriceRows]);
+  const svcIds = new Set([...Object.keys(servicePrices), ...Object.keys(serviceDurations)]);
+  const svcRows = [...svcIds]
+    .map((id) => [id, toNum(servicePrices[id]), toNum(serviceDurations[id])])
+    .filter(([, price, duration]) => price !== null || duration !== null)
+    .map(([serviceId, price, duration]) => [req.params.id, serviceId, price, duration]);
+  if (svcRows.length) {
+    await pool.query(
+      'INSERT INTO barber_service_prices (barber_id, service_id, price_cents, duration_min) VALUES ?',
+      [svcRows]
+    );
+  }
+
+  const extIds = new Set([...Object.keys(extraPrices), ...Object.keys(extraDurations)]);
+  const extRows = [...extIds]
+    .map((id) => [id, toNum(extraPrices[id]), toNum(extraDurations[id])])
+    .filter(([, price, duration]) => price !== null || duration !== null)
+    .map(([extraId, price, duration]) => [req.params.id, extraId, price, duration]);
+  if (extRows.length) {
+    await pool.query(
+      'INSERT INTO barber_extra_prices (barber_id, extra_id, price_cents, duration_min) VALUES ?',
+      [extRows]
+    );
   }
 
   res.json({ ok: true });
