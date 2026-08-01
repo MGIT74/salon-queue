@@ -169,7 +169,12 @@
         <div class="fld"><label for="new-name">Nom</label><input id="new-name" type="text" placeholder="Salon Rive Gauche"></div>
         <div class="fld"><label for="new-slug">Identifiant (dans l'URL)</label><input id="new-slug" type="text" placeholder="salon-2" pattern="[a-z0-9-]+"></div>
       </div>
-      <div class="fld"><label for="new-pw">Mot de passe admin</label><input id="new-pw" type="text" placeholder="Généré automatiquement si vide"></div>
+      <div class="grid2">
+        <div class="fld"><label for="new-email">Email du client (optionnel)</label>
+          <input id="new-email" type="email" placeholder="client@exemple.com"></div>
+        <div class="fld"><label for="new-pw">Mot de passe admin</label><input id="new-pw" type="text" placeholder="Généré automatiquement si vide"></div>
+      </div>
+      <p class="hint" style="margin-top:-6px">Si renseigné, un email de confirmation est envoyé au client (comme pour une inscription), et il pourra se connecter directement avec son email.</p>
       <button class="btn btn-primary" onclick="createSalon()">Créer l'enseigne</button>
     </div>
     <div id="owners-list"></div>
@@ -343,19 +348,28 @@ function renderOwners() {
 function createSalon() {
   var name = document.getElementById('new-name').value.trim();
   var slug = document.getElementById('new-slug').value.trim().toLowerCase();
+  var email = document.getElementById('new-email').value.trim();
   var pw = document.getElementById('new-pw').value.trim() || Math.random().toString(36).slice(2, 10);
 
   if (!name || !slug) { toast('Nom et identifiant requis', true); return; }
 
-  superApi('/api/super/salons', { method: 'POST', body: { name: name, slug: slug, admin_password: pw } })
-    .then(function () {
+  superApi('/api/super/salons', {
+    method: 'POST',
+    body: { name: name, slug: slug, email: email, admin_password: pw, base_url: window.location.origin }
+  })
+    .then(function (r) {
       document.getElementById('new-name').value = '';
       document.getElementById('new-slug').value = '';
+      document.getElementById('new-email').value = '';
       document.getElementById('new-pw').value = '';
-      return loadOwners();
+      return loadOwners().then(function () { return r; });
     })
-    .then(function () {
-      return showAlert('Mot de passe admin : ' + pw + '\n\nNotez-le maintenant, transmettez-le au gérant de cette enseigne.', { title: 'Enseigne "' + name + '" créée' });
+    .then(function (r) {
+      var msg = 'Mot de passe admin : ' + pw + '\n\nNotez-le maintenant, transmettez-le au gérant de cette enseigne.';
+      if (r.email_sent) {
+        msg += '\n\nUn email de confirmation vient aussi d\'être envoyé — le client doit cliquer sur le lien avant de pouvoir se connecter avec son email.';
+      }
+      return showAlert(msg, { title: 'Enseigne "' + name + '" créée' });
     })
     .catch(function (e) { toast(e.message, true); });
 }

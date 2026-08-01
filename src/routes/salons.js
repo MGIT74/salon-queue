@@ -1,7 +1,8 @@
 const express = require('express');
 const crypto = require('crypto');
 const { pool, getPlatformSettings, setPlatformSettings } = require('../db');
-const { sendTestEmail, invalidateTransport } = require('../lib/platformMailer');
+const { sendTestEmail, sendVerificationEmail, invalidateTransport } = require('../lib/platformMailer');
+const { hashPassword } = require('../lib/password');
 const { createToken } = require('../lib/impersonation');
 
 const router = express.Router();
@@ -41,6 +42,7 @@ router.get('/salons', requireSuperAdmin, wrap(async (req, res) => {
 
 router.post('/salons', requireSuperAdmin, wrap(async (req, res) => {
   const { name, slug, admin_password } = req.body;
+  const email = String(req.body.email || '').trim();
   if (!name || !slug || !admin_password) {
     return res.status(400).json({ error: 'Nom, identifiant et mot de passe requis' });
   }
@@ -49,15 +51,38 @@ router.post('/salons', requireSuperAdmin, wrap(async (req, res) => {
       error: "L'identifiant ne doit contenir que des lettres minuscules, chiffres et tirets"
     });
   }
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ error: 'Adresse email invalide' });
+  }
 
   const [[existing]] = await pool.query('SELECT id FROM salons WHERE slug = ?', [slug]);
   if (existing) return res.status(409).json({ error: 'Cet identifiant est déjà utilisé' });
 
+  if (email) {
+    const [[existingEmail]] = await pool.query('SELECT id FROM owners WHERE email = ?', [email]);
+    if (existingEmail) return res.status(409).json({ error: 'Un compte existe déjà avec cet email' });
+  }
+
+  // Email renseigné : le client valide son adresse comme pour une
+  // auto-inscription, et pourra aussi se connecter par email ensuite
+  // (mot de passe haché en plus du mot de passe partagé en clair).
   const ownerId = crypto.randomUUID();
-  await pool.query(
-    'INSERT INTO owners (id, name, admin_password) VALUES (?, ?, ?)',
-    [ownerId, name, admin_password]
-  );
+  let verifyToken = null;
+  if (email) {
+    const passwordHash = await hashPassword(admin_password);
+    verifyToken = crypto.randomBytes(32).toString('hex');
+    const verifyExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await pool.query(
+      `INSERT INTO owners (id, name, email, admin_password, password_hash, verify_token, verify_token_expires)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [ownerId, name, email, admin_password, passwordHash, verifyToken, verifyExpires]
+    );
+  } else {
+    await pool.query(
+      'INSERT INTO owners (id, name, admin_password) VALUES (?, ?, ?)',
+      [ownerId, name, admin_password]
+    );
+  }
 
   const id = crypto.randomUUID();
   await pool.query(
@@ -99,7 +124,17 @@ router.post('/salons', requireSuperAdmin, wrap(async (req, res) => {
   ];
   await pool.query('INSERT INTO settings (salon_id, `key`, value) VALUES ?', [settingsRows]);
 
-  res.json({ ok: true, item: { id, name, slug } });
+  if (email && verifyToken) {
+    try {
+      const verifyUrl = String(req.body.base_url || '').replace(/\/$/, '') + '/verify-email.html?token=' + verifyToken;
+      await sendVerificationEmail(email, verifyUrl);
+    } catch (err) {
+      // N'empêche jamais la création du compte si l'envoi échoue.
+      console.error('[super-admin création enseigne] envoi email de vérification échoué:', err.message);
+    }
+  }
+
+  res.json({ ok: true, item: { id, name, slug }, email_sent: Boolean(email && verifyToken) });
 }));
 
 router.put('/salons/:id', requireSuperAdmin, wrap(async (req, res) => {
