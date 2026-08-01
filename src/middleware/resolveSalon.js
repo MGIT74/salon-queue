@@ -12,10 +12,12 @@ module.exports = async function resolveSalon(req, res, next) {
   try {
     const slug = (req.get('X-Salon-Slug') || '').trim();
     const sql = slug
-      ? `SELECT s.*, o.admin_password AS owner_admin_password, o.password_hash AS owner_password_hash, o.name AS owner_name
+      ? `SELECT s.*, o.admin_password AS owner_admin_password, o.password_hash AS owner_password_hash,
+                o.name AS owner_name, o.email_verified AS owner_email_verified
          FROM salons s JOIN owners o ON o.id = s.owner_id
          WHERE s.slug = ? AND s.active = 1 AND o.active = 1 LIMIT 1`
-      : `SELECT s.*, o.admin_password AS owner_admin_password, o.password_hash AS owner_password_hash, o.name AS owner_name
+      : `SELECT s.*, o.admin_password AS owner_admin_password, o.password_hash AS owner_password_hash,
+                o.name AS owner_name, o.email_verified AS owner_email_verified
          FROM salons s JOIN owners o ON o.id = s.owner_id
          WHERE s.is_default = 1 AND s.active = 1 AND o.active = 1 LIMIT 1`;
     const params = slug ? [slug] : [];

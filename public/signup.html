@@ -57,8 +57,8 @@
   <div class="card-box success" id="success-card" style="display:none">
     <div class="check"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
     <h2>Salon créé !</h2>
-    <p>Connectez-vous à votre dashboard avec l'email et le mot de passe que vous venez de définir.</p>
-    <a class="btn btn-primary" id="dashboard-link" href="#">Aller à mon dashboard</a>
+    <p>Un email de confirmation vient de vous être envoyé. Cliquez sur le lien qu'il contient pour activer votre compte avant de vous connecter.</p>
+    <a class="btn btn-primary" id="dashboard-link" href="#">Aller à la connexion</a>
   </div>
 
   <div class="login-link">Déjà un salon ? <a href="/dashboard.html">Se connecter</a></div>
@@ -100,7 +100,7 @@ function doSignup() {
   fetch('/api/signup', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ salon_name: salon, slug: slug, email: email, password: pw })
+    body: JSON.stringify({ salon_name: salon, slug: slug, email: email, password: pw, base_url: window.location.origin })
   }).then(function (r) {
     return r.json().then(function (d) {
       if (!r.ok) throw new Error(d.error || 'Erreur');

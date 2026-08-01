@@ -248,3 +248,13 @@ ALTER TABLE barber_service_prices MODIFY price_cents INT NULL;
 ALTER TABLE barber_service_prices ADD COLUMN IF NOT EXISTS duration_min INT NULL;
 ALTER TABLE barber_extra_prices MODIFY price_cents INT NULL;
 ALTER TABLE barber_extra_prices ADD COLUMN IF NOT EXISTS duration_min INT NULL;
+
+-- Vérification email à l'inscription : le compte reste marqué comme
+-- non vérifié tant que le lien envoyé par email n'a pas été cliqué.
+ALTER TABLE owners ADD COLUMN IF NOT EXISTS email_verified TINYINT(1) NOT NULL DEFAULT 0;
+ALTER TABLE owners ADD COLUMN IF NOT EXISTS verify_token VARCHAR(64) NULL;
+ALTER TABLE owners ADD COLUMN IF NOT EXISTS verify_token_expires DATETIME NULL;
+-- Important : les comptes déjà créés avant cette fonctionnalité n'ont
+-- jamais eu à confirmer quoi que ce soit - on les marque vérifiés pour
+-- ne pas les bloquer soudainement à la connexion.
+UPDATE owners SET email_verified = 1 WHERE verify_token IS NULL AND verify_token_expires IS NULL;

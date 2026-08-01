@@ -49,6 +49,22 @@ async function sendPasswordReset(to, resetUrl) {
   });
 }
 
+async function sendVerificationEmail(to, verifyUrl) {
+  const { tx, from } = await getTransport();
+  await tx.sendMail({
+    from,
+    to,
+    subject: 'Confirmez votre adresse email',
+    text: `Bienvenue ! Cliquez sur ce lien pour confirmer votre adresse email et activer votre compte ` +
+          `(valable 24 heures) :\n\n${verifyUrl}\n\n` +
+          `Si vous n'êtes pas à l'origine de cette inscription, ignorez simplement cet email.`,
+    html: `<p>Bienvenue ! Cliquez sur ce lien pour confirmer votre adresse email et activer votre compte ` +
+          `(valable 24 heures) :</p>` +
+          `<p><a href="${verifyUrl}">${verifyUrl}</a></p>` +
+          `<p>Si vous n'êtes pas à l'origine de cette inscription, ignorez simplement cet email.</p>`
+  });
+}
+
 async function sendTestEmail(to) {
   const { tx, from } = await getTransport();
   await tx.sendMail({
@@ -59,4 +75,4 @@ async function sendTestEmail(to) {
   });
 }
 
-module.exports = { sendPasswordReset, sendTestEmail, invalidateTransport };
+module.exports = { sendPasswordReset, sendVerificationEmail, sendTestEmail, invalidateTransport };

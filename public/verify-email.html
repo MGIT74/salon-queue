@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Confirmation de votre email</title>
+<link rel="stylesheet" href="/app.css?v=3">
+<style>
+  .wrap { max-width: 400px; margin: 0 auto; padding: clamp(20px,3vw,44px); }
+  .head { text-align: center; margin: 14vh 0 30px; }
+  .head h1 { font-size: 26px; font-weight: 600; letter-spacing: -.03em; margin: 0; }
+  .card-box { background: var(--card); border-radius: 18px; padding: 26px; box-shadow: var(--shadow); }
+  .msg { text-align: center; color: var(--grey); font-size: 14.5px; line-height: 1.6; }
+  .msg.error { color: var(--red); }
+  .spinner {
+    width: 32px; height: 32px; border-radius: 50%; border: 3px solid var(--sep);
+    border-top-color: var(--blue); margin: 0 auto 18px; animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .back-link { text-align: center; margin-top: 18px; font-size: 14px; }
+  .back-link a { color: var(--blue); text-decoration: none; font-weight: 500; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head"><h1>Confirmation de votre email</h1></div>
+
+  <div class="card-box" id="status-card">
+    <div class="spinner"></div>
+    <p class="msg">Vérification en cours…</p>
+  </div>
+
+  <div class="back-link"><a href="/dashboard.html">Retour à la connexion</a></div>
+</div>
+
+<script src="/app.js?v=3"></script>
+<script>
+mountThemeButton();
+
+var token = new URLSearchParams(window.location.search).get('token') || '';
+var card = document.getElementById('status-card');
+
+function showError(message) {
+  card.innerHTML = '<p class="msg error">' + message + '</p>' +
+    '<button class="btn btn-primary" style="width:100%;padding:15px;font-size:16px;margin-top:14px" onclick="resend()">Renvoyer un email de confirmation</button>' +
+    '<div class="fld" style="margin-top:14px"><input id="resend-email" type="email" placeholder="Votre email"></div>';
+}
+
+function resend() {
+  var email = document.getElementById('resend-email') ? document.getElementById('resend-email').value.trim() : '';
+  if (!email) { toast('Entrez votre email', true); return; }
+  fetch('/api/signup/resend-verification', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: email, base_url: window.location.origin })
+  }).then(function (r) { return r.json(); }).then(function (d) {
+    toast(d.message || 'Email envoyé si le compte existe.');
+  }).catch(function () { toast('Erreur réseau', true); });
+}
+
+if (!token) {
+  showError('Lien invalide. Utilisez le lien reçu par email, ou demandez-en un nouveau.');
+} else {
+  fetch('/api/signup/verify-email', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token: token })
+  })
+    .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
+    .then(function (res) {
+      if (!res.ok) {
+        showError(res.data.error || 'Ce lien est invalide ou a expiré.');
+        return;
+      }
+      card.innerHTML = '<p class="msg">Email confirmé ! Votre compte est maintenant actif.</p>' +
+        '<a class="btn btn-primary" href="/dashboard.html" style="display:block;text-align:center;margin-top:16px;padding:15px;font-size:16px;text-decoration:none">Aller au dashboard</a>';
+    })
+    .catch(function () {
+      showError('Erreur réseau. Réessayez dans un instant.');
+    });
+}
+</script>
+</body>
+</html>

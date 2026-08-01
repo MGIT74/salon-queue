@@ -2,7 +2,7 @@ const express = require('express');
 const crypto = require('crypto');
 const { pool } = require('../db');
 const { hashPassword } = require('../lib/password');
-const { sendPasswordReset } = require('../lib/platformMailer');
+const { sendPasswordReset, sendVerificationEmail } = require('../lib/platformMailer');
 
 const router = express.Router();
 
@@ -40,11 +40,14 @@ router.post('/', wrap(async (req, res) => {
   if (existingEmail) return res.status(409).json({ error: 'Un compte existe déjà avec cet email' });
 
   const passwordHash = await hashPassword(password);
+  const verifyToken = crypto.randomBytes(32).toString('hex');
+  const verifyExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
   const ownerId = crypto.randomUUID();
   await pool.query(
-    'INSERT INTO owners (id, name, email, password_hash, admin_password) VALUES (?, ?, ?, ?, ?)',
-    [ownerId, salon_name, email, passwordHash, '']
+    `INSERT INTO owners (id, name, email, password_hash, admin_password, verify_token, verify_token_expires)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [ownerId, salon_name, email, passwordHash, '', verifyToken, verifyExpires]
   );
 
   const salonId = crypto.randomUUID();
@@ -82,7 +85,16 @@ router.post('/', wrap(async (req, res) => {
   ];
   await pool.query('INSERT INTO settings (salon_id, `key`, value) VALUES ?', [settingsRows]);
 
-  res.json({ ok: true, slug });
+  try {
+    const verifyUrl = String(req.body.base_url || '').replace(/\/$/, '') + '/verify-email.html?token=' + verifyToken;
+    await sendVerificationEmail(email, verifyUrl);
+  } catch (err) {
+    // Ne bloque jamais la création du compte si l'email échoue (ex. SMTP
+    // plateforme pas encore configuré) — journalisé pour investigation.
+    console.error('[signup] envoi email de vérification échoué:', err.message);
+  }
+
+  res.json({ ok: true, slug, needs_email_verification: true });
 }));
 
 /**
@@ -134,6 +146,58 @@ router.post('/reset-password', wrap(async (req, res) => {
   );
 
   res.json({ ok: true });
+}));
+
+/**
+ * Confirmation du lien envoyé à l'inscription. Active définitivement le
+ * compte (email_verified = 1), consomme le jeton.
+ */
+router.post('/verify-email', wrap(async (req, res) => {
+  const { token } = req.body;
+  if (!token) return res.status(400).json({ error: 'Lien invalide' });
+
+  const [[owner]] = await pool.query(
+    'SELECT id, email FROM owners WHERE verify_token = ? AND verify_token_expires > NOW()',
+    [token]
+  );
+  if (!owner) return res.status(400).json({ error: 'Ce lien est invalide ou a expiré. Redemandez un email de confirmation.' });
+
+  await pool.query(
+    'UPDATE owners SET email_verified = 1, verify_token = NULL, verify_token_expires = NULL WHERE id = ?',
+    [owner.id]
+  );
+
+  res.json({ ok: true, email: owner.email });
+}));
+
+/**
+ * Renvoi de l'email de confirmation (lien perdu ou expiré). Réponse
+ * générique dans tous les cas, comme pour le mot de passe oublié.
+ */
+router.post('/resend-verification', wrap(async (req, res) => {
+  const email = String(req.body.email || '').trim();
+  const genericMsg = "Si un compte existe avec cet email et n'est pas encore confirmé, un nouveau lien vient d'être envoyé.";
+  if (!email) return res.json({ ok: true, message: genericMsg });
+
+  try {
+    const [[owner]] = await pool.query(
+      'SELECT id FROM owners WHERE email = ? AND email_verified = 0', [email]
+    );
+    if (owner) {
+      const verifyToken = crypto.randomBytes(32).toString('hex');
+      const verifyExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      await pool.query(
+        'UPDATE owners SET verify_token = ?, verify_token_expires = ? WHERE id = ?',
+        [verifyToken, verifyExpires, owner.id]
+      );
+      const verifyUrl = String(req.body.base_url || '').replace(/\/$/, '') + '/verify-email.html?token=' + verifyToken;
+      await sendVerificationEmail(email, verifyUrl);
+    }
+  } catch (err) {
+    console.error('[resend-verification]', err.message);
+  }
+
+  res.json({ ok: true, message: genericMsg });
 }));
 
 module.exports = router;

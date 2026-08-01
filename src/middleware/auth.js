@@ -25,6 +25,14 @@ module.exports = async function requireAdmin(req, res, next) {
     if (req.salon.owner_password_hash) {
       const ok = await verifyPassword(given, req.salon.owner_password_hash);
       if (!ok) return res.status(401).json({ error: 'Mot de passe incorrect' });
+      // Uniquement pour les comptes créés par inscription (email_verified
+      // n'a pas de sens pour les comptes provisionnés à l'ancienne, qui
+      // n'ont pas de password_hash).
+      if (req.salon.owner_email_verified === 0) {
+        return res.status(403).json({
+          error: 'Merci de confirmer votre email avant de vous connecter (vérifiez votre boîte de réception, et vos spams).'
+        });
+      }
       return next();
     }
 
