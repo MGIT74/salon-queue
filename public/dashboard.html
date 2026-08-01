@@ -411,7 +411,9 @@
 <div class="wrap login" id="login">
   <h1>Dashboard</h1>
   <p id="login-salon-name" style="font-weight:600;color:var(--blue)">Chargement…</p>
-  <p>Entrez le mot de passe du salon</p>
+  <p>Connectez-vous avec votre email (retrouve votre salon automatiquement)</p>
+  <div class="fld"><input id="login-email" type="email" placeholder="Email"
+       onkeydown="if(event.key==='Enter') doLogin()"></div>
   <div class="fld"><input id="pw" type="password" placeholder="Mot de passe"
        onkeydown="if(event.key==='Enter') doLogin()"></div>
   <button class="btn btn-primary" style="width:100%;padding:15px;font-size:16px" onclick="doLogin()">Entrer</button>
@@ -765,8 +767,21 @@ loadCurrentSalonName();
 
 /* ============ Connexion ============ */
 function doLogin() {
+  var email = document.getElementById('login-email').value.trim();
   var pw = document.getElementById('pw').value;
   if (!pw) return;
+
+  if (email) {
+    doLoginWithEmail(email, pw);
+  } else {
+    doLoginWithCurrentSlug(pw);
+  }
+}
+
+// Connexion "classique" : mot de passe contre le salon déjà résolu par
+// l'URL (?salon=...) ou le salon par défaut — conservé pour les comptes
+// à l'ancienne (mot de passe partagé, sans email) et les liens directs.
+function doLoginWithCurrentSlug(pw) {
   setAdminPw(pw);
   api('/api/login', { method: 'POST', body: {} }).then(function () {
     try { sessionStorage.setItem('pw', pw); } catch (e) {}
@@ -777,6 +792,57 @@ function doLogin() {
     setAdminPw('');
     toast(err.message, true);
   });
+}
+
+// Connexion universelle : retrouve automatiquement le(s) salon(s) liés
+// à cet email, sans avoir besoin de connaître son propre lien précis.
+function doLoginWithEmail(email, pw) {
+  fetch('/api/signup/login-lookup', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: email, password: pw })
+  }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
+    .then(function (res) {
+      if (!res.ok) { toast(res.data.error || 'Connexion impossible', true); return; }
+      var salons = res.data.salons;
+      if (salons.length === 1) {
+        proceedLoginWithSlug(salons[0].slug, pw);
+      } else {
+        showLoginSalonPicker(salons, pw);
+      }
+    })
+    .catch(function () { toast('Erreur réseau', true); });
+}
+
+function proceedLoginWithSlug(slug, pw) {
+  setSalonSlug(slug);
+  try {
+    var url = new URL(window.location.href);
+    url.searchParams.set('salon', slug);
+    window.history.replaceState({}, '', url.toString());
+  } catch (e) {}
+  doLoginWithCurrentSlug(pw);
+}
+
+var pendingLoginSalons = [];
+var pendingLoginPw = '';
+var loginPickerOverlay = null;
+
+function showLoginSalonPicker(salons, pw) {
+  pendingLoginSalons = salons;
+  pendingLoginPw = pw;
+  var body = '<div class="modal-title">Choisissez un salon</div>' +
+    salons.map(function (s, i) {
+      return '<button class="btn btn-soft" style="width:100%;margin-bottom:8px;text-align:left" onclick="selectLoginSalon(' + i + ')">' + esc(s.name) + '</button>';
+    }).join('');
+  loginPickerOverlay = _buildModal(body);
+  loginPickerOverlay.addEventListener('click', function (e) { if (e.target === loginPickerOverlay) _closeModal(loginPickerOverlay); });
+}
+
+function selectLoginSalon(index) {
+  var s = pendingLoginSalons[index];
+  if (loginPickerOverlay) _closeModal(loginPickerOverlay);
+  proceedLoginWithSlug(s.slug, pendingLoginPw);
 }
 
 function logout() {

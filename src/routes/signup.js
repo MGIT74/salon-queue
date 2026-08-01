@@ -1,7 +1,7 @@
 const express = require('express');
 const crypto = require('crypto');
 const { pool } = require('../db');
-const { hashPassword } = require('../lib/password');
+const { hashPassword, verifyPassword } = require('../lib/password');
 const { sendPasswordReset, sendVerificationEmail } = require('../lib/platformMailer');
 
 const router = express.Router();
@@ -198,6 +198,47 @@ router.post('/resend-verification', wrap(async (req, res) => {
   }
 
   res.json({ ok: true, message: genericMsg });
+}));
+
+/**
+ * Connexion universelle : on entre son email + mot de passe (pas besoin
+ * de connaître son propre lien/identifiant de salon), le serveur
+ * retrouve tout seul quel(s) salon(s) appartiennent à ce compte.
+ * Ne fait QUE la résolution + vérification — la connexion réelle au
+ * salon choisi se fait ensuite normalement via /api/login (X-Salon-Slug
+ * + X-Admin-Password), ce endpoint ne pose pas de session.
+ */
+router.post('/login-lookup', wrap(async (req, res) => {
+  const email = String(req.body.email || '').trim();
+  const password = String(req.body.password || '');
+  if (!email || !password) return res.status(400).json({ error: 'Email et mot de passe requis' });
+
+  const [[owner]] = await pool.query(
+    'SELECT id, password_hash, active, email_verified FROM owners WHERE email = ?', [email]
+  );
+  if (!owner || !owner.password_hash) {
+    return res.status(401).json({ error: 'Email ou mot de passe incorrect' });
+  }
+  if (!owner.active) {
+    return res.status(403).json({ error: 'Ce compte a été suspendu. Contactez le support.' });
+  }
+
+  const ok = await verifyPassword(password, owner.password_hash);
+  if (!ok) return res.status(401).json({ error: 'Email ou mot de passe incorrect' });
+
+  if (!owner.email_verified) {
+    return res.status(403).json({
+      error: 'Merci de confirmer votre email avant de vous connecter (vérifiez votre boîte de réception, et vos spams).'
+    });
+  }
+
+  const [salons] = await pool.query(
+    'SELECT slug, name, is_default FROM salons WHERE owner_id = ? AND active = 1 ORDER BY is_default DESC, name',
+    [owner.id]
+  );
+  if (!salons.length) return res.status(404).json({ error: 'Aucun salon actif trouvé pour ce compte.' });
+
+  res.json({ ok: true, salons: salons.map((s) => ({ slug: s.slug, name: s.name })) });
 }));
 
 module.exports = router;
