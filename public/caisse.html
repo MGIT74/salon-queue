@@ -79,6 +79,18 @@
 
   .empty { background: var(--card); border-radius: 16px; padding: 30px 20px; text-align: center; color: var(--grey); font-size: 14px; box-shadow: var(--shadow); }
 
+  .pending-list { margin-bottom: 18px; }
+  .pending-card {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    background: var(--card); border-radius: 14px; padding: 14px 16px; margin-bottom: 8px;
+    box-shadow: var(--shadow); cursor: pointer; transition: opacity .15s ease;
+  }
+  .pending-card.locked { opacity: .55; cursor: default; }
+  .pending-card .name { font-size: 14.5px; font-weight: 600; }
+  .pending-card .meta { font-size: 12.5px; color: var(--grey); margin-top: 2px; }
+  .pending-card .amount { font-size: 15px; font-weight: 600; flex-shrink: 0; }
+  .pending-card .lock-note { font-size: 11.5px; color: var(--orange); margin-top: 2px; }
+
   /* --- Reçu imprimable --- */
   .receipt-overlay {
     display: none; position: fixed; inset: 0; z-index: 400; background: rgba(0,0,0,.5);
@@ -130,6 +142,9 @@
 
     <div class="caisse-layout">
       <div>
+        <div class="section-label" id="pending-label" style="display:none;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--grey);margin:0 0 10px 2px">En attente d'encaissement</div>
+        <div class="pending-list" id="pending-list"></div>
+
         <div class="cat-tabs" id="cat-tabs">
           <button class="on" data-cat="services">Prestations</button>
           <button data-cat="extras">Suppléments</button>
@@ -145,8 +160,7 @@
         <div class="pay-grid">
           <button onclick="pay('especes')" id="pay-especes">Espèces</button>
           <button onclick="pay('cb')" id="pay-cb">CB</button>
-          <button onclick="pay('cheque')" id="pay-cheque">Chèque</button>
-          <button onclick="pay('cheque_cadeau')" id="pay-cheque_cadeau">Chèque cadeau</button>
+          <button onclick="pay('cheque_cadeau')" id="pay-cheque_cadeau" style="grid-column:span 2">Chèque cadeau</button>
         </div>
         <button class="clear-ticket-btn" onclick="clearTicket()">Vider le ticket</button>
       </div>
@@ -165,6 +179,8 @@ mountThemeButton();
 var me = null;
 var catalog = { services: [], extras: [], products: [] };
 var ticket = []; // { item_type, item_id, item_name, unit_price_cents, quantity }
+var ticketQueueId = null; // coupe d'origine si le ticket vient d'un encaissement en attente
+var pendingPayments = [];
 var currentCat = 'services';
 
 var SALON_SLUG = (function () {
@@ -271,6 +287,8 @@ function showApp() {
   document.getElementById('app-screen').style.display = 'block';
   document.getElementById('my-name').textContent = me.name;
   loadCatalog();
+  loadPendingPayments();
+  setInterval(loadPendingPayments, 5000);
 }
 
 (function autoLogin() {
@@ -304,6 +322,54 @@ document.getElementById('cat-tabs').addEventListener('click', function (e) {
   renderItemGrid();
 });
 
+/**
+ * Coupes terminées par ce coiffeur, pas encore encaissées. Seule la
+ * plus ancienne (premier arrivé, premier encaissé) est cliquable — les
+ * autres restent visibles mais verrouillées, même principe que "À
+ * suivre" dans Mon poste.
+ */
+function loadPendingPayments() {
+  barberApi('/api/queue/pending-payment').then(function (r) {
+    pendingPayments = r.items;
+    renderPendingList();
+  }).catch(function () {});
+}
+
+function renderPendingList() {
+  var label = document.getElementById('pending-label');
+  var list = document.getElementById('pending-list');
+  if (!pendingPayments.length) {
+    label.style.display = 'none';
+    list.innerHTML = '';
+    return;
+  }
+  label.style.display = 'block';
+  list.innerHTML = pendingPayments.map(function (q, i) {
+    var locked = i > 0;
+    var detail = q.service.name + (q.extras.length ? ' + ' + q.extras.map(function (x) { return x.name; }).join(', ') : '');
+    return '<div class="pending-card' + (locked ? ' locked' : '') + '"' +
+      (locked ? '' : ' onclick="usePendingForTicket(\'' + q.id + '\')"') + '>' +
+      '<div><div class="name">' + esc(q.client_name) + '</div>' +
+      '<div class="meta">' + esc(detail) + '</div>' +
+      (locked ? '<div class="lock-note">En attente de son tour</div>' : '') + '</div>' +
+      '<div class="amount">' + eur(q.total_price_cents) + '</div>' +
+      '</div>';
+  }).join('');
+}
+
+function usePendingForTicket(queueId) {
+  var q = pendingPayments.find(function (x) { return x.id === queueId; });
+  if (!q) return;
+
+  ticket = [{ item_type: 'service', item_id: q.service.id, item_name: q.service.name, unit_price_cents: q.service.price_cents, quantity: 1 }];
+  q.extras.forEach(function (e) {
+    ticket.push({ item_type: 'extra', item_id: e.id, item_name: e.name, unit_price_cents: e.price_cents, quantity: 1 });
+  });
+  ticketQueueId = queueId;
+  renderTicket();
+  toast('Ticket de ' + q.client_name + ' chargé — choisissez le paiement');
+}
+
 function renderItemGrid() {
   var items = catalog[currentCat] || [];
   var typeSingular = currentCat === 'services' ? 'service' : (currentCat === 'extras' ? 'extra' : 'product');
@@ -329,6 +395,7 @@ function addToTicket(itemType, itemId, itemName, unitPriceCents) {
 function changeQty(index, delta) {
   ticket[index].quantity += delta;
   if (ticket[index].quantity <= 0) ticket.splice(index, 1);
+  if (!ticket.length) ticketQueueId = null;
   renderTicket();
 }
 
@@ -337,6 +404,7 @@ function clearTicket() {
   showConfirm('Vider le ticket en cours ?', { title: 'Vider le ticket', danger: true }).then(function (ok) {
     if (!ok) return;
     ticket = [];
+    ticketQueueId = null;
     renderTicket();
   });
 }
@@ -362,7 +430,7 @@ function renderTicket() {
 
   var total = ticketTotal();
   document.getElementById('ticket-total').textContent = eur(total);
-  ['especes', 'cb', 'cheque', 'cheque_cadeau'].forEach(function (m) {
+  ['especes', 'cb', 'cheque_cadeau'].forEach(function (m) {
     document.getElementById('pay-' + m).disabled = ticket.length === 0;
   });
 }
@@ -372,18 +440,21 @@ function pay(method) {
   if (!ticket.length) return;
   var total = ticketTotal();
   var soldTicket = ticket.slice();
+  var linkedQueueId = ticketQueueId;
 
   barberApi('/api/sales', {
     method: 'POST',
-    body: { payment_method: method, items: soldTicket }
+    body: { payment_method: method, items: soldTicket, queue_id: linkedQueueId }
   }).then(function () {
     showReceipt(soldTicket, total, method);
     ticket = [];
+    ticketQueueId = null;
     renderTicket();
+    loadPendingPayments();
   }).catch(function (e) { toast(e.message, true); });
 }
 
-var PAYMENT_LABELS = { especes: 'Espèces', cb: 'Carte bancaire', cheque: 'Chèque', cheque_cadeau: 'Chèque cadeau' };
+var PAYMENT_LABELS = { especes: 'Espèces', cb: 'Carte bancaire', cheque_cadeau: 'Chèque cadeau' };
 
 function showReceipt(lines, total, method) {
   var when = new Date().toLocaleString('fr-FR');

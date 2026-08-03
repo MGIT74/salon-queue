@@ -298,3 +298,7 @@ CREATE TABLE IF NOT EXISTS sale_items (
   quantity INT NOT NULL DEFAULT 1,
   FOREIGN KEY (sale_id) REFERENCES sales(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Une coupe terminee ('done') reste en attente d'encaissement tant que
+-- paid_at est NULL - c'est la caisse qui la marque payee.
+ALTER TABLE queue ADD COLUMN IF NOT EXISTS paid_at DATETIME NULL;

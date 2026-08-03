@@ -8,14 +8,21 @@ function clientKey(row) {
 }
 
 /**
- * Charge la file complète d'UN salon (attente + en cours) avec leur
- * prestation, leurs suppléments, la durée totale et le prix total.
+ * Charge la file d'UN salon pour les statuts demandés (par défaut :
+ * attente + en cours) avec leur prestation, leurs suppléments, la durée
+ * totale et le prix total. `onlyUnpaid` restreint aux entrées pas
+ * encore encaissées (utilisé pour la liste "en attente d'encaissement"
+ * de la caisse, sur les entrées 'done').
  */
-async function loadQueue(salonId) {
+async function loadQueue(salonId, statuses, onlyUnpaid) {
+  statuses = statuses || ['waiting', 'in_progress'];
+  const statusPlaceholders = statuses.map(() => '?').join(',');
   const [[rows], [services], [extras], [links], [notes], [svcPrices], [extPrices]] = await Promise.all([
     pool.query(
-      "SELECT * FROM queue WHERE salon_id = ? AND status IN ('waiting','in_progress') ORDER BY checkin_at",
-      [salonId]
+      `SELECT * FROM queue WHERE salon_id = ? AND status IN (${statusPlaceholders})` +
+      (onlyUnpaid ? ' AND paid_at IS NULL' : '') +
+      ' ORDER BY checkin_at',
+      [salonId, ...statuses]
     ),
     pool.query('SELECT * FROM services WHERE salon_id = ?', [salonId]),
     pool.query('SELECT * FROM extras WHERE salon_id = ?', [salonId]),

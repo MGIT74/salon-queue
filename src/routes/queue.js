@@ -27,6 +27,18 @@ router.get('/', wrap(async (req, res) => {
   res.json({ ok: true, queue: rows });
 }));
 
+/**
+ * Coupes terminées mais pas encore encaissées, pour la caisse. Scopé au
+ * coiffeur connecté par PIN (chacun encaisse ses propres clients, dans
+ * l'ordre) — un admin voit tout le monde.
+ */
+router.get('/pending-payment', requireAdminOrBarber, wrap(async (req, res) => {
+  let rows = await loadQueue(req.salon.id, ['done'], true);
+  if (req.barberId) rows = rows.filter((r) => r.barber_id === req.barberId);
+  rows.sort((a, b) => new Date(a.end_at || a.checkin_at) - new Date(b.end_at || b.checkin_at));
+  res.json({ ok: true, items: rows });
+}));
+
 // --- Public : check-in à la borne ---------------------------------------
 router.post('/checkin', wrap(async (req, res) => {
   const { client_name, email, phone, service_id, barber_id, extras } = req.body;

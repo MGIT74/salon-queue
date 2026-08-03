@@ -15,7 +15,7 @@ function wrap(fn) {
   };
 }
 
-const PAYMENT_METHODS = ['especes', 'cb', 'cheque', 'cheque_cadeau', 'autre'];
+const PAYMENT_METHODS = ['especes', 'cb', 'cheque_cadeau', 'autre'];
 
 /**
  * Enregistre une vente en caisse — indépendante de la file d'attente,
@@ -25,12 +25,27 @@ const PAYMENT_METHODS = ['especes', 'cb', 'cheque', 'cheque_cadeau', 'autre'];
  * seulement l'admin.
  */
 router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
-  const { payment_method, items } = req.body;
+  const { payment_method, items, queue_id } = req.body;
   if (!PAYMENT_METHODS.includes(payment_method)) {
     return res.status(400).json({ error: 'Moyen de paiement invalide' });
   }
   if (!Array.isArray(items) || !items.length) {
     return res.status(400).json({ error: 'Le ticket est vide' });
+  }
+
+  // Si la vente correspond à une coupe terminée précise (venant de "En
+  // attente d'encaissement"), on vérifie qu'elle appartient bien à ce
+  // coiffeur et qu'elle n'est pas déjà réglée, avant de l'encaisser.
+  if (queue_id) {
+    const [[row]] = await pool.query(
+      'SELECT barber_id, status, paid_at FROM queue WHERE id = ? AND salon_id = ?',
+      [queue_id, req.salon.id]
+    );
+    if (!row) return res.status(404).json({ error: 'Client introuvable' });
+    if (req.barberId && row.barber_id !== req.barberId) {
+      return res.status(403).json({ error: "Ce n'est pas votre client." });
+    }
+    if (row.paid_at) return res.status(409).json({ error: 'Ce client a déjà été encaissé.' });
   }
 
   const barberId = req.barberId || (req.body.barber_id || null);
@@ -52,6 +67,10 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
     'INSERT INTO sale_items (id, sale_id, item_type, item_id, item_name, unit_price_cents, quantity) VALUES ?',
     [itemRows]
   );
+
+  if (queue_id) {
+    await pool.query('UPDATE queue SET paid_at = NOW() WHERE id = ? AND salon_id = ?', [queue_id, req.salon.id]);
+  }
 
   res.json({ ok: true, sale: { id: saleId, total_price_cents: total, payment_method, barber_id: barberId } });
 }));
