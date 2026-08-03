@@ -1,7 +1,7 @@
 const express = require('express');
 const crypto = require('crypto');
 const { pool, utcIso } = require('../db');
-const { clientKey } = require('../lib/queueMath');
+const { clientKey, earnLoyaltyPoint } = require('../lib/queueMath');
 const requireAdmin = require('../middleware/auth');
 const requireAdminOrBarber = require('../middleware/barberAuth');
 
@@ -26,7 +26,7 @@ const PAYMENT_METHODS = ['especes', 'cb', 'autre'];
  * seulement l'admin.
  */
 router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
-  const { payment_method, items, queue_id, gift } = req.body;
+  const { payment_method, items, queue_id, gift, loyalty_redeem } = req.body;
   if (!PAYMENT_METHODS.includes(payment_method)) {
     return res.status(400).json({ error: 'Moyen de paiement invalide' });
   }
@@ -49,9 +49,10 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
   // Si la vente correspond à une coupe terminée précise (venant de "En
   // attente d'encaissement"), on vérifie qu'elle appartient bien à ce
   // coiffeur et qu'elle n'est pas déjà réglée, avant de l'encaisser.
+  let queueRow = null;
   if (queue_id) {
     const [[row]] = await pool.query(
-      'SELECT barber_id, status, paid_at FROM queue WHERE id = ? AND salon_id = ?',
+      'SELECT barber_id, status, paid_at, client_name, email, phone FROM queue WHERE id = ? AND salon_id = ?',
       [queue_id, req.salon.id]
     );
     if (!row) return res.status(404).json({ error: 'Client introuvable' });
@@ -59,6 +60,7 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
       return res.status(403).json({ error: "Ce n'est pas votre client." });
     }
     if (row.paid_at) return res.status(409).json({ error: 'Ce client a déjà été encaissé.' });
+    queueRow = row;
   }
 
   const barberId = req.barberId || (req.body.barber_id || null);
@@ -83,6 +85,20 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
 
   if (queue_id) {
     await pool.query('UPDATE queue SET paid_at = NOW() WHERE id = ? AND salon_id = ?', [queue_id, req.salon.id]);
+    // Ce passage vient d'être réellement payé : +1 point de fidélité.
+    await earnLoyaltyPoint(req.ownerId, queueRow);
+    // Une récompense de fidélité était appliquée à ce ticket (gagnée à
+    // un passage précédent) — on la consomme maintenant.
+    if (loyalty_redeem) {
+      const key = clientKey(queueRow);
+      if (key) {
+        await pool.query(
+          `UPDATE loyalty_accounts SET rewards_available = GREATEST(rewards_available - 1, 0), updated_at = NOW()
+           WHERE owner_id = ? AND client_key = ? AND rewards_available > 0`,
+          [req.ownerId, key]
+        );
+      }
+    }
   }
 
   if (gift) {
@@ -146,7 +162,7 @@ router.post('/gift-cards/:id/redeem', requireAdminOrBarber, wrap(async (req, res
   if (gift.used_at) return res.status(409).json({ error: 'Ce bon cadeau a déjà été utilisé' });
 
   const [[queueRow]] = await pool.query(
-    'SELECT barber_id, paid_at FROM queue WHERE id = ? AND salon_id = ?',
+    'SELECT barber_id, paid_at, client_name, email, phone FROM queue WHERE id = ? AND salon_id = ?',
     [queue_id, req.salon.id]
   );
   if (!queueRow) return res.status(404).json({ error: 'Client introuvable' });
@@ -157,6 +173,9 @@ router.post('/gift-cards/:id/redeem', requireAdminOrBarber, wrap(async (req, res
 
   await pool.query('UPDATE gift_cards SET used_at = NOW(), used_queue_id = ? WHERE id = ?', [queue_id, req.params.id]);
   await pool.query('UPDATE queue SET paid_at = NOW() WHERE id = ?', [queue_id]);
+  // Ce passage vient d'être réglé (via le cadeau) : compte aussi comme
+  // un vrai passage payé pour la fidélité.
+  await earnLoyaltyPoint(req.ownerId, queueRow);
 
   res.json({ ok: true });
 }));

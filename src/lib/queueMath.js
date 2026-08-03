@@ -8,6 +8,42 @@ function clientKey(row) {
 }
 
 /**
+ * +1 point de fidélité pour ce client, cumulé au niveau de l'ENSEIGNE
+ * (owner_id), pas du salon — un client va parfois dans un salon,
+ * parfois dans un autre de la même enseigne. Tous les 10 points, une
+ * récompense s'ajoute (utilisable à partir du PROCHAIN passage, pas
+ * celui-ci). Appelée à chaque fois qu'un passage est réellement payé
+ * (paiement normal ou cadeau utilisé) — jamais pour une simple vente
+ * de comptoir sans lien avec un passage.
+ */
+async function earnLoyaltyPoint(ownerId, row) {
+  const key = clientKey(row);
+  if (!key) return;
+
+  const [[existing]] = await pool.query(
+    'SELECT id, points, rewards_available FROM loyalty_accounts WHERE owner_id = ? AND client_key = ?',
+    [ownerId, key]
+  );
+
+  let points = (existing ? existing.points : 0) + 1;
+  let rewards = existing ? existing.rewards_available : 0;
+  if (points >= 10) { points -= 10; rewards += 1; }
+
+  if (existing) {
+    await pool.query(
+      'UPDATE loyalty_accounts SET points = ?, rewards_available = ?, client_name = ?, updated_at = NOW() WHERE id = ?',
+      [points, rewards, row.client_name, existing.id]
+    );
+  } else {
+    await pool.query(
+      `INSERT INTO loyalty_accounts (id, owner_id, client_key, client_name, points, rewards_available)
+       VALUES (UUID(), ?, ?, ?, ?, ?)`,
+      [ownerId, key, row.client_name, points, rewards]
+    );
+  }
+}
+
+/**
  * Charge la file d'UN salon pour les statuts demandés (par défaut :
  * attente + en cours) avec leur prestation, leurs suppléments, la durée
  * totale et le prix total. `onlyUnpaid` restreint aux entrées pas
@@ -194,4 +230,4 @@ async function recompute(salonId) {
   return updates;
 }
 
-module.exports = { loadQueue, recompute, activeBarberCount, clientKey };
+module.exports = { loadQueue, recompute, activeBarberCount, clientKey, earnLoyaltyPoint };

@@ -50,12 +50,24 @@ router.get('/pending-payment', requireAdminOrBarber, wrap(async (req, res) => {
     const key = clientKey({ email: g.recipient_email, phone: g.recipient_phone, client_name: g.recipient_name });
     if (key) giftByKey[key] = g;
   });
+
+  // Fidélité : cumulée au niveau de l'ENSEIGNE (owner_id), pas du
+  // salon — un client vu ici peut avoir gagné ses points ailleurs.
+  const [loyaltyRows] = await pool.query(
+    'SELECT client_key, rewards_available FROM loyalty_accounts WHERE owner_id = ? AND rewards_available > 0',
+    [req.ownerId]
+  );
+  const loyaltyByKey = {};
+  loyaltyRows.forEach((l) => { loyaltyByKey[l.client_key] = l.rewards_available; });
+
   rows = rows.map((r) => {
     const key = clientKey(r);
     const gift = key ? giftByKey[key] : null;
-    return gift
-      ? Object.assign({}, r, { gift_card: { id: gift.id, amount_cents: gift.amount_cents } })
-      : r;
+    const rewards = key ? loyaltyByKey[key] : null;
+    const extra = {};
+    if (gift) extra.gift_card = { id: gift.id, amount_cents: gift.amount_cents };
+    if (rewards) extra.loyalty_rewards_available = rewards;
+    return Object.keys(extra).length ? Object.assign({}, r, extra) : r;
   });
 
   rows.sort((a, b) => {

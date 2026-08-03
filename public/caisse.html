@@ -179,6 +179,14 @@
         <div class="ticket-lines" id="ticket-lines"><div class="empty">Aucun article sélectionné</div></div>
         <div class="ticket-total"><span class="label">Total</span><span class="amount" id="ticket-total">0,00 €</span></div>
 
+        <div id="loyalty-section" style="display:none;margin-bottom:14px">
+          <div style="font-size:13px;color:var(--green);font-weight:600;margin-bottom:8px">⭐ Fidélité disponible</div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-soft" id="loyalty-btn-service" onclick="toggleLoyaltyDiscount('service')" style="flex:1;font-size:12.5px">-50% prestation</button>
+            <button class="btn btn-soft" id="loyalty-btn-product" onclick="toggleLoyaltyDiscount('product')" style="flex:1;font-size:12.5px">-20% produit</button>
+          </div>
+        </div>
+
         <div id="gift-section" style="display:none;margin-bottom:14px">
           <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-bottom:10px">
             <input type="checkbox" id="gift-checkbox" onchange="toggleGiftFields()" style="width:16px;height:16px">
@@ -213,6 +221,8 @@ var me = null;
 var catalog = { services: [], extras: [], products: [] };
 var ticket = []; // { item_type, item_id, item_name, unit_price_cents, quantity }
 var ticketQueueId = null; // coupe d'origine si le ticket vient d'un encaissement en attente
+var loyaltyRewardsAvailable = 0; // récompenses dispo pour le client du ticket en cours
+var loyaltyDiscount = null; // { index, originalPrice, type } si une réduction fidélité est appliquée
 var pendingPayments = [];
 var currentCat = 'services';
 
@@ -401,11 +411,14 @@ function renderPendingList() {
     var giftNote = q.gift_card
       ? '<div class="lock-note" style="color:var(--green)">🎁 Cadeau disponible</div>'
       : '';
+    var loyaltyNote = q.loyalty_rewards_available
+      ? '<div class="lock-note" style="color:var(--blue)">⭐ Fidélité disponible</div>'
+      : '';
     return '<div class="pending-card' + (isActive ? '' : ' locked') + '"' +
       (isActive && !q.gift_card ? ' onclick="usePendingForTicket(\'' + q.id + '\')"' : '') + '>' +
       '<div><div class="name">' + esc(q.client_name) + '</div>' +
       '<div class="meta">' + esc(detail) + '</div>' +
-      (isActive ? giftNote : '<div class="lock-note">En attente de son tour</div>') + '</div>' +
+      (isActive ? giftNote + loyaltyNote : '<div class="lock-note">En attente de son tour</div>') + '</div>' +
       '<div class="pending-actions">' +
         '<span class="amount">' + eur(q.total_price_cents) + '</span>' +
         (isActive && q.gift_card
@@ -443,6 +456,8 @@ function usePendingForTicket(queueId) {
     ticket.push({ item_type: 'extra', item_id: e.id, item_name: e.name, unit_price_cents: e.price_cents, quantity: 1 });
   });
   ticketQueueId = queueId;
+  loyaltyRewardsAvailable = q.loyalty_rewards_available || 0;
+  loyaltyDiscount = null;
   renderTicket();
   toast('Ticket de ' + q.client_name + ' chargé — choisissez le paiement');
 }
@@ -511,9 +526,50 @@ function renderTicket() {
     document.getElementById('pay-' + m).disabled = ticket.length === 0;
   });
   updateGiftVisibility();
+  updateLoyaltyVisibility();
 }
 
 /* ---------- Paiement ---------- */
+// La fidélité ne peut s'appliquer que sur un ticket venant de "En
+// attente d'encaissement" (client identifié) — jamais sur un ticket
+// construit à la main sans identité de client connue.
+function updateLoyaltyVisibility() {
+  var section = document.getElementById('loyalty-section');
+  var show = ticket.length > 0 && ticketQueueId && loyaltyRewardsAvailable > 0;
+  section.style.display = show ? 'block' : 'none';
+  if (show) {
+    var hasService = ticket.some(function (l) { return l.item_type === 'service'; });
+    var hasProduct = ticket.some(function (l) { return l.item_type === 'product'; });
+    document.getElementById('loyalty-btn-service').disabled = !hasService && !(loyaltyDiscount && loyaltyDiscount.type === 'service');
+    document.getElementById('loyalty-btn-product').disabled = !hasProduct && !(loyaltyDiscount && loyaltyDiscount.type === 'product');
+    document.getElementById('loyalty-btn-service').classList.toggle('btn-primary', loyaltyDiscount && loyaltyDiscount.type === 'service');
+    document.getElementById('loyalty-btn-product').classList.toggle('btn-primary', loyaltyDiscount && loyaltyDiscount.type === 'product');
+  }
+}
+
+function toggleLoyaltyDiscount(type) {
+  // Retire d'abord une réduction déjà appliquée (même type = on annule,
+  // autre type = on change d'avis).
+  if (loyaltyDiscount) {
+    ticket[loyaltyDiscount.index].unit_price_cents = loyaltyDiscount.originalPrice;
+    ticket[loyaltyDiscount.index].item_name = loyaltyDiscount.originalName;
+    var wasType = loyaltyDiscount.type;
+    loyaltyDiscount = null;
+    if (wasType === type) { renderTicket(); return; }
+  }
+
+  var idx = ticket.findIndex(function (l) { return l.item_type === type; });
+  if (idx === -1) { toast('Aucune ligne ' + (type === 'service' ? 'prestation' : 'produit') + ' dans ce ticket', true); renderTicket(); return; }
+
+  var factor = type === 'service' ? 0.5 : 0.8;
+  var originalPrice = ticket[idx].unit_price_cents;
+  var originalName = ticket[idx].item_name;
+  loyaltyDiscount = { index: idx, originalPrice: originalPrice, originalName: originalName, type: type };
+  ticket[idx].unit_price_cents = Math.round(originalPrice * factor);
+  ticket[idx].item_name = originalName + ' (fidélité -' + (type === 'service' ? '50' : '20') + '%)';
+  renderTicket();
+}
+
 function toggleGiftFields() {
   var checked = document.getElementById('gift-checkbox').checked;
   document.getElementById('gift-fields').style.display = checked ? 'block' : 'none';
@@ -551,14 +607,17 @@ function pay(method) {
   var total = ticketTotal();
   var soldTicket = ticket.slice();
   var linkedQueueId = ticketQueueId;
+  var usedLoyalty = Boolean(loyaltyDiscount);
 
   barberApi('/api/sales', {
     method: 'POST',
-    body: { payment_method: method, items: soldTicket, queue_id: linkedQueueId, gift: gift }
+    body: { payment_method: method, items: soldTicket, queue_id: linkedQueueId, gift: gift, loyalty_redeem: usedLoyalty }
   }).then(function () {
     showReceipt(soldTicket, total, method);
     ticket = [];
     ticketQueueId = null;
+    loyaltyRewardsAvailable = 0;
+    loyaltyDiscount = null;
     document.getElementById('gift-checkbox').checked = false;
     document.getElementById('gift-name').value = '';
     document.getElementById('gift-phone').value = '';

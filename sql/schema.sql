@@ -325,3 +325,19 @@ CREATE TABLE IF NOT EXISTS gift_cards (
   FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE,
   FOREIGN KEY (sale_id) REFERENCES sales(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Fidelite : 1 point par passage PAYE (peu importe le salon de
+-- l'enseigne, cumule au niveau du PROPRIETAIRE). Tous les 10 points,
+-- une recompense s'ajoute au compteur - utilisable a partir du
+-- PROCHAIN passage (pas celui qui vient de faire atteindre 10).
+CREATE TABLE IF NOT EXISTS loyalty_accounts (
+  id CHAR(36) PRIMARY KEY,
+  owner_id CHAR(36) NOT NULL,
+  client_key VARCHAR(255) NOT NULL,
+  client_name VARCHAR(255) NOT NULL,
+  points INT NOT NULL DEFAULT 0,
+  rewards_available INT NOT NULL DEFAULT 0,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_owner_client (owner_id, client_key),
+  FOREIGN KEY (owner_id) REFERENCES owners(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
