@@ -2,6 +2,7 @@ const express = require('express');
 const crypto = require('crypto');
 const { pool, utcIso } = require('../db');
 const { clientKey, earnLoyaltyPoint } = require('../lib/queueMath');
+const { sendGiftConfirmation } = require('../lib/mailer');
 const requireAdmin = require('../middleware/auth');
 const requireAdminOrBarber = require('../middleware/barberAuth');
 
@@ -17,6 +18,16 @@ function wrap(fn) {
 }
 
 const PAYMENT_METHODS = ['especes', 'cb', 'autre'];
+
+// Alphabet sans caractères ambigus à l'oral/à l'écrit (pas de 0/O, 1/I).
+const GIFT_CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+function generateGiftCode() {
+  let code = '';
+  for (let i = 0; i < 8; i++) {
+    code += GIFT_CODE_CHARS[crypto.randomInt(GIFT_CODE_CHARS.length)];
+  }
+  return code;
+}
 
 /**
  * Enregistre une vente en caisse — indépendante de la file d'attente,
@@ -104,15 +115,32 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
   if (gift) {
     const itemsSnapshot = items.map((it) => ({
       item_type: it.item_type || 'product',
+      item_id: it.item_id || null,
       item_name: it.item_name || 'Article',
       unit_price_cents: Math.round(Number(it.unit_price_cents) || 0),
       quantity: Math.max(1, Number(it.quantity) || 1)
     }));
+    const giftId = crypto.randomUUID();
+    const code = generateGiftCode();
     await pool.query(
-      `INSERT INTO gift_cards (id, salon_id, sale_id, recipient_name, recipient_phone, recipient_email, amount_cents, items_json)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [crypto.randomUUID(), req.salon.id, saleId, gift.recipient_name, gift.recipient_phone, gift.recipient_email, total, JSON.stringify(itemsSnapshot)]
+      `INSERT INTO gift_cards (id, salon_id, sale_id, recipient_name, recipient_phone, recipient_email, amount_cents, items_json, code)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [giftId, req.salon.id, saleId, gift.recipient_name, gift.recipient_phone, gift.recipient_email, total, JSON.stringify(itemsSnapshot), code]
     );
+
+    try {
+      await sendGiftConfirmation(req.salon.id, gift.recipient_email, {
+        recipientName: gift.recipient_name,
+        amountEur: (total / 100).toFixed(2).replace('.', ',') + ' €',
+        items: itemsSnapshot,
+        code
+      });
+    } catch (err) {
+      // N'empêche jamais la vente si l'email échoue (ex. SMTP salon pas
+      // configuré) — le code reste consultable par le super admin/admin
+      // si besoin, juste journalisé pour investigation.
+      console.error('[gift] envoi email de confirmation échoué:', err.message);
+    }
   }
 
   res.json({ ok: true, sale: { id: saleId, total_price_cents: total, payment_method, barber_id: barberId } });
@@ -184,6 +212,38 @@ router.post('/gift-cards/:id/redeem', requireAdminOrBarber, wrap(async (req, res
   await earnLoyaltyPoint(req.ownerId, queueRow);
 
   res.json({ ok: true });
+}));
+
+/**
+ * Consultation d'un cadeau par son code (public — utilisé par le
+ * kiosk). Ne marque RIEN comme utilisé, juste une consultation : c'est
+ * toujours la caisse qui encaisse réellement le cadeau.
+ */
+router.get('/gift-cards/lookup', wrap(async (req, res) => {
+  const code = String(req.query.code || '').trim().toUpperCase();
+  if (!code) return res.status(400).json({ error: 'Code requis' });
+
+  const [[gift]] = await pool.query(
+    'SELECT * FROM gift_cards WHERE salon_id = ? AND code = ?',
+    [req.salon.id, code]
+  );
+  if (!gift) return res.status(404).json({ error: 'Code introuvable pour ce salon' });
+  if (gift.used_at) return res.status(409).json({ error: 'Ce cadeau a déjà été utilisé' });
+
+  let items = [];
+  try { items = JSON.parse(gift.items_json || '[]'); } catch (e) { items = []; }
+
+  res.json({
+    ok: true,
+    gift: {
+      id: gift.id,
+      recipient_name: gift.recipient_name,
+      recipient_email: gift.recipient_email,
+      recipient_phone: gift.recipient_phone,
+      amount_cents: gift.amount_cents,
+      items
+    }
+  });
 }));
 
 module.exports = router;

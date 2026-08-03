@@ -347,3 +347,8 @@ CREATE TABLE IF NOT EXISTS loyalty_accounts (
 -- au beneficiaire au moment d'utiliser le cadeau (ex: un produit
 -- achete en plus de la coupe, que le kiosk ne connait pas).
 ALTER TABLE gift_cards ADD COLUMN IF NOT EXISTS items_json TEXT NULL;
+
+-- Code court a saisir par le beneficiaire (kiosk, futur systeme de
+-- rendez-vous en ligne) - plus pratique a taper qu'un identifiant
+-- technique. Nullable pour les cadeaux crees avant cette fonctionnalite.
+ALTER TABLE gift_cards ADD COLUMN IF NOT EXISTS code VARCHAR(12) NULL UNIQUE;

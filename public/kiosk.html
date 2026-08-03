@@ -43,6 +43,11 @@
   .panel.on { display: block; }
 
   .eyebrow { font-size: clamp(14px,1.3vw,17px); font-weight: 600; color: var(--grey); margin-bottom: clamp(14px,2vh,22px); }
+  .gift-entry-btn {
+    display: block; margin: clamp(20px,3vh,32px) auto 0; background: none; border: 1.5px solid var(--sep);
+    border-radius: 999px; padding: 12px 26px; font-family: inherit; font-size: clamp(14px,1.3vw,16px);
+    font-weight: 600; color: var(--ink); cursor: pointer;
+  }
   .barber-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(clamp(140px,16vw,220px), 1fr));
@@ -185,8 +190,19 @@
   <main class="stage">
 
     <section class="panel on" id="p-home">
-      <div class="eyebrow">Choisissez votre coiffeur</div>
+      <div class="eyebrow" id="eyebrow-home">Choisissez votre coiffeur</div>
       <div class="barber-grid" id="barber-grid"></div>
+      <button class="gift-entry-btn" onclick="show('p-gift-code')">🎁 Utiliser un cadeau</button>
+    </section>
+
+    <section class="panel" id="p-gift-code">
+      <button class="back" onclick="show('p-home')">‹ Retour</button>
+      <h1 class="ftitle">Utiliser un cadeau</h1>
+      <p class="hero-sub" style="margin:-8px 0 22px">Saisissez le code reçu par email.</p>
+      <div class="fld"><label for="gift-code-input">Code</label>
+        <input id="gift-code-input" type="text" placeholder="ABCD1234" style="text-transform:uppercase;letter-spacing:2px;font-size:20px;text-align:center" maxlength="8"></div>
+      <div class="login-error" id="gift-code-error" style="color:var(--red);font-size:14px;min-height:20px;margin-bottom:14px"></div>
+      <button class="go" onclick="lookupGiftCode()">Valider le code</button>
     </section>
 
     <section class="panel" id="p-form">
@@ -237,6 +253,7 @@ mountThemeButton();
 
 var services = [], extras = [], barbers = [], queue = [], salonName = 'Le Salon';
 var selBarber = null, selExtras = [];
+var activeGift = null; // { id, recipient_name, recipient_email, recipient_phone, items } si en mode "utiliser un cadeau"
 
 function svcById(id) { return services.find(function (s) { return s.id === id; }); }
 function extById(id) { return extras.find(function (e) { return e.id === id; }); }
@@ -431,14 +448,74 @@ function renderBarberGrid() {
   }).join('') || '<div class="empty">Aucun coiffeur configuré</div>';
 }
 
+/* ---------- Utiliser un cadeau ---------- */
+function lookupGiftCode() {
+  var code = document.getElementById('gift-code-input').value.trim().toUpperCase();
+  var errEl = document.getElementById('gift-code-error');
+  errEl.textContent = '';
+  if (!code) { errEl.textContent = 'Entrez le code reçu par email'; return; }
+
+  api('/api/sales/gift-cards/lookup?code=' + encodeURIComponent(code)).then(function (r) {
+    var g = r.gift;
+    var serviceItem = g.items.find(function (it) { return it.item_type === 'service'; });
+    if (!serviceItem) {
+      errEl.textContent = "Ce cadeau ne comprend pas de prestation — présentez-vous à l'accueil pour le récupérer.";
+      return;
+    }
+    activeGift = g;
+    document.getElementById('eyebrow-home').textContent = 'Cadeau de ' + g.recipient_name + ' — choisissez le coiffeur';
+    show('p-home');
+  }).catch(function (err) {
+    errEl.textContent = err.message;
+  });
+}
+
 function pickBarberAndGo(id) {
   selBarber = id;
   var b = barbers.find(function (x) { return x.id === id; });
+
+  if (activeGift) {
+    submitGiftCheckin(b);
+    return;
+  }
+
   document.getElementById('chosen-barber-note').innerHTML = b
     ? 'Avec <b>' + esc(b.name) + '</b>'
     : '';
   renderFormOptions();
   show('p-form');
+}
+
+function submitGiftCheckin(b) {
+  var serviceItem = activeGift.items.find(function (it) { return it.item_type === 'service'; });
+  var extraItems = activeGift.items.filter(function (it) { return it.item_type === 'extra'; });
+
+  api('/api/queue/checkin', {
+    method: 'POST',
+    body: {
+      client_name: activeGift.recipient_name,
+      email: activeGift.recipient_email || null,
+      phone: activeGift.recipient_phone || null,
+      service_id: serviceItem.item_id,
+      barber_id: selBarber,
+      extras: extraItems.map(function (it) { return it.item_id; }).filter(Boolean)
+    }
+  }).then(function (r) {
+    var e = r.entry;
+    document.getElementById('t-name').textContent = e.client_name;
+    document.getElementById('t-service').textContent =
+      e.service.name + (e.extras.length ? ' + ' + e.extras.map(function (x) { return x.name; }).join(', ') : '') +
+      ' · ' + (b ? b.name : 'Premier disponible');
+    document.getElementById('t-num').textContent = e.position;
+    document.getElementById('t-wait').textContent = e.estimated_wait_min;
+    document.getElementById('t-note').innerHTML = '🎁 Cadeau enregistré — présentez ce ticket à votre coiffeur.';
+    activeGift = null;
+    document.getElementById('eyebrow-home').textContent = 'Choisissez votre coiffeur';
+    show('p-ticket');
+    refresh();
+  }).catch(function (err) {
+    toast(err.message, true);
+  });
 }
 
 /* ---------- Suppléments ---------- */

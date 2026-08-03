@@ -43,6 +43,29 @@ async function sendTurnSoon(salonId, to, name, waitMin) {
   });
 }
 
+async function sendGiftConfirmation(salonId, to, info) {
+  const { tx, from, salon } = await getTransport(salonId);
+  const itemsList = info.items.map((it) => `${it.quantity} × ${it.item_name}`).join(', ');
+  await tx.sendMail({
+    from,
+    to,
+    subject: 'Votre cadeau — ' + salon,
+    text: `Bonjour ${info.recipientName},\n\n` +
+          `Un cadeau de ${info.amountEur} vous a été offert chez ${salon} !\n\n` +
+          `Contenu : ${itemsList}\n\n` +
+          `Votre code : ${info.code}\n\n` +
+          `Présentez-vous en salon et indiquez ce code à l'accueil ou saisissez-le sur la borne ` +
+          `("Utiliser un cadeau") pour en profiter.\n\n${salon}`,
+    html: `<p>Bonjour ${info.recipientName},</p>` +
+          `<p>Un cadeau de <strong>${info.amountEur}</strong> vous a été offert chez ${salon} !</p>` +
+          `<p>Contenu : ${itemsList}</p>` +
+          `<p style="font-size:20px;font-weight:700;letter-spacing:2px">${info.code}</p>` +
+          `<p>Présentez-vous en salon et indiquez ce code à l'accueil, ou saisissez-le sur la borne ` +
+          `(« Utiliser un cadeau ») pour en profiter.</p>` +
+          `<p>${salon}</p>`
+  });
+}
+
 async function sendTest(salonId, to) {
   const { tx, from, salon } = await getTransport(salonId);
   await tx.sendMail({
@@ -53,4 +76,4 @@ async function sendTest(salonId, to) {
   });
 }
 
-module.exports = { sendTurnSoon, sendTest, invalidateTransport };
+module.exports = { sendTurnSoon, sendTest, sendGiftConfirmation, invalidateTransport };
