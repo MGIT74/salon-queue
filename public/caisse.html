@@ -90,6 +90,10 @@
   .pending-card .meta { font-size: 12.5px; color: var(--grey); margin-top: 2px; }
   .pending-card .amount { font-size: 15px; font-weight: 600; flex-shrink: 0; }
   .pending-card .lock-note { font-size: 11.5px; color: var(--orange); margin-top: 2px; }
+  .pending-card.deferred { opacity: .7; }
+  .pending-card.deferred .lock-note { color: var(--grey); }
+  .pending-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .pending-actions .btn { padding: 8px 12px; font-size: 12.5px; white-space: nowrap; }
 
   /* --- Reçu imprimable --- */
   .receipt-overlay {
@@ -142,15 +146,15 @@
 
     <div class="caisse-layout">
       <div>
-        <div class="section-label" id="pending-label" style="display:none;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--grey);margin:0 0 10px 2px">En attente d'encaissement</div>
-        <div class="pending-list" id="pending-list"></div>
-
         <div class="cat-tabs" id="cat-tabs">
           <button class="on" data-cat="services">Prestations</button>
           <button data-cat="extras">Suppléments</button>
           <button data-cat="products">Produits</button>
         </div>
         <div class="item-grid" id="item-grid"></div>
+
+        <div class="section-label" id="pending-label" style="display:none;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--grey);margin:22px 0 10px 2px">En attente d'encaissement</div>
+        <div class="pending-list" id="pending-list"></div>
       </div>
 
       <div class="ticket-panel">
@@ -344,17 +348,46 @@ function renderPendingList() {
     return;
   }
   label.style.display = 'block';
+
+  // Le premier client NON mis de côté est le seul "actif" (encaissable
+  // tout de suite) — les suivants restent verrouillés jusqu'à ce qu'il
+  // soit réglé OU mis de côté à son tour.
+  var firstActiveIndex = pendingPayments.findIndex(function (q) { return !q.deferred; });
+
   list.innerHTML = pendingPayments.map(function (q, i) {
-    var locked = i > 0;
     var detail = q.service.name + (q.extras.length ? ' + ' + q.extras.map(function (x) { return x.name; }).join(', ') : '');
-    return '<div class="pending-card' + (locked ? ' locked' : '') + '"' +
-      (locked ? '' : ' onclick="usePendingForTicket(\'' + q.id + '\')"') + '>' +
+
+    if (q.deferred) {
+      return '<div class="pending-card deferred">' +
+        '<div><div class="name">' + esc(q.client_name) + '</div>' +
+        '<div class="meta">' + esc(detail) + '</div>' +
+        '<div class="lock-note">Mis de côté</div></div>' +
+        '<div class="pending-actions">' +
+          '<span class="amount">' + eur(q.total_price_cents) + '</span>' +
+          '<button class="btn btn-soft" onclick="event.stopPropagation();toggleDeferPayment(\'' + q.id + '\')">Reprendre</button>' +
+        '</div></div>';
+    }
+
+    var isActive = i === firstActiveIndex;
+    return '<div class="pending-card' + (isActive ? '' : ' locked') + '"' +
+      (isActive ? ' onclick="usePendingForTicket(\'' + q.id + '\')"' : '') + '>' +
       '<div><div class="name">' + esc(q.client_name) + '</div>' +
       '<div class="meta">' + esc(detail) + '</div>' +
-      (locked ? '<div class="lock-note">En attente de son tour</div>' : '') + '</div>' +
-      '<div class="amount">' + eur(q.total_price_cents) + '</div>' +
-      '</div>';
+      (isActive ? '' : '<div class="lock-note">En attente de son tour</div>') + '</div>' +
+      '<div class="pending-actions">' +
+        '<span class="amount">' + eur(q.total_price_cents) + '</span>' +
+        (isActive ? '<button class="btn btn-ghost" onclick="event.stopPropagation();toggleDeferPayment(\'' + q.id + '\')">Mettre de côté</button>' : '') +
+      '</div></div>';
   }).join('');
+}
+
+function toggleDeferPayment(queueId) {
+  barberApi('/api/queue/' + queueId + '/defer-payment', { method: 'POST', body: {} })
+    .then(function (r) {
+      toast(r.deferred ? 'Client mis de côté' : 'Client repris');
+      loadPendingPayments();
+    })
+    .catch(function (e) { toast(e.message, true); });
 }
 
 function usePendingForTicket(queueId) {

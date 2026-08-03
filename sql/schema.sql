@@ -302,3 +302,7 @@ CREATE TABLE IF NOT EXISTS sale_items (
 -- Une coupe terminee ('done') reste en attente d'encaissement tant que
 -- paid_at est NULL - c'est la caisse qui la marque payee.
 ALTER TABLE queue ADD COLUMN IF NOT EXISTS paid_at DATETIME NULL;
+
+-- Un encaissement peut etre "mis de cote" (client parti chercher sa
+-- carte, urgence...) sans etre perdu ni bloquer le suivant.
+ALTER TABLE queue ADD COLUMN IF NOT EXISTS payment_deferred_at DATETIME NULL;

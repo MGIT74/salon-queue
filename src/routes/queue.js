@@ -30,13 +30,40 @@ router.get('/', wrap(async (req, res) => {
 /**
  * Coupes terminées mais pas encore encaissées, pour la caisse. Scopé au
  * coiffeur connecté par PIN (chacun encaisse ses propres clients, dans
- * l'ordre) — un admin voit tout le monde.
+ * l'ordre) — un admin voit tout le monde. Les encaissements "mis de
+ * côté" (client parti chercher sa carte, urgence...) sont relégués à la
+ * fin de la liste, pour ne jamais bloquer les suivants.
  */
 router.get('/pending-payment', requireAdminOrBarber, wrap(async (req, res) => {
   let rows = await loadQueue(req.salon.id, ['done'], true);
   if (req.barberId) rows = rows.filter((r) => r.barber_id === req.barberId);
-  rows.sort((a, b) => new Date(a.end_at || a.checkin_at) - new Date(b.end_at || b.checkin_at));
-  res.json({ ok: true, items: rows });
+  rows.sort((a, b) => {
+    const aDef = Boolean(a.payment_deferred_at), bDef = Boolean(b.payment_deferred_at);
+    if (aDef !== bDef) return aDef ? 1 : -1;
+    return new Date(a.end_at || a.checkin_at) - new Date(b.end_at || b.checkin_at);
+  });
+  res.json({ ok: true, items: rows.map((r) => Object.assign({}, r, { deferred: Boolean(r.payment_deferred_at) })) });
+}));
+
+/**
+ * Met de côté (ou reprend) un encaissement en attente — sans le perdre
+ * ni bloquer le client suivant. Même vérification de propriété que le
+ * reste (son propre client, ou non-assigné).
+ */
+router.post('/:id/defer-payment', requireAdminOrBarber, wrap(async (req, res) => {
+  const [[row]] = await pool.query(
+    'SELECT barber_id, status, paid_at, payment_deferred_at FROM queue WHERE id = ? AND salon_id = ?',
+    [req.params.id, req.salon.id]
+  );
+  if (!row) return res.status(404).json({ error: 'Client introuvable' });
+  if (req.barberId && row.barber_id && row.barber_id !== req.barberId) {
+    return res.status(403).json({ error: "Ce n'est pas votre client." });
+  }
+  if (row.paid_at) return res.status(409).json({ error: 'Ce client a déjà été encaissé.' });
+
+  const newValue = row.payment_deferred_at ? null : new Date();
+  await pool.query('UPDATE queue SET payment_deferred_at = ? WHERE id = ?', [newValue, req.params.id]);
+  res.json({ ok: true, deferred: Boolean(newValue) });
 }));
 
 // --- Public : check-in à la borne ---------------------------------------
