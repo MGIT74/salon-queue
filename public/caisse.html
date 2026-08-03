@@ -189,9 +189,8 @@
         </div>
 
         <div class="pay-grid">
-          <button onclick="pay('especes')" id="pay-especes">Espèces</button>
-          <button onclick="pay('cb')" id="pay-cb">CB</button>
-          <button onclick="pay('cheque_cadeau')" id="pay-cheque_cadeau" style="grid-column:span 2">Chèque cadeau</button>
+          <button onclick="pay('especes')" id="pay-especes" style="grid-column:span 2">Espèces</button>
+          <button onclick="pay('cb')" id="pay-cb" style="grid-column:span 2">CB</button>
         </div>
         <button class="clear-ticket-btn" onclick="clearTicket()">Vider le ticket</button>
       </div>
@@ -505,7 +504,7 @@ function renderTicket() {
 
   var total = ticketTotal();
   document.getElementById('ticket-total').textContent = eur(total);
-  ['especes', 'cb', 'cheque_cadeau'].forEach(function (m) {
+  ['especes', 'cb'].forEach(function (m) {
     document.getElementById('pay-' + m).disabled = ticket.length === 0;
   });
   updateGiftVisibility();
@@ -566,7 +565,7 @@ function pay(method) {
   }).catch(function (e) { toast(e.message, true); });
 }
 
-var PAYMENT_LABELS = { especes: 'Espèces', cb: 'Carte bancaire', cheque_cadeau: 'Chèque cadeau' };
+var PAYMENT_LABELS = { especes: 'Espèces', cb: 'Carte bancaire' };
 
 function showReceipt(lines, total, method) {
   var when = new Date().toLocaleString('fr-FR');

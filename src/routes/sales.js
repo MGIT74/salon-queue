@@ -16,7 +16,7 @@ function wrap(fn) {
   };
 }
 
-const PAYMENT_METHODS = ['especes', 'cb', 'cheque_cadeau', 'autre'];
+const PAYMENT_METHODS = ['especes', 'cb', 'autre'];
 
 /**
  * Enregistre une vente en caisse — indépendante de la file d'attente,
