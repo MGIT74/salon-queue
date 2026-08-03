@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Caisse</title>
+<link rel="stylesheet" href="/app.css?v=3">
+<style>
+  html, body { min-height: 100%; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 20px 18px 40px; }
+
+  /* --- Écran de connexion (identique à Mon poste) --- */
+  .login { text-align: center; padding-top: 12vh; }
+  .login .mark { font-size: 15px; font-weight: 600; color: var(--grey); margin-bottom: 6px; }
+  .login h1 { font-size: 28px; font-weight: 600; letter-spacing: -.03em; margin: 0 0 36px; }
+  .pin-dots { display: flex; justify-content: center; gap: 14px; margin-bottom: 32px; }
+  .pin-dot { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--sep); transition: background .1s ease, border-color .1s ease; }
+  .pin-dot.filled { background: var(--blue); border-color: var(--blue); }
+  .keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; max-width: 280px; margin: 0 auto; }
+  .keypad button {
+    aspect-ratio: 1; border: none; border-radius: 50%; background: var(--fill);
+    color: var(--ink); font-size: 24px; font-weight: 500; font-family: inherit; cursor: pointer;
+  }
+  .keypad button:active { background: var(--fill-2); }
+  .keypad .empty { visibility: hidden; }
+  .keypad .del { font-size: 18px; color: var(--grey); }
+  .login-error { color: var(--red); font-size: 14px; margin-top: 18px; min-height: 20px; }
+
+  /* --- Écran principal --- */
+  .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+  .topbar h1 { font-size: 22px; font-weight: 600; letter-spacing: -.03em; margin: 0; }
+  .logout-btn { background: none; border: none; color: var(--grey); font-family: inherit; font-size: 14px; cursor: pointer; padding: 6px 0; }
+
+  .caisse-layout { display: grid; grid-template-columns: 1fr 340px; gap: 18px; align-items: start; }
+  @media (max-width: 860px) { .caisse-layout { grid-template-columns: 1fr; } }
+
+  .cat-tabs { display: flex; gap: 6px; background: var(--fill); border-radius: 999px; padding: 4px; margin-bottom: 16px; overflow-x: auto; }
+  .cat-tabs button {
+    flex: 1 0 auto; border: none; background: none; color: var(--ink); font-family: inherit;
+    font-size: 14px; font-weight: 500; padding: 10px 16px; border-radius: 999px; cursor: pointer; white-space: nowrap;
+  }
+  .cat-tabs button.on { background: var(--card); font-weight: 600; box-shadow: var(--shadow); }
+
+  .item-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+  .item-btn {
+    background: var(--card); border: none; border-radius: 14px; padding: 16px 14px; box-shadow: var(--shadow);
+    cursor: pointer; text-align: left; font-family: inherit; color: var(--ink); transition: transform .1s ease;
+  }
+  .item-btn:active { transform: scale(.96); }
+  .item-btn .name { font-size: 14.5px; font-weight: 600; margin-bottom: 4px; }
+  .item-btn .price { font-size: 13px; color: var(--grey); }
+
+  .ticket-panel {
+    background: var(--card); border-radius: 18px; padding: 18px; box-shadow: var(--shadow);
+    position: sticky; top: 20px; max-height: calc(100vh - 40px); display: flex; flex-direction: column;
+  }
+  .ticket-panel h3 { font-size: 15px; margin: 0 0 12px; }
+  .ticket-lines { flex: 1; overflow-y: auto; margin-bottom: 14px; min-height: 60px; }
+  .ticket-line { display: flex; align-items: center; gap: 8px; padding: 9px 0; border-bottom: 1px solid var(--sep); }
+  .ticket-line:last-child { border-bottom: none; }
+  .ticket-line .name { flex: 1; min-width: 0; font-size: 13.5px; }
+  .ticket-line .qty-ctrl { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .ticket-line .qty-ctrl button {
+    width: 22px; height: 22px; border-radius: 50%; border: none; background: var(--fill);
+    color: var(--ink); font-size: 13px; cursor: pointer; line-height: 1;
+  }
+  .ticket-line .qty-val { font-size: 13px; min-width: 14px; text-align: center; }
+  .ticket-line .line-price { font-size: 13.5px; font-weight: 600; flex-shrink: 0; min-width: 52px; text-align: right; }
+  .ticket-total { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-top: 2px solid var(--sep); margin-bottom: 14px; }
+  .ticket-total .label { font-size: 14px; color: var(--grey); }
+  .ticket-total .amount { font-size: 24px; font-weight: 600; letter-spacing: -.02em; }
+  .pay-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .pay-grid button {
+    border: none; border-radius: 12px; padding: 13px 8px; font-family: inherit; font-size: 13.5px;
+    font-weight: 600; cursor: pointer; background: var(--fill); color: var(--ink);
+  }
+  .pay-grid button:disabled { opacity: .4; cursor: default; }
+  .clear-ticket-btn { background: none; border: none; color: var(--red); font-family: inherit; font-size: 13px; cursor: pointer; margin-top: 10px; width: 100%; text-align: center; }
+
+  .empty { background: var(--card); border-radius: 16px; padding: 30px 20px; text-align: center; color: var(--grey); font-size: 14px; box-shadow: var(--shadow); }
+
+  /* --- Reçu imprimable --- */
+  .receipt-overlay {
+    display: none; position: fixed; inset: 0; z-index: 400; background: rgba(0,0,0,.5);
+    align-items: center; justify-content: center; padding: 20px;
+  }
+  .receipt-overlay.on { display: flex; }
+  .receipt-box { background: #fff; color: #111; border-radius: 14px; padding: 26px; max-width: 340px; width: 100%; font-family: 'Courier New', monospace; }
+  .receipt-box h2 { font-size: 16px; text-align: center; margin: 0 0 4px; }
+  .receipt-box .sub { text-align: center; font-size: 12px; color: #666; margin-bottom: 16px; }
+  .receipt-box .rline { display: flex; justify-content: space-between; font-size: 13px; padding: 3px 0; }
+  .receipt-box .rtotal { border-top: 1px dashed #999; margin-top: 8px; padding-top: 8px; font-weight: 700; font-size: 14px; }
+  .receipt-actions { display: flex; gap: 8px; margin-top: 18px; }
+  .receipt-actions .btn { flex: 1; }
+
+  @media print {
+    body * { visibility: hidden; }
+    .receipt-box, .receipt-box * { visibility: visible; }
+    .receipt-box { position: fixed; top: 0; left: 0; box-shadow: none; }
+    .receipt-actions { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="login" id="login-screen">
+    <div class="mark" id="salon-mark">LE SALON</div>
+    <h1>Caisse</h1>
+    <div class="pin-dots" id="pin-dots">
+      <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
+    </div>
+    <div class="keypad" id="keypad">
+      <button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button>
+      <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button>
+      <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button>
+      <button class="empty"></button><button data-k="0">0</button><button class="del" data-k="del">⌫</button>
+    </div>
+    <div class="login-error" id="login-error"></div>
+  </div>
+
+  <div id="app-screen" style="display:none">
+    <div class="topbar">
+      <div>
+        <div id="salon-name-tag" style="font-size:12px;font-weight:600;color:var(--grey);letter-spacing:.04em;text-transform:uppercase;margin-bottom:2px"></div>
+        <h1 id="my-name">—</h1>
+      </div>
+      <button class="logout-btn" onclick="logout()">Déconnexion</button>
+    </div>
+
+    <div class="caisse-layout">
+      <div>
+        <div class="cat-tabs" id="cat-tabs">
+          <button class="on" data-cat="services">Prestations</button>
+          <button data-cat="extras">Suppléments</button>
+          <button data-cat="products">Produits</button>
+        </div>
+        <div class="item-grid" id="item-grid"></div>
+      </div>
+
+      <div class="ticket-panel">
+        <h3>Ticket en cours</h3>
+        <div class="ticket-lines" id="ticket-lines"><div class="empty">Aucun article sélectionné</div></div>
+        <div class="ticket-total"><span class="label">Total</span><span class="amount" id="ticket-total">0,00 €</span></div>
+        <div class="pay-grid">
+          <button onclick="pay('especes')" id="pay-especes">Espèces</button>
+          <button onclick="pay('cb')" id="pay-cb">CB</button>
+          <button onclick="pay('cheque')" id="pay-cheque">Chèque</button>
+          <button onclick="pay('cheque_cadeau')" id="pay-cheque_cadeau">Chèque cadeau</button>
+        </div>
+        <button class="clear-ticket-btn" onclick="clearTicket()">Vider le ticket</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="receipt-overlay" id="receipt-overlay">
+  <div class="receipt-box" id="receipt-box"></div>
+</div>
+
+<script src="/app.js?v=3"></script>
+<script>
+mountThemeButton();
+
+var me = null;
+var catalog = { services: [], extras: [], products: [] };
+var ticket = []; // { item_type, item_id, item_name, unit_price_cents, quantity }
+var currentCat = 'services';
+
+var SALON_SLUG = (function () {
+  try { return new URLSearchParams(window.location.search).get('salon') || ''; }
+  catch (e) { return ''; }
+})();
+
+function loadSalonName() {
+  var headers = {};
+  if (SALON_SLUG) headers['X-Salon-Slug'] = SALON_SLUG;
+  fetch('/api/settings/public', { headers: headers })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      var name = d.salon_name || 'Le Salon';
+      document.title = name + ' — Caisse';
+      var mark = document.getElementById('salon-mark');
+      if (mark) mark.textContent = name.toUpperCase();
+      var tag = document.getElementById('salon-name-tag');
+      if (tag) tag.textContent = name;
+    })
+    .catch(function () {});
+}
+loadSalonName();
+
+function barberApi(path, opts) {
+  opts = opts || {};
+  var headers = { 'Content-Type': 'application/json' };
+  if (me) { headers['X-Barber-Id'] = me.id; headers['X-Barber-Pin'] = me.pin; }
+  if (SALON_SLUG) headers['X-Salon-Slug'] = SALON_SLUG;
+  return fetch(path, {
+    method: opts.method || 'GET',
+    headers: headers,
+    body: opts.body ? JSON.stringify(opts.body) : undefined
+  }).then(function (r) {
+    return r.json().then(function (data) {
+      if (!r.ok) throw new Error(data.error || 'Erreur ' + r.status);
+      return data;
+    });
+  });
+}
+
+/* ---------- Connexion par code PIN (identique à Mon poste) ---------- */
+var pinBuffer = '';
+
+function renderPinDots() {
+  var dots = document.querySelectorAll('.pin-dot');
+  dots.forEach(function (d, i) { d.classList.toggle('filled', i < pinBuffer.length); });
+}
+
+document.getElementById('keypad').addEventListener('click', function (e) {
+  var btn = e.target.closest('button');
+  if (!btn || btn.classList.contains('empty')) return;
+  var k = btn.dataset.k;
+  document.getElementById('login-error').textContent = '';
+
+  if (k === 'del') {
+    pinBuffer = pinBuffer.slice(0, -1);
+    renderPinDots();
+    return;
+  }
+  if (pinBuffer.length >= 4) return;
+  pinBuffer += k;
+  renderPinDots();
+  if (pinBuffer.length === 4) attemptLogin();
+});
+
+function attemptLogin() {
+  var headers = { 'Content-Type': 'application/json' };
+  if (SALON_SLUG) headers['X-Salon-Slug'] = SALON_SLUG;
+  fetch('/api/barbers/login', {
+    method: 'POST',
+    headers: headers,
+    body: JSON.stringify({ pin: pinBuffer })
+  }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
+    .then(function (res) {
+      if (!res.ok) {
+        document.getElementById('login-error').textContent = res.data.error || 'Code incorrect';
+        pinBuffer = '';
+        renderPinDots();
+        return;
+      }
+      me = { id: res.data.barber.id, name: res.data.barber.name, pin: pinBuffer };
+      try { sessionStorage.setItem('caisse-session', JSON.stringify(me)); } catch (e) {}
+      showApp();
+    })
+    .catch(function () {
+      document.getElementById('login-error').textContent = 'Connexion impossible';
+      pinBuffer = '';
+      renderPinDots();
+    });
+}
+
+function logout() {
+  me = null;
+  try { sessionStorage.removeItem('caisse-session'); } catch (e) {}
+  pinBuffer = '';
+  document.getElementById('app-screen').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'block';
+  renderPinDots();
+}
+
+function showApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app-screen').style.display = 'block';
+  document.getElementById('my-name').textContent = me.name;
+  loadCatalog();
+}
+
+(function autoLogin() {
+  var saved = null;
+  try { saved = JSON.parse(sessionStorage.getItem('caisse-session') || 'null'); } catch (e) {}
+  if (saved && saved.id && saved.pin) {
+    me = saved;
+    showApp();
+  }
+})();
+
+/* ---------- Catalogue ---------- */
+function loadCatalog() {
+  Promise.all([
+    barberApi('/api/catalog/services'),
+    barberApi('/api/catalog/extras'),
+    barberApi('/api/catalog/products')
+  ]).then(function (r) {
+    catalog.services = r[0].items;
+    catalog.extras = r[1].items;
+    catalog.products = r[2].items;
+    renderItemGrid();
+  }).catch(function (e) { toast(e.message, true); });
+}
+
+document.getElementById('cat-tabs').addEventListener('click', function (e) {
+  var btn = e.target.closest('button');
+  if (!btn) return;
+  currentCat = btn.dataset.cat;
+  document.querySelectorAll('#cat-tabs button').forEach(function (b) { b.classList.toggle('on', b === btn); });
+  renderItemGrid();
+});
+
+function renderItemGrid() {
+  var items = catalog[currentCat] || [];
+  var typeSingular = currentCat === 'services' ? 'service' : (currentCat === 'extras' ? 'extra' : 'product');
+  document.getElementById('item-grid').innerHTML = items.length === 0
+    ? '<div class="empty">Rien à afficher ici</div>'
+    : items.map(function (it) {
+        return '<button class="item-btn" onclick="addToTicket(\'' + typeSingular + '\',\'' + it.id + '\',\'' + esc(it.name).replace(/'/g, "\\'") + '\',' + it.price_cents + ')">' +
+          '<div class="name">' + esc(it.name) + '</div>' +
+          '<div class="price">' + eur(it.price_cents) + '</div>' +
+          '</button>';
+      }).join('');
+}
+
+/* ---------- Ticket ---------- */
+function addToTicket(itemType, itemId, itemName, unitPriceCents) {
+  var existing = ticket.find(function (l) { return l.item_type === itemType && l.item_id === itemId; });
+  if (existing) { existing.quantity++; } else {
+    ticket.push({ item_type: itemType, item_id: itemId, item_name: itemName, unit_price_cents: unitPriceCents, quantity: 1 });
+  }
+  renderTicket();
+}
+
+function changeQty(index, delta) {
+  ticket[index].quantity += delta;
+  if (ticket[index].quantity <= 0) ticket.splice(index, 1);
+  renderTicket();
+}
+
+function clearTicket() {
+  if (!ticket.length) return;
+  showConfirm('Vider le ticket en cours ?', { title: 'Vider le ticket', danger: true }).then(function (ok) {
+    if (!ok) return;
+    ticket = [];
+    renderTicket();
+  });
+}
+
+function ticketTotal() {
+  return ticket.reduce(function (a, l) { return a + l.unit_price_cents * l.quantity; }, 0);
+}
+
+function renderTicket() {
+  document.getElementById('ticket-lines').innerHTML = ticket.length === 0
+    ? '<div class="empty">Aucun article sélectionné</div>'
+    : ticket.map(function (l, i) {
+        return '<div class="ticket-line">' +
+          '<div class="name">' + esc(l.item_name) + '</div>' +
+          '<div class="qty-ctrl">' +
+            '<button onclick="changeQty(' + i + ',-1)">−</button>' +
+            '<span class="qty-val">' + l.quantity + '</span>' +
+            '<button onclick="changeQty(' + i + ',1)">+</button>' +
+          '</div>' +
+          '<div class="line-price">' + eur(l.unit_price_cents * l.quantity) + '</div>' +
+          '</div>';
+      }).join('');
+
+  var total = ticketTotal();
+  document.getElementById('ticket-total').textContent = eur(total);
+  ['especes', 'cb', 'cheque', 'cheque_cadeau'].forEach(function (m) {
+    document.getElementById('pay-' + m).disabled = ticket.length === 0;
+  });
+}
+
+/* ---------- Paiement ---------- */
+function pay(method) {
+  if (!ticket.length) return;
+  var total = ticketTotal();
+  var soldTicket = ticket.slice();
+
+  barberApi('/api/sales', {
+    method: 'POST',
+    body: { payment_method: method, items: soldTicket }
+  }).then(function () {
+    showReceipt(soldTicket, total, method);
+    ticket = [];
+    renderTicket();
+  }).catch(function (e) { toast(e.message, true); });
+}
+
+var PAYMENT_LABELS = { especes: 'Espèces', cb: 'Carte bancaire', cheque: 'Chèque', cheque_cadeau: 'Chèque cadeau' };
+
+function showReceipt(lines, total, method) {
+  var when = new Date().toLocaleString('fr-FR');
+  var html = '<h2>' + esc(document.title.replace(' — Caisse', '')) + '</h2>' +
+    '<div class="sub">' + when + ' · ' + esc(me.name) + '</div>' +
+    lines.map(function (l) {
+      return '<div class="rline"><span>' + l.quantity + ' × ' + esc(l.item_name) + '</span><span>' + eur(l.unit_price_cents * l.quantity) + '</span></div>';
+    }).join('') +
+    '<div class="rline rtotal"><span>Total (' + esc(PAYMENT_LABELS[method] || method) + ')</span><span>' + eur(total) + '</span></div>' +
+    '<div class="receipt-actions">' +
+      '<button class="btn btn-soft" onclick="closeReceipt()">Fermer</button>' +
+      '<button class="btn btn-primary" onclick="window.print()">Imprimer</button>' +
+    '</div>';
+  document.getElementById('receipt-box').innerHTML = html;
+  document.getElementById('receipt-overlay').classList.add('on');
+}
+
+function closeReceipt() {
+  document.getElementById('receipt-overlay').classList.remove('on');
+}
+</script>
+</body>
+</html>

@@ -258,3 +258,43 @@ ALTER TABLE owners ADD COLUMN IF NOT EXISTS verify_token_expires DATETIME NULL;
 -- jamais eu à confirmer quoi que ce soit - on les marque vérifiés pour
 -- ne pas les bloquer soudainement à la connexion.
 UPDATE owners SET email_verified = 1 WHERE verify_token IS NULL AND verify_token_expires IS NULL;
+
+-- Catalogue de PRODUITS vendus en caisse (boissons, shampoings a
+-- emporter, etc.) - distinct des prestations/supplements car sans duree.
+CREATE TABLE IF NOT EXISTS products (
+  id CHAR(36) PRIMARY KEY,
+  salon_id CHAR(36) NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  price_cents INT NOT NULL,
+  category VARCHAR(100) NULL,
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  sort_order INT NOT NULL DEFAULT 0,
+  FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Une vente en caisse (independante de la file d'attente) : qui l'a
+-- faite, comment elle a ete payee, pour quel montant total.
+CREATE TABLE IF NOT EXISTS sales (
+  id CHAR(36) PRIMARY KEY,
+  salon_id CHAR(36) NOT NULL,
+  barber_id CHAR(36) NULL,
+  payment_method VARCHAR(30) NOT NULL,
+  total_price_cents INT NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE,
+  FOREIGN KEY (barber_id) REFERENCES barbers(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Chaque ligne d'une vente. Le nom et le prix sont "photographies" au
+-- moment de la vente (item_name/unit_price_cents), pour que l'historique
+-- reste correct meme si le catalogue change ensuite.
+CREATE TABLE IF NOT EXISTS sale_items (
+  id CHAR(36) PRIMARY KEY,
+  sale_id CHAR(36) NOT NULL,
+  item_type VARCHAR(20) NOT NULL,
+  item_id CHAR(36) NULL,
+  item_name VARCHAR(255) NOT NULL,
+  unit_price_cents INT NOT NULL,
+  quantity INT NOT NULL DEFAULT 1,
+  FOREIGN KEY (sale_id) REFERENCES sales(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -73,4 +73,46 @@ async function uniqueId(table, base) {
   }));
 });
 
+// Produits (boissons, vente à emporter...) — même modèle que services/
+// extras, mais sans durée, avec une catégorie libre à la place.
+router.get('/products', wrap(async (req, res) => {
+  const sql = req.query.all === '1'
+    ? 'SELECT * FROM products WHERE salon_id = ? ORDER BY sort_order, name'
+    : 'SELECT * FROM products WHERE salon_id = ? AND active = 1 ORDER BY sort_order, name';
+  const [rows] = await pool.query(sql, [req.salon.id]);
+  res.json({ ok: true, items: rows });
+}));
+
+router.post('/products', requireAdmin, wrap(async (req, res) => {
+  const { name, price_cents, category, sort_order } = req.body;
+  if (!name) return res.status(400).json({ error: 'Le nom est requis' });
+  const id = await uniqueId('products', slugify(name));
+  await pool.query(
+    'INSERT INTO products (id, salon_id, name, price_cents, category, sort_order) VALUES (?, ?, ?, ?, ?, ?)',
+    [id, req.salon.id, name, Number(price_cents) || 0, category || null, Number(sort_order) || 0]
+  );
+  const [[item]] = await pool.query('SELECT * FROM products WHERE id = ?', [id]);
+  res.json({ ok: true, item });
+}));
+
+router.put('/products/:id', requireAdmin, wrap(async (req, res) => {
+  const sets = [];
+  const params = [];
+  if (req.body.name !== undefined) { sets.push('name = ?'); params.push(req.body.name); }
+  if (req.body.active !== undefined) { sets.push('active = ?'); params.push(req.body.active ? 1 : 0); }
+  if (req.body.category !== undefined) { sets.push('category = ?'); params.push(req.body.category || null); }
+  ['price_cents', 'sort_order'].forEach((k) => {
+    if (req.body[k] !== undefined) { sets.push(k + ' = ?'); params.push(Number(req.body[k]) || 0); }
+  });
+  if (!sets.length) return res.json({ ok: true });
+  params.push(req.params.id, req.salon.id);
+  await pool.query(`UPDATE products SET ${sets.join(', ')} WHERE id = ? AND salon_id = ?`, params);
+  res.json({ ok: true });
+}));
+
+router.delete('/products/:id', requireAdmin, wrap(async (req, res) => {
+  await pool.query('UPDATE products SET active = 0 WHERE id = ? AND salon_id = ?', [req.params.id, req.salon.id]);
+  res.json({ ok: true, archived: true });
+}));
+
 module.exports = router;

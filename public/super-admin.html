@@ -314,7 +314,7 @@ function renderOwners() {
     ? '<div class="empty">Aucune enseigne</div>'
     : owners.map(function (o) {
         var salonsHtml = o.salons.map(function (s) {
-          var pages = ['kiosk.html', 'display.html', 'poste.html'];
+          var pages = ['kiosk.html', 'display.html', 'poste.html', 'caisse.html'];
           var links = pages.map(function (p) {
             return '<a href="/' + p + '?salon=' + encodeURIComponent(s.slug) + '" target="_blank">' + p.replace('.html', '') + '</a>';
           }).join('');

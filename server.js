@@ -20,6 +20,7 @@ const express = require('express');
 
 const queueRoutes = require('./src/routes/queue');
 const catalogRoutes = require('./src/routes/catalog');
+const salesRoutes = require('./src/routes/sales');
 const barberRoutes = require('./src/routes/barbers');
 const settingsRoutes = require('./src/routes/settings');
 const salonRoutes = require('./src/routes/salons');
@@ -60,6 +61,7 @@ app.use('/api/signup', signupRoutes);
 app.use('/api', resolveSalon);
 app.use('/api/queue', queueRoutes);
 app.use('/api/catalog', catalogRoutes);
+app.use('/api/sales', salesRoutes);
 app.use('/api/barbers', barberRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/owner', ownerRoutes);
