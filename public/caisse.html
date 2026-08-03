@@ -81,12 +81,15 @@
   .ticket-total { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-top: 2px solid var(--sep); margin-bottom: 14px; }
   .ticket-total .label { font-size: 14px; color: var(--grey); }
   .ticket-total .amount { font-size: 24px; font-weight: 600; letter-spacing: -.02em; }
-  .pay-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .pay-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
   .pay-grid button {
-    border: none; border-radius: 12px; padding: 13px 8px; font-family: inherit; font-size: 13.5px;
-    font-weight: 600; cursor: pointer; background: var(--fill); color: var(--ink);
+    border: none; border-radius: 18px; font-family: inherit; font-size: 17px;
+    font-weight: 700; cursor: pointer; background: var(--fill); color: var(--ink);
+    aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+    min-height: 84px;
   }
   .pay-grid button:disabled { opacity: .4; cursor: default; }
+  .pay-grid button:active { transform: scale(.96); }
   .clear-ticket-btn { background: none; border: none; color: var(--red); font-family: inherit; font-size: 13px; cursor: pointer; margin-top: 10px; width: 100%; text-align: center; }
 
   .empty { background: var(--card); border-radius: 16px; padding: 30px 20px; text-align: center; color: var(--grey); font-size: 14px; box-shadow: var(--shadow); }
@@ -189,8 +192,8 @@
         </div>
 
         <div class="pay-grid">
-          <button onclick="pay('especes')" id="pay-especes" style="grid-column:span 2">Espèces</button>
-          <button onclick="pay('cb')" id="pay-cb" style="grid-column:span 2">CB</button>
+          <button onclick="pay('especes')" id="pay-especes">Espèces</button>
+          <button onclick="pay('cb')" id="pay-cb">CB</button>
         </div>
         <button class="clear-ticket-btn" onclick="clearTicket()">Vider le ticket</button>
       </div>
