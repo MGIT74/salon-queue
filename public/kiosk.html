@@ -43,11 +43,8 @@
   .panel.on { display: block; }
 
   .eyebrow { font-size: clamp(14px,1.3vw,17px); font-weight: 600; color: var(--grey); margin-bottom: clamp(14px,2vh,22px); }
-  .gift-entry-btn {
-    display: block; margin: clamp(20px,3vh,32px) auto 0; background: none; border: 1.5px solid var(--sep);
-    border-radius: 999px; padding: 12px 26px; font-family: inherit; font-size: clamp(14px,1.3vw,16px);
-    font-weight: 600; color: var(--ink); cursor: pointer;
-  }
+  .gift-tile .barber-fallback { background: linear-gradient(160deg, #b8860b, #8a5a00); font-size: clamp(32px,5vw,52px); }
+  .gift-tile .barber-name { color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.6); }
   .barber-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(clamp(140px,16vw,220px), 1fr));
@@ -192,7 +189,6 @@
     <section class="panel on" id="p-home">
       <div class="eyebrow" id="eyebrow-home">Choisissez votre coiffeur</div>
       <div class="barber-grid" id="barber-grid"></div>
-      <button class="gift-entry-btn" onclick="show('p-gift-code')">🎁 Utiliser un cadeau</button>
     </section>
 
     <section class="panel" id="p-gift-code">
@@ -430,7 +426,12 @@ function isOverrun(barberId) {
 }
 
 function renderBarberGrid() {
-  document.getElementById('barber-grid').innerHTML = barbers.map(function (b) {
+  var giftTile = '<button class="barber-card gift-tile" onclick="show(\'p-gift-code\')">' +
+    '<div class="barber-fallback">🎁</div>' +
+    '<div class="barber-overlay"><div class="barber-name">Utiliser un cadeau</div></div>' +
+    '</button>';
+
+  document.getElementById('barber-grid').innerHTML = giftTile + barbers.map(function (b) {
     var w = waitForBarber(b.id);
     var over = isOverrun(b.id);
     var free = w === 0;
@@ -445,7 +446,7 @@ function renderBarberGrid() {
         '<div class="barber-name">' + esc(b.name) + '</div>' +
         '<div class="barber-wait' + (free ? ' free' : '') + '">' + waitLabel + '</div>' +
       '</div></button>';
-  }).join('') || '<div class="empty">Aucun coiffeur configuré</div>';
+  }).join('');
 }
 
 /* ---------- Utiliser un cadeau ---------- */
@@ -490,6 +491,17 @@ function submitGiftCheckin(b) {
   var serviceItem = activeGift.items.find(function (it) { return it.item_type === 'service'; });
   var extraItems = activeGift.items.filter(function (it) { return it.item_type === 'extra'; });
 
+  if (!serviceItem || !serviceItem.item_id) {
+    activeGift = null;
+    document.getElementById('eyebrow-home').textContent = 'Choisissez votre coiffeur';
+    showAlert(
+      "Ce cadeau a été créé avant une mise à jour du système et ne peut pas être utilisé automatiquement ici. " +
+      "Merci de vous présenter à l'accueil, ils pourront vous enregistrer manuellement.",
+      { title: 'Cadeau non compatible' }
+    );
+    return;
+  }
+
   api('/api/queue/checkin', {
     method: 'POST',
     body: {
@@ -514,7 +526,7 @@ function submitGiftCheckin(b) {
     show('p-ticket');
     refresh();
   }).catch(function (err) {
-    toast(err.message, true);
+    showAlert(err.message, { title: 'Erreur' });
   });
 }
 
