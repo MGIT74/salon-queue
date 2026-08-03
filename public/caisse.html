@@ -31,8 +31,20 @@
   .topbar h1 { font-size: 22px; font-weight: 600; letter-spacing: -.03em; margin: 0; }
   .logout-btn { background: none; border: none; color: var(--grey); font-family: inherit; font-size: 14px; cursor: pointer; padding: 6px 0; }
 
-  .caisse-layout { display: grid; grid-template-columns: 1fr 340px; gap: 18px; align-items: start; }
-  @media (max-width: 860px) { .caisse-layout { grid-template-columns: 1fr; } }
+  .caisse-layout {
+    display: grid; gap: 18px; align-items: start;
+    grid-template-columns: 1fr 340px;
+    grid-template-areas: "grid ticket" "pending ticket";
+  }
+  .caisse-grid-col { grid-area: grid; }
+  .ticket-panel { grid-area: ticket; }
+  .pending-section { grid-area: pending; }
+  @media (max-width: 860px) {
+    .caisse-layout {
+      grid-template-columns: 1fr;
+      grid-template-areas: "grid" "ticket" "pending";
+    }
+  }
 
   .cat-tabs { display: flex; gap: 6px; background: var(--fill); border-radius: 999px; padding: 4px; margin-bottom: 16px; overflow-x: auto; }
   .cat-tabs button {
@@ -145,14 +157,16 @@
     </div>
 
     <div class="caisse-layout">
-      <div>
+      <div class="caisse-grid-col">
         <div class="cat-tabs" id="cat-tabs">
           <button class="on" data-cat="services">Prestations</button>
           <button data-cat="extras">Suppléments</button>
           <button data-cat="products">Produits</button>
         </div>
         <div class="item-grid" id="item-grid"></div>
+      </div>
 
+      <div class="pending-section">
         <div class="section-label" id="pending-label" style="display:none;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--grey);margin:22px 0 10px 2px">En attente d'encaissement</div>
         <div class="pending-list" id="pending-list"></div>
       </div>
