@@ -306,3 +306,22 @@ ALTER TABLE queue ADD COLUMN IF NOT EXISTS paid_at DATETIME NULL;
 -- Un encaissement peut etre "mis de cote" (client parti chercher sa
 -- carte, urgence...) sans etre perdu ni bloquer le suivant.
 ALTER TABLE queue ADD COLUMN IF NOT EXISTS payment_deferred_at DATETIME NULL;
+
+-- Bon cadeau : achete d'avance pour un beneficiaire precis, reconnu
+-- automatiquement quand celui-ci passe par le chemin normal (kiosk ->
+-- file -> caisse). L'argent est deja compte a l'achat (sale_id lie a
+-- la vente d'origine) - l'utilisation ne recree jamais une 2e vente.
+CREATE TABLE IF NOT EXISTS gift_cards (
+  id CHAR(36) PRIMARY KEY,
+  salon_id CHAR(36) NOT NULL,
+  sale_id CHAR(36) NOT NULL,
+  recipient_name VARCHAR(255) NOT NULL,
+  recipient_phone VARCHAR(50) NOT NULL,
+  recipient_email VARCHAR(255) NOT NULL,
+  amount_cents INT NOT NULL,
+  used_at DATETIME NULL,
+  used_queue_id CHAR(36) NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE,
+  FOREIGN KEY (sale_id) REFERENCES sales(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

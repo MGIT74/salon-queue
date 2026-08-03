@@ -175,6 +175,19 @@
         <h3>Ticket en cours</h3>
         <div class="ticket-lines" id="ticket-lines"><div class="empty">Aucun article sélectionné</div></div>
         <div class="ticket-total"><span class="label">Total</span><span class="amount" id="ticket-total">0,00 €</span></div>
+
+        <div id="gift-section" style="display:none;margin-bottom:14px">
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-bottom:10px">
+            <input type="checkbox" id="gift-checkbox" onchange="toggleGiftFields()" style="width:16px;height:16px">
+            C'est un cadeau pour quelqu'un d'autre
+          </label>
+          <div id="gift-fields" style="display:none">
+            <input id="gift-name" class="modal-input" placeholder="Nom du bénéficiaire" style="margin-bottom:8px">
+            <input id="gift-phone" class="modal-input" placeholder="Téléphone du bénéficiaire" style="margin-bottom:8px">
+            <input id="gift-email" class="modal-input" type="email" placeholder="Email du bénéficiaire">
+          </div>
+        </div>
+
         <div class="pay-grid">
           <button onclick="pay('especes')" id="pay-especes">Espèces</button>
           <button onclick="pay('cb')" id="pay-cb">CB</button>
@@ -383,16 +396,31 @@ function renderPendingList() {
     }
 
     var isActive = i === firstActiveIndex;
+    var giftNote = q.gift_card
+      ? '<div class="lock-note" style="color:var(--green)">🎁 Cadeau disponible</div>'
+      : '';
     return '<div class="pending-card' + (isActive ? '' : ' locked') + '"' +
-      (isActive ? ' onclick="usePendingForTicket(\'' + q.id + '\')"' : '') + '>' +
+      (isActive && !q.gift_card ? ' onclick="usePendingForTicket(\'' + q.id + '\')"' : '') + '>' +
       '<div><div class="name">' + esc(q.client_name) + '</div>' +
       '<div class="meta">' + esc(detail) + '</div>' +
-      (isActive ? '' : '<div class="lock-note">En attente de son tour</div>') + '</div>' +
+      (isActive ? giftNote : '<div class="lock-note">En attente de son tour</div>') + '</div>' +
       '<div class="pending-actions">' +
         '<span class="amount">' + eur(q.total_price_cents) + '</span>' +
+        (isActive && q.gift_card
+          ? '<button class="btn btn-primary" onclick="event.stopPropagation();useGiftCard(\'' + q.gift_card.id + '\',\'' + q.id + '\')">Utiliser le cadeau</button>'
+          : '') +
         (isActive ? '<button class="btn btn-ghost" onclick="event.stopPropagation();toggleDeferPayment(\'' + q.id + '\')">Mettre de côté</button>' : '') +
       '</div></div>';
   }).join('');
+}
+
+function useGiftCard(giftId, queueId) {
+  barberApi('/api/sales/gift-cards/' + giftId + '/redeem', { method: 'POST', body: { queue_id: queueId } })
+    .then(function () {
+      toast('Cadeau utilisé — client réglé');
+      loadPendingPayments();
+    })
+    .catch(function (e) { toast(e.message, true); });
 }
 
 function toggleDeferPayment(queueId) {
@@ -480,22 +508,59 @@ function renderTicket() {
   ['especes', 'cb', 'cheque_cadeau'].forEach(function (m) {
     document.getElementById('pay-' + m).disabled = ticket.length === 0;
   });
+  updateGiftVisibility();
 }
 
 /* ---------- Paiement ---------- */
+function toggleGiftFields() {
+  var checked = document.getElementById('gift-checkbox').checked;
+  document.getElementById('gift-fields').style.display = checked ? 'block' : 'none';
+}
+
+// La case "cadeau" n'a de sens que pour un ticket construit à la main
+// (jamais pour un encaissement qui vient de "En attente d'encaissement" —
+// ce client est déjà en train de se faire servir, ce n'est pas un
+// cadeau à l'avance pour quelqu'un d'autre).
+function updateGiftVisibility() {
+  var section = document.getElementById('gift-section');
+  var show = ticket.length > 0 && !ticketQueueId;
+  section.style.display = show ? 'block' : 'none';
+  if (!show) {
+    document.getElementById('gift-checkbox').checked = false;
+    document.getElementById('gift-fields').style.display = 'none';
+  }
+}
+
 function pay(method) {
   if (!ticket.length) return;
+
+  var gift = null;
+  if (document.getElementById('gift-checkbox').checked) {
+    var gName = document.getElementById('gift-name').value.trim();
+    var gPhone = document.getElementById('gift-phone').value.trim();
+    var gEmail = document.getElementById('gift-email').value.trim();
+    if (!gName || !gPhone || !gEmail) {
+      toast('Nom, téléphone et email du bénéficiaire sont requis pour un cadeau', true);
+      return;
+    }
+    gift = { recipient_name: gName, recipient_phone: gPhone, recipient_email: gEmail };
+  }
+
   var total = ticketTotal();
   var soldTicket = ticket.slice();
   var linkedQueueId = ticketQueueId;
 
   barberApi('/api/sales', {
     method: 'POST',
-    body: { payment_method: method, items: soldTicket, queue_id: linkedQueueId }
+    body: { payment_method: method, items: soldTicket, queue_id: linkedQueueId, gift: gift }
   }).then(function () {
     showReceipt(soldTicket, total, method);
     ticket = [];
     ticketQueueId = null;
+    document.getElementById('gift-checkbox').checked = false;
+    document.getElementById('gift-name').value = '';
+    document.getElementById('gift-phone').value = '';
+    document.getElementById('gift-email').value = '';
     renderTicket();
     loadPendingPayments();
   }).catch(function (e) { toast(e.message, true); });

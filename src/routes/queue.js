@@ -37,6 +37,27 @@ router.get('/', wrap(async (req, res) => {
 router.get('/pending-payment', requireAdminOrBarber, wrap(async (req, res) => {
   let rows = await loadQueue(req.salon.id, ['done'], true);
   if (req.barberId) rows = rows.filter((r) => r.barber_id === req.barberId);
+
+  // Rapproche chaque client en attente avec un bon cadeau non utilisé,
+  // par la même clé de rapprochement que les notes (email > téléphone
+  // > nom) — le beneficiaire n'a pas besoin d'avoir explicitement
+  // rappelé qu'il a un cadeau, ça ressort tout seul.
+  const [gifts] = await pool.query(
+    'SELECT * FROM gift_cards WHERE salon_id = ? AND used_at IS NULL', [req.salon.id]
+  );
+  const giftByKey = {};
+  gifts.forEach((g) => {
+    const key = clientKey({ email: g.recipient_email, phone: g.recipient_phone, client_name: g.recipient_name });
+    if (key) giftByKey[key] = g;
+  });
+  rows = rows.map((r) => {
+    const key = clientKey(r);
+    const gift = key ? giftByKey[key] : null;
+    return gift
+      ? Object.assign({}, r, { gift_card: { id: gift.id, amount_cents: gift.amount_cents } })
+      : r;
+  });
+
   rows.sort((a, b) => {
     const aDef = Boolean(a.payment_deferred_at), bDef = Boolean(b.payment_deferred_at);
     if (aDef !== bDef) return aDef ? 1 : -1;
