@@ -409,7 +409,8 @@ function renderPendingList() {
 
     var isActive = i === firstActiveIndex;
     var giftNote = q.gift_card
-      ? '<div class="lock-note" style="color:var(--green)">🎁 Cadeau disponible</div>'
+      ? '<div class="lock-note" style="color:var(--green)">🎁 Cadeau disponible (' + eur(q.gift_card.amount_cents) +
+        (q.gift_card.items && q.gift_card.items.length > 1 ? ' — ' + q.gift_card.items.length + ' articles' : '') + ')</div>'
       : '';
     var loyaltyNote = q.loyalty_rewards_available
       ? '<div class="lock-note" style="color:var(--blue)">⭐ Fidélité disponible</div>'
@@ -430,12 +431,27 @@ function renderPendingList() {
 }
 
 function useGiftCard(giftId, queueId) {
-  barberApi('/api/sales/gift-cards/' + giftId + '/redeem', { method: 'POST', body: { queue_id: queueId } })
-    .then(function () {
-      toast('Cadeau utilisé — client réglé');
-      loadPendingPayments();
-    })
-    .catch(function (e) { toast(e.message, true); });
+  var q = pendingPayments.find(function (x) { return x.id === queueId; });
+  var gift = q && q.gift_card;
+  var items = (gift && gift.items) || [];
+
+  var itemsList = items.map(function (it) {
+    return it.quantity + ' × ' + it.item_name;
+  }).join(', ');
+  var message = items.length
+    ? 'Ce cadeau (' + eur(gift.amount_cents) + ') comprend : ' + itemsList + '. ' +
+      'Pensez à remettre au client tout ce qui n\'est pas la coupe déjà effectuée (produits, suppléments...).'
+    : 'Confirmer l\'utilisation de ce cadeau ?';
+
+  showConfirm(message, { title: 'Utiliser le cadeau' }).then(function (ok) {
+    if (!ok) return;
+    barberApi('/api/sales/gift-cards/' + giftId + '/redeem', { method: 'POST', body: { queue_id: queueId } })
+      .then(function () {
+        toast('Cadeau utilisé — client réglé');
+        loadPendingPayments();
+      })
+      .catch(function (e) { toast(e.message, true); });
+  });
 }
 
 function toggleDeferPayment(queueId) {

@@ -341,3 +341,9 @@ CREATE TABLE IF NOT EXISTS loyalty_accounts (
   UNIQUE KEY uniq_owner_client (owner_id, client_key),
   FOREIGN KEY (owner_id) REFERENCES owners(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Detail des articles compris dans un bon cadeau (pas seulement le
+-- montant total), pour que le coiffeur sache exactement quoi remettre
+-- au beneficiaire au moment d'utiliser le cadeau (ex: un produit
+-- achete en plus de la coupe, que le kiosk ne connait pas).
+ALTER TABLE gift_cards ADD COLUMN IF NOT EXISTS items_json TEXT NULL;

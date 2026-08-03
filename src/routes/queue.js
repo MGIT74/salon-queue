@@ -65,7 +65,11 @@ router.get('/pending-payment', requireAdminOrBarber, wrap(async (req, res) => {
     const gift = key ? giftByKey[key] : null;
     const rewards = key ? loyaltyByKey[key] : null;
     const extra = {};
-    if (gift) extra.gift_card = { id: gift.id, amount_cents: gift.amount_cents };
+    if (gift) {
+      let giftItems = [];
+      try { giftItems = JSON.parse(gift.items_json || '[]'); } catch (e) { giftItems = []; }
+      extra.gift_card = { id: gift.id, amount_cents: gift.amount_cents, items: giftItems };
+    }
     if (rewards) extra.loyalty_rewards_available = rewards;
     return Object.keys(extra).length ? Object.assign({}, r, extra) : r;
   });

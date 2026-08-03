@@ -102,10 +102,16 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
   }
 
   if (gift) {
+    const itemsSnapshot = items.map((it) => ({
+      item_type: it.item_type || 'product',
+      item_name: it.item_name || 'Article',
+      unit_price_cents: Math.round(Number(it.unit_price_cents) || 0),
+      quantity: Math.max(1, Number(it.quantity) || 1)
+    }));
     await pool.query(
-      `INSERT INTO gift_cards (id, salon_id, sale_id, recipient_name, recipient_phone, recipient_email, amount_cents)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [crypto.randomUUID(), req.salon.id, saleId, gift.recipient_name, gift.recipient_phone, gift.recipient_email, total]
+      `INSERT INTO gift_cards (id, salon_id, sale_id, recipient_name, recipient_phone, recipient_email, amount_cents, items_json)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [crypto.randomUUID(), req.salon.id, saleId, gift.recipient_name, gift.recipient_phone, gift.recipient_email, total, JSON.stringify(itemsSnapshot)]
     );
   }
 
