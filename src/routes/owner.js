@@ -453,4 +453,110 @@ router.get('/client-marketing', requireAdmin, wrap(async (req, res) => {
   });
 }));
 
+/**
+ * Periode de caisse actuellement OUVERTE (depuis la derniere cloture,
+ * ou depuis le debut si jamais cloture) - total, nombre de ventes,
+ * detail par mode de paiement, detail par coiffeur.
+ */
+router.get('/caisse/current-period', requireAdmin, wrap(async (req, res) => {
+  const [[lastClosing]] = await pool.query(
+    'SELECT period_end FROM cash_closings WHERE salon_id = ? ORDER BY period_end DESC LIMIT 1',
+    [req.salon.id]
+  );
+  const periodStart = lastClosing ? lastClosing.period_end : null;
+
+  const [sales] = await pool.query(
+    periodStart
+      ? 'SELECT s.*, b.name AS barber_name FROM sales s LEFT JOIN barbers b ON b.id = s.barber_id WHERE s.salon_id = ? AND s.created_at > ? ORDER BY s.created_at DESC'
+      : 'SELECT s.*, b.name AS barber_name FROM sales s LEFT JOIN barbers b ON b.id = s.barber_id WHERE s.salon_id = ? ORDER BY s.created_at DESC',
+    periodStart ? [req.salon.id, periodStart] : [req.salon.id]
+  );
+
+  const byMethod = {};
+  const byBarber = {};
+  let total = 0;
+  sales.forEach((s) => {
+    total += s.total_price_cents;
+    byMethod[s.payment_method] = (byMethod[s.payment_method] || 0) + s.total_price_cents;
+    const bName = s.barber_name || 'Non assigné';
+    if (!byBarber[bName]) byBarber[bName] = { total_cents: 0, count: 0 };
+    byBarber[bName].total_cents += s.total_price_cents;
+    byBarber[bName].count += 1;
+  });
+
+  res.json({
+    ok: true,
+    period_start: periodStart ? utcIso(periodStart) : null,
+    total_cents: total,
+    sales_count: sales.length,
+    by_method: byMethod,
+    by_barber: byBarber
+  });
+}));
+
+/**
+ * Cloture la periode ouverte actuelle - fige les chiffres dans
+ * cash_closings. Admin uniquement (jamais accessible depuis la caisse
+ * elle-meme, authentifiee par PIN coiffeur).
+ */
+router.post('/caisse/close', requireAdmin, wrap(async (req, res) => {
+  const [[lastClosing]] = await pool.query(
+    'SELECT period_end FROM cash_closings WHERE salon_id = ? ORDER BY period_end DESC LIMIT 1',
+    [req.salon.id]
+  );
+  const periodStart = lastClosing ? lastClosing.period_end : null;
+
+  const [sales] = await pool.query(
+    periodStart
+      ? 'SELECT payment_method, total_price_cents FROM sales WHERE salon_id = ? AND created_at > ?'
+      : 'SELECT payment_method, total_price_cents FROM sales WHERE salon_id = ?',
+    periodStart ? [req.salon.id, periodStart] : [req.salon.id]
+  );
+
+  if (sales.length === 0) {
+    return res.status(400).json({ error: 'Aucune vente à clôturer sur cette période.' });
+  }
+
+  const byMethod = {};
+  let total = 0;
+  sales.forEach((s) => {
+    total += s.total_price_cents;
+    byMethod[s.payment_method] = (byMethod[s.payment_method] || 0) + s.total_price_cents;
+  });
+
+  const id = crypto.randomUUID();
+  await pool.query(
+    `INSERT INTO cash_closings (id, salon_id, period_start, period_end, total_cents, sales_count, breakdown_json)
+     VALUES (?, ?, ?, NOW(), ?, ?, ?)`,
+    [id, req.salon.id, periodStart, total, sales.length, JSON.stringify(byMethod)]
+  );
+
+  res.json({ ok: true, id, total_cents: total, sales_count: sales.length });
+}));
+
+/**
+ * Historique des clotures precedentes.
+ */
+router.get('/caisse/closings', requireAdmin, wrap(async (req, res) => {
+  const [rows] = await pool.query(
+    'SELECT * FROM cash_closings WHERE salon_id = ? ORDER BY period_end DESC LIMIT 100',
+    [req.salon.id]
+  );
+  res.json({
+    ok: true,
+    items: rows.map((r) => {
+      let breakdown = {};
+      try { breakdown = JSON.parse(r.breakdown_json || '{}'); } catch (e) { breakdown = {}; }
+      return {
+        id: r.id,
+        period_start: r.period_start ? utcIso(r.period_start) : null,
+        period_end: utcIso(r.period_end),
+        total_cents: r.total_cents,
+        sales_count: r.sales_count,
+        breakdown
+      };
+    })
+  });
+}));
+
 module.exports = router;

@@ -380,3 +380,21 @@ ALTER TABLE loyalty_accounts ADD COLUMN IF NOT EXISTS recipient_email VARCHAR(25
 ALTER TABLE services ADD COLUMN IF NOT EXISTS image_url LONGTEXT NULL;
 ALTER TABLE extras ADD COLUMN IF NOT EXISTS image_url LONGTEXT NULL;
 ALTER TABLE products ADD COLUMN IF NOT EXISTS image_url LONGTEXT NULL;
+
+-- Cloture de caisse : fige une periode de ventes (depuis la
+-- precedente cloture, ou depuis le debut si jamais fait), avec le
+-- detail par mode de paiement pour pouvoir reconcilier. Une fois
+-- creee, la periode est consideree "close" - les ventes suivantes
+-- constituent une nouvelle periode ouverte.
+CREATE TABLE IF NOT EXISTS cash_closings (
+  id CHAR(36) PRIMARY KEY,
+  salon_id CHAR(36) NOT NULL,
+  period_start DATETIME NULL,
+  period_end DATETIME NOT NULL,
+  total_cents INT NOT NULL,
+  sales_count INT NOT NULL,
+  breakdown_json TEXT NULL,
+  closed_by VARCHAR(255) NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -17,7 +17,8 @@ function wrap(fn) {
 const EDITABLE = [
   'salon_name', 'notify_before_min', 'logo_url', 'gift_tile_image_url',
   'smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_from',
-  'printer_connection_type', 'printer_ip', 'printer_model'
+  'printer_connection_type', 'printer_ip', 'printer_model',
+  'caisse_inactivity_seconds'
 ];
 
 router.get('/', requireAdmin, wrap(async (req, res) => {
@@ -83,7 +84,8 @@ router.get('/public', wrap(async (req, res) => {
     ok: true,
     salon_name: s.salon_name || 'Le Salon',
     logo_url: s.logo_url || null,
-    gift_tile_image_url: s.gift_tile_image_url || null
+    gift_tile_image_url: s.gift_tile_image_url || null,
+    caisse_inactivity_seconds: s.caisse_inactivity_seconds ? Number(s.caisse_inactivity_seconds) : 15
   });
 }));
 

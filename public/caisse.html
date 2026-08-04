@@ -364,9 +364,23 @@ function showApp() {
   loadCatalog();
   loadPendingPayments();
   loadMarketingSettings();
+  loadInactivitySetting();
   clearInterval(pendingPaymentsInterval);
   pendingPaymentsInterval = setInterval(loadPendingPayments, 5000);
   resetInactivityTimer();
+}
+
+function loadInactivitySetting() {
+  var headers = {};
+  if (SALON_SLUG) headers['X-Salon-Slug'] = SALON_SLUG;
+  fetch('/api/settings/public', { headers: headers })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      var seconds = Number(d.caisse_inactivity_seconds) || 15;
+      INACTIVITY_LIMIT_MS = seconds * 1000;
+      resetInactivityTimer();
+    })
+    .catch(function () {});
 }
 
 function loadMarketingSettings() {

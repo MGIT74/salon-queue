@@ -458,6 +458,7 @@
         <button data-t="extras"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg></span> Suppléments</button>
         <button data-t="products"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg></span> Produits</button>
         <button data-t="marketing"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12v6a2 2 0 01-2 2H6a2 2 0 01-2-2v-6M2 7l10-5 10 5-10 5-10-5z"/><path d="M6 10v6a6 3 0 0012 0v-6"/></svg></span> Marketing</button>
+        <button data-t="caisse"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M2 11h20M7 15h2M12 15h5"/></svg></span> Caisse</button>
         <button data-t="barbers"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-6 8-6s8 2 8 6"/></svg></span> Coiffeurs</button>
         <button data-t="clients"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 00-3-3.87"/><path d="M15.5 3.13a4 4 0 010 7.75"/></svg></span> Clients</button>
         <button data-t="salons"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l1-5h16l1 5"/><path d="M4 9v11h16V9"/><line x1="9" y1="20" x2="9" y2="14"/><line x1="15" y1="20" x2="15" y2="14"/></svg></span> Mes salons</button>
@@ -589,6 +590,34 @@
       <p class="hint">Historique des cadeaux achetés dans ce salon.</p>
       <div id="gift-cards-list"></div>
       <div class="clients-pagination" id="gifts-pagination"></div>
+    </div>
+  </div>
+
+  <!-- ===== Onglet caisse ===== -->
+  <div class="tab-panel" id="t-caisse">
+    <div class="card-box">
+      <h3>Période en cours</h3>
+      <p class="hint" id="caisse-period-since">Depuis le début.</p>
+      <div class="total-line" style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:16px">
+        <span style="color:var(--grey);font-size:14px" id="caisse-sales-count">0 vente</span>
+        <span style="font-size:24px;font-weight:600" id="caisse-total">0,00 €</span>
+      </div>
+      <div id="caisse-by-method" style="margin-bottom:14px"></div>
+      <div class="hint" style="font-weight:600;color:var(--ink);margin-bottom:6px">Par coiffeur</div>
+      <div id="caisse-by-barber" style="margin-bottom:18px"></div>
+      <button class="btn btn-primary" onclick="startCaisseClosing()">Clôturer la caisse</button>
+    </div>
+
+    <div class="card-box">
+      <h3>Historique des clôtures</h3>
+      <div id="caisse-closings-list"></div>
+    </div>
+
+    <div class="card-box">
+      <h3>Réglages de la caisse</h3>
+      <div class="fld"><label for="caisse-inactivity">Déconnexion automatique après (secondes)</label>
+        <input id="caisse-inactivity" type="number" min="5" max="300"></div>
+      <button class="btn btn-primary" onclick="saveCaisseInactivity()">Enregistrer</button>
     </div>
   </div>
 
@@ -1093,6 +1122,7 @@ document.getElementById('tabs').addEventListener('click', function (e) {
   if (b.dataset.t === 'clients') loadClients();
   if (b.dataset.t === 'salons') loadChainTab();
   if (b.dataset.t === 'marketing') loadMarketingTab();
+  if (b.dataset.t === 'caisse') loadCaisseTab();
 });
 
 /* ============ Chargement ============ */
@@ -2204,6 +2234,83 @@ function saveMarketingSettings() {
       loyalty_product_discount_pct: productPct
     }
   }).then(function () { toast('Réglages enregistrés'); })
+    .catch(function (e) { toast(e.message, true); });
+}
+
+/* ============ Caisse ============ */
+function loadCaisseTab() {
+  api('/api/owner/caisse/current-period').then(function (r) {
+    document.getElementById('caisse-period-since').textContent = r.period_start
+      ? 'Depuis la dernière clôture (' + new Date(r.period_start).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) + ').'
+      : 'Depuis le début (aucune clôture précédente).';
+    document.getElementById('caisse-sales-count').textContent = r.sales_count + (r.sales_count > 1 ? ' ventes' : ' vente');
+    document.getElementById('caisse-total').textContent = eur(r.total_cents);
+
+    var methodLabels = { especes: 'Espèces', cb: 'CB', autre: 'Autre' };
+    var methods = Object.keys(r.by_method);
+    document.getElementById('caisse-by-method').innerHTML = methods.length === 0
+      ? '<div class="empty">Aucune vente sur cette période</div>'
+      : methods.map(function (m) {
+          return '<div style="display:flex;justify-content:space-between;font-size:14px;padding:4px 0">' +
+            '<span style="color:var(--grey)">' + (methodLabels[m] || m) + '</span><span>' + eur(r.by_method[m]) + '</span></div>';
+        }).join('');
+
+    var barbers = Object.keys(r.by_barber);
+    document.getElementById('caisse-by-barber').innerHTML = barbers.length === 0
+      ? '<div class="empty">Aucune vente sur cette période</div>'
+      : barbers.map(function (name) {
+          var b = r.by_barber[name];
+          return '<div style="display:flex;justify-content:space-between;font-size:14px;padding:4px 0">' +
+            '<span style="color:var(--grey)">' + esc(name) + ' · ' + b.count + ' vente' + (b.count > 1 ? 's' : '') + '</span>' +
+            '<span>' + eur(b.total_cents) + '</span></div>';
+        }).join('');
+  }).catch(function (e) { toast(e.message, true); });
+
+  api('/api/owner/caisse/closings').then(function (r) {
+    var list = document.getElementById('caisse-closings-list');
+    list.innerHTML = r.items.length === 0
+      ? '<div class="empty">Aucune clôture pour le moment</div>'
+      : r.items.map(function (c) {
+          var when = new Date(c.period_end).toLocaleString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+          return '<div class="item"><div class="item-main">' +
+            '<div class="item-name">' + when + ' — ' + eur(c.total_cents) + '</div>' +
+            '<div class="item-meta">' + c.sales_count + ' vente' + (c.sales_count > 1 ? 's' : '') + '</div>' +
+            '</div></div>';
+        }).join('');
+  }).catch(function (e) { toast(e.message, true); });
+
+  api('/api/settings').then(function (r) {
+    document.getElementById('caisse-inactivity').value = r.settings.caisse_inactivity_seconds || 15;
+  }).catch(function () {});
+}
+
+// Double validation demandée explicitement, pour eviter une cloture
+// par erreur (action definitive, ne peut pas etre annulee).
+function startCaisseClosing() {
+  api('/api/owner/caisse/current-period').then(function (r) {
+    if (r.sales_count === 0) { toast('Aucune vente à clôturer sur cette période', true); return; }
+    showConfirm(
+      'Clôturer la caisse pour ' + eur(r.total_cents) + ' (' + r.sales_count + ' vente' + (r.sales_count > 1 ? 's' : '') + ') ?',
+      { title: '1/2 — Confirmer la clôture' }
+    ).then(function (ok1) {
+      if (!ok1) return;
+      showConfirm(
+        'Cette action est définitive et ne peut pas être annulée. Confirmez une seconde fois pour valider.',
+        { title: '2/2 — Dernière confirmation', danger: true, confirmLabel: 'Clôturer définitivement' }
+      ).then(function (ok2) {
+        if (!ok2) return;
+        api('/api/owner/caisse/close', { method: 'POST', body: {} })
+          .then(function () { toast('Caisse clôturée'); loadCaisseTab(); })
+          .catch(function (e) { toast(e.message, true); });
+      });
+    });
+  }).catch(function (e) { toast(e.message, true); });
+}
+
+function saveCaisseInactivity() {
+  var seconds = Number(document.getElementById('caisse-inactivity').value) || 15;
+  api('/api/settings', { method: 'PUT', body: { caisse_inactivity_seconds: seconds } })
+    .then(function () { toast('Délai enregistré'); })
     .catch(function (e) { toast(e.message, true); });
 }
 
