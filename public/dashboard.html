@@ -1160,9 +1160,11 @@ function renderDrawerMarketing(r) {
   if (r.gifts && r.gifts.length) {
     r.gifts.forEach(function (g) {
       var itemsList = g.items.map(function (it) { return (it.quantity > 1 ? it.quantity + ' × ' : '') + it.item_name; }).join(', ');
+      var label = g.used_at ? '🎁 Cadeau utilisé' : '🎁 Cadeau disponible';
+      var color = g.used_at ? 'var(--grey)' : 'var(--green)';
       parts.push(
         '<div class="detail-row" style="flex-direction:column;align-items:flex-start;gap:2px">' +
-        '<span class="detail-label" style="color:var(--green)">🎁 Cadeau disponible (' + eur(g.amount_cents) + ')</span>' +
+        '<span class="detail-label" style="color:' + color + '">' + label + ' (' + eur(g.amount_cents) + ')</span>' +
         '<span class="detail-value" style="font-weight:400">' + esc(itemsList) + '</span></div>'
       );
     });

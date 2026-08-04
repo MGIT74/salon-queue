@@ -380,8 +380,8 @@ router.get('/client-marketing', requireAdmin, wrap(async (req, res) => {
   );
 
   const [allGifts] = await pool.query(
-    'SELECT id, recipient_name, recipient_phone, recipient_email, amount_cents, items_json, created_at ' +
-    'FROM gift_cards WHERE salon_id = ? AND used_at IS NULL ORDER BY created_at ASC',
+    'SELECT id, recipient_name, recipient_phone, recipient_email, amount_cents, items_json, used_at, created_at ' +
+    'FROM gift_cards WHERE salon_id = ? ORDER BY created_at DESC',
     [req.salon.id]
   );
   const relevantGifts = allGifts.filter((g) => {
@@ -390,7 +390,13 @@ router.get('/client-marketing', requireAdmin, wrap(async (req, res) => {
   }).map((g) => {
     let items = [];
     try { items = JSON.parse(g.items_json || '[]'); } catch (e) { items = []; }
-    return { id: g.id, amount_cents: g.amount_cents, items, created_at: utcIso(g.created_at) };
+    return {
+      id: g.id,
+      amount_cents: g.amount_cents,
+      items,
+      used_at: g.used_at ? utcIso(g.used_at) : null,
+      created_at: utcIso(g.created_at)
+    };
   });
 
   res.json({
