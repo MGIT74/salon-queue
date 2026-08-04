@@ -420,16 +420,20 @@ function renderNext() {
   }
 
   zone.innerHTML = mine.map(function (q, i) {
-    var locked = i > 0;
+    var isAppointmentNotYet = Boolean(q.is_appointment) && new Date(q.checkin_at) > new Date();
+    var locked = i > 0 || isAppointmentNotYet;
     var detail = q.service.name + (q.extras.length ? ' + ' + q.extras.map(function (x) { return x.name; }).join(', ') : '');
     var open = Boolean(nextDetailOpen[q.id]);
+    var lockNote = isAppointmentNotYet
+      ? 'RDV à ' + new Date(q.checkin_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+      : 'En attente de son tour';
     return '<div class="next-item" data-id="' + q.id + '">' +
       '<div class="next-card' + (locked ? ' locked' : '') + '">' +
         '<div class="next-info" onclick="toggleNextDetail(\'' + q.id + '\')">' +
           '<div class="name">' + esc(q.client_name) + '</div>' +
           '<div class="meta">' + esc(detail) + '</div>' +
           (q.gift_card ? giftBadgeHtml(q.gift_card) : '') +
-          (locked ? '<div class="lock-note">En attente de son tour</div>' : '') +
+          (locked ? '<div class="lock-note">' + lockNote + '</div>' : '') +
         '</div>' +
         '<div class="next-btns">' +
           (locked ? '' : '<button class="btn btn-primary" onclick="startMine(\'' + q.id + '\')">Commencer</button>') +

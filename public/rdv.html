@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prendre rendez-vous</title>
+<link rel="stylesheet" href="/app.css?v=3">
+<style>
+  html, body { min-height: 100%; }
+  .wrap { max-width: 640px; margin: 0 auto; padding: clamp(20px,3vw,40px) 18px 60px; }
+  .rdv-header { text-align: center; margin-bottom: 28px; }
+  .rdv-header .mark { font-size: 15px; font-weight: 600; color: var(--grey); margin-bottom: 6px; }
+  .rdv-header h1 { font-size: 26px; font-weight: 600; letter-spacing: -.03em; margin: 0; }
+
+  .panel { display: none; }
+  .panel.on { display: block; }
+  .back { background: none; border: none; padding: 0; font-family: inherit; font-size: 15px;
+          color: var(--blue); font-weight: 500; cursor: pointer; margin-bottom: 18px; }
+  .eyebrow { font-size: 15px; font-weight: 600; color: var(--grey); margin-bottom: 14px; }
+
+  .svc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px,1fr)); gap: 10px; margin-bottom: 22px; }
+  .svc-card {
+    border: none; background: var(--fill); color: var(--ink); border-radius: 18px;
+    padding: 20px 14px; cursor: pointer; font-family: inherit; text-align: center;
+    display: flex; flex-direction: column; align-items: center; gap: 7px;
+    transition: background .15s ease, transform .1s ease; min-height: 108px; justify-content: center;
+  }
+  .svc-card .icon { font-size: 34px; line-height: 1; }
+  .svc-card .name { font-size: 14.5px; font-weight: 600; }
+  .svc-card .meta { font-size: 12.5px; color: var(--grey); }
+  .svc-card.sel { background: var(--blue); color: #fff; }
+  .svc-card.sel .meta { color: rgba(255,255,255,.8); }
+  .svc-card:active { transform: scale(.96); }
+
+  .extras-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 22px; }
+  .xchip { border: none; background: var(--fill); color: var(--ink); border-radius: 999px;
+           padding: 12px 18px; cursor: pointer; font-family: inherit; font-size: 14.5px;
+           font-weight: 500; display: flex; align-items: baseline; gap: 8px; }
+  .xchip .xm { font-size: 13px; color: var(--grey); }
+  .xchip.sel { background: var(--blue); color: #fff; font-weight: 600; }
+  .xchip.sel .xm { color: rgba(255,255,255,.75); }
+
+  .slots-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px,1fr)); gap: 8px; margin-bottom: 22px; }
+  .slot-btn {
+    border: none; background: var(--fill); color: var(--ink); border-radius: 12px;
+    padding: 13px 6px; cursor: pointer; font-family: inherit; font-size: 14.5px; font-weight: 600;
+    text-align: center;
+  }
+  .slot-btn.sel { background: var(--blue); color: #fff; }
+
+  .go { display: block; width: 100%; background: var(--blue); color: #fff; border: none;
+        border-radius: 16px; padding: 16px; font-size: 16px; font-weight: 600; font-family: inherit;
+        cursor: pointer; }
+  .go:disabled { opacity: .5; }
+
+  .empty { color: var(--grey); font-size: 14px; padding: 20px 0; text-align: center; }
+  .confirm-box { text-align: center; padding: 20px 0; }
+  .confirm-box .check {
+    width: 56px; height: 56px; border-radius: 50%; background: var(--green); margin: 0 auto 18px;
+    display: flex; align-items: center; justify-content: center;
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="rdv-header">
+    <div class="mark" id="salon-mark">LE SALON</div>
+    <h1>Prendre rendez-vous</h1>
+  </div>
+
+  <section class="panel on" id="p-barber">
+    <div class="eyebrow">Choisissez votre coiffeur</div>
+    <div class="svc-grid" id="barber-grid"></div>
+  </section>
+
+  <section class="panel" id="p-service">
+    <button class="back" onclick="show('p-barber')">‹ Retour</button>
+    <div class="eyebrow">Prestation</div>
+    <div class="svc-grid" id="svc-grid"></div>
+    <div class="eyebrow">Suppléments (optionnels)</div>
+    <div class="extras-grid" id="extras-grid"></div>
+    <button class="go" id="service-next-btn" onclick="goToDateStep()" disabled>Suivant</button>
+  </section>
+
+  <section class="panel" id="p-datetime">
+    <button class="back" onclick="show('p-service')">‹ Retour</button>
+    <div class="fld"><label for="rdv-date">Date</label><input id="rdv-date" type="date" onchange="loadSlots()"></div>
+    <div class="eyebrow" style="margin-top:20px">Créneaux disponibles</div>
+    <div class="slots-grid" id="slots-grid"><div class="empty">Choisissez une date</div></div>
+    <button class="go" id="date-next-btn" onclick="goToContactStep()" disabled>Suivant</button>
+  </section>
+
+  <section class="panel" id="p-contact">
+    <button class="back" onclick="show('p-datetime')">‹ Retour</button>
+    <div class="eyebrow" id="contact-summary"></div>
+    <div class="fld"><label for="rdv-name">Prénom</label><input id="rdv-name" type="text" autocomplete="given-name"></div>
+    <div class="fld"><label for="rdv-email">Email — pour la confirmation</label><input id="rdv-email" type="email" autocomplete="email"></div>
+    <div class="fld"><label for="rdv-phone">Téléphone (optionnel)</label><input id="rdv-phone" type="tel" autocomplete="tel"></div>
+    <button class="go" id="confirm-btn" onclick="submitAppointment()">Confirmer le rendez-vous</button>
+  </section>
+
+  <section class="panel" id="p-confirmed">
+    <div class="confirm-box">
+      <div class="check"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+      <h1>C'est confirmé !</h1>
+      <p style="color:var(--grey);margin-top:10px" id="confirm-details"></p>
+      <p style="color:var(--grey);font-size:13.5px;margin-top:14px">Un email de confirmation vous a été envoyé, avec un lien pour annuler si besoin.</p>
+    </div>
+  </section>
+
+  <section class="panel" id="p-cancel">
+    <div class="confirm-box">
+      <h1>Annuler ce rendez-vous ?</h1>
+      <p style="color:var(--grey);margin:14px 0 22px" id="cancel-details">Confirmez pour libérer ce créneau.</p>
+      <button class="go" onclick="confirmCancel()" style="background:var(--red)">Oui, annuler mon rendez-vous</button>
+    </div>
+  </section>
+
+  <section class="panel" id="p-cancelled">
+    <div class="confirm-box">
+      <h1>Rendez-vous annulé</h1>
+      <p style="color:var(--grey);margin-top:10px">Votre créneau a bien été libéré.</p>
+    </div>
+  </section>
+</div>
+
+<script src="/app.js?v=3"></script>
+<script>
+mountThemeButton();
+
+var SALON_SLUG = (function () {
+  try { return new URLSearchParams(window.location.search).get('salon') || ''; }
+  catch (e) { return ''; }
+})();
+
+function api(path, opts) {
+  opts = opts || {};
+  var headers = { 'Content-Type': 'application/json' };
+  if (SALON_SLUG) headers['X-Salon-Slug'] = SALON_SLUG;
+  return fetch(path, {
+    method: opts.method || 'GET',
+    headers: headers,
+    body: opts.body ? JSON.stringify(opts.body) : undefined
+  }).then(function (r) {
+    return r.json().then(function (data) {
+      if (!r.ok) throw new Error(data.error || 'Erreur ' + r.status);
+      return data;
+    });
+  });
+}
+
+function show(id) {
+  document.querySelectorAll('.panel').forEach(function (p) { p.classList.remove('on'); });
+  document.getElementById(id).classList.add('on');
+  window.scrollTo(0, 0);
+}
+
+function iconForItem(name) {
+  var n = (name || '').toLowerCase();
+  if (n.indexOf('enfant') !== -1) return '🧒';
+  if (n.indexOf('barbe') !== -1) return '🧔';
+  if (n.indexOf('shampoo') !== -1 || n.indexOf('shampooing') !== -1) return '🧴';
+  if (n.indexOf('couleur') !== -1 || n.indexOf('colorat') !== -1) return '🎨';
+  if (n.indexOf('serviette') !== -1 || n.indexOf('chaude') !== -1) return '🔥';
+  if (n.indexOf('contour') !== -1 || n.indexOf('traçage') !== -1 || n.indexOf('tracage') !== -1) return '📏';
+  if (n.indexOf('dégradé') !== -1 || n.indexOf('degrade') !== -1 || n.indexOf('américain') !== -1) return '💈';
+  if (n.indexOf('huile') !== -1 || n.indexOf('soin') !== -1) return '💧';
+  if (n.indexOf('cire') !== -1 || n.indexOf('gel') !== -1) return '🧴';
+  if (n.indexOf('zéro') !== -1 || n.indexOf('zero') !== -1) return '🪒';
+  if (n.indexOf('coupe') !== -1) return '✂️';
+  return '✂️';
+}
+
+var services = [], extras = [], barbers = [];
+var selBarber = null, selService = null, selExtras = [], selDate = null, selSlot = null;
+
+/* ---------- Chargement ---------- */
+function loadCatalog() {
+  return Promise.all([
+    api('/api/catalog/services'),
+    api('/api/catalog/extras'),
+    api('/api/barbers'),
+    api('/api/settings/public')
+  ]).then(function (r) {
+    services = r[0].items;
+    extras = r[1].items;
+    barbers = r[2].items.filter(function (b) { return b.accepts_appointments; });
+    var salonName = r[3].salon_name;
+    document.title = 'Rendez-vous — ' + salonName;
+    document.getElementById('salon-mark').textContent = salonName.toUpperCase();
+    renderBarberGrid();
+    renderServiceGrid();
+  });
+}
+
+function renderBarberGrid() {
+  var anyTile = '<button class="svc-card sel" data-barber-id="" onclick="selectBarber(this, null)">' +
+    '<span class="icon">👥</span><span class="name">Peu importe</span><span class="meta">Premier disponible</span></button>';
+
+  document.getElementById('barber-grid').innerHTML = anyTile + barbers.map(function (b) {
+    var photoStyle = b.photo_url ? 'background-image:url(&quot;' + esc(b.photo_url) + '&quot;);background-size:cover;background-position:center' : '';
+    return '<button class="svc-card" data-barber-id="' + b.id + '" style="' + photoStyle + '" onclick="selectBarber(this, \'' + b.id + '\')">' +
+      (b.photo_url ? '' : '<span class="icon">' + esc(b.name.charAt(0).toUpperCase()) + '</span>') +
+      '<span class="name" style="' + (b.photo_url ? 'color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.6)' : '') + '">' + esc(b.name) + '</span>' +
+      '</button>';
+  }).join('');
+
+  if (barbers.length === 0) {
+    document.getElementById('barber-grid').innerHTML += '<div class="empty">Aucun coiffeur ne prend de RDV en ligne pour le moment — présentez-vous directement au salon.</div>';
+  }
+}
+
+function selectBarber(el, id) {
+  selBarber = id;
+  document.querySelectorAll('#barber-grid .svc-card').forEach(function (c) { c.classList.remove('sel'); });
+  el.classList.add('sel');
+  show('p-service');
+}
+
+function renderServiceGrid() {
+  document.getElementById('svc-grid').innerHTML = services.map(function (s) {
+    return '<button class="svc-card" data-id="' + s.id + '" onclick="selectService(this,\'' + s.id + '\')">' +
+      '<span class="icon">' + iconForItem(s.name) + '</span>' +
+      '<span class="name">' + esc(s.name) + '</span>' +
+      '<span class="meta">' + s.duration_min + ' min · ' + eur(s.price_cents) + '</span></button>';
+  }).join('');
+
+  document.getElementById('extras-grid').innerHTML = extras.map(function (e) {
+    return '<button class="xchip" data-id="' + e.id + '" onclick="toggleExtra(this,\'' + e.id + '\')">' +
+      '<span>' + esc(e.name) + '</span><span class="xm">+' + e.duration_min + ' min · ' + eur(e.price_cents) + '</span></button>';
+  }).join('');
+}
+
+function selectService(el, id) {
+  selService = id;
+  document.querySelectorAll('#svc-grid .svc-card').forEach(function (c) { c.classList.remove('sel'); });
+  el.classList.add('sel');
+  document.getElementById('service-next-btn').disabled = false;
+}
+
+function toggleExtra(el, id) {
+  var i = selExtras.indexOf(id);
+  if (i === -1) selExtras.push(id); else selExtras.splice(i, 1);
+  el.classList.toggle('sel');
+}
+
+function goToDateStep() {
+  if (!selService) { toast('Choisissez une prestation', true); return; }
+  var today = new Date().toISOString().slice(0, 10);
+  document.getElementById('rdv-date').min = today;
+  if (!document.getElementById('rdv-date').value) document.getElementById('rdv-date').value = today;
+  show('p-datetime');
+  loadSlots();
+}
+
+/* ---------- Créneaux ---------- */
+function loadSlots() {
+  selDate = document.getElementById('rdv-date').value;
+  selSlot = null;
+  document.getElementById('date-next-btn').disabled = true;
+  if (!selDate) return;
+
+  var url = '/api/appointments/availability?date=' + selDate + '&service_id=' + selService +
+    '&extras=' + selExtras.join(',') + (selBarber ? '&barber_id=' + selBarber : '');
+
+  document.getElementById('slots-grid').innerHTML = '<div class="empty">Chargement…</div>';
+  api(url).then(function (r) {
+    var grid = document.getElementById('slots-grid');
+    grid.innerHTML = r.slots.length === 0
+      ? '<div class="empty">Aucun créneau disponible ce jour-là</div>'
+      : r.slots.map(function (s) {
+          return '<button class="slot-btn" data-time="' + s.time + '" data-barber="' + s.barber_id + '" onclick="selectSlot(this)">' + s.time + '</button>';
+        }).join('');
+  }).catch(function (e) { toast(e.message, true); });
+}
+
+function selectSlot(btn) {
+  document.querySelectorAll('.slot-btn').forEach(function (b) { b.classList.remove('sel'); });
+  btn.classList.add('sel');
+  selSlot = { time: btn.dataset.time, barberId: btn.dataset.barber };
+  document.getElementById('date-next-btn').disabled = false;
+}
+
+function goToContactStep() {
+  if (!selSlot) { toast('Choisissez un créneau', true); return; }
+  var s = services.find(function (x) { return x.id === selService; });
+  var extraNames = selExtras.map(function (id) { return extras.find(function (e) { return e.id === id; }).name; });
+  var when = new Date(selDate + 'T' + selSlot.time).toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' }) + ' à ' + selSlot.time;
+  document.getElementById('contact-summary').textContent = when + ' — ' + s.name + (extraNames.length ? ' + ' + extraNames.join(', ') : '');
+  show('p-contact');
+}
+
+/* ---------- Envoi ---------- */
+function submitAppointment() {
+  var name = document.getElementById('rdv-name').value.trim();
+  var email = document.getElementById('rdv-email').value.trim();
+  var phone = document.getElementById('rdv-phone').value.trim();
+  if (!name) { toast('Entrez votre prénom', true); return; }
+  if (!email) { toast('Entrez votre email', true); return; }
+
+  var btn = document.getElementById('confirm-btn');
+  btn.disabled = true; btn.textContent = 'Enregistrement…';
+
+  api('/api/appointments', {
+    method: 'POST',
+    body: {
+      client_name: name, email: email, phone: phone || null,
+      service_id: selService, extras: selExtras,
+      barber_id: selSlot.barberId, date: selDate, time: selSlot.time,
+      base_url: window.location.origin + window.location.pathname + (SALON_SLUG ? '?salon=' + SALON_SLUG : '')
+    }
+  }).then(function () {
+    var s = services.find(function (x) { return x.id === selService; });
+    var when = new Date(selDate + 'T' + selSlot.time).toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' }) + ' à ' + selSlot.time;
+    document.getElementById('confirm-details').textContent = when + ' — ' + s.name;
+    show('p-confirmed');
+  }).catch(function (e) {
+    toast(e.message, true);
+  }).finally(function () {
+    btn.disabled = false; btn.textContent = 'Confirmer le rendez-vous';
+  });
+}
+
+/* ---------- Annulation ---------- */
+var pendingCancelToken = null;
+
+function checkForCancelLink() {
+  var token = new URLSearchParams(window.location.search).get('cancel');
+  if (!token) return false;
+  pendingCancelToken = token;
+  show('p-cancel');
+  return true;
+}
+
+function confirmCancel() {
+  api('/api/appointments/cancel', { method: 'POST', body: { token: pendingCancelToken } })
+    .then(function () { show('p-cancelled'); })
+    .catch(function (e) { toast(e.message, true); });
+}
+
+if (!checkForCancelLink()) {
+  loadCatalog();
+}
+</script>
+</body>
+</html>

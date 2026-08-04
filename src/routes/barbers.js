@@ -91,6 +91,7 @@ router.put('/:id', requireAdmin, wrap(async (req, res) => {
     sets.push('pin_code = ?'); params.push(req.body.pin_code || null);
   }
   if (req.body.photo_url !== undefined) { sets.push('photo_url = ?'); params.push(req.body.photo_url || null); }
+  if (req.body.accepts_appointments !== undefined) { sets.push('accepts_appointments = ?'); params.push(req.body.accepts_appointments ? 1 : 0); }
   if (!sets.length) return res.json({ ok: true });
   params.push(req.params.id, req.salon.id);
   try {

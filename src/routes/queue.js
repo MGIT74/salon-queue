@@ -2,6 +2,7 @@ const express = require('express');
 const crypto = require('crypto');
 const { pool, utcIso } = require('../db');
 const { loadQueue, recompute, clientKey } = require('../lib/queueMath');
+const { promoteTodayAppointments } = require('./appointments');
 const requireAdmin = require('../middleware/auth');
 const requireAdminOrBarber = require('../middleware/barberAuth');
 
@@ -51,6 +52,7 @@ async function attachGiftInfo(rows, salonId) {
 
 // --- Public : état de la file (du salon résolu) --------------------------
 router.get('/', wrap(async (req, res) => {
+  await promoteTodayAppointments(req.salon.id);
   await recompute(req.salon.id);
   let rows = await loadQueue(req.salon.id);
   rows = await attachGiftInfo(rows, req.salon.id);

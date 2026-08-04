@@ -96,4 +96,22 @@ async function sendTest(salonId, to) {
   });
 }
 
-module.exports = { sendTurnSoon, sendTest, sendGiftConfirmation, sendLoyaltyActivation, invalidateTransport };
+async function sendAppointmentConfirmation(salonId, to, info) {
+  const { tx, from, salon } = await getTransport(salonId);
+  await tx.sendMail({
+    from,
+    to,
+    subject: 'Confirmation de votre rendez-vous — ' + salon,
+    text: `Bonjour ${info.clientName},\n\n` +
+          `Votre rendez-vous chez ${salon} est confirmé :\n` +
+          `${info.when} — ${info.serviceName}${info.barberName ? ' avec ' + info.barberName : ''}\n\n` +
+          `Besoin d'annuler ? ${info.cancelUrl}\n\n${salon}`,
+    html: `<p>Bonjour ${info.clientName},</p>` +
+          `<p>Votre rendez-vous chez ${salon} est confirmé :</p>` +
+          `<p><strong>${info.when}</strong><br>${info.serviceName}${info.barberName ? ' avec ' + info.barberName : ''}</p>` +
+          `<p><a href="${info.cancelUrl}">Annuler ce rendez-vous</a></p>` +
+          `<p>${salon}</p>`
+  });
+}
+
+module.exports = { sendTurnSoon, sendTest, sendGiftConfirmation, sendLoyaltyActivation, sendAppointmentConfirmation, invalidateTransport };

@@ -19,6 +19,7 @@ dotenv.config(); // .env du dépôt, ne comble que ce qui manque encore
 const express = require('express');
 
 const queueRoutes = require('./src/routes/queue');
+const { router: appointmentRoutes } = require('./src/routes/appointments');
 const catalogRoutes = require('./src/routes/catalog');
 const salesRoutes = require('./src/routes/sales');
 const barberRoutes = require('./src/routes/barbers');
@@ -60,6 +61,7 @@ app.use('/api/signup', signupRoutes);
 // l'en-tête X-Salon-Slug (ou le salon par défaut si absent).
 app.use('/api', resolveSalon);
 app.use('/api/queue', queueRoutes);
+app.use('/api/appointments', appointmentRoutes);
 app.use('/api/catalog', catalogRoutes);
 app.use('/api/sales', salesRoutes);
 app.use('/api/barbers', barberRoutes);

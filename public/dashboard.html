@@ -1728,6 +1728,10 @@ function renderBarberDetail(b) {
     '<button class="btn btn-soft" onclick="event.stopPropagation();setBarberPin(\'' + b.id + '\',\'' + esc(b.name).replace(/'/g, "\\'") + '\')">' +
     (b.has_pin ? 'Changer le code' : 'Définir un code') + '</button>' +
     '</div>' +
+    '<label style="display:flex;align-items:center;gap:8px;font-size:13.5px;margin-bottom:16px;cursor:pointer" onclick="event.stopPropagation()">' +
+    '<input type="checkbox" ' + (b.accepts_appointments ? 'checked' : '') + ' onchange="toggleAcceptsAppointments(\'' + b.id + '\', this.checked)" style="width:16px;height:16px">' +
+    'Accepte les rendez-vous en ligne' +
+    '</label>' +
     '<div class="subtabs" onclick="event.stopPropagation()">' +
     '<button class="' + (tab === 'horaires' ? 'on' : '') + '" onclick="switchBarberTab(\'' + b.id + '\',\'horaires\')">Horaires</button>' +
     '<button class="' + (tab === 'prestations' ? 'on' : '') + '" onclick="switchBarberTab(\'' + b.id + '\',\'prestations\')">Prestations</button>' +
@@ -2024,6 +2028,12 @@ function deleteLeave(barberId, leaveId) {
 
 // Redimensionne l'image côté navigateur avant envoi (évite de stocker des
 // photos trop lourdes en base — 300x300 recadré, JPEG compressé).
+function toggleAcceptsAppointments(id, checked) {
+  api('/api/barbers/' + id, { method: 'PUT', body: { accepts_appointments: checked } })
+    .then(function () { toast(checked ? 'Accepte désormais les RDV en ligne' : 'Ne prend plus de RDV en ligne'); return loadBarbers(); })
+    .catch(function (e) { toast(e.message, true); });
+}
+
 function uploadBarberPhoto(id, input) {
   var file = input.files && input.files[0];
   if (!file) return;
@@ -2582,7 +2592,7 @@ function loadSalonsList() {
 
 function renderSalonsList() {
   document.getElementById('salons-list').innerHTML = chainSalons.map(function (s) {
-    var pages = ['kiosk.html', 'display.html', 'poste.html', 'caisse.html'];
+    var pages = ['kiosk.html', 'display.html', 'poste.html', 'caisse.html', 'rdv.html'];
     var links = pages.map(function (p) {
       return '<a href="/' + p + '?salon=' + encodeURIComponent(s.slug) + '" target="_blank" style="font-size:12.5px;color:var(--blue);background:var(--fill);padding:6px 11px;border-radius:999px;text-decoration:none;margin-right:6px">' +
         p.replace('.html', '') + '</a>';

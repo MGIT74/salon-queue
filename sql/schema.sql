@@ -398,3 +398,42 @@ CREATE TABLE IF NOT EXISTS cash_closings (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Coiffeur qui accepte les rendez-vous en ligne (en plus ou a la
+-- place du sans-rdv). Un coiffeur "non" n'apparait jamais dans le
+-- formulaire de reservation en ligne.
+ALTER TABLE barbers ADD COLUMN IF NOT EXISTS accepts_appointments TINYINT(1) NOT NULL DEFAULT 0;
+
+-- Rendez-vous pris en ligne. Reste dans cette table jusqu'a ce qu'il
+-- soit "promu" (transforme en vraie entree de file le jour meme) -
+-- promoted_queue_id garde le lien vers cette entree une fois cree.
+CREATE TABLE IF NOT EXISTS appointments (
+  id CHAR(36) PRIMARY KEY,
+  salon_id CHAR(36) NOT NULL,
+  barber_id CHAR(36) NULL,
+  client_name VARCHAR(255) NOT NULL,
+  email VARCHAR(255) NULL,
+  phone VARCHAR(50) NULL,
+  service_id CHAR(36) NOT NULL,
+  scheduled_at DATETIME NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'confirmed',
+  cancel_token VARCHAR(64) NULL,
+  promoted_queue_id CHAR(36) NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE,
+  FOREIGN KEY (barber_id) REFERENCES barbers(id) ON DELETE SET NULL,
+  FOREIGN KEY (service_id) REFERENCES services(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS appointment_extras (
+  appointment_id CHAR(36) NOT NULL,
+  extra_id CHAR(36) NOT NULL,
+  PRIMARY KEY (appointment_id, extra_id),
+  FOREIGN KEY (appointment_id) REFERENCES appointments(id) ON DELETE CASCADE,
+  FOREIGN KEY (extra_id) REFERENCES extras(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Marque une entree de file comme venant d'un RDV (pas d'un check-in
+-- kiosk classique) - permet a l'interface de savoir qu'il faut griser
+-- "Commencer" tant que l'heure prevue n'est pas encore arrivee.
+ALTER TABLE queue ADD COLUMN IF NOT EXISTS is_appointment TINYINT(1) NOT NULL DEFAULT 0;
