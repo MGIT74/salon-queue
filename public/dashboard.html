@@ -630,6 +630,39 @@
       <p class="hint">Après une clôture, la caisse reste fermée (impossible d'encaisser) jusqu'à cette heure le <strong>lendemain</strong> — quelle que soit l'heure de la clôture.</p>
       <button class="btn btn-primary" onclick="saveCaisseInactivity()">Enregistrer</button>
     </div>
+
+    <div class="card-box">
+      <h3 class="accordion-head" onclick="toggleSettingsAccordion('devices')">
+        Appareils connectés
+        <svg class="accordion-chevron" id="devices-chevron" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </h3>
+      <div class="accordion-body" id="devices-body" style="display:none">
+      <p class="hint">
+        Imprimante de tickets / tiroir-caisse — enregistrez les infos ici pour préparer l'intégration.
+        <strong>En USB</strong> : l'impression automatique depuis la Caisse nécessite un petit programme installé sur
+        l'ordinateur de la caisse (pas encore développé) — en attendant, l'impression via le navigateur (bouton
+        "Imprimer" du reçu) fonctionne déjà avec n'importe quelle imprimante.
+        <strong>En réseau (Wi-Fi/Ethernet, avec sa propre adresse IP)</strong> : une impression plus directe est
+        envisageable, à tester au cas par cas selon le modèle.
+      </p>
+      <div class="grid2">
+        <div class="fld"><label for="set-printer-type">Connexion</label>
+          <select id="set-printer-type" onchange="updatePrinterIpVisibility()">
+            <option value="">Non renseigné</option>
+            <option value="usb">USB</option>
+            <option value="network">Réseau (Wi-Fi/Ethernet)</option>
+          </select>
+        </div>
+        <div class="fld"><label for="set-printer-model">Modèle</label>
+          <input id="set-printer-model" type="text" placeholder="Ex: Aures ODP 333, Epson TM-T20…"></div>
+      </div>
+      <div class="fld" id="set-printer-ip-fld" style="display:none">
+        <label for="set-printer-ip">Adresse IP de l'imprimante</label>
+        <input id="set-printer-ip" type="text" placeholder="192.168.1.50">
+      </div>
+      <button class="btn btn-primary" onclick="saveDeviceSettings()">Enregistrer</button>
+      </div>
+    </div>
   </div>
 
   <!-- ===== Onglet coiffeurs ===== -->
@@ -784,39 +817,6 @@
         <button class="btn btn-primary" onclick="saveSettings()">Enregistrer</button>
         <button class="btn btn-soft" onclick="testSmtp()">Envoyer un email de test</button>
       </div>
-      </div>
-    </div>
-
-    <div class="card-box">
-      <h3 class="accordion-head" onclick="toggleSettingsAccordion('devices')">
-        Appareils connectés
-        <svg class="accordion-chevron" id="devices-chevron" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-      </h3>
-      <div class="accordion-body" id="devices-body" style="display:none">
-      <p class="hint">
-        Imprimante de tickets / tiroir-caisse — enregistrez les infos ici pour préparer l'intégration.
-        <strong>En USB</strong> : l'impression automatique depuis la Caisse nécessite un petit programme installé sur
-        l'ordinateur de la caisse (pas encore développé) — en attendant, l'impression via le navigateur (bouton
-        "Imprimer" du reçu) fonctionne déjà avec n'importe quelle imprimante.
-        <strong>En réseau (Wi-Fi/Ethernet, avec sa propre adresse IP)</strong> : une impression plus directe est
-        envisageable, à tester au cas par cas selon le modèle.
-      </p>
-      <div class="grid2">
-        <div class="fld"><label for="set-printer-type">Connexion</label>
-          <select id="set-printer-type" onchange="updatePrinterIpVisibility()">
-            <option value="">Non renseigné</option>
-            <option value="usb">USB</option>
-            <option value="network">Réseau (Wi-Fi/Ethernet)</option>
-          </select>
-        </div>
-        <div class="fld"><label for="set-printer-model">Modèle</label>
-          <input id="set-printer-model" type="text" placeholder="Ex: Aures ODP 333, Epson TM-T20…"></div>
-      </div>
-      <div class="fld" id="set-printer-ip-fld" style="display:none">
-        <label for="set-printer-ip">Adresse IP de l'imprimante</label>
-        <input id="set-printer-ip" type="text" placeholder="192.168.1.50">
-      </div>
-      <button class="btn btn-primary" onclick="saveDeviceSettings()">Enregistrer</button>
       </div>
     </div>
   </div>
@@ -2310,6 +2310,10 @@ function loadCaisseTab() {
   api('/api/settings').then(function (r) {
     document.getElementById('caisse-inactivity').value = r.settings.caisse_inactivity_seconds || 15;
     document.getElementById('caisse-reopen-hour').value = r.settings.caisse_reopen_hour || '00:00';
+    document.getElementById('set-printer-type').value = r.settings.printer_connection_type || '';
+    document.getElementById('set-printer-model').value = r.settings.printer_model || '';
+    document.getElementById('set-printer-ip').value = r.settings.printer_ip || '';
+    updatePrinterIpVisibility();
   }).catch(function () {});
 }
 
@@ -2780,11 +2784,6 @@ function loadSettings() {
     document.getElementById('set-from').value = s.smtp_from || '';
     document.getElementById('set-pass').value = '';
     document.getElementById('pass-state').textContent = r.smtp_pass_set ? '· déjà enregistré' : '';
-
-    document.getElementById('set-printer-type').value = s.printer_connection_type || '';
-    document.getElementById('set-printer-model').value = s.printer_model || '';
-    document.getElementById('set-printer-ip').value = s.printer_ip || '';
-    updatePrinterIpVisibility();
   }).catch(function (e) { toast(e.message, true); });
 }
 
