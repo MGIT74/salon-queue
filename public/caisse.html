@@ -13,6 +13,20 @@
   .login { text-align: center; padding-top: 12vh; }
   .login .mark { font-size: 15px; font-weight: 600; color: var(--grey); margin-bottom: 6px; }
   .login h1 { font-size: 28px; font-weight: 600; letter-spacing: -.03em; margin: 0 0 36px; }
+
+  /* Verrouillage par inactivite : le contenu reste visible mais flou
+     derriere, avec l'ecran de code PIN au premier plan. */
+  #login-screen.lock-overlay {
+    position: fixed; inset: 0; z-index: 500; display: flex !important;
+    align-items: center; justify-content: center; background: rgba(0,0,0,.6);
+    padding: 20px; box-sizing: border-box; backdrop-filter: blur(2px);
+  }
+  #login-screen.lock-overlay .login-card {
+    background: var(--card); border-radius: 28px; padding: 44px 32px 36px;
+    box-shadow: 0 25px 70px rgba(0,0,0,.45); max-width: 380px; width: 100%;
+  }
+  #login-screen.lock-overlay { padding-top: 0; }
+  #app-screen.blurred { filter: blur(16px); transition: filter .35s ease; pointer-events: none; user-select: none; }
   .pin-dots { display: flex; justify-content: center; gap: 14px; margin-bottom: 32px; }
   .pin-dot { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--sep); transition: background .1s ease, border-color .1s ease; }
   .pin-dot.filled { background: var(--blue); border-color: var(--blue); }
@@ -145,18 +159,20 @@
 
 <div class="wrap">
   <div class="login" id="login-screen">
-    <div class="mark" id="salon-mark">LE SALON</div>
-    <h1>Caisse</h1>
-    <div class="pin-dots" id="pin-dots">
-      <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
+    <div class="login-card">
+      <div class="mark" id="salon-mark">LE SALON</div>
+      <h1>Caisse</h1>
+      <div class="pin-dots" id="pin-dots">
+        <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
+      </div>
+      <div class="keypad" id="keypad">
+        <button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button>
+        <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button>
+        <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button>
+        <button class="empty"></button><button data-k="0">0</button><button class="del" data-k="del">⌫</button>
+      </div>
+      <div class="login-error" id="login-error"></div>
     </div>
-    <div class="keypad" id="keypad">
-      <button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button>
-      <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button>
-      <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button>
-      <button class="empty"></button><button data-k="0">0</button><button class="del" data-k="del">⌫</button>
-    </div>
-    <div class="login-error" id="login-error"></div>
   </div>
 
   <div id="app-screen" style="display:none">
@@ -330,19 +346,53 @@ function logout() {
   me = null;
   try { sessionStorage.removeItem('caisse-session'); } catch (e) {}
   pinBuffer = '';
+  clearTimeout(inactivityTimer);
   document.getElementById('app-screen').style.display = 'none';
+  document.getElementById('app-screen').classList.remove('blurred');
+  document.getElementById('login-screen').classList.remove('lock-overlay');
   document.getElementById('login-screen').style.display = 'block';
   renderPinDots();
 }
 
+// Verrouillage automatique par inactivité (15s) : contrairement à la
+// déconnexion manuelle, le contenu reste visible mais flou derrière
+// l'écran de code — le temps que le prochain coiffeur vienne saisir
+// le sien, sans tout masquer brutalement.
+var inactivityTimer = null;
+var INACTIVITY_LIMIT_MS = 15000;
+
+function resetInactivityTimer() {
+  if (!me) return;
+  clearTimeout(inactivityTimer);
+  inactivityTimer = setTimeout(lockCaisse, INACTIVITY_LIMIT_MS);
+}
+
+function lockCaisse() {
+  if (!me) return;
+  me = null;
+  try { sessionStorage.removeItem('caisse-session'); } catch (e) {}
+  pinBuffer = '';
+  document.getElementById('app-screen').classList.add('blurred');
+  document.getElementById('login-screen').classList.add('lock-overlay');
+  document.getElementById('login-screen').style.display = 'flex';
+  renderPinDots();
+}
+
+['click', 'touchstart', 'keydown'].forEach(function (evt) {
+  document.addEventListener(evt, function () { resetInactivityTimer(); }, { passive: true });
+});
+
 function showApp() {
   document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('login-screen').classList.remove('lock-overlay');
+  document.getElementById('app-screen').classList.remove('blurred');
   document.getElementById('app-screen').style.display = 'block';
   document.getElementById('my-name').textContent = me.name;
   loadCatalog();
   loadPendingPayments();
   loadMarketingSettings();
   setInterval(loadPendingPayments, 5000);
+  resetInactivityTimer();
 }
 
 function loadMarketingSettings() {
