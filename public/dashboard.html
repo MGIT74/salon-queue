@@ -749,6 +749,11 @@
 
     <div class="client-drawer-section" id="drawer-info-section"></div>
 
+    <div class="client-drawer-section" id="drawer-marketing-section" style="display:none">
+      <h3>Marketing</h3>
+      <div id="drawer-marketing-content"></div>
+    </div>
+
     <div class="client-drawer-section">
       <h3>Note</h3>
       <textarea id="drawer-note" class="modal-input" rows="3" placeholder="Ex: préfère dégradé américain, allergie..." style="margin-bottom:8px"></textarea>
@@ -1099,9 +1104,46 @@ function openClientDrawer(id, source) {
   document.getElementById('drawer-visit-count').textContent = '';
   document.getElementById('client-drawer-backdrop').classList.add('on');
 
+  document.getElementById('drawer-marketing-section').style.display = 'none';
+  api('/api/owner/client-marketing?email=' + encodeURIComponent(c.email || '') +
+      '&phone=' + encodeURIComponent(c.phone || '') + '&name=' + encodeURIComponent(c.client_name || ''))
+    .then(function (r) { renderDrawerMarketing(r); })
+    .catch(function () {});
+
   api('/api/queue/' + id + '/client-history').then(function (r) {
     renderDrawerVisits(r.items);
   }).catch(function (e) { toast(e.message, true); });
+}
+
+function renderDrawerMarketing(r) {
+  var parts = [];
+
+  if (r.loyalty && r.loyalty.activated) {
+    parts.push(
+      '<div class="detail-row"><span class="detail-label">⭐ Fidélité</span><span class="detail-value">' +
+      r.loyalty.points + ' point' + (r.loyalty.points > 1 ? 's' : '') +
+      (r.loyalty.rewards_available > 0 ? ' · ' + r.loyalty.rewards_available + ' récompense' + (r.loyalty.rewards_available > 1 ? 's' : '') + ' disponible' + (r.loyalty.rewards_available > 1 ? 's' : '') : '') +
+      '</span></div>'
+    );
+  } else {
+    parts.push('<div class="hint" style="margin:0 0 4px">Carte de fidélité non activée</div>');
+  }
+
+  if (r.gifts && r.gifts.length) {
+    r.gifts.forEach(function (g) {
+      var itemsList = g.items.map(function (it) { return (it.quantity > 1 ? it.quantity + ' × ' : '') + it.item_name; }).join(', ');
+      parts.push(
+        '<div class="detail-row" style="flex-direction:column;align-items:flex-start;gap:2px">' +
+        '<span class="detail-label" style="color:var(--green)">🎁 Cadeau disponible (' + eur(g.amount_cents) + ')</span>' +
+        '<span class="detail-value" style="font-weight:400">' + esc(itemsList) + '</span></div>'
+      );
+    });
+  }
+
+  if (parts.length) {
+    document.getElementById('drawer-marketing-content').innerHTML = parts.join('');
+    document.getElementById('drawer-marketing-section').style.display = 'block';
+  }
 }
 
 function renderDrawerVisits(items) {

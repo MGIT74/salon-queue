@@ -362,4 +362,46 @@ router.post('/loyalty-accounts/activate', requireAdminOrBarber, wrap(async (req,
   res.json({ ok: true });
 }));
 
+/**
+ * Statut marketing (fidélité + cadeaux non utilisés) d'un client
+ * précis, identifié par ses coordonnées — pour le tiroir "fiche
+ * client" du dashboard admin.
+ */
+router.get('/client-marketing', requireAdmin, wrap(async (req, res) => {
+  const email = String(req.query.email || '').trim();
+  const phone = String(req.query.phone || '').trim();
+  const name = String(req.query.name || '').trim();
+  const key = clientKey({ email, phone, client_name: name });
+  if (!key) return res.json({ ok: true, loyalty: null, gifts: [] });
+
+  const [[loyalty]] = await pool.query(
+    'SELECT points, rewards_available, activated_at FROM loyalty_accounts WHERE owner_id = ? AND client_key = ?',
+    [req.ownerId, key]
+  );
+
+  const [allGifts] = await pool.query(
+    'SELECT id, recipient_name, recipient_phone, recipient_email, amount_cents, items_json, created_at ' +
+    'FROM gift_cards WHERE salon_id = ? AND used_at IS NULL ORDER BY created_at ASC',
+    [req.salon.id]
+  );
+  const relevantGifts = allGifts.filter((g) => {
+    const gKey = clientKey({ email: g.recipient_email, phone: g.recipient_phone, client_name: g.recipient_name });
+    return gKey === key;
+  }).map((g) => {
+    let items = [];
+    try { items = JSON.parse(g.items_json || '[]'); } catch (e) { items = []; }
+    return { id: g.id, amount_cents: g.amount_cents, items, created_at: utcIso(g.created_at) };
+  });
+
+  res.json({
+    ok: true,
+    loyalty: loyalty ? {
+      points: loyalty.points,
+      rewards_available: loyalty.rewards_available,
+      activated: Boolean(loyalty.activated_at)
+    } : null,
+    gifts: relevantGifts
+  });
+}));
+
 module.exports = router;
