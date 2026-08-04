@@ -733,6 +733,34 @@
         <button class="btn btn-soft" onclick="testSmtp()">Envoyer un email de test</button>
       </div>
     </div>
+
+    <div class="card-box">
+      <h3>Appareils connectés</h3>
+      <p class="hint">
+        Imprimante de tickets / tiroir-caisse — enregistrez les infos ici pour préparer l'intégration.
+        <strong>En USB</strong> : l'impression automatique depuis la Caisse nécessite un petit programme installé sur
+        l'ordinateur de la caisse (pas encore développé) — en attendant, l'impression via le navigateur (bouton
+        "Imprimer" du reçu) fonctionne déjà avec n'importe quelle imprimante.
+        <strong>En réseau (Wi-Fi/Ethernet, avec sa propre adresse IP)</strong> : une impression plus directe est
+        envisageable, à tester au cas par cas selon le modèle.
+      </p>
+      <div class="grid2">
+        <div class="fld"><label for="set-printer-type">Connexion</label>
+          <select id="set-printer-type" onchange="updatePrinterIpVisibility()">
+            <option value="">Non renseigné</option>
+            <option value="usb">USB</option>
+            <option value="network">Réseau (Wi-Fi/Ethernet)</option>
+          </select>
+        </div>
+        <div class="fld"><label for="set-printer-model">Modèle</label>
+          <input id="set-printer-model" type="text" placeholder="Ex: Aures ODP 333, Epson TM-T20…"></div>
+      </div>
+      <div class="fld" id="set-printer-ip-fld" style="display:none">
+        <label for="set-printer-ip">Adresse IP de l'imprimante</label>
+        <input id="set-printer-ip" type="text" placeholder="192.168.1.50">
+      </div>
+      <button class="btn btn-primary" onclick="saveDeviceSettings()">Enregistrer</button>
+    </div>
   </div>
 
     </div>
@@ -2597,7 +2625,26 @@ function loadSettings() {
     document.getElementById('set-from').value = s.smtp_from || '';
     document.getElementById('set-pass').value = '';
     document.getElementById('pass-state').textContent = r.smtp_pass_set ? '· déjà enregistré' : '';
+
+    document.getElementById('set-printer-type').value = s.printer_connection_type || '';
+    document.getElementById('set-printer-model').value = s.printer_model || '';
+    document.getElementById('set-printer-ip').value = s.printer_ip || '';
+    updatePrinterIpVisibility();
   }).catch(function (e) { toast(e.message, true); });
+}
+
+function updatePrinterIpVisibility() {
+  var isNetwork = document.getElementById('set-printer-type').value === 'network';
+  document.getElementById('set-printer-ip-fld').style.display = isNetwork ? 'block' : 'none';
+}
+
+function saveDeviceSettings() {
+  api('/api/settings', { method: 'PUT', body: {
+    printer_connection_type: document.getElementById('set-printer-type').value,
+    printer_model: document.getElementById('set-printer-model').value,
+    printer_ip: document.getElementById('set-printer-ip').value
+  }}).then(function () { toast('Appareil enregistré'); })
+    .catch(function (e) { toast(e.message, true); });
 }
 
 function saveSettings() {
