@@ -431,13 +431,17 @@ router.get('/:id/client-history', requireAdmin, wrap(async (req, res) => {
   const key = clientKey(row);
   if (!key) return res.json({ ok: true, items: [] });
 
+  // Tous les salons de la MÊME ENSEIGNE, pas seulement celui-ci — un
+  // client peut avoir frequenté plusieurs salons du même propriétaire.
   const [allRows] = await pool.query(
     `SELECT q.id, q.client_name, q.email, q.phone, q.status, q.checkin_at, q.start_at, q.end_at,
-            q.total_price_cents, s.name AS service_name
-     FROM queue q LEFT JOIN services s ON s.id = q.service_id
-     WHERE q.salon_id = ?
+            q.total_price_cents, s.name AS service_name, sa.name AS salon_name
+     FROM queue q
+     LEFT JOIN services s ON s.id = q.service_id
+     JOIN salons sa ON sa.id = q.salon_id
+     WHERE sa.owner_id = ?
      ORDER BY q.checkin_at DESC LIMIT 1000`,
-    [req.salon.id]
+    [req.ownerId]
   );
 
   const items = allRows
