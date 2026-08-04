@@ -121,10 +121,25 @@
   .back { background: none; border: none; padding: 0; font-family: inherit; font-size: clamp(14px,1.3vw,16px);
           color: var(--blue); font-weight: 500; cursor: pointer; margin-bottom: clamp(12px,1.8vh,18px); }
 
+  .svc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px,1fr)); gap: 10px; margin-bottom: 4px; }
+  .svc-card {
+    border: none; background: var(--fill); color: var(--ink); border-radius: 18px;
+    padding: 20px 14px; cursor: pointer; font-family: inherit; text-align: center;
+    display: flex; flex-direction: column; align-items: center; gap: 7px;
+    transition: background .15s ease, transform .1s ease; min-height: 108px; justify-content: center;
+  }
+  .svc-card .icon { font-size: 34px; line-height: 1; }
+  .svc-card .name { font-size: 14.5px; font-weight: 600; }
+  .svc-card .meta { font-size: 12.5px; color: var(--grey); font-variant-numeric: tabular-nums; }
+  .svc-card.sel { background: var(--blue); color: #fff; }
+  .svc-card.sel .meta { color: rgba(255,255,255,.8); }
+  .svc-card:active { transform: scale(.96); }
+
   .extras-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
   .xchip { border: none; background: var(--fill); color: var(--ink); border-radius: 999px;
-           padding: 11px 17px; cursor: pointer; font-family: inherit; font-size: 14.5px;
+           padding: 12px 18px; cursor: pointer; font-family: inherit; font-size: 14.5px;
            font-weight: 500; display: flex; align-items: baseline; gap: 8px; transition: background .15s ease; }
+  .xchip .xi { font-size: 16px; }
   .xchip .xm { font-size: 13px; color: var(--grey); font-variant-numeric: tabular-nums; }
   .xchip.sel { background: var(--blue); color: #fff; font-weight: 600; }
   .xchip.sel .xm { color: rgba(255,255,255,.75); }
@@ -211,9 +226,16 @@
         <div class="fld"><label for="f-mail">Email — pour être prévenu avant votre tour</label>
           <input id="f-mail" type="email" placeholder="vous@exemple.com" autocomplete="email"></div>
       </div>
-      <div class="fld"><label for="f-service">Prestation</label><select id="f-service"></select></div>
-      <div class="fld"><label>Suppléments (optionnel)</label>
-        <div class="extras-grid" id="extras-grid"></div></div>
+      <div class="fld"><label>Prestation</label>
+        <div class="svc-grid" id="svc-grid"></div></div>
+      <button class="go" id="step1-next-btn" onclick="goToExtrasStep()" disabled>Suivant</button>
+    </section>
+
+    <section class="panel" id="p-form-extras">
+      <button class="back" onclick="show('p-form')">‹ Retour</button>
+      <h1 class="ftitle">Un petit plus ?</h1>
+      <p class="hero-sub" style="margin:-8px 0 22px">Suppléments optionnels, en plus de votre prestation.</p>
+      <div class="fld"><div class="extras-grid" id="extras-grid"></div></div>
       <div class="total-line">
         <span class="lab">Durée · total</span>
         <span class="val"><span id="tot-dur">0</span> min · <span id="tot-price">0,00 €</span></span>
@@ -248,7 +270,7 @@
 mountThemeButton();
 
 var services = [], extras = [], barbers = [], queue = [], salonName = 'Le Salon', giftTileImage = '';
-var selBarber = null, selExtras = [];
+var selBarber = null, selExtras = [], selService = null;
 var activeGift = null; // { id, recipient_name, recipient_email, recipient_phone, items } si en mode "utiliser un cadeau"
 
 function svcById(id) { return services.find(function (s) { return s.id === id; }); }
@@ -272,7 +294,7 @@ function loadCatalog() {
     document.getElementById('salon-name').textContent = salonName;
     document.getElementById('t-salon').textContent = salonName;
 
-    document.getElementById('f-service').onchange = renderTotals;
+    document.getElementById('f-name').oninput = updateStep1NextState;
     renderFormOptions();
   });
 }
@@ -280,6 +302,26 @@ function loadCatalog() {
 // Filtre les prestations/suppléments affichés dans le formulaire selon ce
 // que le coiffeur choisi réalise ou non (par défaut tout est proposé,
 // tant qu'aucun coiffeur n'est encore sélectionné).
+// Icône par défaut selon des mots-clés dans le nom — pas de gestion
+// d'image personnalisée pour l'instant, juste de quoi rendre chaque
+// prestation/supplément plus reconnaissable visuellement d'un coup d'œil.
+function iconForItem(name) {
+  var n = (name || '').toLowerCase();
+  if (n.indexOf('enfant') !== -1) return '🧒';
+  if (n.indexOf('barbe') !== -1) return '🧔';
+  if (n.indexOf('shampoo') !== -1 || n.indexOf('shampooing') !== -1) return '🧴';
+  if (n.indexOf('couleur') !== -1 || n.indexOf('colorat') !== -1) return '🎨';
+  if (n.indexOf('serviette') !== -1 || n.indexOf('chaude') !== -1) return '🔥';
+  if (n.indexOf('contour') !== -1 || n.indexOf('traçage') !== -1 || n.indexOf('tracage') !== -1) return '📏';
+  if (n.indexOf('dégradé') !== -1 || n.indexOf('degrade') !== -1 || n.indexOf('américain') !== -1) return '💈';
+  if (n.indexOf('huile') !== -1 || n.indexOf('soin') !== -1) return '💧';
+  if (n.indexOf('cire') !== -1 || n.indexOf('gel') !== -1) return '🧴';
+  if (n.indexOf('zéro') !== -1 || n.indexOf('zero') !== -1) return '🪒';
+  if (n.indexOf('barbe') !== -1) return '🧔';
+  if (n.indexOf('coupe') !== -1) return '✂️';
+  return '✂️';
+}
+
 function renderFormOptions() {
   var b = selBarber ? barbers.find(function (x) { return x.id === selBarber; }) : null;
   var disabledSvc = (b && b.disabled_service_ids) || [];
@@ -288,19 +330,55 @@ function renderFormOptions() {
   var availableServices = services.filter(function (s) { return disabledSvc.indexOf(s.id) === -1; });
   var availableExtras = extras.filter(function (e) { return disabledExt.indexOf(e.id) === -1; });
 
-  document.getElementById('f-service').innerHTML = availableServices.map(function (s) {
-    return '<option value="' + s.id + '">' + esc(s.name) + ' — ' + s.duration_min + ' min · ' + eur(s.price_cents) + '</option>';
-  }).join('') || '<option value="">Aucune prestation disponible</option>';
+  // Si le service choisi n'est plus disponible avec ce coiffeur, on
+  // désélectionne pour éviter d'envoyer un choix invalide.
+  if (selService && !availableServices.some(function (s) { return s.id === selService; })) {
+    selService = null;
+  }
+
+  document.getElementById('svc-grid').innerHTML = availableServices.length
+    ? availableServices.map(function (s) {
+        return '<button class="svc-card' + (selService === s.id ? ' sel' : '') + '" data-id="' + s.id + '" onclick="selectService(\'' + s.id + '\')">' +
+          '<span class="icon">' + iconForItem(s.name) + '</span>' +
+          '<span class="name">' + esc(s.name) + '</span>' +
+          '<span class="meta">' + s.duration_min + ' min · ' + eur(s.price_cents) + '</span>' +
+          '</button>';
+      }).join('')
+    : '<div class="empty">Aucune prestation disponible</div>';
 
   document.getElementById('extras-grid').innerHTML = availableExtras.map(function (e) {
     return '<button class="xchip' + (selExtras.indexOf(e.id) !== -1 ? ' sel' : '') + '" data-id="' + e.id + '" onclick="toggleExtra(\'' + e.id + '\')">' +
+           '<span class="xi">' + iconForItem(e.name) + '</span>' +
            '<span>' + esc(e.name) + '</span><span class="xm">+' + e.duration_min + ' min · ' + eur(e.price_cents) + '</span></button>';
   }).join('');
 
   // Retire de la sélection les suppléments devenus indisponibles avec ce coiffeur
   selExtras = selExtras.filter(function (id) { return availableExtras.some(function (e) { return e.id === id; }); });
 
+  updateStep1NextState();
   renderTotals();
+}
+
+function selectService(id) {
+  selService = id;
+  document.querySelectorAll('.svc-card').forEach(function (c) {
+    c.classList.toggle('sel', c.dataset.id === id);
+  });
+  updateStep1NextState();
+  renderTotals();
+}
+
+function updateStep1NextState() {
+  var name = document.getElementById('f-name').value.trim();
+  var btn = document.getElementById('step1-next-btn');
+  if (btn) btn.disabled = !(name && selService);
+}
+
+function goToExtrasStep() {
+  var name = document.getElementById('f-name').value.trim();
+  if (!name) { toast('Entrez votre prénom', true); return; }
+  if (!selService) { toast('Choisissez une prestation', true); return; }
+  show('p-form-extras');
 }
 
 function refresh() {
@@ -555,8 +633,12 @@ function toggleExtra(id) {
 }
 
 function renderTotals() {
-  var s = svcById(document.getElementById('f-service').value);
-  if (!s) return;
+  var s = svcById(selService);
+  if (!s) {
+    document.getElementById('tot-dur').textContent = '0';
+    document.getElementById('tot-price').textContent = eur(0);
+    return;
+  }
   var dur = s.duration_min + selExtras.reduce(function (a, id) { return a + extById(id).duration_min; }, 0);
   var cents = s.price_cents + selExtras.reduce(function (a, id) { return a + extById(id).price_cents; }, 0);
   document.getElementById('tot-dur').textContent = dur;
@@ -568,6 +650,7 @@ function submitForm() {
   var name = document.getElementById('f-name').value.trim();
   var mail = document.getElementById('f-mail').value.trim();
   if (!name) { toast('Merci d\'indiquer votre prénom', true); return; }
+  if (!selService) { toast('Choisissez une prestation', true); return; }
 
   var btn = document.getElementById('submit-btn');
   btn.disabled = true; btn.textContent = 'Enregistrement…';
@@ -577,7 +660,7 @@ function submitForm() {
     body: {
       client_name: name,
       email: mail || null,
-      service_id: document.getElementById('f-service').value,
+      service_id: selService,
       barber_id: selBarber,
       extras: selExtras
     }
@@ -605,8 +688,9 @@ function submitForm() {
 function resetForm() {
   document.getElementById('f-name').value = '';
   document.getElementById('f-mail').value = '';
-  selExtras = []; selBarber = null;
+  selExtras = []; selBarber = null; selService = null;
   document.querySelectorAll('.xchip').forEach(function (c) { c.classList.remove('sel'); });
+  document.querySelectorAll('.svc-card').forEach(function (c) { c.classList.remove('sel'); });
   renderTotals(); renderBarberGrid();
   show('p-home');
 }
