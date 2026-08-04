@@ -128,11 +128,11 @@ router.post('/checkin', wrap(async (req, res) => {
   if (!client_name) return res.status(400).json({ error: 'Le nom est requis' });
   if (!service_id) return res.status(400).json({ error: 'La prestation est requise' });
 
-  // Faille corrigée : un même cadeau ne peut pas servir à créer
-  // plusieurs entrées actives à la fois dans la file (le code ne
-  // marque rien comme "utilisé" tant que le passage n'est pas
-  // réellement encaissé — sans ce garde-fou, un même code pouvait
-  // être utilisé un nombre illimité de fois avant ce moment-là).
+  // Un même cadeau ne peut pas servir à créer plusieurs entrées actives
+  // à la fois dans la file (le code ne marque rien comme "utilisé" tant
+  // que le passage n'est pas réellement encaissé) — sans ce garde-fou,
+  // un même code pouvait être réutilisé un nombre illimité de fois
+  // avant ce moment-là.
   const key = clientKey({ email, phone, client_name });
   if (key) {
     const [[unusedGift]] = await pool.query(
@@ -161,7 +161,6 @@ router.post('/checkin', wrap(async (req, res) => {
      VALUES (?, ?, ?, ?, ?, ?, ?, 'waiting')`,
     [id, req.salon.id, client_name, email || null, phone || null, service_id, barber_id || null]
   );
-
   if (Array.isArray(extras) && extras.length) {
     const values = extras.map((extraId) => [id, extraId]);
     await pool.query('INSERT INTO queue_extras (queue_id, extra_id) VALUES ?', [values]);

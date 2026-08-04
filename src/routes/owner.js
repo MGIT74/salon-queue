@@ -374,11 +374,24 @@ router.post('/loyalty-accounts/activate', requireAdminOrBarber, wrap(async (req,
       [email, clientName, existing.id]
     );
   } else {
-    await pool.query(
-      `INSERT INTO loyalty_accounts (id, owner_id, client_key, client_name, recipient_email, activated_at)
-       VALUES (UUID(), ?, ?, ?, ?, NOW())`,
-      [req.ownerId, key, clientName, email]
-    );
+    try {
+      await pool.query(
+        `INSERT INTO loyalty_accounts (id, owner_id, client_key, client_name, recipient_email, activated_at)
+         VALUES (UUID(), ?, ?, ?, ?, NOW())`,
+        [req.ownerId, key, clientName, email]
+      );
+    } catch (err) {
+      // Deux activations envoyées au même instant (double clic) peuvent
+      // toutes les deux passer la vérification ci-dessus avant qu'aucune
+      // n'ait encore inséré sa ligne — la contrainte d'unicité sur
+      // (owner_id, client_key) fait échouer la seconde avec ce code
+      // d'erreur précis, qu'on transforme en refus propre plutôt qu'une
+      // erreur serveur générique.
+      if (err && err.code === 'ER_DUP_ENTRY') {
+        return res.status(409).json({ error: 'Ce client a déjà une carte de fidélité active' });
+      }
+      throw err;
+    }
   }
 
   try {

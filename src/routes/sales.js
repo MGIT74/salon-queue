@@ -60,6 +60,12 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
   // Si la vente correspond à une coupe terminée précise (venant de "En
   // attente d'encaissement"), on vérifie qu'elle appartient bien à ce
   // coiffeur et qu'elle n'est pas déjà réglée, avant de l'encaisser.
+  // Le marquage "payé" se fait ICI, de façon ATOMIQUE et AVANT toute
+  // création de vente — si deux requêtes arrivent en même temps (double
+  // clic, deux appareils), une seule doit réussir à marquer paid_at :
+  // la condition "AND paid_at IS NULL" dans le WHERE garantit que seule
+  // la première requête peut effectivement le faire, la seconde reçoit
+  // 0 ligne affectée et est refusée avant même de créer quoi que ce soit.
   let queueRow = null;
   if (queue_id) {
     const [[row]] = await pool.query(
@@ -71,6 +77,14 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
       return res.status(403).json({ error: "Ce n'est pas votre client." });
     }
     if (row.paid_at) return res.status(409).json({ error: 'Ce client a déjà été encaissé.' });
+
+    const [markResult] = await pool.query(
+      'UPDATE queue SET paid_at = NOW() WHERE id = ? AND salon_id = ? AND paid_at IS NULL',
+      [queue_id, req.salon.id]
+    );
+    if (markResult.affectedRows === 0) {
+      return res.status(409).json({ error: 'Ce client vient d\'être encaissé (probablement par un autre appareil).' });
+    }
     queueRow = row;
   }
 
@@ -95,7 +109,6 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
   );
 
   if (queue_id) {
-    await pool.query('UPDATE queue SET paid_at = NOW() WHERE id = ? AND salon_id = ?', [queue_id, req.salon.id]);
     // Ce passage vient d'être réellement payé : +1 point de fidélité.
     await earnLoyaltyPoint(req.ownerId, queueRow);
     // Une récompense de fidélité était appliquée à ce ticket (gagnée à
@@ -205,8 +218,30 @@ router.post('/gift-cards/:id/redeem', requireAdminOrBarber, wrap(async (req, res
   }
   if (queueRow.paid_at) return res.status(409).json({ error: 'Ce client a déjà été encaissé.' });
 
-  await pool.query('UPDATE gift_cards SET used_at = NOW(), used_queue_id = ? WHERE id = ?', [queue_id, req.params.id]);
-  await pool.query('UPDATE queue SET paid_at = NOW() WHERE id = ?', [queue_id]);
+  // Deux marquages ATOMIQUES (WHERE ... IS NULL + vérification des
+  // lignes affectées) — si deux requêtes arrivent en même temps (double
+  // clic, ou tentative d'utiliser le même cadeau sur deux clients
+  // différents simultanément), une seule peut effectivement réussir.
+  const [giftResult] = await pool.query(
+    'UPDATE gift_cards SET used_at = NOW(), used_queue_id = ? WHERE id = ? AND used_at IS NULL',
+    [queue_id, req.params.id]
+  );
+  if (giftResult.affectedRows === 0) {
+    return res.status(409).json({ error: 'Ce bon cadeau vient d\'être utilisé (probablement par un autre appareil).' });
+  }
+
+  const [queueResult] = await pool.query(
+    'UPDATE queue SET paid_at = NOW() WHERE id = ? AND paid_at IS NULL',
+    [queue_id]
+  );
+  if (queueResult.affectedRows === 0) {
+    // Le client vient d'être payé autrement entre-temps — on annule la
+    // consommation du cadeau qu'on venait de marquer, pour ne pas le
+    // perdre pour rien.
+    await pool.query('UPDATE gift_cards SET used_at = NULL, used_queue_id = NULL WHERE id = ?', [req.params.id]);
+    return res.status(409).json({ error: 'Ce client vient d\'être encaissé autrement.' });
+  }
+
   // Ce passage vient d'être réglé (via le cadeau) : compte aussi comme
   // un vrai passage payé pour la fidélité.
   await earnLoyaltyPoint(req.ownerId, queueRow);
