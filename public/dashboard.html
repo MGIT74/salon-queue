@@ -658,6 +658,22 @@
     </div>
 
     <div class="card-box">
+      <h3>Image "Utiliser un cadeau" (kiosk)</h3>
+      <p class="hint">Remplace l'icône 🎁 par défaut sur la tuile du kiosk. Une image carrée fonctionne mieux.</p>
+      <div style="display:flex;align-items:center;gap:16px">
+        <div id="gift-tile-preview" onclick="document.getElementById('gift-tile-input').click()"
+             style="width:72px;height:72px;border-radius:16px;cursor:pointer;background:var(--fill);
+             display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;
+             color:var(--grey);font-size:12px;text-align:center;background-size:cover;background-position:center">🎁</div>
+        <input type="file" id="gift-tile-input" accept="image/*" style="display:none" onchange="uploadGiftTileImage(this)">
+        <div>
+          <div class="hint" style="margin:0 0 6px">Cliquez sur le cadre pour choisir une image.</div>
+          <button class="btn btn-ghost" onclick="removeGiftTileImage()" style="font-size:13px;padding:6px 12px">Revenir à l'icône par défaut</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card-box">
       <h3>Mot de passe</h3>
       <p class="hint">Ce mot de passe est partagé par tous les salons de votre enseigne.</p>
       <div class="grid2">
@@ -809,6 +825,7 @@ var CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.
 var currentSalonName = '';
 
 var currentSalonLogo = '';
+var currentGiftTileImage = '';
 
 function loadCurrentSalonName() {
   fetch('/api/settings/public', {
@@ -819,6 +836,7 @@ function loadCurrentSalonName() {
       var name = d.salon_name || 'Le Salon';
       currentSalonName = name;
       currentSalonLogo = d.logo_url || '';
+      currentGiftTileImage = d.gift_tile_image_url || '';
       document.title = name + ' — Dashboard';
       var loginEl = document.getElementById('login-salon-name');
       if (loginEl) loginEl.textContent = name;
@@ -834,6 +852,16 @@ function loadCurrentSalonName() {
         } else {
           logoPreview.style.backgroundImage = '';
           logoPreview.textContent = 'Ajouter';
+        }
+      }
+      var giftPreview = document.getElementById('gift-tile-preview');
+      if (giftPreview) {
+        if (currentGiftTileImage) {
+          giftPreview.style.backgroundImage = 'url("' + currentGiftTileImage + '")';
+          giftPreview.textContent = '';
+        } else {
+          giftPreview.style.backgroundImage = '';
+          giftPreview.textContent = '🎁';
         }
       }
       renderBarbers();
@@ -2429,6 +2457,42 @@ function uploadSalonLogo(input) {
     img.src = e.target.result;
   };
   reader.readAsDataURL(file);
+}
+
+// Même principe que le logo — remplace l'icône 🎁 par défaut sur la
+// tuile "Utiliser un cadeau" du kiosk.
+function uploadGiftTileImage(input) {
+  var file = input.files && input.files[0];
+  if (!file) return;
+
+  var reader = new FileReader();
+  reader.onload = function (e) {
+    var img = new Image();
+    img.onload = function () {
+      var size = 300;
+      var canvas = document.createElement('canvas');
+      canvas.width = size; canvas.height = size;
+      var ctx = canvas.getContext('2d');
+      var side = Math.min(img.width, img.height);
+      var sx = (img.width - side) / 2, sy = (img.height - side) / 2;
+      ctx.drawImage(img, sx, sy, side, side, 0, 0, size, size);
+      var dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+
+      api('/api/settings', { method: 'PUT', body: { gift_tile_image_url: dataUrl } })
+        .then(loadCurrentSalonName)
+        .then(function () { toast('Image mise à jour'); })
+        .catch(function (e) { toast(e.message, true); });
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeGiftTileImage() {
+  api('/api/settings', { method: 'PUT', body: { gift_tile_image_url: '' } })
+    .then(loadCurrentSalonName)
+    .then(function () { toast('Icône par défaut restaurée'); })
+    .catch(function (e) { toast(e.message, true); });
 }
 
 function changeOwnPassword() {

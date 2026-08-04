@@ -247,7 +247,7 @@
 <script>
 mountThemeButton();
 
-var services = [], extras = [], barbers = [], queue = [], salonName = 'Le Salon';
+var services = [], extras = [], barbers = [], queue = [], salonName = 'Le Salon', giftTileImage = '';
 var selBarber = null, selExtras = [];
 var activeGift = null; // { id, recipient_name, recipient_email, recipient_phone, items } si en mode "utiliser un cadeau"
 
@@ -268,6 +268,7 @@ function loadCatalog() {
   ]).then(function (r) {
     services = r[0].items; extras = r[1].items;
     salonName = r[2].salon_name;
+    giftTileImage = r[2].gift_tile_image_url || '';
     document.getElementById('salon-name').textContent = salonName;
     document.getElementById('t-salon').textContent = salonName;
 
@@ -426,8 +427,12 @@ function isOverrun(barberId) {
 }
 
 function renderBarberGrid() {
-  var giftTile = '<button class="barber-card gift-tile" onclick="show(\'p-gift-code\')">' +
-    '<div class="barber-fallback">🎁</div>' +
+  var giftPhotoAttr = giftTileImage
+    ? ' style="background-image:url(&quot;' + esc(giftTileImage) + '&quot;)"'
+    : '';
+  var giftTile = '<button class="barber-card gift-tile' + (giftTileImage ? ' has-photo' : '') + '"' + giftPhotoAttr +
+    ' onclick="show(\'p-gift-code\')">' +
+    (giftTileImage ? '' : '<div class="barber-fallback">🎁</div>') +
     '<div class="barber-overlay"><div class="barber-name">Utiliser un cadeau</div></div>' +
     '</button>';
 
