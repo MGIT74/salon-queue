@@ -61,6 +61,15 @@
   .item-btn:active { transform: scale(.96); }
   .item-btn .name { font-size: 14.5px; font-weight: 600; margin-bottom: 4px; }
   .item-btn .price { font-size: 13px; color: var(--grey); }
+  .item-btn .icon { font-size: 24px; margin-bottom: 6px; display: block; }
+  .item-btn.has-photo { padding: 0; overflow: hidden; position: relative; min-height: 96px; }
+  .item-btn.has-photo .photo-bg { position: absolute; inset: 0; background-size: cover; background-position: center; }
+  .item-btn.has-photo .overlay {
+    position: relative; z-index: 1; min-height: 96px; display: flex; flex-direction: column; justify-content: flex-end;
+    padding: 12px; box-sizing: border-box; background: linear-gradient(to top, rgba(0,0,0,.78), rgba(0,0,0,.1) 65%, transparent);
+  }
+  .item-btn.has-photo .name, .item-btn.has-photo .price { color: #fff; }
+  .item-btn.has-photo .price { color: rgba(255,255,255,.85); }
 
   .ticket-panel {
     background: var(--card); border-radius: 18px; padding: 18px; box-shadow: var(--shadow);
@@ -524,13 +533,41 @@ function usePendingForTicket(queueId) {
   toast('Ticket de ' + q.client_name + ' chargé — choisissez le paiement');
 }
 
+// Icône par défaut selon des mots-clés dans le nom (même mapping que
+// le kiosk), utilisée quand aucune photo personnalisée n'est définie.
+function iconForItem(name) {
+  var n = (name || '').toLowerCase();
+  if (n.indexOf('enfant') !== -1) return '🧒';
+  if (n.indexOf('barbe') !== -1) return '🧔';
+  if (n.indexOf('shampoo') !== -1 || n.indexOf('shampooing') !== -1) return '🧴';
+  if (n.indexOf('couleur') !== -1 || n.indexOf('colorat') !== -1) return '🎨';
+  if (n.indexOf('serviette') !== -1 || n.indexOf('chaude') !== -1) return '🔥';
+  if (n.indexOf('contour') !== -1 || n.indexOf('traçage') !== -1 || n.indexOf('tracage') !== -1) return '📏';
+  if (n.indexOf('dégradé') !== -1 || n.indexOf('degrade') !== -1 || n.indexOf('américain') !== -1) return '💈';
+  if (n.indexOf('huile') !== -1 || n.indexOf('soin') !== -1) return '💧';
+  if (n.indexOf('cire') !== -1 || n.indexOf('gel') !== -1) return '🧴';
+  if (n.indexOf('zéro') !== -1 || n.indexOf('zero') !== -1) return '🪒';
+  if (n.indexOf('coupe') !== -1) return '✂️';
+  return currentCat === 'products' ? '🛍️' : '✂️';
+}
+
 function renderItemGrid() {
   var items = catalog[currentCat] || [];
   var typeSingular = currentCat === 'services' ? 'service' : (currentCat === 'extras' ? 'extra' : 'product');
   document.getElementById('item-grid').innerHTML = items.length === 0
     ? '<div class="empty">Rien à afficher ici</div>'
     : items.map(function (it) {
-        return '<button class="item-btn" onclick="addToTicket(\'' + typeSingular + '\',\'' + it.id + '\',\'' + esc(it.name).replace(/'/g, "\\'") + '\',' + it.price_cents + ')">' +
+        var onclickAttr = 'addToTicket(\'' + typeSingular + '\',\'' + it.id + '\',\'' + esc(it.name).replace(/'/g, "\\'") + '\',' + it.price_cents + ')';
+        if (it.image_url) {
+          return '<button class="item-btn has-photo" onclick="' + onclickAttr + '">' +
+            '<span class="photo-bg" style="background-image:url(&quot;' + esc(it.image_url) + '&quot;)"></span>' +
+            '<span class="overlay">' +
+              '<span class="name">' + esc(it.name) + '</span>' +
+              '<span class="price">' + eur(it.price_cents) + '</span>' +
+            '</span></button>';
+        }
+        return '<button class="item-btn" onclick="' + onclickAttr + '">' +
+          '<span class="icon">' + iconForItem(it.name) + '</span>' +
           '<div class="name">' + esc(it.name) + '</div>' +
           '<div class="price">' + eur(it.price_cents) + '</div>' +
           '</button>';

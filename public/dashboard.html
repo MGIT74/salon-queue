@@ -224,6 +224,11 @@
           display: flex; align-items: center; gap: 14px; box-shadow: var(--shadow); flex-wrap: wrap; transition: background .25s ease; }
   .item.off { opacity: .5; }
   .item-main { flex: 1; min-width: 160px; }
+  .cat-photo {
+    width: 52px; height: 52px; border-radius: 12px; background: var(--fill); flex-shrink: 0;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    color: var(--grey); font-size: 10.5px; text-align: center; line-height: 1.2;
+  }
   .item-name { font-size: 16px; font-weight: 600; letter-spacing: -.015em; }
   .item-meta { font-size: 13px; color: var(--grey); margin-top: 2px; font-variant-numeric: tabular-nums; }
   .item-actions { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -1446,7 +1451,12 @@ function renderCatalog(table) {
         var meta = table === 'products'
           ? eur(x.price_cents)
           : x.duration_min + ' min · ' + (table === 'extras' ? '+ ' : '') + eur(x.price_cents);
+        var photoStyle = x.image_url ? 'background:url(&quot;' + esc(x.image_url) + '&quot;) center/cover' : '';
         return '<div class="item' + (x.active ? '' : ' off') + '">' +
+          '<div class="cat-photo" style="' + photoStyle + '" onclick="document.getElementById(\'cat-photo-input-' + x.id + '\').click()">' +
+            (x.image_url ? '' : '<span>+ photo</span>') +
+          '</div>' +
+          '<input type="file" accept="image/*" id="cat-photo-input-' + x.id + '" style="display:none" onchange="uploadCatalogImage(\'' + table + '\',\'' + x.id + '\',this)">' +
           '<div class="item-main"><div class="item-name">' + esc(x.name) + '</div>' +
           '<div class="item-meta">' + meta + (x.active ? '' : ' · archivé') + '</div></div>' +
           '<div class="item-actions">' +
@@ -1456,6 +1466,33 @@ function renderCatalog(table) {
             : '<button class="btn btn-soft" onclick="restoreCatalog(\'' + table + '\',\'' + x.id + '\')">Réactiver</button>') +
           '</div></div>';
       }).join('');
+}
+
+function uploadCatalogImage(table, id, input) {
+  var file = input.files && input.files[0];
+  if (!file) return;
+
+  var reader = new FileReader();
+  reader.onload = function (e) {
+    var img = new Image();
+    img.onload = function () {
+      var size = 300;
+      var canvas = document.createElement('canvas');
+      canvas.width = size; canvas.height = size;
+      var ctx = canvas.getContext('2d');
+      var side = Math.min(img.width, img.height);
+      var sx = (img.width - side) / 2, sy = (img.height - side) / 2;
+      ctx.drawImage(img, sx, sy, side, side, 0, 0, size, size);
+      var dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+
+      api('/api/catalog/' + table + '/' + id, { method: 'PUT', body: { image_url: dataUrl } })
+        .then(loadCatalog)
+        .then(function () { toast('Photo mise à jour'); })
+        .catch(function (e) { toast(e.message, true); });
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
 }
 
 var editingCat = null;

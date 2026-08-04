@@ -134,6 +134,19 @@
   .svc-card.sel { background: var(--blue); color: #fff; }
   .svc-card.sel .meta { color: rgba(255,255,255,.8); }
   .svc-card:active { transform: scale(.96); }
+  .svc-card.has-photo { padding: 0; overflow: hidden; position: relative; }
+  .svc-card.has-photo .photo-bg { position: absolute; inset: 0; background-size: cover; background-position: center; }
+  .svc-card.has-photo .overlay {
+    position: relative; z-index: 1; width: 100%; height: 100%; min-height: 108px;
+    display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 2px;
+    padding: 12px 10px; background: linear-gradient(to top, rgba(0,0,0,.78), rgba(0,0,0,.1) 65%, transparent);
+    box-sizing: border-box;
+  }
+  .svc-card.has-photo .name, .svc-card.has-photo .meta { color: #fff; }
+  .svc-card.has-photo .meta { color: rgba(255,255,255,.85); }
+  .svc-card.has-photo.sel { box-shadow: inset 0 0 0 3px var(--blue); }
+
+  .xchip .xphoto { width: 22px; height: 22px; border-radius: 50%; background-size: cover; background-position: center; flex-shrink: 0; }
 
   .extras-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
   .xchip { border: none; background: var(--fill); color: var(--ink); border-radius: 999px;
@@ -338,7 +351,16 @@ function renderFormOptions() {
 
   document.getElementById('svc-grid').innerHTML = availableServices.length
     ? availableServices.map(function (s) {
-        return '<button class="svc-card' + (selService === s.id ? ' sel' : '') + '" data-id="' + s.id + '" onclick="selectService(\'' + s.id + '\')">' +
+        var isSel = selService === s.id;
+        if (s.image_url) {
+          return '<button class="svc-card has-photo' + (isSel ? ' sel' : '') + '" data-id="' + s.id + '" onclick="selectService(\'' + s.id + '\')">' +
+            '<span class="photo-bg" style="background-image:url(&quot;' + esc(s.image_url) + '&quot;)"></span>' +
+            '<span class="overlay">' +
+              '<span class="name">' + esc(s.name) + '</span>' +
+              '<span class="meta">' + s.duration_min + ' min · ' + eur(s.price_cents) + '</span>' +
+            '</span></button>';
+        }
+        return '<button class="svc-card' + (isSel ? ' sel' : '') + '" data-id="' + s.id + '" onclick="selectService(\'' + s.id + '\')">' +
           '<span class="icon">' + iconForItem(s.name) + '</span>' +
           '<span class="name">' + esc(s.name) + '</span>' +
           '<span class="meta">' + s.duration_min + ' min · ' + eur(s.price_cents) + '</span>' +
@@ -347,8 +369,11 @@ function renderFormOptions() {
     : '<div class="empty">Aucune prestation disponible</div>';
 
   document.getElementById('extras-grid').innerHTML = availableExtras.map(function (e) {
+    var iconHtml = e.image_url
+      ? '<span class="xphoto" style="background-image:url(&quot;' + esc(e.image_url) + '&quot;)"></span>'
+      : '<span class="xi">' + iconForItem(e.name) + '</span>';
     return '<button class="xchip' + (selExtras.indexOf(e.id) !== -1 ? ' sel' : '') + '" data-id="' + e.id + '" onclick="toggleExtra(\'' + e.id + '\')">' +
-           '<span class="xi">' + iconForItem(e.name) + '</span>' +
+           iconHtml +
            '<span>' + esc(e.name) + '</span><span class="xm">+' + e.duration_min + ' min · ' + eur(e.price_cents) + '</span></button>';
   }).join('');
 

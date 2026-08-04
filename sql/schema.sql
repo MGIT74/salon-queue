@@ -372,3 +372,11 @@ CREATE TABLE IF NOT EXISTS owner_settings (
 -- client n'accumule aucun point, meme s'il revient plusieurs fois.
 ALTER TABLE loyalty_accounts ADD COLUMN IF NOT EXISTS activated_at DATETIME NULL;
 ALTER TABLE loyalty_accounts ADD COLUMN IF NOT EXISTS recipient_email VARCHAR(255) NULL;
+
+-- Photo personnalisable pour chaque prestation/supplement/produit,
+-- affichee sur le kiosk et en caisse a la place de l'icone par
+-- defaut - meme mecanique que les photos de coiffeurs (data URL,
+-- redimensionnee/recadree cote navigateur avant envoi).
+ALTER TABLE services ADD COLUMN IF NOT EXISTS image_url LONGTEXT NULL;
+ALTER TABLE extras ADD COLUMN IF NOT EXISTS image_url LONGTEXT NULL;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS image_url LONGTEXT NULL;

@@ -58,6 +58,7 @@ async function uniqueId(table, base) {
     const params = [];
     if (req.body.name !== undefined) { sets.push('name = ?'); params.push(req.body.name); }
     if (req.body.active !== undefined) { sets.push('active = ?'); params.push(req.body.active ? 1 : 0); }
+    if (req.body.image_url !== undefined) { sets.push('image_url = ?'); params.push(req.body.image_url || null); }
     ['duration_min', 'price_cents', 'sort_order'].forEach((k) => {
       if (req.body[k] !== undefined) { sets.push(k + ' = ?'); params.push(Number(req.body[k]) || 0); }
     });
@@ -101,6 +102,7 @@ router.put('/products/:id', requireAdmin, wrap(async (req, res) => {
   if (req.body.name !== undefined) { sets.push('name = ?'); params.push(req.body.name); }
   if (req.body.active !== undefined) { sets.push('active = ?'); params.push(req.body.active ? 1 : 0); }
   if (req.body.category !== undefined) { sets.push('category = ?'); params.push(req.body.category || null); }
+  if (req.body.image_url !== undefined) { sets.push('image_url = ?'); params.push(req.body.image_url || null); }
   ['price_cents', 'sort_order'].forEach((k) => {
     if (req.body[k] !== undefined) { sets.push(k + ' = ?'); params.push(Number(req.body[k]) || 0); }
   });
