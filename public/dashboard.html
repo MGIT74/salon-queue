@@ -436,6 +436,7 @@
         <button data-t="services"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg></span> Prestations</button>
         <button data-t="extras"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg></span> Suppléments</button>
         <button data-t="products"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg></span> Produits</button>
+        <button data-t="marketing"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12v6a2 2 0 01-2 2H6a2 2 0 01-2-2v-6M2 7l10-5 10 5-10 5-10-5z"/><path d="M6 10v6a6 3 0 0012 0v-6"/></svg></span> Marketing</button>
         <button data-t="barbers"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-6 8-6s8 2 8 6"/></svg></span> Coiffeurs</button>
         <button data-t="clients"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 00-3-3.87"/><path d="M15.5 3.13a4 4 0 010 7.75"/></svg></span> Clients</button>
         <button data-t="salons"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l1-5h16l1 5"/><path d="M4 9v11h16V9"/><line x1="9" y1="20" x2="9" y2="14"/><line x1="15" y1="20" x2="15" y2="14"/></svg></span> Mes salons</button>
@@ -500,6 +501,38 @@
     </div>
     <p class="hint" style="margin-top:-6px">Boissons, vente à emporter... vendus en Caisse, sans durée associée.</p>
     <div id="products-list"></div>
+  </div>
+
+  <!-- ===== Onglet marketing (fidélité + cadeaux) ===== -->
+  <div class="tab-panel" id="t-marketing">
+    <div class="card-box">
+      <h3>Programme de fidélité</h3>
+      <p class="hint">Cumulé au niveau de l'enseigne — un client gagne 1 point par passage payé, sur n'importe lequel de vos salons.</p>
+      <div class="grid2">
+        <div class="fld"><label for="mk-threshold">Passages requis pour une récompense</label>
+          <input id="mk-threshold" type="number" min="1" value="10"></div>
+        <div></div>
+      </div>
+      <div class="grid2">
+        <div class="fld"><label for="mk-service-pct">Remise sur une prestation (%)</label>
+          <input id="mk-service-pct" type="number" min="0" max="100" value="50"></div>
+        <div class="fld"><label for="mk-product-pct">Remise sur un produit (%)</label>
+          <input id="mk-product-pct" type="number" min="0" max="100" value="20"></div>
+      </div>
+      <button class="btn btn-primary" onclick="saveMarketingSettings()">Enregistrer</button>
+    </div>
+
+    <div class="card-box">
+      <h3>Clients fidèles</h3>
+      <p class="hint">Points et récompenses en attente, tous salons de l'enseigne confondus.</p>
+      <div id="loyalty-accounts-list"></div>
+    </div>
+
+    <div class="card-box">
+      <h3>Cadeaux vendus</h3>
+      <p class="hint">Historique des cadeaux achetés dans ce salon.</p>
+      <div id="gift-cards-list"></div>
+    </div>
   </div>
 
   <!-- ===== Onglet coiffeurs ===== -->
@@ -929,6 +962,7 @@ document.getElementById('tabs').addEventListener('click', function (e) {
   if (b.dataset.t === 'settings') loadSettings();
   if (b.dataset.t === 'clients') loadClients();
   if (b.dataset.t === 'salons') loadChainTab();
+  if (b.dataset.t === 'marketing') loadMarketingTab();
 });
 
 /* ============ Chargement ============ */
@@ -1845,6 +1879,61 @@ var STATUS_LABEL = {
   done: 'Terminé',
   cancelled: 'Absent / annulé'
 };
+
+/* ============ Marketing (fidélité + cadeaux) ============ */
+function loadMarketingTab() {
+  api('/api/owner/marketing-settings').then(function (r) {
+    document.getElementById('mk-threshold').value = r.settings.loyalty_threshold;
+    document.getElementById('mk-service-pct').value = r.settings.loyalty_service_discount_pct;
+    document.getElementById('mk-product-pct').value = r.settings.loyalty_product_discount_pct;
+  }).catch(function (e) { toast(e.message, true); });
+
+  api('/api/owner/loyalty-accounts').then(function (r) {
+    var list = document.getElementById('loyalty-accounts-list');
+    list.innerHTML = r.items.length === 0
+      ? '<div class="empty">Aucun client fidèle pour le moment</div>'
+      : r.items.map(function (a) {
+          return '<div class="item">' +
+            '<div class="item-main"><div class="item-name">' + esc(a.client_name) + '</div>' +
+            '<div class="item-meta">' + a.points + ' point' + (a.points > 1 ? 's' : '') +
+            (a.rewards_available > 0 ? ' · ' + a.rewards_available + ' récompense' + (a.rewards_available > 1 ? 's' : '') + ' disponible' + (a.rewards_available > 1 ? 's' : '') : '') +
+            '</div></div></div>';
+        }).join('');
+  }).catch(function (e) { toast(e.message, true); });
+
+  api('/api/owner/gift-cards').then(function (r) {
+    var list = document.getElementById('gift-cards-list');
+    list.innerHTML = r.items.length === 0
+      ? '<div class="empty">Aucun cadeau vendu pour le moment</div>'
+      : r.items.map(function (g) {
+          var itemsList = g.items.map(function (it) { return (it.quantity > 1 ? it.quantity + ' × ' : '') + it.item_name; }).join(', ');
+          var statusLabel = g.used_at ? 'Utilisé' : 'Non utilisé';
+          var statusColor = g.used_at ? 'var(--grey)' : 'var(--green)';
+          return '<div class="item">' +
+            '<div class="item-main"><div class="item-name">' + esc(g.recipient_name) + ' — ' + eur(g.amount_cents) + '</div>' +
+            '<div class="item-meta">' + esc(itemsList) + '</div>' +
+            '<div class="item-meta">' + esc(g.recipient_email) + ' · ' + esc(g.recipient_phone) + ' · code ' + esc(g.code || '—') + '</div></div>' +
+            '<div class="item-actions"><span style="color:' + statusColor + ';font-size:13px;font-weight:600">' + statusLabel + '</span></div>' +
+            '</div>';
+        }).join('');
+  }).catch(function (e) { toast(e.message, true); });
+}
+
+function saveMarketingSettings() {
+  var threshold = Number(document.getElementById('mk-threshold').value);
+  var servicePct = Number(document.getElementById('mk-service-pct').value);
+  var productPct = Number(document.getElementById('mk-product-pct').value);
+
+  api('/api/owner/marketing-settings', {
+    method: 'PUT',
+    body: {
+      loyalty_threshold: threshold,
+      loyalty_service_discount_pct: servicePct,
+      loyalty_product_discount_pct: productPct
+    }
+  }).then(function () { toast('Réglages enregistrés'); })
+    .catch(function (e) { toast(e.message, true); });
+}
 
 function loadClients() {
   var params = 'page=' + clientsPage + '&per_page=' + clientsPerPage;

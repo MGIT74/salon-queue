@@ -1,7 +1,8 @@
 const express = require('express');
 const crypto = require('crypto');
-const { pool, utcIso } = require('../db');
+const { pool, utcIso, getOwnerSettings, setOwnerSettings } = require('../db');
 const requireAdmin = require('../middleware/auth');
+const requireAdminOrBarber = require('../middleware/barberAuth');
 const { hashPassword } = require('../lib/password');
 
 const router = express.Router();
@@ -217,6 +218,90 @@ router.put('/password', requireAdmin, wrap(async (req, res) => {
   const hash = await hashPassword(new_password);
   await pool.query('UPDATE owners SET password_hash = ? WHERE id = ?', [hash, req.ownerId]);
   res.json({ ok: true });
+}));
+
+const DEFAULT_MARKETING_SETTINGS = {
+  loyalty_threshold: 10,
+  loyalty_service_discount_pct: 50,
+  loyalty_product_discount_pct: 20
+};
+
+/**
+ * Réglages marketing (fidélité) — au niveau de l'ENSEIGNE, pas du
+ * salon, cohérent avec le cumul des points partagé entre tous les
+ * salons du même propriétaire.
+ */
+router.get('/marketing-settings', requireAdminOrBarber, wrap(async (req, res) => {
+  const raw = await getOwnerSettings(req.ownerId);
+  const out = {};
+  Object.keys(DEFAULT_MARKETING_SETTINGS).forEach((k) => {
+    out[k] = raw[k] !== undefined ? Number(raw[k]) : DEFAULT_MARKETING_SETTINGS[k];
+  });
+  res.json({ ok: true, settings: out });
+}));
+
+router.put('/marketing-settings', requireAdmin, wrap(async (req, res) => {
+  const updates = {};
+  Object.keys(DEFAULT_MARKETING_SETTINGS).forEach((k) => {
+    if (req.body[k] !== undefined) updates[k] = Number(req.body[k]);
+  });
+
+  if (Object.values(updates).some((n) => !Number.isFinite(n))) {
+    return res.status(400).json({ error: 'Valeur invalide' });
+  }
+  if (updates.loyalty_threshold !== undefined && updates.loyalty_threshold < 1) {
+    return res.status(400).json({ error: 'Le seuil doit être au moins 1 passage' });
+  }
+  for (const k of ['loyalty_service_discount_pct', 'loyalty_product_discount_pct']) {
+    if (updates[k] !== undefined && (updates[k] < 0 || updates[k] > 100)) {
+      return res.status(400).json({ error: 'Le pourcentage doit être entre 0 et 100' });
+    }
+  }
+
+  await setOwnerSettings(req.ownerId, updates);
+  res.json({ ok: true });
+}));
+
+/**
+ * Historique des cadeaux vendus dans CE salon (achat, utilisation,
+ * bénéficiaire, contenu) — vue admin uniquement.
+ */
+router.get('/gift-cards', requireAdmin, wrap(async (req, res) => {
+  const [rows] = await pool.query(
+    'SELECT * FROM gift_cards WHERE salon_id = ? ORDER BY created_at DESC LIMIT 300',
+    [req.salon.id]
+  );
+  res.json({
+    ok: true,
+    items: rows.map((g) => {
+      let items = [];
+      try { items = JSON.parse(g.items_json || '[]'); } catch (e) { items = []; }
+      return {
+        id: g.id,
+        recipient_name: g.recipient_name,
+        recipient_email: g.recipient_email,
+        recipient_phone: g.recipient_phone,
+        amount_cents: g.amount_cents,
+        items,
+        code: g.code,
+        used_at: g.used_at ? utcIso(g.used_at) : null,
+        created_at: utcIso(g.created_at)
+      };
+    })
+  });
+}));
+
+/**
+ * Comptes fidélité de cette ENSEIGNE (tous salons confondus) — vue
+ * admin, pour voir qui a combien de points/récompenses en attente.
+ */
+router.get('/loyalty-accounts', requireAdmin, wrap(async (req, res) => {
+  const [rows] = await pool.query(
+    'SELECT client_name, client_key, points, rewards_available, updated_at FROM loyalty_accounts ' +
+    'WHERE owner_id = ? ORDER BY updated_at DESC LIMIT 300',
+    [req.ownerId]
+  );
+  res.json({ ok: true, items: rows.map((r) => Object.assign({}, r, { updated_at: utcIso(r.updated_at) })) });
 }));
 
 module.exports = router;

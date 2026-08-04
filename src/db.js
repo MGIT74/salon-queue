@@ -59,6 +59,29 @@ async function setSettings(salonId, obj) {
   );
 }
 
+// Réglages marketing au niveau de l'ENSEIGNE (owner_id) — fidélité,
+// pourcentages de remise, cohérents avec le cumul de points partagé
+// entre tous les salons du même propriétaire.
+async function getOwnerSettings(ownerId) {
+  const [rows] = await pool.query('SELECT `key`, value FROM owner_settings WHERE owner_id = ?', [ownerId]);
+  const out = {};
+  rows.forEach((r) => { out[r.key] = r.value; });
+  return out;
+}
+
+async function setOwnerSettings(ownerId, obj) {
+  const entries = Object.entries(obj);
+  if (!entries.length) return;
+  const placeholders = entries.map(() => '(?, ?, ?, NOW())').join(', ');
+  const params = [];
+  entries.forEach(([k, v]) => { params.push(ownerId, k, v == null ? '' : String(v)); });
+  await pool.query(
+    `INSERT INTO owner_settings (owner_id, \`key\`, value, updated_at) VALUES ${placeholders}
+     ON DUPLICATE KEY UPDATE value = VALUES(value), updated_at = VALUES(updated_at)`,
+    params
+  );
+}
+
 // Réglages globaux de la plateforme (pas liés à un salon), ex: SMTP
 // utilisé pour les emails de la plateforme elle-même.
 async function getPlatformSettings() {
@@ -81,4 +104,4 @@ async function setPlatformSettings(obj) {
   );
 }
 
-module.exports = { pool, getSettings, setSettings, getPlatformSettings, setPlatformSettings, utcIso };
+module.exports = { pool, getSettings, setSettings, getOwnerSettings, setOwnerSettings, getPlatformSettings, setPlatformSettings, utcIso };

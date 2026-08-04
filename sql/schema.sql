@@ -352,3 +352,16 @@ ALTER TABLE gift_cards ADD COLUMN IF NOT EXISTS items_json TEXT NULL;
 -- rendez-vous en ligne) - plus pratique a taper qu'un identifiant
 -- technique. Nullable pour les cadeaux crees avant cette fonctionnalite.
 ALTER TABLE gift_cards ADD COLUMN IF NOT EXISTS code VARCHAR(12) NULL UNIQUE;
+
+-- Reglages marketing (fidelite) au niveau de l'ENSEIGNE (owner_id),
+-- pas du salon - coherent avec le cumul des points deja fait par
+-- enseigne. Valeurs par defaut = comportement actuel (seuil 10,
+-- -50% prestation, -20% produit).
+CREATE TABLE IF NOT EXISTS owner_settings (
+  owner_id CHAR(36) NOT NULL,
+  `key` VARCHAR(100) NOT NULL,
+  value TEXT NULL,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (owner_id, `key`),
+  FOREIGN KEY (owner_id) REFERENCES owners(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

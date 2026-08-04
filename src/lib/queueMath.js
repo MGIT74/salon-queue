@@ -1,4 +1,4 @@
-const { pool, utcIso } = require('../db');
+const { pool, utcIso, getOwnerSettings } = require('../db');
 
 // Clé de rapprochement d'un client : email en priorité, sinon téléphone,
 // sinon nom — il n'existe pas de fiche client dédiée dans ce modèle,
@@ -20,6 +20,9 @@ async function earnLoyaltyPoint(ownerId, row) {
   const key = clientKey(row);
   if (!key) return;
 
+  const settings = await getOwnerSettings(ownerId);
+  const threshold = Math.max(1, Number(settings.loyalty_threshold) || 10);
+
   const [[existing]] = await pool.query(
     'SELECT id, points, rewards_available FROM loyalty_accounts WHERE owner_id = ? AND client_key = ?',
     [ownerId, key]
@@ -27,7 +30,7 @@ async function earnLoyaltyPoint(ownerId, row) {
 
   let points = (existing ? existing.points : 0) + 1;
   let rewards = existing ? existing.rewards_available : 0;
-  if (points >= 10) { points -= 10; rewards += 1; }
+  if (points >= threshold) { points -= threshold; rewards += 1; }
 
   if (existing) {
     await pool.query(

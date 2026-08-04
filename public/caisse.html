@@ -223,6 +223,7 @@ var ticket = []; // { item_type, item_id, item_name, unit_price_cents, quantity 
 var ticketQueueId = null; // coupe d'origine si le ticket vient d'un encaissement en attente
 var loyaltyRewardsAvailable = 0; // récompenses dispo pour le client du ticket en cours
 var loyaltyDiscount = null; // { index, originalPrice, type } si une réduction fidélité est appliquée
+var marketingSettings = { loyalty_service_discount_pct: 50, loyalty_product_discount_pct: 20 };
 var pendingPayments = [];
 var currentCat = 'services';
 
@@ -331,7 +332,14 @@ function showApp() {
   document.getElementById('my-name').textContent = me.name;
   loadCatalog();
   loadPendingPayments();
+  loadMarketingSettings();
   setInterval(loadPendingPayments, 5000);
+}
+
+function loadMarketingSettings() {
+  barberApi('/api/owner/marketing-settings').then(function (r) {
+    marketingSettings = r.settings;
+  }).catch(function () {});
 }
 
 (function autoLogin() {
@@ -565,6 +573,8 @@ function updateLoyaltyVisibility() {
     document.getElementById('loyalty-btn-product').disabled = !hasProduct && !(loyaltyDiscount && loyaltyDiscount.type === 'product');
     document.getElementById('loyalty-btn-service').classList.toggle('btn-primary', loyaltyDiscount && loyaltyDiscount.type === 'service');
     document.getElementById('loyalty-btn-product').classList.toggle('btn-primary', loyaltyDiscount && loyaltyDiscount.type === 'product');
+    document.getElementById('loyalty-btn-service').textContent = '-' + marketingSettings.loyalty_service_discount_pct + '% prestation';
+    document.getElementById('loyalty-btn-product').textContent = '-' + marketingSettings.loyalty_product_discount_pct + '% produit';
   }
 }
 
@@ -582,12 +592,13 @@ function toggleLoyaltyDiscount(type) {
   var idx = ticket.findIndex(function (l) { return l.item_type === type; });
   if (idx === -1) { toast('Aucune ligne ' + (type === 'service' ? 'prestation' : 'produit') + ' dans ce ticket', true); renderTicket(); return; }
 
-  var factor = type === 'service' ? 0.5 : 0.8;
+  var pct = type === 'service' ? marketingSettings.loyalty_service_discount_pct : marketingSettings.loyalty_product_discount_pct;
+  var factor = 1 - (pct / 100);
   var originalPrice = ticket[idx].unit_price_cents;
   var originalName = ticket[idx].item_name;
   loyaltyDiscount = { index: idx, originalPrice: originalPrice, originalName: originalName, type: type };
   ticket[idx].unit_price_cents = Math.round(originalPrice * factor);
-  ticket[idx].item_name = originalName + ' (fidélité -' + (type === 'service' ? '50' : '20') + '%)';
+  ticket[idx].item_name = originalName + ' (fidélité -' + pct + '%)';
   renderTicket();
 }
 
