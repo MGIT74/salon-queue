@@ -4,7 +4,7 @@ const { pool, utcIso, getOwnerSettings, setOwnerSettings } = require('../db');
 const requireAdmin = require('../middleware/auth');
 const requireAdminOrBarber = require('../middleware/barberAuth');
 const { hashPassword } = require('../lib/password');
-const { sendLoyaltyActivation } = require('../lib/mailer');
+const { sendLoyaltyActivation, sendGiftConfirmation } = require('../lib/mailer');
 const { clientKey } = require('../lib/queueMath');
 
 const router = express.Router();
@@ -291,6 +291,36 @@ router.get('/gift-cards', requireAdmin, wrap(async (req, res) => {
       };
     })
   });
+}));
+
+/**
+ * Renvoie l'email de confirmation d'un cadeau (avec son code) — filet
+ * de sécurité en cas de souci d'envoi (spam, mauvaise adresse
+ * corrigée depuis, etc.). Inutile pour un cadeau déjà utilisé.
+ */
+router.post('/gift-cards/:id/resend', requireAdmin, wrap(async (req, res) => {
+  const [[gift]] = await pool.query(
+    'SELECT * FROM gift_cards WHERE id = ? AND salon_id = ?',
+    [req.params.id, req.salon.id]
+  );
+  if (!gift) return res.status(404).json({ error: 'Cadeau introuvable' });
+  if (gift.used_at) return res.status(409).json({ error: 'Ce cadeau a déjà été utilisé' });
+
+  let giftItems = [];
+  try { giftItems = JSON.parse(gift.items_json || '[]'); } catch (e) { giftItems = []; }
+
+  try {
+    await sendGiftConfirmation(req.salon.id, gift.recipient_email, {
+      recipientName: gift.recipient_name,
+      amountEur: (gift.amount_cents / 100).toFixed(2).replace('.', ',') + ' €',
+      items: giftItems,
+      code: gift.code
+    });
+  } catch (err) {
+    return res.status(502).json({ error: "Échec de l'envoi — vérifiez la configuration SMTP du salon (Réglages)." });
+  }
+
+  res.json({ ok: true });
 }));
 
 /**

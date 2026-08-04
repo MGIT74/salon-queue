@@ -2073,11 +2073,20 @@ function renderGiftCardsList() {
           '<div class="item-main"><div class="item-name">' + esc(g.recipient_name) + ' — ' + eur(g.amount_cents) + '</div>' +
           '<div class="item-meta">' + esc(itemsList) + '</div>' +
           '<div class="item-meta">' + esc(g.recipient_email) + ' · ' + esc(g.recipient_phone) + ' · code ' + esc(g.code || '—') + '</div></div>' +
-          '<div class="item-actions"><span style="color:' + statusColor + ';font-size:13px;font-weight:600">' + statusLabel + '</span></div>' +
+          '<div class="item-actions">' +
+            (g.used_at ? '' : '<button class="btn btn-soft" onclick="resendGiftCode(\'' + g.id + '\')" style="font-size:13px;padding:6px 12px">Renvoyer le code</button>') +
+            '<span style="color:' + statusColor + ';font-size:13px;font-weight:600;align-self:center">' + statusLabel + '</span>' +
+          '</div>' +
           '</div>';
       }).join('');
 
   renderPaginationControls('gifts-pagination', giftsPage, giftsPerPage, giftCardsData.length, 'goToGiftsPage');
+}
+
+function resendGiftCode(giftId) {
+  api('/api/owner/gift-cards/' + giftId + '/resend', { method: 'POST', body: { base_url: window.location.origin } })
+    .then(function () { toast('Email renvoyé'); })
+    .catch(function (e) { toast(e.message, true); });
 }
 
 function saveMarketingSettings() {
