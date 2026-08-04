@@ -13,20 +13,6 @@
   .login { text-align: center; padding-top: 12vh; }
   .login .mark { font-size: 15px; font-weight: 600; color: var(--grey); margin-bottom: 6px; }
   .login h1 { font-size: 28px; font-weight: 600; letter-spacing: -.03em; margin: 0 0 36px; }
-
-  /* Verrouillage par inactivite : le contenu reste visible mais flou
-     derriere, avec l'ecran de code PIN au premier plan. */
-  #login-screen.lock-overlay {
-    position: fixed; inset: 0; z-index: 500; display: flex !important;
-    align-items: center; justify-content: center; background: rgba(0,0,0,.6);
-    padding: 20px; box-sizing: border-box; backdrop-filter: blur(2px);
-  }
-  #login-screen.lock-overlay .login-card {
-    background: var(--card); border-radius: 28px; padding: 44px 32px 36px;
-    box-shadow: 0 25px 70px rgba(0,0,0,.45); max-width: 380px; width: 100%;
-  }
-  #login-screen.lock-overlay { padding-top: 0; }
-  #app-screen.blurred { filter: blur(16px); transition: filter .35s ease; pointer-events: none; user-select: none; }
   .pin-dots { display: flex; justify-content: center; gap: 14px; margin-bottom: 32px; }
   .pin-dot { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--sep); transition: background .1s ease, border-color .1s ease; }
   .pin-dot.filled { background: var(--blue); border-color: var(--blue); }
@@ -348,50 +334,38 @@ function logout() {
   pinBuffer = '';
   clearTimeout(inactivityTimer);
   document.getElementById('app-screen').style.display = 'none';
-  document.getElementById('app-screen').classList.remove('blurred');
-  document.getElementById('login-screen').classList.remove('lock-overlay');
   document.getElementById('login-screen').style.display = 'block';
   renderPinDots();
 }
 
-// Verrouillage automatique par inactivité (15s) : contrairement à la
-// déconnexion manuelle, le contenu reste visible mais flou derrière
-// l'écran de code — le temps que le prochain coiffeur vienne saisir
-// le sien, sans tout masquer brutalement.
+// Deconnexion automatique apres 15s d'inactivite - utilise exactement
+// le meme mecanisme que le bouton "Deconnexion" (pas de mode "flou en
+// arriere-plan" : ca garantit qu'un autre coiffeur peut toujours se
+// reconnecter normalement juste apres, sans aucun etat residuel).
 var inactivityTimer = null;
 var INACTIVITY_LIMIT_MS = 15000;
 
 function resetInactivityTimer() {
   if (!me) return;
   clearTimeout(inactivityTimer);
-  inactivityTimer = setTimeout(lockCaisse, INACTIVITY_LIMIT_MS);
-}
-
-function lockCaisse() {
-  if (!me) return;
-  me = null;
-  try { sessionStorage.removeItem('caisse-session'); } catch (e) {}
-  pinBuffer = '';
-  document.getElementById('app-screen').classList.add('blurred');
-  document.getElementById('login-screen').classList.add('lock-overlay');
-  document.getElementById('login-screen').style.display = 'flex';
-  renderPinDots();
+  inactivityTimer = setTimeout(logout, INACTIVITY_LIMIT_MS);
 }
 
 ['click', 'touchstart', 'keydown'].forEach(function (evt) {
   document.addEventListener(evt, function () { resetInactivityTimer(); }, { passive: true });
 });
 
+var pendingPaymentsInterval = null;
+
 function showApp() {
   document.getElementById('login-screen').style.display = 'none';
-  document.getElementById('login-screen').classList.remove('lock-overlay');
-  document.getElementById('app-screen').classList.remove('blurred');
   document.getElementById('app-screen').style.display = 'block';
   document.getElementById('my-name').textContent = me.name;
   loadCatalog();
   loadPendingPayments();
   loadMarketingSettings();
-  setInterval(loadPendingPayments, 5000);
+  clearInterval(pendingPaymentsInterval);
+  pendingPaymentsInterval = setInterval(loadPendingPayments, 5000);
   resetInactivityTimer();
 }
 
