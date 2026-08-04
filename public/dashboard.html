@@ -523,15 +523,35 @@
     </div>
 
     <div class="card-box">
-      <h3>Clients fidèles</h3>
+      <div class="admin-head" style="margin-bottom:4px">
+        <h3 style="margin:0">Clients fidèles</h3>
+        <div class="fld" style="margin:0"><label for="loyalty-per-page">Par page</label>
+          <select id="loyalty-per-page" onchange="changeLoyaltyPerPage(this.value)">
+            <option value="5">5</option>
+            <option value="10" selected>10</option>
+            <option value="15">15</option>
+          </select>
+        </div>
+      </div>
       <p class="hint">Points et récompenses en attente, tous salons de l'enseigne confondus.</p>
       <div id="loyalty-accounts-list"></div>
+      <div class="clients-pagination" id="loyalty-pagination"></div>
     </div>
 
     <div class="card-box">
-      <h3>Cadeaux vendus</h3>
+      <div class="admin-head" style="margin-bottom:4px">
+        <h3 style="margin:0">Cadeaux vendus</h3>
+        <div class="fld" style="margin:0"><label for="gifts-per-page">Par page</label>
+          <select id="gifts-per-page" onchange="changeGiftsPerPage(this.value)">
+            <option value="5">5</option>
+            <option value="10" selected>10</option>
+            <option value="15">15</option>
+          </select>
+        </div>
+      </div>
       <p class="hint">Historique des cadeaux achetés dans ce salon.</p>
       <div id="gift-cards-list"></div>
+      <div class="clients-pagination" id="gifts-pagination"></div>
     </div>
   </div>
 
@@ -1923,6 +1943,11 @@ var STATUS_LABEL = {
 };
 
 /* ============ Marketing (fidélité + cadeaux) ============ */
+var loyaltyAccountsData = [];
+var loyaltyPage = 1, loyaltyPerPage = 10;
+var giftCardsData = [];
+var giftsPage = 1, giftsPerPage = 10;
+
 function loadMarketingTab() {
   api('/api/owner/marketing-settings').then(function (r) {
     document.getElementById('mk-threshold').value = r.settings.loyalty_threshold;
@@ -1931,34 +1956,90 @@ function loadMarketingTab() {
   }).catch(function (e) { toast(e.message, true); });
 
   api('/api/owner/loyalty-accounts').then(function (r) {
-    var list = document.getElementById('loyalty-accounts-list');
-    list.innerHTML = r.items.length === 0
-      ? '<div class="empty">Aucun client fidèle pour le moment</div>'
-      : r.items.map(function (a) {
-          return '<div class="item">' +
-            '<div class="item-main"><div class="item-name">' + esc(a.client_name) + '</div>' +
-            '<div class="item-meta">' + a.points + ' point' + (a.points > 1 ? 's' : '') +
-            (a.rewards_available > 0 ? ' · ' + a.rewards_available + ' récompense' + (a.rewards_available > 1 ? 's' : '') + ' disponible' + (a.rewards_available > 1 ? 's' : '') : '') +
-            '</div></div></div>';
-        }).join('');
+    loyaltyAccountsData = r.items;
+    loyaltyPage = 1;
+    renderLoyaltyAccountsList();
   }).catch(function (e) { toast(e.message, true); });
 
   api('/api/owner/gift-cards').then(function (r) {
-    var list = document.getElementById('gift-cards-list');
-    list.innerHTML = r.items.length === 0
-      ? '<div class="empty">Aucun cadeau vendu pour le moment</div>'
-      : r.items.map(function (g) {
-          var itemsList = g.items.map(function (it) { return (it.quantity > 1 ? it.quantity + ' × ' : '') + it.item_name; }).join(', ');
-          var statusLabel = g.used_at ? 'Utilisé' : 'Non utilisé';
-          var statusColor = g.used_at ? 'var(--grey)' : 'var(--green)';
-          return '<div class="item">' +
-            '<div class="item-main"><div class="item-name">' + esc(g.recipient_name) + ' — ' + eur(g.amount_cents) + '</div>' +
-            '<div class="item-meta">' + esc(itemsList) + '</div>' +
-            '<div class="item-meta">' + esc(g.recipient_email) + ' · ' + esc(g.recipient_phone) + ' · code ' + esc(g.code || '—') + '</div></div>' +
-            '<div class="item-actions"><span style="color:' + statusColor + ';font-size:13px;font-weight:600">' + statusLabel + '</span></div>' +
-            '</div>';
-        }).join('');
+    giftCardsData = r.items;
+    giftsPage = 1;
+    renderGiftCardsList();
   }).catch(function (e) { toast(e.message, true); });
+}
+
+function renderPaginationControls(containerId, page, perPage, total, goFn) {
+  var totalPages = Math.max(1, Math.ceil(total / perPage));
+  document.getElementById(containerId).innerHTML = total === 0 ? '' :
+    '<button onclick="' + goFn + '(' + (page - 1) + ')"' + (page <= 1 ? ' disabled' : '') + '>‹</button>' +
+    '<span class="page-label">Page ' + page + ' / ' + totalPages + '</span>' +
+    '<button onclick="' + goFn + '(' + (page + 1) + ')"' + (page >= totalPages ? ' disabled' : '') + '>›</button>';
+}
+
+function changeLoyaltyPerPage(value) {
+  loyaltyPerPage = Number(value) || 10;
+  loyaltyPage = 1;
+  renderLoyaltyAccountsList();
+}
+
+function goToLoyaltyPage(p) {
+  var totalPages = Math.max(1, Math.ceil(loyaltyAccountsData.length / loyaltyPerPage));
+  if (p < 1 || p > totalPages) return;
+  loyaltyPage = p;
+  renderLoyaltyAccountsList();
+}
+
+function renderLoyaltyAccountsList() {
+  var start = (loyaltyPage - 1) * loyaltyPerPage;
+  var pageItems = loyaltyAccountsData.slice(start, start + loyaltyPerPage);
+
+  var list = document.getElementById('loyalty-accounts-list');
+  list.innerHTML = loyaltyAccountsData.length === 0
+    ? '<div class="empty">Aucun client fidèle pour le moment</div>'
+    : pageItems.map(function (a) {
+        return '<div class="item">' +
+          '<div class="item-main"><div class="item-name">' + esc(a.client_name) + '</div>' +
+          '<div class="item-meta">' + a.points + ' point' + (a.points > 1 ? 's' : '') +
+          (a.rewards_available > 0 ? ' · ' + a.rewards_available + ' récompense' + (a.rewards_available > 1 ? 's' : '') + ' disponible' + (a.rewards_available > 1 ? 's' : '') : '') +
+          '</div></div></div>';
+      }).join('');
+
+  renderPaginationControls('loyalty-pagination', loyaltyPage, loyaltyPerPage, loyaltyAccountsData.length, 'goToLoyaltyPage');
+}
+
+function changeGiftsPerPage(value) {
+  giftsPerPage = Number(value) || 10;
+  giftsPage = 1;
+  renderGiftCardsList();
+}
+
+function goToGiftsPage(p) {
+  var totalPages = Math.max(1, Math.ceil(giftCardsData.length / giftsPerPage));
+  if (p < 1 || p > totalPages) return;
+  giftsPage = p;
+  renderGiftCardsList();
+}
+
+function renderGiftCardsList() {
+  var start = (giftsPage - 1) * giftsPerPage;
+  var pageItems = giftCardsData.slice(start, start + giftsPerPage);
+
+  var list = document.getElementById('gift-cards-list');
+  list.innerHTML = giftCardsData.length === 0
+    ? '<div class="empty">Aucun cadeau vendu pour le moment</div>'
+    : pageItems.map(function (g) {
+        var itemsList = g.items.map(function (it) { return (it.quantity > 1 ? it.quantity + ' × ' : '') + it.item_name; }).join(', ');
+        var statusLabel = g.used_at ? 'Utilisé' : 'Non utilisé';
+        var statusColor = g.used_at ? 'var(--grey)' : 'var(--green)';
+        return '<div class="item">' +
+          '<div class="item-main"><div class="item-name">' + esc(g.recipient_name) + ' — ' + eur(g.amount_cents) + '</div>' +
+          '<div class="item-meta">' + esc(itemsList) + '</div>' +
+          '<div class="item-meta">' + esc(g.recipient_email) + ' · ' + esc(g.recipient_phone) + ' · code ' + esc(g.code || '—') + '</div></div>' +
+          '<div class="item-actions"><span style="color:' + statusColor + ';font-size:13px;font-weight:600">' + statusLabel + '</span></div>' +
+          '</div>';
+      }).join('');
+
+  renderPaginationControls('gifts-pagination', giftsPage, giftsPerPage, giftCardsData.length, 'goToGiftsPage');
 }
 
 function saveMarketingSettings() {
