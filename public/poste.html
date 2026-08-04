@@ -329,10 +329,12 @@ function renderActive(force) {
       chipsHtml(cur) +
       '<div class="big-timer' + (t.over ? ' over' : '') + '" id="active-timer-value">' + t.text + '</div>' +
       '<div class="timer-sub' + (t.over ? ' over' : '') + '" id="active-timer-sub">' + t.label + ' · prévu ' + cur.total_duration_min + ' min · ' + eur(cur.total_price_cents) + '</div>' +
-      '<button class="btn btn-soft" onclick="toggleExtrasPicker()">Ajouter un supplément</button>' +
-      '<div id="extras-picker" style="display:' + (extrasPickerOpen ? 'block' : 'none') + '">' + extrasOptions +
-        '<button class="btn btn-primary" onclick="saveExtras(\'' + cur.id + '\')">Valider</button>' +
-      '</div>' +
+      (cur.gift_card
+        ? '<div class="hint" style="color:var(--green);margin:8px 0">🎁 Cadeau — supplément non modifiable, terminez la coupe telle quelle.</div>'
+        : '<button class="btn btn-soft" onclick="toggleExtrasPicker()">Ajouter un supplément</button>' +
+          '<div id="extras-picker" style="display:' + (extrasPickerOpen ? 'block' : 'none') + '">' + extrasOptions +
+            '<button class="btn btn-primary" onclick="saveExtras(\'' + cur.id + '\')">Valider</button>' +
+          '</div>') +
       '<div class="note-block">' +
         '<label for="client-note">Note sur ce client</label>' +
         '<textarea id="client-note" rows="2" placeholder="Ex: préfère dégradé américain, allergie...">' + esc(cur.note || '') + '</textarea>' +

@@ -248,7 +248,7 @@ router.post('/:id/cancel', requireAdminOrBarber, wrap(async (req, res) => {
 // --- Coiffeur : modifier prestation et suppléments en cours de route -----
 router.put('/:id', requireAdminOrBarber, wrap(async (req, res) => {
   const [[existing]] = await pool.query(
-    'SELECT barber_id, status FROM queue WHERE id = ? AND salon_id = ?',
+    'SELECT barber_id, status, client_name, email, phone FROM queue WHERE id = ? AND salon_id = ?',
     [req.params.id, req.salon.id]
   );
   if (!existing) return res.status(404).json({ error: 'Client introuvable' });
@@ -268,6 +268,24 @@ router.put('/:id', requireAdminOrBarber, wrap(async (req, res) => {
       'SELECT COUNT(*) AS n FROM queue_extras WHERE queue_id = ?', [req.params.id]
     );
     if (extras.length > currentExtrasCount) {
+      // Un cadeau associé fige le contenu payé à l'achat — ajouter un
+      // supplément ici casserait la logique (ce supplément ne serait
+      // couvert par rien). On bloque TOUJOURS l'ajout dans ce cas,
+      // même si personne n'attend derrière.
+      const key = clientKey(existing);
+      if (key) {
+        const [[gift]] = await pool.query(
+          'SELECT id FROM gift_cards WHERE salon_id = ? AND used_at IS NULL AND ' +
+          '(recipient_email = ? OR recipient_phone = ? OR recipient_name = ?) LIMIT 1',
+          [req.salon.id, existing.email || '', existing.phone || '', existing.client_name]
+        );
+        if (gift) {
+          return res.status(409).json({
+            error: 'Ce client utilise un cadeau — impossible d\'ajouter un supplément non prévu. Terminez la coupe telle quelle.'
+          });
+        }
+      }
+
       const [[nextWaiting]] = await pool.query(
         `SELECT id FROM queue WHERE salon_id = ? AND status = 'waiting'
          AND (barber_id IS NULL OR barber_id = ?) LIMIT 1`,
