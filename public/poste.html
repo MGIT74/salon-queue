@@ -326,6 +326,9 @@ function renderActive(force) {
   zone.innerHTML =
     '<div class="active-card">' +
       '<div class="name">' + esc(cur.client_name) + '</div>' +
+      (cur.is_appointment
+        ? '<div class="hint" style="color:var(--blue);margin:-4px 0 6px">📅 Rendez-vous</div>'
+        : '') +
       chipsHtml(cur) +
       '<div class="big-timer' + (t.over ? ' over' : '') + '" id="active-timer-value">' + t.text + '</div>' +
       '<div class="timer-sub' + (t.over ? ' over' : '') + '" id="active-timer-sub">' + t.label + ' · prévu ' + cur.total_duration_min + ' min · ' + eur(cur.total_price_cents) + '</div>' +
@@ -427,11 +430,15 @@ function renderNext() {
     var lockNote = isAppointmentNotYet
       ? 'RDV à ' + new Date(q.checkin_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
       : 'En attente de son tour';
+    var appointmentBadge = (q.is_appointment && !isAppointmentNotYet)
+      ? '<div class="meta" style="color:var(--blue)">📅 RDV ' + new Date(q.checkin_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) + '</div>'
+      : '';
     return '<div class="next-item" data-id="' + q.id + '">' +
       '<div class="next-card' + (locked ? ' locked' : '') + '">' +
         '<div class="next-info" onclick="toggleNextDetail(\'' + q.id + '\')">' +
           '<div class="name">' + esc(q.client_name) + '</div>' +
           '<div class="meta">' + esc(detail) + '</div>' +
+          appointmentBadge +
           (q.gift_card ? giftBadgeHtml(q.gift_card) : '') +
           (locked ? '<div class="lock-note">' + lockNote + '</div>' : '') +
         '</div>' +
