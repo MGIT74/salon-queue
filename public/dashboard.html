@@ -609,6 +609,12 @@
     </div>
 
     <div class="card-box">
+      <h3>Détail des ventes — période en cours</h3>
+      <p class="hint">Chaque vente encaissée, avec le coiffeur, les prestations/produits et le tarif.</p>
+      <div id="caisse-sales-detail"></div>
+    </div>
+
+    <div class="card-box">
       <h3>Historique des clôtures</h3>
       <div id="caisse-closings-list"></div>
     </div>
@@ -2264,6 +2270,23 @@ function loadCaisseTab() {
             '<span style="color:var(--grey)">' + esc(name) + ' · ' + b.count + ' vente' + (b.count > 1 ? 's' : '') + '</span>' +
             '<span>' + eur(b.total_cents) + '</span></div>';
         }).join('');
+
+    var salesUrl = '/api/sales' + (r.period_start ? '?since=' + encodeURIComponent(r.period_start) : '');
+    api(salesUrl).then(function (rs) {
+      var list = document.getElementById('caisse-sales-detail');
+      list.innerHTML = rs.items.length === 0
+        ? '<div class="empty">Aucune vente sur cette période</div>'
+        : rs.items.map(function (s) {
+            var when = new Date(s.created_at).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+            var itemsList = s.items.map(function (it) { return (it.quantity > 1 ? it.quantity + ' × ' : '') + it.item_name; }).join(', ');
+            var methodLabel2 = { especes: 'Espèces', cb: 'CB', autre: 'Autre' }[s.payment_method] || s.payment_method;
+            return '<div class="item"><div class="item-main">' +
+              '<div class="item-name">' + esc(s.barber_name || 'Non assigné') + ' — ' + eur(s.total_price_cents) + '</div>' +
+              '<div class="item-meta">' + esc(itemsList) + '</div>' +
+              '<div class="item-meta">' + when + ' · ' + methodLabel2 + '</div>' +
+              '</div></div>';
+          }).join('');
+    }).catch(function (e) { toast(e.message, true); });
   }).catch(function (e) { toast(e.message, true); });
 
   api('/api/owner/caisse/closings').then(function (r) {

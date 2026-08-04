@@ -168,6 +168,11 @@ router.get('/', requireAdmin, wrap(async (req, res) => {
   const params = [req.salon.id];
   if (req.query.date_from) { conditions.push('s.created_at >= ?'); params.push(req.query.date_from + ' 00:00:00'); }
   if (req.query.date_to) { conditions.push('s.created_at <= ?'); params.push(req.query.date_to + ' 23:59:59'); }
+  if (req.query.since) {
+    const mysqlDatetime = String(req.query.since).replace('T', ' ').replace('Z', '');
+    conditions.push('s.created_at > ?');
+    params.push(mysqlDatetime);
+  }
 
   const [sales] = await pool.query(
     `SELECT s.*, b.name AS barber_name FROM sales s LEFT JOIN barbers b ON b.id = s.barber_id
