@@ -145,7 +145,7 @@
 
 <div class="wrap">
   <div class="login" id="login-screen">
-    <div class="login-card">
+    <div class="login-card" id="login-card-normal">
       <div class="mark" id="salon-mark">LE SALON</div>
       <h1>Caisse</h1>
       <div class="pin-dots" id="pin-dots">
@@ -158,6 +158,11 @@
         <button class="empty"></button><button data-k="0">0</button><button class="del" data-k="del">⌫</button>
       </div>
       <div class="login-error" id="login-error"></div>
+    </div>
+    <div class="login-card" id="login-card-locked" style="display:none">
+      <div style="font-size:44px;margin-bottom:12px">🔒</div>
+      <h1 style="margin-bottom:10px">Caisse fermée</h1>
+      <p style="color:var(--grey);font-size:15px;line-height:1.5" id="locked-reopen-text">Réouverture demain matin.</p>
     </div>
   </div>
 
@@ -390,12 +395,30 @@ function loadMarketingSettings() {
 }
 
 (function autoLogin() {
-  var saved = null;
-  try { saved = JSON.parse(sessionStorage.getItem('caisse-session') || 'null'); } catch (e) {}
-  if (saved && saved.id && saved.pin) {
-    me = saved;
-    showApp();
-  }
+  var headers = {};
+  if (SALON_SLUG) headers['X-Salon-Slug'] = SALON_SLUG;
+
+  fetch('/api/settings/public', { headers: headers })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (d.caisse_locked_until) {
+        var when = new Date(d.caisse_locked_until).toLocaleString('fr-FR', {
+          weekday: 'long', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
+        });
+        document.getElementById('locked-reopen-text').textContent = 'Réouverture prévue le ' + when + '.';
+        document.getElementById('login-card-normal').style.display = 'none';
+        document.getElementById('login-card-locked').style.display = 'block';
+        return;
+      }
+
+      var saved = null;
+      try { saved = JSON.parse(sessionStorage.getItem('caisse-session') || 'null'); } catch (e) {}
+      if (saved && saved.id && saved.pin) {
+        me = saved;
+        showApp();
+      }
+    })
+    .catch(function () {});
 })();
 
 /* ---------- Catalogue ---------- */

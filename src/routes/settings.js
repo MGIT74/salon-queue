@@ -1,5 +1,5 @@
 const express = require('express');
-const { pool, getSettings, setSettings } = require('../db');
+const { pool, getSettings, setSettings, getCaisseLockedUntil } = require('../db');
 const { sendTest, invalidateTransport } = require('../lib/mailer');
 const requireAdmin = require('../middleware/auth');
 
@@ -18,7 +18,7 @@ const EDITABLE = [
   'salon_name', 'notify_before_min', 'logo_url', 'gift_tile_image_url',
   'smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_from',
   'printer_connection_type', 'printer_ip', 'printer_model',
-  'caisse_inactivity_seconds'
+  'caisse_inactivity_seconds', 'caisse_reopen_hour'
 ];
 
 router.get('/', requireAdmin, wrap(async (req, res) => {
@@ -80,12 +80,16 @@ router.post('/smtp/test', requireAdmin, wrap(async (req, res) => {
 // Réglages publics utiles à la borne (nom du salon uniquement)
 router.get('/public', wrap(async (req, res) => {
   const s = await getSettings(req.salon.id);
+  const caisseLockedUntil = await getCaisseLockedUntil(req.salon.id, s);
+
   res.json({
     ok: true,
     salon_name: s.salon_name || 'Le Salon',
     logo_url: s.logo_url || null,
     gift_tile_image_url: s.gift_tile_image_url || null,
-    caisse_inactivity_seconds: s.caisse_inactivity_seconds ? Number(s.caisse_inactivity_seconds) : 15
+    caisse_inactivity_seconds: s.caisse_inactivity_seconds ? Number(s.caisse_inactivity_seconds) : 15,
+    caisse_reopen_hour: s.caisse_reopen_hour || '00:00',
+    caisse_locked_until: caisseLockedUntil
   });
 }));
 

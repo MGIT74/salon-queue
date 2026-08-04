@@ -621,8 +621,13 @@
 
     <div class="card-box">
       <h3>Réglages de la caisse</h3>
-      <div class="fld"><label for="caisse-inactivity">Déconnexion automatique après (secondes)</label>
-        <input id="caisse-inactivity" type="number" min="5" max="300"></div>
+      <div class="grid2">
+        <div class="fld"><label for="caisse-inactivity">Déconnexion automatique après (secondes)</label>
+          <input id="caisse-inactivity" type="number" min="5" max="300"></div>
+        <div class="fld"><label for="caisse-reopen-hour">Heure de réouverture le lendemain d'une clôture</label>
+          <input id="caisse-reopen-hour" type="time" value="00:00"></div>
+      </div>
+      <p class="hint">Après une clôture, la caisse reste fermée (impossible d'encaisser) jusqu'à cette heure le <strong>lendemain</strong> — quelle que soit l'heure de la clôture.</p>
       <button class="btn btn-primary" onclick="saveCaisseInactivity()">Enregistrer</button>
     </div>
   </div>
@@ -2304,6 +2309,7 @@ function loadCaisseTab() {
 
   api('/api/settings').then(function (r) {
     document.getElementById('caisse-inactivity').value = r.settings.caisse_inactivity_seconds || 15;
+    document.getElementById('caisse-reopen-hour').value = r.settings.caisse_reopen_hour || '00:00';
   }).catch(function () {});
 }
 
@@ -2332,8 +2338,9 @@ function startCaisseClosing() {
 
 function saveCaisseInactivity() {
   var seconds = Number(document.getElementById('caisse-inactivity').value) || 15;
-  api('/api/settings', { method: 'PUT', body: { caisse_inactivity_seconds: seconds } })
-    .then(function () { toast('Délai enregistré'); })
+  var reopenHour = document.getElementById('caisse-reopen-hour').value || '00:00';
+  api('/api/settings', { method: 'PUT', body: { caisse_inactivity_seconds: seconds, caisse_reopen_hour: reopenHour } })
+    .then(function () { toast('Réglages enregistrés'); })
     .catch(function (e) { toast(e.message, true); });
 }
 

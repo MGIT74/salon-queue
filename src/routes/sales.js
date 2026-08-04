@@ -1,6 +1,6 @@
 const express = require('express');
 const crypto = require('crypto');
-const { pool, utcIso } = require('../db');
+const { pool, utcIso, getSettings, getCaisseLockedUntil } = require('../db');
 const { clientKey, earnLoyaltyPoint } = require('../lib/queueMath');
 const { sendGiftConfirmation } = require('../lib/mailer');
 const requireAdmin = require('../middleware/auth');
@@ -38,6 +38,20 @@ function generateGiftCode() {
  */
 router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
   const { payment_method, items, queue_id, gift, loyalty_redeem } = req.body;
+
+  // La caisse peut être verrouillée jusqu'au lendemain suite à une
+  // clôture — vérifié ici côté serveur (pas seulement visuellement),
+  // pour qu'aucune vente ne puisse être créée pendant ce temps, peu
+  // importe comment la requête est envoyée.
+  const settingsForLock = await getSettings(req.salon.id);
+  const lockedUntil = await getCaisseLockedUntil(req.salon.id, settingsForLock);
+  if (lockedUntil) {
+    return res.status(423).json({
+      error: 'La caisse est fermée suite à une clôture — réouverture prévue le ' +
+        new Date(lockedUntil).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) + '.'
+    });
+  }
+
   if (!PAYMENT_METHODS.includes(payment_method)) {
     return res.status(400).json({ error: 'Moyen de paiement invalide' });
   }

@@ -38,6 +38,29 @@ function utcIso(v) {
   return v.replace(' ', 'T') + 'Z';
 }
 
+/**
+ * Renvoie la date de reouverture (ISO) si la caisse est actuellement
+ * verrouillee suite a une cloture, ou null si elle est ouverte. La
+ * caisse ne se rouvre JAMAIS le meme jour qu'une cloture - toujours
+ * le LENDEMAIN, a l'heure configuree (par defaut minuit).
+ */
+async function getCaisseLockedUntil(salonId, settings) {
+  const [[lastClosing]] = await pool.query(
+    'SELECT period_end FROM cash_closings WHERE salon_id = ? ORDER BY period_end DESC LIMIT 1',
+    [salonId]
+  );
+  if (!lastClosing) return null;
+
+  const reopenHour = /^\d{2}:\d{2}$/.test(settings.caisse_reopen_hour || '') ? settings.caisse_reopen_hour : '00:00';
+  const [hh, mm] = reopenHour.split(':').map(Number);
+  const closingDate = new Date(lastClosing.period_end + 'Z');
+  const reopenAt = new Date(closingDate);
+  reopenAt.setUTCDate(reopenAt.getUTCDate() + 1);
+  reopenAt.setUTCHours(hh, mm, 0, 0);
+
+  return new Date() < reopenAt ? reopenAt.toISOString() : null;
+}
+
 // Lecture / écriture de la table settings (clé -> valeur), par salon
 async function getSettings(salonId) {
   const [rows] = await pool.query('SELECT `key`, value FROM settings WHERE salon_id = ?', [salonId]);
@@ -104,4 +127,4 @@ async function setPlatformSettings(obj) {
   );
 }
 
-module.exports = { pool, getSettings, setSettings, getOwnerSettings, setOwnerSettings, getPlatformSettings, setPlatformSettings, utcIso };
+module.exports = { pool, getSettings, setSettings, getOwnerSettings, setOwnerSettings, getPlatformSettings, setPlatformSettings, utcIso, getCaisseLockedUntil };
