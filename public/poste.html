@@ -426,6 +426,7 @@ function renderNext() {
         '<div class="next-info" onclick="toggleNextDetail(\'' + q.id + '\')">' +
           '<div class="name">' + esc(q.client_name) + '</div>' +
           '<div class="meta">' + esc(detail) + '</div>' +
+          (q.gift_card ? giftBadgeHtml(q.gift_card) : '') +
           (locked ? '<div class="lock-note">En attente de son tour</div>' : '') +
         '</div>' +
         '<div class="next-btns">' +
@@ -437,12 +438,37 @@ function renderNext() {
         '<div class="detail-row"><span class="detail-label">Client</span><span class="detail-value">' + esc(q.client_name) + '</span></div>' +
         (q.email ? '<div class="detail-row"><span class="detail-label">Email</span><span class="detail-value">' + esc(q.email) + '</span></div>' : '') +
         (q.phone ? '<div class="detail-row"><span class="detail-label">Téléphone</span><span class="detail-value">' + esc(q.phone) + '</span></div>' : '') +
+        (q.gift_card ? giftDetailHtml(q.gift_card) : '') +
         '<label>Note sur ce client</label>' +
         '<textarea id="next-note-' + q.id + '" rows="2" placeholder="Ex: préfère dégradé américain, allergie...">' + esc(q.note || '') + '</textarea>' +
         '<button class="btn btn-soft" onclick="saveNextNote(\'' + q.id + '\')">Enregistrer la note</button>' +
       '</div>' +
     '</div>';
   }).join('');
+}
+
+/**
+ * Petit badge visible directement sur la carte repliée — ne mentionne
+ * "produit offert" que si le cadeau contient réellement un produit à
+ * remettre en plus de la coupe.
+ */
+function giftBadgeHtml(gift) {
+  var hasProduct = gift.items.some(function (it) { return it.item_type === 'product'; });
+  var label = hasProduct ? '🎁 Cadeau — pensez au produit offert' : '🎁 Cadeau';
+  return '<div class="meta" style="color:var(--green)">' + label + '</div>';
+}
+
+/**
+ * Détail d'un cadeau lié à ce client — notamment les articles qui ne
+ * font PAS partie de la coupe (produits, suppléments non choisis au
+ * check-in), pour que le coiffeur sache quoi remettre en plus.
+ */
+function giftDetailHtml(gift) {
+  var itemsList = gift.items.map(function (it) { return it.quantity + ' × ' + esc(it.item_name); }).join(', ');
+  return '<div class="detail-row" style="flex-direction:column;align-items:flex-start;gap:4px">' +
+    '<span class="detail-label" style="color:var(--green)">🎁 Cadeau (' + eur(gift.amount_cents) + ')</span>' +
+    '<span class="detail-value" style="font-weight:400">' + itemsList + '</span>' +
+    '</div>';
 }
 
 function toggleNextDetail(id) {
@@ -478,8 +504,16 @@ function startMine(id) {
 }
 
 function finishMine(id) {
+  var cur = queue.find(function (q) { return q.id === id; });
   barberApi('/api/queue/' + id + '/finish', { method: 'POST', body: {} })
-    .then(refresh)
+    .then(function () {
+      if (cur && cur.gift_card) {
+        toast('Coupe terminée — ' + cur.client_name + ' a un cadeau à récupérer, direction la caisse');
+      } else {
+        toast('Coupe terminée — envoyez le client à la caisse');
+      }
+      return refresh();
+    })
     .catch(function (e) { toast(e.message, true); });
 }
 </script>

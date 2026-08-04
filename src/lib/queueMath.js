@@ -50,10 +50,10 @@ async function earnLoyaltyPoint(ownerId, row) {
  * encore encaissées (utilisé pour la liste "en attente d'encaissement"
  * de la caisse, sur les entrées 'done').
  */
-async function loadQueue(salonId, statuses, onlyUnpaid) {
+async function loadQueue(salonId, statuses, onlyUnpaid, ownerId) {
   statuses = statuses || ['waiting', 'in_progress'];
   const statusPlaceholders = statuses.map(() => '?').join(',');
-  const [[rows], [services], [extras], [links], [notes], [svcPrices], [extPrices]] = await Promise.all([
+  const [[rows], [services], [extras], [links], [notes], [svcPrices], [extPrices], [gifts], [loyaltyRows]] = await Promise.all([
     pool.query(
       `SELECT * FROM queue WHERE salon_id = ? AND status IN (${statusPlaceholders})` +
       (onlyUnpaid ? ' AND paid_at IS NULL' : '') +
@@ -78,12 +78,30 @@ async function loadQueue(salonId, statuses, onlyUnpaid) {
       `SELECT bep.barber_id, bep.extra_id, bep.price_cents, bep.duration_min FROM barber_extra_prices bep
        JOIN barbers b ON b.id = bep.barber_id WHERE b.salon_id = ?`,
       [salonId]
-    )
+    ),
+    pool.query('SELECT * FROM gift_cards WHERE salon_id = ? AND used_at IS NULL', [salonId]),
+    ownerId
+      ? pool.query('SELECT client_key, rewards_available FROM loyalty_accounts WHERE owner_id = ? AND rewards_available > 0', [ownerId])
+      : Promise.resolve([[]])
   ]);
 
   const svcById = Object.fromEntries(services.map((s) => [s.id, s]));
   const extById = Object.fromEntries(extras.map((e) => [e.id, e]));
   const noteByKey = Object.fromEntries(notes.map((n) => [n.client_key, n.note]));
+
+  // Rapprochement cadeau/fidélité — disponible pour QUI QUE CE SOIT qui
+  // regarde ce client (Mon poste, dashboard, caisse), pas seulement au
+  // moment de payer.
+  const giftByKey = {};
+  gifts.forEach((g) => {
+    const gKey = clientKey({ email: g.recipient_email, phone: g.recipient_phone, client_name: g.recipient_name });
+    if (gKey) {
+      let giftItems = [];
+      try { giftItems = JSON.parse(g.items_json || '[]'); } catch (e) { giftItems = []; }
+      giftByKey[gKey] = { id: g.id, amount_cents: g.amount_cents, items: giftItems };
+    }
+  });
+  const loyaltyByKey = Object.fromEntries(loyaltyRows.map((l) => [l.client_key, l.rewards_available]));
 
   // Prix/durée personnalisés par coiffeur (remplacent le tarif par défaut
   // du catalogue quand définis) — clé "barberId:itemId" pour un accès direct.

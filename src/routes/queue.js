@@ -16,10 +16,37 @@ function wrap(fn) {
   };
 }
 
+/**
+ * Rapproche chaque ligne de file avec un cadeau non utilisé pour ce
+ * client (même clé que les notes), quel que soit son statut — utile
+ * dès la file d'attente (le coiffeur sait avant même de commencer),
+ * pas seulement à l'encaissement.
+ */
+async function attachGiftInfo(rows, salonId) {
+  const [gifts] = await pool.query(
+    'SELECT * FROM gift_cards WHERE salon_id = ? AND used_at IS NULL', [salonId]
+  );
+  if (!gifts.length) return rows;
+  const giftByKey = {};
+  gifts.forEach((g) => {
+    const key = clientKey({ email: g.recipient_email, phone: g.recipient_phone, client_name: g.recipient_name });
+    if (key) giftByKey[key] = g;
+  });
+  return rows.map((r) => {
+    const key = clientKey(r);
+    const gift = key ? giftByKey[key] : null;
+    if (!gift) return r;
+    let items = [];
+    try { items = JSON.parse(gift.items_json || '[]'); } catch (e) { items = []; }
+    return Object.assign({}, r, { gift_card: { id: gift.id, amount_cents: gift.amount_cents, items } });
+  });
+}
+
 // --- Public : état de la file (du salon résolu) --------------------------
 router.get('/', wrap(async (req, res) => {
   await recompute(req.salon.id);
-  const rows = await loadQueue(req.salon.id);
+  let rows = await loadQueue(req.salon.id);
+  rows = await attachGiftInfo(rows, req.salon.id);
   rows.sort((a, b) => {
     if (a.status !== b.status) return a.status === 'in_progress' ? -1 : 1;
     return (a.position || 0) - (b.position || 0);
@@ -37,19 +64,7 @@ router.get('/', wrap(async (req, res) => {
 router.get('/pending-payment', requireAdminOrBarber, wrap(async (req, res) => {
   let rows = await loadQueue(req.salon.id, ['done'], true);
   if (req.barberId) rows = rows.filter((r) => r.barber_id === req.barberId);
-
-  // Rapproche chaque client en attente avec un bon cadeau non utilisé,
-  // par la même clé de rapprochement que les notes (email > téléphone
-  // > nom) — le beneficiaire n'a pas besoin d'avoir explicitement
-  // rappelé qu'il a un cadeau, ça ressort tout seul.
-  const [gifts] = await pool.query(
-    'SELECT * FROM gift_cards WHERE salon_id = ? AND used_at IS NULL', [req.salon.id]
-  );
-  const giftByKey = {};
-  gifts.forEach((g) => {
-    const key = clientKey({ email: g.recipient_email, phone: g.recipient_phone, client_name: g.recipient_name });
-    if (key) giftByKey[key] = g;
-  });
+  rows = await attachGiftInfo(rows, req.salon.id);
 
   // Fidélité : cumulée au niveau de l'ENSEIGNE (owner_id), pas du
   // salon — un client vu ici peut avoir gagné ses points ailleurs.
@@ -62,16 +77,8 @@ router.get('/pending-payment', requireAdminOrBarber, wrap(async (req, res) => {
 
   rows = rows.map((r) => {
     const key = clientKey(r);
-    const gift = key ? giftByKey[key] : null;
     const rewards = key ? loyaltyByKey[key] : null;
-    const extra = {};
-    if (gift) {
-      let giftItems = [];
-      try { giftItems = JSON.parse(gift.items_json || '[]'); } catch (e) { giftItems = []; }
-      extra.gift_card = { id: gift.id, amount_cents: gift.amount_cents, items: giftItems };
-    }
-    if (rewards) extra.loyalty_rewards_available = rewards;
-    return Object.keys(extra).length ? Object.assign({}, r, extra) : r;
+    return rewards ? Object.assign({}, r, { loyalty_rewards_available: rewards }) : r;
   });
 
   rows.sort((a, b) => {
