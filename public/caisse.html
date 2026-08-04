@@ -438,9 +438,42 @@ function renderPendingList() {
         (isActive && q.gift_card
           ? '<button class="btn btn-primary" onclick="event.stopPropagation();useGiftCard(\'' + q.gift_card.id + '\',\'' + q.id + '\')">Utiliser le cadeau</button>'
           : '') +
+        (isActive && !q.loyalty_member
+          ? '<button class="btn btn-ghost" onclick="event.stopPropagation();proposeLoyaltyActivation(\'' + q.id + '\')">Proposer la fidélité</button>'
+          : '') +
         (isActive ? '<button class="btn btn-ghost" onclick="event.stopPropagation();toggleDeferPayment(\'' + q.id + '\')">Mettre de côté</button>' : '') +
       '</div></div>';
   }).join('');
+}
+
+/**
+ * L'activation n'est jamais automatique : le coiffeur doit avoir
+ * l'accord explicite du client avant de l'activer. Un email est requis
+ * pour la confirmation — pré-rempli s'il est déjà connu depuis le
+ * check-in, sinon demandé à l'instant.
+ */
+function proposeLoyaltyActivation(queueId) {
+  var q = pendingPayments.find(function (x) { return x.id === queueId; });
+  if (!q) return;
+
+  var proceed = function (email) {
+    if (!email) return;
+    barberApi('/api/owner/loyalty-accounts/activate', {
+      method: 'POST',
+      body: { client_name: q.client_name, client_email: email, client_phone: q.phone || '' }
+    }).then(function () {
+      toast('Carte de fidélité activée pour ' + q.client_name);
+      loadPendingPayments();
+    }).catch(function (e) { toast(e.message, true); });
+  };
+
+  if (q.email) {
+    showConfirm('Activer la carte de fidélité pour ' + q.client_name + ' (' + q.email + ') ?', { title: 'Fidélité' })
+      .then(function (ok) { if (ok) proceed(q.email); });
+  } else {
+    showPrompt('Quel est l\'email de ' + q.client_name + ' pour activer sa carte de fidélité ?', { title: 'Fidélité', placeholder: 'email@exemple.com' })
+      .then(function (email) { if (email) proceed(email.trim()); });
+  }
 }
 
 function useGiftCard(giftId, queueId) {

@@ -15,35 +15,33 @@ function clientKey(row) {
  * celui-ci). Appelée à chaque fois qu'un passage est réellement payé
  * (paiement normal ou cadeau utilisé) — jamais pour une simple vente
  * de comptoir sans lien avec un passage.
+ *
+ * IMPORTANT : ne fait RIEN tant que le client n'a pas explicitement
+ * activé sa carte (activated_at) — le coiffeur doit lui avoir demandé
+ * son accord au préalable. Un client jamais activé n'accumule jamais
+ * le moindre point, même s'il revient plusieurs fois.
  */
 async function earnLoyaltyPoint(ownerId, row) {
   const key = clientKey(row);
   if (!key) return;
 
+  const [[existing]] = await pool.query(
+    'SELECT id, points, rewards_available, activated_at FROM loyalty_accounts WHERE owner_id = ? AND client_key = ?',
+    [ownerId, key]
+  );
+  if (!existing || !existing.activated_at) return;
+
   const settings = await getOwnerSettings(ownerId);
   const threshold = Math.max(1, Number(settings.loyalty_threshold) || 10);
 
-  const [[existing]] = await pool.query(
-    'SELECT id, points, rewards_available FROM loyalty_accounts WHERE owner_id = ? AND client_key = ?',
-    [ownerId, key]
-  );
-
-  let points = (existing ? existing.points : 0) + 1;
-  let rewards = existing ? existing.rewards_available : 0;
+  let points = existing.points + 1;
+  let rewards = existing.rewards_available;
   if (points >= threshold) { points -= threshold; rewards += 1; }
 
-  if (existing) {
-    await pool.query(
-      'UPDATE loyalty_accounts SET points = ?, rewards_available = ?, client_name = ?, updated_at = NOW() WHERE id = ?',
-      [points, rewards, row.client_name, existing.id]
-    );
-  } else {
-    await pool.query(
-      `INSERT INTO loyalty_accounts (id, owner_id, client_key, client_name, points, rewards_available)
-       VALUES (UUID(), ?, ?, ?, ?, ?)`,
-      [ownerId, key, row.client_name, points, rewards]
-    );
-  }
+  await pool.query(
+    'UPDATE loyalty_accounts SET points = ?, rewards_available = ?, client_name = ?, updated_at = NOW() WHERE id = ?',
+    [points, rewards, row.client_name, existing.id]
+  );
 }
 
 /**

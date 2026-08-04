@@ -43,6 +43,26 @@ async function sendTurnSoon(salonId, to, name, waitMin) {
   });
 }
 
+async function sendLoyaltyActivation(salonId, to, info) {
+  const { tx, from, salon } = await getTransport(salonId);
+  await tx.sendMail({
+    from,
+    to,
+    subject: 'Votre carte de fidélité est activée — ' + salon,
+    text: `Bonjour ${info.clientName},\n\n` +
+          `Votre carte de fidélité chez ${salon} vient d'être activée !\n\n` +
+          `À chaque passage réglé, vous gagnez 1 point. Tous les ${info.threshold} points, ` +
+          `vous obtenez une récompense (réduction sur une prestation ou un produit), ` +
+          `utilisable dès votre prochaine visite.\n\n${salon}`,
+    html: `<p>Bonjour ${info.clientName},</p>` +
+          `<p>Votre carte de fidélité chez ${salon} vient d'être activée !</p>` +
+          `<p>À chaque passage réglé, vous gagnez 1 point. Tous les <strong>${info.threshold} points</strong>, ` +
+          `vous obtenez une récompense (réduction sur une prestation ou un produit), ` +
+          `utilisable dès votre prochaine visite.</p>` +
+          `<p>${salon}</p>`
+  });
+}
+
 async function sendGiftConfirmation(salonId, to, info) {
   const { tx, from, salon } = await getTransport(salonId);
   const itemsList = info.items.map((it) => `${it.quantity} × ${it.item_name}`).join(', ');
@@ -76,4 +96,4 @@ async function sendTest(salonId, to) {
   });
 }
 
-module.exports = { sendTurnSoon, sendTest, sendGiftConfirmation, invalidateTransport };
+module.exports = { sendTurnSoon, sendTest, sendGiftConfirmation, sendLoyaltyActivation, invalidateTransport };

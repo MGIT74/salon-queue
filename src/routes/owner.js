@@ -4,6 +4,8 @@ const { pool, utcIso, getOwnerSettings, setOwnerSettings } = require('../db');
 const requireAdmin = require('../middleware/auth');
 const requireAdminOrBarber = require('../middleware/barberAuth');
 const { hashPassword } = require('../lib/password');
+const { sendLoyaltyActivation } = require('../lib/mailer');
+const { clientKey } = require('../lib/queueMath');
 
 const router = express.Router();
 
@@ -297,11 +299,67 @@ router.get('/gift-cards', requireAdmin, wrap(async (req, res) => {
  */
 router.get('/loyalty-accounts', requireAdmin, wrap(async (req, res) => {
   const [rows] = await pool.query(
-    'SELECT client_name, client_key, points, rewards_available, updated_at FROM loyalty_accounts ' +
-    'WHERE owner_id = ? ORDER BY updated_at DESC LIMIT 300',
+    'SELECT client_name, client_key, points, rewards_available, activated_at, updated_at FROM loyalty_accounts ' +
+    'WHERE owner_id = ? AND activated_at IS NOT NULL ORDER BY updated_at DESC LIMIT 300',
     [req.ownerId]
   );
-  res.json({ ok: true, items: rows.map((r) => Object.assign({}, r, { updated_at: utcIso(r.updated_at) })) });
+  res.json({
+    ok: true,
+    items: rows.map((r) => Object.assign({}, r, {
+      activated_at: utcIso(r.activated_at),
+      updated_at: utcIso(r.updated_at)
+    }))
+  });
+}));
+
+/**
+ * Active la carte de fidélité d'un client — SEULEMENT sur demande
+ * explicite du coiffeur (qui a demandé l'accord du client). Tant que
+ * ce n'est pas fait, ce client n'accumule jamais le moindre point,
+ * même s'il revient plusieurs fois. Email obligatoire pour envoyer la
+ * confirmation. Accessible aux coiffeurs par PIN (activation depuis la
+ * caisse), pas seulement l'admin.
+ */
+router.post('/loyalty-accounts/activate', requireAdminOrBarber, wrap(async (req, res) => {
+  const clientName = String(req.body.client_name || '').trim();
+  const email = String(req.body.client_email || '').trim();
+  const phone = String(req.body.client_phone || '').trim();
+  if (!clientName) return res.status(400).json({ error: 'Le nom du client est requis' });
+  if (!email) return res.status(400).json({ error: "L'email du client est requis pour activer sa carte" });
+
+  const key = clientKey({ email, phone, client_name: clientName });
+  if (!key) return res.status(400).json({ error: 'Impossible d\'identifier ce client' });
+
+  const [[existing]] = await pool.query(
+    'SELECT id, activated_at FROM loyalty_accounts WHERE owner_id = ? AND client_key = ?',
+    [req.ownerId, key]
+  );
+  if (existing && existing.activated_at) {
+    return res.status(409).json({ error: 'Ce client a déjà une carte de fidélité active' });
+  }
+
+  if (existing) {
+    await pool.query(
+      'UPDATE loyalty_accounts SET activated_at = NOW(), recipient_email = ?, client_name = ? WHERE id = ?',
+      [email, clientName, existing.id]
+    );
+  } else {
+    await pool.query(
+      `INSERT INTO loyalty_accounts (id, owner_id, client_key, client_name, recipient_email, activated_at)
+       VALUES (UUID(), ?, ?, ?, ?, NOW())`,
+      [req.ownerId, key, clientName, email]
+    );
+  }
+
+  try {
+    const settings = await getOwnerSettings(req.ownerId);
+    const threshold = Math.max(1, Number(settings.loyalty_threshold) || 10);
+    await sendLoyaltyActivation(req.salon.id, email, { clientName, threshold });
+  } catch (err) {
+    console.error('[fidélité] envoi email d\'activation échoué:', err.message);
+  }
+
+  res.json({ ok: true });
 }));
 
 module.exports = router;

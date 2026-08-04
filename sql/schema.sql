@@ -365,3 +365,10 @@ CREATE TABLE IF NOT EXISTS owner_settings (
   PRIMARY KEY (owner_id, `key`),
   FOREIGN KEY (owner_id) REFERENCES owners(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- La fidelite ne se declenche plus automatiquement : le coiffeur doit
+-- explicitement activer la carte avec l'accord du client (email
+-- requis pour la confirmation). Tant que activated_at est NULL, ce
+-- client n'accumule aucun point, meme s'il revient plusieurs fois.
+ALTER TABLE loyalty_accounts ADD COLUMN IF NOT EXISTS activated_at DATETIME NULL;
+ALTER TABLE loyalty_accounts ADD COLUMN IF NOT EXISTS recipient_email VARCHAR(255) NULL;
