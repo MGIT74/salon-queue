@@ -531,6 +531,22 @@
     </div>
 
     <div class="card-box">
+      <h3>Image "Utiliser un cadeau" (kiosk)</h3>
+      <p class="hint">Remplace l'icône 🎁 par défaut sur la tuile du kiosk. Une image carrée fonctionne mieux.</p>
+      <div style="display:flex;align-items:center;gap:16px">
+        <div id="gift-tile-preview" onclick="document.getElementById('gift-tile-input').click()"
+             style="width:72px;height:72px;border-radius:16px;cursor:pointer;background:var(--fill);
+             display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;
+             color:var(--grey);font-size:12px;text-align:center;background-size:cover;background-position:center">🎁</div>
+        <input type="file" id="gift-tile-input" accept="image/*" style="display:none" onchange="uploadGiftTileImage(this)">
+        <div>
+          <div class="hint" style="margin:0 0 6px">Cliquez sur le cadre pour choisir une image.</div>
+          <button class="btn btn-ghost" onclick="removeGiftTileImage()" style="font-size:13px;padding:6px 12px">Revenir à l'icône par défaut</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card-box">
       <div class="admin-head" style="margin-bottom:4px">
         <h3 style="margin:0">Clients fidèles</h3>
         <div class="fld" style="margin:0"><label for="loyalty-per-page">Par page</label>
@@ -654,22 +670,6 @@
              color:var(--grey);font-size:12px;text-align:center;background-size:cover;background-position:center">Ajouter</div>
         <input type="file" id="logo-input" accept="image/*" style="display:none" onchange="uploadSalonLogo(this)">
         <div class="hint" style="margin:0">Cliquez sur le cadre pour choisir une image.</div>
-      </div>
-    </div>
-
-    <div class="card-box">
-      <h3>Image "Utiliser un cadeau" (kiosk)</h3>
-      <p class="hint">Remplace l'icône 🎁 par défaut sur la tuile du kiosk. Une image carrée fonctionne mieux.</p>
-      <div style="display:flex;align-items:center;gap:16px">
-        <div id="gift-tile-preview" onclick="document.getElementById('gift-tile-input').click()"
-             style="width:72px;height:72px;border-radius:16px;cursor:pointer;background:var(--fill);
-             display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;
-             color:var(--grey);font-size:12px;text-align:center;background-size:cover;background-position:center">🎁</div>
-        <input type="file" id="gift-tile-input" accept="image/*" style="display:none" onchange="uploadGiftTileImage(this)">
-        <div>
-          <div class="hint" style="margin:0 0 6px">Cliquez sur le cadre pour choisir une image.</div>
-          <button class="btn btn-ghost" onclick="removeGiftTileImage()" style="font-size:13px;padding:6px 12px">Revenir à l'icône par défaut</button>
-        </div>
       </div>
     </div>
 
