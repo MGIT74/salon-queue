@@ -23,14 +23,21 @@ function wrap(fn) {
  * pas seulement à l'encaissement.
  */
 async function attachGiftInfo(rows, salonId) {
+  // Trié du plus ancien au plus récent : si un même client a
+  // malencontreusement plusieurs cadeaux non utilisés (tests répétés,
+  // ou vrais cadeaux multiples), c'est le PLUS ANCIEN qui doit sortir
+  // en premier — sans ce tri, l'ordre de retour SQL n'est pas garanti
+  // et pouvait faire ressortir n'importe lequel au hasard.
   const [gifts] = await pool.query(
-    'SELECT * FROM gift_cards WHERE salon_id = ? AND used_at IS NULL', [salonId]
+    'SELECT * FROM gift_cards WHERE salon_id = ? AND used_at IS NULL ORDER BY created_at ASC', [salonId]
   );
   if (!gifts.length) return rows;
   const giftByKey = {};
   gifts.forEach((g) => {
     const key = clientKey({ email: g.recipient_email, phone: g.recipient_phone, client_name: g.recipient_name });
-    if (key) giftByKey[key] = g;
+    // Ne jamais écraser un cadeau déjà trouvé pour cette clé : le
+    // premier de la boucle (donc le plus ancien, grâce au tri) reste.
+    if (key && !giftByKey[key]) giftByKey[key] = g;
   });
   return rows.map((r) => {
     const key = clientKey(r);
