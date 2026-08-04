@@ -833,6 +833,18 @@ var currentSalonLogo = '';
 var currentGiftTileImage = '';
 
 function loadCurrentSalonName() {
+  // Si l'URL ne precise pas de salon (lien universel, pas un lien
+  // bookmark d'une enseigne precise), on n'affiche PAS le nom du
+  // salon par defaut avant connexion - ce serait trompeur pour
+  // n'importe quelle autre enseigne qui utilise ce meme lien
+  // universel. Le vrai salon se determine seulement APRES connexion
+  // (par email, ou par mot de passe si un slug etait deja dans l'URL).
+  if (!SALON_SLUG) {
+    var genericLoginEl = document.getElementById('login-salon-name');
+    if (genericLoginEl) genericLoginEl.textContent = 'Connexion';
+    document.title = 'Dashboard';
+  }
+
   fetch('/api/settings/public', {
     headers: SALON_SLUG ? { 'X-Salon-Slug': SALON_SLUG } : {}
   })
@@ -842,9 +854,15 @@ function loadCurrentSalonName() {
       currentSalonName = name;
       currentSalonLogo = d.logo_url || '';
       currentGiftTileImage = d.gift_tile_image_url || '';
-      document.title = name + ' — Dashboard';
       var loginEl = document.getElementById('login-salon-name');
-      if (loginEl) loginEl.textContent = name;
+      if (SALON_SLUG) {
+        // Un salon precis est demande (lien direct/bookmark) — on peut
+        // afficher son nom en toute confiance des l'ecran de connexion.
+        document.title = name + ' — Dashboard';
+        if (loginEl) loginEl.textContent = name;
+      }
+      // Une fois connecte (app-screen visible), le nom affiche est
+      // toujours celui du salon REELLEMENT resolu pour cette session.
       var brandEl = document.getElementById('app-salon-badge');
       if (brandEl) brandEl.textContent = name;
       var impNameEl = document.getElementById('imp-salon-name');
@@ -1033,6 +1051,7 @@ document.getElementById('tabs').addEventListener('click', function (e) {
 
 /* ============ Chargement ============ */
 function boot() {
+  loadCurrentSalonName();
   loadSalonSwitcher();
   loadCatalog()
     .then(loadBarbers)
