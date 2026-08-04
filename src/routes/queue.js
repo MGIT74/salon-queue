@@ -128,6 +128,33 @@ router.post('/checkin', wrap(async (req, res) => {
   if (!client_name) return res.status(400).json({ error: 'Le nom est requis' });
   if (!service_id) return res.status(400).json({ error: 'La prestation est requise' });
 
+  // Faille corrigée : un même cadeau ne peut pas servir à créer
+  // plusieurs entrées actives à la fois dans la file (le code ne
+  // marque rien comme "utilisé" tant que le passage n'est pas
+  // réellement encaissé — sans ce garde-fou, un même code pouvait
+  // être utilisé un nombre illimité de fois avant ce moment-là).
+  const key = clientKey({ email, phone, client_name });
+  if (key) {
+    const [[unusedGift]] = await pool.query(
+      'SELECT id FROM gift_cards WHERE salon_id = ? AND used_at IS NULL AND ' +
+      '(recipient_email = ? OR recipient_phone = ? OR recipient_name = ?) LIMIT 1',
+      [req.salon.id, email || '', phone || '', client_name]
+    );
+    if (unusedGift) {
+      const [existingRows] = await pool.query(
+        `SELECT id, client_name, email, phone FROM queue
+         WHERE salon_id = ? AND (status IN ('waiting','in_progress') OR (status = 'done' AND paid_at IS NULL))`,
+        [req.salon.id]
+      );
+      const alreadyActive = existingRows.some((r) => clientKey(r) === key);
+      if (alreadyActive) {
+        return res.status(409).json({
+          error: 'Ce cadeau est déjà utilisé pour une visite en cours — impossible de le réutiliser tant que celle-ci n\'est pas terminée.'
+        });
+      }
+    }
+  }
+
   const id = crypto.randomUUID();
   await pool.query(
     `INSERT INTO queue (id, salon_id, client_name, email, phone, service_id, barber_id, status)
