@@ -609,18 +609,32 @@
     </div>
 
     <div class="card-box">
-      <h3>Détail des ventes — période en cours</h3>
+      <h3 class="accordion-head" onclick="toggleSettingsAccordion('sales-detail')">
+        Détail des ventes — période en cours
+        <svg class="accordion-chevron" id="sales-detail-chevron" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </h3>
+      <div class="accordion-body" id="sales-detail-body" style="display:none">
       <p class="hint">Chaque vente encaissée, avec le coiffeur, les prestations/produits et le tarif.</p>
       <div id="caisse-sales-detail"></div>
+      </div>
     </div>
 
     <div class="card-box">
-      <h3>Historique des clôtures</h3>
+      <h3 class="accordion-head" onclick="toggleSettingsAccordion('closings')">
+        Historique des clôtures
+        <svg class="accordion-chevron" id="closings-chevron" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </h3>
+      <div class="accordion-body" id="closings-body" style="display:none">
       <div id="caisse-closings-list"></div>
+      </div>
     </div>
 
     <div class="card-box">
-      <h3>Réglages de la caisse</h3>
+      <h3 class="accordion-head" onclick="toggleSettingsAccordion('caisse-settings')">
+        Réglages de la caisse
+        <svg class="accordion-chevron" id="caisse-settings-chevron" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </h3>
+      <div class="accordion-body" id="caisse-settings-body" style="display:none">
       <div class="grid2">
         <div class="fld"><label for="caisse-inactivity">Déconnexion automatique après (secondes)</label>
           <input id="caisse-inactivity" type="number" min="5" max="300"></div>
@@ -629,6 +643,7 @@
       </div>
       <p class="hint">Après une clôture, la caisse reste fermée (impossible d'encaisser) jusqu'à cette heure le <strong>lendemain</strong> — quelle que soit l'heure de la clôture.</p>
       <button class="btn btn-primary" onclick="saveCaisseInactivity()">Enregistrer</button>
+      </div>
     </div>
 
     <div class="card-box">
