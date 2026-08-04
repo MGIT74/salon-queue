@@ -431,7 +431,7 @@ function renderBarberGrid() {
     ? ' style="background-image:url(&quot;' + esc(giftTileImage) + '&quot;)"'
     : '';
   var giftTile = '<button class="barber-card gift-tile' + (giftTileImage ? ' has-photo' : '') + '"' + giftPhotoAttr +
-    ' onclick="show(\'p-gift-code\')">' +
+    ' onclick="openGiftCodeScreen()">' +
     (giftTileImage ? '' : '<div class="barber-fallback">🎁</div>') +
     '<div class="barber-overlay"><div class="barber-name">Utiliser un cadeau</div></div>' +
     '</button>';
@@ -455,6 +455,15 @@ function renderBarberGrid() {
 }
 
 /* ---------- Utiliser un cadeau ---------- */
+// Vide toujours le champ (et l'erreur éventuelle) avant d'afficher
+// l'écran — sinon le code du client précédent restait visible pour le
+// suivant qui utilise la borne.
+function openGiftCodeScreen() {
+  document.getElementById('gift-code-input').value = '';
+  document.getElementById('gift-code-error').textContent = '';
+  show('p-gift-code');
+}
+
 function lookupGiftCode() {
   var code = document.getElementById('gift-code-input').value.trim().toUpperCase();
   var errEl = document.getElementById('gift-code-error');
