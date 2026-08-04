@@ -413,19 +413,20 @@ function renderPendingList() {
       var giftItemsList = (q.gift_card.items || []).map(function (it) {
         return (it.quantity > 1 ? it.quantity + ' × ' : '') + it.item_name;
       }).join(', ');
-      giftNote = '<div class="lock-note" style="color:var(--green)">🎁 Cadeau disponible (' + eur(q.gift_card.amount_cents) + ')</div>' +
+      giftNote = '<div class="lock-note" style="color:var(--green)">🎁 Cadeau disponible</div>' +
         (giftItemsList ? '<div class="meta" style="color:var(--green)">' + esc(giftItemsList) + '</div>' : '');
     }
     var loyaltyNote = q.loyalty_rewards_available
       ? '<div class="lock-note" style="color:var(--blue)">⭐ Fidélité disponible</div>'
       : '';
+    var displayAmount = q.gift_card ? q.gift_card.amount_cents : q.total_price_cents;
     return '<div class="pending-card' + (isActive ? '' : ' locked') + '"' +
       (isActive && !q.gift_card ? ' onclick="usePendingForTicket(\'' + q.id + '\')"' : '') + '>' +
       '<div><div class="name">' + esc(q.client_name) + '</div>' +
       '<div class="meta">' + esc(detail) + '</div>' +
       (isActive ? giftNote + loyaltyNote : '<div class="lock-note">En attente de son tour</div>') + '</div>' +
       '<div class="pending-actions">' +
-        '<span class="amount">' + eur(q.total_price_cents) + '</span>' +
+        '<span class="amount">' + eur(displayAmount) + '</span>' +
         (isActive && q.gift_card
           ? '<button class="btn btn-primary" onclick="event.stopPropagation();useGiftCard(\'' + q.gift_card.id + '\',\'' + q.id + '\')">Utiliser le cadeau</button>'
           : '') +
