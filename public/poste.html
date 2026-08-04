@@ -503,12 +503,14 @@ function cancelMine(id) {
 }
 
 function startMine(id) {
+  extrasPickerOpen = false;
   barberApi('/api/queue/' + id + '/start', { method: 'POST', body: { barber_id: me.id } })
     .then(refresh)
     .catch(function (e) { toast(e.message, true); });
 }
 
 function finishMine(id) {
+  extrasPickerOpen = false;
   var cur = queue.find(function (q) { return q.id === id; });
   barberApi('/api/queue/' + id + '/finish', { method: 'POST', body: {} })
     .then(function () {
