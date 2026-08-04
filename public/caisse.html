@@ -408,10 +408,14 @@ function renderPendingList() {
     }
 
     var isActive = i === firstActiveIndex;
-    var giftNote = q.gift_card
-      ? '<div class="lock-note" style="color:var(--green)">🎁 Cadeau disponible (' + eur(q.gift_card.amount_cents) +
-        (q.gift_card.items && q.gift_card.items.length > 1 ? ' — ' + q.gift_card.items.length + ' articles' : '') + ')</div>'
-      : '';
+    var giftNote = '';
+    if (q.gift_card) {
+      var giftItemsList = (q.gift_card.items || []).map(function (it) {
+        return (it.quantity > 1 ? it.quantity + ' × ' : '') + it.item_name;
+      }).join(', ');
+      giftNote = '<div class="lock-note" style="color:var(--green)">🎁 Cadeau disponible (' + eur(q.gift_card.amount_cents) + ')</div>' +
+        (giftItemsList ? '<div class="meta" style="color:var(--green)">' + esc(giftItemsList) + '</div>' : '');
+    }
     var loyaltyNote = q.loyalty_rewards_available
       ? '<div class="lock-note" style="color:var(--blue)">⭐ Fidélité disponible</div>'
       : '';

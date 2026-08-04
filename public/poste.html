@@ -453,8 +453,11 @@ function renderNext() {
  * remettre en plus de la coupe.
  */
 function giftBadgeHtml(gift) {
-  var hasProduct = gift.items.some(function (it) { return it.item_type === 'product'; });
-  var label = hasProduct ? '🎁 Cadeau — pensez au produit offert' : '🎁 Cadeau';
+  var productNames = gift.items
+    .filter(function (it) { return it.item_type === 'product'; })
+    .map(function (it) { return (it.quantity > 1 ? it.quantity + ' × ' : '') + it.item_name; })
+    .join(', ');
+  var label = productNames ? '🎁 Cadeau — à remettre : ' + esc(productNames) : '🎁 Cadeau';
   return '<div class="meta" style="color:var(--green)">' + label + '</div>';
 }
 
