@@ -512,4 +512,35 @@ router.get('/:id/client-history', requireAdmin, wrap(async (req, res) => {
   res.json({ ok: true, items });
 }));
 
+/**
+ * Meme historique, mais a partir du nom/email/telephone directement -
+ * utilise pour un RDV pas encore promu en file (RDV futur), qui n'a
+ * donc pas encore d'entree de file existante a interroger.
+ */
+router.get('/client-history-by-contact', requireAdmin, wrap(async (req, res) => {
+  const key = clientKey({ email: req.query.email, phone: req.query.phone, client_name: req.query.name });
+  if (!key) return res.json({ ok: true, items: [] });
+
+  const [allRows] = await pool.query(
+    `SELECT q.id, q.client_name, q.email, q.phone, q.status, q.checkin_at, q.start_at, q.end_at,
+            q.total_price_cents, s.name AS service_name, sa.name AS salon_name
+     FROM queue q
+     LEFT JOIN services s ON s.id = q.service_id
+     JOIN salons sa ON sa.id = q.salon_id
+     WHERE sa.owner_id = ?
+     ORDER BY q.checkin_at DESC LIMIT 1000`,
+    [req.ownerId]
+  );
+
+  const items = allRows
+    .filter((r) => clientKey(r) === key)
+    .map((r) => Object.assign({}, r, {
+      checkin_at: utcIso(r.checkin_at),
+      start_at: utcIso(r.start_at),
+      end_at: utcIso(r.end_at)
+    }));
+
+  res.json({ ok: true, items });
+}));
+
 module.exports = router;

@@ -258,6 +258,18 @@
   .cal-view-switch button.on { background: var(--blue); color: #fff; }
 
   .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  .cal-week-row { margin-bottom: 4px; }
+  .cal-expand-panel {
+    background: var(--fill); border-radius: 14px; padding: 16px 18px; margin: 6px 0 10px;
+    animation: cal-expand .18s ease;
+  }
+  @keyframes cal-expand { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+  .cal-expand-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; font-size: 14.5px; text-transform: capitalize; }
+  .cal-expand-row {
+    display: flex; align-items: center; gap: 12px; padding: 10px 8px; border-radius: 10px; cursor: pointer;
+    transition: background .12s ease;
+  }
+  .cal-expand-row:hover { background: rgba(255,255,255,.06); }
   .cal-weekday { text-align: center; font-size: 12px; color: var(--grey); font-weight: 600; padding: 6px 0 10px; }
   .cal-day {
     min-height: 62px; border-radius: 10px; background: var(--fill); cursor: pointer;
@@ -750,7 +762,7 @@
         <div class="cal-weekday">Lun</div><div class="cal-weekday">Mar</div><div class="cal-weekday">Mer</div>
         <div class="cal-weekday">Jeu</div><div class="cal-weekday">Ven</div><div class="cal-weekday">Sam</div><div class="cal-weekday">Dim</div>
       </div>
-      <div class="cal-grid" id="cal-days"></div>
+      <div id="cal-days"></div>
       <div id="cal-day-view" style="display:none"></div>
       <div class="cal-legend" id="cal-legend"></div>
     </div>
@@ -1365,10 +1377,10 @@ var drawerClientId = null;
  * complet de tous ses passages (peu importe où le clic est parti — file
  * d'attente en cours ou historique des clients).
  */
-function openClientDrawer(id, source) {
+function openClientDrawer(id, source, directData) {
   var c = source === 'queue'
     ? queue.find(function (x) { return x.id === id; })
-    : clientHistory.find(function (x) { return x.id === id; });
+    : (source === 'appointment' ? directData : clientHistory.find(function (x) { return x.id === id; }));
   if (!c) return;
 
   drawerClientId = id;
@@ -1390,7 +1402,15 @@ function openClientDrawer(id, source) {
     .then(function (r) { renderDrawerMarketing(r); })
     .catch(function () {});
 
-  api('/api/queue/' + id + '/client-history').then(function (r) {
+  // Un RDV deja promu en file (aujourd'hui) a un vrai id de file a
+  // interroger normalement ; un RDV futur pas encore promu n'en a pas
+  // encore, on cherche alors directement par nom/email/telephone.
+  var historyUrl = (source === 'appointment' && !c.promoted_queue_id)
+    ? '/api/queue/client-history-by-contact?email=' + encodeURIComponent(c.email || '') +
+      '&phone=' + encodeURIComponent(c.phone || '') + '&name=' + encodeURIComponent(c.client_name || '')
+    : '/api/queue/' + (source === 'appointment' ? c.promoted_queue_id : id) + '/client-history';
+
+  api(historyUrl).then(function (r) {
     renderDrawerVisits(r.items);
   }).catch(function (e) { toast(e.message, true); });
 }
@@ -2378,6 +2398,7 @@ var calAnchor = new Date(); // date de reference pour la periode affichee
 var calViewMode = 'month'; // 'month' | 'week' | 'day'
 var calMonthCache = {}; // 'YYYY-MM' -> items[]
 var calSelectedDate = null; // 'YYYY-MM-DD' ou null (= vue "a venir", hors calendrier)
+var calAppointmentById = {}; // cache des RDV affiches, pour retrouver les infos au clic sans re-echapper du JSON en HTML
 var calUpcoming = [];
 var rdvBarberColors = {};
 
@@ -2476,25 +2497,82 @@ function renderMonthView() {
   });
 
   var todayStr = ymd(new Date());
-  var cells = '';
-  for (var i = 0; i < startOffset; i++) cells += '<div class="cal-day empty"></div>';
 
-  for (var day = 1; day <= daysInMonth; day++) {
-    var dateStr = calAnchor.getFullYear() + '-' + String(calAnchor.getMonth() + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
-    var dayAppts = byDay[dateStr] || [];
-    var barberIds = [];
-    dayAppts.forEach(function (a) { if (a.barber_id && barberIds.indexOf(a.barber_id) === -1) barberIds.push(a.barber_id); });
-    var dots = barberIds.slice(0, 5).map(function (bid) {
-      return '<span class="cal-dot" style="background:' + (rdvBarberColors[bid] || '#888') + '"></span>';
+  // Construit la liste des jours (avec cases vides en debut/fin de
+  // grille), puis les decoupe en semaines de 7 pour pouvoir inserer
+  // le panneau d'expansion juste apres la BONNE semaine.
+  var dayCells = [];
+  for (var i = 0; i < startOffset; i++) dayCells.push(null);
+  for (var day = 1; day <= daysInMonth; day++) dayCells.push(day);
+  while (dayCells.length % 7 !== 0) dayCells.push(null);
+
+  var html = '';
+  for (var w = 0; w < dayCells.length; w += 7) {
+    var weekDays = dayCells.slice(w, w + 7);
+    var weekHtml = weekDays.map(function (day) {
+      if (day === null) return '<div class="cal-day empty"></div>';
+      var dateStr = calAnchor.getFullYear() + '-' + String(calAnchor.getMonth() + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+      var dayAppts = byDay[dateStr] || [];
+      var barberIds = [];
+      dayAppts.forEach(function (a) { if (a.barber_id && barberIds.indexOf(a.barber_id) === -1) barberIds.push(a.barber_id); });
+      var dots = barberIds.slice(0, 5).map(function (bid) {
+        return '<span class="cal-dot" style="background:' + (rdvBarberColors[bid] || '#888') + '"></span>';
+      }).join('');
+      var classes = 'cal-day' + (dateStr === todayStr ? ' today' : '') + (dateStr === calSelectedDate ? ' selected' : '');
+      return '<div class="' + classes + '" onclick="selectCalendarDay(\'' + dateStr + '\')">' +
+        '<div class="cal-day-num">' + day + '</div>' +
+        (dots ? '<div class="cal-dots">' + dots + '</div>' : '') +
+        '</div>';
     }).join('');
 
-    var classes = 'cal-day' + (dateStr === todayStr ? ' today' : '') + (dateStr === calSelectedDate ? ' selected' : '');
-    cells += '<div class="' + classes + '" onclick="selectCalendarDay(\'' + dateStr + '\')">' +
-      '<div class="cal-day-num">' + day + '</div>' +
-      (dots ? '<div class="cal-dots">' + dots + '</div>' : '') +
-      '</div>';
+    html += '<div class="cal-grid cal-week-row">' + weekHtml + '</div>';
+
+    // Le jour selectionne fait-il partie de cette semaine ? Si oui,
+    // on insere le panneau d'expansion juste apres.
+    var selectedInThisWeek = calSelectedDate && weekDays.some(function (day) {
+      if (day === null) return false;
+      var dateStr = calAnchor.getFullYear() + '-' + String(calAnchor.getMonth() + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+      return dateStr === calSelectedDate;
+    });
+    if (selectedInThisWeek) html += renderExpandPanel(calSelectedDate, byDay[calSelectedDate] || []);
   }
-  document.getElementById('cal-days').innerHTML = cells;
+  document.getElementById('cal-days').innerHTML = html;
+}
+
+/**
+ * Panneau qui "ecarte" la semaine concernee dans la vue Mois - liste
+ * les RDV du jour choisi, avec le nom du client cliquable pour ouvrir
+ * son tiroir d'infos (meme tiroir que partout ailleurs dans l'app).
+ */
+function renderExpandPanel(dateStr, dayAppts) {
+  var when = new Date(dateStr + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' });
+  var sorted = dayAppts.slice().sort(function (a, b) { return a.scheduled_at.localeCompare(b.scheduled_at); });
+
+  sorted.forEach(function (a) { calAppointmentById[a.id] = a; });
+
+  var rows = sorted.length === 0
+    ? '<div class="empty">Aucun rendez-vous ce jour-là</div>'
+    : sorted.map(function (a) {
+        var time = a.scheduled_at.slice(11, 16);
+        return '<div class="cal-expand-row" onclick="openClientDrawerForAppointment(\'' + a.id + '\')">' +
+          '<div class="cal-day-view-time">' + time + '</div>' +
+          '<div class="cal-day-view-dot" style="background:' + (rdvBarberColors[a.barber_id] || '#888') + '"></div>' +
+          '<div style="flex:1"><div class="cal-day-view-name">' + esc(a.client_name) + '</div>' +
+          '<div class="cal-day-view-meta">' + esc(a.service_name) + (a.barber_name ? ' avec ' + esc(a.barber_name) : '') + '</div></div>' +
+          '</div>';
+      }).join('');
+
+  return '<div class="cal-expand-panel">' +
+    '<div class="cal-expand-head"><strong style="text-transform:capitalize">' + when + '</strong>' +
+    '<button class="btn btn-soft" onclick="event.stopPropagation();selectCalendarDay(null)">Fermer</button></div>' +
+    rows +
+    '</div>';
+}
+
+function openClientDrawerForAppointment(id) {
+  var a = calAppointmentById[id];
+  if (!a) return;
+  openClientDrawer(id, 'appointment', a);
 }
 
 function renderWeekView() {
@@ -2529,7 +2607,7 @@ function renderWeekView() {
       '<div class="cal-week-appts">' + apptsHtml + '</div>' +
       '</div>';
   }
-  document.getElementById('cal-days').innerHTML = cells;
+  document.getElementById('cal-days').innerHTML = '<div class="cal-grid">' + cells + '</div>';
 }
 
 function renderDayView() {
@@ -2572,6 +2650,7 @@ function renderCalendarLegend(keys) {
 }
 
 function selectCalendarDay(dateStr) {
+  if (!dateStr || dateStr === calSelectedDate) { resetRdvListToUpcoming(); return; }
   calSelectedDate = dateStr;
   if (calViewMode === 'month') renderMonthView();
   else if (calViewMode === 'week') renderWeekView();
