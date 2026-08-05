@@ -308,9 +308,28 @@ router.post('/cancel', wrap(async (req, res) => {
  * naturellement au bon endroit dans la file (ni trop tôt, ni trop
  * tard) et verrouille "Commencer" côté interface tant que cette heure
  * n'est pas encore là.
+ *
+ * Reservation ATOMIQUE avant toute creation : deux appels concurrents
+ * (dashboard + Mon poste qui rafraichissent la file en meme temps, par
+ * exemple) pourraient sinon tous les deux voir promoted_queue_id
+ * encore NULL et creer chacun leur propre entree en double. On genere
+ * l'id de la future ligne de file D'ABORD, puis on tente de
+ * "reserver" ce RDV avec un UPDATE conditionne sur promoted_queue_id
+ * IS NULL - un seul appel peut reussir cette reservation, l'autre
+ * voit 0 ligne affectee et abandonne proprement sans rien creer.
  */
 async function promoteAppointment(appt, extraIds) {
   const queueId = crypto.randomUUID();
+
+  const [claimResult] = await pool.query(
+    'UPDATE appointments SET promoted_queue_id = ? WHERE id = ? AND promoted_queue_id IS NULL',
+    [queueId, appt.id]
+  );
+  if (claimResult.affectedRows === 0) {
+    // Deja promu (ou en cours de promotion) par un autre appel concurrent.
+    return null;
+  }
+
   await pool.query(
     `INSERT INTO queue (id, salon_id, client_name, email, phone, service_id, barber_id, status, checkin_at, is_appointment)
      VALUES (?, ?, ?, ?, ?, ?, ?, 'waiting', ?, 1)`,
@@ -322,7 +341,6 @@ async function promoteAppointment(appt, extraIds) {
       [extraIds.map((eid) => [queueId, eid])]
     );
   }
-  await pool.query('UPDATE appointments SET promoted_queue_id = ? WHERE id = ?', [queueId, appt.id]);
   return queueId;
 }
 
