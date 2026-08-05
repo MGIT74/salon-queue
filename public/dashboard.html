@@ -2595,10 +2595,11 @@ function renderWeekView() {
     var d = addDays(start, i);
     var dateStr = ymd(d);
     var dayAppts = (byDay[dateStr] || []).sort(function (a, b) { return a.scheduled_at.localeCompare(b.scheduled_at); });
+    dayAppts.forEach(function (a) { calAppointmentById[a.id] = a; });
     var apptsHtml = dayAppts.map(function (a) {
       var time = a.scheduled_at.slice(11, 16);
       return '<div class="cal-week-appt" style="background:' + (rdvBarberColors[a.barber_id] || '#888') + '" ' +
-        'onclick="event.stopPropagation();selectCalendarDay(\'' + dateStr + '\')" title="' + esc(a.client_name) + '">' +
+        'onclick="event.stopPropagation();openClientDrawerForAppointment(\'' + a.id + '\')" title="' + esc(a.client_name) + '">' +
         time + ' ' + esc(a.client_name) + '</div>';
     }).join('');
     var classes = 'cal-day week-mode' + (dateStr === todayStr ? ' today' : '') + (dateStr === calSelectedDate ? ' selected' : '');
@@ -2615,12 +2616,13 @@ function renderDayView() {
     calAnchor.toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
 
   var dayAppts = appointmentsForRange(calAnchor, calAnchor).sort(function (a, b) { return a.scheduled_at.localeCompare(b.scheduled_at); });
+  dayAppts.forEach(function (a) { calAppointmentById[a.id] = a; });
   var view = document.getElementById('cal-day-view');
   view.innerHTML = dayAppts.length === 0
     ? '<div class="empty">Aucun rendez-vous ce jour-là</div>'
     : '<div class="cal-day-view-list">' + dayAppts.map(function (a) {
         var time = a.scheduled_at.slice(11, 16);
-        return '<div class="cal-day-view-appt">' +
+        return '<div class="cal-day-view-appt" style="cursor:pointer" onclick="openClientDrawerForAppointment(\'' + a.id + '\')">' +
           '<div class="cal-day-view-time">' + time + '</div>' +
           '<div class="cal-day-view-dot" style="background:' + (rdvBarberColors[a.barber_id] || '#888') + '"></div>' +
           '<div><div class="cal-day-view-name">' + esc(a.client_name) + '</div>' +
