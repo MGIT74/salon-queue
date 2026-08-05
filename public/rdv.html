@@ -106,6 +106,7 @@
       <h1>C'est confirmé !</h1>
       <p style="color:var(--grey);margin-top:10px" id="confirm-details"></p>
       <p style="color:var(--grey);font-size:13.5px;margin-top:14px">Un email de confirmation vous a été envoyé, avec un lien pour annuler si besoin.</p>
+      <button class="go" style="margin-top:24px" onclick="startNewBooking()">Prendre un autre rendez-vous</button>
     </div>
   </section>
 
@@ -320,6 +321,20 @@ function submitAppointment() {
   }).finally(function () {
     btn.disabled = false; btn.textContent = 'Confirmer le rendez-vous';
   });
+}
+
+function startNewBooking() {
+  selBarber = null; selService = null; selExtras = []; selDate = null; selSlot = null;
+  document.getElementById('rdv-name').value = '';
+  document.getElementById('rdv-email').value = '';
+  document.getElementById('rdv-phone').value = '';
+  document.getElementById('rdv-date').value = '';
+  document.getElementById('service-next-btn').disabled = true;
+  document.getElementById('date-next-btn').disabled = true;
+  renderBarberGrid();
+  renderServiceGrid();
+  document.getElementById('slots-grid').innerHTML = '<div class="empty">Choisissez une date</div>';
+  show('p-barber');
 }
 
 /* ---------- Annulation ---------- */
