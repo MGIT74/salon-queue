@@ -17,6 +17,25 @@ function wrap(fn) {
 
 const SLOT_STEP_MIN = 15;
 
+/**
+ * Heure "de salon" fiable (Europe/Paris), independante du fuseau
+ * horaire configure sur le serveur - les horaires coiffeur
+ * (barber_schedules) sont saisis en heure locale francaise, donc la
+ * comparaison "creneau deja passe ?" doit se faire dans ce meme
+ * referentiel, pas en UTC brut du serveur.
+ */
+function nowInParis() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false
+  }).formatToParts(new Date());
+  const get = (type) => parts.find((p) => p.type === type).value;
+  return {
+    dateStr: get('year') + '-' + get('month') + '-' + get('day'),
+    minutes: Number(get('hour')) * 60 + Number(get('minute'))
+  };
+}
+
 function timeToMinutes(t) {
   const [h, m] = String(t).split(':').map(Number);
   return h * 60 + m;
@@ -68,8 +87,9 @@ async function computeSlotsForBarber(barberId, dateStr, durationMin) {
 
   const startMin = timeToMinutes(schedule.start_time);
   const endMin = timeToMinutes(schedule.end_time);
-  const isToday = dateStr === new Date().toISOString().slice(0, 10);
-  const nowMin = isToday ? new Date().getUTCHours() * 60 + new Date().getUTCMinutes() : -1;
+  const paris = nowInParis();
+  const isToday = dateStr === paris.dateStr;
+  const nowMin = isToday ? paris.minutes : -1;
 
   const slots = [];
   for (let t = startMin; t + durationMin <= endMin; t += SLOT_STEP_MIN) {
@@ -250,7 +270,7 @@ router.post('/', wrap(async (req, res) => {
 
   // Si c'est pour aujourd'hui, on le fait apparaître tout de suite
   // dans la file (verrouillé jusqu'à l'heure prévue côté interface).
-  const today = new Date().toISOString().slice(0, 10);
+  const today = nowInParis().dateStr;
   if (date === today) {
     await promoteAppointment({ id, salon_id: req.salon.id, barber_id: finalBarberId, client_name, email, phone, service_id, scheduled_at: scheduledAt }, extraIds);
   }
@@ -312,7 +332,7 @@ async function promoteAppointment(appt, extraIds) {
  * besoin de tâche planifiée séparée.
  */
 async function promoteTodayAppointments(salonId) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = nowInParis().dateStr;
   const [rows] = await pool.query(
     `SELECT * FROM appointments
      WHERE salon_id = ? AND status = 'confirmed' AND promoted_queue_id IS NULL AND DATE(scheduled_at) = ?`,
