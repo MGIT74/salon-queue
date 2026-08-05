@@ -248,6 +248,27 @@
   .card-box .hint { font-size: 13.5px; color: var(--grey); margin: 0 0 18px; line-height: 1.5; }
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 
+  .cal-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+  .cal-month-label { font-size: 17px; font-weight: 600; letter-spacing: -.02em; text-transform: capitalize; }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  .cal-weekday { text-align: center; font-size: 12px; color: var(--grey); font-weight: 600; padding: 6px 0 10px; }
+  .cal-day {
+    aspect-ratio: 1; border-radius: 10px; background: var(--fill); cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+    position: relative; transition: background .15s ease;
+  }
+  .cal-day:hover { filter: brightness(1.15); }
+  .cal-day.empty { background: none; cursor: default; }
+  .cal-day.today { box-shadow: inset 0 0 0 2px var(--blue); }
+  .cal-day.selected { background: var(--blue); }
+  .cal-day.selected .cal-day-num { color: #fff; }
+  .cal-day-num { font-size: 13px; font-weight: 600; }
+  .cal-dots { display: flex; gap: 2px; flex-wrap: wrap; justify-content: center; max-width: 100%; }
+  .cal-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .cal-legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--sep); }
+  .cal-legend-item { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--grey); }
+  .cal-legend-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+
   .accordion-head {
     display: flex; align-items: center; justify-content: space-between;
     cursor: pointer; user-select: none; margin-bottom: 0 !important;
@@ -684,10 +705,44 @@
   <!-- ===== Onglet rendez-vous ===== -->
   <div class="tab-panel" id="t-rdv">
     <div class="admin-head">
-      <h2>Rendez-vous à venir</h2>
+      <h2>Rendez-vous</h2>
     </div>
     <p class="hint" style="margin-top:-8px">Réservés en ligne — ceux du jour apparaissent aussi automatiquement dans la file d'attente au moment prévu.</p>
-    <div id="rdv-list"></div>
+
+    <div class="card-box">
+      <div class="cal-nav">
+        <button class="btn btn-soft" onclick="calShiftMonth(-1)">‹</button>
+        <div class="cal-month-label" id="cal-month-label"></div>
+        <button class="btn btn-soft" onclick="calShiftMonth(1)">›</button>
+      </div>
+      <div class="cal-grid" id="cal-weekdays">
+        <div class="cal-weekday">Lun</div><div class="cal-weekday">Mar</div><div class="cal-weekday">Mer</div>
+        <div class="cal-weekday">Jeu</div><div class="cal-weekday">Ven</div><div class="cal-weekday">Sam</div><div class="cal-weekday">Dim</div>
+      </div>
+      <div class="cal-grid" id="cal-days"></div>
+      <div class="cal-legend" id="cal-legend"></div>
+    </div>
+
+    <div class="card-box">
+      <div class="admin-head" style="margin-bottom:14px">
+        <h3 id="rdv-list-title" style="margin:0">À venir</h3>
+        <button class="btn btn-soft" id="rdv-reset-btn" onclick="resetRdvListToUpcoming()" style="display:none">Voir tous les à venir</button>
+      </div>
+      <div class="row2" style="margin-bottom:16px">
+        <div class="fld"><label for="rdv-filter-status">Statut</label>
+          <select id="rdv-filter-status" onchange="renderRdvList()">
+            <option value="">Tous</option>
+            <option value="confirmed">Confirmés</option>
+            <option value="completed">Terminés</option>
+            <option value="cancelled">Annulés</option>
+          </select>
+        </div>
+        <div class="fld"><label for="rdv-filter-barber">Coiffeur</label>
+          <select id="rdv-filter-barber" onchange="renderRdvList()"><option value="">Tous</option></select>
+        </div>
+      </div>
+      <div id="rdv-list"></div>
+    </div>
   </div>
 
   <!-- ===== Onglet coiffeurs ===== -->
@@ -2286,24 +2341,149 @@ function saveMarketingSettings() {
 
 /* ============ Caisse ============ */
 /* ============ Rendez-vous ============ */
+/* ============ Rendez-vous ============ */
+var DOT_COLORS = ['#3b82f6', '#f97316', '#10b981', '#a855f7', '#ec4899', '#eab308', '#14b8a6', '#ef4444'];
+var calYear, calMonth; // calMonth : 0-11
+var calAppointments = []; // toutes les entrees du mois affiche
+var calSelectedDate = null; // 'YYYY-MM-DD' ou null (= vue "a venir")
+var rdvBarberColors = {};
+
 function loadRdvTab() {
-  api('/api/appointments').then(function (r) {
-    var list = document.getElementById('rdv-list');
-    list.innerHTML = r.items.length === 0
-      ? '<div class="empty">Aucun rendez-vous à venir</div>'
-      : r.items.map(function (a) {
-          var when = new Date(a.scheduled_at).toLocaleString('fr-FR', {
-            weekday: 'long', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
-          });
-          var isToday = a.scheduled_at.slice(0, 10) === new Date().toISOString().slice(0, 10);
-          return '<div class="item">' +
-            '<div class="item-main"><div class="item-name">' + esc(a.client_name) + ' — ' + when + '</div>' +
-            '<div class="item-meta">' + esc(a.service_name) + (a.barber_name ? ' avec ' + esc(a.barber_name) : ' · premier disponible') + '</div>' +
-            '<div class="item-meta">' + esc(a.email || '') + (a.phone ? ' · ' + esc(a.phone) : '') + '</div></div>' +
-            (isToday ? '<div class="item-actions"><span style="color:var(--blue);font-size:13px;font-weight:600">Aujourd\'hui</span></div>' : '') +
-            '</div>';
-        }).join('');
+  var today = new Date();
+  calYear = today.getFullYear();
+  calMonth = today.getMonth();
+  calSelectedDate = null;
+
+  api('/api/barbers?all=1').then(function (r) {
+    var sel = document.getElementById('rdv-filter-barber');
+    var sorted = r.items.slice().sort(function (a, b) { return a.name.localeCompare(b.name); });
+    sorted.forEach(function (b, i) { rdvBarberColors[b.id] = DOT_COLORS[i % DOT_COLORS.length]; });
+    sel.innerHTML = '<option value="">Tous</option>' + sorted.map(function (b) {
+      return '<option value="' + b.id + '">' + esc(b.name) + '</option>';
+    }).join('');
+  });
+
+  loadCalendarMonth();
+  resetRdvListToUpcoming();
+}
+
+function calShiftMonth(delta) {
+  calMonth += delta;
+  if (calMonth < 0) { calMonth = 11; calYear -= 1; }
+  if (calMonth > 11) { calMonth = 0; calYear += 1; }
+  loadCalendarMonth();
+}
+
+function loadCalendarMonth() {
+  var monthStr = calYear + '-' + String(calMonth + 1).padStart(2, '0');
+  api('/api/appointments?month=' + monthStr + '&all=1').then(function (r) {
+    calAppointments = r.items;
+    renderCalendarGrid();
+    renderCalendarLegend();
   }).catch(function (e) { toast(e.message, true); });
+}
+
+function renderCalendarGrid() {
+  var monthNames = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+  document.getElementById('cal-month-label').textContent = monthNames[calMonth] + ' ' + calYear;
+
+  var firstDay = new Date(calYear, calMonth, 1);
+  var daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+  var startOffset = (firstDay.getDay() + 6) % 7; // lundi = 0
+
+  var byDay = {};
+  calAppointments.forEach(function (a) {
+    var d = a.scheduled_at.slice(0, 10);
+    if (!byDay[d]) byDay[d] = [];
+    byDay[d].push(a);
+  });
+
+  var todayStr = new Date().toISOString().slice(0, 10);
+  var cells = '';
+  for (var i = 0; i < startOffset; i++) cells += '<div class="cal-day empty"></div>';
+
+  for (var day = 1; day <= daysInMonth; day++) {
+    var dateStr = calYear + '-' + String(calMonth + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+    var dayAppts = (byDay[dateStr] || []).filter(function (a) { return a.status !== 'cancelled'; });
+    var barberIds = [];
+    dayAppts.forEach(function (a) { if (a.barber_id && barberIds.indexOf(a.barber_id) === -1) barberIds.push(a.barber_id); });
+    var dots = barberIds.slice(0, 5).map(function (bid) {
+      return '<span class="cal-dot" style="background:' + (rdvBarberColors[bid] || '#888') + '"></span>';
+    }).join('');
+
+    var classes = 'cal-day' + (dateStr === todayStr ? ' today' : '') + (dateStr === calSelectedDate ? ' selected' : '');
+    cells += '<div class="' + classes + '" onclick="selectCalendarDay(\'' + dateStr + '\')">' +
+      '<div class="cal-day-num">' + day + '</div>' +
+      (dots ? '<div class="cal-dots">' + dots + '</div>' : '') +
+      '</div>';
+  }
+  document.getElementById('cal-days').innerHTML = cells;
+}
+
+function renderCalendarLegend() {
+  var seen = {};
+  calAppointments.forEach(function (a) {
+    if (a.barber_id && a.barber_name) seen[a.barber_id] = a.barber_name;
+  });
+  var names = Object.keys(seen);
+  document.getElementById('cal-legend').innerHTML = names.length === 0
+    ? '<span class="hint" style="margin:0">Aucun coiffeur avec un RDV ce mois-ci</span>'
+    : names.map(function (bid) {
+        return '<div class="cal-legend-item"><span class="cal-legend-dot" style="background:' + (rdvBarberColors[bid] || '#888') + '"></span>' + esc(seen[bid]) + '</div>';
+      }).join('');
+}
+
+function selectCalendarDay(dateStr) {
+  calSelectedDate = dateStr;
+  renderCalendarGrid();
+  var when = new Date(dateStr + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+  document.getElementById('rdv-list-title').textContent = 'Le ' + when;
+  document.getElementById('rdv-reset-btn').style.display = 'inline-block';
+  renderRdvList();
+}
+
+function resetRdvListToUpcoming() {
+  calSelectedDate = null;
+  renderCalendarGrid();
+  document.getElementById('rdv-list-title').textContent = 'À venir';
+  document.getElementById('rdv-reset-btn').style.display = 'none';
+
+  api('/api/appointments').then(function (r) {
+    calUpcoming = r.items;
+    renderRdvList();
+  }).catch(function (e) { toast(e.message, true); });
+}
+
+var calUpcoming = [];
+
+function renderRdvList() {
+  var statusFilter = document.getElementById('rdv-filter-status').value;
+  var barberFilter = document.getElementById('rdv-filter-barber').value;
+
+  var items = calSelectedDate
+    ? calAppointments.filter(function (a) { return a.scheduled_at.slice(0, 10) === calSelectedDate; })
+    : calUpcoming;
+
+  if (statusFilter) items = items.filter(function (a) { return a.display_status === statusFilter; });
+  if (barberFilter) items = items.filter(function (a) { return a.barber_id === barberFilter; });
+
+  var statusLabels = { confirmed: 'Confirmé', completed: 'Terminé', cancelled: 'Annulé' };
+  var statusColors = { confirmed: 'var(--blue)', completed: 'var(--green)', cancelled: 'var(--red)' };
+
+  var list = document.getElementById('rdv-list');
+  list.innerHTML = items.length === 0
+    ? '<div class="empty">Aucun rendez-vous</div>'
+    : items.map(function (a) {
+        var when = new Date(a.scheduled_at).toLocaleString('fr-FR', {
+          weekday: 'long', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
+        });
+        return '<div class="item">' +
+          '<div class="item-main"><div class="item-name">' + esc(a.client_name) + ' — ' + when + '</div>' +
+          '<div class="item-meta">' + esc(a.service_name) + (a.barber_name ? ' avec ' + esc(a.barber_name) : ' · premier disponible') + '</div>' +
+          '<div class="item-meta">' + esc(a.email || '') + (a.phone ? ' · ' + esc(a.phone) : '') + '</div></div>' +
+          '<div class="item-actions"><span style="color:' + (statusColors[a.display_status] || 'var(--grey)') + ';font-size:13px;font-weight:600">' + (statusLabels[a.display_status] || a.display_status) + '</span></div>' +
+          '</div>';
+      }).join('');
 }
 
 function loadCaisseTab() {

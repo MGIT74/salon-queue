@@ -125,18 +125,48 @@ router.get('/availability', wrap(async (req, res) => {
  * "Rendez-vous du jour" dans le dashboard.
  */
 router.get('/', requireAdmin, wrap(async (req, res) => {
+  const conditions = ['a.salon_id = ?'];
+  const params = [req.salon.id];
+
+  if (req.query.month) {
+    // Format attendu : YYYY-MM
+    conditions.push('DATE_FORMAT(a.scheduled_at, "%Y-%m") = ?');
+    params.push(req.query.month);
+  } else if (!req.query.all) {
+    // Comportement par defaut (sans mois precise) : uniquement les
+    // RDV confirmes et a venir, comme avant.
+    conditions.push("a.status = 'confirmed'");
+    conditions.push('a.scheduled_at >= NOW()');
+  }
+
   const [rows] = await pool.query(
-    `SELECT a.*, s.name AS service_name, b.name AS barber_name FROM appointments a
-     LEFT JOIN services s ON s.id = a.service_id LEFT JOIN barbers b ON b.id = a.barber_id
-     WHERE a.salon_id = ? AND a.status = 'confirmed' ORDER BY a.scheduled_at ASC LIMIT 200`,
-    [req.salon.id]
+    `SELECT a.*, s.name AS service_name, b.name AS barber_name,
+            q.status AS queue_status
+     FROM appointments a
+     LEFT JOIN services s ON s.id = a.service_id
+     LEFT JOIN barbers b ON b.id = a.barber_id
+     LEFT JOIN queue q ON q.id = a.promoted_queue_id
+     WHERE ${conditions.join(' AND ')}
+     ORDER BY a.scheduled_at ASC LIMIT 500`,
+    params
   );
+
   res.json({
     ok: true,
-    items: rows.map((r) => Object.assign({}, r, {
-      scheduled_at: utcIso(r.scheduled_at),
-      created_at: utcIso(r.created_at)
-    }))
+    items: rows.map((r) => {
+      // Statut affiche : annule reste annule ; termine si la coupe
+      // promue en file est marquee "done" ; sinon confirme (a venir,
+      // ou en cours d'attente/de coupe le jour meme).
+      let displayStatus = 'confirmed';
+      if (r.status === 'cancelled') displayStatus = 'cancelled';
+      else if (r.queue_status === 'done') displayStatus = 'completed';
+
+      return Object.assign({}, r, {
+        scheduled_at: utcIso(r.scheduled_at),
+        created_at: utcIso(r.created_at),
+        display_status: displayStatus
+      });
+    })
   });
 }));
 
