@@ -16,7 +16,15 @@ const pool = mysql.createPool({
   waitForConnections: true,
   connectionLimit: 10,
   namedPlaceholders: false,
-  dateStrings: true
+  dateStrings: true,
+  // Sans ce réglage, le driver sérialise un objet Date JS passé en
+  // paramètre de requête (ex: `new Date()`) en utilisant le fuseau
+  // horaire LOCAL du système d'exploitation - un réglage implicite qui
+  // ne dépend d'aucune configuration ici (donc invisible), et qui
+  // casserait silencieusement si l'OS du serveur changeait un jour de
+  // fuseau par défaut. 'Z' force une sérialisation UTC systématique,
+  // cohérente avec le SET time_zone='+00:00' appliqué juste en dessous.
+  timezone: 'Z'
 });
 
 // Force chaque connexion à travailler en UTC, peu importe le fuseau
