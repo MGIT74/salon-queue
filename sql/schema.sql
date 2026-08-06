@@ -438,6 +438,11 @@ CREATE TABLE IF NOT EXISTS appointment_extras (
 -- "Commencer" tant que l'heure prevue n'est pas encore arrivee.
 ALTER TABLE queue ADD COLUMN IF NOT EXISTS is_appointment TINYINT(1) NOT NULL DEFAULT 0;
 
+-- Origine de l'entrée d'agenda : 'online' = pris en ligne via rdv.html,
+-- 'walkin' = client arrivé sans RDV, synchronisé depuis le check-in
+-- kiosk. Sert uniquement à l'affichage (badge dans le calendrier).
+ALTER TABLE appointments ADD COLUMN IF NOT EXISTS source VARCHAR(20) NOT NULL DEFAULT 'online';
+
 -- Coiffeur exclu du kiosk (visible uniquement sur le formulaire de
 -- rendez-vous en ligne). A l'inverse, accepts_appointments=0 exclut
 -- deja du formulaire en ligne (visible uniquement sur le kiosk). Les

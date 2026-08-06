@@ -184,6 +184,9 @@
           background: var(--fill); color: var(--ink); }
   .chip.main { background: var(--blue-soft); color: var(--blue); font-weight: 600; }
   .chip.add { color: var(--grey); }
+  .src-badge { font-size: 10.5px; font-weight: 700; padding: 1.5px 8px; border-radius: 999px; letter-spacing: .01em; white-space: nowrap; }
+  .src-badge.online { background: var(--blue-soft); color: var(--blue); }
+  .src-badge.walkin { background: var(--fill); color: var(--grey); }
   .row-meta { text-align: right; flex-shrink: 0; }
   .row-meta .dur { font-size: 16px; font-weight: 600; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
   .row-meta .price { font-size: 13px; color: var(--grey); margin-top: 1px; }
@@ -2492,6 +2495,21 @@ function appointmentsForRange(startDate, endDate) {
   });
 }
 
+/**
+ * Étiquette d'origine d'un rendez-vous : pris en ligne (RDV) ou client
+ * arrivé sans RDV, synchronisé depuis le check-in kiosk (Sans RDV).
+ * En version "compact" (peu de place, ex: vue Semaine), une simple
+ * icône avec info-bulle plutôt que le texte complet.
+ */
+function sourceBadge(a, compact) {
+  var isWalkin = a.source === 'walkin';
+  if (compact) {
+    return '<span title="' + (isWalkin ? 'Sans RDV (passage)' : 'RDV en ligne') + '" style="margin-right:3px">' +
+      (isWalkin ? '🚶' : '📅') + '</span>';
+  }
+  return '<span class="src-badge ' + (isWalkin ? 'walkin' : 'online') + '">' + (isWalkin ? 'Sans RDV' : 'RDV') + '</span>';
+}
+
 var monthNames = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
 
 function renderMonthView() {
@@ -2570,7 +2588,7 @@ function renderExpandPanel(dateStr, dayAppts) {
         return '<div class="cal-expand-row" onclick="openClientDrawerForAppointment(\'' + a.id + '\')">' +
           '<div class="cal-day-view-time">' + time + '</div>' +
           '<div class="cal-day-view-dot" style="background:' + (rdvBarberColors[a.barber_id] || '#888') + '"></div>' +
-          '<div style="flex:1"><div class="cal-day-view-name">' + esc(a.client_name) + '</div>' +
+          '<div style="flex:1"><div class="cal-day-view-name">' + esc(a.client_name) + ' ' + sourceBadge(a) + '</div>' +
           '<div class="cal-day-view-meta">' + esc(a.service_name) + (a.barber_name ? ' avec ' + esc(a.barber_name) : '') + '</div></div>' +
           '</div>';
       }).join('');
@@ -2613,7 +2631,7 @@ function renderWeekView() {
       var time = a.scheduled_at.slice(11, 16);
       return '<div class="cal-week-appt" style="background:' + (rdvBarberColors[a.barber_id] || '#888') + '" ' +
         'onclick="event.stopPropagation();openClientDrawerForAppointment(\'' + a.id + '\')" title="' + esc(a.client_name) + '">' +
-        time + ' ' + esc(a.client_name) + '</div>';
+        sourceBadge(a, true) + time + ' ' + esc(a.client_name) + '</div>';
     }).join('');
     var classes = 'cal-day week-mode' + (dateStr === todayStr ? ' today' : '') + (dateStr === calSelectedDate ? ' selected' : '');
     cells += '<div class="' + classes + '" onclick="selectCalendarDay(\'' + dateStr + '\')">' +
@@ -2638,7 +2656,7 @@ function renderDayView() {
         return '<div class="cal-day-view-appt" style="cursor:pointer" onclick="openClientDrawerForAppointment(\'' + a.id + '\')">' +
           '<div class="cal-day-view-time">' + time + '</div>' +
           '<div class="cal-day-view-dot" style="background:' + (rdvBarberColors[a.barber_id] || '#888') + '"></div>' +
-          '<div><div class="cal-day-view-name">' + esc(a.client_name) + '</div>' +
+          '<div><div class="cal-day-view-name">' + esc(a.client_name) + ' ' + sourceBadge(a) + '</div>' +
           '<div class="cal-day-view-meta">' + esc(a.service_name) + (a.barber_name ? ' avec ' + esc(a.barber_name) : '') + '</div></div>' +
           '</div>';
       }).join('') + '</div>';
@@ -2721,7 +2739,7 @@ function renderRdvList() {
         var when = dateOnly.toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'short' }) +
           ' à ' + a.scheduled_at.slice(11, 16);
         return '<div class="item">' +
-          '<div class="item-main"><div class="item-name">' + esc(a.client_name) + ' — ' + when + '</div>' +
+          '<div class="item-main"><div class="item-name">' + esc(a.client_name) + ' — ' + when + ' ' + sourceBadge(a) + '</div>' +
           '<div class="item-meta">' + esc(a.service_name) + (a.barber_name ? ' avec ' + esc(a.barber_name) : ' · premier disponible') + '</div>' +
           '<div class="item-meta">' + esc(a.email || '') + (a.phone ? ' · ' + esc(a.phone) : '') + '</div></div>' +
           '<div class="item-actions"><span style="color:' + (statusColors[a.display_status] || 'var(--grey)') + ';font-size:13px;font-weight:600">' + (statusLabels[a.display_status] || a.display_status) + '</span></div>' +

@@ -182,8 +182,8 @@ router.post('/checkin', wrap(async (req, res) => {
     // et l'agenda (qui affiche scheduled_at tel quel, sans conversion)
     // se déciderait alors avec 1h à 2h de décalage.
     await pool.query(
-      `INSERT INTO appointments (id, salon_id, barber_id, client_name, email, phone, service_id, scheduled_at, status, promoted_queue_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?)`,
+      `INSERT INTO appointments (id, salon_id, barber_id, client_name, email, phone, service_id, scheduled_at, status, promoted_queue_id, source)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, 'walkin')`,
       [apptId, req.salon.id, barber_id || null, client_name, email || null, phone || null, service_id, nowParisDatetimeString(), id]
     );
     if (Array.isArray(extras) && extras.length) {
