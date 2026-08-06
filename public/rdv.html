@@ -196,19 +196,16 @@ function loadCatalog() {
 }
 
 function renderBarberGrid() {
-  var anyTile = '<button class="svc-card sel" data-barber-id="" onclick="selectBarber(this, null)">' +
-    '<span class="icon">👥</span><span class="name">Peu importe</span><span class="meta">Premier disponible</span></button>';
-
-  document.getElementById('barber-grid').innerHTML = anyTile + barbers.map(function (b) {
+  document.getElementById('barber-grid').innerHTML = barbers.map(function (b) {
     var photoStyle = b.photo_url ? 'background-image:url(&quot;' + esc(b.photo_url) + '&quot;);background-size:cover;background-position:center' : '';
-    return '<button class="svc-card" data-barber-id="' + b.id + '" style="' + photoStyle + '" onclick="selectBarber(this, \'' + b.id + '\')">' +
+    return '<button class="svc-card' + (selBarber === b.id ? ' sel' : '') + '" data-barber-id="' + b.id + '" style="' + photoStyle + '" onclick="selectBarber(this, \'' + b.id + '\')">' +
       (b.photo_url ? '' : '<span class="icon">' + esc(b.name.charAt(0).toUpperCase()) + '</span>') +
       '<span class="name" style="' + (b.photo_url ? 'color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.6)' : '') + '">' + esc(b.name) + '</span>' +
       '</button>';
   }).join('');
 
   if (barbers.length === 0) {
-    document.getElementById('barber-grid').innerHTML += '<div class="empty">Aucun coiffeur ne prend de RDV en ligne pour le moment — présentez-vous directement au salon.</div>';
+    document.getElementById('barber-grid').innerHTML = '<div class="empty">Aucun coiffeur ne prend de RDV en ligne pour le moment — présentez-vous directement au salon.</div>';
   }
 }
 
