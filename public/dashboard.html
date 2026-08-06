@@ -778,6 +778,7 @@
             <option value="">Tous</option>
             <option value="confirmed">Confirmés</option>
             <option value="completed">Terminés</option>
+            <option value="no_show">Absents</option>
             <option value="cancelled">Annulés</option>
           </select>
         </div>
@@ -2691,8 +2692,8 @@ function renderRdvList() {
   if (statusFilter) items = items.filter(function (a) { return a.display_status === statusFilter; });
   if (barberFilter) items = items.filter(function (a) { return a.barber_id === barberFilter; });
 
-  var statusLabels = { confirmed: 'Confirmé', completed: 'Terminé', cancelled: 'Annulé' };
-  var statusColors = { confirmed: 'var(--blue)', completed: 'var(--green)', cancelled: 'var(--red)' };
+  var statusLabels = { confirmed: 'Confirmé', completed: 'Terminé', no_show: 'Absent', cancelled: 'Annulé' };
+  var statusColors = { confirmed: 'var(--blue)', completed: 'var(--green)', no_show: 'var(--orange, #f97316)', cancelled: 'var(--red)' };
 
   var list = document.getElementById('rdv-list');
   list.innerHTML = items.length === 0

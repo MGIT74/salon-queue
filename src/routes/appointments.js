@@ -216,6 +216,7 @@ router.get('/', requireAdmin, wrap(async (req, res) => {
       let displayStatus = 'confirmed';
       if (r.status === 'cancelled') displayStatus = 'cancelled';
       else if (r.queue_status === 'done') displayStatus = 'completed';
+      else if (r.queue_status === 'cancelled') displayStatus = 'no_show';
 
       return Object.assign({}, r, {
         scheduled_at: utcIso(r.scheduled_at),
