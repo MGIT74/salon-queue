@@ -122,6 +122,7 @@
     <div class="confirm-box">
       <h1>Rendez-vous annulé</h1>
       <p style="color:var(--grey);margin-top:10px">Votre créneau a bien été libéré.</p>
+      <button class="go" style="margin-top:24px" onclick="startNewBooking()">Prendre un nouveau rendez-vous</button>
     </div>
   </section>
 </div>
@@ -328,10 +329,11 @@ function startNewBooking() {
   document.getElementById('rdv-date').value = '';
   document.getElementById('service-next-btn').disabled = true;
   document.getElementById('date-next-btn').disabled = true;
-  renderBarberGrid();
-  renderServiceGrid();
   document.getElementById('slots-grid').innerHTML = '<div class="empty">Choisissez une date</div>';
-  show('p-barber');
+  // Après une annulation (arrivée directe via le lien de l'email), le
+  // catalogue n'a jamais été chargé — loadCatalog() gère aussi bien ce
+  // cas que le retour depuis une réservation classique (déjà chargée).
+  loadCatalog().then(function () { show('p-barber'); }).catch(function (e) { toast(e.message, true); });
 }
 
 /* ---------- Annulation ---------- */

@@ -339,13 +339,23 @@ router.post('/', wrap(async (req, res) => {
     weekday: 'long', day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit'
   });
 
+  // base_url (envoyé par le navigateur) contient déjà le chemin complet
+  // vers rdv.html, avec son éventuel ?salon=xxx — on ne doit donc jamais
+  // recoller un second "/rdv.html" par-dessus (ça produisait une URL du
+  // type ".../rdv.html?salon=xxx/rdv.html?cancel=yyy", où le paramètre
+  // cancel finissait noyé dans la valeur de salon, rendant le lien
+  // d'annulation inopérant). On ajoute juste le paramètre cancel, avec
+  // le bon séparateur selon qu'un ?salon= est déjà présent ou non.
+  const baseUrl = String(req.body.base_url || '').replace(/\/$/, '');
+  const cancelUrl = baseUrl + (baseUrl.includes('?') ? '&' : '?') + 'cancel=' + cancelToken;
+
   try {
     await sendAppointmentConfirmation(req.salon.id, email, {
       clientName: client_name,
       when,
       serviceName: service.name + (extraNames.length ? ' + ' + extraNames.join(', ') : ''),
       barberName: barber ? barber.name : null,
-      cancelUrl: String(req.body.base_url || '').replace(/\/$/, '') + '/rdv.html?cancel=' + cancelToken
+      cancelUrl
     });
   } catch (err) {
     console.error('[rdv] envoi email de confirmation échoué:', err.message);
