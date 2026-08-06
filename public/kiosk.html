@@ -408,7 +408,8 @@ function goToExtrasStep() {
 
 function refresh() {
   return Promise.all([api('/api/queue'), api('/api/barbers')]).then(function (r) {
-    queue = r[0].queue; barbers = r[1].items;
+    queue = r[0].queue;
+    barbers = r[1].items.filter(function (b) { return !b.kiosk_hidden; });
     renderBoard(); renderBarberGrid();
   }).catch(function (err) { toast(err.message, true); });
 }

@@ -437,3 +437,10 @@ CREATE TABLE IF NOT EXISTS appointment_extras (
 -- kiosk classique) - permet a l'interface de savoir qu'il faut griser
 -- "Commencer" tant que l'heure prevue n'est pas encore arrivee.
 ALTER TABLE queue ADD COLUMN IF NOT EXISTS is_appointment TINYINT(1) NOT NULL DEFAULT 0;
+
+-- Coiffeur exclu du kiosk (visible uniquement sur le formulaire de
+-- rendez-vous en ligne). A l'inverse, accepts_appointments=0 exclut
+-- deja du formulaire en ligne (visible uniquement sur le kiosk). Les
+-- deux ensemble n'ont pas de sens et sont geres comme mutuellement
+-- exclusifs cote interface.
+ALTER TABLE barbers ADD COLUMN kiosk_hidden TINYINT(1) NOT NULL DEFAULT 0;

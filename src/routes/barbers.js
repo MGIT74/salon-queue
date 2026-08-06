@@ -91,7 +91,20 @@ router.put('/:id', requireAdmin, wrap(async (req, res) => {
     sets.push('pin_code = ?'); params.push(req.body.pin_code || null);
   }
   if (req.body.photo_url !== undefined) { sets.push('photo_url = ?'); params.push(req.body.photo_url || null); }
-  if (req.body.accepts_appointments !== undefined) { sets.push('accepts_appointments = ?'); params.push(req.body.accepts_appointments ? 1 : 0); }
+
+  // Les deux cases sont mutuellement exclusives : cocher l'une decoche
+  // l'autre automatiquement, applique ici cote serveur pour que ce
+  // soit garanti quel que soit l'appelant (pas seulement l'interface).
+  if (req.body.accepts_appointments !== undefined) {
+    const acceptsAppointments = req.body.accepts_appointments ? 1 : 0;
+    sets.push('accepts_appointments = ?'); params.push(acceptsAppointments);
+    if (!acceptsAppointments) { sets.push('kiosk_hidden = ?'); params.push(0); }
+  }
+  if (req.body.kiosk_hidden !== undefined) {
+    const kioskHidden = req.body.kiosk_hidden ? 1 : 0;
+    sets.push('kiosk_hidden = ?'); params.push(kioskHidden);
+    if (kioskHidden) { sets.push('accepts_appointments = ?'); params.push(1); }
+  }
   if (!sets.length) return res.json({ ok: true });
   params.push(req.params.id, req.salon.id);
   try {
