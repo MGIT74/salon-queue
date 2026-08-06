@@ -168,6 +168,31 @@ router.post('/checkin', wrap(async (req, res) => {
     await pool.query('INSERT INTO queue_extras (queue_id, extra_id) VALUES ?', [values]);
   }
 
+  // Synchronise avec l'agenda "Rendez-vous" : un client venu sans RDV
+  // (check-in direct à la borne) apparaît aussi dans le calendrier, à
+  // l'heure présente, déjà "promu" (promoted_queue_id posé tout de
+  // suite) — les deux vues restent cohérentes sans double entrée ni
+  // promotion ultérieure. Pas d'email de confirmation ici : le client
+  // est déjà physiquement au salon.
+  const apptId = crypto.randomUUID();
+  try {
+    await pool.query(
+      `INSERT INTO appointments (id, salon_id, barber_id, client_name, email, phone, service_id, scheduled_at, status, promoted_queue_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), 'confirmed', ?)`,
+      [apptId, req.salon.id, barber_id || null, client_name, email || null, phone || null, service_id, id]
+    );
+    if (Array.isArray(extras) && extras.length) {
+      await pool.query(
+        'INSERT INTO appointment_extras (appointment_id, extra_id) VALUES ?',
+        [extras.map((extraId) => [apptId, extraId])]
+      );
+    }
+  } catch (err) {
+    // La file d'attente ne doit jamais échouer à cause de l'agenda —
+    // on journalise et on continue, le check-in reste prioritaire.
+    console.error('[checkin] synchronisation agenda échouée:', err.message);
+  }
+
   await recompute(req.salon.id);
 
   const rows = await loadQueue(req.salon.id);
@@ -231,6 +256,15 @@ router.post('/:id/start', requireAdminOrBarber, wrap(async (req, res) => {
     "UPDATE queue SET status = 'in_progress', start_at = NOW(), barber_id = COALESCE(?, barber_id) WHERE id = ? AND salon_id = ?",
     [barberId, req.params.id, req.salon.id]
   );
+  // Répercute le coiffeur finalement retenu sur l'entrée d'agenda liée
+  // (walk-in synchronisé, ou RDV "premier disponible" promu), pour que
+  // le calendrier affiche le bon nom dès que la coupe démarre.
+  if (barberId) {
+    await pool.query(
+      'UPDATE appointments SET barber_id = COALESCE(barber_id, ?) WHERE promoted_queue_id = ?',
+      [barberId, req.params.id]
+    );
+  }
   await recompute(req.salon.id);
   res.json({ ok: true });
 }));
@@ -353,6 +387,27 @@ router.put('/:id', requireAdminOrBarber, wrap(async (req, res) => {
     if (extras.length) {
       const values = extras.map((extraId) => [req.params.id, extraId]);
       await pool.query('INSERT INTO queue_extras (queue_id, extra_id) VALUES ?', [values]);
+    }
+  }
+
+  // Répercute les mêmes changements sur l'entrée d'agenda liée (si elle
+  // existe), pour qu'un changement de prestation/suppléments en cours de
+  // route reste visible et exact dans le calendrier Rendez-vous.
+  const [[linkedAppt]] = await pool.query(
+    'SELECT id FROM appointments WHERE promoted_queue_id = ?', [req.params.id]
+  );
+  if (linkedAppt) {
+    if (service_id) {
+      await pool.query('UPDATE appointments SET service_id = ? WHERE id = ?', [service_id, linkedAppt.id]);
+    }
+    if (Array.isArray(extras)) {
+      await pool.query('DELETE FROM appointment_extras WHERE appointment_id = ?', [linkedAppt.id]);
+      if (extras.length) {
+        await pool.query(
+          'INSERT INTO appointment_extras (appointment_id, extra_id) VALUES ?',
+          [extras.map((extraId) => [linkedAppt.id, extraId])]
+        );
+      }
     }
   }
 
