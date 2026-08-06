@@ -47,11 +47,42 @@ function minutesToTime(mins) {
 }
 
 /**
+ * Estime le nombre de minutes avant que ce coiffeur soit REELLEMENT
+ * libre, en tenant compte de sa file d'attente ACTUELLE (coupe en
+ * cours + clients deja en attente qui lui sont explicitement
+ * assignes, sans-RDV ou RDV deja promus confondus) - c'est ce qui
+ * synchronise la prise de RDV en ligne avec la vraie charge du salon,
+ * pour ne jamais proposer un creneau deja pris par l'affluence sans
+ * RDV. Les clients "premier disponible" (barber_id NULL) ne sont pas
+ * comptes ici : on ne peut pas savoir a l'avance sur quel coiffeur
+ * ils vont finalement tomber.
+ */
+async function getBarberBusyMinutesToday(barberId) {
+  const [rows] = await pool.query(
+    `SELECT status, start_at, total_duration_min FROM queue
+     WHERE barber_id = ? AND status IN ('waiting', 'in_progress')`,
+    [barberId]
+  );
+  const OVERRUN_BUFFER_MIN = 5;
+  let busy = 0;
+  rows.forEach((r) => {
+    if (r.status === 'in_progress') {
+      const elapsedMin = r.start_at ? (Date.now() - new Date(r.start_at + 'Z').getTime()) / 60000 : 0;
+      const remaining = (r.total_duration_min || 0) - elapsedMin;
+      busy += remaining > 0 ? remaining : OVERRUN_BUFFER_MIN;
+    } else {
+      busy += r.total_duration_min || 0;
+    }
+  });
+  return busy;
+}
+
+/**
  * Calcule les créneaux disponibles d'UN coiffeur pour une date et une
  * durée données — à partir de ses horaires (barber_schedules), ses
- * congés (barber_leaves), et les RDV déjà pris ce jour-là. Ne tient
- * PAS compte de la file d'attente en temps réel (les passages sans
- * RDV sont par nature imprévisibles).
+ * congés (barber_leaves), les RDV déjà pris ce jour-là, ET (pour
+ * aujourd'hui uniquement) sa charge réelle de file d'attente sans RDV
+ * en ce moment même.
  */
 async function computeSlotsForBarber(barberId, dateStr, durationMin) {
   const date = new Date(dateStr + 'T00:00:00Z');
@@ -89,7 +120,12 @@ async function computeSlotsForBarber(barberId, dateStr, durationMin) {
   const endMin = timeToMinutes(schedule.end_time);
   const paris = nowInParis();
   const isToday = dateStr === paris.dateStr;
-  const nowMin = isToday ? paris.minutes : -1;
+  let nowMin = isToday ? paris.minutes : -1;
+
+  if (isToday) {
+    const busyMin = await getBarberBusyMinutesToday(barberId);
+    nowMin = paris.minutes + busyMin;
+  }
 
   const slots = [];
   for (let t = startMin; t + durationMin <= endMin; t += SLOT_STEP_MIN) {
