@@ -257,15 +257,25 @@ CREATE TABLE IF NOT EXISTS barber_extra_prices (
 -- deviennent chacun optionnels indépendamment - une ligne peut ne
 -- personnaliser que l'un des deux).
 ALTER TABLE barber_service_prices MODIFY price_cents INT NULL;
-ALTER TABLE barber_service_prices ADD COLUMN IF NOT EXISTS duration_min INT NULL;
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'barber_service_prices' AND column_name = 'duration_min');
+SET @sql := IF(@c = 0, "ALTER TABLE barber_service_prices ADD COLUMN duration_min INT NULL", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 ALTER TABLE barber_extra_prices MODIFY price_cents INT NULL;
-ALTER TABLE barber_extra_prices ADD COLUMN IF NOT EXISTS duration_min INT NULL;
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'barber_extra_prices' AND column_name = 'duration_min');
+SET @sql := IF(@c = 0, "ALTER TABLE barber_extra_prices ADD COLUMN duration_min INT NULL", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- Vérification email à l'inscription : le compte reste marqué comme
 -- non vérifié tant que le lien envoyé par email n'a pas été cliqué.
-ALTER TABLE owners ADD COLUMN IF NOT EXISTS email_verified TINYINT(1) NOT NULL DEFAULT 0;
-ALTER TABLE owners ADD COLUMN IF NOT EXISTS verify_token VARCHAR(64) NULL;
-ALTER TABLE owners ADD COLUMN IF NOT EXISTS verify_token_expires DATETIME NULL;
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'owners' AND column_name = 'email_verified');
+SET @sql := IF(@c = 0, "ALTER TABLE owners ADD COLUMN email_verified TINYINT(1) NOT NULL DEFAULT 0", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'owners' AND column_name = 'verify_token');
+SET @sql := IF(@c = 0, "ALTER TABLE owners ADD COLUMN verify_token VARCHAR(64) NULL", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'owners' AND column_name = 'verify_token_expires');
+SET @sql := IF(@c = 0, "ALTER TABLE owners ADD COLUMN verify_token_expires DATETIME NULL", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 -- Important : les comptes déjà créés avant cette fonctionnalité n'ont
 -- jamais eu à confirmer quoi que ce soit - on les marque vérifiés pour
 -- ne pas les bloquer soudainement à la connexion.
@@ -313,11 +323,15 @@ CREATE TABLE IF NOT EXISTS sale_items (
 
 -- Une coupe terminee ('done') reste en attente d'encaissement tant que
 -- paid_at est NULL - c'est la caisse qui la marque payee.
-ALTER TABLE queue ADD COLUMN IF NOT EXISTS paid_at DATETIME NULL;
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'queue' AND column_name = 'paid_at');
+SET @sql := IF(@c = 0, "ALTER TABLE queue ADD COLUMN paid_at DATETIME NULL", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- Un encaissement peut etre "mis de cote" (client parti chercher sa
 -- carte, urgence...) sans etre perdu ni bloquer le suivant.
-ALTER TABLE queue ADD COLUMN IF NOT EXISTS payment_deferred_at DATETIME NULL;
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'queue' AND column_name = 'payment_deferred_at');
+SET @sql := IF(@c = 0, "ALTER TABLE queue ADD COLUMN payment_deferred_at DATETIME NULL", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- Bon cadeau : achete d'avance pour un beneficiaire precis, reconnu
 -- automatiquement quand celui-ci passe par le chemin normal (kiosk ->
@@ -358,12 +372,16 @@ CREATE TABLE IF NOT EXISTS loyalty_accounts (
 -- montant total), pour que le coiffeur sache exactement quoi remettre
 -- au beneficiaire au moment d'utiliser le cadeau (ex: un produit
 -- achete en plus de la coupe, que le kiosk ne connait pas).
-ALTER TABLE gift_cards ADD COLUMN IF NOT EXISTS items_json TEXT NULL;
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'gift_cards' AND column_name = 'items_json');
+SET @sql := IF(@c = 0, "ALTER TABLE gift_cards ADD COLUMN items_json TEXT NULL", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- Code court a saisir par le beneficiaire (kiosk, futur systeme de
 -- rendez-vous en ligne) - plus pratique a taper qu'un identifiant
 -- technique. Nullable pour les cadeaux crees avant cette fonctionnalite.
-ALTER TABLE gift_cards ADD COLUMN IF NOT EXISTS code VARCHAR(12) NULL UNIQUE;
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'gift_cards' AND column_name = 'code');
+SET @sql := IF(@c = 0, "ALTER TABLE gift_cards ADD COLUMN code VARCHAR(12) NULL UNIQUE", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- Reglages marketing (fidelite) au niveau de l'ENSEIGNE (owner_id),
 -- pas du salon - coherent avec le cumul des points deja fait par
@@ -382,16 +400,26 @@ CREATE TABLE IF NOT EXISTS owner_settings (
 -- explicitement activer la carte avec l'accord du client (email
 -- requis pour la confirmation). Tant que activated_at est NULL, ce
 -- client n'accumule aucun point, meme s'il revient plusieurs fois.
-ALTER TABLE loyalty_accounts ADD COLUMN IF NOT EXISTS activated_at DATETIME NULL;
-ALTER TABLE loyalty_accounts ADD COLUMN IF NOT EXISTS recipient_email VARCHAR(255) NULL;
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'loyalty_accounts' AND column_name = 'activated_at');
+SET @sql := IF(@c = 0, "ALTER TABLE loyalty_accounts ADD COLUMN activated_at DATETIME NULL", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'loyalty_accounts' AND column_name = 'recipient_email');
+SET @sql := IF(@c = 0, "ALTER TABLE loyalty_accounts ADD COLUMN recipient_email VARCHAR(255) NULL", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- Photo personnalisable pour chaque prestation/supplement/produit,
 -- affichee sur le kiosk et en caisse a la place de l'icone par
 -- defaut - meme mecanique que les photos de coiffeurs (data URL,
 -- redimensionnee/recadree cote navigateur avant envoi).
-ALTER TABLE services ADD COLUMN IF NOT EXISTS image_url LONGTEXT NULL;
-ALTER TABLE extras ADD COLUMN IF NOT EXISTS image_url LONGTEXT NULL;
-ALTER TABLE products ADD COLUMN IF NOT EXISTS image_url LONGTEXT NULL;
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'services' AND column_name = 'image_url');
+SET @sql := IF(@c = 0, "ALTER TABLE services ADD COLUMN image_url LONGTEXT NULL", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'extras' AND column_name = 'image_url');
+SET @sql := IF(@c = 0, "ALTER TABLE extras ADD COLUMN image_url LONGTEXT NULL", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'products' AND column_name = 'image_url');
+SET @sql := IF(@c = 0, "ALTER TABLE products ADD COLUMN image_url LONGTEXT NULL", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- Cloture de caisse : fige une periode de ventes (depuis la
 -- precedente cloture, ou depuis le debut si jamais fait), avec le
@@ -414,7 +442,9 @@ CREATE TABLE IF NOT EXISTS cash_closings (
 -- Coiffeur qui accepte les rendez-vous en ligne (en plus ou a la
 -- place du sans-rdv). Un coiffeur "non" n'apparait jamais dans le
 -- formulaire de reservation en ligne.
-ALTER TABLE barbers ADD COLUMN IF NOT EXISTS accepts_appointments TINYINT(1) NOT NULL DEFAULT 0;
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'barbers' AND column_name = 'accepts_appointments');
+SET @sql := IF(@c = 0, "ALTER TABLE barbers ADD COLUMN accepts_appointments TINYINT(1) NOT NULL DEFAULT 0", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- Rendez-vous pris en ligne. Reste dans cette table jusqu'a ce qu'il
 -- soit "promu" (transforme en vraie entree de file le jour meme) -
@@ -448,12 +478,16 @@ CREATE TABLE IF NOT EXISTS appointment_extras (
 -- Marque une entree de file comme venant d'un RDV (pas d'un check-in
 -- kiosk classique) - permet a l'interface de savoir qu'il faut griser
 -- "Commencer" tant que l'heure prevue n'est pas encore arrivee.
-ALTER TABLE queue ADD COLUMN IF NOT EXISTS is_appointment TINYINT(1) NOT NULL DEFAULT 0;
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'queue' AND column_name = 'is_appointment');
+SET @sql := IF(@c = 0, "ALTER TABLE queue ADD COLUMN is_appointment TINYINT(1) NOT NULL DEFAULT 0", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- Origine de l'entrée d'agenda : 'online' = pris en ligne via rdv.html,
 -- 'walkin' = client arrivé sans RDV, synchronisé depuis le check-in
 -- kiosk. Sert uniquement à l'affichage (badge dans le calendrier).
-ALTER TABLE appointments ADD COLUMN IF NOT EXISTS source VARCHAR(20) NOT NULL DEFAULT 'online';
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'appointments' AND column_name = 'source');
+SET @sql := IF(@c = 0, "ALTER TABLE appointments ADD COLUMN source VARCHAR(20) NOT NULL DEFAULT 'online'", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- Rattrapage pour les rendez-vous déjà en base avant l'ajout de cette
 -- colonne : ils ont tous hérité de la valeur par défaut 'online',
@@ -469,4 +503,6 @@ UPDATE appointments SET source = 'walkin' WHERE cancel_token IS NULL;
 -- deja du formulaire en ligne (visible uniquement sur le kiosk). Les
 -- deux ensemble n'ont pas de sens et sont geres comme mutuellement
 -- exclusifs cote interface.
-ALTER TABLE barbers ADD COLUMN IF NOT EXISTS kiosk_hidden TINYINT(1) NOT NULL DEFAULT 0;
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'barbers' AND column_name = 'kiosk_hidden');
+SET @sql := IF(@c = 0, "ALTER TABLE barbers ADD COLUMN kiosk_hidden TINYINT(1) NOT NULL DEFAULT 0", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
