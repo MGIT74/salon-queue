@@ -62,11 +62,23 @@ router.post('/', requireAdmin, wrap(async (req, res) => {
   if (pin_code && !/^\d{4,8}$/.test(pin_code)) {
     return res.status(400).json({ error: 'Le code PIN doit contenir entre 4 et 8 chiffres' });
   }
+  // Équipe figée dès la création : plus de "masqué en attendant qu'on
+  // choisisse" - il faut savoir tout de suite si ce coiffeur rejoint
+  // l'équipe Sans RDV (visible kiosk) ou RDV en ligne (visible rdv.html),
+  // les deux équipes ne se recoupent jamais.
+  const modeMap = {
+    walkin: { accepts_appointments: 0, kiosk_hidden: 0 },
+    online: { accepts_appointments: 1, kiosk_hidden: 1 }
+  };
+  if (!modeMap[req.body.mode]) {
+    return res.status(400).json({ error: "mode doit être 'walkin' ou 'online'" });
+  }
+  const { accepts_appointments, kiosk_hidden } = modeMap[req.body.mode];
   const id = crypto.randomUUID();
   try {
     await pool.query(
-      'INSERT INTO barbers (id, salon_id, name, sort_order, pin_code, photo_url, accepts_appointments, kiosk_hidden) VALUES (?, ?, ?, ?, ?, ?, 0, 1)',
-      [id, req.salon.id, name, Number(sort_order) || 0, pin_code || null, photo_url || null]
+      'INSERT INTO barbers (id, salon_id, name, sort_order, pin_code, photo_url, accepts_appointments, kiosk_hidden) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [id, req.salon.id, name, Number(sort_order) || 0, pin_code || null, photo_url || null, accepts_appointments, kiosk_hidden]
     );
   } catch (err) {
     if (err.code === 'ER_DUP_ENTRY') {

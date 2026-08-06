@@ -797,7 +797,10 @@
   <div class="tab-panel" id="t-barbers">
     <div class="admin-head">
       <h2>Coiffeurs et horaires</h2>
-      <button class="btn btn-primary" onclick="addBarber()">+ Ajouter</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-soft" style="color:var(--orange, #f97316)" onclick="addBarber('walkin')">+ Sans RDV</button>
+        <button class="btn btn-soft" style="color:var(--blue)" onclick="addBarber('online')">+ RDV en ligne</button>
+      </div>
     </div>
     <div id="barbers-list"></div>
   </div>
@@ -1845,14 +1848,6 @@ function renderBarberDetail(b) {
     '<button class="btn btn-soft" onclick="event.stopPropagation();setBarberPin(\'' + b.id + '\',\'' + esc(b.name).replace(/'/g, "\\'") + '\')">' +
     (b.has_pin ? 'Changer le code' : 'Définir un code') + '</button>' +
     '</div>' +
-    '<label style="display:flex;align-items:center;gap:8px;font-size:13.5px;margin-bottom:10px;cursor:pointer" onclick="event.stopPropagation()">' +
-    '<input type="checkbox" ' + (!b.kiosk_hidden && !b.accepts_appointments ? 'checked' : '') + ' onchange="setBarberMode(\'' + b.id + '\', this.checked ? \'walkin\' : \'none\')" style="width:16px;height:16px">' +
-    'Accepte les sans rendez-vous' +
-    '</label>' +
-    '<label style="display:flex;align-items:center;gap:8px;font-size:13.5px;margin-bottom:16px;cursor:pointer" onclick="event.stopPropagation()">' +
-    '<input type="checkbox" ' + (b.kiosk_hidden && b.accepts_appointments ? 'checked' : '') + ' onchange="setBarberMode(\'' + b.id + '\', this.checked ? \'online\' : \'none\')" style="width:16px;height:16px">' +
-    'Accepte les rendez-vous en ligne' +
-    '</label>' +
     '<div class="subtabs" onclick="event.stopPropagation()">' +
     '<button class="' + (tab === 'horaires' ? 'on' : '') + '" onclick="switchBarberTab(\'' + b.id + '\',\'horaires\')">Horaires</button>' +
     '<button class="' + (tab === 'prestations' ? 'on' : '') + '" onclick="switchBarberTab(\'' + b.id + '\',\'prestations\')">Prestations</button>' +
@@ -2149,12 +2144,6 @@ function deleteLeave(barberId, leaveId) {
 
 // Redimensionne l'image côté navigateur avant envoi (évite de stocker des
 // photos trop lourdes en base — 300x300 recadré, JPEG compressé).
-function setBarberMode(id, mode) {
-  var label = mode === 'walkin' ? 'Sans rendez-vous uniquement' : mode === 'online' ? 'Rendez-vous en ligne uniquement' : 'Masqué partout (aucun mode choisi)';
-  api('/api/barbers/' + id, { method: 'PUT', body: { mode: mode } })
-    .then(function () { toast(label); return loadBarbers(); })
-    .catch(function (e) { toast(e.message, true); });
-}
 
 function uploadBarberPhoto(id, input) {
   var file = input.files && input.files[0];
@@ -2218,14 +2207,15 @@ function saveSchedule(id) {
     .catch(function (e) { toast(e.message, true); });
 }
 
-function addBarber() {
-  showPrompt('', { title: 'Nouveau coiffeur', placeholder: 'Nom du coiffeur' }).then(function (name) {
+function addBarber(mode) {
+  var teamLabel = mode === 'walkin' ? 'Sans RDV' : 'RDV en ligne';
+  showPrompt('', { title: 'Nouveau coiffeur — équipe ' + teamLabel, placeholder: 'Nom du coiffeur' }).then(function (name) {
     if (!name) return;
     var pin = String(Math.floor(1000 + Math.random() * 9000));
-    api('/api/barbers', { method: 'POST', body: { name: name, pin_code: pin } })
+    api('/api/barbers', { method: 'POST', body: { name: name, pin_code: pin, mode: mode } })
       .then(loadBarbers)
       .then(function () {
-        toast('Coiffeur ajouté');
+        toast('Coiffeur ajouté à l\'équipe ' + teamLabel);
         return showAlert(
           name + ' peut se connecter sur /poste.html avec le code : ' + pin + '\n\nNotez-le maintenant — il ne sera plus jamais affiché ensuite (vous pourrez en générer un nouveau depuis sa fiche si besoin).',
           { title: 'Code PIN généré' }
