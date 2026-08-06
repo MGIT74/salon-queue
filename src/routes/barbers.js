@@ -65,7 +65,7 @@ router.post('/', requireAdmin, wrap(async (req, res) => {
   const id = crypto.randomUUID();
   try {
     await pool.query(
-      'INSERT INTO barbers (id, salon_id, name, sort_order, pin_code, photo_url) VALUES (?, ?, ?, ?, ?, ?)',
+      'INSERT INTO barbers (id, salon_id, name, sort_order, pin_code, photo_url, accepts_appointments) VALUES (?, ?, ?, ?, ?, ?, 1)',
       [id, req.salon.id, name, Number(sort_order) || 0, pin_code || null, photo_url || null]
     );
   } catch (err) {

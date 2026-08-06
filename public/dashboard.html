@@ -1848,8 +1848,8 @@ function renderBarberDetail(b) {
     (b.has_pin ? 'Changer le code' : 'Définir un code') + '</button>' +
     '</div>' +
     '<label style="display:flex;align-items:center;gap:8px;font-size:13.5px;margin-bottom:16px;cursor:pointer" onclick="event.stopPropagation()">' +
-    '<input type="checkbox" ' + (b.accepts_appointments ? 'checked' : '') + ' onchange="toggleAcceptsAppointments(\'' + b.id + '\', this.checked)" style="width:16px;height:16px">' +
-    'Accepte les rendez-vous en ligne' +
+    '<input type="checkbox" ' + (b.accepts_appointments ? '' : 'checked') + ' onchange="toggleAcceptsAppointments(\'' + b.id + '\', this.checked)" style="width:16px;height:16px">' +
+    'Accepte les sans rendez-vous uniquement' +
     '</label>' +
     '<div class="subtabs" onclick="event.stopPropagation()">' +
     '<button class="' + (tab === 'horaires' ? 'on' : '') + '" onclick="switchBarberTab(\'' + b.id + '\',\'horaires\')">Horaires</button>' +
@@ -2147,9 +2147,10 @@ function deleteLeave(barberId, leaveId) {
 
 // Redimensionne l'image côté navigateur avant envoi (évite de stocker des
 // photos trop lourdes en base — 300x300 recadré, JPEG compressé).
-function toggleAcceptsAppointments(id, checked) {
-  api('/api/barbers/' + id, { method: 'PUT', body: { accepts_appointments: checked } })
-    .then(function () { toast(checked ? 'Accepte désormais les RDV en ligne' : 'Ne prend plus de RDV en ligne'); return loadBarbers(); })
+function toggleAcceptsAppointments(id, checkedSansRdv) {
+  var acceptsAppointments = !checkedSansRdv;
+  api('/api/barbers/' + id, { method: 'PUT', body: { accepts_appointments: acceptsAppointments } })
+    .then(function () { toast(acceptsAppointments ? 'Mode rendez-vous activé' : 'Sans rendez-vous uniquement'); return loadBarbers(); })
     .catch(function (e) { toast(e.message, true); });
 }
 
