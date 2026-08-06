@@ -147,9 +147,9 @@ CREATE TABLE IF NOT EXISTS queue_extras (
   FOREIGN KEY (queue_id) REFERENCES queue(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE INDEX idx_queue_status ON queue(status);
-CREATE INDEX idx_queue_checkin ON queue(checkin_at);
-CREATE INDEX idx_queue_salon ON queue(salon_id);
+CREATE INDEX IF NOT EXISTS idx_queue_status ON queue(status);
+CREATE INDEX IF NOT EXISTS idx_queue_checkin ON queue(checkin_at);
+CREATE INDEX IF NOT EXISTS idx_queue_salon ON queue(salon_id);
 
 CREATE TABLE IF NOT EXISTS settings (
   salon_id CHAR(36) NOT NULL,
@@ -443,9 +443,18 @@ ALTER TABLE queue ADD COLUMN IF NOT EXISTS is_appointment TINYINT(1) NOT NULL DE
 -- kiosk. Sert uniquement à l'affichage (badge dans le calendrier).
 ALTER TABLE appointments ADD COLUMN IF NOT EXISTS source VARCHAR(20) NOT NULL DEFAULT 'online';
 
+-- Rattrapage pour les rendez-vous déjà en base avant l'ajout de cette
+-- colonne : ils ont tous hérité de la valeur par défaut 'online',
+-- walk-ins compris. Un vrai RDV pris en ligne a TOUJOURS un
+-- cancel_token (généré à la réservation, pour le lien d'annulation
+-- envoyé par email) ; une entrée synchronisée depuis le check-in
+-- kiosk n'en a jamais — distinction fiable, sans ambiguïté, quelle que
+-- soit la date de création de la ligne.
+UPDATE appointments SET source = 'walkin' WHERE cancel_token IS NULL;
+
 -- Coiffeur exclu du kiosk (visible uniquement sur le formulaire de
 -- rendez-vous en ligne). A l'inverse, accepts_appointments=0 exclut
 -- deja du formulaire en ligne (visible uniquement sur le kiosk). Les
 -- deux ensemble n'ont pas de sens et sont geres comme mutuellement
 -- exclusifs cote interface.
-ALTER TABLE barbers ADD COLUMN kiosk_hidden TINYINT(1) NOT NULL DEFAULT 0;
+ALTER TABLE barbers ADD COLUMN IF NOT EXISTS kiosk_hidden TINYINT(1) NOT NULL DEFAULT 0;
