@@ -170,6 +170,14 @@ async function computeSlotsForBarber(barberId, dateStr, durationMin) {
       return [start, start + a.svc_duration + Number(a.extras_duration)];
     });
 
+  // Pauses (déjeuner, etc.) — bloquent les créneaux au même titre qu'un
+  // RDV déjà pris, pour ce jour de la semaine précis.
+  const [breaks] = await pool.query(
+    'SELECT start_time, end_time FROM barber_breaks WHERE barber_id = ? AND weekday = ? AND active = 1',
+    [barberId, weekday]
+  );
+  breaks.forEach((b) => busyRanges.push([timeToMinutes(b.start_time), timeToMinutes(b.end_time)]));
+
   const startMin = timeToMinutes(schedule.start_time);
   const endMin = timeToMinutes(schedule.end_time);
   const paris = nowInParis();

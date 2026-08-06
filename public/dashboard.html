@@ -1862,6 +1862,7 @@ function renderScheduleTab(b) {
   var days = DAYS.map(function (dn, wd) {
     var s = (b.schedules || []).find(function (x) { return x.weekday === wd; });
     var on = Boolean(s);
+    var myBreaks = (b.breaks || []).filter(function (x) { return x.weekday === wd; });
     return '<div class="day-row' + (on ? '' : ' off') + '" data-day="' + wd + '">' +
       '<div class="day-row-label">' +
         '<div class="switch' + (on ? ' on' : '') + '" onclick="toggleDay(this)"></div>' +
@@ -1872,9 +1873,34 @@ function renderScheduleTab(b) {
         '<span class="to">à</span>' +
         '<input type="time" value="' + (s ? s.end_time.slice(0, 5) : '19:00') + '">' +
       '</div>' +
+      '<div class="day-breaks" style="margin:8px 0 0 44px;display:flex;flex-direction:column;gap:6px">' +
+        myBreaks.map(function (bk) {
+          return '<div class="break-row" style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--grey)">' +
+            '<span>Pause</span>' +
+            '<input type="time" value="' + bk.start_time.slice(0, 5) + '">' +
+            '<span class="to">à</span>' +
+            '<input type="time" value="' + bk.end_time.slice(0, 5) + '">' +
+            '<button class="btn btn-ghost" style="padding:2px 8px;font-size:12px" onclick="this.closest(\'.break-row\').remove()">✕</button>' +
+            '</div>';
+        }).join('') +
+        '<button class="btn btn-soft" style="align-self:flex-start;padding:4px 10px;font-size:12.5px" onclick="addBreakRow(this)">+ Pause (ex: déjeuner)</button>' +
+      '</div>' +
       '</div>';
   }).join('');
   return days + '<button class="btn btn-primary" style="margin-top:16px" onclick="saveSchedule(\'' + b.id + '\')">Enregistrer les horaires</button>';
+}
+
+function addBreakRow(btn) {
+  var container = btn.closest('.day-breaks');
+  var row = document.createElement('div');
+  row.className = 'break-row';
+  row.style.cssText = 'display:flex;align-items:center;gap:8px;font-size:13px;color:var(--grey)';
+  row.innerHTML = '<span>Pause</span>' +
+    '<input type="time" value="12:00">' +
+    '<span class="to">à</span>' +
+    '<input type="time" value="13:00">' +
+    '<button class="btn btn-ghost" style="padding:2px 8px;font-size:12px" onclick="this.closest(\'.break-row\').remove()">✕</button>';
+  container.insertBefore(row, btn);
 }
 
 function renderStatsTab(b) {
@@ -2194,7 +2220,7 @@ function toggleDay(el) {
 function saveSchedule(id) {
   var box = document.querySelector('[data-barber="' + id + '"]');
   var schedules = Array.prototype.map.call(box.querySelectorAll('.day-row'), function (row) {
-    var times = row.querySelectorAll('input[type="time"]');
+    var times = row.querySelector('.day-row-times').querySelectorAll('input[type="time"]');
     return {
       weekday: Number(row.dataset.day),
       active: row.querySelector('.switch').classList.contains('on'),
@@ -2202,7 +2228,15 @@ function saveSchedule(id) {
       end_time: times[1].value
     };
   });
-  api('/api/barbers/' + id + '/schedule', { method: 'PUT', body: { schedules: schedules } })
+  var breaks = [];
+  Array.prototype.forEach.call(box.querySelectorAll('.day-row'), function (row) {
+    var weekday = Number(row.dataset.day);
+    Array.prototype.forEach.call(row.querySelectorAll('.break-row'), function (br) {
+      var times = br.querySelectorAll('input[type="time"]');
+      breaks.push({ weekday: weekday, start_time: times[0].value, end_time: times[1].value });
+    });
+  });
+  api('/api/barbers/' + id + '/schedule', { method: 'PUT', body: { schedules: schedules, breaks: breaks } })
     .then(loadBarbers).then(function () { toast('Horaires enregistrés'); })
     .catch(function (e) { toast(e.message, true); });
 }

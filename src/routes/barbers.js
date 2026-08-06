@@ -33,6 +33,12 @@ router.get('/', wrap(async (req, res) => {
      WHERE b.salon_id = ?`,
     [req.salon.id]
   );
+  const [breaks] = await pool.query(
+    `SELECT bb.* FROM barber_breaks bb
+     JOIN barbers b ON b.id = bb.barber_id
+     WHERE b.salon_id = ?`,
+    [req.salon.id]
+  );
   const [svcExcl] = await pool.query(
     `SELECT bse.* FROM barber_service_exclusions bse
      JOIN barbers b ON b.id = bse.barber_id WHERE b.salon_id = ?`,
@@ -44,14 +50,33 @@ router.get('/', wrap(async (req, res) => {
     [req.salon.id]
   );
 
+  // Heure de salon actuelle (jour + minutes depuis minuit) pour
+  // déterminer si un coiffeur est actuellement en pause — le kiosk
+  // s'appuie sur ce booléen tout calculé plutôt que de refaire ce calcul
+  // côté navigateur (évite toute divergence de fuseau horaire).
+  const nowParts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false
+  }).formatToParts(new Date());
+  const g = (t) => nowParts.find((p) => p.type === t).value;
+  const nowWeekday = new Date(`${g('year')}-${g('month')}-${g('day')}T00:00:00Z`).getUTCDay();
+  const nowMinutes = Number(g('hour')) * 60 + Number(g('minute'));
+  const toMinutes = (t) => { const [h, m] = String(t).split(':').map(Number); return h * 60 + m; };
+
   // Identifiants de prestations/suppléments NON réalisés par ce coiffeur —
   // pas un secret (les catalogues sont déjà publics), utile au kiosk pour
   // filtrer le formulaire une fois le coiffeur choisi.
-  const items = barbers.map((b) => Object.assign({}, stripSecrets(b), {
-    schedules: schedules.filter((s) => s.barber_id === b.id).sort((a, c) => a.weekday - c.weekday),
-    disabled_service_ids: svcExcl.filter((e) => e.barber_id === b.id).map((e) => e.service_id),
-    disabled_extra_ids: extExcl.filter((e) => e.barber_id === b.id).map((e) => e.extra_id)
-  }));
+  const items = barbers.map((b) => {
+    const myBreaksToday = breaks.filter((bk) => bk.barber_id === b.id && bk.active && bk.weekday === nowWeekday);
+    const onBreakNow = myBreaksToday.some((bk) => nowMinutes >= toMinutes(bk.start_time) && nowMinutes < toMinutes(bk.end_time));
+    return Object.assign({}, stripSecrets(b), {
+      schedules: schedules.filter((s) => s.barber_id === b.id).sort((a, c) => a.weekday - c.weekday),
+      breaks: breaks.filter((bk) => bk.barber_id === b.id).sort((a, c) => a.weekday - c.weekday),
+      on_break_now: onBreakNow,
+      disabled_service_ids: svcExcl.filter((e) => e.barber_id === b.id).map((e) => e.service_id),
+      disabled_extra_ids: extExcl.filter((e) => e.barber_id === b.id).map((e) => e.extra_id)
+    });
+  });
 
   res.json({ ok: true, items, on_duty: await activeBarberCount(req.salon.id) });
 }));
@@ -185,7 +210,22 @@ router.put('/:id/schedule', requireAdmin, wrap(async (req, res) => {
     );
   }
 
-  res.json({ ok: true, saved: rows.length });
+  // Pauses (ex: déjeuner) — même principe que les horaires : on
+  // remplace tout à chaque sauvegarde, plusieurs pauses possibles par
+  // jour (weekday peut se répéter dans la liste).
+  const breakList = Array.isArray(req.body.breaks) ? req.body.breaks : [];
+  await pool.query('DELETE FROM barber_breaks WHERE barber_id = ?', [req.params.id]);
+  const breakRows = breakList
+    .filter((b) => b.start_time && b.end_time)
+    .map((b) => [crypto.randomUUID(), req.params.id, Number(b.weekday), b.start_time, b.end_time, 1]);
+  if (breakRows.length) {
+    await pool.query(
+      'INSERT INTO barber_breaks (id, barber_id, weekday, start_time, end_time, active) VALUES ?',
+      [breakRows]
+    );
+  }
+
+  res.json({ ok: true, saved: rows.length, breaks_saved: breakRows.length });
 }));
 
 /**

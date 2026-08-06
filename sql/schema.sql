@@ -513,3 +513,20 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 -- (accepts_appointments=0, kiosk_hidden=1) jusqu'à ce qu'un mode soit
 -- choisi - décision confirmée explicitement, pas un effet de bord.
 UPDATE barbers SET accepts_appointments = 0, kiosk_hidden = 1 WHERE accepts_appointments = 1 AND kiosk_hidden = 0;
+
+-- Pauses (ex: déjeuner) : comme barber_schedules, mais plusieurs pauses
+-- possibles par jour. Bloquent à la fois les RDV en ligne (dans
+-- computeSlotsForBarber) ET la disponibilité au kiosk (on_break_now).
+CREATE TABLE IF NOT EXISTS barber_breaks (
+  id CHAR(36) PRIMARY KEY,
+  barber_id CHAR(36) NOT NULL,
+  weekday TINYINT NOT NULL,
+  start_time TIME NOT NULL,
+  end_time TIME NOT NULL,
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  FOREIGN KEY (barber_id) REFERENCES barbers(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+SET @idx := (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'barber_breaks' AND index_name = 'idx_barber_breaks_barber_day');
+SET @sql := IF(@idx = 0, 'CREATE INDEX idx_barber_breaks_barber_day ON barber_breaks(barber_id, weekday)', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
