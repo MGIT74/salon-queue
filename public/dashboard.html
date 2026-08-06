@@ -1463,7 +1463,7 @@ function renderDrawerVisits(items) {
           '<div class="visit-date">' + when + (v.salon_name ? ' · <span style="color:var(--blue)">' + esc(v.salon_name) + '</span>' : '') + '</div>' +
           '<div class="visit-meta">' + esc(v.service_name || 'Prestation') +
           (v.total_price_cents ? ' · ' + eur(v.total_price_cents) : '') +
-          ' · ' + esc(STATUS_LABEL[v.status] || v.status) + '</div>' +
+          ' · <span style="color:' + (STATUS_COLOR[v.status] || 'var(--grey)') + '">' + esc(STATUS_LABEL[v.status] || v.status) + '</span></div>' +
         '</div>';
       }).join('');
 }
@@ -2266,6 +2266,12 @@ var STATUS_LABEL = {
   done: 'Terminé',
   cancelled: 'Absent / annulé'
 };
+var STATUS_COLOR = {
+  waiting: 'var(--grey)',
+  in_progress: 'var(--blue)',
+  done: 'var(--green)',
+  cancelled: 'var(--red)'
+};
 
 /* ============ Marketing (fidélité + cadeaux) ============ */
 var loyaltyAccountsData = [];
@@ -2693,7 +2699,7 @@ function renderRdvList() {
   if (barberFilter) items = items.filter(function (a) { return a.barber_id === barberFilter; });
 
   var statusLabels = { confirmed: 'Confirmé', completed: 'Terminé', no_show: 'Absent', cancelled: 'Annulé' };
-  var statusColors = { confirmed: 'var(--blue)', completed: 'var(--green)', no_show: 'var(--orange, #f97316)', cancelled: 'var(--red)' };
+  var statusColors = { confirmed: 'var(--blue)', completed: 'var(--green)', no_show: 'var(--red)', cancelled: 'var(--orange, #f97316)' };
 
   var list = document.getElementById('rdv-list');
   list.innerHTML = items.length === 0
