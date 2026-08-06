@@ -2711,9 +2711,15 @@ function renderRdvList() {
   list.innerHTML = items.length === 0
     ? '<div class="empty">Aucun rendez-vous</div>'
     : items.map(function (a) {
-        var when = new Date(a.scheduled_at).toLocaleString('fr-FR', {
-          weekday: 'long', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
-        });
+        // scheduled_at est une heure de SALON (Europe/Paris), jamais de
+        // l'UTC — new Date(...).toLocaleString() l'interpréterait comme
+        // UTC et décalerait l'affichage de 1h à 2h. On construit le
+        // libellé à la main : le jour/mois via une Date à minuit (non
+        // ambigu, insensible au fuseau), l'heure directement depuis la
+        // chaîne brute (comme partout ailleurs dans le calendrier).
+        var dateOnly = new Date(a.scheduled_at.slice(0, 10) + 'T00:00:00');
+        var when = dateOnly.toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'short' }) +
+          ' à ' + a.scheduled_at.slice(11, 16);
         return '<div class="item">' +
           '<div class="item-main"><div class="item-name">' + esc(a.client_name) + ' — ' + when + '</div>' +
           '<div class="item-meta">' + esc(a.service_name) + (a.barber_name ? ' avec ' + esc(a.barber_name) : ' · premier disponible') + '</div>' +

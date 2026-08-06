@@ -36,6 +36,52 @@ function nowInParis() {
   };
 }
 
+/**
+ * Chaîne datetime "heure de salon" (Europe/Paris) pour l'instant présent,
+ * au format MySQL "YYYY-MM-DD HH:MM:SS" — à utiliser partout où une
+ * valeur doit rejoindre scheduled_at (toujours exprimé en heure locale
+ * de salon, jamais en UTC), pour rester dans le même référentiel que le
+ * reste du module (créneaux, disponibilités, réservations).
+ */
+function nowParisDatetimeString() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+  }).formatToParts(new Date());
+  const get = (type) => parts.find((p) => p.type === type).value;
+  return `${get('year')}-${get('month')}-${get('day')} ${get('hour')}:${get('minute')}:${get('second')}`;
+}
+
+/**
+ * Convertit une date+heure exprimées en heure LOCALE de salon
+ * (Europe/Paris) en le vrai instant UTC correspondant. Indispensable
+ * dès qu'une valeur "heure de salon" (scheduled_at, saisie via le
+ * formulaire de RDV) doit rejoindre une colonne qui est, elle, un vrai
+ * timestamp UTC (checkin_at, start_at...) — sans cette conversion, les
+ * deux référentiels se mélangent et tout calcul d'écart (verrouillage
+ * "pas encore commencé", tri par heure d'arrivée...) dérive de 1h ou 2h
+ * selon la saison.
+ */
+function parisLocalToUtcDate(dateStr, timeStr) {
+  const [y, mo, d] = dateStr.split('-').map(Number);
+  const [hh, mi, se] = String(timeStr).split(':').map(Number);
+  const guess = new Date(Date.UTC(y, mo - 1, d, hh, mi, se || 0));
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Europe/Paris', hour12: false,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit'
+  }).formatToParts(guess);
+  const get = (t) => Number(parts.find((p) => p.type === t).value);
+  const hour24 = get('hour') === 24 ? 0 : get('hour');
+  const asIfParis = Date.UTC(get('year'), get('month') - 1, get('day'), hour24, get('minute'), get('second'));
+  const offsetMs = asIfParis - guess.getTime();
+  return new Date(guess.getTime() - offsetMs);
+}
+
+function toMysqlDatetime(date) {
+  return date.toISOString().slice(0, 19).replace('T', ' ');
+}
+
 function timeToMinutes(t) {
   const [h, m] = String(t).split(':').map(Number);
   return h * 60 + m;
@@ -367,10 +413,18 @@ async function promoteAppointment(appt, extraIds) {
     return null;
   }
 
+  // appt.scheduled_at est en heure de salon (Europe/Paris) ; checkin_at
+  // est un vrai timestamp UTC comme le reste de la file — conversion
+  // obligatoire ici, sinon le verrouillage "pas encore commencé" et
+  // l'ordre d'arrivée dérivent de 1h à 2h selon la saison.
+  const checkinUtc = toMysqlDatetime(
+    parisLocalToUtcDate(appt.scheduled_at.slice(0, 10), appt.scheduled_at.slice(11, 19))
+  );
+
   await pool.query(
     `INSERT INTO queue (id, salon_id, client_name, email, phone, service_id, barber_id, status, checkin_at, is_appointment)
      VALUES (?, ?, ?, ?, ?, ?, ?, 'waiting', ?, 1)`,
-    [queueId, appt.salon_id, appt.client_name, appt.email, appt.phone || null, appt.service_id, appt.barber_id, appt.scheduled_at]
+    [queueId, appt.salon_id, appt.client_name, appt.email, appt.phone || null, appt.service_id, appt.barber_id, checkinUtc]
   );
   if (extraIds && extraIds.length) {
     await pool.query(
@@ -399,4 +453,4 @@ async function promoteTodayAppointments(salonId) {
   }
 }
 
-module.exports = { router, promoteTodayAppointments };
+module.exports = { router, promoteTodayAppointments, nowParisDatetimeString };
