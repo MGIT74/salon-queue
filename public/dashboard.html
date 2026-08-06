@@ -808,11 +808,18 @@
     </div>
 
     <div class="clients-toolbar">
-      <div class="fld" style="margin:0"><label for="client-date-from">Du</label><input id="client-date-from" type="date"></div>
-      <div class="fld" style="margin:0"><label for="client-date-to">Au</label><input id="client-date-to" type="date"></div>
-      <button class="btn btn-soft" onclick="applyClientDateFilter()">Filtrer</button>
-      <button class="btn btn-ghost" onclick="clearClientDateFilter()">Réinitialiser</button>
-      <div class="fld" style="margin:0"><label for="client-per-page">Par page</label>
+      <div class="fld" style="margin:0"><label for="clients-salon-filter">Salon</label>
+        <select id="clients-salon-filter" onchange="onClientsSalonFilterChange()"
+                style="padding:11px 16px;border:none;border-radius:999px;background:var(--fill);color:var(--ink);font-family:inherit;font-size:14px">
+          <option value="current">Ce salon</option>
+          <option value="all">Tous les salons</option>
+        </select>
+      </div>
+      <div class="fld" style="margin:0" id="client-date-from-fld"><label for="client-date-from">Du</label><input id="client-date-from" type="date"></div>
+      <div class="fld" style="margin:0" id="client-date-to-fld"><label for="client-date-to">Au</label><input id="client-date-to" type="date"></div>
+      <button class="btn btn-soft" id="client-filter-btn" onclick="applyClientDateFilter()">Filtrer</button>
+      <button class="btn btn-ghost" id="client-reset-btn" onclick="clearClientDateFilter()">Réinitialiser</button>
+      <div class="fld" style="margin:0" id="client-per-page-fld"><label for="client-per-page">Par page</label>
         <select id="client-per-page" onchange="changeClientsPerPage(this.value)">
           <option value="5">5</option>
           <option value="10">10</option>
@@ -821,7 +828,7 @@
           <option value="50">50</option>
         </select>
       </div>
-      <button class="btn btn-ghost" onclick="selectAllClients()" style="margin-left:auto">Tout sélectionner</button>
+      <button class="btn btn-ghost" id="client-select-all-btn" onclick="selectAllClients()" style="margin-left:auto">Tout sélectionner</button>
     </div>
 
     <div class="clients-export-bar" id="clients-export-bar" style="display:none">
@@ -856,17 +863,6 @@
     <div class="section-label" style="margin-top:28px">Coiffeurs de l'enseigne</div>
     <p class="hint" style="margin:-6px 0 16px">Déplacez un coiffeur vers un autre de vos salons si besoin.</p>
     <div id="chain-barbers-list" class="chain-barbers-target"></div>
-
-    <div class="section-label" style="margin-top:28px">Clients — toute l'enseigne</div>
-    <div class="admin-head">
-      <select id="clients-salon-filter" onchange="loadChainClients()"
-              style="padding:11px 16px;border:none;border-radius:999px;background:var(--fill);color:var(--ink);font-family:inherit;font-size:14px">
-        <option value="all">Tous les salons</option>
-      </select>
-      <input id="chain-client-search" type="text" placeholder="Rechercher un nom…" oninput="renderChainClients()"
-             style="max-width:260px;padding:11px 16px;border:none;border-radius:999px;background:var(--fill);color:var(--ink);font-family:inherit;font-size:14px;outline:none">
-    </div>
-    <div id="chain-clients-list"></div>
   </div>
 
   <!-- ===== Onglet compte ===== -->
@@ -1255,7 +1251,7 @@ document.getElementById('tabs').addEventListener('click', function (e) {
   document.querySelectorAll('.tab-panel').forEach(function (p) { p.classList.remove('on'); });
   document.getElementById('t-' + b.dataset.t).classList.add('on');
   if (b.dataset.t === 'settings') loadSettings();
-  if (b.dataset.t === 'clients') loadClients();
+  if (b.dataset.t === 'clients') { loadSalonsList().then(function () { onClientsSalonFilterChange(); }); }
   if (b.dataset.t === 'salons') loadChainTab();
   if (b.dataset.t === 'marketing') loadMarketingTab();
   if (b.dataset.t === 'caisse') loadCaisseTab();
@@ -2882,7 +2878,10 @@ function renderClientsPagination() {
     '<button onclick="goToClientsPage(' + (clientsPage + 1) + ')"' + (clientsPage >= clientsTotalPages ? ' disabled' : '') + '>›</button>';
 }
 
-document.getElementById('client-search').addEventListener('input', renderClients);
+document.getElementById('client-search').addEventListener('input', function () {
+  var isCurrent = document.getElementById('clients-salon-filter').value === 'current';
+  if (isCurrent) renderClients(); else renderChainClients();
+});
 
 function toggleClientSelect(id, checked) {
   if (checked) selectedClientIds[id] = true; else delete selectedClientIds[id];
@@ -3045,9 +3044,10 @@ function loadSalonsList() {
     renderSalonsList();
     var sel = document.getElementById('clients-salon-filter');
     var current = sel.value;
-    sel.innerHTML = '<option value="all">Tous les salons</option>' +
-      chainSalons.map(function (s) { return '<option value="' + s.id + '">' + esc(s.name) + '</option>'; }).join('');
-    sel.value = current || 'all';
+    sel.innerHTML = '<option value="current">Ce salon</option>' +
+      chainSalons.map(function (s) { return '<option value="' + s.id + '">' + esc(s.name) + '</option>'; }).join('') +
+      '<option value="all">Tous les salons</option>';
+    sel.value = current || 'current';
   }).catch(function (e) { toast(e.message, true); });
 }
 
@@ -3146,12 +3146,12 @@ function loadChainClients() {
 }
 
 function renderChainClients() {
-  var q = (document.getElementById('chain-client-search').value || '').trim().toLowerCase();
+  var q = (document.getElementById('client-search').value || '').trim().toLowerCase();
   var rows = chainClients.filter(function (c) {
     return !q || c.client_name.toLowerCase().indexOf(q) !== -1;
   });
 
-  document.getElementById('chain-clients-list').innerHTML = rows.length === 0
+  document.getElementById('clients-list').innerHTML = rows.length === 0
     ? '<div class="empty">Aucun client trouvé</div>'
     : rows.map(function (c) {
         var when = new Date(c.checkin_at).toLocaleString('fr-FR', {
@@ -3165,6 +3165,24 @@ function renderChainClients() {
           (c.total_price_cents ? ' · ' + eur(c.total_price_cents) : '') + '</div>' +
           '</div></div>';
       }).join('');
+}
+
+/**
+ * Bascule entre la vue riche (ce salon uniquement — pagination, export,
+ * filtre par dates) et la vue simplifiee multi-salons de l'enseigne
+ * (juste une liste, pas de pagination/export puisque ca melange
+ * plusieurs salons a la fois).
+ */
+function onClientsSalonFilterChange() {
+  var isCurrent = document.getElementById('clients-salon-filter').value === 'current';
+  ['client-date-from-fld', 'client-date-to-fld', 'client-filter-btn', 'client-reset-btn', 'client-per-page-fld', 'client-select-all-btn']
+    .forEach(function (id) { document.getElementById(id).style.display = isCurrent ? '' : 'none'; });
+  document.getElementById('clients-pagination').style.display = isCurrent ? '' : 'none';
+  document.getElementById('clients-export-bar').style.display = 'none';
+  clearClientSelection();
+
+  if (isCurrent) loadClients();
+  else loadChainClients();
 }
 
 /* ============ Réglages ============ */
