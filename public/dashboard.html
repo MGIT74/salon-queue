@@ -2979,7 +2979,7 @@ function renderClients() {
           ' onclick="event.stopPropagation()" onchange="toggleClientSelect(\'' + c.id + '\', this.checked)">' +
           '<div class="item-main" onclick="openClientDrawer(\'' + c.id + '\', \'history\')" style="cursor:pointer">' +
             '<div class="item-name">' + esc(c.client_name) +
-              ' <span class="chip' + (c.status === 'in_progress' ? ' main' : '') + '" style="margin-left:6px;font-size:11px">' +
+              ' <span class="chip' + (c.status === 'in_progress' ? ' main' : '') + '" style="margin-left:6px;font-size:11px;color:' + (STATUS_COLOR[c.status] || 'var(--grey)') + '">' +
               esc(STATUS_LABEL[c.status] || c.status) + '</span>' +
               (stuck ? ' <span class="chip" style="background:var(--orange);color:#fff;font-size:11px">bloqué</span>' : '') +
             '</div>' +
@@ -3142,7 +3142,7 @@ function renderChainClients() {
         });
         return '<div class="item"><div class="item-main">' +
           '<div class="item-name">' + esc(c.client_name) +
-          ' <span class="chip' + (c.status === 'in_progress' ? ' main' : '') + '" style="margin-left:6px;font-size:11px">' +
+          ' <span class="chip' + (c.status === 'in_progress' ? ' main' : '') + '" style="margin-left:6px;font-size:11px;color:' + (STATUS_COLOR[c.status] || 'var(--grey)') + '">' +
           esc(STATUS_LABEL[c.status] || c.status) + '</span></div>' +
           '<div class="item-meta">' + esc(c.salon_name) + ' · ' + esc(c.service_name || 'Prestation') + ' · ' + when +
           (c.total_price_cents ? ' · ' + eur(c.total_price_cents) : '') + '</div>' +
