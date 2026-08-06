@@ -1794,11 +1794,11 @@ function renderBarbers() {
           '<div class="barber-head-info">' +
           '<div class="name">' + esc(b.name) + (b.active ? '' : ' · inactif') + '</div>' +
           '<div class="sub">' + (currentSalonName ? esc(currentSalonName) + ' · ' : '') + (b.has_pin ? 'Code PIN configuré' : 'Aucun code PIN') +
-          ' · ' + (b.kiosk_hidden
+          ' · ' + (b.kiosk_hidden && b.accepts_appointments
             ? '<span style="color:var(--blue)">RDV uniquement</span>'
-            : (!b.accepts_appointments
+            : (!b.kiosk_hidden && !b.accepts_appointments
                 ? '<span style="color:var(--orange, #f97316)">Sans RDV uniquement</span>'
-                : '<span style="color:var(--green)">Sans-RDV + RDV</span>')) +
+                : '<span style="color:var(--red)">Masqué partout (aucun mode choisi)</span>')) +
           '</div>' +
           '</div>' +
           '<svg class="barber-chevron' + (open ? ' open' : '') + '" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>' +
@@ -1846,12 +1846,12 @@ function renderBarberDetail(b) {
     (b.has_pin ? 'Changer le code' : 'Définir un code') + '</button>' +
     '</div>' +
     '<label style="display:flex;align-items:center;gap:8px;font-size:13.5px;margin-bottom:10px;cursor:pointer" onclick="event.stopPropagation()">' +
-    '<input type="checkbox" ' + (b.accepts_appointments ? '' : 'checked') + ' onchange="toggleAcceptsAppointments(\'' + b.id + '\', this.checked)" style="width:16px;height:16px">' +
-    'Accepte les sans rendez-vous uniquement' +
+    '<input type="checkbox" ' + (!b.kiosk_hidden && !b.accepts_appointments ? 'checked' : '') + ' onchange="setBarberMode(\'' + b.id + '\', this.checked ? \'walkin\' : \'none\')" style="width:16px;height:16px">' +
+    'Accepte les sans rendez-vous' +
     '</label>' +
     '<label style="display:flex;align-items:center;gap:8px;font-size:13.5px;margin-bottom:16px;cursor:pointer" onclick="event.stopPropagation()">' +
-    '<input type="checkbox" ' + (b.kiosk_hidden ? 'checked' : '') + ' onchange="toggleKioskHidden(\'' + b.id + '\', this.checked)" style="width:16px;height:16px">' +
-    'Accepte les rendez-vous uniquement' +
+    '<input type="checkbox" ' + (b.kiosk_hidden && b.accepts_appointments ? 'checked' : '') + ' onchange="setBarberMode(\'' + b.id + '\', this.checked ? \'online\' : \'none\')" style="width:16px;height:16px">' +
+    'Accepte les rendez-vous en ligne' +
     '</label>' +
     '<div class="subtabs" onclick="event.stopPropagation()">' +
     '<button class="' + (tab === 'horaires' ? 'on' : '') + '" onclick="switchBarberTab(\'' + b.id + '\',\'horaires\')">Horaires</button>' +
@@ -2149,16 +2149,10 @@ function deleteLeave(barberId, leaveId) {
 
 // Redimensionne l'image côté navigateur avant envoi (évite de stocker des
 // photos trop lourdes en base — 300x300 recadré, JPEG compressé).
-function toggleAcceptsAppointments(id, checkedSansRdv) {
-  var acceptsAppointments = !checkedSansRdv;
-  api('/api/barbers/' + id, { method: 'PUT', body: { accepts_appointments: acceptsAppointments } })
-    .then(function () { toast(acceptsAppointments ? 'Mode rendez-vous activé' : 'Sans rendez-vous uniquement'); return loadBarbers(); })
-    .catch(function (e) { toast(e.message, true); });
-}
-
-function toggleKioskHidden(id, checkedRdvOnly) {
-  api('/api/barbers/' + id, { method: 'PUT', body: { kiosk_hidden: checkedRdvOnly } })
-    .then(function () { toast(checkedRdvOnly ? 'Rendez-vous uniquement (masqué du kiosk)' : 'Redevient disponible sur le kiosk'); return loadBarbers(); })
+function setBarberMode(id, mode) {
+  var label = mode === 'walkin' ? 'Sans rendez-vous uniquement' : mode === 'online' ? 'Rendez-vous en ligne uniquement' : 'Masqué partout (aucun mode choisi)';
+  api('/api/barbers/' + id, { method: 'PUT', body: { mode: mode } })
+    .then(function () { toast(label); return loadBarbers(); })
     .catch(function (e) { toast(e.message, true); });
 }
 

@@ -500,9 +500,16 @@ UPDATE appointments SET source = 'walkin' WHERE cancel_token IS NULL;
 
 -- Coiffeur exclu du kiosk (visible uniquement sur le formulaire de
 -- rendez-vous en ligne). A l'inverse, accepts_appointments=0 exclut
--- deja du formulaire en ligne (visible uniquement sur le kiosk). Les
--- deux ensemble n'ont pas de sens et sont geres comme mutuellement
--- exclusifs cote interface.
+-- deja du formulaire en ligne (visible uniquement sur le kiosk).
 SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'barbers' AND column_name = 'kiosk_hidden');
 SET @sql := IF(@c = 0, "ALTER TABLE barbers ADD COLUMN kiosk_hidden TINYINT(1) NOT NULL DEFAULT 0", 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Le mode "disponible partout sans l'avoir choisi" (accepts_appointments=1
+-- ET kiosk_hidden=0 en même temps, l'ancien réglage par défaut) est
+-- retiré : un coiffeur doit désormais choisir explicitement un seul
+-- mode (RDV en ligne OU sans rendez-vous). Les coiffeurs qui se
+-- trouvaient dans cet état ambigu basculent en "masqué partout"
+-- (accepts_appointments=0, kiosk_hidden=1) jusqu'à ce qu'un mode soit
+-- choisi - décision confirmée explicitement, pas un effet de bord.
+UPDATE barbers SET accepts_appointments = 0, kiosk_hidden = 1 WHERE accepts_appointments = 1 AND kiosk_hidden = 0;

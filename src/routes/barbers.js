@@ -65,7 +65,7 @@ router.post('/', requireAdmin, wrap(async (req, res) => {
   const id = crypto.randomUUID();
   try {
     await pool.query(
-      'INSERT INTO barbers (id, salon_id, name, sort_order, pin_code, photo_url, accepts_appointments) VALUES (?, ?, ?, ?, ?, ?, 1)',
+      'INSERT INTO barbers (id, salon_id, name, sort_order, pin_code, photo_url, accepts_appointments, kiosk_hidden) VALUES (?, ?, ?, ?, ?, ?, 0, 1)',
       [id, req.salon.id, name, Number(sort_order) || 0, pin_code || null, photo_url || null]
     );
   } catch (err) {
@@ -92,18 +92,24 @@ router.put('/:id', requireAdmin, wrap(async (req, res) => {
   }
   if (req.body.photo_url !== undefined) { sets.push('photo_url = ?'); params.push(req.body.photo_url || null); }
 
-  // Les deux cases sont mutuellement exclusives : cocher l'une decoche
-  // l'autre automatiquement, applique ici cote serveur pour que ce
-  // soit garanti quel que soit l'appelant (pas seulement l'interface).
-  if (req.body.accepts_appointments !== undefined) {
-    const acceptsAppointments = req.body.accepts_appointments ? 1 : 0;
-    sets.push('accepts_appointments = ?'); params.push(acceptsAppointments);
-    if (!acceptsAppointments) { sets.push('kiosk_hidden = ?'); params.push(0); }
-  }
-  if (req.body.kiosk_hidden !== undefined) {
-    const kioskHidden = req.body.kiosk_hidden ? 1 : 0;
-    sets.push('kiosk_hidden = ?'); params.push(kioskHidden);
-    if (kioskHidden) { sets.push('accepts_appointments = ?'); params.push(1); }
+  // Un seul mode possible par coiffeur, plus de "disponible partout"
+  // implicite : le client envoie 'walkin' | 'online' | 'none', traduit
+  // ici en les deux colonnes historiques pour ne rien casser ailleurs
+  // dans le code (kiosk.html, rdv.html, appointments.js les lisent
+  // toujours telles quelles).
+  //   'walkin' -> accepts_appointments=0, kiosk_hidden=0 (visible kiosk seul)
+  //   'online' -> accepts_appointments=1, kiosk_hidden=1 (visible RDV seul)
+  //   'none'   -> accepts_appointments=0, kiosk_hidden=1 (masqué partout)
+  if (req.body.mode !== undefined) {
+    const mode = req.body.mode;
+    const map = {
+      walkin: { accepts_appointments: 0, kiosk_hidden: 0 },
+      online: { accepts_appointments: 1, kiosk_hidden: 1 },
+      none: { accepts_appointments: 0, kiosk_hidden: 1 }
+    };
+    if (!map[mode]) return res.status(400).json({ error: "mode doit être 'walkin', 'online' ou 'none'" });
+    sets.push('accepts_appointments = ?'); params.push(map[mode].accepts_appointments);
+    sets.push('kiosk_hidden = ?'); params.push(map[mode].kiosk_hidden);
   }
   if (!sets.length) return res.json({ ok: true });
   params.push(req.params.id, req.salon.id);
