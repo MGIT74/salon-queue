@@ -148,19 +148,27 @@ async function computeSlotsForBarber(barberId, dateStr, durationMin) {
 
   const [existing] = await pool.query(
     `SELECT a.scheduled_at, s.duration_min AS svc_duration,
-            COALESCE(SUM(e.duration_min), 0) AS extras_duration
+            COALESCE(SUM(e.duration_min), 0) AS extras_duration,
+            q.status AS queue_status
      FROM appointments a
      JOIN services s ON s.id = a.service_id
      LEFT JOIN appointment_extras ae ON ae.appointment_id = a.id
      LEFT JOIN extras e ON e.id = ae.extra_id
+     LEFT JOIN queue q ON q.id = a.promoted_queue_id
      WHERE a.barber_id = ? AND a.status = 'confirmed' AND DATE(a.scheduled_at) = ?
      GROUP BY a.id`,
     [barberId, dateStr]
   );
-  const busyRanges = existing.map((a) => {
-    const start = timeToMinutes(a.scheduled_at.split(' ')[1].slice(0, 5));
-    return [start, start + a.svc_duration + Number(a.extras_duration)];
-  });
+  // Un RDV déjà honoré (terminé) ou annulé ne bloque plus sa plage
+  // théorique - s'il a été pris en charge en avance et fini plus tôt
+  // que prévu, le reste de sa plage doit redevenir réservable tout de
+  // suite, pas seulement à l'heure théorique de fin.
+  const busyRanges = existing
+    .filter((a) => a.queue_status !== 'done' && a.queue_status !== 'cancelled')
+    .map((a) => {
+      const start = timeToMinutes(a.scheduled_at.split(' ')[1].slice(0, 5));
+      return [start, start + a.svc_duration + Number(a.extras_duration)];
+    });
 
   const startMin = timeToMinutes(schedule.start_time);
   const endMin = timeToMinutes(schedule.end_time);
