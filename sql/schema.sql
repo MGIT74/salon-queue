@@ -147,9 +147,21 @@ CREATE TABLE IF NOT EXISTS queue_extras (
   FOREIGN KEY (queue_id) REFERENCES queue(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE INDEX IF NOT EXISTS idx_queue_status ON queue(status);
-CREATE INDEX IF NOT EXISTS idx_queue_checkin ON queue(checkin_at);
-CREATE INDEX IF NOT EXISTS idx_queue_salon ON queue(salon_id);
+-- CREATE INDEX IF NOT EXISTS n'existe pas en syntaxe MySQL standard
+-- (extension propre à MariaDB) - on vérifie via information_schema et
+-- on n'exécute la création que si l'index n'existe pas déjà, pour que
+-- ce script reste rejouable sans erreur sur MySQL comme sur MariaDB.
+SET @idx := (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'queue' AND index_name = 'idx_queue_status');
+SET @sql := IF(@idx = 0, 'CREATE INDEX idx_queue_status ON queue(status)', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @idx := (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'queue' AND index_name = 'idx_queue_checkin');
+SET @sql := IF(@idx = 0, 'CREATE INDEX idx_queue_checkin ON queue(checkin_at)', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @idx := (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'queue' AND index_name = 'idx_queue_salon');
+SET @sql := IF(@idx = 0, 'CREATE INDEX idx_queue_salon ON queue(salon_id)', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 CREATE TABLE IF NOT EXISTS settings (
   salon_id CHAR(36) NOT NULL,
