@@ -18,7 +18,7 @@ const EDITABLE = [
   'salon_name', 'notify_before_min', 'logo_url', 'gift_tile_image_url',
   'smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_from',
   'printer_connection_type', 'printer_ip', 'printer_model',
-  'caisse_inactivity_seconds', 'caisse_reopen_hour'
+  'caisse_inactivity_seconds', 'caisse_reopen_hour', 'currency'
 ];
 
 // Force la réouverture immédiate de la caisse (annule le verrouillage
@@ -97,6 +97,7 @@ router.get('/public', wrap(async (req, res) => {
     gift_tile_image_url: s.gift_tile_image_url || null,
     caisse_inactivity_seconds: s.caisse_inactivity_seconds ? Number(s.caisse_inactivity_seconds) : 15,
     caisse_reopen_hour: s.caisse_reopen_hour || '00:00',
+    currency: s.currency || 'EUR',
     caisse_locked_until: caisseLockedUntil
   });
 }));

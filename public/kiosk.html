@@ -304,6 +304,7 @@ function loadCatalog() {
     services = r[0].items; extras = r[1].items;
     salonName = r[2].salon_name;
     giftTileImage = r[2].gift_tile_image_url || '';
+    CURRENCY = r[2].currency || 'EUR';
     document.getElementById('salon-name').textContent = salonName;
     document.getElementById('t-salon').textContent = salonName;
 

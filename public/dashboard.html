@@ -911,6 +911,12 @@
         <div class="fld"><label for="set-salon">Nom du salon</label><input id="set-salon" type="text"></div>
         <div class="fld"><label for="set-notify">Prévenir le client X minutes avant son tour</label>
           <input id="set-notify" type="number" min="5" max="120"></div>
+        <div class="fld"><label for="set-currency">Devise</label>
+          <select id="set-currency">
+            <option value="EUR">Euro (€)</option>
+            <option value="CHF">Franc suisse (CHF)</option>
+          </select>
+        </div>
       </div>
     </div>
 
@@ -1276,6 +1282,9 @@ document.getElementById('tabs').addEventListener('click', function (e) {
 function boot() {
   loadCurrentSalonName();
   loadSalonSwitcher();
+  // Devise du salon : utilisée par eur() partout dans le dashboard,
+  // chargée dès le départ (pas seulement à l'ouverture de Réglages).
+  api('/api/settings/public').then(function (r) { CURRENCY = r.currency || 'EUR'; }).catch(function () {});
   loadCatalog()
     .then(loadBarbers)
     .then(refreshQueue)
@@ -3384,6 +3393,7 @@ function loadSettings() {
     var s = r.settings;
     document.getElementById('set-salon').value = s.salon_name || '';
     document.getElementById('set-notify').value = s.notify_before_min || 30;
+    document.getElementById('set-currency').value = s.currency || 'EUR';
     document.getElementById('set-host').value = s.smtp_host || '';
     document.getElementById('set-port').value = s.smtp_port || 587;
     document.getElementById('set-user').value = s.smtp_user || '';
@@ -3419,12 +3429,16 @@ function saveSettings() {
   api('/api/settings', { method: 'PUT', body: {
     salon_name: document.getElementById('set-salon').value,
     notify_before_min: document.getElementById('set-notify').value,
+    currency: document.getElementById('set-currency').value,
     smtp_host: document.getElementById('set-host').value,
     smtp_port: document.getElementById('set-port').value,
     smtp_user: document.getElementById('set-user').value,
     smtp_pass: document.getElementById('set-pass').value,
     smtp_from: document.getElementById('set-from').value
-  }}).then(function () { toast('Réglages enregistrés'); loadSettings(); })
+  }}).then(function () {
+    CURRENCY = document.getElementById('set-currency').value || 'EUR';
+    toast('Réglages enregistrés'); loadSettings();
+  })
     .catch(function (e) { toast(e.message, true); });
 }
 

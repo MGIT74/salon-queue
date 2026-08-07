@@ -744,7 +744,10 @@ function esc(s) {
   if (SALON_SLUG) {
     fetch('/api/settings/public', { headers: { 'X-Salon-Slug': SALON_SLUG } })
       .then(function (r) { return r.json(); })
-      .then(function (d) { if (d.salon_name) document.getElementById('salon-mark').textContent = d.salon_name.toUpperCase(); })
+      .then(function (d) {
+        if (d.salon_name) document.getElementById('salon-mark').textContent = d.salon_name.toUpperCase();
+        CURRENCY = d.currency || 'EUR';
+      })
       .catch(function () {});
   }
 

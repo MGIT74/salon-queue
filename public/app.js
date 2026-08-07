@@ -34,7 +34,10 @@ function esc(s) {
   return d.innerHTML;
 }
 
-function eur(cents) { return (cents / 100).toFixed(2).replace('.', ',') + ' €'; }
+// Devise du salon (EUR par défaut) - chaque page la met à jour après
+// avoir chargé les réglages du salon (CURRENCY = data.currency).
+var CURRENCY = 'EUR';
+function eur(cents) { return (cents / 100).toFixed(2).replace('.', ',') + ' ' + (CURRENCY === 'CHF' ? 'CHF' : '€'); }
 
 function mmss(sec) {
   return String(Math.floor(sec / 60)).padStart(2, '0') + ':' + String(sec % 60).padStart(2, '0');

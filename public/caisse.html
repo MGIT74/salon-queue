@@ -261,6 +261,7 @@ function loadSalonName() {
     .then(function (r) { return r.json(); })
     .then(function (d) {
       var name = d.salon_name || 'Le Salon';
+      CURRENCY = d.currency || 'EUR';
       document.title = name + ' — Caisse';
       var mark = document.getElementById('salon-mark');
       if (mark) mark.textContent = name.toUpperCase();
