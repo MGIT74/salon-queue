@@ -56,6 +56,16 @@
   .client-footer button.on { color: var(--blue); font-weight: 600; }
   body.has-footer .wrap { padding-bottom: 90px; }
 
+  .modal-backdrop {
+    display: none; position: fixed; inset: 0; z-index: 100;
+    background: rgba(0,0,0,.45); align-items: center; justify-content: center; padding: 20px;
+  }
+  .modal-backdrop.on { display: flex; }
+  .modal-box {
+    background: var(--card); border-radius: 20px; padding: 24px; max-width: 380px; width: 100%;
+    box-shadow: 0 20px 60px rgba(0,0,0,.3);
+  }
+
   /* Réservation intégrée (repris de rdv.html) */
   .svc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px,1fr)); gap: 10px; margin-bottom: 22px; }
   .svc-card {
@@ -218,6 +228,7 @@
   <section class="panel" id="p-book-confirm">
     <button class="back" onclick="show('p-book-datetime')">‹ Retour</button>
     <div class="eyebrow" id="bk-confirm-summary"></div>
+    <div class="fld"><label for="bk-note">Note pour le salon (allergie, préférence… optionnel)</label><textarea id="bk-note" rows="3" style="width:100%;font-family:inherit;font-size:15px;padding:12px;border-radius:12px;border:none;background:var(--fill);color:var(--ink);resize:vertical"></textarea></div>
     <button class="go" id="bk-confirm-btn" onclick="submitBookAppointment()">Confirmer le rendez-vous</button>
   </section>
 
@@ -248,6 +259,15 @@
     <svg class="ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4H6.5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2H9"/><path d="M16 15.5 20.5 12 16 8.5"/><path d="M20 12H9"/></svg>
     Déconnexion
   </button>
+</div>
+
+<div class="modal-backdrop" id="cancel-modal-backdrop" onclick="if(event.target===this)closeCancelModal()">
+  <div class="modal-box">
+    <h2 style="margin-bottom:10px">Annuler ce rendez-vous ?</h2>
+    <p style="color:var(--grey);font-size:14.5px;margin-bottom:20px">Le créneau sera libéré et cette action est définitive.</p>
+    <button class="go" style="background:var(--red)" id="cancel-modal-confirm-btn" onclick="confirmCancelUpcoming()">Oui, annuler mon rendez-vous</button>
+    <button class="go" style="background:var(--fill);color:var(--ink);margin-top:10px" onclick="closeCancelModal()">Non, garder mon rendez-vous</button>
+  </div>
 </div>
 
 <script src="/app.js?v=3"></script>
@@ -367,12 +387,18 @@ function renderVisitCard(upcoming, lastVisit) {
       '<div class="visit-row" style="cursor:pointer" onclick="toggleVisitDetails()">' +
         '<div><div class="name">' + esc(upcoming.service_name || 'Prestation') + '</div>' +
         '<div class="when">' + when + '</div></div>' +
-        '<button class="go" id="cancel-btn" style="width:auto;margin:0;padding:10px 16px;font-size:14px;background:var(--red)" onclick="event.stopPropagation();onCancelClick()">Annuler</button>' +
+        '<button class="go" style="width:auto;margin:0;padding:10px 16px;font-size:14px;background:var(--red)" onclick="event.stopPropagation();openCancelModal()">Annuler</button>' +
       '</div>' +
       '<div id="visit-details" style="display:none;margin-top:14px;padding-top:14px;border-top:1px solid rgba(128,128,128,.25);font-size:13.5px;color:var(--grey);line-height:1.9">' +
         (upcoming.barber_name ? '<div>Coiffeur : <strong style="color:var(--ink)">' + esc(upcoming.barber_name) + '</strong></div>' : '') +
         (upcoming.extras.length ? '<div>Suppléments : ' + esc(upcoming.extras.join(', ')) + '</div>' : '') +
         '<div>Tarif : <strong style="color:var(--ink)">' + eur(upcoming.price_cents) + '</strong></div>' +
+        '<div style="margin-top:10px" onclick="event.stopPropagation()">' +
+          '<label style="font-size:12.5px;display:block;margin-bottom:5px">Note pour le salon (allergie, préférence…)</label>' +
+          '<textarea id="visit-note" rows="2" style="width:100%;font-family:inherit;font-size:14px;padding:9px;border-radius:10px;border:none;background:var(--bg);color:var(--ink);resize:vertical">' + esc(upcoming.client_note || '') + '</textarea>' +
+          '<button class="link-btn" style="margin-top:6px" onclick="saveVisitNote()">Enregistrer la note</button>' +
+          '<span class="msg" id="visit-note-msg" style="display:inline-block;margin-left:8px"></span>' +
+        '</div>' +
       '</div>';
   } else if (lastVisit) {
     eyebrow.textContent = 'Dernière prestation';
@@ -391,19 +417,34 @@ function toggleVisitDetails() {
   d.style.display = d.style.display === 'none' ? 'block' : 'none';
 }
 
-// Double validation avant annulation : 1er clic transforme le bouton
-// en confirmation explicite, 2e clic annule pour de bon.
-function onCancelClick() {
-  var btn = document.getElementById('cancel-btn');
-  if (btn.dataset.confirming === '1') {
-    btn.disabled = true; btn.textContent = 'Annulation…';
-    api('/api/appointments/cancel', { method: 'POST', body: { token: pendingCancelToken } })
-      .then(function () { toast('Rendez-vous annulé'); loadProfile(); })
-      .catch(function (e) { toast(e.message, true); btn.disabled = false; btn.textContent = 'Annuler'; btn.dataset.confirming = ''; });
-  } else {
-    btn.dataset.confirming = '1';
-    btn.textContent = 'Confirmer l\'annulation ?';
-  }
+function saveVisitNote() {
+  var note = document.getElementById('visit-note').value.trim();
+  var msg = document.getElementById('visit-note-msg');
+  api('/api/client-auth/upcoming-note', { method: 'PUT', body: { note: note } })
+    .then(function () { msg.textContent = 'Enregistré.'; setTimeout(function () { msg.textContent = ''; }, 2500); })
+    .catch(function (e) { toast(e.message, true); });
+}
+
+/* ---------- Annulation (popup, pas de double-clic sur le même bouton) ---------- */
+function openCancelModal() {
+  document.getElementById('cancel-modal-backdrop').classList.add('on');
+}
+
+function closeCancelModal() {
+  document.getElementById('cancel-modal-backdrop').classList.remove('on');
+}
+
+function confirmCancelUpcoming() {
+  var btn = document.getElementById('cancel-modal-confirm-btn');
+  btn.disabled = true; btn.textContent = 'Annulation…';
+  api('/api/appointments/cancel', { method: 'POST', body: { token: pendingCancelToken } })
+    .then(function () {
+      closeCancelModal();
+      toast('Rendez-vous annulé');
+      loadProfile();
+    })
+    .catch(function (e) { toast(e.message, true); })
+    .finally(function () { btn.disabled = false; btn.textContent = 'Oui, annuler mon rendez-vous'; });
 }
 
 function loadProfile() {
@@ -600,13 +641,14 @@ function goToBookConfirmStep() {
 function submitBookAppointment() {
   var btn = document.getElementById('bk-confirm-btn');
   btn.disabled = true; btn.textContent = 'Enregistrement…';
+  var note = document.getElementById('bk-note').value.trim();
 
   api('/api/client-auth/me').then(function (me) {
     return apiForBooking('/api/appointments', {
       method: 'POST',
       body: {
         client_name: me.profile.name, email: me.profile.email, phone: me.profile.phone || null,
-        service_id: selBookService, extras: selBookExtras,
+        service_id: selBookService, extras: selBookExtras, client_note: note || null,
         barber_id: selBookSlot.barberId, date: selBookDate, time: selBookSlot.time,
         base_url: window.location.origin + '/rdv.html' + (bookSalonSlug ? '?salon=' + bookSalonSlug : '')
       }
@@ -617,6 +659,7 @@ function submitBookAppointment() {
     document.getElementById('bk-confirm-details').textContent = when + ' — ' + s.name;
     selBookBarber = null; selBookService = null; selBookExtras = []; selBookDate = null; selBookSlot = null;
     document.getElementById('bk-date').value = '';
+    document.getElementById('bk-note').value = '';
     show('p-book-confirmed');
     hideFooter();
   }).catch(function (e) {

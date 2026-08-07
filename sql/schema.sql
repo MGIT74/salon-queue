@@ -566,3 +566,13 @@ CREATE TABLE IF NOT EXISTS client_sessions (
 SET @idx := (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'client_sessions' AND index_name = 'idx_client_sessions_client');
 SET @sql := IF(@idx = 0, 'CREATE INDEX idx_client_sessions_client ON client_sessions(client_id)', 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Note que le CLIENT ajoute lui-même à SON rendez-vous au moment de la
+-- réservation (allergie, préférence...) - distincte de la note privée
+-- que le coiffeur écrit sur la fiche client (client_notes), qui reste
+-- inchangée. Visible des deux côtés : dans le détail dépliable du RDV
+-- côté client (compte.html) et dans le tiroir client de l'agenda côté
+-- admin (dashboard.html).
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'appointments' AND column_name = 'client_note');
+SET @sql := IF(@c = 0, "ALTER TABLE appointments ADD COLUMN client_note VARCHAR(500) NULL", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;

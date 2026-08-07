@@ -1386,7 +1386,8 @@ function openClientDrawer(id, source, directData) {
   document.getElementById('drawer-info-section').innerHTML =
     (c.email ? '<div class="detail-row"><span class="detail-label">Email</span><span class="detail-value">' + esc(c.email) + '</span></div>' : '') +
     (c.phone ? '<div class="detail-row"><span class="detail-label">Téléphone</span><span class="detail-value">' + esc(c.phone) + '</span></div>' : '') +
-    (!c.email && !c.phone ? '<div class="hint" style="margin:0">Aucune coordonnée renseignée</div>' : '');
+    (!c.email && !c.phone ? '<div class="hint" style="margin:0">Aucune coordonnée renseignée</div>' : '') +
+    (c.client_note ? '<div class="detail-row" style="flex-direction:column;align-items:flex-start;gap:2px"><span class="detail-label">📝 Note du client (RDV)</span><span class="detail-value" style="font-weight:400">' + esc(c.client_note) + '</span></div>' : '');
 
   document.getElementById('drawer-visits').innerHTML = '<div class="empty">Chargement…</div>';
   document.getElementById('drawer-visit-count').textContent = '';

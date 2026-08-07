@@ -206,7 +206,7 @@ router.get('/me', requireClient, wrap(async (req, res) => {
   // 'confirmed' indéfiniment côté appointments, seule la file liée
   // (promoted_queue_id) sait qu'il est déjà 'done'.
   const [[upcoming]] = await pool.query(
-    `SELECT a.id, a.scheduled_at, a.cancel_token, a.service_id, a.barber_id,
+    `SELECT a.id, a.scheduled_at, a.cancel_token, a.service_id, a.barber_id, a.client_note,
             s.name AS service_name, s.price_cents AS service_price_cents,
             bar.name AS barber_name, sl.slug AS salon_slug, sl.name AS salon_name
      FROM appointments a
@@ -228,11 +228,13 @@ router.get('/me', requireClient, wrap(async (req, res) => {
     );
     const totalCents = upcoming.service_price_cents + extraRows.reduce((sum, e) => sum + e.price_cents, 0);
     upcomingAppointment = {
+      id: upcoming.id,
       scheduled_at: upcoming.scheduled_at,
       service_name: upcoming.service_name,
       barber_name: upcoming.barber_name,
       extras: extraRows.map((e) => e.name),
       price_cents: totalCents,
+      client_note: upcoming.client_note || '',
       cancel_token: upcoming.cancel_token
     };
   }
@@ -292,6 +294,28 @@ router.put('/me', requireClient, wrap(async (req, res) => {
 
   params.push(req.clientAccount.id);
   await pool.query(`UPDATE clients SET ${sets.join(', ')} WHERE id = ?`, params);
+  res.json({ ok: true });
+}));
+
+/**
+ * Modifie la note du client sur SON rendez-vous à venir (allergie,
+ * préférence...) - jamais la note privée du coiffeur (client_notes),
+ * qui reste un outil séparé réservé au staff.
+ */
+router.put('/upcoming-note', requireClient, wrap(async (req, res) => {
+  const c = req.clientAccount;
+  const key = clientKey({ email: c.email });
+  const note = req.body.note ? String(req.body.note).slice(0, 500) : null;
+
+  const [[upcoming]] = await pool.query(
+    `SELECT a.id FROM appointments a JOIN salons sl ON sl.id = a.salon_id
+     WHERE sl.owner_id = ? AND LOWER(TRIM(a.email)) = ? AND a.status = 'confirmed' AND a.scheduled_at >= ?
+     ORDER BY a.scheduled_at ASC LIMIT 1`,
+    [c.owner_id, key, nowParisDatetimeString()]
+  );
+  if (!upcoming) return res.status(404).json({ error: 'Aucun rendez-vous à venir' });
+
+  await pool.query('UPDATE appointments SET client_note = ? WHERE id = ?', [note, upcoming.id]);
   res.json({ ok: true });
 }));
 

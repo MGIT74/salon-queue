@@ -295,6 +295,7 @@ router.get('/', requireAdmin, wrap(async (req, res) => {
  */
 router.post('/', wrap(async (req, res) => {
   const { client_name, email, phone, service_id, barber_id, extras, date, time } = req.body;
+  const clientNote = req.body.client_note ? String(req.body.client_note).slice(0, 500) : null;
   if (!client_name) return res.status(400).json({ error: 'Le nom est requis' });
   if (!email) return res.status(400).json({ error: "L'email est requis pour la confirmation" });
   if (!service_id || !date || !time) return res.status(400).json({ error: 'Prestation, date et créneau requis' });
@@ -336,9 +337,9 @@ router.post('/', wrap(async (req, res) => {
   const scheduledAt = date + ' ' + time + ':00';
 
   await pool.query(
-    `INSERT INTO appointments (id, salon_id, barber_id, client_name, email, phone, service_id, scheduled_at, status, cancel_token)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?)`,
-    [id, req.salon.id, finalBarberId, client_name, email, phone || null, service_id, scheduledAt, cancelToken]
+    `INSERT INTO appointments (id, salon_id, barber_id, client_name, email, phone, service_id, scheduled_at, status, cancel_token, client_note)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?)`,
+    [id, req.salon.id, finalBarberId, client_name, email, phone || null, service_id, scheduledAt, cancelToken, clientNote]
   );
   if (extraIds.length) {
     await pool.query(
