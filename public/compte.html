@@ -38,6 +38,23 @@
 
   .top-actions { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
   .logout-link { font-size: 13.5px; color: var(--grey); background: none; border: none; cursor: pointer; font-family: inherit; }
+
+  /* Footer de navigation (visible une fois connecté) */
+  .client-footer {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
+    display: none; justify-content: space-around; align-items: center;
+    background: var(--card, #fff); box-shadow: 0 -6px 20px rgba(0,0,0,.1);
+    border-radius: 20px 20px 0 0; padding: 10px 8px calc(10px + env(safe-area-inset-bottom, 0px));
+  }
+  .client-footer.on { display: flex; }
+  .client-footer button {
+    background: none; border: none; font-family: inherit; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    font-size: 11.5px; color: var(--grey); padding: 4px 18px; flex: 1;
+  }
+  .client-footer button .ic { font-size: 21px; line-height: 1; }
+  .client-footer button.on { color: var(--blue); font-weight: 600; }
+  body.has-footer .wrap { padding-bottom: 90px; }
 </style>
 </head>
 <body>
@@ -98,23 +115,30 @@
     <div class="err" id="reset-err"></div>
   </section>
 
-  <!-- Profil connecté -->
-  <section class="panel" id="p-profile">
+  <!-- Accueil (connecté) : fidélité + dernière prestation -->
+  <section class="panel" id="p-home">
     <div class="top-actions">
-      <div style="font-size:16px;font-weight:600" id="profile-hello"></div>
-      <button class="logout-link" onclick="doLogout()">Se déconnecter</button>
+      <div style="font-size:16px;font-weight:600" id="home-hello"></div>
     </div>
 
-    <div class="eyebrow">Fidélité</div>
-    <div class="card">
-      <div class="big" id="loyalty-points">0</div>
-      <div class="lbl">points de fidélité</div>
-      <div id="loyalty-gift"></div>
+    <div id="loyalty-section">
+      <div class="eyebrow">Fidélité</div>
+      <div class="card">
+        <div class="big" id="loyalty-points">0</div>
+        <div class="lbl">points de fidélité</div>
+        <div id="loyalty-gift"></div>
+      </div>
+    </div>
+    <div id="loyalty-inactive-msg" class="msg" style="display:none">
+      Votre carte de fidélité n'est pas encore activée — demandez à votre coiffeur de l'activer lors de votre prochain passage.
     </div>
 
     <div class="eyebrow">Dernière prestation</div>
     <div class="card" id="last-visit-card"></div>
+  </section>
 
+  <!-- Compte (connecté) : infos + mot de passe -->
+  <section class="panel" id="p-account">
     <div class="eyebrow">Mes informations</div>
     <div class="fld"><label for="pf-name">Nom</label><input id="pf-name" type="text"></div>
     <div class="fld"><label for="pf-email">Email</label><input id="pf-email" type="email"></div>
@@ -129,6 +153,12 @@
     <div class="err" id="password-err"></div>
     <div class="msg" id="password-msg"></div>
   </section>
+</div>
+
+<div class="client-footer" id="client-footer">
+  <button id="nav-home" onclick="goHome()"><span class="ic">🏠</span>Accueil</button>
+  <button id="nav-account" onclick="goAccount()"><span class="ic">👤</span>Compte</button>
+  <button onclick="doLogout()"><span class="ic">↩️</span>Déconnexion</button>
 </div>
 
 <script>
@@ -165,6 +195,21 @@ function show(id) {
   window.scrollTo(0, 0);
 }
 
+function showFooter(activeId) {
+  document.getElementById('client-footer').classList.add('on');
+  document.body.classList.add('has-footer');
+  document.getElementById('nav-home').classList.toggle('on', activeId === 'nav-home');
+  document.getElementById('nav-account').classList.toggle('on', activeId === 'nav-account');
+}
+
+function hideFooter() {
+  document.getElementById('client-footer').classList.remove('on');
+  document.body.classList.remove('has-footer');
+}
+
+function goHome() { show('p-home'); showFooter('nav-home'); }
+function goAccount() { show('p-account'); showFooter('nav-account'); }
+
 function doSignup() {
   var name = document.getElementById('su-name').value.trim();
   var email = document.getElementById('su-email').value.trim();
@@ -191,6 +236,7 @@ function doLogin() {
 function doLogout() {
   api('/api/client-auth/logout', { method: 'POST' }).catch(function () {});
   localStorage.removeItem('client_token');
+  hideFooter();
   show('p-login');
 }
 
@@ -216,14 +262,18 @@ var STATUS_LABEL = { waiting: 'En attente', in_progress: 'En cours', done: 'Term
 
 function loadProfile() {
   api('/api/client-auth/me').then(function (d) {
-    document.getElementById('profile-hello').textContent = 'Bonjour ' + d.profile.name;
+    document.getElementById('home-hello').textContent = 'Bonjour ' + d.profile.name;
     document.getElementById('pf-name').value = d.profile.name;
     document.getElementById('pf-email').value = d.profile.email;
 
-    document.getElementById('loyalty-points').textContent = d.loyalty.points;
-    document.getElementById('loyalty-gift').innerHTML = d.loyalty.rewards_available > 0
-      ? '<span class="gift-badge">🎁 ' + d.loyalty.rewards_available + ' cadeau' + (d.loyalty.rewards_available > 1 ? 'x' : '') + ' disponible' + (d.loyalty.rewards_available > 1 ? 's' : '') + '</span>'
-      : '';
+    document.getElementById('loyalty-section').style.display = d.loyalty_activated ? 'block' : 'none';
+    document.getElementById('loyalty-inactive-msg').style.display = d.loyalty_activated ? 'none' : 'block';
+    if (d.loyalty_activated) {
+      document.getElementById('loyalty-points').textContent = d.loyalty.points;
+      document.getElementById('loyalty-gift').innerHTML = d.loyalty.rewards_available > 0
+        ? '<span class="gift-badge">🎁 ' + d.loyalty.rewards_available + ' cadeau' + (d.loyalty.rewards_available > 1 ? 'x' : '') + ' disponible' + (d.loyalty.rewards_available > 1 ? 's' : '') + '</span>'
+        : '';
+    }
 
     var lv = d.last_visit;
     document.getElementById('last-visit-card').innerHTML = !lv
@@ -233,9 +283,10 @@ function loadProfile() {
         ' · ' + esc(STATUS_LABEL[lv.status] || lv.status) + '</div></div>' +
         '<button class="go" style="width:auto;margin:0;padding:10px 16px;font-size:14px" onclick="rebook(\'' + lv.salon_slug + '\',\'' + lv.service_id + '\')">Réserver à nouveau</button></div>';
 
-    show('p-profile');
+    goHome();
   }).catch(function () {
     localStorage.removeItem('client_token');
+    hideFooter();
     show('p-login');
   });
 }

@@ -181,9 +181,10 @@ router.get('/me', requireClient, wrap(async (req, res) => {
   const key = clientKey({ email: c.email });
 
   const [[loyalty]] = await pool.query(
-    'SELECT points, rewards_available FROM loyalty_accounts WHERE owner_id = ? AND client_key = ?',
+    'SELECT points, rewards_available, activated_at FROM loyalty_accounts WHERE owner_id = ? AND client_key = ?',
     [c.owner_id, key]
   );
+  var loyaltyActivated = Boolean(loyalty && loyalty.activated_at);
 
   const [[lastVisit]] = await pool.query(
     `SELECT q.checkin_at, q.status, s.name AS service_name, q.service_id, sl.slug AS salon_slug, sl.name AS salon_name
@@ -198,7 +199,8 @@ router.get('/me', requireClient, wrap(async (req, res) => {
   res.json({
     ok: true,
     profile: { name: c.name, email: c.email, phone: c.phone },
-    loyalty: loyalty || { points: 0, rewards_available: 0 },
+    loyalty_activated: loyaltyActivated,
+    loyalty: loyaltyActivated ? { points: loyalty.points, rewards_available: loyalty.rewards_available } : null,
     last_visit: lastVisit || null
   });
 }));
