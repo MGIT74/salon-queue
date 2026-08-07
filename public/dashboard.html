@@ -291,6 +291,30 @@
   .cal-legend-item { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--grey); }
   .cal-legend-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
 
+  /* Assistant "Ajouter un RDV" (admin) - parcours par étapes */
+  .aa-step-title { font-size: 15px; font-weight: 600; margin-bottom: 12px; }
+  .aa-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px,1fr)); gap: 8px; margin-bottom: 6px; }
+  .aa-card {
+    border: none; background: var(--fill); color: var(--ink); border-radius: 14px;
+    padding: 14px 10px; cursor: pointer; font-family: inherit; text-align: center;
+    font-size: 13.5px; font-weight: 600; transition: background .15s ease;
+  }
+  .aa-card .aa-meta { display: block; font-size: 11.5px; font-weight: 400; color: var(--grey); margin-top: 3px; }
+  .aa-card.sel { background: var(--blue); color: #fff; }
+  .aa-card.sel .aa-meta { color: rgba(255,255,255,.8); }
+  .aa-chips { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 6px; }
+  .aa-chip {
+    border: none; background: var(--fill); color: var(--ink); border-radius: 999px;
+    padding: 9px 13px; cursor: pointer; font-family: inherit; font-size: 12.5px; font-weight: 500;
+  }
+  .aa-chip .aa-meta { color: var(--grey); margin-left: 4px; }
+  .aa-chip.sel { background: var(--blue); color: #fff; }
+  .aa-chip.sel .aa-meta { color: rgba(255,255,255,.75); }
+  .aa-slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px,1fr)); gap: 7px; margin-bottom: 6px; }
+  .aa-slot { border: none; background: var(--fill); color: var(--ink); border-radius: 10px; padding: 10px 4px; cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 600; }
+  .aa-slot.sel { background: var(--blue); color: #fff; }
+  .aa-back { background: none; border: none; padding: 0; font-family: inherit; font-size: 13.5px; color: var(--blue); font-weight: 500; cursor: pointer; margin-bottom: 14px; }
+
   /* Vue jour : une seule colonne, liste verticale */
   .cal-day-view-list { display: flex; flex-direction: column; gap: 8px; }
   .cal-day-view-appt {
@@ -2686,71 +2710,117 @@ function renderExpandPanel(dateStr, dayAppts) {
  */
 function openAdminAddAppointment(dateStr) {
   var rdvBarbers = barbers.filter(function (b) { return b.accepts_appointments; });
-  var barberOptions = '<option value="">— Choisir —</option>' +
-    rdvBarbers.map(function (b) { return '<option value="' + b.id + '">' + esc(b.name) + '</option>'; }).join('');
-  var svcOptions = '<option value="">— Choisir —</option>' +
-    services.map(function (s) { return '<option value="' + s.id + '">' + esc(s.name) + ' · ' + s.duration_min + ' min · ' + eur(s.price_cents) + '</option>'; }).join('');
-  var extraChips = extras.map(function (e) {
-    return '<label style="display:inline-flex;align-items:center;gap:5px;background:var(--fill);border-radius:999px;padding:7px 12px;font-size:13px;cursor:pointer;margin:3px 4px 3px 0">' +
-      '<input type="checkbox" class="aa-extra" value="' + e.id + '" style="margin:0"> ' + esc(e.name) + ' <span style="color:var(--grey)">+' + e.duration_min + 'min</span></label>';
-  }).join('');
-
   var when = new Date(dateStr + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' });
+
+  var state = { barberId: null, serviceId: null, extraIds: [], time: null };
 
   var overlay = _buildModal(
     '<div class="modal-title">Ajouter un RDV — ' + when + '</div>' +
-    '<div class="fld" style="margin-bottom:10px"><label>Coiffeur</label><select class="modal-input" id="aa-barber">' + barberOptions + '</select></div>' +
-    '<div class="fld" style="margin-bottom:10px"><label>Prestation</label><select class="modal-input" id="aa-service">' + svcOptions + '</select></div>' +
-    '<div class="fld" style="margin-bottom:10px"><label>Suppléments (optionnels)</label><div>' + (extraChips || '<span class="hint" style="margin:0">Aucun</span>') + '</div></div>' +
-    '<div class="fld" style="margin-bottom:10px"><label>Créneau</label><select class="modal-input" id="aa-time" disabled><option value="">Choisissez d\'abord coiffeur + prestation</option></select></div>' +
-    '<div class="fld" style="margin-bottom:10px"><label>Nom du client</label><input class="modal-input" id="aa-name" type="text"></div>' +
-    '<div class="fld" style="margin-bottom:10px"><label>Email (optionnel)</label><input class="modal-input" id="aa-email" type="email"></div>' +
-    '<div class="fld" style="margin-bottom:14px"><label>Téléphone (optionnel)</label><input class="modal-input" id="aa-phone" type="tel"></div>' +
-    '<div class="modal-error" id="aa-error" style="display:none"></div>' +
-    '<div class="modal-actions">' +
-    '<button class="btn btn-soft" id="aa-cancel-btn">Annuler</button>' +
-    '<button class="btn btn-primary" id="aa-save-btn">Ajouter le RDV</button>' +
+
+    '<div id="aa-step-barber">' +
+      '<div class="aa-step-title">Coiffeur</div>' +
+      '<div class="aa-grid">' + rdvBarbers.map(function (b) {
+        return '<button class="aa-card" data-id="' + b.id + '" onclick="aaSelectBarber(this)">' + esc(b.name) + '</button>';
+      }).join('') + '</div>' +
+      (rdvBarbers.length === 0 ? '<p class="hint">Aucun coiffeur en mode RDV en ligne.</p>' : '') +
+    '</div>' +
+
+    '<div id="aa-step-service" style="display:none">' +
+      '<button class="aa-back" onclick="aaGoStep(\'barber\')">‹ Retour</button>' +
+      '<div class="aa-step-title">Prestation</div>' +
+      '<div class="aa-grid">' + services.map(function (s) {
+        return '<button class="aa-card" data-id="' + s.id + '" onclick="aaSelectService(this)">' + esc(s.name) +
+          '<span class="aa-meta">' + s.duration_min + ' min · ' + eur(s.price_cents) + '</span></button>';
+      }).join('') + '</div>' +
+    '</div>' +
+
+    '<div id="aa-step-extras" style="display:none">' +
+      '<button class="aa-back" onclick="aaGoStep(\'service\')">‹ Retour</button>' +
+      '<div class="aa-step-title">Suppléments (optionnels)</div>' +
+      '<div class="aa-chips">' + extras.map(function (e) {
+        return '<button class="aa-chip" data-id="' + e.id + '" onclick="aaToggleExtra(this)">' + esc(e.name) + '<span class="aa-meta">+' + e.duration_min + 'min</span></button>';
+      }).join('') + '</div>' +
+      '<button class="btn btn-primary" style="width:100%;margin-top:10px" onclick="aaGoStep(\'datetime\')">Suivant</button>' +
+    '</div>' +
+
+    '<div id="aa-step-datetime" style="display:none">' +
+      '<button class="aa-back" onclick="aaGoStep(\'extras\')">‹ Retour</button>' +
+      '<div class="aa-step-title">Créneau</div>' +
+      '<div class="aa-slots" id="aa-slots"><span class="hint" style="margin:0">Chargement…</span></div>' +
+    '</div>' +
+
+    '<div id="aa-step-contact" style="display:none">' +
+      '<button class="aa-back" onclick="aaGoStep(\'datetime\')">‹ Retour</button>' +
+      '<div class="aa-step-title" id="aa-contact-summary"></div>' +
+      '<div class="fld" style="margin-bottom:10px"><label>Nom du client</label><input class="modal-input" id="aa-name" type="text"></div>' +
+      '<div class="fld" style="margin-bottom:10px"><label>Email (optionnel)</label><input class="modal-input" id="aa-email" type="email"></div>' +
+      '<div class="fld" style="margin-bottom:14px"><label>Téléphone (optionnel)</label><input class="modal-input" id="aa-phone" type="tel"></div>' +
+      '<div class="modal-error" id="aa-error" style="display:none"></div>' +
+      '<div class="modal-actions">' +
+      '<button class="btn btn-soft" id="aa-cancel-btn">Annuler</button>' +
+      '<button class="btn btn-primary" id="aa-save-btn">Ajouter le RDV</button>' +
+      '</div>' +
     '</div>'
   );
 
-  function reloadSlots() {
-    var barberId = overlay.querySelector('#aa-barber').value;
-    var serviceId = overlay.querySelector('#aa-service').value;
-    var timeSel = overlay.querySelector('#aa-time');
-    if (!barberId || !serviceId) {
-      timeSel.innerHTML = '<option value="">Choisissez d\'abord coiffeur + prestation</option>';
-      timeSel.disabled = true;
-      return;
+  var STEPS = ['barber', 'service', 'extras', 'datetime', 'contact'];
+
+  window.aaGoStep = function (step) {
+    STEPS.forEach(function (s) { overlay.querySelector('#aa-step-' + s).style.display = s === step ? 'block' : 'none'; });
+    if (step === 'datetime') aaLoadSlots();
+    if (step === 'contact') {
+      var s = services.find(function (x) { return x.id === state.serviceId; });
+      overlay.querySelector('#aa-contact-summary').textContent = when + ' à ' + state.time + ' — ' + (s ? s.name : '');
     }
-    var extraIds = Array.prototype.map.call(overlay.querySelectorAll('.aa-extra:checked'), function (c) { return c.value; });
-    timeSel.innerHTML = '<option value="">Chargement…</option>';
-    timeSel.disabled = true;
-    api('/api/appointments/availability?date=' + dateStr + '&service_id=' + serviceId + '&barber_id=' + barberId + '&extras=' + extraIds.join(','))
+  };
+
+  window.aaSelectBarber = function (el) {
+    state.barberId = el.dataset.id;
+    overlay.querySelectorAll('#aa-step-barber .aa-card').forEach(function (c) { c.classList.remove('sel'); });
+    el.classList.add('sel');
+    aaGoStep('service');
+  };
+
+  window.aaSelectService = function (el) {
+    state.serviceId = el.dataset.id;
+    overlay.querySelectorAll('#aa-step-service .aa-card').forEach(function (c) { c.classList.remove('sel'); });
+    el.classList.add('sel');
+    aaGoStep('extras');
+  };
+
+  window.aaToggleExtra = function (el) {
+    var id = el.dataset.id;
+    var i = state.extraIds.indexOf(id);
+    if (i === -1) state.extraIds.push(id); else state.extraIds.splice(i, 1);
+    el.classList.toggle('sel');
+  };
+
+  function aaLoadSlots() {
+    var slotsEl = overlay.querySelector('#aa-slots');
+    slotsEl.innerHTML = '<span class="hint" style="margin:0">Chargement…</span>';
+    api('/api/appointments/availability?date=' + dateStr + '&service_id=' + state.serviceId + '&barber_id=' + state.barberId + '&extras=' + state.extraIds.join(','))
       .then(function (r) {
-        if (!r.slots.length) { timeSel.innerHTML = '<option value="">Aucun créneau disponible ce jour-là</option>'; return; }
-        timeSel.innerHTML = '<option value="">— Choisir —</option>' + r.slots.map(function (s) { return '<option value="' + s.time + '">' + s.time + '</option>'; }).join('');
-        timeSel.disabled = false;
+        if (!r.slots.length) { slotsEl.innerHTML = '<span class="hint" style="margin:0">Aucun créneau disponible ce jour-là</span>'; return; }
+        slotsEl.innerHTML = r.slots.map(function (s) {
+          return '<button class="aa-slot" data-time="' + s.time + '" onclick="aaSelectSlot(this)">' + s.time + '</button>';
+        }).join('');
       })
-      .catch(function (e) { timeSel.innerHTML = '<option value="">Erreur</option>'; toast(e.message, true); });
+      .catch(function (e) { slotsEl.innerHTML = ''; toast(e.message, true); });
   }
 
-  overlay.querySelector('#aa-barber').onchange = reloadSlots;
-  overlay.querySelector('#aa-service').onchange = reloadSlots;
-  Array.prototype.forEach.call(overlay.querySelectorAll('.aa-extra'), function (c) { c.onchange = reloadSlots; });
+  window.aaSelectSlot = function (el) {
+    state.time = el.dataset.time;
+    overlay.querySelectorAll('#aa-slots .aa-slot').forEach(function (c) { c.classList.remove('sel'); });
+    el.classList.add('sel');
+    aaGoStep('contact');
+  };
 
   overlay.querySelector('#aa-cancel-btn').onclick = function () { _closeModal(overlay); };
 
   overlay.querySelector('#aa-save-btn').onclick = function () {
     var errEl = overlay.querySelector('#aa-error');
     var name = overlay.querySelector('#aa-name').value.trim();
-    var barberId = overlay.querySelector('#aa-barber').value;
-    var serviceId = overlay.querySelector('#aa-service').value;
-    var time = overlay.querySelector('#aa-time').value;
     if (!name) { errEl.textContent = 'Le nom du client est requis'; errEl.style.display = 'block'; return; }
-    if (!barberId) { errEl.textContent = 'Le coiffeur est requis'; errEl.style.display = 'block'; return; }
-    if (!serviceId || !time) { errEl.textContent = 'Prestation et créneau requis'; errEl.style.display = 'block'; return; }
-
-    var extraIds = Array.prototype.map.call(overlay.querySelectorAll('.aa-extra:checked'), function (c) { return c.value; });
 
     api('/api/appointments/admin-create', {
       method: 'POST',
@@ -2758,8 +2828,8 @@ function openAdminAddAppointment(dateStr) {
         client_name: name,
         email: overlay.querySelector('#aa-email').value.trim(),
         phone: overlay.querySelector('#aa-phone').value.trim(),
-        service_id: serviceId, barber_id: barberId, extras: extraIds,
-        date: dateStr, time: time,
+        service_id: state.serviceId, barber_id: state.barberId, extras: state.extraIds,
+        date: dateStr, time: state.time,
         base_url: window.location.origin + '/rdv.html'
       }
     }).then(function () {
