@@ -1000,11 +1000,12 @@
   <div class="client-drawer">
     <div class="client-drawer-head">
       <h2 id="drawer-client-name">—</h2>
-      <button class="x" id="drawer-edit-btn" title="Modifier ce client" onclick="toggleEditClientInfo()" style="margin-right:6px">
-        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
-      </button>
       <button class="x" onclick="closeClientDrawer()">✕</button>
     </div>
+    <button class="link-btn-edit" id="drawer-edit-btn" title="Modifier ce client" onclick="toggleEditClientInfo()" style="display:flex;align-items:center;gap:6px;background:none;border:none;color:var(--blue);font-family:inherit;font-size:13.5px;font-weight:500;cursor:pointer;padding:0;margin:-10px 0 16px">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+      Modifier
+    </button>
 
     <div class="client-drawer-section" id="drawer-info-section"></div>
     <div class="client-drawer-section" id="drawer-info-edit-section" style="display:none">
