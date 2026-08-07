@@ -27,6 +27,7 @@ const settingsRoutes = require('./src/routes/settings');
 const salonRoutes = require('./src/routes/salons');
 const ownerRoutes = require('./src/routes/owner');
 const signupRoutes = require('./src/routes/signup');
+const clientAuthRoutes = require('./src/routes/clientAuth');
 const requireAdmin = require('./src/middleware/auth');
 const resolveSalon = require('./src/middleware/resolveSalon');
 const { startNotifyJob } = require('./src/cron/notify');
@@ -67,6 +68,7 @@ app.use('/api/sales', salesRoutes);
 app.use('/api/barbers', barberRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/owner', ownerRoutes);
+app.use('/api/client-auth', clientAuthRoutes);
 
 // Vérification du mot de passe depuis l'écran de connexion du dashboard
 app.post('/api/login', requireAdmin, (req, res) => res.json({ ok: true }));

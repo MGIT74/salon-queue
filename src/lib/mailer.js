@@ -114,4 +114,37 @@ async function sendAppointmentConfirmation(salonId, to, info) {
   });
 }
 
-module.exports = { sendTurnSoon, sendTest, sendGiftConfirmation, sendLoyaltyActivation, sendAppointmentConfirmation, invalidateTransport };
+async function sendClientVerificationEmail(salonId, to, verifyUrl) {
+  const { tx, from, salon } = await getTransport(salonId);
+  await tx.sendMail({
+    from,
+    to,
+    subject: 'Confirmez votre adresse email — ' + salon,
+    text: `Bienvenue ! Cliquez sur ce lien pour confirmer votre adresse email et activer votre compte ` +
+          `chez ${salon} (valable 24 heures) :\n\n${verifyUrl}\n\n` +
+          `Si vous n'êtes pas à l'origine de cette inscription, ignorez simplement cet email.`,
+    html: `<p>Bienvenue ! Cliquez sur ce lien pour confirmer votre adresse email et activer votre compte ` +
+          `chez ${salon} (valable 24 heures) :</p>` +
+          `<p><a href="${verifyUrl}">${verifyUrl}</a></p>` +
+          `<p>Si vous n'êtes pas à l'origine de cette inscription, ignorez simplement cet email.</p>`
+  });
+}
+
+async function sendClientPasswordReset(salonId, to, resetUrl) {
+  const { tx, from, salon } = await getTransport(salonId);
+  await tx.sendMail({
+    from,
+    to,
+    subject: 'Réinitialisation de votre mot de passe — ' + salon,
+    text: `Cliquez sur ce lien pour choisir un nouveau mot de passe (valable 1 heure) :\n\n${resetUrl}\n\n` +
+          `Si vous n'êtes pas à l'origine de cette demande, ignorez simplement cet email.`,
+    html: `<p>Cliquez sur ce lien pour choisir un nouveau mot de passe (valable 1 heure) :</p>` +
+          `<p><a href="${resetUrl}">${resetUrl}</a></p>` +
+          `<p>Si vous n'êtes pas à l'origine de cette demande, ignorez simplement cet email.</p>`
+  });
+}
+
+module.exports = {
+  sendTurnSoon, sendTest, sendGiftConfirmation, sendLoyaltyActivation, sendAppointmentConfirmation,
+  sendClientVerificationEmail, sendClientPasswordReset, invalidateTransport
+};

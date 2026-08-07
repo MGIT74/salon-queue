@@ -530,3 +530,39 @@ CREATE TABLE IF NOT EXISTS barber_breaks (
 SET @idx := (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'barber_breaks' AND index_name = 'idx_barber_breaks_barber_day');
 SET @sql := IF(@idx = 0, 'CREATE INDEX idx_barber_breaks_barber_day ON barber_breaks(barber_id, weekday)', 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Compte client (espace "compte.html") : rattaché à l'ENSEIGNE
+-- (owner_id), pas à un salon précis - même logique que les points de
+-- fidélité (loyalty_accounts), un client va parfois dans un salon,
+-- parfois dans un autre du même propriétaire.
+CREATE TABLE IF NOT EXISTS clients (
+  id CHAR(36) PRIMARY KEY,
+  owner_id CHAR(36) NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  email VARCHAR(255) NOT NULL,
+  phone VARCHAR(50) NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  email_verified TINYINT(1) NOT NULL DEFAULT 0,
+  verify_token VARCHAR(64) NULL,
+  verify_token_expires DATETIME NULL,
+  reset_token VARCHAR(64) NULL,
+  reset_token_expires DATETIME NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_owner_client_email (owner_id, email),
+  FOREIGN KEY (owner_id) REFERENCES owners(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Jeton de session du compte client (porté par le navigateur via
+-- X-Client-Token), volontairement simple - pas de JWT, juste un jeton
+-- aléatoire opaque comme le reste du projet (cf. impersonation.js).
+CREATE TABLE IF NOT EXISTS client_sessions (
+  token VARCHAR(64) PRIMARY KEY,
+  client_id CHAR(36) NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  expires_at DATETIME NOT NULL,
+  FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+SET @idx := (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'client_sessions' AND index_name = 'idx_client_sessions_client');
+SET @sql := IF(@idx = 0, 'CREATE INDEX idx_client_sessions_client ON client_sessions(client_id)', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;

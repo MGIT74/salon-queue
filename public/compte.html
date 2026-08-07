@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mon compte</title>
+<link rel="stylesheet" href="/app.css?v=3">
+<style>
+  html, body { min-height: 100%; }
+  .wrap { max-width: 480px; margin: 0 auto; padding: clamp(20px,3vw,40px) 18px 60px; }
+  .rdv-header { text-align: center; margin-bottom: 28px; }
+  .rdv-header .mark { font-size: 15px; font-weight: 600; color: var(--grey); margin-bottom: 6px; }
+  .rdv-header h1 { font-size: 26px; font-weight: 600; letter-spacing: -.03em; margin: 0; }
+
+  .panel { display: none; }
+  .panel.on { display: block; }
+  .eyebrow { font-size: 15px; font-weight: 600; color: var(--grey); margin: 22px 0 12px; }
+  .eyebrow:first-child { margin-top: 0; }
+
+  .go { display: block; width: 100%; background: var(--blue); color: #fff; border: none;
+        border-radius: 16px; padding: 16px; font-size: 16px; font-weight: 600; font-family: inherit;
+        cursor: pointer; margin-top: 6px; }
+  .go:disabled { opacity: .5; }
+  .link-btn { background: none; border: none; padding: 0; font-family: inherit; font-size: 14px;
+              color: var(--blue); font-weight: 500; cursor: pointer; }
+  .err { color: var(--red); font-size: 13.5px; margin-top: 10px; min-height: 1px; }
+  .msg { color: var(--grey); font-size: 13.5px; margin-top: 10px; line-height: 1.5; }
+
+  .card { background: var(--fill); border-radius: 18px; padding: 18px; margin-bottom: 16px; }
+  .card .big { font-size: 28px; font-weight: 700; letter-spacing: -.02em; }
+  .card .lbl { font-size: 13px; color: var(--grey); margin-top: 2px; }
+  .gift-badge { display: inline-block; margin-top: 10px; background: var(--orange, #f97316);
+                color: #fff; font-size: 13px; font-weight: 600; padding: 5px 12px; border-radius: 999px; }
+
+  .visit-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .visit-row .name { font-size: 16px; font-weight: 600; }
+  .visit-row .when { font-size: 13px; color: var(--grey); margin-top: 2px; }
+
+  .top-actions { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  .logout-link { font-size: 13.5px; color: var(--grey); background: none; border: none; cursor: pointer; font-family: inherit; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="rdv-header">
+    <div class="mark" id="salon-mark">LE SALON</div>
+    <h1>Mon compte</h1>
+  </div>
+
+  <!-- Connexion -->
+  <section class="panel on" id="p-login">
+    <div class="fld"><label for="li-email">Email</label><input id="li-email" type="email" placeholder="vous@exemple.fr"></div>
+    <div class="fld"><label for="li-pass">Mot de passe</label><input id="li-pass" type="password"></div>
+    <button class="go" onclick="doLogin()">Se connecter</button>
+    <div class="err" id="login-err"></div>
+    <div style="text-align:center;margin-top:16px;display:flex;justify-content:space-between">
+      <button class="link-btn" onclick="show('p-signup')">Créer un compte</button>
+      <button class="link-btn" onclick="show('p-forgot')">Mot de passe oublié ?</button>
+    </div>
+  </section>
+
+  <!-- Inscription -->
+  <section class="panel" id="p-signup">
+    <div class="fld"><label for="su-name">Nom</label><input id="su-name" type="text" placeholder="Votre nom"></div>
+    <div class="fld"><label for="su-email">Email</label><input id="su-email" type="email" placeholder="vous@exemple.fr"></div>
+    <div class="fld"><label for="su-phone">Téléphone (optionnel)</label><input id="su-phone" type="tel"></div>
+    <div class="fld"><label for="su-pass">Mot de passe</label><input id="su-pass" type="password" placeholder="6 caractères minimum"></div>
+    <button class="go" onclick="doSignup()">Créer mon compte</button>
+    <div class="err" id="signup-err"></div>
+    <div style="text-align:center;margin-top:16px">
+      <button class="link-btn" onclick="show('p-login')">‹ J'ai déjà un compte</button>
+    </div>
+  </section>
+
+  <!-- Vérification email envoyée -->
+  <section class="panel" id="p-check-email">
+    <div class="msg" style="text-align:center;font-size:15px">
+      Un email de confirmation vient de vous être envoyé. Cliquez sur le lien qu'il contient pour activer votre compte, puis revenez vous connecter ici.
+    </div>
+    <button class="go" style="margin-top:18px" onclick="show('p-login')">Retour à la connexion</button>
+  </section>
+
+  <!-- Mot de passe oublié -->
+  <section class="panel" id="p-forgot">
+    <div class="fld"><label for="fp-email">Email</label><input id="fp-email" type="email" placeholder="vous@exemple.fr"></div>
+    <button class="go" onclick="doForgot()">Envoyer le lien de réinitialisation</button>
+    <div class="msg" id="forgot-msg"></div>
+    <div style="text-align:center;margin-top:16px">
+      <button class="link-btn" onclick="show('p-login')">‹ Retour</button>
+    </div>
+  </section>
+
+  <!-- Nouveau mot de passe (depuis le lien email) -->
+  <section class="panel" id="p-reset">
+    <div class="fld"><label for="rp-pass">Nouveau mot de passe</label><input id="rp-pass" type="password" placeholder="6 caractères minimum"></div>
+    <button class="go" onclick="doResetPassword()">Valider</button>
+    <div class="err" id="reset-err"></div>
+  </section>
+
+  <!-- Profil connecté -->
+  <section class="panel" id="p-profile">
+    <div class="top-actions">
+      <div style="font-size:16px;font-weight:600" id="profile-hello"></div>
+      <button class="logout-link" onclick="doLogout()">Se déconnecter</button>
+    </div>
+
+    <div class="eyebrow">Fidélité</div>
+    <div class="card">
+      <div class="big" id="loyalty-points">0</div>
+      <div class="lbl">points de fidélité</div>
+      <div id="loyalty-gift"></div>
+    </div>
+
+    <div class="eyebrow">Dernière prestation</div>
+    <div class="card" id="last-visit-card"></div>
+
+    <div class="eyebrow">Mes informations</div>
+    <div class="fld"><label for="pf-name">Nom</label><input id="pf-name" type="text"></div>
+    <div class="fld"><label for="pf-email">Email</label><input id="pf-email" type="email"></div>
+    <button class="go" onclick="saveProfile()">Enregistrer</button>
+    <div class="err" id="profile-err"></div>
+    <div class="msg" id="profile-msg"></div>
+
+    <div class="eyebrow">Changer mon mot de passe</div>
+    <div class="fld"><label for="pf-current">Mot de passe actuel</label><input id="pf-current" type="password"></div>
+    <div class="fld"><label for="pf-new">Nouveau mot de passe</label><input id="pf-new" type="password" placeholder="6 caractères minimum"></div>
+    <button class="go" onclick="changePassword()">Changer le mot de passe</button>
+    <div class="err" id="password-err"></div>
+    <div class="msg" id="password-msg"></div>
+  </section>
+</div>
+
+<script>
+var SALON_SLUG = (function () {
+  try { return new URLSearchParams(window.location.search).get('salon') || ''; }
+  catch (e) { return ''; }
+})();
+
+function baseUrl() {
+  return window.location.origin + window.location.pathname + (SALON_SLUG ? '?salon=' + SALON_SLUG : '');
+}
+
+function api(path, opts) {
+  opts = opts || {};
+  var headers = { 'Content-Type': 'application/json' };
+  if (SALON_SLUG) headers['X-Salon-Slug'] = SALON_SLUG;
+  var token = localStorage.getItem('client_token');
+  if (token) headers['X-Client-Token'] = token;
+  return fetch(path, {
+    method: opts.method || 'GET',
+    headers: headers,
+    body: opts.body ? JSON.stringify(opts.body) : undefined
+  }).then(function (r) {
+    return r.json().then(function (data) {
+      if (!r.ok) throw new Error(data.error || 'Erreur ' + r.status);
+      return data;
+    });
+  });
+}
+
+function show(id) {
+  document.querySelectorAll('.panel').forEach(function (p) { p.classList.remove('on'); });
+  document.getElementById(id).classList.add('on');
+  window.scrollTo(0, 0);
+}
+
+function doSignup() {
+  var name = document.getElementById('su-name').value.trim();
+  var email = document.getElementById('su-email').value.trim();
+  var phone = document.getElementById('su-phone').value.trim();
+  var password = document.getElementById('su-pass').value;
+  document.getElementById('signup-err').textContent = '';
+  api('/api/client-auth/signup', { method: 'POST', body: { name: name, email: email, phone: phone, password: password, base_url: baseUrl() } })
+    .then(function () { show('p-check-email'); })
+    .catch(function (e) { document.getElementById('signup-err').textContent = e.message; });
+}
+
+function doLogin() {
+  var email = document.getElementById('li-email').value.trim();
+  var password = document.getElementById('li-pass').value;
+  document.getElementById('login-err').textContent = '';
+  api('/api/client-auth/login', { method: 'POST', body: { email: email, password: password } })
+    .then(function (d) {
+      localStorage.setItem('client_token', d.token);
+      loadProfile();
+    })
+    .catch(function (e) { document.getElementById('login-err').textContent = e.message; });
+}
+
+function doLogout() {
+  api('/api/client-auth/logout', { method: 'POST' }).catch(function () {});
+  localStorage.removeItem('client_token');
+  show('p-login');
+}
+
+function doForgot() {
+  var email = document.getElementById('fp-email').value.trim();
+  api('/api/client-auth/forgot-password', { method: 'POST', body: { email: email, base_url: baseUrl() } })
+    .then(function (d) { document.getElementById('forgot-msg').textContent = d.message; });
+}
+
+function doResetPassword() {
+  var token = new URLSearchParams(window.location.search).get('reset');
+  var password = document.getElementById('rp-pass').value;
+  document.getElementById('reset-err').textContent = '';
+  api('/api/client-auth/reset-password', { method: 'POST', body: { token: token, password: password } })
+    .then(function () {
+      window.history.replaceState({}, '', window.location.pathname + (SALON_SLUG ? '?salon=' + SALON_SLUG : ''));
+      show('p-login');
+    })
+    .catch(function (e) { document.getElementById('reset-err').textContent = e.message; });
+}
+
+var STATUS_LABEL = { waiting: 'En attente', in_progress: 'En cours', done: 'Terminé', cancelled: 'Absent / annulé' };
+
+function loadProfile() {
+  api('/api/client-auth/me').then(function (d) {
+    document.getElementById('profile-hello').textContent = 'Bonjour ' + d.profile.name;
+    document.getElementById('pf-name').value = d.profile.name;
+    document.getElementById('pf-email').value = d.profile.email;
+
+    document.getElementById('loyalty-points').textContent = d.loyalty.points;
+    document.getElementById('loyalty-gift').innerHTML = d.loyalty.rewards_available > 0
+      ? '<span class="gift-badge">🎁 ' + d.loyalty.rewards_available + ' cadeau' + (d.loyalty.rewards_available > 1 ? 'x' : '') + ' disponible' + (d.loyalty.rewards_available > 1 ? 's' : '') + '</span>'
+      : '';
+
+    var lv = d.last_visit;
+    document.getElementById('last-visit-card').innerHTML = !lv
+      ? '<div class="lbl">Aucune prestation trouvée pour le moment.</div>'
+      : '<div class="visit-row"><div><div class="name">' + esc(lv.service_name || 'Prestation') + '</div>' +
+        '<div class="when">' + new Date(lv.checkin_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' }) +
+        ' · ' + esc(STATUS_LABEL[lv.status] || lv.status) + '</div></div>' +
+        '<button class="go" style="width:auto;margin:0;padding:10px 16px;font-size:14px" onclick="rebook(\'' + lv.salon_slug + '\',\'' + lv.service_id + '\')">Réserver à nouveau</button></div>';
+
+    show('p-profile');
+  }).catch(function () {
+    localStorage.removeItem('client_token');
+    show('p-login');
+  });
+}
+
+function rebook(salonSlug, serviceId) {
+  window.location.href = '/rdv.html?salon=' + encodeURIComponent(salonSlug || SALON_SLUG) + '&service=' + encodeURIComponent(serviceId);
+}
+
+function saveProfile() {
+  document.getElementById('profile-err').textContent = '';
+  document.getElementById('profile-msg').textContent = '';
+  api('/api/client-auth/me', {
+    method: 'PUT',
+    body: { name: document.getElementById('pf-name').value.trim(), email: document.getElementById('pf-email').value.trim() }
+  })
+    .then(function () { document.getElementById('profile-msg').textContent = 'Enregistré.'; })
+    .catch(function (e) { document.getElementById('profile-err').textContent = e.message; });
+}
+
+function changePassword() {
+  document.getElementById('password-err').textContent = '';
+  document.getElementById('password-msg').textContent = '';
+  var current = document.getElementById('pf-current').value;
+  var next = document.getElementById('pf-new').value;
+  api('/api/client-auth/me', { method: 'PUT', body: { current_password: current, new_password: next } })
+    .then(function () {
+      document.getElementById('password-msg').textContent = 'Mot de passe changé.';
+      document.getElementById('pf-current').value = '';
+      document.getElementById('pf-new').value = '';
+    })
+    .catch(function (e) { document.getElementById('password-err').textContent = e.message; });
+}
+
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+
+(function init() {
+  var params = new URLSearchParams(window.location.search);
+  var verifyToken = params.get('verify');
+  var resetToken = params.get('reset');
+
+  if (verifyToken) {
+    api('/api/client-auth/verify-email', { method: 'POST', body: { token: verifyToken } })
+      .then(function () {
+        window.history.replaceState({}, '', window.location.pathname + (SALON_SLUG ? '?salon=' + SALON_SLUG : ''));
+        show('p-login');
+        document.getElementById('login-err').textContent = '';
+      })
+      .catch(function (e) { document.getElementById('login-err').textContent = e.message; show('p-login'); });
+    return;
+  }
+
+  if (resetToken) { show('p-reset'); return; }
+
+  if (localStorage.getItem('client_token')) { loadProfile(); return; }
+
+  if (SALON_SLUG) {
+    fetch('/api/settings/public', { headers: { 'X-Salon-Slug': SALON_SLUG } })
+      .then(function (r) { return r.json(); })
+      .then(function (d) { if (d.salon_name) document.getElementById('salon-mark').textContent = d.salon_name.toUpperCase(); })
+      .catch(function () {});
+  }
+})();
+</script>
+</body>
+</html>

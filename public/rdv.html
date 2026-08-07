@@ -193,6 +193,17 @@ function loadCatalog() {
     document.getElementById('salon-mark').textContent = salonName.toUpperCase();
     renderBarberGrid();
     renderServiceGrid();
+
+    // Pré-remplissage depuis "Réserver à nouveau" (compte.html) : la
+    // prestation de la dernière visite est déjà sélectionnée, le client
+    // n'a plus qu'à choisir son coiffeur puis une nouvelle date/heure.
+    var preselectService = new URLSearchParams(window.location.search).get('service');
+    if (preselectService && services.some(function (s) { return s.id === preselectService; })) {
+      selService = preselectService;
+      var btn = document.querySelector('#svc-grid .svc-card[data-id="' + preselectService + '"]');
+      if (btn) btn.classList.add('sel');
+      document.getElementById('service-next-btn').disabled = false;
+    }
   });
 }
 
