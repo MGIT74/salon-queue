@@ -21,6 +21,14 @@ const EDITABLE = [
   'caisse_inactivity_seconds', 'caisse_reopen_hour'
 ];
 
+// Force la réouverture immédiate de la caisse (annule le verrouillage
+// jusqu'au lendemain habituel), sans attendre l'heure de réouverture
+// configurée. Se réactive normalement à la prochaine clôture.
+router.post('/caisse/force-open', requireAdmin, wrap(async (req, res) => {
+  await setSettings(req.salon.id, { caisse_force_reopen_at: new Date().toISOString() });
+  res.json({ ok: true });
+}));
+
 router.get('/', requireAdmin, wrap(async (req, res) => {
   const s = await getSettings(req.salon.id);
   // Le mot de passe SMTP n'est jamais renvoyé en clair : on indique

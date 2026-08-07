@@ -50,7 +50,11 @@ function utcIso(v) {
  * Renvoie la date de reouverture (ISO) si la caisse est actuellement
  * verrouillee suite a une cloture, ou null si elle est ouverte. La
  * caisse ne se rouvre JAMAIS le meme jour qu'une cloture - toujours
- * le LENDEMAIN, a l'heure configuree (par defaut minuit).
+ * le LENDEMAIN, a l'heure configuree (par defaut minuit) - SAUF si
+ * l'admin a force l'ouverture manuellement depuis cette cloture
+ * (settings.caisse_force_reopen_at, un forçage plus ancien que la
+ * derniere cloture ne compte plus - une nouvelle cloture re-verrouille
+ * normalement).
  */
 async function getCaisseLockedUntil(salonId, settings) {
   const [[lastClosing]] = await pool.query(
@@ -59,8 +63,14 @@ async function getCaisseLockedUntil(salonId, settings) {
   );
   if (!lastClosing) return null;
 
-  const reopenHour = /^\d{2}:\d{2}$/.test(settings.caisse_reopen_hour || '') ? settings.caisse_reopen_hour : '00:00';
   const closingDate = new Date(lastClosing.period_end + 'Z'); // vrai instant UTC de la clôture
+
+  if (settings.caisse_force_reopen_at) {
+    const forcedAt = new Date(settings.caisse_force_reopen_at);
+    if (!Number.isNaN(forcedAt.getTime()) && forcedAt > closingDate) return null;
+  }
+
+  const reopenHour = /^\d{2}:\d{2}$/.test(settings.caisse_reopen_hour || '') ? settings.caisse_reopen_hour : '00:00';
 
   // "08:00" dans le réglage est une heure de SALON (Europe/Paris), pas de
   // l'UTC — appliquer setUTCHours() dessus décalait la réouverture de

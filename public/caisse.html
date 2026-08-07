@@ -168,6 +168,7 @@
       </div>
       <h1 style="margin-bottom:10px">Caisse fermée</h1>
       <p style="color:var(--grey);font-size:15px;line-height:1.5" id="locked-reopen-text">Réouverture demain matin.</p>
+      <button class="btn btn-ghost" style="margin-top:18px;font-size:13px" onclick="forceOpenCaisse()">Forcer l'ouverture maintenant (admin)</button>
     </div>
   </div>
 
@@ -397,6 +398,17 @@ function loadMarketingSettings() {
   barberApi('/api/owner/marketing-settings').then(function (r) {
     marketingSettings = r.settings;
   }).catch(function () {});
+}
+
+function forceOpenCaisse() {
+  var pw = window.prompt('Mot de passe admin :');
+  if (!pw) return;
+  var headers = { 'Content-Type': 'application/json', 'X-Admin-Password': pw };
+  if (SALON_SLUG) headers['X-Salon-Slug'] = SALON_SLUG;
+  fetch('/api/settings/caisse/force-open', { method: 'POST', headers: headers })
+    .then(function (r) { return r.json().then(function (d) { if (!r.ok) throw new Error(d.error || 'Erreur'); return d; }); })
+    .then(function () { window.location.reload(); })
+    .catch(function (e) { window.alert(e.message); });
 }
 
 (function autoLogin() {
