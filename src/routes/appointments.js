@@ -27,7 +27,7 @@ const SLOT_STEP_MIN = 15;
 function nowInParis() {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', hour12: false
+    hour: '2-digit', minute: '2-digit', hour12: false, hourCycle: 'h23'
   }).formatToParts(new Date());
   const get = (type) => parts.find((p) => p.type === type).value;
   return {
@@ -46,7 +46,7 @@ function nowInParis() {
 function nowParisDatetimeString() {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, hourCycle: 'h23'
   }).formatToParts(new Date());
   const get = (type) => parts.find((p) => p.type === type).value;
   return `${get('year')}-${get('month')}-${get('day')} ${get('hour')}:${get('minute')}:${get('second')}`;
@@ -67,7 +67,7 @@ function parisLocalToUtcDate(dateStr, timeStr) {
   const [hh, mi, se] = String(timeStr).split(':').map(Number);
   const guess = new Date(Date.UTC(y, mo - 1, d, hh, mi, se || 0));
   const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'Europe/Paris', hour12: false,
+    timeZone: 'Europe/Paris', hour12: false, hourCycle: 'h23',
     year: 'numeric', month: '2-digit', day: '2-digit',
     hour: '2-digit', minute: '2-digit', second: '2-digit'
   }).formatToParts(guess);
@@ -138,7 +138,6 @@ async function computeSlotsForBarber(barberId, dateStr, durationMin) {
     'SELECT start_time, end_time FROM barber_schedules WHERE barber_id = ? AND weekday = ? AND active = 1',
     [barberId, weekday]
   );
-  console.error('[DEBUG-SLOTS]', { barberId, dateStr, weekday, schedule });
   if (!schedule) return [];
 
   const [[onLeave]] = await pool.query(
@@ -190,15 +189,12 @@ async function computeSlotsForBarber(barberId, dateStr, durationMin) {
     nowMin = paris.minutes + busyMin;
   }
 
-  console.error('[DEBUG-SLOTS]', { startMin, endMin, durationMin, isToday, nowMin, busyRangesCount: busyRanges.length, busyRanges });
-
   const slots = [];
   for (let t = startMin; t + durationMin <= endMin; t += SLOT_STEP_MIN) {
     if (isToday && t <= nowMin) continue;
     const overlaps = busyRanges.some(([bStart, bEnd]) => t < bEnd && t + durationMin > bStart);
     if (!overlaps) slots.push(minutesToTime(t));
   }
-  console.error('[DEBUG-SLOTS] result count:', slots.length);
   return slots;
 }
 

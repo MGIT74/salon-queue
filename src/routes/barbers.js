@@ -56,7 +56,7 @@ router.get('/', wrap(async (req, res) => {
   // côté navigateur (évite toute divergence de fuseau horaire).
   const nowParts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', hour12: false
+    hour: '2-digit', minute: '2-digit', hour12: false, hourCycle: 'h23'
   }).formatToParts(new Date());
   const g = (t) => nowParts.find((p) => p.type === t).value;
   const nowWeekday = new Date(`${g('year')}-${g('month')}-${g('day')}T00:00:00Z`).getUTCDay();
