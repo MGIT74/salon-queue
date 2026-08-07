@@ -150,8 +150,9 @@
   <!-- Mot de passe oublié -->
   <section class="panel" id="p-forgot">
     <div class="fld"><label for="fp-email">Email</label><input id="fp-email" type="email" placeholder="vous@exemple.fr"></div>
-    <button class="go" onclick="doForgot()">Envoyer le lien de réinitialisation</button>
-    <div class="msg" id="forgot-msg"></div>
+    <button class="go" id="fp-send-btn" onclick="doForgot()">Envoyer le lien de réinitialisation</button>
+    <div class="msg" id="forgot-msg" style="font-size:14.5px;color:var(--ink);font-weight:500"></div>
+    <div class="err" id="forgot-err"></div>
     <div style="text-align:center;margin-top:16px">
       <button class="link-btn" onclick="show('p-login')">‹ Retour</button>
     </div>
@@ -358,8 +359,18 @@ function doLogout() {
 
 function doForgot() {
   var email = document.getElementById('fp-email').value.trim();
+  var btn = document.getElementById('fp-send-btn');
+  var errEl = document.getElementById('forgot-err');
+  var msgEl = document.getElementById('forgot-msg');
+  errEl.textContent = ''; msgEl.textContent = '';
+
+  if (!email) { errEl.textContent = 'Entrez votre email'; return; }
+
+  btn.disabled = true; btn.textContent = 'Envoi en cours…';
   api('/api/client-auth/forgot-password', { method: 'POST', body: { email: email, base_url: baseUrl() } })
-    .then(function (d) { document.getElementById('forgot-msg').textContent = d.message; });
+    .then(function (d) { msgEl.textContent = d.message; })
+    .catch(function (e) { errEl.textContent = e.message || 'Une erreur est survenue, réessayez.'; })
+    .finally(function () { btn.disabled = false; btn.textContent = 'Envoyer le lien de réinitialisation'; });
 }
 
 function doResetPassword() {
