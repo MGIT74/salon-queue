@@ -3055,11 +3055,16 @@ function forceCloseClient(id) {
 function deleteClient(id) {
   showConfirm('Supprimer définitivement cette fiche ? Cette action est irréversible.', { title: 'Supprimer', danger: true, confirmLabel: 'Supprimer' }).then(function (ok) {
     if (!ok) return;
-    api('/api/queue/' + id, { method: 'DELETE' })
-      .then(loadClients).then(refreshQueue)
-      .then(function () { toast('Supprimé'); })
-      .catch(function (e) { toast(e.message, true); });
-  });
+    // Double validation pour une action irréversible : une 2e
+    // confirmation explicite avant l'appel réel à l'API.
+    return showConfirm('Dernière confirmation : voulez-vous vraiment supprimer définitivement cette fiche ?', { title: 'Êtes-vous sûr ?', danger: true, confirmLabel: 'Oui, supprimer' })
+      .then(function (ok2) {
+        if (!ok2) return;
+        return api('/api/queue/' + id, { method: 'DELETE' })
+          .then(loadClients).then(refreshQueue)
+          .then(function () { toast('Supprimé'); });
+      });
+  }).catch(function (e) { toast(e.message, true); });
 }
 
 /* ============ Mes salons (chaîne / enseigne) ============ */
