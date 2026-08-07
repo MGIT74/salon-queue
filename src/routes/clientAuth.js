@@ -16,6 +16,14 @@ function wrap(fn) {
   };
 }
 
+// base_url contient déjà ?salon=xxx si l'espace client est ouvert pour
+// un salon précis - ne jamais recoller un second '?' par-dessus (même
+// bug déjà rencontré et corrigé sur le lien d'annulation de RDV).
+function appendParam(baseUrl, key, value) {
+  const url = String(baseUrl || '').replace(/\/$/, '');
+  return url + (url.includes('?') ? '&' : '?') + key + '=' + value;
+}
+
 /**
  * Authentifie le client via l'en-tête X-Client-Token (jeton opaque,
  * cf. client_sessions). Ne fait AUCUN lien avec l'auth admin/coiffeur -
@@ -58,7 +66,7 @@ router.post('/signup', wrap(async (req, res) => {
   );
 
   try {
-    const verifyUrl = String(req.body.base_url || '').replace(/\/$/, '') + '?verify=' + verifyToken;
+    const verifyUrl = appendParam(req.body.base_url, 'verify', verifyToken);
     await sendClientVerificationEmail(req.salon.id, email, verifyUrl);
   } catch (err) {
     console.error('[client signup] envoi email échoué:', err.message);
@@ -93,7 +101,7 @@ router.post('/resend-verification', wrap(async (req, res) => {
       const verifyToken = crypto.randomBytes(32).toString('hex');
       const verifyExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
       await pool.query('UPDATE clients SET verify_token = ?, verify_token_expires = ? WHERE id = ?', [verifyToken, verifyExpires, client.id]);
-      const verifyUrl = String(req.body.base_url || '').replace(/\/$/, '') + '?verify=' + verifyToken;
+      const verifyUrl = appendParam(req.body.base_url, 'verify', verifyToken);
       await sendClientVerificationEmail(req.salon.id, email, verifyUrl);
     }
   } catch (err) {
@@ -141,7 +149,7 @@ router.post('/forgot-password', wrap(async (req, res) => {
       const token = crypto.randomBytes(32).toString('hex');
       const expires = new Date(Date.now() + 60 * 60 * 1000);
       await pool.query('UPDATE clients SET reset_token = ?, reset_token_expires = ? WHERE id = ?', [token, expires, client.id]);
-      const resetUrl = String(req.body.base_url || '').replace(/\/$/, '') + '?reset=' + token;
+      const resetUrl = appendParam(req.body.base_url, 'reset', token);
       await sendClientPasswordReset(req.salon.id, email, resetUrl);
     }
   } catch (err) {
