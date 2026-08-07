@@ -27,7 +27,7 @@ const SLOT_STEP_MIN = 15;
 function nowInParis() {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', hour12: false, hourCycle: 'h23'
+    hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
   }).formatToParts(new Date());
   const get = (type) => parts.find((p) => p.type === type).value;
   return {
@@ -46,7 +46,7 @@ function nowInParis() {
 function nowParisDatetimeString() {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, hourCycle: 'h23'
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'
   }).formatToParts(new Date());
   const get = (type) => parts.find((p) => p.type === type).value;
   return `${get('year')}-${get('month')}-${get('day')} ${get('hour')}:${get('minute')}:${get('second')}`;
@@ -67,7 +67,7 @@ function parisLocalToUtcDate(dateStr, timeStr) {
   const [hh, mi, se] = String(timeStr).split(':').map(Number);
   const guess = new Date(Date.UTC(y, mo - 1, d, hh, mi, se || 0));
   const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'Europe/Paris', hour12: false, hourCycle: 'h23',
+    timeZone: 'Europe/Paris', hourCycle: 'h23',
     year: 'numeric', month: '2-digit', day: '2-digit',
     hour: '2-digit', minute: '2-digit', second: '2-digit'
   }).formatToParts(guess);
