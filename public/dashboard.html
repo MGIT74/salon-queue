@@ -2715,7 +2715,10 @@ function openAdminAddAppointment(dateStr) {
   var state = { barberId: null, serviceId: null, extraIds: [], time: null };
 
   var overlay = _buildModal(
-    '<div class="modal-title">Ajouter un RDV — ' + when + '</div>' +
+    '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px">' +
+    '<div class="modal-title" style="margin-bottom:0">Ajouter un RDV — ' + when + '</div>' +
+    '<button id="aa-close-x" style="background:var(--fill);border:none;width:30px;height:30px;border-radius:50%;color:var(--grey);font-size:14px;cursor:pointer;flex-shrink:0;margin-left:10px">✕</button>' +
+    '</div>' +
 
     '<div id="aa-step-barber">' +
       '<div class="aa-step-title">Coiffeur</div>' +
@@ -2815,6 +2818,7 @@ function openAdminAddAppointment(dateStr) {
     aaGoStep('contact');
   };
 
+  overlay.querySelector('#aa-close-x').onclick = function () { _closeModal(overlay); };
   overlay.querySelector('#aa-cancel-btn').onclick = function () { _closeModal(overlay); };
 
   overlay.querySelector('#aa-save-btn').onclick = function () {
