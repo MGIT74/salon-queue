@@ -827,6 +827,7 @@
           <option value="50">50</option>
         </select>
       </div>
+      <button class="btn btn-primary" onclick="addManualClient()">+ Ajouter un client</button>
       <button class="btn btn-ghost" onclick="selectAllClients()" style="margin-left:auto">Tout sélectionner</button>
     </div>
 
@@ -999,10 +1000,22 @@
   <div class="client-drawer">
     <div class="client-drawer-head">
       <h2 id="drawer-client-name">—</h2>
+      <button class="x" id="drawer-edit-btn" title="Modifier ce client" onclick="toggleEditClientInfo()" style="margin-right:6px">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+      </button>
       <button class="x" onclick="closeClientDrawer()">✕</button>
     </div>
 
     <div class="client-drawer-section" id="drawer-info-section"></div>
+    <div class="client-drawer-section" id="drawer-info-edit-section" style="display:none">
+      <div class="fld" style="margin-bottom:8px"><label for="drawer-edit-name">Nom</label><input id="drawer-edit-name" type="text"></div>
+      <div class="fld" style="margin-bottom:8px"><label for="drawer-edit-email">Email</label><input id="drawer-edit-email" type="email"></div>
+      <div class="fld" style="margin-bottom:8px"><label for="drawer-edit-phone">Téléphone</label><input id="drawer-edit-phone" type="tel"></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-primary" onclick="saveClientInfo()">Enregistrer</button>
+        <button class="btn btn-ghost" onclick="toggleEditClientInfo()">Annuler</button>
+      </div>
+    </div>
 
     <div class="client-drawer-section" id="drawer-marketing-section" style="display:none">
       <h3>Marketing</h3>
@@ -1367,6 +1380,40 @@ function chipsHtml(q) {
  * note éditable, plutôt qu'un panneau qui se dépliait sous la ligne.
  */
 var drawerClientId = null;
+var drawerQueueId = null;
+var drawerClientSnapshot = null;
+
+function toggleEditClientInfo() {
+  var editing = document.getElementById('drawer-info-edit-section').style.display !== 'none';
+  if (editing) {
+    document.getElementById('drawer-info-edit-section').style.display = 'none';
+    document.getElementById('drawer-info-section').style.display = 'block';
+    return;
+  }
+  document.getElementById('drawer-edit-name').value = drawerClientSnapshot.client_name;
+  document.getElementById('drawer-edit-email').value = drawerClientSnapshot.email;
+  document.getElementById('drawer-edit-phone').value = drawerClientSnapshot.phone;
+  document.getElementById('drawer-info-section').style.display = 'none';
+  document.getElementById('drawer-info-edit-section').style.display = 'block';
+}
+
+function saveClientInfo() {
+  if (!drawerQueueId) return;
+  var name = document.getElementById('drawer-edit-name').value.trim();
+  if (!name) { toast('Le nom est requis', true); return; }
+  api('/api/queue/' + drawerQueueId, {
+    method: 'PUT',
+    body: {
+      client_name: name,
+      email: document.getElementById('drawer-edit-email').value.trim(),
+      phone: document.getElementById('drawer-edit-phone').value.trim()
+    }
+  }).then(function () {
+    toast('Client mis à jour');
+    toggleEditClientInfo();
+    return Promise.all([loadClients(), refreshQueue()]);
+  }).catch(function (e) { toast(e.message, true); });
+}
 
 /**
  * Panneau latéral (fiche client) : infos, note éditable, et historique
@@ -1380,6 +1427,14 @@ function openClientDrawer(id, source, directData) {
   if (!c) return;
 
   drawerClientId = id;
+  // Pour un RDV pas encore promu en file, il n'y a pas encore de vraie
+  // ligne 'queue' à éditer - le crayon est alors désactivé (rien à
+  // mettre à jour tant que le jour du RDV n'est pas arrivé).
+  drawerQueueId = source === 'appointment' ? (c.promoted_queue_id || null) : id;
+  drawerClientSnapshot = { client_name: c.client_name, email: c.email || '', phone: c.phone || '' };
+  document.getElementById('drawer-info-edit-section').style.display = 'none';
+  document.getElementById('drawer-info-section').style.display = 'block';
+  document.getElementById('drawer-edit-btn').style.display = drawerQueueId ? 'flex' : 'none';
   document.getElementById('drawer-client-name').textContent = c.client_name;
   document.getElementById('drawer-note').value = c.note || '';
 
@@ -3050,6 +3105,51 @@ function forceCloseClient(id) {
     .then(loadClients).then(refreshQueue)
     .then(function () { toast('Clôturé'); })
     .catch(function (e) { toast(e.message, true); });
+}
+
+/**
+ * Ajoute un client manuellement (pas de passage physique en cours) -
+ * utile pour saisir un contact connu par un autre biais, sans passer
+ * par un check-in kiosk. Créé directement comme historique 'Terminé'.
+ */
+function addManualClient() {
+  var svcOptions = '<option value="">— Aucune (facultatif) —</option>' +
+    services.map(function (s) { return '<option value="' + s.id + '">' + esc(s.name) + ' · ' + eur(s.price_cents) + '</option>'; }).join('');
+
+  var overlay = _buildModal(
+    '<div class="modal-title">Ajouter un client</div>' +
+    '<div class="fld" style="margin-bottom:10px"><label>Nom</label><input class="modal-input" id="mc-name" type="text" placeholder="Nom du client"></div>' +
+    '<div class="fld" style="margin-bottom:10px"><label>Email (optionnel)</label><input class="modal-input" id="mc-email" type="email"></div>' +
+    '<div class="fld" style="margin-bottom:10px"><label>Téléphone (optionnel)</label><input class="modal-input" id="mc-phone" type="tel"></div>' +
+    '<div class="fld" style="margin-bottom:14px"><label>Prestation (optionnel)</label><select class="modal-input" id="mc-service">' + svcOptions + '</select></div>' +
+    '<div class="modal-error" id="mc-error" style="display:none"></div>' +
+    '<div class="modal-actions">' +
+    '<button class="btn btn-soft" id="mc-cancel-btn">Annuler</button>' +
+    '<button class="btn btn-primary" id="mc-save-btn">Ajouter</button>' +
+    '</div>'
+  );
+
+  overlay.querySelector('#mc-cancel-btn').onclick = function () { _closeModal(overlay); };
+
+  overlay.querySelector('#mc-save-btn').onclick = function () {
+    var name = overlay.querySelector('#mc-name').value.trim();
+    var errEl = overlay.querySelector('#mc-error');
+    if (!name) { errEl.textContent = 'Le nom est requis'; errEl.style.display = 'block'; return; }
+
+    api('/api/queue/manual-client', {
+      method: 'POST',
+      body: {
+        client_name: name,
+        email: overlay.querySelector('#mc-email').value.trim(),
+        phone: overlay.querySelector('#mc-phone').value.trim(),
+        service_id: overlay.querySelector('#mc-service').value || null
+      }
+    }).then(function () {
+      _closeModal(overlay);
+      toast('Client ajouté');
+      return loadClients();
+    }).catch(function (e) { errEl.textContent = e.message; errEl.style.display = 'block'; });
+  };
 }
 
 function deleteClient(id) {
