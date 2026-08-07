@@ -2674,10 +2674,8 @@ function renderExpandPanel(dateStr, dayAppts) {
 
   return '<div class="cal-expand-panel">' +
     '<div class="cal-expand-head"><strong style="text-transform:capitalize">' + when + '</strong>' +
-    '<div style="display:flex;gap:8px">' +
-    '<button class="btn btn-primary" onclick="event.stopPropagation();openAdminAddAppointment(\'' + dateStr + '\')">+ Ajouter un RDV</button>' +
-    '<button class="btn btn-soft" onclick="event.stopPropagation();selectCalendarDay(null)">Fermer</button>' +
-    '</div></div>' +
+    '<button class="btn btn-soft" onclick="event.stopPropagation();selectCalendarDay(null)">Fermer</button></div>' +
+    '<button class="btn btn-primary" style="width:100%;margin-bottom:14px" onclick="event.stopPropagation();openAdminAddAppointment(\'' + dateStr + '\')">+ Ajouter un RDV</button>' +
     rows +
     '</div>';
 }
