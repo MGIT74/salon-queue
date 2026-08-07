@@ -553,7 +553,7 @@ function submitBookAppointment() {
   var btn = document.getElementById('bk-confirm-btn');
   btn.disabled = true; btn.textContent = 'Enregistrement…';
 
-  apiForBooking('/api/client-auth/me').then(function (me) {
+  api('/api/client-auth/me').then(function (me) {
     return apiForBooking('/api/appointments', {
       method: 'POST',
       body: {
@@ -610,6 +610,17 @@ function esc(s) {
 }
 
 (function init() {
+  // Toujours mettre à jour le nom du salon en haut de page, quel que
+  // soit l'état de connexion — avant, cette mise à jour était sautée
+  // dès qu'un client était déjà connecté (retour anticipé), laissant
+  // le texte statique "LE SALON" du HTML au lieu du vrai nom.
+  if (SALON_SLUG) {
+    fetch('/api/settings/public', { headers: { 'X-Salon-Slug': SALON_SLUG } })
+      .then(function (r) { return r.json(); })
+      .then(function (d) { if (d.salon_name) document.getElementById('salon-mark').textContent = d.salon_name.toUpperCase(); })
+      .catch(function () {});
+  }
+
   var params = new URLSearchParams(window.location.search);
   var verifyToken = params.get('verify');
   var resetToken = params.get('reset');
@@ -628,13 +639,6 @@ function esc(s) {
   if (resetToken) { show('p-reset'); return; }
 
   if (localStorage.getItem('client_token')) { loadProfile(); return; }
-
-  if (SALON_SLUG) {
-    fetch('/api/settings/public', { headers: { 'X-Salon-Slug': SALON_SLUG } })
-      .then(function (r) { return r.json(); })
-      .then(function (d) { if (d.salon_name) document.getElementById('salon-mark').textContent = d.salon_name.toUpperCase(); })
-      .catch(function () {});
-  }
 })();
 </script>
 </body>
