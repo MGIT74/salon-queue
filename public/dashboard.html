@@ -836,6 +836,7 @@
       <div class="export-actions">
         <button class="btn btn-soft" onclick="exportClientsCsv()">Télécharger CSV</button>
         <button class="btn btn-soft" onclick="exportClientsPdf()">Télécharger PDF</button>
+        <button class="btn btn-ghost" style="color:var(--red)" onclick="deleteSelectedClients()">Tout supprimer</button>
         <button class="btn btn-ghost" onclick="clearClientSelection()">Tout désélectionner</button>
       </div>
     </div>
@@ -3151,6 +3152,27 @@ function addManualClient() {
       return loadClients();
     }).catch(function (e) { errEl.textContent = e.message; errEl.style.display = 'block'; });
   };
+}
+
+function deleteSelectedClients() {
+  var rows = getSelectedClients();
+  if (!rows.length) return;
+  var n = rows.length;
+  var label = n + ' fiche' + (n > 1 ? 's' : '');
+
+  showConfirm('Supprimer définitivement ' + label + ' sélectionnée' + (n > 1 ? 's' : '') + ' ? Cette action est irréversible.', { title: 'Supprimer', danger: true, confirmLabel: 'Supprimer' }).then(function (ok) {
+    if (!ok) return;
+    return showConfirm('Dernière confirmation : voulez-vous vraiment supprimer définitivement ' + label + ' ?', { title: 'Êtes-vous sûr ?', danger: true, confirmLabel: 'Oui, tout supprimer' })
+      .then(function (ok2) {
+        if (!ok2) return;
+        return Promise.all(rows.map(function (c) { return api('/api/queue/' + c.id, { method: 'DELETE' }); }))
+          .then(function () {
+            clearClientSelection();
+            return Promise.all([loadClients(), refreshQueue()]);
+          })
+          .then(function () { toast(label + ' supprimée' + (n > 1 ? 's' : '')); });
+      });
+  }).catch(function (e) { toast(e.message, true); });
 }
 
 function deleteClient(id) {
