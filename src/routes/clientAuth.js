@@ -233,8 +233,11 @@ router.get('/me', requireClient, wrap(async (req, res) => {
     });
   }
 
-  // Seulement les passages déjà TERMINÉS/ANNULÉS (jamais un en cours
-  // ou en attente, qui appartient à upcoming_appointments ci-dessus).
+  // Seulement le DERNIER passage TERMINÉ/ANNULÉ (jamais un en cours ou
+  // en attente, déjà couvert par upcoming_appointments) - une liste de
+  // plusieurs n'apportait pas grand-chose en pratique (souvent la même
+  // prestation répétée), contrairement aux RDV à venir qui eux
+  // méritent d'être tous visibles.
   const [recentVisits] = await pool.query(
     `SELECT q.id, q.checkin_at, q.status, s.name AS service_name, q.service_id, q.barber_id, b.name AS barber_name,
             sl.slug AS salon_slug, sl.name AS salon_name
@@ -243,7 +246,7 @@ router.get('/me', requireClient, wrap(async (req, res) => {
      LEFT JOIN services s ON s.id = q.service_id
      LEFT JOIN barbers b ON b.id = q.barber_id
      WHERE sl.owner_id = ? AND LOWER(TRIM(q.email)) = ? AND q.status IN ('done', 'cancelled')
-     ORDER BY q.checkin_at DESC LIMIT 4`,
+     ORDER BY q.checkin_at DESC LIMIT 1`,
     [c.owner_id, key]
   );
 
