@@ -183,8 +183,11 @@
       Votre carte de fidélité n'est pas encore activée — demandez à votre coiffeur de l'activer lors de votre prochain passage.
     </div>
 
-    <div class="eyebrow" id="visit-eyebrow">Dernière prestation</div>
-    <div class="card" id="last-visit-card"></div>
+    <div class="eyebrow" id="upcoming-eyebrow" style="display:none">Vos prochains rendez-vous</div>
+    <div id="upcoming-list"></div>
+
+    <div class="eyebrow">Derniers passages</div>
+    <div id="history-list"></div>
   </section>
 
   <!-- Compte (connecté) : infos + mot de passe -->
@@ -388,60 +391,58 @@ function doResetPassword() {
 var STATUS_LABEL = { waiting: 'En attente', in_progress: 'En cours', done: 'Terminé', cancelled: 'Absent / annulé' };
 var pendingCancelToken = null;
 
-function renderVisitCard(upcoming, lastVisit) {
-  var eyebrow = document.getElementById('visit-eyebrow');
-  var card = document.getElementById('last-visit-card');
-  pendingCancelToken = null;
+function renderVisitCard(upcomingList, historyList) {
+  document.getElementById('upcoming-eyebrow').style.display = upcomingList.length ? 'block' : 'none';
 
-  if (upcoming) {
-    eyebrow.textContent = 'Votre prochain rendez-vous';
-    var when = new Date(upcoming.scheduled_at.replace(' ', 'T')).toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' }) +
-      ' à ' + upcoming.scheduled_at.slice(11, 16);
-    pendingCancelToken = upcoming.cancel_token;
-    card.innerHTML =
-      '<div class="visit-row" style="cursor:pointer" onclick="toggleVisitDetails()">' +
-        '<div><div class="name">' + esc(upcoming.service_name || 'Prestation') + '</div>' +
+  document.getElementById('upcoming-list').innerHTML = upcomingList.map(function (a, i) {
+    var when = new Date(a.scheduled_at.replace(' ', 'T')).toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' }) +
+      ' à ' + a.scheduled_at.slice(11, 16);
+    return '<div class="card" style="margin-bottom:12px">' +
+      '<div class="visit-row" style="cursor:pointer" onclick="toggleVisitDetails(\'up-' + i + '\')">' +
+        '<div><div class="name">' + esc(a.service_name || 'Prestation') + '</div>' +
         '<div class="when">' + when + '</div></div>' +
-        '<button class="go" style="width:auto;margin:0;padding:10px 16px;font-size:14px;background:var(--red)" onclick="event.stopPropagation();openCancelModal()">Annuler</button>' +
+        '<button class="go" style="width:auto;margin:0;padding:10px 16px;font-size:14px;background:var(--red)" onclick="event.stopPropagation();openCancelModal(\'' + a.cancel_token + '\')">Annuler</button>' +
       '</div>' +
-      '<div id="visit-details" style="display:none;margin-top:14px;padding-top:14px;border-top:1px solid rgba(128,128,128,.25);font-size:13.5px;color:var(--grey);line-height:1.9">' +
-        (upcoming.barber_name ? '<div>Coiffeur : <strong style="color:var(--ink)">' + esc(upcoming.barber_name) + '</strong></div>' : '') +
-        (upcoming.extras.length ? '<div>Suppléments : ' + esc(upcoming.extras.join(', ')) + '</div>' : '') +
-        '<div>Tarif : <strong style="color:var(--ink)">' + eur(upcoming.price_cents) + '</strong></div>' +
+      '<div id="details-up-' + i + '" style="display:none;margin-top:14px;padding-top:14px;border-top:1px solid rgba(128,128,128,.25);font-size:13.5px;color:var(--grey);line-height:1.9">' +
+        (a.barber_name ? '<div>Coiffeur : <strong style="color:var(--ink)">' + esc(a.barber_name) + '</strong></div>' : '') +
+        (a.extras.length ? '<div>Suppléments : ' + esc(a.extras.join(', ')) + '</div>' : '') +
+        '<div>Tarif : <strong style="color:var(--ink)">' + eur(a.price_cents) + '</strong></div>' +
         '<div style="margin-top:10px" onclick="event.stopPropagation()">' +
           '<label style="font-size:12.5px;display:block;margin-bottom:5px">Note pour le salon (allergie, préférence…)</label>' +
-          '<textarea id="visit-note" rows="2" style="width:100%;font-family:inherit;font-size:14px;padding:9px;border-radius:10px;border:none;background:var(--bg);color:var(--ink);resize:vertical">' + esc(upcoming.client_note || '') + '</textarea>' +
-          '<button class="link-btn" style="margin-top:6px" onclick="saveVisitNote()">Enregistrer la note</button>' +
-          '<span class="msg" id="visit-note-msg" style="display:inline-block;margin-left:8px"></span>' +
+          '<textarea id="note-up-' + i + '" rows="2" style="width:100%;font-family:inherit;font-size:14px;padding:9px;border-radius:10px;border:none;background:var(--bg);color:var(--ink);resize:vertical">' + esc(a.client_note || '') + '</textarea>' +
+          '<button class="link-btn" style="margin-top:6px" onclick="saveVisitNote(\'' + a.id + '\',\'up-' + i + '\')">Enregistrer la note</button>' +
+          '<span class="msg" id="notemsg-up-' + i + '" style="display:inline-block;margin-left:8px"></span>' +
         '</div>' +
-      '</div>';
-  } else if (lastVisit) {
-    eyebrow.textContent = 'Dernière prestation';
-    card.innerHTML = '<div class="visit-row"><div><div class="name">' + esc(lastVisit.service_name || 'Prestation') + '</div>' +
-      '<div class="when">' + new Date(lastVisit.checkin_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' }) +
-      ' · ' + esc(STATUS_LABEL[lastVisit.status] || lastVisit.status) + '</div></div>' +
-      '<button class="go" style="width:auto;margin:0;padding:10px 16px;font-size:14px" onclick="rebook(\'' + lastVisit.salon_slug + '\',\'' + lastVisit.service_id + '\',\'' + (lastVisit.barber_id || '') + '\')">Réserver à nouveau</button></div>';
-  } else {
-    eyebrow.textContent = 'Dernière prestation';
-    card.innerHTML = '<div class="lbl">Aucune prestation trouvée pour le moment.</div>';
-  }
+      '</div>' +
+    '</div>';
+  }).join('') || '';
+
+  document.getElementById('history-list').innerHTML = historyList.length
+    ? historyList.map(function (v) {
+        return '<div class="card" style="margin-bottom:12px"><div class="visit-row"><div><div class="name">' + esc(v.service_name || 'Prestation') + '</div>' +
+          '<div class="when">' + new Date(v.checkin_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' }) +
+          ' · ' + esc(STATUS_LABEL[v.status] || v.status) + '</div></div>' +
+          '<button class="go" style="width:auto;margin:0;padding:10px 16px;font-size:14px" onclick="rebook(\'' + v.salon_slug + '\',\'' + v.service_id + '\',\'' + (v.barber_id || '') + '\')">Réserver à nouveau</button></div></div>';
+      }).join('')
+    : '<div class="card"><div class="lbl">Aucun passage trouvé pour le moment.</div></div>';
 }
 
-function toggleVisitDetails() {
-  var d = document.getElementById('visit-details');
+function toggleVisitDetails(key) {
+  var d = document.getElementById('details-' + key);
   d.style.display = d.style.display === 'none' ? 'block' : 'none';
 }
 
-function saveVisitNote() {
-  var note = document.getElementById('visit-note').value.trim();
-  var msg = document.getElementById('visit-note-msg');
-  api('/api/client-auth/upcoming-note', { method: 'PUT', body: { note: note } })
+function saveVisitNote(appointmentId, key) {
+  var note = document.getElementById('note-' + key).value.trim();
+  var msg = document.getElementById('notemsg-' + key);
+  api('/api/client-auth/appointments/' + appointmentId + '/note', { method: 'PUT', body: { note: note } })
     .then(function () { msg.textContent = 'Enregistré.'; setTimeout(function () { msg.textContent = ''; }, 2500); })
     .catch(function (e) { toast(e.message, true); });
 }
 
 /* ---------- Annulation (popup, pas de double-clic sur le même bouton) ---------- */
-function openCancelModal() {
+function openCancelModal(cancelToken) {
+  pendingCancelToken = cancelToken;
   document.getElementById('cancel-modal-backdrop').classList.add('on');
 }
 
@@ -500,7 +501,7 @@ function populateHome(d) {
       : '';
   }
 
-  renderVisitCard(d.upcoming_appointment, d.last_visit);
+  renderVisitCard(d.upcoming_appointments || [], d.recent_visits || []);
 }
 
 function loadProfile() {

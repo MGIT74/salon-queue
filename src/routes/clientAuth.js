@@ -171,23 +171,17 @@ router.post('/reset-password', wrap(async (req, res) => {
 }));
 
 /**
- * Profil + fidélité + dernière prestation. Le rapprochement avec
- * l'historique de passages se fait UNIQUEMENT via l'email du compte
- * (cf. clientKey() : email en priorité) - un client ayant réservé/payé
- * autrefois sous un email différent (ou en tant que passage sans-RDV
- * sans email) ne remontera pas ici, limite connue.
- */
-/**
- * Profil + fidélité + RDV en cours. Le rapprochement avec l'historique
- * de passages se fait UNIQUEMENT via l'email du compte (cf.
- * clientKey() : email en priorité) - un client ayant réservé/payé
- * autrefois sous un email différent (ou en tant que passage sans-RDV
- * sans email) ne remontera pas ici, limite connue.
+ * Profil + fidélité + RDV à venir + historique récent. Le
+ * rapprochement avec l'historique de passages se fait UNIQUEMENT via
+ * l'email du compte (cf. clientKey() : email en priorité) - un client
+ * ayant réservé/payé autrefois sous un email différent (ou en tant que
+ * passage sans-RDV sans email) ne remontera pas ici, limite connue.
  *
- * Une seule chose affichée à la fois, jamais une liste :
- * - s'il a un RDV CONFIRMÉ pas encore passé (upcoming_appointment) ->
- *   annulable, avec prix/coiffeur/suppléments pour le détail dépliable.
- * - sinon, son DERNIER passage réel (last_visit) -> pour re-réserver.
+ * - upcoming_appointments : TOUS les RDV confirmés pas encore honorés
+ *   (plus une seule fois la plus proche) -> chacun annulable.
+ * - recent_visits : les derniers passages déjà TERMINÉS ou ANNULÉS
+ *   (jamais un RDV encore en cours - déjà couvert ci-dessus) -> pour
+ *   re-réserver, plusieurs affichés, pas juste le dernier.
  */
 router.get('/me', requireClient, wrap(async (req, res) => {
   const c = req.clientAccount;
@@ -205,7 +199,7 @@ router.get('/me', requireClient, wrap(async (req, res) => {
   // prévu, cf. le correctif des créneaux dynamiques) : son statut reste
   // 'confirmed' indéfiniment côté appointments, seule la file liée
   // (promoted_queue_id) sait qu'il est déjà 'done'.
-  const [[upcoming]] = await pool.query(
+  const [upcomingRows] = await pool.query(
     `SELECT a.id, a.scheduled_at, a.cancel_token, a.service_id, a.barber_id, a.client_note,
             s.name AS service_name, s.price_cents AS service_price_cents,
             bar.name AS barber_name, sl.slug AS salon_slug, sl.name AS salon_name
@@ -216,18 +210,18 @@ router.get('/me', requireClient, wrap(async (req, res) => {
      JOIN salons sl ON sl.id = a.salon_id
      WHERE sl.owner_id = ? AND LOWER(TRIM(a.email)) = ? AND a.status = 'confirmed' AND a.scheduled_at >= ?
        AND (q.status IS NULL OR q.status NOT IN ('done', 'cancelled'))
-     ORDER BY a.scheduled_at ASC LIMIT 1`,
+     ORDER BY a.scheduled_at ASC LIMIT 20`,
     [c.owner_id, key, nowParisDatetimeString()]
   );
 
-  let upcomingAppointment = null;
-  if (upcoming) {
+  const upcomingAppointments = [];
+  for (const upcoming of upcomingRows) {
     const [extraRows] = await pool.query(
       `SELECT e.name, e.price_cents FROM appointment_extras ae JOIN extras e ON e.id = ae.extra_id WHERE ae.appointment_id = ?`,
       [upcoming.id]
     );
     const totalCents = upcoming.service_price_cents + extraRows.reduce((sum, e) => sum + e.price_cents, 0);
-    upcomingAppointment = {
+    upcomingAppointments.push({
       id: upcoming.id,
       scheduled_at: upcoming.scheduled_at,
       service_name: upcoming.service_name,
@@ -236,32 +230,30 @@ router.get('/me', requireClient, wrap(async (req, res) => {
       price_cents: totalCents,
       client_note: upcoming.client_note || '',
       cancel_token: upcoming.cancel_token
-    };
+    });
   }
 
-  let lastVisit = null;
-  if (!upcomingAppointment) {
-    const [[lv]] = await pool.query(
-      `SELECT q.checkin_at, q.status, s.name AS service_name, q.service_id, q.barber_id, b.name AS barber_name,
-              sl.slug AS salon_slug, sl.name AS salon_name
-       FROM queue q
-       JOIN salons sl ON sl.id = q.salon_id
-       LEFT JOIN services s ON s.id = q.service_id
-       LEFT JOIN barbers b ON b.id = q.barber_id
-       WHERE sl.owner_id = ? AND LOWER(TRIM(q.email)) = ?
-       ORDER BY q.checkin_at DESC LIMIT 1`,
-      [c.owner_id, key]
-    );
-    lastVisit = lv || null;
-  }
+  // Seulement les passages déjà TERMINÉS/ANNULÉS (jamais un en cours
+  // ou en attente, qui appartient à upcoming_appointments ci-dessus).
+  const [recentVisits] = await pool.query(
+    `SELECT q.id, q.checkin_at, q.status, s.name AS service_name, q.service_id, q.barber_id, b.name AS barber_name,
+            sl.slug AS salon_slug, sl.name AS salon_name
+     FROM queue q
+     JOIN salons sl ON sl.id = q.salon_id
+     LEFT JOIN services s ON s.id = q.service_id
+     LEFT JOIN barbers b ON b.id = q.barber_id
+     WHERE sl.owner_id = ? AND LOWER(TRIM(q.email)) = ? AND q.status IN ('done', 'cancelled')
+     ORDER BY q.checkin_at DESC LIMIT 4`,
+    [c.owner_id, key]
+  );
 
   res.json({
     ok: true,
     profile: { name: c.name, email: c.email, phone: c.phone },
     loyalty_activated: loyaltyActivated,
     loyalty: loyaltyActivated ? { points: loyalty.points, rewards_available: loyalty.rewards_available } : null,
-    upcoming_appointment: upcomingAppointment,
-    last_visit: lastVisit
+    upcoming_appointments: upcomingAppointments,
+    recent_visits: recentVisits
   });
 }));
 
@@ -298,24 +290,25 @@ router.put('/me', requireClient, wrap(async (req, res) => {
 }));
 
 /**
- * Modifie la note du client sur SON rendez-vous à venir (allergie,
- * préférence...) - jamais la note privée du coiffeur (client_notes),
- * qui reste un outil séparé réservé au staff.
+ * Modifie la note du client sur UN de ses rendez-vous à venir précis
+ * (allergie, préférence...) - jamais la note privée du coiffeur
+ * (client_notes), qui reste un outil séparé réservé au staff.
+ * Vérifie que ce RDV appartient bien au client connecté (même email)
+ * avant toute modification.
  */
-router.put('/upcoming-note', requireClient, wrap(async (req, res) => {
+router.put('/appointments/:id/note', requireClient, wrap(async (req, res) => {
   const c = req.clientAccount;
   const key = clientKey({ email: c.email });
   const note = req.body.note ? String(req.body.note).slice(0, 500) : null;
 
-  const [[upcoming]] = await pool.query(
+  const [[appt]] = await pool.query(
     `SELECT a.id FROM appointments a JOIN salons sl ON sl.id = a.salon_id
-     WHERE sl.owner_id = ? AND LOWER(TRIM(a.email)) = ? AND a.status = 'confirmed' AND a.scheduled_at >= ?
-     ORDER BY a.scheduled_at ASC LIMIT 1`,
-    [c.owner_id, key, nowParisDatetimeString()]
+     WHERE a.id = ? AND sl.owner_id = ? AND LOWER(TRIM(a.email)) = ? AND a.status = 'confirmed'`,
+    [req.params.id, c.owner_id, key]
   );
-  if (!upcoming) return res.status(404).json({ error: 'Aucun rendez-vous à venir' });
+  if (!appt) return res.status(404).json({ error: 'Rendez-vous introuvable' });
 
-  await pool.query('UPDATE appointments SET client_note = ? WHERE id = ?', [note, upcoming.id]);
+  await pool.query('UPDATE appointments SET client_note = ? WHERE id = ?', [note, appt.id]);
   res.json({ ok: true });
 }));
 
