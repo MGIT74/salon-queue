@@ -2580,12 +2580,11 @@ function appointmentsForRange(startDate, endDate) {
 function sourceBadge(a, compact) {
   var isWalkin = a.source === 'walkin';
   var title = isWalkin ? 'Sans RDV (passage au salon)' : 'RDV en ligne';
-  var color = isWalkin ? 'var(--orange, #f97316)' : 'var(--blue)';
   var sz = compact ? 12 : 14;
   var icon = isWalkin
-    ? '<svg viewBox="0 0 24 24" width="' + sz + '" height="' + sz + '" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4h2.5a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H15"/><path d="M8 8.5 3.5 12 8 15.5"/><path d="M4 12h11"/></svg>'
+    ? '<svg viewBox="0 0 24 24" width="' + sz + '" height="' + sz + '" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="13" cy="4" r="1.5"/><path d="M9.5 21l2-6-1.5-1.5.5-4.5 3-1 2 2.5 2.5 1"/><path d="M14.5 21l-1-5"/></svg>'
     : '<svg viewBox="0 0 24 24" width="' + sz + '" height="' + sz + '" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5.5" width="16" height="15" rx="2.5"/><path d="M4 9.5h16"/><path d="M8 3.5v3.5M16 3.5v3.5"/></svg>';
-  return '<span title="' + title + '" style="display:inline-flex;vertical-align:middle;color:' + color + ';margin-right:4px">' + icon + '</span>';
+  return '<span title="' + title + '" style="display:inline-flex;vertical-align:middle;color:var(--blue);margin-right:4px">' + icon + '</span>';
 }
 
 var monthNames = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
