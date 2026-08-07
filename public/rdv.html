@@ -78,13 +78,18 @@
     <button class="back" onclick="show('p-barber')">‹ Retour</button>
     <div class="eyebrow">Prestation</div>
     <div class="svc-grid" id="svc-grid"></div>
+    <button class="go" id="service-next-btn" onclick="goToExtrasStep()" disabled>Suivant</button>
+  </section>
+
+  <section class="panel" id="p-extras">
+    <button class="back" onclick="show('p-service')">‹ Retour</button>
     <div class="eyebrow">Suppléments (optionnels)</div>
     <div class="extras-grid" id="extras-grid"></div>
-    <button class="go" id="service-next-btn" onclick="goToDateStep()" disabled>Suivant</button>
+    <button class="go" onclick="goToDateStep()">Suivant</button>
   </section>
 
   <section class="panel" id="p-datetime">
-    <button class="back" onclick="show('p-service')">‹ Retour</button>
+    <button class="back" onclick="show('p-extras')">‹ Retour</button>
     <div class="fld"><label for="rdv-date">Date</label><input id="rdv-date" type="date" onchange="loadSlots()"></div>
     <div class="eyebrow" style="margin-top:20px">Créneaux disponibles</div>
     <div class="slots-grid" id="slots-grid"><div class="empty">Choisissez une date</div></div>
@@ -254,6 +259,11 @@ function toggleExtra(el, id) {
   var i = selExtras.indexOf(id);
   if (i === -1) selExtras.push(id); else selExtras.splice(i, 1);
   el.classList.toggle('sel');
+}
+
+function goToExtrasStep() {
+  if (!selService) { toast('Choisissez une prestation', true); return; }
+  show('p-extras');
 }
 
 function goToDateStep() {
