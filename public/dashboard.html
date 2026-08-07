@@ -3115,15 +3115,11 @@ function forceCloseClient(id) {
  * par un check-in kiosk. Créé directement comme historique 'Terminé'.
  */
 function addManualClient() {
-  var svcOptions = '<option value="">— Aucune (facultatif) —</option>' +
-    services.map(function (s) { return '<option value="' + s.id + '">' + esc(s.name) + ' · ' + eur(s.price_cents) + '</option>'; }).join('');
-
   var overlay = _buildModal(
     '<div class="modal-title">Ajouter un client</div>' +
     '<div class="fld" style="margin-bottom:10px"><label>Nom</label><input class="modal-input" id="mc-name" type="text" placeholder="Nom du client"></div>' +
     '<div class="fld" style="margin-bottom:10px"><label>Email (optionnel)</label><input class="modal-input" id="mc-email" type="email"></div>' +
-    '<div class="fld" style="margin-bottom:10px"><label>Téléphone (optionnel)</label><input class="modal-input" id="mc-phone" type="tel"></div>' +
-    '<div class="fld" style="margin-bottom:14px"><label>Prestation (optionnel)</label><select class="modal-input" id="mc-service">' + svcOptions + '</select></div>' +
+    '<div class="fld" style="margin-bottom:14px"><label>Téléphone (optionnel)</label><input class="modal-input" id="mc-phone" type="tel"></div>' +
     '<div class="modal-error" id="mc-error" style="display:none"></div>' +
     '<div class="modal-actions">' +
     '<button class="btn btn-soft" id="mc-cancel-btn">Annuler</button>' +
@@ -3143,8 +3139,7 @@ function addManualClient() {
       body: {
         client_name: name,
         email: overlay.querySelector('#mc-email').value.trim(),
-        phone: overlay.querySelector('#mc-phone').value.trim(),
-        service_id: overlay.querySelector('#mc-service').value || null
+        phone: overlay.querySelector('#mc-phone').value.trim()
       }
     }).then(function () {
       _closeModal(overlay);
