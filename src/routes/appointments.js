@@ -300,6 +300,14 @@ router.post('/', wrap(async (req, res) => {
   if (!email) return res.status(400).json({ error: "L'email est requis pour la confirmation" });
   if (!service_id || !date || !time) return res.status(400).json({ error: 'Prestation, date et créneau requis' });
 
+  // Le champ 'min' du calendrier n'est qu'une protection côté
+  // navigateur (fiable sur desktop, pas garantie sur toutes les
+  // versions mobile/tablette) - on revérifie ici, côté serveur, que le
+  // créneau demandé n'est pas déjà passé (heure de salon, pas UTC).
+  if (`${date} ${time}:00` < nowParisDatetimeString()) {
+    return res.status(400).json({ error: 'Ce créneau est déjà passé, choisissez une date/heure à venir.' });
+  }
+
   const [[service]] = await pool.query(
     'SELECT name, duration_min FROM services WHERE id = ? AND salon_id = ?', [service_id, req.salon.id]
   );
