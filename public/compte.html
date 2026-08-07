@@ -324,7 +324,6 @@ function hideFooter() {
   document.body.classList.remove('has-footer');
 }
 
-function goHome() { show('p-home'); showFooter('nav-home'); }
 function goAccount() { show('p-account'); showFooter('nav-account'); }
 
 function doSignup() {
@@ -452,24 +451,51 @@ function confirmCancelUpcoming() {
     .finally(function () { btn.disabled = false; btn.textContent = 'Oui, annuler mon rendez-vous'; });
 }
 
+function goHome() {
+  show('p-home');
+  showFooter('nav-home');
+  refreshHomeInBackground();
+}
+
+function showHomePanel() {
+  show('p-home');
+  showFooter('nav-home');
+}
+
+// Rafraîchit les données (fidélité, RDV à venir/dernier passage) sans
+// perturber l'affichage - la page reste utilisable pendant l'appel,
+// le contenu se met juste à jour une fois la réponse arrivée.
+function refreshHomeInBackground() {
+  api('/api/client-auth/me').then(function (d) {
+    populateHome(d);
+  }).catch(function () {
+    localStorage.removeItem('client_token');
+    hideFooter();
+    show('p-login');
+  });
+}
+
+function populateHome(d) {
+  document.getElementById('home-hello').textContent = 'Bonjour ' + d.profile.name;
+  document.getElementById('pf-name').value = d.profile.name;
+  document.getElementById('pf-email').value = d.profile.email;
+
+  document.getElementById('loyalty-section').style.display = d.loyalty_activated ? 'block' : 'none';
+  document.getElementById('loyalty-inactive-msg').style.display = d.loyalty_activated ? 'none' : 'block';
+  if (d.loyalty_activated) {
+    document.getElementById('loyalty-points').textContent = d.loyalty.points;
+    document.getElementById('loyalty-gift').innerHTML = d.loyalty.rewards_available > 0
+      ? '<span class="gift-badge">🎁 ' + d.loyalty.rewards_available + ' cadeau' + (d.loyalty.rewards_available > 1 ? 'x' : '') + ' disponible' + (d.loyalty.rewards_available > 1 ? 's' : '') + '</span>'
+      : '';
+  }
+
+  renderVisitCard(d.upcoming_appointment, d.last_visit);
+}
+
 function loadProfile() {
   api('/api/client-auth/me').then(function (d) {
-    document.getElementById('home-hello').textContent = 'Bonjour ' + d.profile.name;
-    document.getElementById('pf-name').value = d.profile.name;
-    document.getElementById('pf-email').value = d.profile.email;
-
-    document.getElementById('loyalty-section').style.display = d.loyalty_activated ? 'block' : 'none';
-    document.getElementById('loyalty-inactive-msg').style.display = d.loyalty_activated ? 'none' : 'block';
-    if (d.loyalty_activated) {
-      document.getElementById('loyalty-points').textContent = d.loyalty.points;
-      document.getElementById('loyalty-gift').innerHTML = d.loyalty.rewards_available > 0
-        ? '<span class="gift-badge">🎁 ' + d.loyalty.rewards_available + ' cadeau' + (d.loyalty.rewards_available > 1 ? 'x' : '') + ' disponible' + (d.loyalty.rewards_available > 1 ? 's' : '') + '</span>'
-        : '';
-    }
-
-    renderVisitCard(d.upcoming_appointment, d.last_visit);
-
-    goHome();
+    populateHome(d);
+    showHomePanel();
   }).catch(function () {
     localStorage.removeItem('client_token');
     hideFooter();
