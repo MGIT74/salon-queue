@@ -397,6 +397,85 @@ router.post('/', wrap(async (req, res) => {
 }));
 
 /**
+ * Création manuelle d'un RDV par l'admin (ex: client au téléphone) -
+ * email optionnel (pas de confirmation envoyée si absent, contrairement
+ * à une réservation en ligne où il est obligatoire), mais le coiffeur
+ * est TOUJOURS requis explicitement (pas de "premier disponible"
+ * automatique comme pour le grand public).
+ */
+router.post('/admin-create', requireAdmin, wrap(async (req, res) => {
+  const { client_name, email, phone, service_id, barber_id, extras, date, time } = req.body;
+  const clientNote = req.body.client_note ? String(req.body.client_note).slice(0, 500) : null;
+  if (!client_name) return res.status(400).json({ error: 'Le nom est requis' });
+  if (!barber_id) return res.status(400).json({ error: 'Le coiffeur est requis' });
+  if (!service_id || !date || !time) return res.status(400).json({ error: 'Prestation, date et créneau requis' });
+
+  if (`${date} ${time}:00` < nowParisDatetimeString()) {
+    return res.status(400).json({ error: 'Ce créneau est déjà passé, choisissez une date/heure à venir.' });
+  }
+
+  const [[service]] = await pool.query(
+    'SELECT name, duration_min FROM services WHERE id = ? AND salon_id = ?', [service_id, req.salon.id]
+  );
+  if (!service) return res.status(404).json({ error: 'Prestation introuvable' });
+
+  let extraIds = Array.isArray(extras) ? extras : [];
+  let extraDuration = 0;
+  let extraNames = [];
+  if (extraIds.length) {
+    const [rows] = await pool.query('SELECT id, name, duration_min FROM extras WHERE id IN (?)', [extraIds]);
+    extraDuration = rows.reduce((a, r) => a + r.duration_min, 0);
+    extraNames = rows.map((r) => r.name);
+  }
+  const durationMin = service.duration_min + extraDuration;
+
+  const slots = await computeSlotsForBarber(barber_id, date, durationMin);
+  if (!slots.includes(time)) return res.status(409).json({ error: "Ce créneau n'est plus disponible" });
+
+  const id = crypto.randomUUID();
+  const cancelToken = crypto.randomBytes(24).toString('hex');
+  const scheduledAt = date + ' ' + time + ':00';
+
+  await pool.query(
+    `INSERT INTO appointments (id, salon_id, barber_id, client_name, email, phone, service_id, scheduled_at, status, cancel_token, client_note)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?)`,
+    [id, req.salon.id, barber_id, client_name, email || null, phone || null, service_id, scheduledAt, cancelToken, clientNote]
+  );
+  if (extraIds.length) {
+    await pool.query('INSERT INTO appointment_extras (appointment_id, extra_id) VALUES ?', [extraIds.map((eid) => [id, eid])]);
+  }
+
+  if (email) {
+    const [[barber]] = await pool.query('SELECT name FROM barbers WHERE id = ?', [barber_id]);
+    const when = new Date(scheduledAt.replace(' ', 'T')).toLocaleString('fr-FR', {
+      weekday: 'long', day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit'
+    });
+    const baseUrl = String(req.body.base_url || '').replace(/\/$/, '');
+    const cancelUrl = baseUrl + (baseUrl.includes('?') ? '&' : '?') + 'cancel=' + cancelToken;
+    try {
+      await sendAppointmentConfirmation(req.salon.id, email, {
+        clientName: client_name, when,
+        serviceName: service.name + (extraNames.length ? ' + ' + extraNames.join(', ') : ''),
+        barberName: barber ? barber.name : null,
+        cancelUrl
+      });
+    } catch (err) {
+      console.error('[admin-create] envoi email échoué:', err.message);
+    }
+  }
+
+  const today = nowInParis().dateStr;
+  if (date === today) {
+    await promoteAppointment(
+      { id, salon_id: req.salon.id, barber_id, client_name, email: email || null, phone, service_id, scheduled_at: scheduledAt },
+      extraIds
+    );
+  }
+
+  res.json({ ok: true, id });
+}));
+
+/**
  * Annulation publique via le lien envoyé par email — retrouvé
  * uniquement par le token (le lien ne contient que ça, pas l'id).
  */
