@@ -4,6 +4,7 @@ const { pool } = require('../db');
 const { hashPassword, verifyPassword } = require('../lib/password');
 const { sendClientVerificationEmail, sendClientPasswordReset } = require('../lib/mailer');
 const { clientKey } = require('../lib/queueMath');
+const { nowParisDatetimeString } = require('./appointments');
 
 const router = express.Router();
 
@@ -176,6 +177,18 @@ router.post('/reset-password', wrap(async (req, res) => {
  * autrefois sous un email différent (ou en tant que passage sans-RDV
  * sans email) ne remontera pas ici, limite connue.
  */
+/**
+ * Profil + fidélité + RDV en cours. Le rapprochement avec l'historique
+ * de passages se fait UNIQUEMENT via l'email du compte (cf.
+ * clientKey() : email en priorité) - un client ayant réservé/payé
+ * autrefois sous un email différent (ou en tant que passage sans-RDV
+ * sans email) ne remontera pas ici, limite connue.
+ *
+ * Une seule chose affichée à la fois, jamais une liste :
+ * - s'il a un RDV CONFIRMÉ pas encore passé (upcoming_appointment) ->
+ *   annulable, avec prix/coiffeur/suppléments pour le détail dépliable.
+ * - sinon, son DERNIER passage réel (last_visit) -> pour re-réserver.
+ */
 router.get('/me', requireClient, wrap(async (req, res) => {
   const c = req.clientAccount;
   const key = clientKey({ email: c.email });
@@ -184,26 +197,69 @@ router.get('/me', requireClient, wrap(async (req, res) => {
     'SELECT points, rewards_available, activated_at FROM loyalty_accounts WHERE owner_id = ? AND client_key = ?',
     [c.owner_id, key]
   );
-  var loyaltyActivated = Boolean(loyalty && loyalty.activated_at);
+  const loyaltyActivated = Boolean(loyalty && loyalty.activated_at);
 
-  const [[lastVisit]] = await pool.query(
-    `SELECT q.checkin_at, q.status, s.name AS service_name, q.service_id, q.barber_id, b.name AS barber_name,
-            sl.slug AS salon_slug, sl.name AS salon_name
-     FROM queue q
-     JOIN salons sl ON sl.id = q.salon_id
-     LEFT JOIN services s ON s.id = q.service_id
-     LEFT JOIN barbers b ON b.id = q.barber_id
-     WHERE sl.owner_id = ? AND LOWER(TRIM(q.email)) = ?
-     ORDER BY q.checkin_at DESC LIMIT 1`,
-    [c.owner_id, key]
+  // scheduled_at est une heure de SALON (Europe/Paris), jamais de
+  // l'UTC - comparaison avec l'heure de salon actuelle, pas UTC_TIMESTAMP().
+  // Exclut aussi un RDV déjà honoré en avance (client pris plus tôt que
+  // prévu, cf. le correctif des créneaux dynamiques) : son statut reste
+  // 'confirmed' indéfiniment côté appointments, seule la file liée
+  // (promoted_queue_id) sait qu'il est déjà 'done'.
+  const [[upcoming]] = await pool.query(
+    `SELECT a.id, a.scheduled_at, a.cancel_token, a.service_id, a.barber_id,
+            s.name AS service_name, s.price_cents AS service_price_cents,
+            bar.name AS barber_name, sl.slug AS salon_slug, sl.name AS salon_name
+     FROM appointments a
+     JOIN services s ON s.id = a.service_id
+     LEFT JOIN barbers bar ON bar.id = a.barber_id
+     LEFT JOIN queue q ON q.id = a.promoted_queue_id
+     JOIN salons sl ON sl.id = a.salon_id
+     WHERE sl.owner_id = ? AND LOWER(TRIM(a.email)) = ? AND a.status = 'confirmed' AND a.scheduled_at >= ?
+       AND (q.status IS NULL OR q.status NOT IN ('done', 'cancelled'))
+     ORDER BY a.scheduled_at ASC LIMIT 1`,
+    [c.owner_id, key, nowParisDatetimeString()]
   );
+
+  let upcomingAppointment = null;
+  if (upcoming) {
+    const [extraRows] = await pool.query(
+      `SELECT e.name, e.price_cents FROM appointment_extras ae JOIN extras e ON e.id = ae.extra_id WHERE ae.appointment_id = ?`,
+      [upcoming.id]
+    );
+    const totalCents = upcoming.service_price_cents + extraRows.reduce((sum, e) => sum + e.price_cents, 0);
+    upcomingAppointment = {
+      scheduled_at: upcoming.scheduled_at,
+      service_name: upcoming.service_name,
+      barber_name: upcoming.barber_name,
+      extras: extraRows.map((e) => e.name),
+      price_cents: totalCents,
+      cancel_token: upcoming.cancel_token
+    };
+  }
+
+  let lastVisit = null;
+  if (!upcomingAppointment) {
+    const [[lv]] = await pool.query(
+      `SELECT q.checkin_at, q.status, s.name AS service_name, q.service_id, q.barber_id, b.name AS barber_name,
+              sl.slug AS salon_slug, sl.name AS salon_name
+       FROM queue q
+       JOIN salons sl ON sl.id = q.salon_id
+       LEFT JOIN services s ON s.id = q.service_id
+       LEFT JOIN barbers b ON b.id = q.barber_id
+       WHERE sl.owner_id = ? AND LOWER(TRIM(q.email)) = ?
+       ORDER BY q.checkin_at DESC LIMIT 1`,
+      [c.owner_id, key]
+    );
+    lastVisit = lv || null;
+  }
 
   res.json({
     ok: true,
     profile: { name: c.name, email: c.email, phone: c.phone },
     loyalty_activated: loyaltyActivated,
     loyalty: loyaltyActivated ? { points: loyalty.points, rewards_available: loyalty.rewards_available } : null,
-    last_visit: lastVisit || null
+    upcoming_appointment: upcomingAppointment,
+    last_visit: lastVisit
   });
 }));
 

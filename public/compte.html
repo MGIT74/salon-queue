@@ -172,7 +172,7 @@
       Votre carte de fidélité n'est pas encore activée — demandez à votre coiffeur de l'activer lors de votre prochain passage.
     </div>
 
-    <div class="eyebrow">Dernière prestation</div>
+    <div class="eyebrow" id="visit-eyebrow">Dernière prestation</div>
     <div class="card" id="last-visit-card"></div>
   </section>
 
@@ -351,6 +351,60 @@ function doResetPassword() {
 }
 
 var STATUS_LABEL = { waiting: 'En attente', in_progress: 'En cours', done: 'Terminé', cancelled: 'Absent / annulé' };
+var pendingCancelToken = null;
+
+function renderVisitCard(upcoming, lastVisit) {
+  var eyebrow = document.getElementById('visit-eyebrow');
+  var card = document.getElementById('last-visit-card');
+  pendingCancelToken = null;
+
+  if (upcoming) {
+    eyebrow.textContent = 'Votre prochain rendez-vous';
+    var when = new Date(upcoming.scheduled_at.replace(' ', 'T')).toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' }) +
+      ' à ' + upcoming.scheduled_at.slice(11, 16);
+    pendingCancelToken = upcoming.cancel_token;
+    card.innerHTML =
+      '<div class="visit-row" style="cursor:pointer" onclick="toggleVisitDetails()">' +
+        '<div><div class="name">' + esc(upcoming.service_name || 'Prestation') + '</div>' +
+        '<div class="when">' + when + '</div></div>' +
+        '<button class="go" id="cancel-btn" style="width:auto;margin:0;padding:10px 16px;font-size:14px;background:var(--red)" onclick="event.stopPropagation();onCancelClick()">Annuler</button>' +
+      '</div>' +
+      '<div id="visit-details" style="display:none;margin-top:14px;padding-top:14px;border-top:1px solid rgba(128,128,128,.25);font-size:13.5px;color:var(--grey);line-height:1.9">' +
+        (upcoming.barber_name ? '<div>Coiffeur : <strong style="color:var(--ink)">' + esc(upcoming.barber_name) + '</strong></div>' : '') +
+        (upcoming.extras.length ? '<div>Suppléments : ' + esc(upcoming.extras.join(', ')) + '</div>' : '') +
+        '<div>Tarif : <strong style="color:var(--ink)">' + eur(upcoming.price_cents) + '</strong></div>' +
+      '</div>';
+  } else if (lastVisit) {
+    eyebrow.textContent = 'Dernière prestation';
+    card.innerHTML = '<div class="visit-row"><div><div class="name">' + esc(lastVisit.service_name || 'Prestation') + '</div>' +
+      '<div class="when">' + new Date(lastVisit.checkin_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' }) +
+      ' · ' + esc(STATUS_LABEL[lastVisit.status] || lastVisit.status) + '</div></div>' +
+      '<button class="go" style="width:auto;margin:0;padding:10px 16px;font-size:14px" onclick="rebook(\'' + lastVisit.salon_slug + '\',\'' + lastVisit.service_id + '\',\'' + (lastVisit.barber_id || '') + '\')">Réserver à nouveau</button></div>';
+  } else {
+    eyebrow.textContent = 'Dernière prestation';
+    card.innerHTML = '<div class="lbl">Aucune prestation trouvée pour le moment.</div>';
+  }
+}
+
+function toggleVisitDetails() {
+  var d = document.getElementById('visit-details');
+  d.style.display = d.style.display === 'none' ? 'block' : 'none';
+}
+
+// Double validation avant annulation : 1er clic transforme le bouton
+// en confirmation explicite, 2e clic annule pour de bon.
+function onCancelClick() {
+  var btn = document.getElementById('cancel-btn');
+  if (btn.dataset.confirming === '1') {
+    btn.disabled = true; btn.textContent = 'Annulation…';
+    api('/api/appointments/cancel', { method: 'POST', body: { token: pendingCancelToken } })
+      .then(function () { toast('Rendez-vous annulé'); loadProfile(); })
+      .catch(function (e) { toast(e.message, true); btn.disabled = false; btn.textContent = 'Annuler'; btn.dataset.confirming = ''; });
+  } else {
+    btn.dataset.confirming = '1';
+    btn.textContent = 'Confirmer l\'annulation ?';
+  }
+}
 
 function loadProfile() {
   api('/api/client-auth/me').then(function (d) {
@@ -367,13 +421,7 @@ function loadProfile() {
         : '';
     }
 
-    var lv = d.last_visit;
-    document.getElementById('last-visit-card').innerHTML = !lv
-      ? '<div class="lbl">Aucune prestation trouvée pour le moment.</div>'
-      : '<div class="visit-row"><div><div class="name">' + esc(lv.service_name || 'Prestation') + '</div>' +
-        '<div class="when">' + new Date(lv.checkin_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' }) +
-        ' · ' + esc(STATUS_LABEL[lv.status] || lv.status) + '</div></div>' +
-        '<button class="go" style="width:auto;margin:0;padding:10px 16px;font-size:14px" onclick="rebook(\'' + lv.salon_slug + '\',\'' + lv.service_id + '\',\'' + (lv.barber_id || '') + '\')">Réserver à nouveau</button></div>';
+    renderVisitCard(d.upcoming_appointment, d.last_visit);
 
     goHome();
   }).catch(function () {
