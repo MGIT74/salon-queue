@@ -72,6 +72,14 @@ html, body {
 .fld input:focus, .fld select:focus { outline-color: var(--blue); }
 .fld input::placeholder { color: var(--grey); opacity: .6; }
 
+/* Certains navigateurs mobiles (Chrome Android notamment) rendent
+   l'icône native d'un input[type=date] dans une zone qui déborde de sa
+   propre boîte, décalant visuellement le champ vers la droite malgré
+   width:100%+border-box. On retire ce rendu natif : le champ reste
+   entièrement cliquable (le sélecteur de date natif s'ouvre toujours
+   au tap), seule la petite icône calendrier disparaît visuellement. */
+input[type="date"] { -webkit-appearance: none; appearance: none; }
+
 .toast {
   position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%) translateY(140%);
   background: var(--ink); color: var(--bg);
