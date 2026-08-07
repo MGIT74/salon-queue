@@ -1541,7 +1541,8 @@ function renderDrawerVisits(items) {
           '<div class="visit-date">' + when + (v.salon_name ? ' · <span style="color:var(--blue)">' + esc(v.salon_name) + '</span>' : '') + '</div>' +
           '<div class="visit-meta">' + esc(v.service_name || 'Prestation') +
           (v.total_price_cents ? ' · ' + eur(v.total_price_cents) : '') +
-          ' · <span style="color:' + (STATUS_COLOR[v.status] || 'var(--grey)') + '">' + esc(STATUS_LABEL[v.status] || v.status) + '</span></div>' +
+          ' · <span style="color:' + (STATUS_COLOR[v.status] || 'var(--grey)') + '">' + esc(STATUS_LABEL[v.status] || v.status) + '</span>' +
+          durationBadge(v.start_at, v.end_at) + '</div>' +
         '</div>';
       }).join('');
 }
@@ -3229,6 +3230,20 @@ function exportClientsPdf() {
   setTimeout(function () { win.print(); }, 300);
 }
 
+/**
+ * Petite étiquette "⏱ Xmin" = durée réelle de la prestation (fin - début),
+ * quand les deux horodatages existent (coupe déjà terminée). Absente
+ * sinon (en attente, en cours, ou passage sans horaire de début/fin).
+ */
+function durationBadge(startAt, endAt) {
+  if (!startAt || !endAt) return '';
+  var mins = Math.round((new Date(endAt) - new Date(startAt)) / 60000);
+  if (!(mins > 0)) return '';
+  return ' · <span style="display:inline-flex;align-items:center;gap:3px;color:var(--grey)">' +
+    '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>' +
+    mins + ' min</span>';
+}
+
 function renderClients() {
   var q = (document.getElementById('client-search').value || '').trim().toLowerCase();
   var rows = clientHistory.filter(function (c) {
@@ -3264,7 +3279,8 @@ function renderClients() {
             '</div>' +
             '<div class="item-meta">' + esc(detail) + ' · ' + when +
               (c.email ? ' · ' + esc(c.email) : '') +
-              (c.total_price_cents ? ' · ' + eur(c.total_price_cents) : '') + '</div>' +
+              (c.total_price_cents ? ' · ' + eur(c.total_price_cents) : '') +
+              durationBadge(c.start_at, c.end_at) + '</div>' +
           '</div>' +
           '<div class="item-actions" onclick="event.stopPropagation()">' + actions + '</div>' +
         '</div>';
