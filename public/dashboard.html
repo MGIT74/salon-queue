@@ -996,7 +996,7 @@
       <div class="fld"><label for="sc-name">Nom</label><input id="sc-name" type="text" placeholder="Coupe dégradée"></div>
       <div class="grid2">
         <div class="fld" id="sc-dur-fld"><label for="sc-dur">Durée (minutes)</label><input id="sc-dur" type="number" min="0" value="30"></div>
-        <div class="fld"><label for="sc-price">Prix (€)</label><input id="sc-price" type="number" min="0" step="0.5" value="20"></div>
+        <div class="fld"><label for="sc-price" id="sc-price-label">Prix (€)</label><input id="sc-price" type="number" min="0" step="0.5" value="20"></div>
       </div>
     </div>
     <div class="sheet-foot"><button class="btn btn-primary" onclick="saveCatalog()">Enregistrer</button></div>
@@ -1807,6 +1807,7 @@ function openCatalogForm(table, id) {
   document.getElementById('sc-title').textContent = (item ? 'Modifier le ' : 'Nouveau ') + label;
   document.getElementById('sc-name').value = item ? item.name : '';
   document.getElementById('sc-price').value = item ? (item.price_cents / 100) : (table === 'services' ? 20 : (table === 'extras' ? 5 : 2));
+  document.getElementById('sc-price-label').textContent = 'Prix (' + (CURRENCY === 'CHF' ? 'CHF' : '€') + ')';
   document.getElementById('sc-dur-fld').style.display = table === 'products' ? 'none' : 'block';
   if (table !== 'products') {
     document.getElementById('sc-dur').value = item ? item.duration_min : (table === 'services' ? 30 : 10);
