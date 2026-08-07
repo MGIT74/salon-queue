@@ -55,6 +55,45 @@
   .client-footer button .ic { display: block; }
   .client-footer button.on { color: var(--blue); font-weight: 600; }
   body.has-footer .wrap { padding-bottom: 90px; }
+
+  /* Réservation intégrée (repris de rdv.html) */
+  .svc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px,1fr)); gap: 10px; margin-bottom: 22px; }
+  .svc-card {
+    border: none; background: var(--fill); color: var(--ink); border-radius: 18px;
+    padding: 20px 14px; cursor: pointer; font-family: inherit; text-align: center;
+    display: flex; flex-direction: column; align-items: center; gap: 7px;
+    transition: background .15s ease, transform .1s ease; min-height: 108px; justify-content: center;
+  }
+  .svc-card .icon { font-size: 34px; line-height: 1; }
+  .svc-card .name { font-size: 14.5px; font-weight: 600; }
+  .svc-card .meta { font-size: 12.5px; color: var(--grey); }
+  .svc-card.sel { background: var(--blue); color: #fff; }
+  .svc-card.sel .meta { color: rgba(255,255,255,.8); }
+  .svc-card:active { transform: scale(.96); }
+
+  .extras-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 22px; }
+  .xchip { border: none; background: var(--fill); color: var(--ink); border-radius: 999px;
+           padding: 12px 18px; cursor: pointer; font-family: inherit; font-size: 14.5px;
+           font-weight: 500; display: flex; align-items: baseline; gap: 8px; }
+  .xchip .xm { font-size: 13px; color: var(--grey); }
+  .xchip.sel { background: var(--blue); color: #fff; font-weight: 600; }
+  .xchip.sel .xm { color: rgba(255,255,255,.75); }
+
+  .slots-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px,1fr)); gap: 8px; margin-bottom: 22px; }
+  .slot-btn {
+    border: none; background: var(--fill); color: var(--ink); border-radius: 12px;
+    padding: 13px 6px; cursor: pointer; font-family: inherit; font-size: 14.5px; font-weight: 600;
+    text-align: center;
+  }
+  .slot-btn.sel { background: var(--blue); color: #fff; }
+
+  .back { background: none; border: none; padding: 0; font-family: inherit; font-size: 15px;
+          color: var(--blue); font-weight: 500; cursor: pointer; margin-bottom: 18px; }
+  .confirm-box { text-align: center; padding: 20px 0; }
+  .confirm-box .check {
+    width: 56px; height: 56px; border-radius: 50%; background: var(--green); margin: 0 auto 18px;
+    display: flex; align-items: center; justify-content: center;
+  }
 </style>
 </head>
 <body>
@@ -153,12 +192,53 @@
     <div class="err" id="password-err"></div>
     <div class="msg" id="password-msg"></div>
   </section>
+  <!-- Réservation intégrée -->
+  <section class="panel" id="p-book-barber">
+    <div class="eyebrow">Choisissez votre coiffeur</div>
+    <div class="svc-grid" id="bk-barber-grid"></div>
+  </section>
+
+  <section class="panel" id="p-book-service">
+    <button class="back" onclick="show('p-book-barber')">‹ Retour</button>
+    <div class="eyebrow">Prestation</div>
+    <div class="svc-grid" id="bk-svc-grid"></div>
+    <div class="eyebrow">Suppléments (optionnels)</div>
+    <div class="extras-grid" id="bk-extras-grid"></div>
+    <button class="go" id="bk-service-next-btn" onclick="goToBookDateStep()" disabled>Suivant</button>
+  </section>
+
+  <section class="panel" id="p-book-datetime">
+    <button class="back" onclick="show('p-book-service')">‹ Retour (prestation/suppléments)</button>
+    <div class="fld"><label for="bk-date">Date</label><input id="bk-date" type="date" onchange="loadBookSlots()"></div>
+    <div class="eyebrow" style="margin-top:20px">Créneaux disponibles</div>
+    <div class="slots-grid" id="bk-slots-grid"><div class="empty">Choisissez une date</div></div>
+    <button class="go" id="bk-date-next-btn" onclick="goToBookConfirmStep()" disabled>Suivant</button>
+  </section>
+
+  <section class="panel" id="p-book-confirm">
+    <button class="back" onclick="show('p-book-datetime')">‹ Retour</button>
+    <div class="eyebrow" id="bk-confirm-summary"></div>
+    <button class="go" id="bk-confirm-btn" onclick="submitBookAppointment()">Confirmer le rendez-vous</button>
+  </section>
+
+  <section class="panel" id="p-book-confirmed">
+    <div class="confirm-box">
+      <div class="check"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+      <h1>C'est confirmé !</h1>
+      <p style="color:var(--grey);margin-top:10px" id="bk-confirm-details"></p>
+      <button class="go" style="margin-top:24px" onclick="goHome()">Retour à l'accueil</button>
+    </div>
+  </section>
 </div>
 
 <div class="client-footer" id="client-footer">
   <button id="nav-home" onclick="goHome()">
     <svg class="ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 9.5V19a1 1 0 0 0 1 1H9.5a1 1 0 0 0 1-1v-4a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v4a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1V9.5"/></svg>
     Accueil
+  </button>
+  <button id="nav-book" onclick="goBook()">
+    <svg class="ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5.5" width="16" height="15" rx="2.5"/><path d="M4 9.5h16"/><path d="M8 3.5v3.5M16 3.5v3.5"/><path d="M12 13v4M10 15h4"/></svg>
+    Réserver
   </button>
   <button id="nav-account" onclick="goAccount()">
     <svg class="ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20c1.2-4 4-6 7.5-6s6.3 2 7.5 6"/></svg>
@@ -170,7 +250,9 @@
   </button>
 </div>
 
+<script src="/app.js?v=3"></script>
 <script>
+mountThemeButton();
 var SALON_SLUG = (function () {
   try { return new URLSearchParams(window.location.search).get('salon') || ''; }
   catch (e) { return ''; }
@@ -208,6 +290,7 @@ function showFooter(activeId) {
   document.getElementById('client-footer').classList.add('on');
   document.body.classList.add('has-footer');
   document.getElementById('nav-home').classList.toggle('on', activeId === 'nav-home');
+  document.getElementById('nav-book').classList.toggle('on', activeId === 'nav-book');
   document.getElementById('nav-account').classList.toggle('on', activeId === 'nav-account');
 }
 
@@ -290,7 +373,7 @@ function loadProfile() {
       : '<div class="visit-row"><div><div class="name">' + esc(lv.service_name || 'Prestation') + '</div>' +
         '<div class="when">' + new Date(lv.checkin_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' }) +
         ' · ' + esc(STATUS_LABEL[lv.status] || lv.status) + '</div></div>' +
-        '<button class="go" style="width:auto;margin:0;padding:10px 16px;font-size:14px" onclick="rebook(\'' + lv.salon_slug + '\',\'' + lv.service_id + '\')">Réserver à nouveau</button></div>';
+        '<button class="go" style="width:auto;margin:0;padding:10px 16px;font-size:14px" onclick="rebook(\'' + lv.salon_slug + '\',\'' + lv.service_id + '\',\'' + (lv.barber_id || '') + '\')">Réserver à nouveau</button></div>';
 
     goHome();
   }).catch(function () {
@@ -300,8 +383,199 @@ function loadProfile() {
   });
 }
 
-function rebook(salonSlug, serviceId) {
-  window.location.href = '/rdv.html?salon=' + encodeURIComponent(salonSlug || SALON_SLUG) + '&service=' + encodeURIComponent(serviceId);
+function rebook(salonSlug, serviceId, barberId) {
+  bookSalonSlug = salonSlug || SALON_SLUG;
+  goBook(function () {
+    selBookService = serviceId || null;
+    selBookBarber = barberId || null;
+    renderBookBarberGrid();
+    renderBookServiceGrid();
+    goToBookDateStep();
+  });
+}
+
+/* ---------- Réservation intégrée ---------- */
+var bookCatalogLoaded = false;
+var bookSalonSlug = SALON_SLUG;
+var bookServices = [], bookExtras = [], bookBarbers = [];
+var selBookBarber = null, selBookService = null, selBookExtras = [], selBookDate = null, selBookSlot = null;
+
+function iconForItem(name) {
+  var n = (name || '').toLowerCase();
+  if (n.indexOf('enfant') !== -1) return '🧒';
+  if (n.indexOf('barbe') !== -1) return '🧔';
+  if (n.indexOf('shampoo') !== -1 || n.indexOf('shampooing') !== -1) return '🧴';
+  if (n.indexOf('couleur') !== -1 || n.indexOf('colorat') !== -1) return '🎨';
+  if (n.indexOf('serviette') !== -1 || n.indexOf('chaude') !== -1) return '🔥';
+  if (n.indexOf('contour') !== -1 || n.indexOf('traçage') !== -1 || n.indexOf('tracage') !== -1) return '📏';
+  if (n.indexOf('dégradé') !== -1 || n.indexOf('degrade') !== -1 || n.indexOf('américain') !== -1) return '💈';
+  if (n.indexOf('huile') !== -1 || n.indexOf('soin') !== -1) return '💧';
+  if (n.indexOf('cire') !== -1 || n.indexOf('gel') !== -1) return '🧴';
+  if (n.indexOf('zéro') !== -1 || n.indexOf('zero') !== -1) return '🪒';
+  if (n.indexOf('coupe') !== -1) return '✂️';
+  return '✂️';
+}
+
+// Le catalogue (services/coiffeurs) suit toujours le salon indiqué dans
+// l'URL (SALON_SLUG) - sauf juste après un "Réserver à nouveau" depuis
+// une visite faite dans un AUTRE salon de la même enseigne, où on charge
+// temporairement celui-là à la place, le temps de cette réservation.
+function apiForBooking(path, opts) {
+  opts = opts || {};
+  var headers = { 'Content-Type': 'application/json' };
+  if (bookSalonSlug) headers['X-Salon-Slug'] = bookSalonSlug;
+  return fetch(path, {
+    method: opts.method || 'GET', headers: headers,
+    body: opts.body ? JSON.stringify(opts.body) : undefined
+  }).then(function (r) {
+    return r.json().then(function (data) {
+      if (!r.ok) throw new Error(data.error || 'Erreur ' + r.status);
+      return data;
+    });
+  });
+}
+
+function goBook(afterLoad) {
+  var finish = function () {
+    show('p-book-barber');
+    showFooter('nav-book');
+    if (afterLoad) afterLoad();
+  };
+  if (bookCatalogLoaded && !afterLoad) { finish(); return; }
+  Promise.all([
+    apiForBooking('/api/catalog/services'),
+    apiForBooking('/api/catalog/extras'),
+    apiForBooking('/api/barbers')
+  ]).then(function (r) {
+    bookServices = r[0].items;
+    bookExtras = r[1].items;
+    bookBarbers = r[2].items.filter(function (b) { return b.accepts_appointments; });
+    bookCatalogLoaded = true;
+    renderBookBarberGrid();
+    renderBookServiceGrid();
+    finish();
+  }).catch(function (e) { toast(e.message, true); });
+}
+
+function renderBookBarberGrid() {
+  document.getElementById('bk-barber-grid').innerHTML = bookBarbers.map(function (b) {
+    var photoStyle = b.photo_url ? 'background-image:url(&quot;' + esc(b.photo_url) + '&quot;);background-size:cover;background-position:center' : '';
+    return '<button class="svc-card' + (selBookBarber === b.id ? ' sel' : '') + '" style="' + photoStyle + '" onclick="selectBookBarber(this, \'' + b.id + '\')">' +
+      (b.photo_url ? '' : '<span class="icon">' + esc(b.name.charAt(0).toUpperCase()) + '</span>') +
+      '<span class="name" style="' + (b.photo_url ? 'color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.6)' : '') + '">' + esc(b.name) + '</span>' +
+      '</button>';
+  }).join('');
+  if (bookBarbers.length === 0) {
+    document.getElementById('bk-barber-grid').innerHTML = '<div class="empty">Aucun coiffeur ne prend de RDV en ligne pour le moment — présentez-vous directement au salon.</div>';
+  }
+}
+
+function selectBookBarber(el, id) {
+  selBookBarber = id;
+  document.querySelectorAll('#bk-barber-grid .svc-card').forEach(function (c) { c.classList.remove('sel'); });
+  el.classList.add('sel');
+  show('p-book-service');
+}
+
+function renderBookServiceGrid() {
+  document.getElementById('bk-svc-grid').innerHTML = bookServices.map(function (s) {
+    return '<button class="svc-card' + (selBookService === s.id ? ' sel' : '') + '" data-id="' + s.id + '" onclick="selectBookService(this,\'' + s.id + '\')">' +
+      '<span class="icon">' + iconForItem(s.name) + '</span>' +
+      '<span class="name">' + esc(s.name) + '</span>' +
+      '<span class="meta">' + s.duration_min + ' min · ' + eur(s.price_cents) + '</span></button>';
+  }).join('');
+  document.getElementById('bk-extras-grid').innerHTML = bookExtras.map(function (e) {
+    return '<button class="xchip" data-id="' + e.id + '" onclick="toggleBookExtra(this,\'' + e.id + '\')">' +
+      '<span>' + esc(e.name) + '</span><span class="xm">+' + e.duration_min + ' min · ' + eur(e.price_cents) + '</span></button>';
+  }).join('');
+  document.getElementById('bk-service-next-btn').disabled = !selBookService;
+}
+
+function selectBookService(el, id) {
+  selBookService = id;
+  document.querySelectorAll('#bk-svc-grid .svc-card').forEach(function (c) { c.classList.remove('sel'); });
+  el.classList.add('sel');
+  document.getElementById('bk-service-next-btn').disabled = false;
+}
+
+function toggleBookExtra(el, id) {
+  var i = selBookExtras.indexOf(id);
+  if (i === -1) selBookExtras.push(id); else selBookExtras.splice(i, 1);
+  el.classList.toggle('sel');
+}
+
+function goToBookDateStep() {
+  if (!selBookService) { toast('Choisissez une prestation', true); return; }
+  var today = new Date().toISOString().slice(0, 10);
+  document.getElementById('bk-date').min = today;
+  if (!document.getElementById('bk-date').value) document.getElementById('bk-date').value = today;
+  show('p-book-datetime');
+  loadBookSlots();
+}
+
+function loadBookSlots() {
+  selBookDate = document.getElementById('bk-date').value;
+  selBookSlot = null;
+  document.getElementById('bk-date-next-btn').disabled = true;
+  if (!selBookDate) return;
+
+  var url = '/api/appointments/availability?date=' + selBookDate + '&service_id=' + selBookService +
+    '&extras=' + selBookExtras.join(',') + (selBookBarber ? '&barber_id=' + selBookBarber : '');
+
+  document.getElementById('bk-slots-grid').innerHTML = '<div class="empty">Chargement…</div>';
+  apiForBooking(url).then(function (r) {
+    var grid = document.getElementById('bk-slots-grid');
+    grid.innerHTML = r.slots.length === 0
+      ? '<div class="empty">Aucun créneau disponible ce jour-là</div>'
+      : r.slots.map(function (s) {
+          return '<button class="slot-btn" data-time="' + s.time + '" data-barber="' + s.barber_id + '" onclick="selectBookSlot(this)">' + s.time + '</button>';
+        }).join('');
+  }).catch(function (e) { toast(e.message, true); });
+}
+
+function selectBookSlot(btn) {
+  document.querySelectorAll('#bk-slots-grid .slot-btn').forEach(function (b) { b.classList.remove('sel'); });
+  btn.classList.add('sel');
+  selBookSlot = { time: btn.dataset.time, barberId: btn.dataset.barber };
+  document.getElementById('bk-date-next-btn').disabled = false;
+}
+
+function goToBookConfirmStep() {
+  if (!selBookSlot) { toast('Choisissez un créneau', true); return; }
+  var s = bookServices.find(function (x) { return x.id === selBookService; });
+  var extraNames = selBookExtras.map(function (id) { return bookExtras.find(function (e) { return e.id === id; }).name; });
+  var when = new Date(selBookDate + 'T' + selBookSlot.time).toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' }) + ' à ' + selBookSlot.time;
+  document.getElementById('bk-confirm-summary').textContent = when + ' — ' + s.name + (extraNames.length ? ' + ' + extraNames.join(', ') : '');
+  show('p-book-confirm');
+}
+
+function submitBookAppointment() {
+  var btn = document.getElementById('bk-confirm-btn');
+  btn.disabled = true; btn.textContent = 'Enregistrement…';
+
+  apiForBooking('/api/client-auth/me').then(function (me) {
+    return apiForBooking('/api/appointments', {
+      method: 'POST',
+      body: {
+        client_name: me.profile.name, email: me.profile.email, phone: me.profile.phone || null,
+        service_id: selBookService, extras: selBookExtras,
+        barber_id: selBookSlot.barberId, date: selBookDate, time: selBookSlot.time,
+        base_url: window.location.origin + '/rdv.html' + (bookSalonSlug ? '?salon=' + bookSalonSlug : '')
+      }
+    });
+  }).then(function () {
+    var s = bookServices.find(function (x) { return x.id === selBookService; });
+    var when = new Date(selBookDate + 'T' + selBookSlot.time).toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' }) + ' à ' + selBookSlot.time;
+    document.getElementById('bk-confirm-details').textContent = when + ' — ' + s.name;
+    selBookBarber = null; selBookService = null; selBookExtras = []; selBookDate = null; selBookSlot = null;
+    document.getElementById('bk-date').value = '';
+    show('p-book-confirmed');
+    hideFooter();
+  }).catch(function (e) {
+    toast(e.message, true);
+  }).finally(function () {
+    btn.disabled = false; btn.textContent = 'Confirmer le rendez-vous';
+  });
 }
 
 function saveProfile() {

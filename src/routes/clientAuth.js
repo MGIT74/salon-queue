@@ -187,10 +187,12 @@ router.get('/me', requireClient, wrap(async (req, res) => {
   var loyaltyActivated = Boolean(loyalty && loyalty.activated_at);
 
   const [[lastVisit]] = await pool.query(
-    `SELECT q.checkin_at, q.status, s.name AS service_name, q.service_id, sl.slug AS salon_slug, sl.name AS salon_name
+    `SELECT q.checkin_at, q.status, s.name AS service_name, q.service_id, q.barber_id, b.name AS barber_name,
+            sl.slug AS salon_slug, sl.name AS salon_name
      FROM queue q
      JOIN salons sl ON sl.id = q.salon_id
      LEFT JOIN services s ON s.id = q.service_id
+     LEFT JOIN barbers b ON b.id = q.barber_id
      WHERE sl.owner_id = ? AND LOWER(TRIM(q.email)) = ?
      ORDER BY q.checkin_at DESC LIMIT 1`,
     [c.owner_id, key]
