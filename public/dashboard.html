@@ -2754,6 +2754,10 @@ function openAdminAddAppointment(dateStr) {
       '<button class="aa-back" onclick="aaGoStep(\'extras\')">‹ Retour</button>' +
       '<div class="aa-step-title">Créneau</div>' +
       '<div class="aa-slots" id="aa-slots"><span class="hint" style="margin:0">Chargement…</span></div>' +
+      '<div id="aa-half-toggle" style="display:none;gap:8px;margin-top:8px">' +
+        '<button class="btn btn-soft" id="aa-half-morning" style="flex:1" onclick="aaShowHalf(\'morning\')">Matin</button>' +
+        '<button class="btn btn-soft" id="aa-half-afternoon" style="flex:1" onclick="aaShowHalf(\'afternoon\')">Après-midi</button>' +
+      '</div>' +
     '</div>' +
 
     '<div id="aa-step-contact" style="display:none">' +
@@ -2802,15 +2806,52 @@ function openAdminAddAppointment(dateStr) {
     el.classList.toggle('sel');
   };
 
+  var slotsByHalf = { morning: [], afternoon: [] };
+  var currentHalf = 'afternoon';
+
+  function aaRenderHalf() {
+    var slotsEl = overlay.querySelector('#aa-slots');
+    var list = slotsByHalf[currentHalf];
+    slotsEl.innerHTML = list.length
+      ? list.map(function (s) {
+          return '<button class="aa-slot" data-time="' + s.time + '" onclick="aaSelectSlot(this)">' + s.time + '</button>';
+        }).join('')
+      : '<span class="hint" style="margin:0">Aucun créneau ' + (currentHalf === 'morning' ? 'le matin' : "l'après-midi") + '</span>';
+  }
+
+  window.aaShowHalf = function (half) {
+    currentHalf = half;
+    overlay.querySelector('#aa-half-morning').className = 'btn ' + (half === 'morning' ? 'btn-primary' : 'btn-soft');
+    overlay.querySelector('#aa-half-afternoon').className = 'btn ' + (half === 'afternoon' ? 'btn-primary' : 'btn-soft');
+    overlay.querySelector('#aa-half-morning').style.flex = '1';
+    overlay.querySelector('#aa-half-afternoon').style.flex = '1';
+    aaRenderHalf();
+  };
+
   function aaLoadSlots() {
     var slotsEl = overlay.querySelector('#aa-slots');
+    var toggleEl = overlay.querySelector('#aa-half-toggle');
     slotsEl.innerHTML = '<span class="hint" style="margin:0">Chargement…</span>';
+    toggleEl.style.display = 'none';
     api('/api/appointments/availability?date=' + dateStr + '&service_id=' + state.serviceId + '&barber_id=' + state.barberId + '&extras=' + state.extraIds.join(','))
       .then(function (r) {
         if (!r.slots.length) { slotsEl.innerHTML = '<span class="hint" style="margin:0">Aucun créneau disponible ce jour-là</span>'; return; }
-        slotsEl.innerHTML = r.slots.map(function (s) {
-          return '<button class="aa-slot" data-time="' + s.time + '" onclick="aaSelectSlot(this)">' + s.time + '</button>';
-        }).join('');
+
+        // Matin (avant 12h) / après-midi (12h et après) - si le matin
+        // est entièrement passé (aucun créneau restant avant midi), on
+        // n'affiche même pas l'onglet Matin, inutile de proposer un
+        // choix vide.
+        slotsByHalf.morning = r.slots.filter(function (s) { return s.time < '12:00'; });
+        slotsByHalf.afternoon = r.slots.filter(function (s) { return s.time >= '12:00'; });
+
+        if (!slotsByHalf.morning.length) {
+          toggleEl.style.display = 'none';
+          currentHalf = 'afternoon';
+          aaRenderHalf();
+        } else {
+          toggleEl.style.display = 'flex';
+          aaShowHalf('morning');
+        }
       })
       .catch(function (e) { slotsEl.innerHTML = ''; toast(e.message, true); });
   }
