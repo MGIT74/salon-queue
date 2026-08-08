@@ -2,6 +2,7 @@ const express = require('express');
 const crypto = require('crypto');
 const { pool, utcIso, getSettings } = require('../db');
 const requireAdmin = require('../middleware/auth');
+const requireAdminOrBarber = require('../middleware/barberAuth');
 const { sendAppointmentConfirmation } = require('../lib/mailer');
 
 const router = express.Router();
@@ -278,9 +279,17 @@ router.get('/availability', wrap(async (req, res) => {
  * Liste des rendez-vous à venir (admin) — pour une future vue
  * "Rendez-vous du jour" dans le dashboard.
  */
-router.get('/', requireAdmin, wrap(async (req, res) => {
+router.get('/', requireAdminOrBarber, wrap(async (req, res) => {
   const conditions = ['a.salon_id = ?'];
   const params = [req.salon.id];
+
+  // Un coiffeur connecté (PIN, pas admin) ne voit que SES propres RDV -
+  // utilisé par 'Mon poste' pour son propre agenda, jamais l'admin
+  // complet du salon.
+  if (req.barberId) {
+    conditions.push('a.barber_id = ?');
+    params.push(req.barberId);
+  }
 
   if (req.query.month) {
     // Format attendu : YYYY-MM
