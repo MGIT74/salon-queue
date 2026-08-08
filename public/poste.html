@@ -227,6 +227,11 @@ function attemptLogin() {
 
 function logout() {
   me = null;
+  // Les minuteurs de rafraîchissement automatique (refresh, renderActive)
+  // tournaient encore après une déconnexion, plantant en boucle car ils
+  // référencent me.id sans vérifier qu'un coiffeur est bien connecté.
+  if (refreshIntervalId) { clearInterval(refreshIntervalId); refreshIntervalId = null; }
+  if (renderActiveIntervalId) { clearInterval(renderActiveIntervalId); renderActiveIntervalId = null; }
   try { sessionStorage.removeItem('poste-session'); } catch (e) {}
   pinBuffer = '';
   renderPinDots();
@@ -248,13 +253,17 @@ function showApp() {
 }
 
 /* ---------- Application ---------- */
+var refreshIntervalId = null;
+var renderActiveIntervalId = null;
+
 function boot() {
   refresh();
-  setInterval(refresh, 4000);
-  setInterval(renderActive, 1000);
+  refreshIntervalId = setInterval(refresh, 4000);
+  renderActiveIntervalId = setInterval(renderActive, 1000);
 }
 
 function refresh() {
+  if (!me) return;
   return Promise.all([
     barberApi('/api/queue'),
     barberApi('/api/barbers'),
@@ -269,6 +278,7 @@ function refresh() {
 }
 
 function myActive() {
+  if (!me) return null;
   return queue.find(function (q) { return q.status === 'in_progress' && q.barber_id === me.id; });
 }
 
