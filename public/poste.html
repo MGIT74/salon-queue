@@ -109,7 +109,14 @@
   body.has-poste-footer #app-screen { padding-bottom: 84px; }
 
   /* --- Agenda (calendrier personnel, lecture seule) --- */
-  .cal-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; gap: 12px; flex-wrap: wrap; }
+  /* Disposition fixe en 2 lignes, jamais de réagencement selon la
+     longueur du libellé de période (ex: "Août 2026" vs "3 Août – 9
+     Août 2026") - contrairement à un simple flex-wrap qui replace les
+     boutons différemment à chaque navigation. */
+  .cal-nav { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+  .cal-nav-row1 { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .cal-nav-row1 .cal-month-label { flex: 1; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cal-nav-row2 { display: flex; justify-content: center; }
   .cal-month-label { font-size: 16px; font-weight: 600; letter-spacing: -.02em; text-transform: capitalize; }
   .cal-view-switch { display: flex; background: var(--fill); border-radius: 10px; padding: 3px; gap: 2px; }
   .cal-view-switch button {
@@ -176,14 +183,18 @@
 
     <div id="p-agenda" style="display:none">
       <div class="cal-nav">
-        <button class="btn btn-soft" onclick="calShiftPeriod(-1)">‹</button>
-        <div class="cal-month-label" id="cal-month-label"></div>
-        <div class="cal-view-switch">
-          <button id="cal-view-month" class="on" onclick="setCalView('month')">Mois</button>
-          <button id="cal-view-week" onclick="setCalView('week')">Semaine</button>
-          <button id="cal-view-day" onclick="setCalView('day')">Jour</button>
+        <div class="cal-nav-row1">
+          <button class="btn btn-soft" onclick="calShiftPeriod(-1)">‹</button>
+          <div class="cal-month-label" id="cal-month-label"></div>
+          <button class="btn btn-soft" onclick="calShiftPeriod(1)">›</button>
         </div>
-        <button class="btn btn-soft" onclick="calShiftPeriod(1)">›</button>
+        <div class="cal-nav-row2">
+          <div class="cal-view-switch">
+            <button id="cal-view-month" class="on" onclick="setCalView('month')">Mois</button>
+            <button id="cal-view-week" onclick="setCalView('week')">Semaine</button>
+            <button id="cal-view-day" onclick="setCalView('day')">Jour</button>
+          </div>
+        </div>
       </div>
       <div class="cal-grid" id="cal-weekdays">
         <div class="cal-weekday">Lun</div><div class="cal-weekday">Mar</div><div class="cal-weekday">Mer</div>
