@@ -101,7 +101,7 @@
     <div class="eyebrow" id="contact-summary"></div>
     <div class="fld"><label for="rdv-name">Prénom</label><input id="rdv-name" type="text" autocomplete="given-name"></div>
     <div class="fld"><label for="rdv-email">Email — pour la confirmation</label><input id="rdv-email" type="email" autocomplete="email"></div>
-    <div class="fld"><label for="rdv-phone">Téléphone (optionnel)</label><input id="rdv-phone" type="tel" autocomplete="tel"></div>
+    <div class="fld"><label for="rdv-phone">Téléphone</label><input id="rdv-phone" type="tel" autocomplete="tel"></div>
     <button class="go" id="confirm-btn" onclick="submitAppointment()">Confirmer le rendez-vous</button>
   </section>
 
@@ -319,6 +319,7 @@ function submitAppointment() {
   var phone = document.getElementById('rdv-phone').value.trim();
   if (!name) { toast('Entrez votre prénom', true); return; }
   if (!email) { toast('Entrez votre email', true); return; }
+  if (!phone) { toast('Entrez votre téléphone', true); return; }
 
   var btn = document.getElementById('confirm-btn');
   btn.disabled = true; btn.textContent = 'Enregistrement…';

@@ -46,6 +46,7 @@ async function requireClient(req, res, next) {
 router.post('/signup', wrap(async (req, res) => {
   const { name, email, phone, password } = req.body;
   if (!name || !email || !password) return res.status(400).json({ error: 'Nom, email et mot de passe requis' });
+  if (!phone) return res.status(400).json({ error: 'Le téléphone est requis' });
   if (password.length < 6) return res.status(400).json({ error: 'Le mot de passe doit contenir au moins 6 caractères' });
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Adresse email invalide' });
 
@@ -63,7 +64,7 @@ router.post('/signup', wrap(async (req, res) => {
   await pool.query(
     `INSERT INTO clients (id, owner_id, name, email, phone, password_hash, verify_token, verify_token_expires)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [id, ownerId, name, email, phone || null, passwordHash, verifyToken, verifyExpires]
+    [id, ownerId, name, email, phone, passwordHash, verifyToken, verifyExpires]
   );
 
   try {
@@ -261,11 +262,16 @@ router.get('/me', requireClient, wrap(async (req, res) => {
 }));
 
 router.put('/me', requireClient, wrap(async (req, res) => {
-  const { name, email, new_password, current_password } = req.body;
+  const { name, email, phone, new_password, current_password } = req.body;
   const sets = [];
   const params = [];
 
   if (name) { sets.push('name = ?'); params.push(name); }
+
+  if (phone !== undefined) {
+    if (!String(phone).trim()) return res.status(400).json({ error: 'Le téléphone est requis' });
+    sets.push('phone = ?'); params.push(String(phone).trim());
+  }
 
   if (email && email !== req.clientAccount.email) {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Adresse email invalide' });

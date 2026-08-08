@@ -130,7 +130,7 @@
   <section class="panel" id="p-signup">
     <div class="fld"><label for="su-name">Nom</label><input id="su-name" type="text" placeholder="Votre nom"></div>
     <div class="fld"><label for="su-email">Email</label><input id="su-email" type="email" placeholder="vous@exemple.fr"></div>
-    <div class="fld"><label for="su-phone">Téléphone (optionnel)</label><input id="su-phone" type="tel"></div>
+    <div class="fld"><label for="su-phone">Téléphone</label><input id="su-phone" type="tel"></div>
     <div class="fld"><label for="su-pass">Mot de passe</label><input id="su-pass" type="password" placeholder="6 caractères minimum"></div>
     <button class="go" onclick="doSignup()">Créer mon compte</button>
     <div class="err" id="signup-err"></div>
@@ -195,6 +195,7 @@
     <div class="eyebrow">Mes informations</div>
     <div class="fld"><label for="pf-name">Nom</label><input id="pf-name" type="text"></div>
     <div class="fld"><label for="pf-email">Email</label><input id="pf-email" type="email"></div>
+    <div class="fld"><label for="pf-phone">Téléphone</label><input id="pf-phone" type="tel"></div>
     <button class="go" onclick="saveProfile()">Enregistrer</button>
     <div class="err" id="profile-err"></div>
     <div class="msg" id="profile-msg"></div>
@@ -335,10 +336,12 @@ function doSignup() {
   var email = document.getElementById('su-email').value.trim();
   var phone = document.getElementById('su-phone').value.trim();
   var password = document.getElementById('su-pass').value;
-  document.getElementById('signup-err').textContent = '';
+  var errEl = document.getElementById('signup-err');
+  errEl.textContent = '';
+  if (!phone) { errEl.textContent = 'Le téléphone est requis'; return; }
   api('/api/client-auth/signup', { method: 'POST', body: { name: name, email: email, phone: phone, password: password, base_url: baseUrl() } })
     .then(function () { show('p-check-email'); })
-    .catch(function (e) { document.getElementById('signup-err').textContent = e.message; });
+    .catch(function (e) { errEl.textContent = e.message; });
 }
 
 function doLogin() {
@@ -491,6 +494,7 @@ function populateHome(d) {
   document.getElementById('home-hello').textContent = 'Bonjour ' + d.profile.name;
   document.getElementById('pf-name').value = d.profile.name;
   document.getElementById('pf-email').value = d.profile.email;
+  document.getElementById('pf-phone').value = d.profile.phone || '';
 
   document.getElementById('loyalty-section').style.display = d.loyalty_activated ? 'block' : 'none';
   document.getElementById('loyalty-inactive-msg').style.display = d.loyalty_activated ? 'none' : 'block';
@@ -718,14 +722,17 @@ function submitBookAppointment() {
 }
 
 function saveProfile() {
-  document.getElementById('profile-err').textContent = '';
+  var errEl = document.getElementById('profile-err');
   document.getElementById('profile-msg').textContent = '';
+  var phone = document.getElementById('pf-phone').value.trim();
+  if (!phone) { errEl.textContent = 'Le téléphone est requis'; return; }
+  errEl.textContent = '';
   api('/api/client-auth/me', {
     method: 'PUT',
-    body: { name: document.getElementById('pf-name').value.trim(), email: document.getElementById('pf-email').value.trim() }
+    body: { name: document.getElementById('pf-name').value.trim(), email: document.getElementById('pf-email').value.trim(), phone: phone }
   })
     .then(function () { document.getElementById('profile-msg').textContent = 'Enregistré.'; })
-    .catch(function (e) { document.getElementById('profile-err').textContent = e.message; });
+    .catch(function (e) { errEl.textContent = e.message; });
 }
 
 function changePassword() {
