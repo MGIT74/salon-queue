@@ -105,19 +105,28 @@ function minutesToTime(mins) {
  */
 async function getBarberBusyMinutesToday(barberId) {
   const [rows] = await pool.query(
-    `SELECT status, start_at, total_duration_min FROM queue
+    `SELECT status, start_at, checkin_at, total_duration_min FROM queue
      WHERE barber_id = ? AND status IN ('waiting', 'in_progress')`,
     [barberId]
   );
   const OVERRUN_BUFFER_MIN = 5;
+  const nowMs = Date.now();
   let busy = 0;
   rows.forEach((r) => {
     if (r.status === 'in_progress') {
-      const elapsedMin = r.start_at ? (Date.now() - new Date(r.start_at + 'Z').getTime()) / 60000 : 0;
+      const elapsedMin = r.start_at ? (nowMs - new Date(r.start_at + 'Z').getTime()) / 60000 : 0;
       const remaining = (r.total_duration_min || 0) - elapsedMin;
       busy += remaining > 0 ? remaining : OVERRUN_BUFFER_MIN;
     } else {
-      busy += r.total_duration_min || 0;
+      // 'waiting' : ne compte comme charge immédiate QUE si l'heure
+      // prévue est déjà arrivée (file d'attente réelle / RDV en
+      // retard pas encore démarré). Un RDV futur pas encore dû
+      // (ex: 18h35 alors qu'il est 18h06) n'occupe PAS le coiffeur
+      // maintenant - sa plage est déjà bloquée séparément via
+      // busyRanges au bon horaire, inutile (et faux) de la compter
+      // deux fois en avance.
+      const due = r.checkin_at ? new Date(r.checkin_at + 'Z').getTime() <= nowMs : true;
+      if (due) busy += r.total_duration_min || 0;
     }
   });
   return busy;
