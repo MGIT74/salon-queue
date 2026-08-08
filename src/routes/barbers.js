@@ -69,10 +69,25 @@ router.get('/', wrap(async (req, res) => {
   const items = barbers.map((b) => {
     const myBreaksToday = breaks.filter((bk) => bk.barber_id === b.id && bk.active && bk.weekday === nowWeekday);
     const onBreakNow = myBreaksToday.some((bk) => nowMinutes >= toMinutes(bk.start_time) && nowMinutes < toMinutes(bk.end_time));
+
+    // En dehors de ses horaires de travail (pas de plage active pour
+    // aujourd'hui, ou hors de la plage horaire) - le kiosk (sans-RDV)
+    // ne doit jamais proposer un coiffeur qui a fini sa journée, ou
+    // qui n'est pas encore arrivé. Ne s'applique QUE si des horaires
+    // ont été explicitement réglés pour ce coiffeur au moins un jour
+    // de la semaine - sinon (jamais configuré), on garde le
+    // comportement historique "toujours disponible" pour ne pas
+    // masquer silencieusement un coiffeur qu'on vient de créer.
+    const myScheduleEver = schedules.filter((s) => s.barber_id === b.id);
+    const myScheduleToday = myScheduleEver.filter((s) => s.active && s.weekday === nowWeekday);
+    const withinHours = myScheduleToday.some((s) => nowMinutes >= toMinutes(s.start_time) && nowMinutes < toMinutes(s.end_time));
+    const outsideHoursNow = myScheduleEver.length > 0 && !withinHours;
+
     return Object.assign({}, stripSecrets(b), {
       schedules: schedules.filter((s) => s.barber_id === b.id).sort((a, c) => a.weekday - c.weekday),
       breaks: breaks.filter((bk) => bk.barber_id === b.id).sort((a, c) => a.weekday - c.weekday),
       on_break_now: onBreakNow,
+      outside_hours_now: outsideHoursNow,
       disabled_service_ids: svcExcl.filter((e) => e.barber_id === b.id).map((e) => e.service_id),
       disabled_extra_ids: extExcl.filter((e) => e.barber_id === b.id).map((e) => e.extra_id)
     });
