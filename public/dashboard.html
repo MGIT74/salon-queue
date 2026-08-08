@@ -1551,13 +1551,13 @@ function renderDrawerVisits(items) {
 }
 
 function saveDrawerNote() {
-  if (!drawerClientId) return;
+  if (!drawerQueueId) { toast('Impossible de rattacher une note - ce RDV n\'est pas encore dans la file (jour futur).', true); return; }
   var note = document.getElementById('drawer-note').value;
-  api('/api/queue/' + drawerClientId + '/note', { method: 'PUT', body: { note: note } })
+  api('/api/queue/' + drawerQueueId + '/note', { method: 'PUT', body: { note: note } })
     .then(function () {
-      var q = queue.find(function (x) { return x.id === drawerClientId; });
+      var q = queue.find(function (x) { return x.id === drawerQueueId; });
       if (q) q.note = note;
-      var c = clientHistory.find(function (x) { return x.id === drawerClientId; });
+      var c = clientHistory.find(function (x) { return x.id === drawerQueueId; });
       if (c) c.note = note;
       toast('Note enregistrée');
     })
