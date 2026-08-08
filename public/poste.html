@@ -667,6 +667,7 @@ var calViewMode = 'month';
 var calMonthCache = {};
 var calSelectedDate = null;
 var calBooted = false;
+var calApptById = {};
 
 function ymd(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
 function monthKey(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
@@ -779,12 +780,13 @@ function renderCalMonth() {
 function renderCalExpandPanel(dateStr, dayAppts) {
   var when = new Date(dateStr + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' });
   var sorted = dayAppts.slice().sort(function (a, b) { return a.scheduled_at.localeCompare(b.scheduled_at); });
+  sorted.forEach(function (a) { calApptById[a.id] = a; });
 
   var rows = sorted.length === 0
     ? '<div class="empty">Aucun rendez-vous ce jour-là</div>'
     : sorted.map(function (a) {
         var time = a.scheduled_at.slice(11, 16);
-        return '<div class="cal-expand-row">' +
+        return '<div class="cal-expand-row" style="cursor:pointer" onclick="openPosteClientDrawer(\'' + a.id + '\')">' +
           '<div class="cal-day-view-time">' + time + '</div>' +
           '<div style="flex:1"><div class="cal-day-view-name">' + esc(a.client_name) + ' ' + calSourceBadge(a) + '</div>' +
           '<div class="cal-day-view-meta">' + esc(a.service_name) + '</div></div>' +
@@ -835,12 +837,13 @@ function renderCalDay() {
     calAnchor.toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
 
   var dayAppts = apptsForRange(calAnchor, calAnchor).sort(function (a, b) { return a.scheduled_at.localeCompare(b.scheduled_at); });
+  dayAppts.forEach(function (a) { calApptById[a.id] = a; });
   var view = document.getElementById('cal-day-view');
   view.innerHTML = dayAppts.length === 0
     ? '<div class="empty">Aucun rendez-vous ce jour-là</div>'
     : '<div class="cal-day-view-list">' + dayAppts.map(function (a) {
         var time = a.scheduled_at.slice(11, 16);
-        return '<div class="cal-day-view-appt">' +
+        return '<div class="cal-day-view-appt" style="cursor:pointer" onclick="openPosteClientDrawer(\'' + a.id + '\')">' +
           '<div class="cal-day-view-time">' + time + '</div>' +
           '<div><div class="cal-day-view-name">' + esc(a.client_name) + ' ' + calSourceBadge(a) + '</div>' +
           '<div class="cal-day-view-meta">' + esc(a.service_name) + '</div></div>' +
@@ -852,6 +855,52 @@ function selectCalDay(dateStr) {
   calSelectedDate = (!dateStr || dateStr === calSelectedDate) ? null : dateStr;
   if (calViewMode === 'month') renderCalMonth();
   else if (calViewMode === 'week') renderCalWeek();
+}
+
+/**
+ * Tiroir client simplifié (coiffeur) - infos + note interne
+ * modifiable via le même endpoint que la section 'À suivre'. La note
+ * n'est modifiable que si ce RDV est déjà une vraie ligne de file
+ * (promoted_queue_id posé, ex: RDV du jour même) - un RDV futur pas
+ * encore promu n'a encore rien à éditer.
+ */
+function openPosteClientDrawer(id) {
+  var a = calApptById[id];
+  if (!a) return;
+
+  var when = new Date(a.scheduled_at.replace(' ', 'T')).toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' }) +
+    ' à ' + a.scheduled_at.slice(11, 16);
+
+  var overlay = _buildModal(
+    '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px">' +
+    '<div class="modal-title" style="margin-bottom:0">' + esc(a.client_name) + '</div>' +
+    '<button id="pcd-close-x" style="background:var(--fill);border:none;width:30px;height:30px;border-radius:50%;color:var(--grey);font-size:14px;cursor:pointer;flex-shrink:0;margin-left:10px">✕</button>' +
+    '</div>' +
+    '<div class="detail-row"><span class="detail-label">Quand</span><span class="detail-value" style="text-transform:capitalize">' + when + '</span></div>' +
+    '<div class="detail-row"><span class="detail-label">Prestation</span><span class="detail-value">' + esc(a.service_name) + '</span></div>' +
+    (a.email ? '<div class="detail-row"><span class="detail-label">Email</span><span class="detail-value">' + esc(a.email) + '</span></div>' : '') +
+    (a.phone ? '<div class="detail-row"><span class="detail-label">Téléphone</span><span class="detail-value">' + esc(a.phone) + '</span></div>' : '') +
+    (a.client_note ? '<div class="detail-row" style="flex-direction:column;align-items:flex-start;gap:2px"><span class="detail-label">📝 Note du client (RDV)</span><span class="detail-value" style="font-weight:400">' + esc(a.client_note) + '</span></div>' : '') +
+    '<div style="margin-top:14px">' +
+      '<label style="display:block;font-size:12.5px;font-weight:600;color:var(--grey);margin-bottom:6px">Note interne</label>' +
+      (a.promoted_queue_id
+        ? '<textarea id="pcd-note" rows="2" style="width:100%;padding:11px 13px;border:none;border-radius:10px;background:var(--fill);color:var(--ink);font-family:inherit;font-size:14px;resize:vertical;margin-bottom:8px">' + esc(a.note || '') + '</textarea>' +
+          '<button class="btn btn-soft" id="pcd-save-note-btn" style="width:100%">Enregistrer la note</button>'
+        : '<p class="hint" style="margin:0">Pas encore modifiable — ce RDV entrera dans la file le jour même.</p>') +
+    '</div>'
+  );
+
+  overlay.querySelector('#pcd-close-x').onclick = function () { _closeModal(overlay); };
+
+  var saveBtn = overlay.querySelector('#pcd-save-note-btn');
+  if (saveBtn) {
+    saveBtn.onclick = function () {
+      var note = overlay.querySelector('#pcd-note').value;
+      barberApi('/api/queue/' + a.promoted_queue_id + '/note', { method: 'PUT', body: { note: note } })
+        .then(function () { a.note = note; toast('Note enregistrée'); })
+        .catch(function (e) { toast(e.message, true); });
+    };
+  }
 }
 </script>
 </body>

@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const { pool, utcIso, getSettings } = require('../db');
 const requireAdmin = require('../middleware/auth');
 const requireAdminOrBarber = require('../middleware/barberAuth');
+const { clientKey } = require('../lib/queueMath');
 const { sendAppointmentConfirmation } = require('../lib/mailer');
 
 const router = express.Router();
@@ -314,6 +315,12 @@ router.get('/', requireAdminOrBarber, wrap(async (req, res) => {
     params
   );
 
+  // Note interne (client_notes, staff) - jamais jointe en SQL direct
+  // car rattachée par clientKey() (email > téléphone > nom), pas par
+  // colonne stricte. Même pattern que /api/queue/history.
+  const [notes] = await pool.query('SELECT client_key, note FROM client_notes WHERE salon_id = ?', [req.salon.id]);
+  const noteByKey = Object.fromEntries(notes.map((n) => [n.client_key, n.note]));
+
   res.json({
     ok: true,
     items: rows.map((r) => {
@@ -328,7 +335,8 @@ router.get('/', requireAdminOrBarber, wrap(async (req, res) => {
       return Object.assign({}, r, {
         scheduled_at: utcIso(r.scheduled_at),
         created_at: utcIso(r.created_at),
-        display_status: displayStatus
+        display_status: displayStatus,
+        note: noteByKey[clientKey(r)] || ''
       });
     })
   });
