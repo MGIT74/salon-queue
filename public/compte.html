@@ -232,6 +232,10 @@
     <div class="fld"><label for="bk-date">Date</label><input id="bk-date" type="date" onchange="loadBookSlots()"></div>
     <div class="eyebrow" style="margin-top:20px">Créneaux disponibles</div>
     <div class="slots-grid" id="bk-slots-grid"><div class="empty">Choisissez une date</div></div>
+    <div id="bk-half-toggle" style="display:none;gap:8px;margin-bottom:22px">
+      <button class="btn btn-soft" id="bk-half-morning" style="flex:1" onclick="showBookHalf('morning')">Matin</button>
+      <button class="btn btn-soft" id="bk-half-afternoon" style="flex:1" onclick="showBookHalf('afternoon')">Après-midi</button>
+    </div>
     <button class="go" id="bk-date-next-btn" onclick="goToBookConfirmStep()" disabled>Suivant</button>
   </section>
 
@@ -654,6 +658,28 @@ function goToBookDateStep() {
   loadBookSlots();
 }
 
+var bkSlotsByHalf = { morning: [], afternoon: [] };
+var bkCurrentHalf = 'afternoon';
+
+function renderBookHalf() {
+  var grid = document.getElementById('bk-slots-grid');
+  var list = bkSlotsByHalf[bkCurrentHalf];
+  grid.innerHTML = list.length
+    ? list.map(function (s) {
+        return '<button class="slot-btn" data-time="' + s.time + '" data-barber="' + s.barber_id + '" onclick="selectBookSlot(this)">' + s.time + '</button>';
+      }).join('')
+    : '<div class="empty">Aucun créneau ' + (bkCurrentHalf === 'morning' ? 'le matin' : "l'après-midi") + '</div>';
+}
+
+function showBookHalf(half) {
+  bkCurrentHalf = half;
+  document.getElementById('bk-half-morning').className = 'btn ' + (half === 'morning' ? 'btn-primary' : 'btn-soft');
+  document.getElementById('bk-half-afternoon').className = 'btn ' + (half === 'afternoon' ? 'btn-primary' : 'btn-soft');
+  document.getElementById('bk-half-morning').style.flex = '1';
+  document.getElementById('bk-half-afternoon').style.flex = '1';
+  renderBookHalf();
+}
+
 function loadBookSlots() {
   selBookDate = document.getElementById('bk-date').value;
   selBookSlot = null;
@@ -663,14 +689,26 @@ function loadBookSlots() {
   var url = '/api/appointments/availability?date=' + selBookDate + '&service_id=' + selBookService +
     '&extras=' + selBookExtras.join(',') + (selBookBarber ? '&barber_id=' + selBookBarber : '');
 
+  var toggleEl = document.getElementById('bk-half-toggle');
   document.getElementById('bk-slots-grid').innerHTML = '<div class="empty">Chargement…</div>';
+  toggleEl.style.display = 'none';
   apiForBooking(url).then(function (r) {
-    var grid = document.getElementById('bk-slots-grid');
-    grid.innerHTML = r.slots.length === 0
-      ? '<div class="empty">Aucun créneau disponible ce jour-là</div>'
-      : r.slots.map(function (s) {
-          return '<button class="slot-btn" data-time="' + s.time + '" data-barber="' + s.barber_id + '" onclick="selectBookSlot(this)">' + s.time + '</button>';
-        }).join('');
+    if (r.slots.length === 0) {
+      document.getElementById('bk-slots-grid').innerHTML = '<div class="empty">Aucun créneau disponible ce jour-là</div>';
+      return;
+    }
+
+    bkSlotsByHalf.morning = r.slots.filter(function (s) { return s.time < '12:00'; });
+    bkSlotsByHalf.afternoon = r.slots.filter(function (s) { return s.time >= '12:00'; });
+
+    if (!bkSlotsByHalf.morning.length) {
+      toggleEl.style.display = 'none';
+      bkCurrentHalf = 'afternoon';
+      renderBookHalf();
+    } else {
+      toggleEl.style.display = 'flex';
+      showBookHalf('morning');
+    }
   }).catch(function (e) { toast(e.message, true); });
 }
 

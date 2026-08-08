@@ -93,6 +93,10 @@
     <div class="fld"><label for="rdv-date">Date</label><input id="rdv-date" type="date" onchange="loadSlots()"></div>
     <div class="eyebrow" style="margin-top:20px">Créneaux disponibles</div>
     <div class="slots-grid" id="slots-grid"><div class="empty">Choisissez une date</div></div>
+    <div id="half-toggle" style="display:none;gap:8px;margin-bottom:22px">
+      <button class="btn btn-soft" id="half-morning" style="flex:1" onclick="showHalf('morning')">Matin</button>
+      <button class="btn btn-soft" id="half-afternoon" style="flex:1" onclick="showHalf('afternoon')">Après-midi</button>
+    </div>
     <button class="go" id="date-next-btn" onclick="goToContactStep()" disabled>Suivant</button>
   </section>
 
@@ -276,6 +280,28 @@ function goToDateStep() {
 }
 
 /* ---------- Créneaux ---------- */
+var slotsByHalf = { morning: [], afternoon: [] };
+var currentHalf = 'afternoon';
+
+function renderHalf() {
+  var grid = document.getElementById('slots-grid');
+  var list = slotsByHalf[currentHalf];
+  grid.innerHTML = list.length
+    ? list.map(function (s) {
+        return '<button class="slot-btn" data-time="' + s.time + '" data-barber="' + s.barber_id + '" onclick="selectSlot(this)">' + s.time + '</button>';
+      }).join('')
+    : '<div class="empty">Aucun créneau ' + (currentHalf === 'morning' ? 'le matin' : "l'après-midi") + '</div>';
+}
+
+function showHalf(half) {
+  currentHalf = half;
+  document.getElementById('half-morning').className = 'btn ' + (half === 'morning' ? 'btn-primary' : 'btn-soft');
+  document.getElementById('half-afternoon').className = 'btn ' + (half === 'afternoon' ? 'btn-primary' : 'btn-soft');
+  document.getElementById('half-morning').style.flex = '1';
+  document.getElementById('half-afternoon').style.flex = '1';
+  renderHalf();
+}
+
 function loadSlots() {
   selDate = document.getElementById('rdv-date').value;
   selSlot = null;
@@ -285,14 +311,29 @@ function loadSlots() {
   var url = '/api/appointments/availability?date=' + selDate + '&service_id=' + selService +
     '&extras=' + selExtras.join(',') + (selBarber ? '&barber_id=' + selBarber : '');
 
+  var toggleEl = document.getElementById('half-toggle');
   document.getElementById('slots-grid').innerHTML = '<div class="empty">Chargement…</div>';
+  toggleEl.style.display = 'none';
   api(url).then(function (r) {
-    var grid = document.getElementById('slots-grid');
-    grid.innerHTML = r.slots.length === 0
-      ? '<div class="empty">Aucun créneau disponible ce jour-là</div>'
-      : r.slots.map(function (s) {
-          return '<button class="slot-btn" data-time="' + s.time + '" data-barber="' + s.barber_id + '" onclick="selectSlot(this)">' + s.time + '</button>';
-        }).join('');
+    if (r.slots.length === 0) {
+      document.getElementById('slots-grid').innerHTML = '<div class="empty">Aucun créneau disponible ce jour-là</div>';
+      return;
+    }
+
+    // Matin (avant 12h) / après-midi (12h et après) - si le matin est
+    // entièrement passé (aucun créneau restant avant midi), on
+    // n'affiche même pas l'onglet Matin.
+    slotsByHalf.morning = r.slots.filter(function (s) { return s.time < '12:00'; });
+    slotsByHalf.afternoon = r.slots.filter(function (s) { return s.time >= '12:00'; });
+
+    if (!slotsByHalf.morning.length) {
+      toggleEl.style.display = 'none';
+      currentHalf = 'afternoon';
+      renderHalf();
+    } else {
+      toggleEl.style.display = 'flex';
+      showHalf('morning');
+    }
   }).catch(function (e) { toast(e.message, true); });
 }
 
