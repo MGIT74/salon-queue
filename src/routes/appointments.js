@@ -1,6 +1,6 @@
 const express = require('express');
 const crypto = require('crypto');
-const { pool, utcIso } = require('../db');
+const { pool, utcIso, getSettings } = require('../db');
 const requireAdmin = require('../middleware/auth');
 const { sendAppointmentConfirmation } = require('../lib/mailer');
 
@@ -130,7 +130,13 @@ async function getBarberBusyMinutesToday(barberId) {
  * aujourd'hui uniquement) sa charge réelle de file d'attente sans RDV
  * en ce moment même.
  */
-async function computeSlotsForBarber(barberId, dateStr, durationMin) {
+async function computeSlotsForBarber(barberId, dateStr, durationMin, rdvSettings, opts) {
+  rdvSettings = rdvSettings || {};
+  opts = opts || {};
+  const stepMin = Number(rdvSettings.rdv_slot_step_min) || 15;
+  const leadMin = opts.skipLead ? 0 : (Number(rdvSettings.rdv_min_lead_min) || 0);
+  const bufferMin = Number(rdvSettings.rdv_buffer_min) || 0;
+
   const date = new Date(dateStr + 'T00:00:00Z');
   const weekday = date.getUTCDay(); // 0=dimanche ... 6=samedi
 
@@ -162,16 +168,19 @@ async function computeSlotsForBarber(barberId, dateStr, durationMin) {
   // Un RDV déjà honoré (terminé) ou annulé ne bloque plus sa plage
   // théorique - s'il a été pris en charge en avance et fini plus tôt
   // que prévu, le reste de sa plage doit redevenir réservable tout de
-  // suite, pas seulement à l'heure théorique de fin.
+  // suite, pas seulement à l'heure théorique de fin. La marge tampon
+  // (rdv_buffer_min) prolonge chaque plage occupée après la fin
+  // théorique, pour laisser un temps de battement avant le RDV suivant.
   const busyRanges = existing
     .filter((a) => a.queue_status !== 'done' && a.queue_status !== 'cancelled')
     .map((a) => {
       const start = timeToMinutes(a.scheduled_at.split(' ')[1].slice(0, 5));
-      return [start, start + a.svc_duration + Number(a.extras_duration)];
+      return [start, start + a.svc_duration + Number(a.extras_duration) + bufferMin];
     });
 
   // Pauses (déjeuner, etc.) — bloquent les créneaux au même titre qu'un
-  // RDV déjà pris, pour ce jour de la semaine précis.
+  // RDV déjà pris, pour ce jour de la semaine précis. Pas de marge
+  // tampon ici, ce sont des horaires fixes déjà volontairement posés.
   const [breaks] = await pool.query(
     'SELECT start_time, end_time FROM barber_breaks WHERE barber_id = ? AND weekday = ? AND active = 1',
     [barberId, weekday]
@@ -186,16 +195,29 @@ async function computeSlotsForBarber(barberId, dateStr, durationMin) {
 
   if (isToday) {
     const busyMin = await getBarberBusyMinutesToday(barberId);
-    nowMin = paris.minutes + busyMin;
+    nowMin = paris.minutes + busyMin + leadMin;
   }
 
   const slots = [];
-  for (let t = startMin; t + durationMin <= endMin; t += SLOT_STEP_MIN) {
+  for (let t = startMin; t + durationMin <= endMin; t += stepMin) {
     if (isToday && t <= nowMin) continue;
     const overlaps = busyRanges.some(([bStart, bEnd]) => t < bEnd && t + durationMin > bStart);
     if (!overlaps) slots.push(minutesToTime(t));
   }
   return slots;
+}
+
+/**
+ * true si dateStr dépasse la fenêtre de réservation maximale à l'avance
+ * (rdv_max_advance_days, 0 = illimité) - comparaison en jours civils,
+ * heure de salon.
+ */
+function isBeyondAdvanceWindow(dateStr, rdvSettings) {
+  const maxDays = Number(rdvSettings.rdv_max_advance_days) || 0;
+  if (!maxDays) return false;
+  const todayStr = nowInParis().dateStr;
+  const diffDays = Math.round((new Date(dateStr + 'T00:00:00Z') - new Date(todayStr + 'T00:00:00Z')) / 86400000);
+  return diffDays > maxDays;
 }
 
 /**
@@ -205,6 +227,11 @@ async function computeSlotsForBarber(barberId, dateStr, durationMin) {
 router.get('/availability', wrap(async (req, res) => {
   const { date, service_id, barber_id } = req.query;
   if (!date || !service_id) return res.status(400).json({ error: 'date et service_id requis' });
+
+  const rdvSettings = await getSettings(req.salon.id);
+  if (isBeyondAdvanceWindow(date, rdvSettings)) {
+    return res.json({ ok: true, slots: [] });
+  }
 
   const [[service]] = await pool.query(
     'SELECT duration_min FROM services WHERE id = ? AND salon_id = ?', [service_id, req.salon.id]
@@ -222,7 +249,7 @@ router.get('/availability', wrap(async (req, res) => {
   const durationMin = service.duration_min + extraDuration;
 
   if (barber_id) {
-    const slots = await computeSlotsForBarber(barber_id, date, durationMin);
+    const slots = await computeSlotsForBarber(barber_id, date, durationMin, rdvSettings);
     return res.json({ ok: true, slots: slots.map((s) => ({ time: s, barber_id })) });
   }
 
@@ -231,7 +258,7 @@ router.get('/availability', wrap(async (req, res) => {
   );
   const allSlots = {};
   for (const b of barbers) {
-    const slots = await computeSlotsForBarber(b.id, date, durationMin);
+    const slots = await computeSlotsForBarber(b.id, date, durationMin, rdvSettings);
     slots.forEach((s) => { if (!allSlots[s]) allSlots[s] = b.id; });
   }
   const merged = Object.keys(allSlots).sort().map((time) => ({ time, barber_id: allSlots[time] }));
@@ -308,6 +335,11 @@ router.post('/', wrap(async (req, res) => {
     return res.status(400).json({ error: 'Ce créneau est déjà passé, choisissez une date/heure à venir.' });
   }
 
+  const rdvSettings = await getSettings(req.salon.id);
+  if (isBeyondAdvanceWindow(date, rdvSettings)) {
+    return res.status(400).json({ error: 'Cette date est trop éloignée, choisissez une date plus proche.' });
+  }
+
   const [[service]] = await pool.query(
     'SELECT name, duration_min FROM services WHERE id = ? AND salon_id = ?', [service_id, req.salon.id]
   );
@@ -331,12 +363,12 @@ router.post('/', wrap(async (req, res) => {
       'SELECT id FROM barbers WHERE salon_id = ? AND active = 1 AND accepts_appointments = 1', [req.salon.id]
     );
     for (const b of barbers) {
-      const slots = await computeSlotsForBarber(b.id, date, durationMin);
+      const slots = await computeSlotsForBarber(b.id, date, durationMin, rdvSettings);
       if (slots.includes(time)) { finalBarberId = b.id; break; }
     }
     if (!finalBarberId) return res.status(409).json({ error: "Ce créneau n'est plus disponible" });
   } else {
-    const slots = await computeSlotsForBarber(finalBarberId, date, durationMin);
+    const slots = await computeSlotsForBarber(finalBarberId, date, durationMin, rdvSettings);
     if (!slots.includes(time)) return res.status(409).json({ error: "Ce créneau n'est plus disponible" });
   }
 
@@ -414,6 +446,8 @@ router.post('/admin-create', requireAdmin, wrap(async (req, res) => {
     return res.status(400).json({ error: 'Ce créneau est déjà passé, choisissez une date/heure à venir.' });
   }
 
+  const rdvSettings = await getSettings(req.salon.id);
+
   const [[service]] = await pool.query(
     'SELECT name, duration_min FROM services WHERE id = ? AND salon_id = ?', [service_id, req.salon.id]
   );
@@ -429,7 +463,12 @@ router.post('/admin-create', requireAdmin, wrap(async (req, res) => {
   }
   const durationMin = service.duration_min + extraDuration;
 
-  const slots = await computeSlotsForBarber(barber_id, date, durationMin);
+  // Admin exempté du délai minimum de réservation (rdv_min_lead_min) et
+  // de la fenêtre max à l'avance (pas vérifiée ici du tout) - ce sont
+  // des garde-fous pour le grand public, pas pour un ajout manuel gu
+  // idé par le staff. Le pas des créneaux et la marge tampon restent
+  // appliqués (évite un vrai conflit d'agenda).
+  const slots = await computeSlotsForBarber(barber_id, date, durationMin, rdvSettings, { skipLead: true });
   if (!slots.includes(time)) return res.status(409).json({ error: "Ce créneau n'est plus disponible" });
 
   const id = crypto.randomUUID();
@@ -484,10 +523,22 @@ router.post('/cancel', wrap(async (req, res) => {
   if (!token) return res.status(400).json({ error: 'Token requis' });
 
   const [[appt]] = await pool.query(
-    'SELECT id, status, promoted_queue_id FROM appointments WHERE cancel_token = ?', [token]
+    'SELECT id, salon_id, status, scheduled_at, promoted_queue_id FROM appointments WHERE cancel_token = ?', [token]
   );
   if (!appt) return res.status(404).json({ error: 'Rendez-vous introuvable' });
   if (appt.status === 'cancelled') return res.status(409).json({ error: 'Ce rendez-vous est déjà annulé' });
+
+  // Délai limite d'annulation : recherché via le salon RÉEL du RDV
+  // (appt.salon_id), pas req.salon - cette route est publique, le
+  // salon envoyé par le client ne fait pas forcément foi.
+  const rdvSettings = await getSettings(appt.salon_id);
+  const deadlineMin = Number(rdvSettings.rdv_cancel_deadline_min) || 0;
+  if (deadlineMin > 0) {
+    const minutesUntil = (new Date(appt.scheduled_at.replace(' ', 'T') + 'Z') - new Date(nowParisDatetimeString().replace(' ', 'T') + 'Z')) / 60000;
+    if (minutesUntil < deadlineMin) {
+      return res.status(403).json({ error: "Trop tard pour annuler ce rendez-vous en ligne, contactez directement le salon." });
+    }
+  }
 
   await pool.query('UPDATE appointments SET status = ? WHERE id = ?', ['cancelled', appt.id]);
   if (appt.promoted_queue_id) {

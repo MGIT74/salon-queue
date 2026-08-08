@@ -18,7 +18,9 @@ const EDITABLE = [
   'salon_name', 'notify_before_min', 'logo_url', 'gift_tile_image_url',
   'smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_from',
   'printer_connection_type', 'printer_ip', 'printer_model',
-  'caisse_inactivity_seconds', 'caisse_reopen_hour', 'currency'
+  'caisse_inactivity_seconds', 'caisse_reopen_hour', 'currency',
+  'rdv_slot_step_min', 'rdv_min_lead_min', 'rdv_max_advance_days',
+  'rdv_buffer_min', 'rdv_cancel_deadline_min'
 ];
 
 // Force la réouverture immédiate de la caisse (annule le verrouillage
@@ -98,6 +100,11 @@ router.get('/public', wrap(async (req, res) => {
     caisse_inactivity_seconds: s.caisse_inactivity_seconds ? Number(s.caisse_inactivity_seconds) : 15,
     caisse_reopen_hour: s.caisse_reopen_hour || '00:00',
     currency: s.currency || 'EUR',
+    rdv_slot_step_min: s.rdv_slot_step_min ? Number(s.rdv_slot_step_min) : 15,
+    rdv_min_lead_min: s.rdv_min_lead_min ? Number(s.rdv_min_lead_min) : 0,
+    rdv_max_advance_days: s.rdv_max_advance_days ? Number(s.rdv_max_advance_days) : 0,
+    rdv_buffer_min: s.rdv_buffer_min ? Number(s.rdv_buffer_min) : 0,
+    rdv_cancel_deadline_min: s.rdv_cancel_deadline_min ? Number(s.rdv_cancel_deadline_min) : 0,
     caisse_locked_until: caisseLockedUntil
   });
 }));

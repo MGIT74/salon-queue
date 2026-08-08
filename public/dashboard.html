@@ -762,6 +762,9 @@
   <div class="tab-panel" id="t-rdv">
     <div class="admin-head">
       <h2>Rendez-vous</h2>
+      <button class="x" title="Paramètres des RDV" onclick="openRdvSettings()" style="margin-left:auto">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2.06 2.06 0 1 1-2.91 2.91l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2.06 2.06 0 1 1-4.12 0v-.09a1.7 1.7 0 0 0-1.11-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2.06 2.06 0 1 1-2.91-2.91l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H3a2.06 2.06 0 1 1 0-4.12h.09a1.7 1.7 0 0 0 1.55-1.11 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2.06 2.06 0 1 1 2.91-2.91l.06.06a1.7 1.7 0 0 0 1.87.34H9a1.7 1.7 0 0 0 1-1.55V3a2.06 2.06 0 1 1 4.12 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06a2.06 2.06 0 1 1 2.91 2.91l-.06.06a1.7 1.7 0 0 0-.34 1.87V9a1.7 1.7 0 0 0 1.55 1H21a2.06 2.06 0 1 1 0 4.12h-.09a1.7 1.7 0 0 0-1.55 1Z"/></svg>
+      </button>
     </div>
     <p class="hint" style="margin-top:-8px">Réservés en ligne — ceux du jour apparaissent aussi automatiquement dans la file d'attente au moment prévu.</p>
 
@@ -3565,6 +3568,108 @@ function saveRecoveryEmail() {
   api('/api/owner/email', { method: 'PUT', body: { email: email } })
     .then(function () { toast('Email de récupération enregistré'); })
     .catch(function (e) { toast(e.message, true); });
+}
+
+/**
+ * Paramètres des RDV (pas des créneaux, délais, marge tampon...) -
+ * popup dédié, séparé de Réglages > Général.
+ */
+function openRdvSettings() {
+  var overlay = _buildModal(
+    '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px">' +
+    '<div class="modal-title" style="margin-bottom:0">Paramètres des rendez-vous</div>' +
+    '<button id="rs-close-x" style="background:var(--fill);border:none;width:30px;height:30px;border-radius:50%;color:var(--grey);font-size:14px;cursor:pointer;flex-shrink:0;margin-left:10px">✕</button>' +
+    '</div>' +
+
+    '<div class="fld" style="margin-bottom:12px">' +
+      '<label>Pas des créneaux proposés</label>' +
+      '<select class="modal-input" id="rs-step">' +
+        '<option value="5">5 minutes</option>' +
+        '<option value="10">10 minutes</option>' +
+        '<option value="15">15 minutes</option>' +
+        '<option value="20">20 minutes</option>' +
+        '<option value="30">30 minutes</option>' +
+      '</select>' +
+    '</div>' +
+
+    '<div class="fld" style="margin-bottom:12px">' +
+      '<label>Délai minimum avant réservation</label>' +
+      '<select class="modal-input" id="rs-lead">' +
+        '<option value="0">Aucun (réservable dès maintenant)</option>' +
+        '<option value="15">15 minutes</option>' +
+        '<option value="30">30 minutes</option>' +
+        '<option value="60">1 heure</option>' +
+      '</select>' +
+      '<p class="hint" style="margin:6px 0 0">Empêche un client de réserver un créneau trop proche de maintenant.</p>' +
+    '</div>' +
+
+    '<div class="fld" style="margin-bottom:12px">' +
+      '<label>Réservable jusqu\'à</label>' +
+      '<select class="modal-input" id="rs-advance">' +
+        '<option value="0">Sans limite</option>' +
+        '<option value="30">30 jours à l\'avance</option>' +
+        '<option value="60">60 jours à l\'avance</option>' +
+        '<option value="90">90 jours à l\'avance</option>' +
+      '</select>' +
+    '</div>' +
+
+    '<div class="fld" style="margin-bottom:12px">' +
+      '<label>Marge tampon entre 2 RDV</label>' +
+      '<select class="modal-input" id="rs-buffer">' +
+        '<option value="0">Aucune</option>' +
+        '<option value="5">5 minutes</option>' +
+        '<option value="10">10 minutes</option>' +
+        '<option value="15">15 minutes</option>' +
+      '</select>' +
+      '<p class="hint" style="margin:6px 0 0">Temps de battement automatique après chaque prestation avant de proposer le créneau suivant.</p>' +
+    '</div>' +
+
+    '<div class="fld" style="margin-bottom:14px">' +
+      '<label>Délai limite pour annuler en ligne</label>' +
+      '<select class="modal-input" id="rs-cancel">' +
+        '<option value="0">Toujours possible</option>' +
+        '<option value="60">Jusqu\'à 1h avant</option>' +
+        '<option value="120">Jusqu\'à 2h avant</option>' +
+        '<option value="1440">Jusqu\'à 24h avant</option>' +
+      '</select>' +
+      '<p class="hint" style="margin:6px 0 0">Passé ce délai, le client doit contacter directement le salon pour annuler.</p>' +
+    '</div>' +
+
+    '<div class="modal-error" id="rs-error" style="display:none"></div>' +
+    '<div class="modal-actions">' +
+    '<button class="btn btn-soft" id="rs-cancel-btn">Fermer</button>' +
+    '<button class="btn btn-primary" id="rs-save-btn">Enregistrer</button>' +
+    '</div>'
+  );
+
+  api('/api/settings').then(function (r) {
+    var s = r.settings;
+    overlay.querySelector('#rs-step').value = s.rdv_slot_step_min || '15';
+    overlay.querySelector('#rs-lead').value = s.rdv_min_lead_min || '0';
+    overlay.querySelector('#rs-advance').value = s.rdv_max_advance_days || '0';
+    overlay.querySelector('#rs-buffer').value = s.rdv_buffer_min || '0';
+    overlay.querySelector('#rs-cancel').value = s.rdv_cancel_deadline_min || '0';
+  }).catch(function (e) { toast(e.message, true); });
+
+  overlay.querySelector('#rs-close-x').onclick = function () { _closeModal(overlay); };
+  overlay.querySelector('#rs-cancel-btn').onclick = function () { _closeModal(overlay); };
+
+  overlay.querySelector('#rs-save-btn').onclick = function () {
+    var errEl = overlay.querySelector('#rs-error');
+    api('/api/settings', {
+      method: 'PUT',
+      body: {
+        rdv_slot_step_min: overlay.querySelector('#rs-step').value,
+        rdv_min_lead_min: overlay.querySelector('#rs-lead').value,
+        rdv_max_advance_days: overlay.querySelector('#rs-advance').value,
+        rdv_buffer_min: overlay.querySelector('#rs-buffer').value,
+        rdv_cancel_deadline_min: overlay.querySelector('#rs-cancel').value
+      }
+    }).then(function () {
+      _closeModal(overlay);
+      toast('Paramètres enregistrés');
+    }).catch(function (e) { errEl.textContent = e.message; errEl.style.display = 'block'; });
+  };
 }
 
 function loadSettings() {
