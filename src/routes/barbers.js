@@ -191,7 +191,7 @@ router.post('/login', wrap(async (req, res) => {
   if (!pin) return res.status(400).json({ error: 'Code PIN requis' });
 
   const [[barber]] = await pool.query(
-    'SELECT id, name FROM barbers WHERE salon_id = ? AND pin_code = ? AND active = 1 LIMIT 1',
+    'SELECT id, name, accepts_appointments FROM barbers WHERE salon_id = ? AND pin_code = ? AND active = 1 LIMIT 1',
     [req.salon.id, pin]
   );
   if (!barber) return res.status(401).json({ error: 'Code PIN incorrect' });

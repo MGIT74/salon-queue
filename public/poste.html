@@ -310,7 +310,7 @@ function attemptLogin() {
         renderPinDots();
         return;
       }
-      me = { id: res.data.barber.id, name: res.data.barber.name, pin: pinBuffer };
+      me = { id: res.data.barber.id, name: res.data.barber.name, pin: pinBuffer, acceptsAppointments: Boolean(res.data.barber.accepts_appointments) };
       try { sessionStorage.setItem('poste-session', JSON.stringify(me)); } catch (e) {}
       showApp();
     })
@@ -349,6 +349,15 @@ function showApp() {
   document.getElementById('my-name').textContent = me.name;
   document.getElementById('poste-footer').style.display = 'flex';
   document.body.classList.add('has-poste-footer');
+
+  // Un coiffeur "Sans RDV" (pas en mode RDV en ligne) n'a pas d'agenda
+  // à consulter - on retire les onglets Timer/Agenda du footer, il ne
+  // reste que Déconnexion, et son seul écran (le suivi de la file en
+  // cours) reste affiché sans bascule inutile.
+  var showTabs = me.acceptsAppointments;
+  document.getElementById('nav-home').style.display = showTabs ? 'flex' : 'none';
+  document.getElementById('nav-agenda').style.display = showTabs ? 'flex' : 'none';
+
   gotoHome();
   boot();
 }
