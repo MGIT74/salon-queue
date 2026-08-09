@@ -133,6 +133,54 @@ async function sendAppointmentConfirmation(salonId, to, info) {
   });
 }
 
+/**
+ * Annulation à l'initiative du SALON (pas du client) - texte
+ * volontairement différent (excuses), distinct de l'annulation
+ * self-service (client via son lien/compte), qui n'envoie aucun
+ * email puisque le client sait déjà qu'il vient d'annuler lui-même.
+ */
+async function sendAppointmentCancelledByAdmin(salonId, to, info) {
+  const { tx, from, salon } = await getTransport(salonId);
+  await tx.sendMail({
+    from,
+    to,
+    subject: 'Votre rendez-vous a été annulé — ' + salon,
+    text: `Bonjour ${info.clientName},\n\n` +
+          `Nous sommes désolés de vous informer que votre rendez-vous du ${info.when} ` +
+          `(${info.serviceName}) chez ${salon} a dû être annulé.\n` +
+          `N'hésitez pas à nous recontacter pour reprendre un nouveau rendez-vous.\n\n` +
+          `Toutes nos excuses pour la gêne occasionnée.\n\n${salon}`,
+    html: `<p>Bonjour ${info.clientName},</p>` +
+          `<p>Nous sommes désolés de vous informer que votre rendez-vous du <strong>${info.when}</strong> ` +
+          `(${info.serviceName}) chez ${salon} a dû être annulé.</p>` +
+          `<p>N'hésitez pas à nous recontacter pour reprendre un nouveau rendez-vous.</p>` +
+          `<p>Toutes nos excuses pour la gêne occasionnée.</p>` +
+          `<p>${salon}</p>`
+  });
+}
+
+/**
+ * Confirmation qu'un RDV a été modifié (nouvel horaire/coiffeur) à
+ * l'initiative du salon.
+ */
+async function sendAppointmentRescheduled(salonId, to, info) {
+  const { tx, from, salon } = await getTransport(salonId);
+  await tx.sendMail({
+    from,
+    to,
+    subject: 'Votre rendez-vous a été modifié — ' + salon,
+    text: `Bonjour ${info.clientName},\n\n` +
+          `Votre rendez-vous chez ${salon} a été modifié.\n\n` +
+          `Nouvel horaire : ${info.when} — ${info.serviceName}${info.barberName ? ' avec ' + info.barberName : ''}\n\n` +
+          `Besoin d'annuler ? ${info.cancelUrl}\n\n${salon}`,
+    html: `<p>Bonjour ${info.clientName},</p>` +
+          `<p>Votre rendez-vous chez ${salon} a été modifié.</p>` +
+          `<p>Nouvel horaire :<br><strong>${info.when}</strong><br>${info.serviceName}${info.barberName ? ' avec ' + info.barberName : ''}</p>` +
+          `<p><a href="${info.cancelUrl}">Annuler ce rendez-vous</a></p>` +
+          `<p>${salon}</p>`
+  });
+}
+
 async function sendClientVerificationEmail(salonId, to, verifyUrl) {
   const { tx, from, salon } = await getTransport(salonId);
   await tx.sendMail({
@@ -165,5 +213,6 @@ async function sendClientPasswordReset(salonId, to, resetUrl) {
 
 module.exports = {
   sendTurnSoon, sendTest, sendGiftConfirmation, sendLoyaltyActivation, sendAppointmentConfirmation,
-  sendAppointmentReminder, sendClientVerificationEmail, sendClientPasswordReset, invalidateTransport
+  sendAppointmentReminder, sendAppointmentCancelledByAdmin, sendAppointmentRescheduled,
+  sendClientVerificationEmail, sendClientPasswordReset, invalidateTransport
 };

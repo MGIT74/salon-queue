@@ -4,7 +4,7 @@ const { pool, utcIso, getSettings } = require('../db');
 const requireAdmin = require('../middleware/auth');
 const requireAdminOrBarber = require('../middleware/barberAuth');
 const { clientKey } = require('../lib/queueMath');
-const { sendAppointmentConfirmation } = require('../lib/mailer');
+const { sendAppointmentConfirmation, sendAppointmentCancelledByAdmin, sendAppointmentRescheduled } = require('../lib/mailer');
 
 const router = express.Router();
 
@@ -173,8 +173,9 @@ async function computeSlotsForBarber(barberId, dateStr, durationMin, rdvSettings
      LEFT JOIN extras e ON e.id = ae.extra_id
      LEFT JOIN queue q ON q.id = a.promoted_queue_id
      WHERE a.barber_id = ? AND a.status = 'confirmed' AND DATE(a.scheduled_at) = ?
+       AND a.id != ?
      GROUP BY a.id`,
-    [barberId, dateStr]
+    [barberId, dateStr, opts.excludeAppointmentId || '']
   );
   // Un RDV déjà honoré (terminé) ou annulé ne bloque plus sa plage
   // théorique - s'il a été pris en charge en avance et fini plus tôt
@@ -258,9 +259,10 @@ router.get('/availability', wrap(async (req, res) => {
     }
   }
   const durationMin = service.duration_min + extraDuration;
+  var slotOpts = req.query.exclude_appointment_id ? { excludeAppointmentId: req.query.exclude_appointment_id } : {};
 
   if (barber_id) {
-    const slots = await computeSlotsForBarber(barber_id, date, durationMin, rdvSettings);
+    const slots = await computeSlotsForBarber(barber_id, date, durationMin, rdvSettings, slotOpts);
     return res.json({ ok: true, slots: slots.map((s) => ({ time: s, barber_id })) });
   }
 
@@ -269,7 +271,7 @@ router.get('/availability', wrap(async (req, res) => {
   );
   const allSlots = {};
   for (const b of barbers) {
-    const slots = await computeSlotsForBarber(b.id, date, durationMin, rdvSettings);
+    const slots = await computeSlotsForBarber(b.id, date, durationMin, rdvSettings, slotOpts);
     slots.forEach((s) => { if (!allSlots[s]) allSlots[s] = b.id; });
   }
   const merged = Object.keys(allSlots).sort().map((time) => ({ time, barber_id: allSlots[time] }));
@@ -578,6 +580,136 @@ router.post('/cancel', wrap(async (req, res) => {
       [appt.promoted_queue_id]
     );
   }
+  res.json({ ok: true });
+}));
+
+/**
+ * Annulation à l'initiative de l'ADMIN (bouton dans le tiroir client de
+ * l'agenda) - distincte de POST /cancel ci-dessus (self-service client
+ * via token, aucun email envoyé puisqu'il vient d'annuler lui-même).
+ * Ici un email d'excuses est envoyé au client s'il a une adresse.
+ */
+router.post('/:id/admin-cancel', requireAdmin, wrap(async (req, res) => {
+  const [[appt]] = await pool.query(
+    `SELECT a.id, a.status, a.scheduled_at, a.promoted_queue_id, a.client_name, a.email, s.name AS service_name
+     FROM appointments a JOIN services s ON s.id = a.service_id
+     WHERE a.id = ? AND a.salon_id = ?`,
+    [req.params.id, req.salon.id]
+  );
+  if (!appt) return res.status(404).json({ error: 'Rendez-vous introuvable' });
+  if (appt.status === 'cancelled') return res.status(409).json({ error: 'Ce rendez-vous est déjà annulé' });
+
+  await pool.query('UPDATE appointments SET status = ? WHERE id = ?', ['cancelled', appt.id]);
+  if (appt.promoted_queue_id) {
+    await pool.query(
+      "UPDATE queue SET status = 'cancelled' WHERE id = ? AND status IN ('waiting','in_progress')",
+      [appt.promoted_queue_id]
+    );
+  }
+
+  if (appt.email) {
+    try {
+      const when = new Date(String(appt.scheduled_at).replace(' ', 'T')).toLocaleString('fr-FR', {
+        weekday: 'long', day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit'
+      });
+      await sendAppointmentCancelledByAdmin(req.salon.id, appt.email, {
+        clientName: appt.client_name, when, serviceName: appt.service_name
+      });
+    } catch (err) {
+      console.error('[admin-cancel] envoi email échoué:', err.message);
+    }
+  }
+  res.json({ ok: true });
+}));
+
+/**
+ * Modification/déplacement d'un RDV par l'admin (nouvelle date/heure,
+ * et éventuellement nouveau coiffeur) - le client reçoit un email de
+ * confirmation avec le nouvel horaire.
+ */
+router.put('/:id/reschedule', requireAdmin, wrap(async (req, res) => {
+  const { date, time, barber_id } = req.body;
+  if (!date || !time) return res.status(400).json({ error: 'Date et créneau requis' });
+
+  const [[appt]] = await pool.query(
+    `SELECT a.*, s.name AS service_name, s.duration_min FROM appointments a
+     JOIN services s ON s.id = a.service_id
+     WHERE a.id = ? AND a.salon_id = ?`,
+    [req.params.id, req.salon.id]
+  );
+  if (!appt) return res.status(404).json({ error: 'Rendez-vous introuvable' });
+  if (appt.status === 'cancelled') return res.status(409).json({ error: 'Ce rendez-vous est annulé, impossible de le modifier.' });
+
+  const finalBarberId = barber_id || appt.barber_id;
+  if (!finalBarberId) return res.status(400).json({ error: 'Le coiffeur est requis' });
+
+  if (`${date} ${time}:00` < nowParisDatetimeString()) {
+    return res.status(400).json({ error: 'Ce créneau est déjà passé.' });
+  }
+
+  const [extraLinks] = await pool.query(
+    `SELECT e.id, e.name, e.duration_min FROM appointment_extras ae JOIN extras e ON e.id = ae.extra_id WHERE ae.appointment_id = ?`,
+    [appt.id]
+  );
+  const extraIds = extraLinks.map((e) => e.id);
+  const extraDuration = extraLinks.reduce((a, e) => a + e.duration_min, 0);
+  const durationMin = appt.duration_min + extraDuration;
+
+  const rdvSettings = await getSettings(req.salon.id);
+  const slots = await computeSlotsForBarber(finalBarberId, date, durationMin, rdvSettings, { skipLead: true, excludeAppointmentId: appt.id });
+  if (!slots.includes(time)) return res.status(409).json({ error: "Ce créneau n'est plus disponible" });
+
+  const newScheduledAt = date + ' ' + time + ':00';
+  const today = nowInParis().dateStr;
+  let stillPromotedId = appt.promoted_queue_id;
+
+  if (appt.promoted_queue_id) {
+    const [[q]] = await pool.query('SELECT status FROM queue WHERE id = ?', [appt.promoted_queue_id]);
+    if (q && q.status === 'waiting') {
+      if (date === today) {
+        // Même jour : on met juste à jour l'horaire/coiffeur de la ligne de file existante.
+        const checkinUtc = toMysqlDatetime(parisLocalToUtcDate(date, time + ':00'));
+        await pool.query('UPDATE queue SET checkin_at = ?, barber_id = ? WHERE id = ?', [checkinUtc, finalBarberId, appt.promoted_queue_id]);
+      } else {
+        // Déplacé à un autre jour : retiré de la file d'aujourd'hui,
+        // sera re-promu automatiquement le bon jour (promoteTodayAppointments).
+        await pool.query("UPDATE queue SET status = 'cancelled' WHERE id = ?", [appt.promoted_queue_id]);
+        stillPromotedId = null;
+      }
+    }
+    // Si déjà 'done'/'in_progress' (coupe déjà en cours ou finie) : on
+    // ne touche pas à la file, cas limite très rare pour un déplacement.
+  }
+
+  await pool.query(
+    'UPDATE appointments SET scheduled_at = ?, barber_id = ?, promoted_queue_id = ? WHERE id = ?',
+    [newScheduledAt, finalBarberId, stillPromotedId, appt.id]
+  );
+
+  if (date === today && !stillPromotedId) {
+    const [[fresh]] = await pool.query('SELECT * FROM appointments WHERE id = ?', [appt.id]);
+    await promoteAppointment(fresh, extraIds);
+  }
+
+  if (appt.email) {
+    try {
+      const when = new Date(newScheduledAt.replace(' ', 'T')).toLocaleString('fr-FR', {
+        weekday: 'long', day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit'
+      });
+      const [[barber]] = await pool.query('SELECT name FROM barbers WHERE id = ?', [finalBarberId]);
+      const baseUrl = String(req.body.base_url || '').replace(/\/$/, '');
+      const cancelUrl = baseUrl + (baseUrl.includes('?') ? '&' : '?') + 'cancel=' + appt.cancel_token;
+      await sendAppointmentRescheduled(req.salon.id, appt.email, {
+        clientName: appt.client_name, when,
+        serviceName: appt.service_name + (extraLinks.length ? ' + ' + extraLinks.map((e) => e.name).join(', ') : ''),
+        barberName: barber ? barber.name : null,
+        cancelUrl
+      });
+    } catch (err) {
+      console.error('[reschedule] envoi email échoué:', err.message);
+    }
+  }
+
   res.json({ ok: true });
 }));
 

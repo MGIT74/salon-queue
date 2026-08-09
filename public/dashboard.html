@@ -1033,6 +1033,11 @@
       Modifier
     </button>
 
+    <div id="drawer-appt-actions" style="display:none;gap:8px;margin:-10px 0 16px">
+      <button class="btn btn-soft" style="flex:1" onclick="openRescheduleAppointment()">Déplacer le RDV</button>
+      <button class="btn btn-soft" style="flex:1;color:var(--red)" onclick="cancelAppointmentByAdmin()">Annuler le RDV</button>
+    </div>
+
     <div class="client-drawer-section" id="drawer-info-section"></div>
     <div class="client-drawer-section" id="drawer-info-edit-section" style="display:none">
       <div class="fld" style="margin-bottom:8px"><label for="drawer-edit-name">Nom</label><input id="drawer-edit-name" type="text"></div>
@@ -1410,8 +1415,113 @@ function chipsHtml(q) {
  * note éditable, plutôt qu'un panneau qui se dépliait sous la ligne.
  */
 var drawerClientId = null;
+var drawerAppointmentId = null;
+var drawerAppointmentData = null;
 var drawerQueueId = null;
 var drawerClientSnapshot = null;
+
+function cancelAppointmentByAdmin() {
+  if (!drawerAppointmentId) return;
+  var name = drawerAppointmentData ? drawerAppointmentData.client_name : 'ce client';
+  showConfirm('Annuler le rendez-vous de ' + name + ' ? Un email d\'excuses lui sera envoyé s\'il a une adresse.', { title: 'Annuler le RDV', danger: true, confirmLabel: 'Annuler le RDV' })
+    .then(function (ok) {
+      if (!ok) return;
+      return api('/api/appointments/' + drawerAppointmentId + '/admin-cancel', { method: 'POST' })
+        .then(function () {
+          toast('Rendez-vous annulé');
+          closeClientDrawer();
+          Object.keys(calMonthCache).forEach(function (k) { delete calMonthCache[k]; });
+          loadCalendarPeriod();
+          renderRdvList();
+        });
+    })
+    .catch(function (e) { toast(e.message, true); });
+}
+
+/**
+ * Déplace un RDV vers un autre créneau (nouvelle date/heure, coiffeur
+ * éventuellement différent) - prestation et suppléments inchangés. Le
+ * client reçoit un email avec le nouvel horaire.
+ */
+function openRescheduleAppointment() {
+  if (!drawerAppointmentId || !drawerAppointmentData) return;
+  var a = drawerAppointmentData;
+  var rdvBarbers = barbers.filter(function (b) { return b.accepts_appointments; });
+  var currentDate = String(a.scheduled_at).slice(0, 10);
+
+  var overlay = _buildModal(
+    '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px">' +
+    '<div class="modal-title" style="margin-bottom:0">Déplacer le RDV</div>' +
+    '<button id="rs-close-x" style="background:var(--fill);border:none;width:30px;height:30px;border-radius:50%;color:var(--grey);font-size:14px;cursor:pointer;flex-shrink:0;margin-left:10px">✕</button>' +
+    '</div>' +
+    '<div class="fld" style="margin-bottom:10px"><label>Coiffeur</label><select class="modal-input" id="rs-barber">' +
+      rdvBarbers.map(function (b) { return '<option value="' + b.id + '"' + (b.id === a.barber_id ? ' selected' : '') + '>' + esc(b.name) + '</option>'; }).join('') +
+    '</select></div>' +
+    '<div class="fld" style="margin-bottom:10px"><label>Nouvelle date</label><input class="modal-input" type="date" id="rs-date" value="' + currentDate + '"></div>' +
+    '<div class="aa-step-title">Créneau</div>' +
+    '<div class="aa-slots" id="rs-slots"><span class="hint" style="margin:0">Chargement…</span></div>' +
+    '<div class="modal-error" id="rs-error" style="display:none"></div>' +
+    '<div class="modal-actions">' +
+    '<button class="btn btn-soft" id="rs-cancel-btn">Annuler</button>' +
+    '<button class="btn btn-primary" id="rs-save-btn" disabled>Enregistrer</button>' +
+    '</div>'
+  );
+
+  var selectedTime = null;
+
+  function loadRsSlots() {
+    var slotsEl = overlay.querySelector('#rs-slots');
+    var barberId = overlay.querySelector('#rs-barber').value;
+    var date = overlay.querySelector('#rs-date').value;
+    selectedTime = null;
+    overlay.querySelector('#rs-save-btn').disabled = true;
+    if (!barberId || !date) return;
+    slotsEl.innerHTML = '<span class="hint" style="margin:0">Chargement…</span>';
+    api('/api/appointments/availability?date=' + date + '&service_id=' + a.service_id + '&barber_id=' + barberId + '&exclude_appointment_id=' + a.id)
+      .then(function (r) {
+        if (!r.slots.length) { slotsEl.innerHTML = '<span class="hint" style="margin:0">Aucun créneau disponible ce jour-là</span>'; return; }
+        slotsEl.innerHTML = r.slots.map(function (s) {
+          return '<button class="aa-slot" data-time="' + s.time + '" onclick="rsSelectSlot(this)">' + s.time + '</button>';
+        }).join('');
+      })
+      .catch(function (e) { slotsEl.innerHTML = ''; toast(e.message, true); });
+  }
+
+  window.rsSelectSlot = function (el) {
+    selectedTime = el.dataset.time;
+    overlay.querySelectorAll('#rs-slots .aa-slot').forEach(function (c) { c.classList.remove('sel'); });
+    el.classList.add('sel');
+    overlay.querySelector('#rs-save-btn').disabled = false;
+  };
+
+  overlay.querySelector('#rs-barber').onchange = loadRsSlots;
+  overlay.querySelector('#rs-date').onchange = loadRsSlots;
+  loadRsSlots();
+
+  overlay.querySelector('#rs-close-x').onclick = function () { _closeModal(overlay); };
+  overlay.querySelector('#rs-cancel-btn').onclick = function () { _closeModal(overlay); };
+
+  overlay.querySelector('#rs-save-btn').onclick = function () {
+    var errEl = overlay.querySelector('#rs-error');
+    if (!selectedTime) return;
+    api('/api/appointments/' + a.id + '/reschedule', {
+      method: 'PUT',
+      body: {
+        date: overlay.querySelector('#rs-date').value,
+        time: selectedTime,
+        barber_id: overlay.querySelector('#rs-barber').value,
+        base_url: window.location.origin + '/rdv.html'
+      }
+    }).then(function () {
+      _closeModal(overlay);
+      toast('Rendez-vous déplacé');
+      closeClientDrawer();
+      Object.keys(calMonthCache).forEach(function (k) { delete calMonthCache[k]; });
+      loadCalendarPeriod();
+      renderRdvList();
+    }).catch(function (e) { errEl.textContent = e.message; errEl.style.display = 'block'; });
+  };
+}
 
 function toggleEditClientInfo() {
   var editing = document.getElementById('drawer-info-edit-section').style.display !== 'none';
@@ -1467,6 +1577,13 @@ function openClientDrawer(id, source, directData) {
   document.getElementById('drawer-edit-btn').style.display = drawerQueueId ? 'flex' : 'none';
   document.getElementById('drawer-client-name').textContent = c.client_name;
   document.getElementById('drawer-note').value = c.note || '';
+
+  // Déplacer/Annuler un RDV : uniquement pour une entrée de type RDV
+  // (source='appointment'), pas encore annulée - ces actions n'ont pas
+  // de sens pour un simple passage sans-RDV (Clients/File d'attente).
+  drawerAppointmentId = (source === 'appointment' && c.status !== 'cancelled') ? c.id : null;
+  drawerAppointmentData = drawerAppointmentId ? c : null;
+  document.getElementById('drawer-appt-actions').style.display = drawerAppointmentId ? 'flex' : 'none';
 
   document.getElementById('drawer-info-section').innerHTML =
     (c.email ? '<div class="detail-row"><span class="detail-label">Email</span><span class="detail-value">' + esc(c.email) + '</span></div>' : '') +
