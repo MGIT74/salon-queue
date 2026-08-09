@@ -1656,9 +1656,10 @@ function renderDrawerVisits(items) {
   document.getElementById('drawer-visit-count').textContent =
     items.length + (items.length > 1 ? ' passages au total' : ' passage au total');
 
+  var shown = items.slice(0, 4);
   document.getElementById('drawer-visits').innerHTML = items.length === 0
     ? '<div class="empty">Aucun passage enregistré</div>'
-    : items.map(function (v) {
+    : shown.map(function (v) {
         var when = new Date(v.checkin_at).toLocaleString('fr-FR', {
           day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
         });
