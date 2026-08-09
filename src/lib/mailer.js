@@ -43,6 +43,25 @@ async function sendTurnSoon(salonId, to, name, waitMin) {
   });
 }
 
+/**
+ * Rappel d'un RDV programmé à l'avance, N minutes avant l'heure fixée
+ * (notify_before_min) - distinct de sendTurnSoon (file d'attente
+ * physique en temps réel), qui ne convient pas ici : un horaire de
+ * RDV est fixe et connu, pas une estimation dynamique de position.
+ */
+async function sendAppointmentReminder(salonId, to, info) {
+  const { tx, from, salon } = await getTransport(salonId);
+  await tx.sendMail({
+    from,
+    to,
+    subject: `Rappel — votre rendez-vous chez ${salon}`,
+    text: `Bonjour ${info.clientName},\n\nPetit rappel : votre rendez-vous (${info.serviceName}) est prévu ${info.when}.\n\n${salon}`,
+    html: `<p>Bonjour ${info.clientName},</p>` +
+          `<p>Petit rappel : votre rendez-vous (<strong>${info.serviceName}</strong>) est prévu <strong>${info.when}</strong>.</p>` +
+          `<p>${salon}</p>`
+  });
+}
+
 async function sendLoyaltyActivation(salonId, to, info) {
   const { tx, from, salon } = await getTransport(salonId);
   await tx.sendMail({
@@ -146,5 +165,5 @@ async function sendClientPasswordReset(salonId, to, resetUrl) {
 
 module.exports = {
   sendTurnSoon, sendTest, sendGiftConfirmation, sendLoyaltyActivation, sendAppointmentConfirmation,
-  sendClientVerificationEmail, sendClientPasswordReset, invalidateTransport
+  sendAppointmentReminder, sendClientVerificationEmail, sendClientPasswordReset, invalidateTransport
 };

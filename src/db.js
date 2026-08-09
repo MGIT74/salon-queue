@@ -178,4 +178,4 @@ async function setPlatformSettings(obj) {
   );
 }
 
-module.exports = { pool, getSettings, setSettings, getOwnerSettings, setOwnerSettings, getPlatformSettings, setPlatformSettings, utcIso, getCaisseLockedUntil };
+module.exports = { pool, getSettings, setSettings, getOwnerSettings, setOwnerSettings, getPlatformSettings, setPlatformSettings, utcIso, getCaisseLockedUntil, parisLocalToUtcDate };

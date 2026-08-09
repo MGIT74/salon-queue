@@ -576,3 +576,12 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'appointments' AND column_name = 'client_note');
 SET @sql := IF(@c = 0, "ALTER TABLE appointments ADD COLUMN client_note VARCHAR(500) NULL", 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Rappel par email envoyé N minutes avant l'heure du RDV (réglage
+-- notify_before_min), mécanisme SÉPARÉ du "votre tour approche" de la
+-- file d'attente physique (qui reste basé sur estimated_wait_min, une
+-- estimation dynamique de position en file - inadaptée à un rappel
+-- avant un horaire fixé à l'avance).
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'appointments' AND column_name = 'reminder_sent');
+SET @sql := IF(@c = 0, "ALTER TABLE appointments ADD COLUMN reminder_sent TINYINT(1) NOT NULL DEFAULT 0", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
