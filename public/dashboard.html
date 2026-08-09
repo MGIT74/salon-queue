@@ -1593,9 +1593,9 @@ function renderQueue() {
           '<div class="name">' + esc(q.client_name) + '</div>' +
           '<div class="assigned">' + esc(b ? b.name : 'Premier disponible') + '</div>' +
           chipsHtml(q) + '</div></div><div class="row-meta">' +
-          '<div class="dur">' + q.total_duration_min + ' min</div>' +
+          '<div class="dur">' + formatMinutes(q.total_duration_min) + '</div>' +
           '<div class="price">' + eur(q.total_price_cents) + '</div>' +
-          '<div class="wait">dans ~' + (q.estimated_wait_min || 0) + ' min</div></div></div>' +
+          '<div class="wait">dans ~' + formatMinutes(q.estimated_wait_min || 0) + '</div></div></div>' +
           '<div class="row-actions" onclick="event.stopPropagation()">' +
           '<button class="btn btn-ghost" onclick="cancelCut(\'' + q.id + '\')">Absent</button>' +
           '</div></div>';
@@ -1734,7 +1734,7 @@ function renderQueueSheet() {
     .map(function (s) {
       return '<div class="opt' + (draftSvc === s.id ? ' sel' : '') + '" onclick="draftSvc=\'' + s.id + '\';renderQueueSheet()">' +
         '<div class="box">' + CHECK + '</div><div><div class="opt-name">' + esc(s.name) + '</div>' +
-        '<div class="opt-meta">' + s.duration_min + ' min · ' + eur(s.price_cents) + '</div></div></div>';
+        '<div class="opt-meta">' + formatMinutes(s.duration_min) + ' · ' + eur(s.price_cents) + '</div></div></div>';
     }).join('');
 
   document.getElementById('sq-extras').innerHTML = extras.filter(function (e) { return e.active; })
@@ -1742,7 +1742,7 @@ function renderQueueSheet() {
       var on = draftExt.indexOf(e.id) !== -1;
       return '<div class="opt' + (on ? ' sel' : '') + '" onclick="toggleDraftExtra(\'' + e.id + '\')">' +
         '<div class="box square">' + CHECK + '</div><div><div class="opt-name">' + esc(e.name) + '</div>' +
-        '<div class="opt-meta">+ ' + e.duration_min + ' min · + ' + eur(e.price_cents) + '</div></div></div>';
+        '<div class="opt-meta">+ ' + formatMinutes(e.duration_min) + ' · + ' + eur(e.price_cents) + '</div></div></div>';
     }).join('') || '<div style="color:var(--grey);font-size:14px">Aucun supplément configuré</div>';
 
   var s = svcById(draftSvc);
@@ -1772,7 +1772,7 @@ function renderCatalog(table) {
     : list.map(function (x) {
         var meta = table === 'products'
           ? eur(x.price_cents)
-          : x.duration_min + ' min · ' + (table === 'extras' ? '+ ' : '') + eur(x.price_cents);
+          : formatMinutes(x.duration_min) + ' · ' + (table === 'extras' ? '+ ' : '') + eur(x.price_cents);
         var photoStyle = x.image_url ? 'background:url(&quot;' + esc(x.image_url) + '&quot;) center/cover' : '';
         return '<div class="item' + (x.active ? '' : ' off') + '">' +
           '<div class="cat-photo" style="' + photoStyle + '" onclick="document.getElementById(\'cat-photo-input-' + x.id + '\').click()">' +
@@ -2048,7 +2048,7 @@ function renderCapabilitiesLists(id) {
 
   function row(item, kind) {
     var priceLabel = item.custom_price_cents !== null ? eur(item.custom_price_cents) : eur(item.default_price_cents) + ' (défaut)';
-    var durationLabel = item.custom_duration_min !== null ? item.custom_duration_min + ' min' : item.default_duration_min + ' min (défaut)';
+    var durationLabel = item.custom_duration_min !== null ? formatMinutes(item.custom_duration_min) : formatMinutes(item.default_duration_min) + ' (défaut)';
     return '<div class="opt' + (item.enabled ? ' sel' : '') + '">' +
       '<div class="opt-main" onclick="toggleCapability(\'' + id + '\',\'' + kind + '\',\'' + item.id + '\')">' +
       '<div class="box square">' + CHECK + '</div><div><div class="opt-name">' + esc(item.name) + '</div></div>' +
@@ -2737,7 +2737,7 @@ function openAdminAddAppointment(dateStr) {
       '<div class="aa-step-title">Prestation</div>' +
       '<div class="aa-grid">' + services.map(function (s) {
         return '<button class="aa-card" data-id="' + s.id + '" onclick="aaSelectService(this)">' + esc(s.name) +
-          '<span class="aa-meta">' + s.duration_min + ' min · ' + eur(s.price_cents) + '</span></button>';
+          '<span class="aa-meta">' + formatMinutes(s.duration_min) + ' · ' + eur(s.price_cents) + '</span></button>';
       }).join('') + '</div>' +
     '</div>' +
 
@@ -2745,7 +2745,7 @@ function openAdminAddAppointment(dateStr) {
       '<button class="aa-back" onclick="aaGoStep(\'service\')">‹ Retour</button>' +
       '<div class="aa-step-title">Suppléments (optionnels)</div>' +
       '<div class="aa-chips">' + extras.map(function (e) {
-        return '<button class="aa-chip" data-id="' + e.id + '" onclick="aaToggleExtra(this)">' + esc(e.name) + '<span class="aa-meta">+' + e.duration_min + 'min</span></button>';
+        return '<button class="aa-chip" data-id="' + e.id + '" onclick="aaToggleExtra(this)">' + esc(e.name) + '<span class="aa-meta">+' + formatMinutes(e.duration_min) + '</span></button>';
       }).join('') + '</div>' +
       '<button class="btn btn-primary" style="width:100%;margin-top:10px" onclick="aaGoStep(\'datetime\')">Suivant</button>' +
     '</div>' +
@@ -3285,7 +3285,7 @@ function durationBadge(startAt, endAt) {
   if (!(mins > 0)) return '';
   return ' · <span style="display:inline-flex;align-items:center;gap:3px;color:var(--grey)">' +
     '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>' +
-    mins + ' min</span>';
+    formatMinutes(mins) + '</span>';
 }
 
 function renderClients() {

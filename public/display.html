@@ -102,7 +102,7 @@ function cutTimerDisplay(cut) {
   var elapsedSec = Math.max(Math.floor((Date.now() - new Date(cut.start_at).getTime()) / 1000), 0);
   var remainSec = (cut.total_duration_min || 0) * 60 - elapsedSec;
   if (remainSec >= 0) return { text: mmss(remainSec), over: false };
-  return { text: '+' + Math.ceil(Math.abs(remainSec) / 60) + ' min', over: true };
+  return { text: '+' + formatMinutes(Math.ceil(Math.abs(remainSec) / 60)), over: true };
 }
 
 function render() {
@@ -126,7 +126,7 @@ function render() {
       return '<div class="chair idle"><div class="chair-who"><span class="dot"></span><div>' +
              '<div class="chair-barber">' + esc(b.name) + '</div>' +
              '<div class="chair-client">' + mine.length + ' en attente</div></div></div>' +
-             '<div class="chair-timer">~' + totalWait + ' min</div></div>';
+             '<div class="chair-timer">~' + formatMinutes(totalWait) + '</div></div>';
     }
 
     return '<div class="chair idle"><div class="chair-who"><span class="dot"></span><div>' +
@@ -144,7 +144,7 @@ function render() {
           '<div class="q-pos">' + (q.position || i + 1) + '</div>' +
           '<div class="q-info"><div class="q-name">' + esc(q.client_name) + '</div>' +
           '<div class="q-service">' + esc(detail) + ' · ' + esc(b ? b.name : 'Premier libre') + '</div></div>' +
-          '<div class="q-wait"><div class="n">' + (q.estimated_wait_min || 0) + ' min</div>' +
+          '<div class="q-wait"><div class="n">' + formatMinutes(q.estimated_wait_min || 0) + '</div>' +
           '<div class="l">d\'attente</div></div></div>';
       }).join('');
 }

@@ -39,6 +39,18 @@ function esc(s) {
 var CURRENCY = 'EUR';
 function eur(cents) { return (cents / 100).toFixed(2).replace('.', ',') + ' ' + (CURRENCY === 'CHF' ? 'CHF' : '€'); }
 
+// Format lisible d'une durée en minutes : sous 60 -> "45 min", au-delà
+// -> "1h", "1h20"... jamais un grand nombre de minutes brut (ex:
+// "200 min" fait fuir un client qui ne veut pas calculer que ça fait
+// 3h20). Utilisé partout où une attente/durée peut dépasser 59 min.
+function formatMinutes(mins) {
+  mins = Math.round(Number(mins) || 0);
+  if (mins < 60) return mins + ' min';
+  var h = Math.floor(mins / 60);
+  var m = mins % 60;
+  return h + 'h' + (m > 0 ? String(m).padStart(2, '0') : '');
+}
+
 function mmss(sec) {
   return String(Math.floor(sec / 60)).padStart(2, '0') + ':' + String(sec % 60).padStart(2, '0');
 }

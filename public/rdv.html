@@ -243,12 +243,12 @@ function renderServiceGrid() {
     return '<button class="svc-card" data-id="' + s.id + '" onclick="selectService(this,\'' + s.id + '\')">' +
       '<span class="icon">' + iconForItem(s.name) + '</span>' +
       '<span class="name">' + esc(s.name) + '</span>' +
-      '<span class="meta">' + s.duration_min + ' min · ' + eur(s.price_cents) + '</span></button>';
+      '<span class="meta">' + formatMinutes(s.duration_min) + ' · ' + eur(s.price_cents) + '</span></button>';
   }).join('');
 
   document.getElementById('extras-grid').innerHTML = extras.map(function (e) {
     return '<button class="xchip" data-id="' + e.id + '" onclick="toggleExtra(this,\'' + e.id + '\')">' +
-      '<span>' + esc(e.name) + '</span><span class="xm">+' + e.duration_min + ' min · ' + eur(e.price_cents) + '</span></button>';
+      '<span>' + esc(e.name) + '</span><span class="xm">+' + formatMinutes(e.duration_min) + ' · ' + eur(e.price_cents) + '</span></button>';
   }).join('');
 }
 

@@ -293,7 +293,7 @@
         </div>
         <div class="perf"></div>
         <div class="ticket-foot">
-          <div class="t-wait">Environ <span id="t-wait">—</span> min d'attente</div>
+          <div class="t-wait">Environ <span id="t-wait">—</span> d'attente</div>
           <p class="t-note" id="t-note"></p>
           <button class="next-btn" onclick="resetForm()">Client suivant</button>
         </div>
@@ -386,13 +386,13 @@ function renderFormOptions() {
             '<span class="photo-bg" style="background-image:url(&quot;' + esc(s.image_url) + '&quot;)"></span>' +
             '<span class="overlay">' +
               '<span class="name">' + esc(s.name) + '</span>' +
-              '<span class="meta">' + s.duration_min + ' min · ' + eur(s.price_cents) + '</span>' +
+              '<span class="meta">' + formatMinutes(s.duration_min) + ' · ' + eur(s.price_cents) + '</span>' +
             '</span></button>';
         }
         return '<button class="svc-card' + (isSel ? ' sel' : '') + '" data-id="' + s.id + '" onclick="selectService(\'' + s.id + '\')">' +
           '<span class="icon">' + iconForItem(s.name) + '</span>' +
           '<span class="name">' + esc(s.name) + '</span>' +
-          '<span class="meta">' + s.duration_min + ' min · ' + eur(s.price_cents) + '</span>' +
+          '<span class="meta">' + formatMinutes(s.duration_min) + ' · ' + eur(s.price_cents) + '</span>' +
           '</button>';
       }).join('')
     : '<div class="empty">Aucune prestation disponible</div>';
@@ -403,7 +403,7 @@ function renderFormOptions() {
       : '<span class="xi">' + iconForItem(e.name) + '</span>';
     return '<button class="xchip' + (selExtras.indexOf(e.id) !== -1 ? ' sel' : '') + '" data-id="' + e.id + '" onclick="toggleExtra(\'' + e.id + '\')">' +
            iconHtml +
-           '<span>' + esc(e.name) + '</span><span class="xm">+' + e.duration_min + ' min · ' + eur(e.price_cents) + '</span></button>';
+           '<span>' + esc(e.name) + '</span><span class="xm">+' + formatMinutes(e.duration_min) + ' · ' + eur(e.price_cents) + '</span></button>';
   }).join('');
 
   // Retire de la sélection les suppléments devenus indisponibles avec ce coiffeur
@@ -448,7 +448,7 @@ function cutTimerDisplay(cut) {
   var elapsedSec = Math.max(Math.floor((Date.now() - new Date(cut.start_at).getTime()) / 1000), 0);
   var remainSec = (cut.total_duration_min || 0) * 60 - elapsedSec;
   if (remainSec >= 0) return { text: mmss(remainSec), over: false };
-  return { text: '+' + Math.ceil(Math.abs(remainSec) / 60) + ' min', over: true };
+  return { text: '+' + formatMinutes(Math.ceil(Math.abs(remainSec) / 60)), over: true };
 }
 
 function renderBoard() {
@@ -476,7 +476,7 @@ function renderBoard() {
       return '<div class="serve-row idle"><div class="serve-who"><span class="status"></span><div>' +
              '<div class="serve-barber">' + esc(b.name) + '</div>' +
              '<div class="serve-client">' + mine.length + ' en attente</div></div></div>' +
-             '<div class="serve-timer">~' + totalWait + ' min</div></div>';
+             '<div class="serve-timer">~' + formatMinutes(totalWait) + '</div></div>';
     }
 
     return '<div class="serve-row idle"><div class="serve-who"><span class="status"></span><div>' +
@@ -573,7 +573,7 @@ function renderBarberGrid() {
     var w = waitForBarber(b.id);
     var over = isOverrun(b.id);
     var free = w === 0;
-    var waitLabel = free ? 'Disponible' : (over ? '~' : '') + w + ' min';
+    var waitLabel = free ? 'Disponible' : (over ? '~' : '') + formatMinutes(w);
     var photoAttr = b.photo_url
       ? ' style="background-image:url(&quot;' + esc(b.photo_url) + '&quot;)"'
       : '';
@@ -666,7 +666,7 @@ function submitGiftCheckin(b) {
       e.service.name + (e.extras.length ? ' + ' + e.extras.map(function (x) { return x.name; }).join(', ') : '') +
       ' · ' + (b ? b.name : 'Premier disponible');
     document.getElementById('t-num').textContent = e.position;
-    document.getElementById('t-wait').textContent = e.estimated_wait_min;
+    document.getElementById('t-wait').textContent = formatMinutes(e.estimated_wait_min);
     document.getElementById('t-note').innerHTML = '🎁 Cadeau enregistré — présentez ce ticket à votre coiffeur.';
     activeGift = null;
     document.getElementById('eyebrow-home').textContent = 'Choisissez votre coiffeur';
@@ -727,7 +727,7 @@ function submitForm() {
       e.service.name + (e.extras.length ? ' + ' + e.extras.map(function (x) { return x.name; }).join(', ') : '') +
       ' · ' + (b ? b.name : 'Premier disponible');
     document.getElementById('t-num').textContent = e.position;
-    document.getElementById('t-wait').textContent = e.estimated_wait_min;
+    document.getElementById('t-wait').textContent = formatMinutes(e.estimated_wait_min);
     document.getElementById('t-note').innerHTML = mail
       ? 'On vous écrit à <b>' + esc(mail) + '</b> avant votre tour. Vous pouvez sortir, votre place est gardée.'
       : 'Sans email, pensez à surveiller l\'écran de la salle d\'attente.';
@@ -814,7 +814,7 @@ function renderIdleWait() {
     if (shortest === null || wait < shortest) shortest = wait;
   });
 
-  el.textContent = shortest === null ? '' : (shortest < 1 ? 'Aucune attente' : '~' + Math.ceil(shortest) + ' min d\'attente');
+  el.textContent = shortest === null ? '' : (shortest < 1 ? 'Aucune attente' : '~' + formatMinutes(Math.ceil(shortest)) + ' d\'attente');
 }
 
 function dismissIdleScreen() {
