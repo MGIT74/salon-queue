@@ -936,6 +936,10 @@ function openPosteAddAppointment(dateStr) {
       '<button class="aa-back" onclick="paGoStep(\'extras\')">‹ Retour</button>' +
       '<div class="aa-step-title">Créneau</div>' +
       '<div class="aa-slots" id="pa-slots"><span class="hint" style="margin:0">Chargement…</span></div>' +
+      '<div id="pa-half-toggle" style="display:none;gap:8px;margin-top:8px">' +
+        '<button class="btn btn-soft" id="pa-half-morning" style="flex:1" onclick="paShowHalf(\'morning\')">Matin</button>' +
+        '<button class="btn btn-soft" id="pa-half-afternoon" style="flex:1" onclick="paShowHalf(\'afternoon\')">Après-midi</button>' +
+      '</div>' +
     '</div>' +
 
     '<div id="pa-step-contact" style="display:none">' +
@@ -977,15 +981,48 @@ function openPosteAddAppointment(dateStr) {
     el.classList.toggle('sel');
   };
 
+  var slotsByHalf = { morning: [], afternoon: [] };
+  var currentHalf = 'afternoon';
+
+  function paRenderHalf() {
+    var slotsEl = overlay.querySelector('#pa-slots');
+    var list = slotsByHalf[currentHalf];
+    slotsEl.innerHTML = list.length
+      ? list.map(function (s) {
+          return '<button class="aa-slot" data-time="' + s.time + '" onclick="paSelectSlot(this)">' + s.time + '</button>';
+        }).join('')
+      : '<span class="hint" style="margin:0">Aucun créneau ' + (currentHalf === 'morning' ? 'le matin' : "l'après-midi") + '</span>';
+  }
+
+  window.paShowHalf = function (half) {
+    currentHalf = half;
+    overlay.querySelector('#pa-half-morning').className = 'btn ' + (half === 'morning' ? 'btn-primary' : 'btn-soft');
+    overlay.querySelector('#pa-half-afternoon').className = 'btn ' + (half === 'afternoon' ? 'btn-primary' : 'btn-soft');
+    overlay.querySelector('#pa-half-morning').style.flex = '1';
+    overlay.querySelector('#pa-half-afternoon').style.flex = '1';
+    paRenderHalf();
+  };
+
   function paLoadSlots() {
     var slotsEl = overlay.querySelector('#pa-slots');
+    var toggleEl = overlay.querySelector('#pa-half-toggle');
     slotsEl.innerHTML = '<span class="hint" style="margin:0">Chargement…</span>';
+    toggleEl.style.display = 'none';
     barberApi('/api/appointments/availability?date=' + dateStr + '&service_id=' + state.serviceId + '&barber_id=' + me.id + '&extras=' + state.extraIds.join(','))
       .then(function (r) {
         if (!r.slots.length) { slotsEl.innerHTML = '<span class="hint" style="margin:0">Aucun créneau disponible ce jour-là</span>'; return; }
-        slotsEl.innerHTML = r.slots.map(function (s) {
-          return '<button class="aa-slot" data-time="' + s.time + '" onclick="paSelectSlot(this)">' + s.time + '</button>';
-        }).join('');
+
+        slotsByHalf.morning = r.slots.filter(function (s) { return s.time < '12:00'; });
+        slotsByHalf.afternoon = r.slots.filter(function (s) { return s.time >= '12:00'; });
+
+        if (!slotsByHalf.morning.length) {
+          toggleEl.style.display = 'none';
+          currentHalf = 'afternoon';
+          paRenderHalf();
+        } else {
+          toggleEl.style.display = 'flex';
+          paShowHalf('morning');
+        }
       })
       .catch(function (e) { slotsEl.innerHTML = ''; toast(e.message, true); });
   }
