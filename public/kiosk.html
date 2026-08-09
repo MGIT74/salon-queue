@@ -194,9 +194,34 @@
     .serving { flex: none; }
     .stage { justify-content: flex-start; }
   }
+  /* --- Écran de veille --- */
+  .idle-screen {
+    position: fixed; inset: 0; z-index: 200; background: var(--bg);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    cursor: pointer; transition: opacity .35s ease;
+  }
+  .idle-screen.off { opacity: 0; pointer-events: none; }
+  .idle-wait {
+    position: absolute; top: clamp(20px,3vh,40px); left: clamp(20px,3vw,40px);
+    font-size: clamp(15px,1.6vw,20px); font-weight: 600; color: var(--grey);
+    background: var(--fill); padding: 10px 18px; border-radius: 999px;
+  }
+  .idle-center { display: flex; align-items: center; justify-content: center; max-width: 60vw; max-height: 40vh; }
+  .idle-center img { max-width: 100%; max-height: 40vh; object-fit: contain; }
+  #idle-logo-text { font-size: clamp(28px,5vw,56px); font-weight: 700; letter-spacing: -.02em; color: var(--ink); text-align: center; }
+  .idle-hint { position: absolute; bottom: clamp(30px,5vh,60px); font-size: clamp(14px,1.4vw,18px); color: var(--grey); }
 </style>
 </head>
 <body>
+<div class="idle-screen" id="idle-screen" onclick="dismissIdleScreen()">
+  <div class="idle-wait" id="idle-wait"></div>
+  <div class="idle-center">
+    <img id="idle-logo-img" alt="" style="display:none">
+    <div id="idle-logo-text" style="display:none"></div>
+  </div>
+  <div class="idle-hint">Touchez l'écran pour commencer</div>
+</div>
+
 <div class="kiosk">
 
   <aside class="board">
@@ -282,7 +307,7 @@
 <script>
 mountThemeButton();
 
-var services = [], extras = [], barbers = [], queue = [], salonName = 'Le Salon', giftTileImage = '';
+var services = [], extras = [], barbers = [], queue = [], salonName = 'Le Salon', salonLogoUrl = '', giftTileImage = '';
 var selBarber = null, selExtras = [], selService = null;
 var activeGift = null; // { id, recipient_name, recipient_email, recipient_phone, items } si en mode "utiliser un cadeau"
 
@@ -303,10 +328,13 @@ function loadCatalog() {
   ]).then(function (r) {
     services = r[0].items; extras = r[1].items;
     salonName = r[2].salon_name;
+    salonLogoUrl = r[2].logo_url || '';
     giftTileImage = r[2].gift_tile_image_url || '';
     CURRENCY = r[2].currency || 'EUR';
     document.getElementById('salon-name').textContent = salonName;
     document.getElementById('t-salon').textContent = salonName;
+
+    renderIdleScreen();
 
     document.getElementById('f-name').oninput = updateStep1NextState;
     renderFormOptions();
@@ -729,6 +757,7 @@ function tick() {
   document.getElementById('clock').textContent = t;
   document.getElementById('t-time').textContent = t;
   renderBoard();
+  renderIdleWait();
 }
 
 loadCatalog().then(refresh).then(function () {
@@ -736,6 +765,80 @@ loadCatalog().then(refresh).then(function () {
   setInterval(tick, 1000);
   subscribeQueue(refresh);
 }).catch(function (err) { toast(err.message, true); });
+
+/* ---------- Écran de veille ---------- */
+var IDLE_TIMEOUT_MS = 45000;
+var idleTimeoutId = null;
+
+function renderIdleScreen() {
+  var img = document.getElementById('idle-logo-img');
+  var txt = document.getElementById('idle-logo-text');
+  if (salonLogoUrl) {
+    img.src = salonLogoUrl;
+    img.style.display = 'block';
+    txt.style.display = 'none';
+  } else {
+    txt.textContent = salonName;
+    txt.style.display = 'block';
+    img.style.display = 'none';
+  }
+}
+
+/**
+ * Temps d'attente le plus court disponible parmi les coiffeurs
+ * configurés - un poste libre (aucune coupe en cours, personne en
+ * attente pour lui) vaut 0 min. Même logique que renderBoard(), sans
+ * dupliquer l'appel réseau (queue/barbers déjà en mémoire).
+ */
+function renderIdleWait() {
+  var el = document.getElementById('idle-wait');
+  if (!barbers.length) { el.textContent = ''; return; }
+
+  var active = queue.filter(function (q) { return q.status === 'in_progress'; });
+  var waiting = queue.filter(function (q) { return q.status === 'waiting'; });
+
+  var shortest = null;
+  barbers.forEach(function (b) {
+    var cut = active.find(function (a) { return a.barber_id === b.id; });
+    var mine = waiting.filter(function (w) { return w.barber_id === b.id; });
+    var wait;
+    if (cut) {
+      var elapsedMin = Math.max((Date.now() - new Date(cut.start_at).getTime()) / 60000, 0);
+      var remaining = Math.max((cut.total_duration_min || 0) - elapsedMin, 0);
+      wait = remaining + mine.reduce(function (a, w) { return a + (w.total_duration_min || 0); }, 0);
+    } else if (mine.length) {
+      wait = mine.reduce(function (a, w) { return a + (w.total_duration_min || 0); }, 0);
+    } else {
+      wait = 0;
+    }
+    if (shortest === null || wait < shortest) shortest = wait;
+  });
+
+  el.textContent = shortest === null ? '' : (shortest < 1 ? 'Aucune attente' : '~' + Math.ceil(shortest) + ' min d\'attente');
+}
+
+function dismissIdleScreen() {
+  document.getElementById('idle-screen').classList.add('off');
+  resetIdleTimer();
+}
+
+function showIdleScreen() {
+  resetForm();
+  renderIdleWait();
+  document.getElementById('idle-screen').classList.remove('off');
+}
+
+function resetIdleTimer() {
+  if (idleTimeoutId) clearTimeout(idleTimeoutId);
+  idleTimeoutId = setTimeout(showIdleScreen, IDLE_TIMEOUT_MS);
+}
+
+['click', 'touchstart'].forEach(function (evt) {
+  document.addEventListener(evt, function (e) {
+    if (document.getElementById('idle-screen').classList.contains('off')) resetIdleTimer();
+  }, true);
+});
+resetIdleTimer();
 </script>
 </body>
 </html>
