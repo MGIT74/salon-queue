@@ -50,9 +50,9 @@ router.post('/signup', wrap(async (req, res) => {
   if (password.length < 6) return res.status(400).json({ error: 'Le mot de passe doit contenir au moins 6 caractères' });
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Adresse email invalide' });
 
-  const ownerId = req.salon.owner_id;
+  const salonId = req.salon.id;
   const [[existing]] = await pool.query(
-    'SELECT id FROM clients WHERE owner_id = ? AND email = ?', [ownerId, email]
+    'SELECT id FROM clients WHERE salon_id = ? AND email = ?', [salonId, email]
   );
   if (existing) return res.status(409).json({ error: 'Un compte existe déjà avec cet email' });
 
@@ -62,9 +62,9 @@ router.post('/signup', wrap(async (req, res) => {
   const id = crypto.randomUUID();
 
   await pool.query(
-    `INSERT INTO clients (id, owner_id, name, email, phone, password_hash, verify_token, verify_token_expires)
+    `INSERT INTO clients (id, salon_id, name, email, phone, password_hash, verify_token, verify_token_expires)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [id, ownerId, name, email, phone, passwordHash, verifyToken, verifyExpires]
+    [id, salonId, name, email, phone, passwordHash, verifyToken, verifyExpires]
   );
 
   try {
@@ -97,7 +97,7 @@ router.post('/resend-verification', wrap(async (req, res) => {
   if (!email) return res.json({ ok: true, message: genericMsg });
   try {
     const [[client]] = await pool.query(
-      'SELECT id FROM clients WHERE owner_id = ? AND email = ? AND email_verified = 0', [req.salon.owner_id, email]
+      'SELECT id FROM clients WHERE salon_id = ? AND email = ? AND email_verified = 0', [req.salon.id, email]
     );
     if (client) {
       const verifyToken = crypto.randomBytes(32).toString('hex');
@@ -118,7 +118,7 @@ router.post('/login', wrap(async (req, res) => {
   if (!email || !password) return res.status(400).json({ error: 'Email et mot de passe requis' });
 
   const [[client]] = await pool.query(
-    'SELECT * FROM clients WHERE owner_id = ? AND email = ?', [req.salon.owner_id, email]
+    'SELECT * FROM clients WHERE salon_id = ? AND email = ?', [req.salon.id, email]
   );
   if (!client || !(await verifyPassword(password, client.password_hash))) {
     return res.status(401).json({ error: 'Email ou mot de passe incorrect' });
@@ -146,7 +146,7 @@ router.post('/forgot-password', wrap(async (req, res) => {
   const genericMsg = "Si un compte existe avec cet email, un lien de réinitialisation vient d'être envoyé.";
   if (!email) return res.json({ ok: true, message: genericMsg });
   try {
-    const [[client]] = await pool.query('SELECT id FROM clients WHERE owner_id = ? AND email = ?', [req.salon.owner_id, email]);
+    const [[client]] = await pool.query('SELECT id FROM clients WHERE salon_id = ? AND email = ?', [req.salon.id, email]);
     if (client) {
       const token = crypto.randomBytes(32).toString('hex');
       const expires = new Date(Date.now() + 60 * 60 * 1000);
@@ -189,8 +189,8 @@ router.get('/me', requireClient, wrap(async (req, res) => {
   const key = clientKey({ email: c.email });
 
   const [[loyalty]] = await pool.query(
-    'SELECT points, rewards_available, activated_at FROM loyalty_accounts WHERE owner_id = ? AND client_key = ?',
-    [c.owner_id, key]
+    'SELECT points, rewards_available, activated_at FROM loyalty_accounts WHERE salon_id = ? AND client_key = ?',
+    [c.salon_id, key]
   );
   const loyaltyActivated = Boolean(loyalty && loyalty.activated_at);
 
@@ -209,10 +209,10 @@ router.get('/me', requireClient, wrap(async (req, res) => {
      LEFT JOIN barbers bar ON bar.id = a.barber_id
      LEFT JOIN queue q ON q.id = a.promoted_queue_id
      JOIN salons sl ON sl.id = a.salon_id
-     WHERE sl.owner_id = ? AND LOWER(TRIM(a.email)) = ? AND a.status = 'confirmed' AND a.scheduled_at >= ?
+     WHERE a.salon_id = ? AND LOWER(TRIM(a.email)) = ? AND a.status = 'confirmed' AND a.scheduled_at >= ?
        AND (q.status IS NULL OR q.status NOT IN ('done', 'cancelled'))
      ORDER BY a.scheduled_at ASC LIMIT 20`,
-    [c.owner_id, key, nowParisDatetimeString()]
+    [c.salon_id, key, nowParisDatetimeString()]
   );
 
   const upcomingAppointments = [];
@@ -246,9 +246,9 @@ router.get('/me', requireClient, wrap(async (req, res) => {
      JOIN salons sl ON sl.id = q.salon_id
      LEFT JOIN services s ON s.id = q.service_id
      LEFT JOIN barbers b ON b.id = q.barber_id
-     WHERE sl.owner_id = ? AND LOWER(TRIM(q.email)) = ? AND q.status IN ('done', 'cancelled')
+     WHERE q.salon_id = ? AND LOWER(TRIM(q.email)) = ? AND q.status IN ('done', 'cancelled')
      ORDER BY q.checkin_at DESC LIMIT 1`,
-    [c.owner_id, key]
+    [c.salon_id, key]
   );
 
   res.json({
@@ -276,8 +276,8 @@ router.put('/me', requireClient, wrap(async (req, res) => {
   if (email && email !== req.clientAccount.email) {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Adresse email invalide' });
     const [[existing]] = await pool.query(
-      'SELECT id FROM clients WHERE owner_id = ? AND email = ? AND id != ?',
-      [req.clientAccount.owner_id, email, req.clientAccount.id]
+      'SELECT id FROM clients WHERE salon_id = ? AND email = ? AND id != ?',
+      [req.clientAccount.salon_id, email, req.clientAccount.id]
     );
     if (existing) return res.status(409).json({ error: 'Cet email est déjà utilisé par un autre compte' });
     sets.push('email = ?'); params.push(email);
@@ -311,9 +311,8 @@ router.put('/appointments/:id/note', requireClient, wrap(async (req, res) => {
   const note = req.body.note ? String(req.body.note).slice(0, 500) : null;
 
   const [[appt]] = await pool.query(
-    `SELECT a.id FROM appointments a JOIN salons sl ON sl.id = a.salon_id
-     WHERE a.id = ? AND sl.owner_id = ? AND LOWER(TRIM(a.email)) = ? AND a.status = 'confirmed'`,
-    [req.params.id, c.owner_id, key]
+    `SELECT a.id FROM appointments a WHERE a.id = ? AND a.salon_id = ? AND LOWER(TRIM(a.email)) = ? AND a.status = 'confirmed'`,
+    [req.params.id, c.salon_id, key]
   );
   if (!appt) return res.status(404).json({ error: 'Rendez-vous introuvable' });
 

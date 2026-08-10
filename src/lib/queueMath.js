@@ -8,30 +8,32 @@ function clientKey(row) {
 }
 
 /**
- * +1 point de fidélité pour ce client, cumulé au niveau de l'ENSEIGNE
- * (owner_id), pas du salon — un client va parfois dans un salon,
- * parfois dans un autre de la même enseigne. Tous les 10 points, une
- * récompense s'ajoute (utilisable à partir du PROCHAIN passage, pas
- * celui-ci). Appelée à chaque fois qu'un passage est réellement payé
- * (paiement normal ou cadeau utilisé) — jamais pour une simple vente
- * de comptoir sans lien avec un passage.
+ * +1 point de fidélité pour ce client, cumulé au niveau du SALON (pas
+ * de toute l'enseigne) - un client qui va dans un autre salon de la
+ * même enseigne y suit son propre parcours, sans lien avec cet
+ * historique-ci. Tous les 10 points, une récompense s'ajoute
+ * (utilisable à partir du PROCHAIN passage, pas celui-ci). Appelée à
+ * chaque fois qu'un passage est réellement payé (paiement normal ou
+ * cadeau utilisé) — jamais pour une simple vente de comptoir sans lien
+ * avec un passage.
  *
  * IMPORTANT : ne fait RIEN tant que le client n'a pas explicitement
  * activé sa carte (activated_at) — le coiffeur doit lui avoir demandé
  * son accord au préalable. Un client jamais activé n'accumule jamais
  * le moindre point, même s'il revient plusieurs fois.
  */
-async function earnLoyaltyPoint(ownerId, row) {
+async function earnLoyaltyPoint(salonId, row) {
   const key = clientKey(row);
   if (!key) return;
 
   const [[existing]] = await pool.query(
-    'SELECT id, points, rewards_available, activated_at FROM loyalty_accounts WHERE owner_id = ? AND client_key = ?',
-    [ownerId, key]
+    'SELECT id, points, rewards_available, activated_at FROM loyalty_accounts WHERE salon_id = ? AND client_key = ?',
+    [salonId, key]
   );
   if (!existing || !existing.activated_at) return;
 
-  const settings = await getOwnerSettings(ownerId);
+  const [[salon]] = await pool.query('SELECT owner_id FROM salons WHERE id = ?', [salonId]);
+  const settings = await getOwnerSettings(salon.owner_id);
   const threshold = Math.max(1, Number(settings.loyalty_threshold) || 10);
 
   let points = existing.points + 1;
@@ -51,7 +53,7 @@ async function earnLoyaltyPoint(ownerId, row) {
  * encore encaissées (utilisé pour la liste "en attente d'encaissement"
  * de la caisse, sur les entrées 'done').
  */
-async function loadQueue(salonId, statuses, onlyUnpaid, ownerId) {
+async function loadQueue(salonId, statuses, onlyUnpaid) {
   statuses = statuses || ['waiting', 'in_progress'];
   const statusPlaceholders = statuses.map(() => '?').join(',');
   const [[rows], [services], [extras], [links], [notes], [svcPrices], [extPrices], [gifts], [loyaltyRows]] = await Promise.all([
@@ -81,9 +83,7 @@ async function loadQueue(salonId, statuses, onlyUnpaid, ownerId) {
       [salonId]
     ),
     pool.query('SELECT * FROM gift_cards WHERE salon_id = ? AND used_at IS NULL', [salonId]),
-    ownerId
-      ? pool.query('SELECT client_key, rewards_available FROM loyalty_accounts WHERE owner_id = ? AND rewards_available > 0', [ownerId])
-      : Promise.resolve([[]])
+    pool.query('SELECT client_key, rewards_available FROM loyalty_accounts WHERE salon_id = ? AND rewards_available > 0', [salonId])
   ]);
 
   const svcById = Object.fromEntries(services.map((s) => [s.id, s]));

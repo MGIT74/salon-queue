@@ -585,3 +585,58 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'appointments' AND column_name = 'reminder_sent');
 SET @sql := IF(@c = 0, "ALTER TABLE appointments ADD COLUMN reminder_sent TINYINT(1) NOT NULL DEFAULT 0", 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Changement de modèle demandé explicitement (pour l'instant) : la
+-- fidélité et les comptes client passent de "partagés pour toute
+-- l'enseigne" (owner_id) à "propres à chaque salon" (salon_id) - un
+-- client qui va dans un 2e salon de la même enseigne y suit le
+-- parcours naturel (nouveau compte, nouvelle carte), sans lien avec
+-- son historique dans le 1er salon.
+--
+-- Backfill des lignes existantes : faute d'avoir toujours su via quel
+-- salon précis un compte/une carte a été créé(e), on rattache au
+-- salon le plus ancien de l'enseigne concernée - approximation
+-- raisonnable, la quasi-totalité des données existantes provient d'un
+-- seul salon actif par enseigne à ce jour.
+
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'loyalty_accounts' AND column_name = 'salon_id');
+SET @sql := IF(@c = 0, "ALTER TABLE loyalty_accounts ADD COLUMN salon_id CHAR(36) NULL", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+UPDATE loyalty_accounts la
+SET la.salon_id = (SELECT s.id FROM salons s WHERE s.owner_id = la.owner_id ORDER BY s.created_at ASC LIMIT 1)
+WHERE la.salon_id IS NULL;
+
+SET @idx := (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'loyalty_accounts' AND index_name = 'uniq_owner_client');
+-- L'index à supprimer sert aussi de support à la contrainte de clé
+-- étrangère sur owner_id (colonne conservée pour l'historique, mais
+-- plus utilisée) - MySQL refuse de le supprimer sans index de
+-- remplacement sur owner_id seul, donc on le crée juste avant.
+SET @idxfk := (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'loyalty_accounts' AND index_name = 'idx_loyalty_owner_id');
+SET @sql := IF(@idx > 0 AND @idxfk = 0, 'CREATE INDEX idx_loyalty_owner_id ON loyalty_accounts(owner_id)', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @sql := IF(@idx > 0, 'ALTER TABLE loyalty_accounts DROP INDEX uniq_owner_client', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @idx2 := (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'loyalty_accounts' AND index_name = 'uniq_salon_client');
+SET @sql := IF(@idx2 = 0, 'ALTER TABLE loyalty_accounts ADD UNIQUE KEY uniq_salon_client (salon_id, client_key)', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'clients' AND column_name = 'salon_id');
+SET @sql := IF(@c = 0, "ALTER TABLE clients ADD COLUMN salon_id CHAR(36) NULL", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+UPDATE clients c
+SET c.salon_id = (SELECT s.id FROM salons s WHERE s.owner_id = c.owner_id ORDER BY s.created_at ASC LIMIT 1)
+WHERE c.salon_id IS NULL;
+
+SET @idx3 := (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'clients' AND index_name = 'uniq_owner_client_email');
+SET @idxfk2 := (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'clients' AND index_name = 'idx_clients_owner_id');
+SET @sql := IF(@idx3 > 0 AND @idxfk2 = 0, 'CREATE INDEX idx_clients_owner_id ON clients(owner_id)', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @sql := IF(@idx3 > 0, 'ALTER TABLE clients DROP INDEX uniq_owner_client_email', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @idx4 := (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'clients' AND index_name = 'uniq_salon_client_email');
+SET @sql := IF(@idx4 = 0, 'ALTER TABLE clients ADD UNIQUE KEY uniq_salon_client_email (salon_id, email)', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;

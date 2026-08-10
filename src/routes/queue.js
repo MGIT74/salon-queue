@@ -75,14 +75,14 @@ router.get('/pending-payment', requireAdminOrBarber, wrap(async (req, res) => {
   if (req.barberId) rows = rows.filter((r) => r.barber_id === req.barberId);
   rows = await attachGiftInfo(rows, req.salon.id);
 
-  // Fidélité : cumulée au niveau de l'ENSEIGNE (owner_id), pas du
-  // salon — un client vu ici peut avoir gagné ses points ailleurs.
+  // Fidélité : cumulée au niveau du SALON, pas de toute l'enseigne -
+  // un client vu ici n'a de points que ceux gagnés dans CE salon.
   // Un client sans compte ACTIVÉ n'est pas encore membre : la caisse
   // doit proposer d'activer sa carte (avec son accord), pas afficher
   // une récompense qui n'existe pas.
   const [loyaltyRows] = await pool.query(
-    'SELECT client_key, rewards_available, activated_at FROM loyalty_accounts WHERE owner_id = ? AND activated_at IS NOT NULL',
-    [req.ownerId]
+    'SELECT client_key, rewards_available, activated_at FROM loyalty_accounts WHERE salon_id = ? AND activated_at IS NOT NULL',
+    [req.salon.id]
   );
   const loyaltyByKey = {};
   loyaltyRows.forEach((l) => { loyaltyByKey[l.client_key] = l.rewards_available; });

@@ -330,8 +330,8 @@ router.post('/gift-cards/:id/resend', requireAdmin, wrap(async (req, res) => {
 router.get('/loyalty-accounts', requireAdmin, wrap(async (req, res) => {
   const [rows] = await pool.query(
     'SELECT client_name, client_key, points, rewards_available, activated_at, updated_at FROM loyalty_accounts ' +
-    'WHERE owner_id = ? AND activated_at IS NOT NULL ORDER BY updated_at DESC LIMIT 300',
-    [req.ownerId]
+    'WHERE salon_id = ? AND activated_at IS NOT NULL ORDER BY updated_at DESC LIMIT 300',
+    [req.salon.id]
   );
   res.json({
     ok: true,
@@ -361,8 +361,8 @@ router.post('/loyalty-accounts/activate', requireAdminOrBarber, wrap(async (req,
   if (!key) return res.status(400).json({ error: 'Impossible d\'identifier ce client' });
 
   const [[existing]] = await pool.query(
-    'SELECT id, activated_at FROM loyalty_accounts WHERE owner_id = ? AND client_key = ?',
-    [req.ownerId, key]
+    'SELECT id, activated_at FROM loyalty_accounts WHERE salon_id = ? AND client_key = ?',
+    [req.salon.id, key]
   );
   if (existing && existing.activated_at) {
     return res.status(409).json({ error: 'Ce client a déjà une carte de fidélité active' });
@@ -376,9 +376,9 @@ router.post('/loyalty-accounts/activate', requireAdminOrBarber, wrap(async (req,
   } else {
     try {
       await pool.query(
-        `INSERT INTO loyalty_accounts (id, owner_id, client_key, client_name, recipient_email, activated_at)
+        `INSERT INTO loyalty_accounts (id, salon_id, client_key, client_name, recipient_email, activated_at)
          VALUES (UUID(), ?, ?, ?, ?, NOW())`,
-        [req.ownerId, key, clientName, email]
+        [req.salon.id, key, clientName, email]
       );
     } catch (err) {
       // Deux activations envoyées au même instant (double clic) peuvent
@@ -418,8 +418,8 @@ router.get('/client-marketing', requireAdmin, wrap(async (req, res) => {
   if (!key) return res.json({ ok: true, loyalty: null, gifts: [] });
 
   const [[loyalty]] = await pool.query(
-    'SELECT points, rewards_available, activated_at FROM loyalty_accounts WHERE owner_id = ? AND client_key = ?',
-    [req.ownerId, key]
+    'SELECT points, rewards_available, activated_at FROM loyalty_accounts WHERE salon_id = ? AND client_key = ?',
+    [req.salon.id, key]
   );
 
   const [allGifts] = await pool.query(

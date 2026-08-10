@@ -124,7 +124,7 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
 
   if (queue_id) {
     // Ce passage vient d'être réellement payé : +1 point de fidélité.
-    await earnLoyaltyPoint(req.ownerId, queueRow);
+    await earnLoyaltyPoint(req.salon.id, queueRow);
     // Une récompense de fidélité était appliquée à ce ticket (gagnée à
     // un passage précédent) — on la consomme maintenant.
     if (loyalty_redeem) {
@@ -132,8 +132,8 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
       if (key) {
         await pool.query(
           `UPDATE loyalty_accounts SET rewards_available = GREATEST(rewards_available - 1, 0), updated_at = NOW()
-           WHERE owner_id = ? AND client_key = ? AND rewards_available > 0`,
-          [req.ownerId, key]
+           WHERE salon_id = ? AND client_key = ? AND rewards_available > 0`,
+          [req.salon.id, key]
         );
       }
     }
@@ -263,7 +263,7 @@ router.post('/gift-cards/:id/redeem', requireAdminOrBarber, wrap(async (req, res
 
   // Ce passage vient d'être réglé (via le cadeau) : compte aussi comme
   // un vrai passage payé pour la fidélité.
-  await earnLoyaltyPoint(req.ownerId, queueRow);
+  await earnLoyaltyPoint(req.salon.id, queueRow);
 
   res.json({ ok: true });
 }));
