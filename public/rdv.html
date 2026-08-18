@@ -70,8 +70,19 @@
   </div>
 
   <section class="panel on" id="p-barber">
-    <div class="eyebrow">Choisissez votre coiffeur</div>
+    <div class="eyebrow" id="barber-eyebrow">Choisissez votre coiffeur</div>
     <div class="svc-grid" id="barber-grid"></div>
+    <button class="back" id="gift-link-btn" style="margin-top:18px" onclick="openGiftCodeScreen()">🎁 J'ai un cadeau à utiliser</button>
+  </section>
+
+  <section class="panel" id="p-gift-code">
+    <button class="back" onclick="show('p-barber')">‹ Retour</button>
+    <div class="eyebrow">Utiliser un cadeau</div>
+    <p style="color:var(--grey);font-size:14px;margin:-8px 0 22px">Saisissez le code reçu par email.</p>
+    <div class="fld"><label for="gift-code-input">Code</label>
+      <input id="gift-code-input" type="text" placeholder="ABCD1234" style="text-transform:uppercase;letter-spacing:2px;font-size:20px;text-align:center" maxlength="8"></div>
+    <div style="color:var(--red);font-size:14px;min-height:20px;margin-bottom:14px" id="gift-code-error"></div>
+    <button class="go" onclick="lookupGiftCode()">Valider le code</button>
   </section>
 
   <section class="panel" id="p-service">
@@ -185,6 +196,7 @@ function iconForItem(name) {
 
 var services = [], extras = [], barbers = [];
 var selBarber = null, selService = null, selExtras = [], selDate = null, selSlot = null;
+var activeGift = null;
 
 /* ---------- Chargement ---------- */
 function loadCatalog() {
@@ -235,7 +247,52 @@ function selectBarber(el, id) {
   selBarber = id;
   document.querySelectorAll('#barber-grid .svc-card').forEach(function (c) { c.classList.remove('sel'); });
   el.classList.add('sel');
+
+  if (activeGift) {
+    // Prestation et suppléments déjà déterminés par le cadeau -
+    // seuls le coiffeur puis la date/heure restent à choisir.
+    show('p-datetime');
+    var today = new Date().toISOString().slice(0, 10);
+    document.getElementById('rdv-date').min = today;
+    if (!document.getElementById('rdv-date').value) document.getElementById('rdv-date').value = today;
+    loadSlots();
+    return;
+  }
   show('p-service');
+}
+
+/* ---------- Utiliser un cadeau ---------- */
+function openGiftCodeScreen() {
+  document.getElementById('gift-code-input').value = '';
+  document.getElementById('gift-code-error').textContent = '';
+  show('p-gift-code');
+}
+
+function lookupGiftCode() {
+  var code = document.getElementById('gift-code-input').value.trim().toUpperCase();
+  var errEl = document.getElementById('gift-code-error');
+  errEl.textContent = '';
+  if (!code) { errEl.textContent = 'Entrez le code reçu par email'; return; }
+
+  api('/api/sales/gift-cards/lookup?code=' + encodeURIComponent(code)).then(function (r) {
+    var g = r.gift;
+    var serviceItem = g.items.find(function (it) { return it.item_type === 'service'; });
+    if (!serviceItem || !serviceItem.item_id) {
+      errEl.textContent = "Ce cadeau ne comprend pas de prestation réservable en ligne — présentez-vous directement au salon.";
+      return;
+    }
+    var extraItems = g.items.filter(function (it) { return it.item_type === 'extra' && it.item_id; });
+
+    activeGift = g;
+    selService = serviceItem.item_id;
+    selExtras = extraItems.map(function (it) { return it.item_id; });
+
+    document.querySelectorAll('#barber-grid .svc-card').forEach(function (c) { c.classList.remove('sel'); });
+    document.getElementById('barber-eyebrow').textContent = 'Cadeau de ' + g.recipient_name + ' — choisissez le coiffeur';
+    show('p-barber');
+  }).catch(function (err) {
+    errEl.textContent = err.message;
+  });
 }
 
 function renderServiceGrid() {
@@ -350,6 +407,15 @@ function goToContactStep() {
   var extraNames = selExtras.map(function (id) { return extras.find(function (e) { return e.id === id; }).name; });
   var when = new Date(selDate + 'T' + selSlot.time).toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' }) + ' à ' + selSlot.time;
   document.getElementById('contact-summary').textContent = when + ' — ' + s.name + (extraNames.length ? ' + ' + extraNames.join(', ') : '');
+
+  // Cadeau : coordonnées du bénéficiaire déjà connues, pré-remplies
+  // mais toujours modifiables (au cas où il faudrait les corriger).
+  if (activeGift) {
+    document.getElementById('rdv-name').value = activeGift.recipient_name || '';
+    document.getElementById('rdv-email').value = activeGift.recipient_email || '';
+    document.getElementById('rdv-phone').value = activeGift.recipient_phone || '';
+  }
+
   show('p-contact');
 }
 
@@ -376,7 +442,8 @@ function submitAppointment() {
   }).then(function () {
     var s = services.find(function (x) { return x.id === selService; });
     var when = new Date(selDate + 'T' + selSlot.time).toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' }) + ' à ' + selSlot.time;
-    document.getElementById('confirm-details').textContent = when + ' — ' + s.name;
+    document.getElementById('confirm-details').textContent = when + ' — ' + s.name + (activeGift ? ' (cadeau utilisé — présentez ce cadeau à votre coiffeur)' : '');
+    activeGift = null;
     show('p-confirmed');
   }).catch(function (e) {
     toast(e.message, true);
@@ -386,7 +453,8 @@ function submitAppointment() {
 }
 
 function startNewBooking() {
-  selBarber = null; selService = null; selExtras = []; selDate = null; selSlot = null;
+  selBarber = null; selService = null; selExtras = []; selDate = null; selSlot = null; activeGift = null;
+  document.getElementById('barber-eyebrow').textContent = 'Choisissez votre coiffeur';
   document.getElementById('rdv-name').value = '';
   document.getElementById('rdv-email').value = '';
   document.getElementById('rdv-phone').value = '';
