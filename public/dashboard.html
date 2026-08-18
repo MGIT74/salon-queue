@@ -29,8 +29,17 @@
   .app-shell { display: flex; align-items: flex-start; gap: 26px; }
   .sidebar {
     width: 240px; flex-shrink: 0; background: var(--card); border-radius: 20px;
-    padding: 18px 12px; box-shadow: var(--shadow); position: sticky; top: 20px;
+    padding: 18px 12px; box-shadow: var(--shadow);
     transition: background .25s ease;
+    /* position: fixed plutôt que sticky - un overflow-x:hidden global
+       sur html/body (filet de sécurité anti-débordement horizontal,
+       dans app.css partagé par toutes les pages) transforme
+       silencieusement overflow-y en 'auto' sur ces éléments d'après
+       les règles CSS, ce qui casse position:sticky de façon peu
+       fiable selon les navigateurs. position:fixed s'ancre à la
+       fenêtre et n'a pas ce problème. */
+    position: fixed; top: 20px; left: clamp(20px,2.2vw,36px); z-index: 40;
+    max-height: calc(100vh - 40px); overflow-y: auto;
   }
   .sidebar-brand { padding: 4px 10px 16px; margin-bottom: 12px; border-bottom: 1px solid var(--sep); }
   .sidebar-brand .name { font-size: 15px; font-weight: 600; letter-spacing: -.01em;
@@ -40,7 +49,7 @@
     background: var(--fill); color: var(--ink); font-family: inherit; font-size: 13px; font-weight: 500;
     min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
-  .main-content { flex: 1; min-width: 0; }
+  .main-content { flex: 1; min-width: 0; margin-left: 266px; }
 
   .tabs { display: flex; flex-direction: column; gap: 2px; background: none; padding: 0; margin: 0; }
   .tabs button {
@@ -105,7 +114,7 @@
     }
     .sidebar-logout .label { display: none; }
 
-    .main-content { padding-top: 76px; padding-bottom: 90px; }
+    .main-content { padding-top: 76px; padding-bottom: 90px; margin-left: 0; }
     .theme-btn { top: auto; bottom: calc(84px + env(safe-area-inset-bottom, 0px)); right: 14px; z-index: 65; }
 
     /* Détail coiffeur déplié : tout en une seule colonne, rien en ligne
