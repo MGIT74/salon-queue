@@ -81,6 +81,10 @@
   .svc-card.sel .meta { color: rgba(255,255,255,.8); }
   .svc-card:active { transform: scale(.96); }
 
+  .svc-card.gift-tile { background: linear-gradient(160deg, #b8860b, #8a5a00); color: #fff; }
+  .svc-card.gift-tile .icon { font-size: 34px; }
+  .svc-card.gift-tile .meta { color: rgba(255,255,255,.85); }
+
   .extras-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 22px; }
   .xchip { border: none; background: var(--fill); color: var(--ink); border-radius: 999px;
            padding: 12px 18px; cursor: pointer; font-family: inherit; font-size: 14.5px;
@@ -209,8 +213,18 @@
   </section>
   <!-- Réservation intégrée -->
   <section class="panel" id="p-book-barber">
-    <div class="eyebrow">Choisissez votre coiffeur</div>
+    <div class="eyebrow" id="bk-barber-eyebrow">Choisissez votre coiffeur</div>
     <div class="svc-grid" id="bk-barber-grid"></div>
+  </section>
+
+  <section class="panel" id="p-book-gift-code">
+    <button class="back" onclick="show('p-book-barber')">‹ Retour</button>
+    <div class="eyebrow">Utiliser un cadeau</div>
+    <p style="color:var(--grey);font-size:14px;margin:-8px 0 22px">Saisissez le code reçu par email.</p>
+    <div class="fld"><label for="bk-gift-code-input">Code</label>
+      <input id="bk-gift-code-input" type="text" placeholder="ABCD1234" style="text-transform:uppercase;letter-spacing:2px;font-size:20px;text-align:center" maxlength="8"></div>
+    <div style="color:var(--red);font-size:14px;min-height:20px;margin-bottom:14px" id="bk-gift-code-error"></div>
+    <button class="go" onclick="lookupBookGiftCode()">Valider le code</button>
   </section>
 
   <section class="panel" id="p-book-service">
@@ -539,6 +553,7 @@ var bookCatalogLoaded = false;
 var bookSalonSlug = SALON_SLUG;
 var bookServices = [], bookExtras = [], bookBarbers = [];
 var selBookBarber = null, selBookService = null, selBookExtras = [], selBookDate = null, selBookSlot = null;
+var activeBookGift = null;
 
 function iconForItem(name) {
   var n = (name || '').toLowerCase();
@@ -598,7 +613,10 @@ function goBook(afterLoad) {
 }
 
 function renderBookBarberGrid() {
-  document.getElementById('bk-barber-grid').innerHTML = bookBarbers.map(function (b) {
+  var giftTile = '<button class="svc-card gift-tile" onclick="openBookGiftCodeScreen()">' +
+    '<span class="icon">🎁</span><span class="name">Utiliser un cadeau</span></button>';
+
+  document.getElementById('bk-barber-grid').innerHTML = giftTile + bookBarbers.map(function (b) {
     var photoStyle = b.photo_url ? 'background-image:url(&quot;' + esc(b.photo_url) + '&quot;);background-size:cover;background-position:center' : '';
     return '<button class="svc-card' + (selBookBarber === b.id ? ' sel' : '') + '" style="' + photoStyle + '" onclick="selectBookBarber(this, \'' + b.id + '\')">' +
       (b.photo_url ? '' : '<span class="icon">' + esc(b.name.charAt(0).toUpperCase()) + '</span>') +
@@ -606,7 +624,7 @@ function renderBookBarberGrid() {
       '</button>';
   }).join('');
   if (bookBarbers.length === 0) {
-    document.getElementById('bk-barber-grid').innerHTML = '<div class="empty">Aucun coiffeur ne prend de RDV en ligne pour le moment — présentez-vous directement au salon.</div>';
+    document.getElementById('bk-barber-grid').innerHTML = giftTile + '<div class="empty">Aucun coiffeur ne prend de RDV en ligne pour le moment — présentez-vous directement au salon.</div>';
   }
 }
 
@@ -614,7 +632,52 @@ function selectBookBarber(el, id) {
   selBookBarber = id;
   document.querySelectorAll('#bk-barber-grid .svc-card').forEach(function (c) { c.classList.remove('sel'); });
   el.classList.add('sel');
+
+  if (activeBookGift) {
+    // Prestation et suppléments déjà déterminés par le cadeau - seuls
+    // le coiffeur puis la date/heure restent à choisir.
+    show('p-book-datetime');
+    var today = new Date().toISOString().slice(0, 10);
+    document.getElementById('bk-date').min = today;
+    if (!document.getElementById('bk-date').value) document.getElementById('bk-date').value = today;
+    loadBookSlots();
+    return;
+  }
   show('p-book-service');
+}
+
+/* ---------- Utiliser un cadeau (réservation) ---------- */
+function openBookGiftCodeScreen() {
+  document.getElementById('bk-gift-code-input').value = '';
+  document.getElementById('bk-gift-code-error').textContent = '';
+  show('p-book-gift-code');
+}
+
+function lookupBookGiftCode() {
+  var code = document.getElementById('bk-gift-code-input').value.trim().toUpperCase();
+  var errEl = document.getElementById('bk-gift-code-error');
+  errEl.textContent = '';
+  if (!code) { errEl.textContent = 'Entrez le code reçu par email'; return; }
+
+  apiForBooking('/api/sales/gift-cards/lookup?code=' + encodeURIComponent(code)).then(function (r) {
+    var g = r.gift;
+    var serviceItem = g.items.find(function (it) { return it.item_type === 'service'; });
+    if (!serviceItem || !serviceItem.item_id) {
+      errEl.textContent = "Ce cadeau ne comprend pas de prestation réservable en ligne — présentez-vous directement au salon.";
+      return;
+    }
+    var extraItems = g.items.filter(function (it) { return it.item_type === 'extra' && it.item_id; });
+
+    activeBookGift = g;
+    selBookService = serviceItem.item_id;
+    selBookExtras = extraItems.map(function (it) { return it.item_id; });
+
+    document.querySelectorAll('#bk-barber-grid .svc-card').forEach(function (c) { c.classList.remove('sel'); });
+    document.getElementById('bk-barber-eyebrow').textContent = 'Cadeau de ' + g.recipient_name + ' — choisissez le coiffeur';
+    show('p-book-barber');
+  }).catch(function (err) {
+    errEl.textContent = err.message;
+  });
 }
 
 function renderBookServiceGrid() {
@@ -746,8 +809,9 @@ function submitBookAppointment() {
   }).then(function () {
     var s = bookServices.find(function (x) { return x.id === selBookService; });
     var when = new Date(selBookDate + 'T' + selBookSlot.time).toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' }) + ' à ' + selBookSlot.time;
-    document.getElementById('bk-confirm-details').textContent = when + ' — ' + s.name;
-    selBookBarber = null; selBookService = null; selBookExtras = []; selBookDate = null; selBookSlot = null;
+    document.getElementById('bk-confirm-details').textContent = when + ' — ' + s.name + (activeBookGift ? ' (cadeau utilisé — présentez-le à votre coiffeur)' : '');
+    selBookBarber = null; selBookService = null; selBookExtras = []; selBookDate = null; selBookSlot = null; activeBookGift = null;
+    document.getElementById('bk-barber-eyebrow').textContent = 'Choisissez votre coiffeur';
     document.getElementById('bk-date').value = '';
     document.getElementById('bk-note').value = '';
     show('p-book-confirmed');
