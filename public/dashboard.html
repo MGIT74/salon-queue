@@ -826,8 +826,7 @@
     <div class="admin-head">
       <h2>Coiffeurs et horaires</h2>
       <div style="display:flex;gap:8px">
-        <button class="btn btn-soft" style="color:var(--orange, #f97316)" onclick="addBarber('walkin')">+ Sans RDV</button>
-        <button class="btn btn-soft" style="color:var(--blue)" onclick="addBarber('online')">+ RDV en ligne</button>
+        <button class="btn btn-primary" onclick="openAddBarberChoice()">+ Ajouter un coiffeur</button>
       </div>
     </div>
     <div id="barbers-list"></div>
@@ -2460,6 +2459,31 @@ function saveSchedule(id) {
   api('/api/barbers/' + id + '/schedule', { method: 'PUT', body: { schedules: schedules, breaks: breaks } })
     .then(loadBarbers).then(function () { toast('Horaires enregistrés'); })
     .catch(function (e) { toast(e.message, true); });
+}
+
+function openAddBarberChoice() {
+  var overlay = _buildModal(
+    '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px">' +
+    '<div class="modal-title" style="margin-bottom:0">Nouveau coiffeur</div>' +
+    '<button id="aab-close-x" style="background:var(--fill);border:none;width:30px;height:30px;border-radius:50%;color:var(--grey);font-size:14px;cursor:pointer;flex-shrink:0;margin-left:10px">✕</button>' +
+    '</div>' +
+    '<button class="aab-choice" id="aab-online" style="width:100%;display:flex;align-items:center;gap:14px;padding:16px;border:none;border-radius:14px;background:var(--fill);color:var(--ink);font-family:inherit;cursor:pointer;margin-bottom:10px;text-align:left">' +
+      '<span style="display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;background:var(--blue);color:#fff;flex-shrink:0">' +
+        '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5.5" width="16" height="15" rx="2.5"/><path d="M4 9.5h16"/><path d="M8 3.5v3.5M16 3.5v3.5"/></svg>' +
+      '</span>' +
+      '<span><strong style="display:block;font-size:15px">RDV en ligne</strong><span class="hint" style="margin:2px 0 0">Prend des rendez-vous programmés à l\'avance</span></span>' +
+    '</button>' +
+    '<button class="aab-choice" id="aab-walkin" style="width:100%;display:flex;align-items:center;gap:14px;padding:16px;border:none;border-radius:14px;background:var(--fill);color:var(--ink);font-family:inherit;cursor:pointer;text-align:left">' +
+      '<span style="display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;background:var(--orange, #f97316);color:#fff;flex-shrink:0">' +
+        '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="13" cy="4" r="1.5"/><path d="M9.5 21l2-6-1.5-1.5.5-4.5 3-1 2 2.5 2.5 1"/><path d="M14.5 21l-1-5"/></svg>' +
+      '</span>' +
+      '<span><strong style="display:block;font-size:15px">Sans RDV</strong><span class="hint" style="margin:2px 0 0">Coupe les clients au fur et à mesure, sur place</span></span>' +
+    '</button>'
+  );
+
+  overlay.querySelector('#aab-close-x').onclick = function () { _closeModal(overlay); };
+  overlay.querySelector('#aab-online').onclick = function () { _closeModal(overlay); addBarber('online'); };
+  overlay.querySelector('#aab-walkin').onclick = function () { _closeModal(overlay); addBarber('walkin'); };
 }
 
 function addBarber(mode) {
