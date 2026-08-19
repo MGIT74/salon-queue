@@ -4,6 +4,7 @@ const { pool, getPlatformSettings, setPlatformSettings } = require('../db');
 const { sendTestEmail, sendVerificationEmail, invalidateTransport } = require('../lib/platformMailer');
 const { hashPassword } = require('../lib/password');
 const { createToken } = require('../lib/impersonation');
+const { loginRateLimiter } = require('../middleware/rateLimiter');
 
 const router = express.Router();
 
@@ -24,7 +25,7 @@ function requireSuperAdmin(req, res, next) {
   next();
 }
 
-router.post('/login', wrap(async (req, res) => {
+router.post('/login', loginRateLimiter('super-admin-login'), wrap(async (req, res) => {
   const expected = (process.env.SUPER_ADMIN_PASSWORD || '').replace(/[\r\n]+$/, '').trim();
   if (!expected) return res.status(500).json({ error: 'SUPER_ADMIN_PASSWORD non défini côté serveur' });
   if ((req.body.password || '') !== expected) {

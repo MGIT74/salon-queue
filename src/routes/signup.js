@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const { pool } = require('../db');
 const { hashPassword, verifyPassword } = require('../lib/password');
 const { sendPasswordReset, sendVerificationEmail } = require('../lib/platformMailer');
+const { loginRateLimiter } = require('../middleware/rateLimiter');
 
 const router = express.Router();
 
@@ -208,7 +209,7 @@ router.post('/resend-verification', wrap(async (req, res) => {
  * salon choisi se fait ensuite normalement via /api/login (X-Salon-Slug
  * + X-Admin-Password), ce endpoint ne pose pas de session.
  */
-router.post('/login-lookup', wrap(async (req, res) => {
+router.post('/login-lookup', loginRateLimiter('signup-login-lookup'), wrap(async (req, res) => {
   const email = String(req.body.email || '').trim();
   const password = String(req.body.password || '');
   if (!email || !password) return res.status(400).json({ error: 'Email et mot de passe requis' });

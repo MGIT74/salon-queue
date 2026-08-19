@@ -31,9 +31,16 @@ const clientAuthRoutes = require('./src/routes/clientAuth');
 const requireAdmin = require('./src/middleware/auth');
 const resolveSalon = require('./src/middleware/resolveSalon');
 const { startNotifyJob } = require('./src/cron/notify');
+const { loginRateLimiter } = require('./src/middleware/rateLimiter');
 
 const app = express();
 const PORT = Number((process.env.PORT || '3000').toString().replace(/[\r\n]+$/, '').trim());
+
+// Nécessaire derrière un reverse proxy (nginx) pour que req.ip reflète
+// la vraie IP du client (via X-Forwarded-For) plutôt que celle du
+// proxy - indispensable pour que le limiteur de tentatives de
+// connexion cible la bonne IP.
+app.set('trust proxy', 1);
 
 app.use(express.json({ limit: '5mb' })); // limite relevée pour les photos de coiffeurs (base64)
 // Les pages HTML ne doivent jamais rester en cache trop longtemps (le mode
@@ -71,7 +78,7 @@ app.use('/api/owner', ownerRoutes);
 app.use('/api/client-auth', clientAuthRoutes);
 
 // Vérification du mot de passe depuis l'écran de connexion du dashboard
-app.post('/api/login', requireAdmin, (req, res) => res.json({ ok: true }));
+app.post('/api/login', loginRateLimiter('admin-login'), requireAdmin, (req, res) => res.json({ ok: true }));
 
 app.get('/healthz', (req, res) => res.json({ ok: true, uptime: process.uptime() }));
 

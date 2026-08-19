@@ -4,6 +4,7 @@ const { pool } = require('../db');
 const { hashPassword, verifyPassword } = require('../lib/password');
 const { sendClientVerificationEmail, sendClientPasswordReset } = require('../lib/mailer');
 const { clientKey } = require('../lib/queueMath');
+const { loginRateLimiter } = require('../middleware/rateLimiter');
 const { nowParisDatetimeString } = require('./appointments');
 
 const router = express.Router();
@@ -112,7 +113,7 @@ router.post('/resend-verification', wrap(async (req, res) => {
   res.json({ ok: true, message: genericMsg });
 }));
 
-router.post('/login', wrap(async (req, res) => {
+router.post('/login', loginRateLimiter('client-login'), wrap(async (req, res) => {
   const email = String(req.body.email || '').trim();
   const password = String(req.body.password || '');
   if (!email || !password) return res.status(400).json({ error: 'Email et mot de passe requis' });

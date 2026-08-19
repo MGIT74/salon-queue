@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const { pool } = require('../db');
 const { activeBarberCount } = require('../lib/queueMath');
 const requireAdmin = require('../middleware/auth');
+const { loginRateLimiter } = require('../middleware/rateLimiter');
 
 const router = express.Router();
 
@@ -186,7 +187,7 @@ router.delete('/:id', requireAdmin, wrap(async (req, res) => {
  * Ne nécessite pas le mot de passe admin : posséder le bon PIN pour CE
  * salon suffit.
  */
-router.post('/login', wrap(async (req, res) => {
+router.post('/login', loginRateLimiter('barber-pin-login'), wrap(async (req, res) => {
   const pin = String(req.body.pin || '').trim();
   if (!pin) return res.status(400).json({ error: 'Code PIN requis' });
 
