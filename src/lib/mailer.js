@@ -141,6 +141,7 @@ async function sendAppointmentConfirmation(salonId, to, info) {
  */
 async function sendAppointmentCancelledByAdmin(salonId, to, info) {
   const { tx, from, salon } = await getTransport(salonId);
+  const customMessage = info.customMessage ? String(info.customMessage).trim() : '';
   await tx.sendMail({
     from,
     to,
@@ -148,12 +149,12 @@ async function sendAppointmentCancelledByAdmin(salonId, to, info) {
     text: `Bonjour ${info.clientName},\n\n` +
           `Nous sommes désolés de vous informer que votre rendez-vous du ${info.when} ` +
           `(${info.serviceName}) chez ${salon} a dû être annulé.\n` +
-          `N'hésitez pas à nous recontacter pour reprendre un nouveau rendez-vous.\n\n` +
+          (customMessage ? `${customMessage}\n\n` : "N'hésitez pas à nous recontacter pour reprendre un nouveau rendez-vous.\n\n") +
           `Toutes nos excuses pour la gêne occasionnée.\n\n${salon}`,
     html: `<p>Bonjour ${info.clientName},</p>` +
           `<p>Nous sommes désolés de vous informer que votre rendez-vous du <strong>${info.when}</strong> ` +
           `(${info.serviceName}) chez ${salon} a dû être annulé.</p>` +
-          `<p>N'hésitez pas à nous recontacter pour reprendre un nouveau rendez-vous.</p>` +
+          (customMessage ? `<p>${customMessage.replace(/\n/g, '<br>')}</p>` : "<p>N'hésitez pas à nous recontacter pour reprendre un nouveau rendez-vous.</p>") +
           `<p>Toutes nos excuses pour la gêne occasionnée.</p>` +
           `<p>${salon}</p>`
   });

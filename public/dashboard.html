@@ -802,9 +802,9 @@
         <h3 id="rdv-list-title" style="margin:0">À venir</h3>
         <button class="btn btn-soft" id="rdv-reset-btn" onclick="resetRdvListToUpcoming()" style="display:none">Voir tous les à venir</button>
       </div>
-      <div class="row2" style="margin-bottom:16px">
+      <div class="row2" style="margin-bottom:12px">
         <div class="fld"><label for="rdv-filter-status">Statut</label>
-          <select id="rdv-filter-status" onchange="renderRdvList()">
+          <select id="rdv-filter-status" onchange="onRdvFilterChange()">
             <option value="">Tous</option>
             <option value="confirmed">Confirmés</option>
             <option value="completed">Terminés</option>
@@ -813,7 +813,23 @@
           </select>
         </div>
         <div class="fld"><label for="rdv-filter-barber">Coiffeur</label>
-          <select id="rdv-filter-barber" onchange="renderRdvList()"><option value="">Tous</option></select>
+          <select id="rdv-filter-barber" onchange="onRdvFilterChange()"><option value="">Tous</option></select>
+        </div>
+      </div>
+      <div class="row2" style="margin-bottom:16px">
+        <div class="fld"><label for="rdv-filter-from">Du</label>
+          <input type="date" id="rdv-filter-from" onchange="onRdvFilterChange()"></div>
+        <div class="fld"><label for="rdv-filter-to">Au</label>
+          <input type="date" id="rdv-filter-to" onchange="onRdvFilterChange()"></div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+        <button class="btn btn-ghost" onclick="selectAllRdv()">Tout sélectionner</button>
+      </div>
+      <div class="clients-export-bar" id="rdv-export-bar" style="display:none">
+        <span id="rdv-selected-count" class="export-count"></span>
+        <div class="export-actions">
+          <button class="btn btn-ghost" style="color:var(--red)" onclick="openCancelAppointmentsModal(Object.keys(rdvSelectedIds))">Annuler la sélection</button>
+          <button class="btn btn-ghost" onclick="clearRdvSelection()">Tout désélectionner</button>
         </div>
       </div>
       <div id="rdv-list"></div>
@@ -1430,20 +1446,7 @@ var drawerClientSnapshot = null;
 
 function cancelAppointmentByAdmin() {
   if (!drawerAppointmentId) return;
-  var name = drawerAppointmentData ? drawerAppointmentData.client_name : 'ce client';
-  showConfirm('Annuler le rendez-vous de ' + name + ' ? Un email d\'excuses lui sera envoyé s\'il a une adresse.', { title: 'Annuler le RDV', danger: true, confirmLabel: 'Annuler le RDV' })
-    .then(function (ok) {
-      if (!ok) return;
-      return api('/api/appointments/' + drawerAppointmentId + '/admin-cancel', { method: 'POST' })
-        .then(function () {
-          toast('Rendez-vous annulé');
-          closeClientDrawer();
-          Object.keys(calMonthCache).forEach(function (k) { delete calMonthCache[k]; });
-          loadCalendarPeriod();
-          renderRdvList();
-        });
-    })
-    .catch(function (e) { toast(e.message, true); });
+  openCancelAppointmentsModal([drawerAppointmentId]);
 }
 
 /**
@@ -3158,9 +3161,44 @@ function resetRdvListToUpcoming() {
   }).catch(function (e) { toast(e.message, true); });
 }
 
+var rdvSelectedIds = {};
+
+function onRdvFilterChange() {
+  clearRdvSelection();
+  renderRdvList();
+}
+
+function toggleRdvSelect(id, checked) {
+  if (checked) rdvSelectedIds[id] = true; else delete rdvSelectedIds[id];
+  updateRdvExportBar();
+}
+
+function selectAllRdv() {
+  document.querySelectorAll('.rdv-check').forEach(function (cb) {
+    rdvSelectedIds[cb.dataset.id] = true;
+    cb.checked = true;
+  });
+  updateRdvExportBar();
+}
+
+function clearRdvSelection() {
+  rdvSelectedIds = {};
+  document.querySelectorAll('.rdv-check').forEach(function (cb) { cb.checked = false; });
+  updateRdvExportBar();
+}
+
+function updateRdvExportBar() {
+  var count = Object.keys(rdvSelectedIds).length;
+  document.getElementById('rdv-export-bar').style.display = count > 0 ? 'flex' : 'none';
+  document.getElementById('rdv-selected-count').textContent =
+    count + (count > 1 ? ' RDV sélectionnés' : ' RDV sélectionné');
+}
+
 function renderRdvList() {
   var statusFilter = document.getElementById('rdv-filter-status').value;
   var barberFilter = document.getElementById('rdv-filter-barber').value;
+  var fromFilter = document.getElementById('rdv-filter-from').value;
+  var toFilter = document.getElementById('rdv-filter-to').value;
 
   var items;
   if (calSelectedDate) {
@@ -3173,6 +3211,8 @@ function renderRdvList() {
 
   if (statusFilter) items = items.filter(function (a) { return a.display_status === statusFilter; });
   if (barberFilter) items = items.filter(function (a) { return a.barber_id === barberFilter; });
+  if (fromFilter) items = items.filter(function (a) { return a.scheduled_at.slice(0, 10) >= fromFilter; });
+  if (toFilter) items = items.filter(function (a) { return a.scheduled_at.slice(0, 10) <= toFilter; });
 
   var statusLabels = { confirmed: 'Confirmé', completed: 'Terminé', no_show: 'Absent', cancelled: 'Annulé' };
   var statusColors = { confirmed: 'var(--blue)', completed: 'var(--green)', no_show: 'var(--red)', cancelled: 'var(--orange, #f97316)' };
@@ -3190,13 +3230,83 @@ function renderRdvList() {
         var dateOnly = new Date(a.scheduled_at.slice(0, 10) + 'T00:00:00');
         var when = dateOnly.toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'short' }) +
           ' à ' + a.scheduled_at.slice(11, 16);
+        // Annulable : un vrai RDV en ligne, pas encore annulé, à venir -
+        // même règle que le tiroir client (openClientDrawer).
+        var cancelable = a.status !== 'cancelled' && a.source !== 'walkin' && new Date(a.scheduled_at) > new Date();
         return '<div class="item">' +
+          (cancelable ? '<input type="checkbox" class="rdv-check" data-id="' + a.id + '" ' + (rdvSelectedIds[a.id] ? 'checked' : '') + ' onchange="toggleRdvSelect(\'' + a.id + '\', this.checked)" style="margin-right:12px;flex-shrink:0">' : '<span style="width:28px;flex-shrink:0;display:inline-block"></span>') +
           '<div class="item-main"><div class="item-name">' + esc(a.client_name) + ' — ' + when + ' ' + sourceBadge(a) + '</div>' +
           '<div class="item-meta">' + esc(a.service_name) + (a.barber_name ? ' avec ' + esc(a.barber_name) : ' · premier disponible') + '</div>' +
           '<div class="item-meta">' + esc(a.email || '') + (a.phone ? ' · ' + esc(a.phone) : '') + '</div></div>' +
-          '<div class="item-actions"><span style="color:' + (statusColors[a.display_status] || 'var(--grey)') + ';font-size:13px;font-weight:600">' + (statusLabels[a.display_status] || a.display_status) + '</span></div>' +
+          '<div class="item-actions" style="display:flex;align-items:center;gap:12px">' +
+          '<span style="color:' + (statusColors[a.display_status] || 'var(--grey)') + ';font-size:13px;font-weight:600">' + (statusLabels[a.display_status] || a.display_status) + '</span>' +
+          (cancelable ? '<button class="btn btn-ghost" style="color:var(--red);padding:6px 10px;font-size:13px" onclick="openCancelAppointmentsModal([\'' + a.id + '\'])">Annuler</button>' : '') +
+          '</div>' +
           '</div>';
       }).join('');
+
+  updateRdvExportBar();
+}
+
+/**
+ * Annulation d'un ou plusieurs RDV, en groupe ou individuel - même
+ * popup, même processus dans les deux cas. Propose un message par
+ * défaut (excuses génériques déjà gérées côté serveur) ou un message
+ * personnalisé (ex: accident, imprévu précis).
+ */
+function openCancelAppointmentsModal(ids) {
+  ids = ids.filter(Boolean);
+  if (!ids.length) return;
+  var plural = ids.length > 1;
+
+  var overlay = _buildModal(
+    '<div class="modal-title">Annuler ' + (plural ? ids.length + ' rendez-vous' : 'le rendez-vous') + '</div>' +
+    '<div class="modal-message" style="margin-bottom:16px">' +
+      (plural ? 'Chaque client concerné recevra un email d\'annulation.' : 'Le client recevra un email d\'annulation, s\'il a une adresse renseignée.') +
+    '</div>' +
+    '<div class="fld" style="margin-bottom:8px">' +
+      '<label style="display:flex;align-items:center;gap:8px;font-weight:400;cursor:pointer">' +
+        '<input type="radio" name="cam-msg-type" id="cam-default" checked onchange="camToggleCustom()"> Message par défaut (excuses génériques)' +
+      '</label>' +
+      '<label style="display:flex;align-items:center;gap:8px;font-weight:400;cursor:pointer;margin-top:6px">' +
+        '<input type="radio" name="cam-msg-type" id="cam-custom" onchange="camToggleCustom()"> Message personnalisé (ex: accident, imprévu…)' +
+      '</label>' +
+    '</div>' +
+    '<textarea class="modal-input" id="cam-custom-text" rows="3" style="display:none" placeholder="Ex: en raison d\'un accident, le salon est exceptionnellement fermé…"></textarea>' +
+    '<div class="modal-error" id="cam-error" style="display:none"></div>' +
+    '<div class="modal-actions">' +
+    '<button class="btn btn-soft" id="cam-cancel-btn">Fermer</button>' +
+    '<button class="btn btn-primary modal-danger-btn" id="cam-confirm-btn">Confirmer l\'annulation</button>' +
+    '</div>'
+  );
+
+  window.camToggleCustom = function () {
+    overlay.querySelector('#cam-custom-text').style.display = overlay.querySelector('#cam-custom').checked ? 'block' : 'none';
+  };
+
+  overlay.querySelector('#cam-cancel-btn').onclick = function () { _closeModal(overlay); };
+
+  overlay.querySelector('#cam-confirm-btn').onclick = function () {
+    var errEl = overlay.querySelector('#cam-error');
+    var customMessage = overlay.querySelector('#cam-custom').checked ? overlay.querySelector('#cam-custom-text').value.trim() : '';
+    var btn = overlay.querySelector('#cam-confirm-btn');
+    btn.disabled = true; btn.textContent = 'Annulation…';
+
+    Promise.all(ids.map(function (id) {
+      return api('/api/appointments/' + id + '/admin-cancel', { method: 'POST', body: { custom_message: customMessage } })
+        .catch(function (e) { return { error: e.message }; });
+    })).then(function (results) {
+      var failed = results.filter(function (r) { return r && r.error; }).length;
+      _closeModal(overlay);
+      if (failed) toast(failed + ' annulation(s) ont échoué sur ' + ids.length, true);
+      else toast(plural ? 'Rendez-vous annulés' : 'Rendez-vous annulé');
+      clearRdvSelection();
+      closeClientDrawer();
+      Object.keys(calMonthCache).forEach(function (k) { delete calMonthCache[k]; });
+      loadCalendarPeriod();
+      resetRdvListToUpcoming();
+    });
+  };
 }
 
 

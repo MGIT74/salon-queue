@@ -613,7 +613,8 @@ router.post('/:id/admin-cancel', requireAdmin, wrap(async (req, res) => {
         weekday: 'long', day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit'
       });
       await sendAppointmentCancelledByAdmin(req.salon.id, appt.email, {
-        clientName: appt.client_name, when, serviceName: appt.service_name
+        clientName: appt.client_name, when, serviceName: appt.service_name,
+        customMessage: req.body.custom_message
       });
     } catch (err) {
       console.error('[admin-cancel] envoi email échoué:', err.message);
