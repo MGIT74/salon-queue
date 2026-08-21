@@ -259,6 +259,8 @@
   .card-box h3 { font-size: 17px; font-weight: 600; letter-spacing: -.02em; margin: 0 0 4px; }
   .card-box .hint { font-size: 13.5px; color: var(--grey); margin: 0 0 18px; line-height: 1.5; }
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  @media (max-width: 700px) { .grid4 { grid-template-columns: 1fr 1fr; } }
 
   .cal-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; gap: 12px; flex-wrap: wrap; }
   .cal-month-label { font-size: 17px; font-weight: 600; letter-spacing: -.02em; text-transform: capitalize; }
@@ -802,7 +804,7 @@
         <h3 id="rdv-list-title" style="margin:0">À venir</h3>
         <button class="btn btn-soft" id="rdv-reset-btn" onclick="resetRdvListToUpcoming()" style="display:none">Voir tous les à venir</button>
       </div>
-      <div class="row2" style="margin-bottom:12px">
+      <div class="grid4" style="margin-bottom:16px">
         <div class="fld"><label for="rdv-filter-status">Statut</label>
           <select id="rdv-filter-status" onchange="onRdvFilterChange()">
             <option value="">Tous</option>
@@ -815,8 +817,6 @@
         <div class="fld"><label for="rdv-filter-barber">Coiffeur</label>
           <select id="rdv-filter-barber" onchange="onRdvFilterChange()"><option value="">Tous</option></select>
         </div>
-      </div>
-      <div class="row2" style="margin-bottom:16px">
         <div class="fld"><label for="rdv-filter-from">Du</label>
           <input type="date" id="rdv-filter-from" onchange="onRdvFilterChange()"></div>
         <div class="fld"><label for="rdv-filter-to">Au</label>
