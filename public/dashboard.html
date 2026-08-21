@@ -235,6 +235,8 @@
   .item { background: var(--card); border-radius: 14px; padding: 14px 18px; margin-bottom: 8px;
           display: flex; align-items: center; gap: 14px; box-shadow: var(--shadow); flex-wrap: wrap; transition: background .25s ease; }
   .item.off { opacity: .5; }
+  #rdv-list .item { border-bottom: 1px solid var(--sep); border-radius: 0; box-shadow: none; background: none; padding: 16px 4px; }
+  #rdv-list .item:last-child { border-bottom: none; }
   .item-main { flex: 1; min-width: 160px; }
   .cat-photo {
     width: 52px; height: 52px; border-radius: 12px; background: var(--fill); flex-shrink: 0;
