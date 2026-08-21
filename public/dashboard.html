@@ -511,6 +511,12 @@
 }
 .export-count { font-size: 13.5px; font-weight: 600; color: var(--ink); }
 .export-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.select-all-row {
+  display: flex; align-items: center; gap: 9px; font-size: 13.5px; color: var(--grey);
+  cursor: pointer; margin-bottom: 10px; width: fit-content;
+}
+.select-all-row input { width: 17px; height: 17px; flex-shrink: 0; cursor: pointer; margin: 0; }
 .clients-pagination { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 18px; }
 .clients-pagination button {
   border: none; background: var(--fill); color: var(--ink); width: 34px; height: 34px; border-radius: 50%;
@@ -847,7 +853,6 @@
             <option value="50">50</option>
           </select>
         </div>
-        <button class="btn btn-ghost" onclick="selectAllRdv()">Tout sélectionner</button>
       </div>
       <div class="clients-export-bar" id="rdv-export-bar" style="display:none">
         <span id="rdv-selected-count" class="export-count"></span>
@@ -855,9 +860,12 @@
           <button class="btn btn-soft" onclick="exportRdvCsv()">Télécharger CSV</button>
           <button class="btn btn-soft" onclick="exportRdvPdf()">Télécharger PDF</button>
           <button class="btn btn-ghost" id="rdv-bulk-cancel-btn" style="color:var(--red);display:none" onclick="openCancelAppointmentsModal(Object.keys(rdvSelectedIds))">Annuler la sélection</button>
-          <button class="btn btn-ghost" onclick="clearRdvSelection()">Tout désélectionner</button>
         </div>
       </div>
+      <label class="select-all-row">
+        <input type="checkbox" id="rdv-select-all" onchange="toggleSelectAllRdv(this.checked)">
+        Tout sélectionner
+      </label>
       <div id="rdv-list"></div>
       <div class="clients-pagination" id="rdv-pagination"></div>
     </div>
@@ -896,7 +904,6 @@
         </select>
       </div>
       <button class="btn btn-primary" onclick="addManualClient()">+ Ajouter un client</button>
-      <button class="btn btn-ghost" onclick="selectAllClients()" style="margin-left:auto">Tout sélectionner</button>
     </div>
 
     <div class="clients-export-bar" id="clients-export-bar" style="display:none">
@@ -905,11 +912,14 @@
         <button class="btn btn-soft" onclick="exportClientsCsv()">Télécharger CSV</button>
         <button class="btn btn-soft" onclick="exportClientsPdf()">Télécharger PDF</button>
         <button class="btn btn-ghost" style="color:var(--red)" onclick="deleteSelectedClients()">Tout supprimer</button>
-        <button class="btn btn-ghost" onclick="clearClientSelection()">Tout désélectionner</button>
       </div>
     </div>
 
     <p class="hint" style="margin:-6px 0 16px">« Forcer la clôture » sert à débloquer une fiche restée coincée « en cours » (ex. test, oubli), sans attendre.</p>
+    <label class="select-all-row">
+      <input type="checkbox" id="clients-select-all" onchange="toggleSelectAllClients(this.checked)">
+      Tout sélectionner
+    </label>
     <div id="clients-list"></div>
     <div class="clients-pagination" id="clients-pagination"></div>
   </div>
@@ -3326,17 +3336,23 @@ function toggleRdvSelect(id, checked) {
   updateRdvExportBar();
 }
 
+function toggleSelectAllRdv(checked) {
+  if (checked) selectAllRdv(); else clearRdvSelection();
+}
+
 function selectAllRdv() {
   document.querySelectorAll('.rdv-check').forEach(function (cb) {
     rdvSelectedIds[cb.dataset.id] = true;
     cb.checked = true;
   });
+  document.getElementById('rdv-select-all').checked = true;
   updateRdvExportBar();
 }
 
 function clearRdvSelection() {
   rdvSelectedIds = {};
   document.querySelectorAll('.rdv-check').forEach(function (cb) { cb.checked = false; });
+  document.getElementById('rdv-select-all').checked = false;
   updateRdvExportBar();
 }
 
@@ -3356,6 +3372,14 @@ function updateRdvExportBar() {
     return a && a.status !== 'cancelled' && a.source !== 'walkin' && a.scheduled_at > now;
   });
   document.getElementById('rdv-bulk-cancel-btn').style.display = hasCancelable ? 'inline-block' : 'none';
+
+  // Coche/décoche/indétermine la case 'Tout sélectionner' selon l'état
+  // des cases de la page actuellement affichée.
+  var checks = document.querySelectorAll('.rdv-check');
+  var checkedCount = document.querySelectorAll('.rdv-check:checked').length;
+  var selectAllBox = document.getElementById('rdv-select-all');
+  selectAllBox.checked = checks.length > 0 && checkedCount === checks.length;
+  selectAllBox.indeterminate = checkedCount > 0 && checkedCount < checks.length;
 }
 
 function getSelectedRdv() {
@@ -3726,6 +3750,10 @@ function toggleClientSelect(id, checked) {
   updateClientsExportBar();
 }
 
+function toggleSelectAllClients(checked) {
+  if (checked) selectAllClients(); else clearClientSelection();
+}
+
 function selectAllClients() {
   var q = (document.getElementById('client-search').value || '').trim().toLowerCase();
   clientHistory.forEach(function (c) {
@@ -3746,6 +3774,12 @@ function updateClientsExportBar() {
   document.getElementById('clients-export-bar').style.display = count > 0 ? 'flex' : 'none';
   document.getElementById('clients-selected-count').textContent =
     count + (count > 1 ? ' clients sélectionnés' : ' client sélectionné');
+
+  var checks = document.querySelectorAll('.client-check');
+  var checkedCount = document.querySelectorAll('.client-check:checked').length;
+  var selectAllBox = document.getElementById('clients-select-all');
+  selectAllBox.checked = checks.length > 0 && checkedCount === checks.length;
+  selectAllBox.indeterminate = checkedCount > 0 && checkedCount < checks.length;
 }
 
 function getSelectedClients() {
