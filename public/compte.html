@@ -47,6 +47,7 @@
     border-radius: 20px 20px 0 0; padding: 10px 8px calc(10px + env(safe-area-inset-bottom, 0px));
   }
   .client-footer.on { display: flex; }
+  .client-footer.on ~ .toast, body:has(.client-footer.on) .toast { bottom: 100px; }
   .client-footer button {
     background: none; border: none; font-family: inherit; cursor: pointer;
     display: flex; flex-direction: column; align-items: center; gap: 3px;
