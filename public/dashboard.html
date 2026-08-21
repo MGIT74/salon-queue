@@ -3329,13 +3329,13 @@ function openCancelAppointmentsModal(ids) {
     '<div class="modal-message" style="margin-bottom:16px">' +
       (plural ? 'Chaque client concerné recevra un email d\'annulation.' : 'Le client recevra un email d\'annulation, s\'il a une adresse renseignée.') +
     '</div>' +
-    '<div class="fld" style="margin-bottom:8px">' +
-      '<label style="display:flex;align-items:center;gap:8px;font-weight:400;cursor:pointer">' +
-        '<input type="radio" name="cam-msg-type" id="cam-default" checked onchange="camToggleCustom()"> Message par défaut (excuses génériques)' +
-      '</label>' +
-      '<label style="display:flex;align-items:center;gap:8px;font-weight:400;cursor:pointer;margin-top:6px">' +
-        '<input type="radio" name="cam-msg-type" id="cam-custom" onchange="camToggleCustom()"> Message personnalisé (ex: accident, imprévu…)' +
-      '</label>' +
+    '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px">' +
+      '<button type="button" class="cam-choice sel" id="cam-default" onclick="camSelectType(\'default\')" style="display:flex;align-items:center;gap:10px;width:100%;padding:13px 15px;border:none;border-radius:12px;background:var(--fill);color:var(--ink);font-family:inherit;font-size:14.5px;font-weight:500;cursor:pointer;text-align:left">' +
+        '<span class="cam-dot"></span>Message par défaut' +
+      '</button>' +
+      '<button type="button" class="cam-choice" id="cam-custom" onclick="camSelectType(\'custom\')" style="display:flex;align-items:center;gap:10px;width:100%;padding:13px 15px;border:none;border-radius:12px;background:var(--fill);color:var(--ink);font-family:inherit;font-size:14.5px;font-weight:500;cursor:pointer;text-align:left">' +
+        '<span class="cam-dot"></span>Message personnalisé' +
+      '</button>' +
     '</div>' +
     '<textarea class="modal-input" id="cam-custom-text" rows="3" style="display:none" placeholder="Ex: en raison d\'un accident, le salon est exceptionnellement fermé…"></textarea>' +
     '<div class="modal-error" id="cam-error" style="display:none"></div>' +
@@ -3345,15 +3345,19 @@ function openCancelAppointmentsModal(ids) {
     '</div>'
   );
 
-  window.camToggleCustom = function () {
-    overlay.querySelector('#cam-custom-text').style.display = overlay.querySelector('#cam-custom').checked ? 'block' : 'none';
+  var camType = 'default';
+  window.camSelectType = function (type) {
+    camType = type;
+    overlay.querySelector('#cam-default').classList.toggle('sel', type === 'default');
+    overlay.querySelector('#cam-custom').classList.toggle('sel', type === 'custom');
+    overlay.querySelector('#cam-custom-text').style.display = type === 'custom' ? 'block' : 'none';
   };
 
   overlay.querySelector('#cam-cancel-btn').onclick = function () { _closeModal(overlay); };
 
   overlay.querySelector('#cam-confirm-btn').onclick = function () {
     var errEl = overlay.querySelector('#cam-error');
-    var customMessage = overlay.querySelector('#cam-custom').checked ? overlay.querySelector('#cam-custom-text').value.trim() : '';
+    var customMessage = camType === 'custom' ? overlay.querySelector('#cam-custom-text').value.trim() : '';
     var btn = overlay.querySelector('#cam-confirm-btn');
     btn.disabled = true; btn.textContent = 'Annulation…';
 

@@ -123,6 +123,16 @@ input[type="date"] { -webkit-appearance: none; appearance: none; }
 .modal-actions .btn { flex: 1; padding: 13px; font-size: 14.5px; }
 .modal-danger-btn { background: var(--red) !important; color: #fff !important; }
 
+.cam-choice.sel { background: var(--blue) !important; color: #fff !important; }
+.cam-dot {
+  width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--grey); flex-shrink: 0;
+  box-sizing: border-box; position: relative;
+}
+.cam-choice.sel .cam-dot { border-color: #fff; }
+.cam-choice.sel .cam-dot::after {
+  content: ''; position: absolute; inset: 2px; border-radius: 50%; background: #fff;
+}
+
 .autocomplete-dropdown {
   position: absolute; left: 0; right: 0; top: 100%; margin-top: 4px;
   background: var(--card); border-radius: 12px; box-shadow: 0 12px 30px rgba(0,0,0,0.25);
