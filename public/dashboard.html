@@ -837,6 +837,7 @@
         </div>
       </div>
       <div id="rdv-list"></div>
+      <div class="clients-pagination" id="rdv-pagination"></div>
     </div>
   </div>
 
@@ -3167,11 +3168,28 @@ function resetRdvListToUpcoming() {
 }
 
 var rdvSelectedIds = {};
+var rdvPage = 1;
+var rdvPerPage = 25;
 var rdvCurrentItems = [];
 
 function onRdvFilterChange() {
   clearRdvSelection();
+  rdvPage = 1;
   renderRdvList();
+}
+
+function goToRdvPage(p) {
+  var totalPages = Math.max(1, Math.ceil(rdvCurrentItems.length / rdvPerPage));
+  if (p < 1 || p > totalPages) return;
+  rdvPage = p;
+  renderRdvList();
+}
+
+function renderRdvPagination(totalPages) {
+  document.getElementById('rdv-pagination').innerHTML = totalPages <= 1 ? '' :
+    '<button onclick="goToRdvPage(' + (rdvPage - 1) + ')"' + (rdvPage <= 1 ? ' disabled' : '') + '>‹</button>' +
+    '<span class="page-label">Page ' + rdvPage + ' / ' + totalPages + '</span>' +
+    '<button onclick="goToRdvPage(' + (rdvPage + 1) + ')"' + (rdvPage >= totalPages ? ' disabled' : '') + '>›</button>';
 }
 
 function toggleRdvSelect(id, checked) {
@@ -3291,13 +3309,17 @@ function renderRdvList() {
   rdvCurrentItems = items;
   calAppointmentById && items.forEach(function (a) { calAppointmentById[a.id] = a; });
 
+  var totalPages = Math.max(1, Math.ceil(items.length / rdvPerPage));
+  if (rdvPage > totalPages) rdvPage = totalPages;
+  var pageItems = items.slice((rdvPage - 1) * rdvPerPage, rdvPage * rdvPerPage);
+
   var statusLabels = { confirmed: 'Confirmé', completed: 'Terminé', no_show: 'Absent', cancelled: 'Annulé' };
   var statusColors = { confirmed: 'var(--blue)', completed: 'var(--green)', no_show: 'var(--red)', cancelled: 'var(--orange, #f97316)' };
 
   var list = document.getElementById('rdv-list');
-  list.innerHTML = items.length === 0
+  list.innerHTML = pageItems.length === 0
     ? '<div class="empty">Aucun rendez-vous</div>'
-    : items.map(function (a) {
+    : pageItems.map(function (a) {
         // scheduled_at est une heure de SALON (Europe/Paris), jamais de
         // l'UTC — new Date(...).toLocaleString() l'interpréterait comme
         // UTC et décalerait l'affichage de 1h à 2h. On construit le
@@ -3324,6 +3346,7 @@ function renderRdvList() {
       }).join('');
 
   updateRdvExportBar();
+  renderRdvPagination(totalPages);
 }
 
 /**
