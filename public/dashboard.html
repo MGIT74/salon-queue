@@ -836,7 +836,17 @@
         <div class="fld"><label for="rdv-filter-to">Au</label>
           <input type="date" id="rdv-filter-to" onchange="onRdvFilterChange()"></div>
       </div>
-      <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:10px;flex-wrap:wrap;gap:10px">
+        <div class="fld" style="margin:0"><label for="rdv-per-page">Par page</label>
+          <select id="rdv-per-page" onchange="changeRdvPerPage(this.value)">
+            <option value="5">5</option>
+            <option value="10">10</option>
+            <option value="15">15</option>
+            <option value="20">20</option>
+            <option value="25" selected>25</option>
+            <option value="50">50</option>
+          </select>
+        </div>
         <button class="btn btn-ghost" onclick="selectAllRdv()">Tout sélectionner</button>
       </div>
       <div class="clients-export-bar" id="rdv-export-bar" style="display:none">
@@ -3248,6 +3258,18 @@ function resetRdvListToUpcoming() {
   document.getElementById('rdv-list-title').textContent = 'À venir';
   document.getElementById('rdv-reset-btn').style.display = 'none';
 
+  // Pré-remplit Du/Au avec la date du jour au premier chargement
+  // uniquement (jamais si l'utilisateur a déjà choisi ses propres
+  // dates) - un champ date vide affiche juste un petit point peu
+  // clair sur mobile.
+  var fromEl = document.getElementById('rdv-filter-from');
+  var toEl = document.getElementById('rdv-filter-to');
+  if (!fromEl.value && !toEl.value) {
+    var today = nowSalonDatetimeString().slice(0, 10);
+    fromEl.value = today;
+    toEl.value = today;
+  }
+
   api('/api/appointments?all=1').then(function (r) {
     calUpcoming = r.items;
     renderRdvList();
@@ -3261,6 +3283,12 @@ var rdvCurrentItems = [];
 
 function onRdvFilterChange() {
   clearRdvSelection();
+  rdvPage = 1;
+  renderRdvList();
+}
+
+function changeRdvPerPage(value) {
+  rdvPerPage = Number(value) || 25;
   rdvPage = 1;
   renderRdvList();
 }
