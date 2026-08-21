@@ -3101,7 +3101,8 @@ function renderDayView() {
   var dayAppts = appointmentsForRange(calAnchor, calAnchor).sort(function (a, b) { return a.scheduled_at.localeCompare(b.scheduled_at); });
   dayAppts.forEach(function (a) { calAppointmentById[a.id] = a; });
   var view = document.getElementById('cal-day-view');
-  view.innerHTML = dayAppts.length === 0
+  var addBtn = '<button class="btn btn-primary" style="width:100%;margin-bottom:14px" onclick="openAdminAddAppointment(\'' + ymd(calAnchor) + '\')">+ Ajouter un RDV</button>';
+  view.innerHTML = addBtn + (dayAppts.length === 0
     ? '<div class="empty">Aucun rendez-vous ce jour-là</div>'
     : '<div class="cal-day-view-list">' + dayAppts.map(function (a) {
         var time = a.scheduled_at.slice(11, 16);
@@ -3111,7 +3112,7 @@ function renderDayView() {
           '<div><div class="cal-day-view-name">' + esc(a.client_name) + ' ' + sourceBadge(a) + '</div>' +
           '<div class="cal-day-view-meta">' + esc(a.service_name) + (a.barber_name ? ' avec ' + esc(a.barber_name) : '') + '</div></div>' +
           '</div>';
-      }).join('') + '</div>';
+      }).join('') + '</div>');
 
   calSelectedDate = ymd(calAnchor);
   document.getElementById('rdv-list-title').textContent = 'Le ' + calAnchor.toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' });
