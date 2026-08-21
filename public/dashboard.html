@@ -832,7 +832,7 @@
         <div class="export-actions">
           <button class="btn btn-soft" onclick="exportRdvCsv()">Télécharger CSV</button>
           <button class="btn btn-soft" onclick="exportRdvPdf()">Télécharger PDF</button>
-          <button class="btn btn-ghost" style="color:var(--red)" onclick="openCancelAppointmentsModal(Object.keys(rdvSelectedIds))">Annuler la sélection</button>
+          <button class="btn btn-ghost" id="rdv-bulk-cancel-btn" style="color:var(--red);display:none" onclick="openCancelAppointmentsModal(Object.keys(rdvSelectedIds))">Annuler la sélection</button>
           <button class="btn btn-ghost" onclick="clearRdvSelection()">Tout désélectionner</button>
         </div>
       </div>
@@ -3198,6 +3198,17 @@ function updateRdvExportBar() {
   document.getElementById('rdv-export-bar').style.display = count > 0 ? 'flex' : 'none';
   document.getElementById('rdv-selected-count').textContent =
     count + (count > 1 ? ' RDV sélectionnés' : ' RDV sélectionné');
+
+  // 'Annuler la sélection' n'a de sens que si au moins un des RDV
+  // sélectionnés est réellement annulable (confirmé, en ligne, à
+  // venir) - sinon le bouton ne servirait à rien pour les autres
+  // statuts (Terminé, Absent, déjà Annulé, RDV passé).
+  var now = nowSalonDatetimeString();
+  var hasCancelable = Object.keys(rdvSelectedIds).some(function (id) {
+    var a = calAppointmentById[id];
+    return a && a.status !== 'cancelled' && a.source !== 'walkin' && a.scheduled_at > now;
+  });
+  document.getElementById('rdv-bulk-cancel-btn').style.display = hasCancelable ? 'inline-block' : 'none';
 }
 
 function getSelectedRdv() {
