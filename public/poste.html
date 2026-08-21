@@ -970,6 +970,7 @@ function openPosteAddAppointment(dateStr) {
   );
 
   var STEPS = ['service', 'extras', 'datetime', 'contact'];
+  attachClientAutocomplete(overlay, 'pa-name', 'pa-email', 'pa-phone', barberApi);
 
   window.paGoStep = function (step) {
     STEPS.forEach(function (s) { overlay.querySelector('#pa-step-' + s).style.display = s === step ? 'block' : 'none'; });

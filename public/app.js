@@ -212,3 +212,59 @@ function showPrompt(message, opts) {
     overlay.querySelector('#modal-confirm-btn').onclick = submit;
   });
 }
+
+/**
+ * Autocomplétion "client connu" pour un champ Nom du client (ajout
+ * manuel d'un RDV, admin ou coiffeur) - dès 3 caractères, propose les
+ * clients correspondants (GET /api/queue/clients-search), et
+ * pré-remplit email/téléphone au clic sur une suggestion.
+ *
+ * container : l'élément overlay/racine dans lequel chercher les champs.
+ * fetchFn : la fonction d'appel API à utiliser (api ou barberApi selon
+ * la page), pour respecter l'authentification propre à chaque contexte.
+ */
+function attachClientAutocomplete(container, nameId, emailId, phoneId, fetchFn) {
+  var nameInput = container.querySelector('#' + nameId);
+  if (!nameInput) return;
+  var emailInput = container.querySelector('#' + emailId);
+  var phoneInput = container.querySelector('#' + phoneId);
+
+  nameInput.parentElement.style.position = 'relative';
+  var dropdown = document.createElement('div');
+  dropdown.className = 'autocomplete-dropdown';
+  dropdown.style.display = 'none';
+  nameInput.parentElement.appendChild(dropdown);
+
+  var debounceId = null;
+  function hide() { dropdown.style.display = 'none'; }
+
+  nameInput.addEventListener('input', function () {
+    var q = nameInput.value.trim();
+    clearTimeout(debounceId);
+    if (q.length < 3) { hide(); return; }
+    debounceId = setTimeout(function () {
+      fetchFn('/api/queue/clients-search?q=' + encodeURIComponent(q)).then(function (r) {
+        if (!r.items || !r.items.length) { hide(); return; }
+        dropdown.innerHTML = r.items.map(function (c, i) {
+          return '<div class="autocomplete-item" data-i="' + i + '">' +
+            '<div class="ac-name">' + esc(c.name) + '</div>' +
+            (c.email || c.phone ? '<div class="ac-meta">' + esc([c.email, c.phone].filter(Boolean).join(' · ')) + '</div>' : '') +
+            '</div>';
+        }).join('');
+        dropdown.style.display = 'block';
+        dropdown.querySelectorAll('.autocomplete-item').forEach(function (el, i) {
+          el.onmousedown = function (e) {
+            e.preventDefault(); // évite que le blur du champ ne ferme la liste avant le clic
+            var c = r.items[i];
+            nameInput.value = c.name;
+            if (emailInput) emailInput.value = c.email || '';
+            if (phoneInput) phoneInput.value = c.phone || '';
+            hide();
+          };
+        });
+      }).catch(hide);
+    }, 250);
+  });
+
+  nameInput.addEventListener('blur', function () { setTimeout(hide, 150); });
+}

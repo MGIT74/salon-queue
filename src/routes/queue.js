@@ -638,4 +638,42 @@ router.get('/client-history-by-contact', requireAdmin, wrap(async (req, res) => 
   res.json({ ok: true, items });
 }));
 
+/**
+ * Autocomplétion "client connu" pour l'ajout manuel d'un RDV (admin
+ * ou coiffeur) - dès 3 caractères tapés, propose les clients dont le
+ * nom correspond déjà, avec leur email/téléphone pré-remplis
+ * automatiquement au clic. Combine l'historique de passages (queue)
+ * ET les RDV déjà pris (appointments), dédupliqué par clientKey
+ * (email > téléphone > nom), le plus récent d'abord.
+ */
+router.get('/clients-search', requireAdminOrBarber, wrap(async (req, res) => {
+  const q = String(req.query.q || '').trim();
+  if (q.length < 3) return res.json({ ok: true, items: [] });
+  const like = '%' + q + '%';
+
+  const [fromQueue] = await pool.query(
+    'SELECT client_name, email, phone, checkin_at AS ref_at FROM queue WHERE salon_id = ? AND client_name LIKE ? ORDER BY checkin_at DESC LIMIT 20',
+    [req.salon.id, like]
+  );
+  const [fromAppointments] = await pool.query(
+    'SELECT client_name, email, phone, created_at AS ref_at FROM appointments WHERE salon_id = ? AND client_name LIKE ? ORDER BY created_at DESC LIMIT 20',
+    [req.salon.id, like]
+  );
+
+  const byKey = {};
+  [...fromQueue, ...fromAppointments].forEach((r) => {
+    const key = clientKey(r);
+    if (!key) return;
+    const existing = byKey[key];
+    if (!existing || new Date(r.ref_at) > new Date(existing.ref_at)) byKey[key] = r;
+  });
+
+  const items = Object.values(byKey)
+    .sort((a, b) => new Date(b.ref_at) - new Date(a.ref_at))
+    .slice(0, 8)
+    .map((r) => ({ name: r.client_name, email: r.email || '', phone: r.phone || '' }));
+
+  res.json({ ok: true, items });
+}));
+
 module.exports = router;

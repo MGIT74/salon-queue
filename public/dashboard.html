@@ -2932,6 +2932,7 @@ function openAdminAddAppointment(dateStr) {
   );
 
   var STEPS = ['barber', 'service', 'extras', 'datetime', 'contact'];
+  attachClientAutocomplete(overlay, 'aa-name', 'aa-email', 'aa-phone', api);
 
   window.aaGoStep = function (step) {
     STEPS.forEach(function (s) { overlay.querySelector('#aa-step-' + s).style.display = s === step ? 'block' : 'none'; });
