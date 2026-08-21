@@ -1456,9 +1456,11 @@ function cancelAppointmentByAdmin() {
  * éventuellement différent) - prestation et suppléments inchangés. Le
  * client reçoit un email avec le nouvel horaire.
  */
-function openRescheduleAppointment() {
-  if (!drawerAppointmentId || !drawerAppointmentData) return;
-  var a = drawerAppointmentData;
+function openRescheduleAppointment(id, data) {
+  id = id || drawerAppointmentId;
+  data = data || drawerAppointmentData;
+  if (!id || !data) return;
+  var a = data;
   var rdvBarbers = barbers.filter(function (b) { return b.accepts_appointments; });
   var currentDate = String(a.scheduled_at).slice(0, 10);
 
@@ -3303,6 +3305,7 @@ function renderRdvList() {
           '<div class="item-meta">' + esc(a.email || '') + (a.phone ? ' · ' + esc(a.phone) : '') + '</div></div>' +
           '<div class="item-actions" style="display:flex;align-items:center;gap:12px">' +
           '<span style="color:' + (statusColors[a.display_status] || 'var(--grey)') + ';font-size:13px;font-weight:600">' + (statusLabels[a.display_status] || a.display_status) + '</span>' +
+          (cancelable ? '<button class="btn btn-soft" style="padding:6px 10px;font-size:13px" onclick="openRescheduleAppointment(\'' + a.id + '\', calAppointmentById[\'' + a.id + '\'])">Déplacer</button>' : '') +
           (cancelable ? '<button class="btn btn-ghost" style="color:var(--red);padding:6px 10px;font-size:13px" onclick="openCancelAppointmentsModal([\'' + a.id + '\'])">Annuler</button>' : '') +
           '</div>' +
           '</div>';
