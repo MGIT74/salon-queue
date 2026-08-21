@@ -3300,7 +3300,7 @@ function renderRdvList() {
         // même règle que le tiroir client (openClientDrawer).
         var cancelable = a.status !== 'cancelled' && a.source !== 'walkin' && a.scheduled_at > nowSalonDatetimeString();
         return '<div class="item">' +
-          (cancelable ? '<input type="checkbox" class="rdv-check" data-id="' + a.id + '" ' + (rdvSelectedIds[a.id] ? 'checked' : '') + ' onchange="toggleRdvSelect(\'' + a.id + '\', this.checked)" style="margin-right:12px;flex-shrink:0">' : '<span style="width:28px;flex-shrink:0;display:inline-block"></span>') +
+          '<input type="checkbox" class="rdv-check" data-id="' + a.id + '" ' + (rdvSelectedIds[a.id] ? 'checked' : '') + ' onchange="toggleRdvSelect(\'' + a.id + '\', this.checked)" style="margin-right:12px;flex-shrink:0">' +
           '<div class="item-main" onclick="openClientDrawerForAppointment(\'' + a.id + '\')" style="cursor:pointer"><div class="item-name">' + esc(a.client_name) + ' — ' + when + ' ' + sourceBadge(a) + '</div>' +
           '<div class="item-meta">' + esc(a.service_name) + (a.barber_name ? ' avec ' + esc(a.barber_name) : ' · premier disponible') + '</div>' +
           '<div class="item-meta">' + esc(a.email || '') + (a.phone ? ' · ' + esc(a.phone) : '') + '</div></div>' +
@@ -3324,12 +3324,33 @@ function renderRdvList() {
 function openCancelAppointmentsModal(ids) {
   ids = ids.filter(Boolean);
   if (!ids.length) return;
+
+  // La sélection peut désormais inclure n'importe quel statut (Terminé,
+  // Absent, déjà Annulé, RDV passé...) puisque la liste affiche tous
+  // les statuts - on ne garde que les RDV réellement annulables, et on
+  // prévient si certains ont été ignorés plutôt que d'échouer en
+  // silence ou de renvoyer une erreur serveur peu claire.
+  var now = nowSalonDatetimeString();
+  var skipped = 0;
+  ids = ids.filter(function (id) {
+    var a = calAppointmentById[id];
+    var ok = a && a.status !== 'cancelled' && a.source !== 'walkin' && a.scheduled_at > now;
+    if (!ok) skipped++;
+    return ok;
+  });
+
+  if (!ids.length) {
+    toast('Aucun des RDV sélectionnés ne peut être annulé (déjà annulé, terminé, ou passé)', true);
+    return;
+  }
+
   var plural = ids.length > 1;
 
   var overlay = _buildModal(
     '<div class="modal-title">Annuler ' + (plural ? ids.length + ' rendez-vous' : 'le rendez-vous') + '</div>' +
     '<div class="modal-message" style="margin-bottom:16px">' +
       (plural ? 'Chaque client concerné recevra un email d\'annulation.' : 'Le client recevra un email d\'annulation, s\'il a une adresse renseignée.') +
+      (skipped ? ' (' + skipped + ' RDV ignoré' + (skipped > 1 ? 's' : '') + ' — déjà annulé, terminé ou passé.)' : '') +
     '</div>' +
     '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px">' +
       '<button type="button" class="cam-choice sel" id="cam-default" onclick="camSelectType(\'default\')" style="display:flex;align-items:center;gap:10px;width:100%;padding:13px 15px;border:none;border-radius:12px;background:var(--fill);color:var(--ink);font-family:inherit;font-size:14.5px;font-weight:500;cursor:pointer;text-align:left">' +
