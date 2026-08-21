@@ -828,6 +828,8 @@
       <div class="clients-export-bar" id="rdv-export-bar" style="display:none">
         <span id="rdv-selected-count" class="export-count"></span>
         <div class="export-actions">
+          <button class="btn btn-soft" onclick="exportRdvCsv()">Télécharger CSV</button>
+          <button class="btn btn-soft" onclick="exportRdvPdf()">Télécharger PDF</button>
           <button class="btn btn-ghost" style="color:var(--red)" onclick="openCancelAppointmentsModal(Object.keys(rdvSelectedIds))">Annuler la sélection</button>
           <button class="btn btn-ghost" onclick="clearRdvSelection()">Tout désélectionner</button>
         </div>
@@ -3162,6 +3164,7 @@ function resetRdvListToUpcoming() {
 }
 
 var rdvSelectedIds = {};
+var rdvCurrentItems = [];
 
 function onRdvFilterChange() {
   clearRdvSelection();
@@ -3194,6 +3197,63 @@ function updateRdvExportBar() {
     count + (count > 1 ? ' RDV sélectionnés' : ' RDV sélectionné');
 }
 
+function getSelectedRdv() {
+  return rdvCurrentItems.filter(function (a) { return rdvSelectedIds[a.id]; });
+}
+
+var RDV_STATUS_LABEL = { confirmed: 'Confirmé', completed: 'Terminé', no_show: 'Absent', cancelled: 'Annulé' };
+
+function exportRdvCsv() {
+  var rows = getSelectedRdv();
+  if (!rows.length) return;
+
+  var header = ['Nom', 'Email', 'Téléphone', 'Prestation', 'Coiffeur', 'Date', 'Statut'];
+  var lines = [header.join(';')];
+  rows.forEach(function (a) {
+    var when = new Date(a.scheduled_at.slice(0, 10) + 'T00:00:00').toLocaleDateString('fr-FR') + ' ' + a.scheduled_at.slice(11, 16);
+    var vals = [
+      a.client_name, a.email || '', a.phone || '', a.service_name || '',
+      a.barber_name || 'Premier disponible', when, RDV_STATUS_LABEL[a.display_status] || a.display_status
+    ];
+    lines.push(vals.map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(';'));
+  });
+
+  var blob = new Blob(['\uFEFF' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  var link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = 'rendez-vous-' + new Date().toISOString().slice(0, 10) + '.csv';
+  link.click();
+  URL.revokeObjectURL(link.href);
+}
+
+function exportRdvPdf() {
+  var rows = getSelectedRdv();
+  if (!rows.length) return;
+
+  var html = '<html><head><meta charset="utf-8"><title>Rendez-vous</title><style>' +
+    'body{font-family:-apple-system,Arial,sans-serif;padding:24px;color:#111}' +
+    'h1{font-size:18px;margin-bottom:16px}' +
+    'table{width:100%;border-collapse:collapse;font-size:12.5px}' +
+    'th,td{border-bottom:1px solid #ddd;padding:8px 10px;text-align:left}' +
+    'th{background:#f2f2f2}' +
+    '</style></head><body>' +
+    '<h1>Rendez-vous — ' + new Date().toLocaleDateString('fr-FR') + '</h1>' +
+    '<table><thead><tr><th>Nom</th><th>Email</th><th>Téléphone</th><th>Prestation</th><th>Coiffeur</th><th>Date</th><th>Statut</th></tr></thead><tbody>' +
+    rows.map(function (a) {
+      var when = new Date(a.scheduled_at.slice(0, 10) + 'T00:00:00').toLocaleDateString('fr-FR') + ' ' + a.scheduled_at.slice(11, 16);
+      return '<tr><td>' + esc(a.client_name) + '</td><td>' + esc(a.email || '') + '</td><td>' + esc(a.phone || '') + '</td>' +
+        '<td>' + esc(a.service_name || '') + '</td><td>' + esc(a.barber_name || 'Premier disponible') + '</td><td>' + when + '</td>' +
+        '<td>' + esc(RDV_STATUS_LABEL[a.display_status] || a.display_status) + '</td></tr>';
+    }).join('') +
+    '</tbody></table></body></html>';
+
+  var win = window.open('', '_blank');
+  win.document.write(html);
+  win.document.close();
+  win.focus();
+  setTimeout(function () { win.print(); }, 300);
+}
+
 function renderRdvList() {
   var statusFilter = document.getElementById('rdv-filter-status').value;
   var barberFilter = document.getElementById('rdv-filter-barber').value;
@@ -3213,6 +3273,9 @@ function renderRdvList() {
   if (barberFilter) items = items.filter(function (a) { return a.barber_id === barberFilter; });
   if (fromFilter) items = items.filter(function (a) { return a.scheduled_at.slice(0, 10) >= fromFilter; });
   if (toFilter) items = items.filter(function (a) { return a.scheduled_at.slice(0, 10) <= toFilter; });
+
+  rdvCurrentItems = items;
+  calAppointmentById && items.forEach(function (a) { calAppointmentById[a.id] = a; });
 
   var statusLabels = { confirmed: 'Confirmé', completed: 'Terminé', no_show: 'Absent', cancelled: 'Annulé' };
   var statusColors = { confirmed: 'var(--blue)', completed: 'var(--green)', no_show: 'var(--red)', cancelled: 'var(--orange, #f97316)' };
@@ -3235,7 +3298,7 @@ function renderRdvList() {
         var cancelable = a.status !== 'cancelled' && a.source !== 'walkin' && new Date(a.scheduled_at) > new Date();
         return '<div class="item">' +
           (cancelable ? '<input type="checkbox" class="rdv-check" data-id="' + a.id + '" ' + (rdvSelectedIds[a.id] ? 'checked' : '') + ' onchange="toggleRdvSelect(\'' + a.id + '\', this.checked)" style="margin-right:12px;flex-shrink:0">' : '<span style="width:28px;flex-shrink:0;display:inline-block"></span>') +
-          '<div class="item-main"><div class="item-name">' + esc(a.client_name) + ' — ' + when + ' ' + sourceBadge(a) + '</div>' +
+          '<div class="item-main" onclick="openClientDrawerForAppointment(\'' + a.id + '\')" style="cursor:pointer"><div class="item-name">' + esc(a.client_name) + ' — ' + when + ' ' + sourceBadge(a) + '</div>' +
           '<div class="item-meta">' + esc(a.service_name) + (a.barber_name ? ' avec ' + esc(a.barber_name) : ' · premier disponible') + '</div>' +
           '<div class="item-meta">' + esc(a.email || '') + (a.phone ? ' · ' + esc(a.phone) : '') + '</div></div>' +
           '<div class="item-actions" style="display:flex;align-items:center;gap:12px">' +
