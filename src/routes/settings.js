@@ -19,6 +19,11 @@ const EDITABLE = [
   'smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_from',
   'printer_connection_type', 'printer_ip', 'printer_model',
   'tpe_provider', 'tpe_merchant_id', 'tpe_terminal_number', 'tpe_api_key',
+  'email_tpl_confirmation_subject', 'email_tpl_confirmation_body',
+  'email_tpl_reminder_subject', 'email_tpl_reminder_body',
+  'email_tpl_cancelled_subject', 'email_tpl_cancelled_body',
+  'email_tpl_rescheduled_subject', 'email_tpl_rescheduled_body',
+  'email_tpl_turn_soon_subject', 'email_tpl_turn_soon_body',
   'caisse_inactivity_seconds', 'caisse_reopen_hour', 'currency',
   'rdv_slot_step_min', 'rdv_min_lead_min', 'rdv_max_advance_days',
   'rdv_buffer_min', 'rdv_cancel_deadline_min', 'rdv_prep_alert_min'

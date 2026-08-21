@@ -353,6 +353,11 @@
   .accordion-head.on .accordion-chevron { transform: rotate(180deg); }
   .accordion-body { margin-top: 18px; width: 100%; box-sizing: border-box; }
 
+  .email-tpl-block { border-bottom: 1px solid var(--sep); margin-bottom: 20px; padding-bottom: 4px; }
+  .email-tpl-block h4 { font-size: 14.5px; font-weight: 600; margin: 0 0 4px; }
+  .email-tpl-block .hint { margin: 0 0 10px; }
+  .fld textarea { resize: vertical; min-height: 60px; font-family: inherit; line-height: 1.4; }
+
   /* Horaires */
   .day-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--sep); flex-wrap: wrap; }
   .day-row:last-child { border-bottom: none; }
@@ -1000,6 +1005,67 @@
         <button class="btn btn-primary" onclick="saveSettings()">Enregistrer</button>
         <button class="btn btn-soft" onclick="testSmtp()">Envoyer un email de test</button>
       </div>
+      </div>
+    </div>
+
+    <div class="card-box">
+      <h3 class="accordion-head" onclick="toggleSettingsAccordion('email-templates')">
+        Modèles d'emails
+        <svg class="accordion-chevron" id="email-templates-chevron" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </h3>
+      <div class="accordion-body" id="email-templates-body" style="display:none">
+      <p class="hint">
+        Personnalisez le sujet et le texte des emails envoyés automatiquement aux clients. Laissez un champ vide
+        pour garder le message par défaut de l'app. Les jetons entre accolades sont remplacés automatiquement
+        par les vraies valeurs à l'envoi.
+      </p>
+
+      <div class="email-tpl-block">
+        <h4>Confirmation de réservation</h4>
+        <p class="hint">Jetons disponibles : {{client_name}}, {{when}}, {{service_name}}, {{barber_name}}, {{salon}}, {{cancel_url}}</p>
+        <div class="fld"><label for="tpl-confirmation-subject">Sujet</label>
+          <input id="tpl-confirmation-subject" type="text" placeholder="Confirmation de votre rendez-vous — {{salon}}"></div>
+        <div class="fld"><label for="tpl-confirmation-body">Message</label>
+          <textarea id="tpl-confirmation-body" rows="4" placeholder="Bonjour {{client_name}}, votre rendez-vous chez {{salon}} est confirmé : {{when}} — {{service_name}}."></textarea></div>
+      </div>
+
+      <div class="email-tpl-block">
+        <h4>Rappel avant un RDV</h4>
+        <p class="hint">Jetons disponibles : {{client_name}}, {{service_name}}, {{when}}, {{salon}}</p>
+        <div class="fld"><label for="tpl-reminder-subject">Sujet</label>
+          <input id="tpl-reminder-subject" type="text" placeholder="Rappel — votre rendez-vous chez {{salon}}"></div>
+        <div class="fld"><label for="tpl-reminder-body">Message</label>
+          <textarea id="tpl-reminder-body" rows="4" placeholder="Bonjour {{client_name}}, petit rappel : votre rendez-vous ({{service_name}}) est prévu {{when}}."></textarea></div>
+      </div>
+
+      <div class="email-tpl-block">
+        <h4>Annulation par le salon</h4>
+        <p class="hint">Jetons disponibles : {{client_name}}, {{when}}, {{service_name}}, {{salon}}, {{custom_message}}</p>
+        <div class="fld"><label for="tpl-cancelled-subject">Sujet</label>
+          <input id="tpl-cancelled-subject" type="text" placeholder="Votre rendez-vous a été annulé — {{salon}}"></div>
+        <div class="fld"><label for="tpl-cancelled-body">Message</label>
+          <textarea id="tpl-cancelled-body" rows="4" placeholder="Bonjour {{client_name}}, votre rendez-vous du {{when}} a dû être annulé. {{custom_message}}"></textarea></div>
+      </div>
+
+      <div class="email-tpl-block">
+        <h4>Déplacement d'un RDV</h4>
+        <p class="hint">Jetons disponibles : {{client_name}}, {{when}}, {{service_name}}, {{barber_name}}, {{salon}}, {{cancel_url}}</p>
+        <div class="fld"><label for="tpl-rescheduled-subject">Sujet</label>
+          <input id="tpl-rescheduled-subject" type="text" placeholder="Votre rendez-vous a été modifié — {{salon}}"></div>
+        <div class="fld"><label for="tpl-rescheduled-body">Message</label>
+          <textarea id="tpl-rescheduled-body" rows="4" placeholder="Bonjour {{client_name}}, votre rendez-vous a été modifié. Nouvel horaire : {{when}}."></textarea></div>
+      </div>
+
+      <div class="email-tpl-block" style="border-bottom:none;margin-bottom:0;padding-bottom:0">
+        <h4>Tour approche (file d'attente sans RDV)</h4>
+        <p class="hint">Jetons disponibles : {{client_name}}, {{wait_min}}, {{salon}}</p>
+        <div class="fld"><label for="tpl-turn-soon-subject">Sujet</label>
+          <input id="tpl-turn-soon-subject" type="text" placeholder="Votre tour approche"></div>
+        <div class="fld"><label for="tpl-turn-soon-body">Message</label>
+          <textarea id="tpl-turn-soon-body" rows="4" placeholder="Bonjour {{client_name}}, votre tour est estimé dans environ {{wait_min}} minutes."></textarea></div>
+      </div>
+
+      <button class="btn btn-primary" onclick="saveEmailTemplates()">Enregistrer les modèles</button>
       </div>
     </div>
   </div>
@@ -3523,6 +3589,12 @@ function loadCaisseTab() {
     document.getElementById('set-tpe-terminal-number').value = r.settings.tpe_terminal_number || '';
     document.getElementById('set-tpe-api-key').value = '';
     document.getElementById('tpe-key-state').textContent = r.tpe_api_key_set ? '· déjà enregistrée' : '';
+
+    EMAIL_TPL_TYPES.forEach(function (type) {
+      var key = type.replace(/-/g, '_');
+      document.getElementById('tpl-' + type + '-subject').value = r.settings['email_tpl_' + key + '_subject'] || '';
+      document.getElementById('tpl-' + type + '-body').value = r.settings['email_tpl_' + key + '_body'] || '';
+    });
   }).catch(function () {});
 }
 
@@ -4174,6 +4246,20 @@ function saveDeviceSettings() {
     tpe_terminal_number: document.getElementById('set-tpe-terminal-number').value,
     tpe_api_key: document.getElementById('set-tpe-api-key').value
   }}).then(function () { toast('Terminal enregistré'); })
+    .catch(function (e) { toast(e.message, true); });
+}
+
+var EMAIL_TPL_TYPES = ['confirmation', 'reminder', 'cancelled', 'rescheduled', 'turn-soon'];
+
+function saveEmailTemplates() {
+  var body = {};
+  EMAIL_TPL_TYPES.forEach(function (type) {
+    var key = type.replace(/-/g, '_');
+    body['email_tpl_' + key + '_subject'] = document.getElementById('tpl-' + type + '-subject').value;
+    body['email_tpl_' + key + '_body'] = document.getElementById('tpl-' + type + '-body').value;
+  });
+  api('/api/settings', { method: 'PUT', body: body })
+    .then(function () { toast('Modèles enregistrés'); })
     .catch(function (e) { toast(e.message, true); });
 }
 

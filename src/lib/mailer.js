@@ -28,18 +28,39 @@ function invalidateTransport(salonId) {
   else cache.clear();
 }
 
+/**
+ * Remplace les jetons {{nom}} d'un modèle personnalisé par les
+ * valeurs réelles - jamais utilisé si le modèle est vide (le
+ * comportement par défaut, codé en dur, reste alors inchangé).
+ */
+function applyTemplate(customText, tokens) {
+  let out = customText;
+  Object.keys(tokens).forEach((k) => {
+    out = out.split('{{' + k + '}}').join(tokens[k] == null ? '' : String(tokens[k]));
+  });
+  return out;
+}
+
 async function sendTurnSoon(salonId, to, name, waitMin) {
   const { tx, from, salon } = await getTransport(salonId);
+  const s = await getSettings(salonId);
+  const tokens = { client_name: name, wait_min: waitMin, salon };
+  const customSubject = s.email_tpl_turn_soon_subject ? applyTemplate(s.email_tpl_turn_soon_subject, tokens) : '';
+  const customBody = s.email_tpl_turn_soon_body ? applyTemplate(s.email_tpl_turn_soon_body, tokens) : '';
+
   await tx.sendMail({
     from,
     to,
-    subject: 'Votre tour approche',
-    text: `Bonjour ${name},\n\nVotre tour est estimé dans environ ${waitMin} minutes.\n` +
-          `Merci de revenir vers le salon d'ici là.\n\n${salon}`,
-    html: `<p>Bonjour ${name},</p>` +
-          `<p>Votre tour est estimé dans environ <strong>${waitMin} minutes</strong>.</p>` +
-          `<p>Merci de revenir vers le salon d'ici là.</p>` +
-          `<p>${salon}</p>`
+    subject: customSubject || 'Votre tour approche',
+    text: customBody ||
+      (`Bonjour ${name},\n\nVotre tour est estimé dans environ ${waitMin} minutes.\n` +
+       `Merci de revenir vers le salon d'ici là.\n\n${salon}`),
+    html: customBody
+      ? customBody.replace(/\n/g, '<br>')
+      : (`<p>Bonjour ${name},</p>` +
+         `<p>Votre tour est estimé dans environ <strong>${waitMin} minutes</strong>.</p>` +
+         `<p>Merci de revenir vers le salon d'ici là.</p>` +
+         `<p>${salon}</p>`)
   });
 }
 
@@ -51,14 +72,21 @@ async function sendTurnSoon(salonId, to, name, waitMin) {
  */
 async function sendAppointmentReminder(salonId, to, info) {
   const { tx, from, salon } = await getTransport(salonId);
+  const s = await getSettings(salonId);
+  const tokens = { client_name: info.clientName, service_name: info.serviceName, when: info.when, salon };
+  const customSubject = s.email_tpl_reminder_subject ? applyTemplate(s.email_tpl_reminder_subject, tokens) : '';
+  const customBody = s.email_tpl_reminder_body ? applyTemplate(s.email_tpl_reminder_body, tokens) : '';
+
   await tx.sendMail({
     from,
     to,
-    subject: `Rappel — votre rendez-vous chez ${salon}`,
-    text: `Bonjour ${info.clientName},\n\nPetit rappel : votre rendez-vous (${info.serviceName}) est prévu ${info.when}.\n\n${salon}`,
-    html: `<p>Bonjour ${info.clientName},</p>` +
-          `<p>Petit rappel : votre rendez-vous (<strong>${info.serviceName}</strong>) est prévu <strong>${info.when}</strong>.</p>` +
-          `<p>${salon}</p>`
+    subject: customSubject || `Rappel — votre rendez-vous chez ${salon}`,
+    text: customBody || `Bonjour ${info.clientName},\n\nPetit rappel : votre rendez-vous (${info.serviceName}) est prévu ${info.when}.\n\n${salon}`,
+    html: customBody
+      ? customBody.replace(/\n/g, '<br>')
+      : (`<p>Bonjour ${info.clientName},</p>` +
+         `<p>Petit rappel : votre rendez-vous (<strong>${info.serviceName}</strong>) est prévu <strong>${info.when}</strong>.</p>` +
+         `<p>${salon}</p>`)
   });
 }
 
@@ -117,19 +145,30 @@ async function sendTest(salonId, to) {
 
 async function sendAppointmentConfirmation(salonId, to, info) {
   const { tx, from, salon } = await getTransport(salonId);
+  const s = await getSettings(salonId);
+  const tokens = {
+    client_name: info.clientName, when: info.when, service_name: info.serviceName,
+    barber_name: info.barberName || '', salon, cancel_url: info.cancelUrl
+  };
+  const customSubject = s.email_tpl_confirmation_subject ? applyTemplate(s.email_tpl_confirmation_subject, tokens) : '';
+  const customBody = s.email_tpl_confirmation_body ? applyTemplate(s.email_tpl_confirmation_body, tokens) : '';
+
   await tx.sendMail({
     from,
     to,
-    subject: 'Confirmation de votre rendez-vous — ' + salon,
-    text: `Bonjour ${info.clientName},\n\n` +
-          `Votre rendez-vous chez ${salon} est confirmé :\n` +
-          `${info.when} — ${info.serviceName}${info.barberName ? ' avec ' + info.barberName : ''}\n\n` +
-          `Besoin d'annuler ? ${info.cancelUrl}\n\n${salon}`,
-    html: `<p>Bonjour ${info.clientName},</p>` +
-          `<p>Votre rendez-vous chez ${salon} est confirmé :</p>` +
-          `<p><strong>${info.when}</strong><br>${info.serviceName}${info.barberName ? ' avec ' + info.barberName : ''}</p>` +
-          `<p><a href="${info.cancelUrl}">Annuler ce rendez-vous</a></p>` +
-          `<p>${salon}</p>`
+    subject: customSubject || ('Confirmation de votre rendez-vous — ' + salon),
+    text: customBody ||
+      (`Bonjour ${info.clientName},\n\n` +
+       `Votre rendez-vous chez ${salon} est confirmé :\n` +
+       `${info.when} — ${info.serviceName}${info.barberName ? ' avec ' + info.barberName : ''}\n\n` +
+       `Besoin d'annuler ? ${info.cancelUrl}\n\n${salon}`),
+    html: customBody
+      ? customBody.replace(/\n/g, '<br>')
+      : (`<p>Bonjour ${info.clientName},</p>` +
+         `<p>Votre rendez-vous chez ${salon} est confirmé :</p>` +
+         `<p><strong>${info.when}</strong><br>${info.serviceName}${info.barberName ? ' avec ' + info.barberName : ''}</p>` +
+         `<p><a href="${info.cancelUrl}">Annuler ce rendez-vous</a></p>` +
+         `<p>${salon}</p>`)
   });
 }
 
@@ -141,22 +180,34 @@ async function sendAppointmentConfirmation(salonId, to, info) {
  */
 async function sendAppointmentCancelledByAdmin(salonId, to, info) {
   const { tx, from, salon } = await getTransport(salonId);
+  const s = await getSettings(salonId);
   const customMessage = info.customMessage ? String(info.customMessage).trim() : '';
+  const defaultReasonText = customMessage || "N'hésitez pas à nous recontacter pour reprendre un nouveau rendez-vous.";
+  const tokens = {
+    client_name: info.clientName, when: info.when, service_name: info.serviceName,
+    salon, custom_message: defaultReasonText
+  };
+  const customSubject = s.email_tpl_cancelled_subject ? applyTemplate(s.email_tpl_cancelled_subject, tokens) : '';
+  const customBody = s.email_tpl_cancelled_body ? applyTemplate(s.email_tpl_cancelled_body, tokens) : '';
+
   await tx.sendMail({
     from,
     to,
-    subject: 'Votre rendez-vous a été annulé — ' + salon,
-    text: `Bonjour ${info.clientName},\n\n` +
-          `Nous sommes désolés de vous informer que votre rendez-vous du ${info.when} ` +
-          `(${info.serviceName}) chez ${salon} a dû être annulé.\n` +
-          (customMessage ? `${customMessage}\n\n` : "N'hésitez pas à nous recontacter pour reprendre un nouveau rendez-vous.\n\n") +
-          `Toutes nos excuses pour la gêne occasionnée.\n\n${salon}`,
-    html: `<p>Bonjour ${info.clientName},</p>` +
-          `<p>Nous sommes désolés de vous informer que votre rendez-vous du <strong>${info.when}</strong> ` +
-          `(${info.serviceName}) chez ${salon} a dû être annulé.</p>` +
-          (customMessage ? `<p>${customMessage.replace(/\n/g, '<br>')}</p>` : "<p>N'hésitez pas à nous recontacter pour reprendre un nouveau rendez-vous.</p>") +
-          `<p>Toutes nos excuses pour la gêne occasionnée.</p>` +
-          `<p>${salon}</p>`
+    subject: customSubject || ('Votre rendez-vous a été annulé — ' + salon),
+    text: customBody ||
+      (`Bonjour ${info.clientName},\n\n` +
+       `Nous sommes désolés de vous informer que votre rendez-vous du ${info.when} ` +
+       `(${info.serviceName}) chez ${salon} a dû être annulé.\n` +
+       `${defaultReasonText}\n\n` +
+       `Toutes nos excuses pour la gêne occasionnée.\n\n${salon}`),
+    html: customBody
+      ? customBody.replace(/\n/g, '<br>')
+      : (`<p>Bonjour ${info.clientName},</p>` +
+         `<p>Nous sommes désolés de vous informer que votre rendez-vous du <strong>${info.when}</strong> ` +
+         `(${info.serviceName}) chez ${salon} a dû être annulé.</p>` +
+         `<p>${defaultReasonText.replace(/\n/g, '<br>')}</p>` +
+         `<p>Toutes nos excuses pour la gêne occasionnée.</p>` +
+         `<p>${salon}</p>`)
   });
 }
 
@@ -166,19 +217,30 @@ async function sendAppointmentCancelledByAdmin(salonId, to, info) {
  */
 async function sendAppointmentRescheduled(salonId, to, info) {
   const { tx, from, salon } = await getTransport(salonId);
+  const s = await getSettings(salonId);
+  const tokens = {
+    client_name: info.clientName, when: info.when, service_name: info.serviceName,
+    barber_name: info.barberName || '', salon, cancel_url: info.cancelUrl
+  };
+  const customSubject = s.email_tpl_rescheduled_subject ? applyTemplate(s.email_tpl_rescheduled_subject, tokens) : '';
+  const customBody = s.email_tpl_rescheduled_body ? applyTemplate(s.email_tpl_rescheduled_body, tokens) : '';
+
   await tx.sendMail({
     from,
     to,
-    subject: 'Votre rendez-vous a été modifié — ' + salon,
-    text: `Bonjour ${info.clientName},\n\n` +
-          `Votre rendez-vous chez ${salon} a été modifié.\n\n` +
-          `Nouvel horaire : ${info.when} — ${info.serviceName}${info.barberName ? ' avec ' + info.barberName : ''}\n\n` +
-          `Besoin d'annuler ? ${info.cancelUrl}\n\n${salon}`,
-    html: `<p>Bonjour ${info.clientName},</p>` +
-          `<p>Votre rendez-vous chez ${salon} a été modifié.</p>` +
-          `<p>Nouvel horaire :<br><strong>${info.when}</strong><br>${info.serviceName}${info.barberName ? ' avec ' + info.barberName : ''}</p>` +
-          `<p><a href="${info.cancelUrl}">Annuler ce rendez-vous</a></p>` +
-          `<p>${salon}</p>`
+    subject: customSubject || ('Votre rendez-vous a été modifié — ' + salon),
+    text: customBody ||
+      (`Bonjour ${info.clientName},\n\n` +
+       `Votre rendez-vous chez ${salon} a été modifié.\n\n` +
+       `Nouvel horaire : ${info.when} — ${info.serviceName}${info.barberName ? ' avec ' + info.barberName : ''}\n\n` +
+       `Besoin d'annuler ? ${info.cancelUrl}\n\n${salon}`),
+    html: customBody
+      ? customBody.replace(/\n/g, '<br>')
+      : (`<p>Bonjour ${info.clientName},</p>` +
+         `<p>Votre rendez-vous chez ${salon} a été modifié.</p>` +
+         `<p>Nouvel horaire :<br><strong>${info.when}</strong><br>${info.serviceName}${info.barberName ? ' avec ' + info.barberName : ''}</p>` +
+         `<p><a href="${info.cancelUrl}">Annuler ce rendez-vous</a></p>` +
+         `<p>${salon}</p>`)
   });
 }
 

@@ -63,13 +63,13 @@ html, body {
   display: block; font-size: 13px; font-weight: 500;
   color: var(--grey); margin-bottom: 7px; letter-spacing: -.01em;
 }
-.fld input, .fld select {
+.fld input, .fld select, .fld textarea {
   width: 100%; padding: 14px 15px; border: none; border-radius: 12px;
   background: var(--fill); color: var(--ink); font-family: inherit; font-size: 16px;
   outline: 2px solid transparent; outline-offset: -2px;
   transition: outline-color .15s ease, background .25s ease;
 }
-.fld input:focus, .fld select:focus { outline-color: var(--blue); }
+.fld input:focus, .fld select:focus, .fld textarea:focus { outline-color: var(--blue); }
 .fld input::placeholder { color: var(--grey); opacity: .6; }
 
 /* Certains navigateurs mobiles (Chrome Android notamment) rendent
