@@ -3833,6 +3833,17 @@ function openRdvSettings() {
       '<p class="hint" style="margin:6px 0 0">Passé ce délai, le client doit contacter directement le salon pour annuler.</p>' +
     '</div>' +
 
+    '<div class="fld" style="margin-bottom:14px">' +
+      '<label>Alerte de préparation avant un RDV</label>' +
+      '<select class="modal-input" id="rs-prep">' +
+        '<option value="0">Désactivée</option>' +
+        '<option value="5">5 minutes avant</option>' +
+        '<option value="10">10 minutes avant</option>' +
+        '<option value="15">15 minutes avant</option>' +
+      '</select>' +
+      '<p class="hint" style="margin:6px 0 0">Met en évidence le RDV à venir dans la liste du coiffeur (Mon poste) pour qu\'il se prépare à temps et évite un retard de lancement.</p>' +
+    '</div>' +
+
     '<div class="modal-error" id="rs-error" style="display:none"></div>' +
     '<div class="modal-actions">' +
     '<button class="btn btn-soft" id="rs-cancel-btn">Fermer</button>' +
@@ -3847,6 +3858,7 @@ function openRdvSettings() {
     overlay.querySelector('#rs-advance').value = s.rdv_max_advance_days || '0';
     overlay.querySelector('#rs-buffer').value = s.rdv_buffer_min || '0';
     overlay.querySelector('#rs-cancel').value = s.rdv_cancel_deadline_min || '0';
+    overlay.querySelector('#rs-prep').value = s.rdv_prep_alert_min || '0';
   }).catch(function (e) { toast(e.message, true); });
 
   overlay.querySelector('#rs-close-x').onclick = function () { _closeModal(overlay); };
@@ -3861,7 +3873,8 @@ function openRdvSettings() {
         rdv_min_lead_min: overlay.querySelector('#rs-lead').value,
         rdv_max_advance_days: overlay.querySelector('#rs-advance').value,
         rdv_buffer_min: overlay.querySelector('#rs-buffer').value,
-        rdv_cancel_deadline_min: overlay.querySelector('#rs-cancel').value
+        rdv_cancel_deadline_min: overlay.querySelector('#rs-cancel').value,
+        rdv_prep_alert_min: overlay.querySelector('#rs-prep').value
       }
     }).then(function () {
       _closeModal(overlay);

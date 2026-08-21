@@ -65,6 +65,14 @@
     box-shadow: var(--shadow); display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;
   }
   .next-card.locked { opacity: .7; }
+  .next-card.prep-alert {
+    opacity: 1; box-shadow: 0 0 0 2px var(--orange, #f97316);
+    animation: prep-pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes prep-pulse {
+    0%, 100% { box-shadow: 0 0 0 2px var(--orange, #f97316); }
+    50% { box-shadow: 0 0 0 4px var(--orange, #f97316); }
+  }
   .next-info { cursor: pointer; flex: 1; min-width: 140px; }
   .next-info .name { font-size: 16px; font-weight: 600; letter-spacing: -.02em; }
   .next-info .meta { font-size: 13px; color: var(--grey); margin-top: 2px; }
@@ -89,6 +97,7 @@
     color: var(--ink); font-family: inherit; font-size: 14px; resize: vertical; margin-bottom: 8px;
   }
   .lock-note { font-size: 12px; color: var(--orange); margin-top: 4px; }
+  .lock-note.prep-alert-note { font-weight: 700; }
 
   .empty { background: var(--card); border-radius: 16px; padding: 30px 20px; text-align: center; color: var(--grey); font-size: 14px; box-shadow: var(--shadow); }
 
@@ -255,6 +264,7 @@
 mountThemeButton();
 
 var me = null; // { id, name, pin }
+var rdvPrepAlertMin = 0;
 var queue = [];
 var barbers = [];
 var extras = [];
@@ -274,6 +284,7 @@ function loadSalonName() {
     .then(function (d) {
       var name = d.salon_name || 'Le Salon';
       CURRENCY = d.currency || 'EUR';
+      rdvPrepAlertMin = Number(d.rdv_prep_alert_min) || 0;
       document.title = name + ' — Mon poste';
       var mark = document.getElementById('salon-mark');
       if (mark) mark.textContent = name.toUpperCase();
@@ -595,20 +606,22 @@ function renderNext() {
     var locked = i > 0 || isAppointmentNotYet;
     var detail = q.service.name + (q.extras.length ? ' + ' + q.extras.map(function (x) { return x.name; }).join(', ') : '');
     var open = Boolean(nextDetailOpen[q.id]);
+    var minutesUntil = isAppointmentNotYet ? Math.round((new Date(q.checkin_at) - new Date()) / 60000) : null;
+    var prepAlert = isAppointmentNotYet && rdvPrepAlertMin > 0 && minutesUntil <= rdvPrepAlertMin;
     var lockNote = isAppointmentNotYet
-      ? 'RDV à ' + new Date(q.checkin_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+      ? (prepAlert ? '⏰ Préparez-vous — RDV dans ' + Math.max(minutesUntil, 0) + ' min' : 'RDV à ' + new Date(q.checkin_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }))
       : 'En attente de son tour';
     var appointmentBadge = (q.is_appointment && !isAppointmentNotYet)
       ? '<div class="meta" style="color:var(--blue)">📅 RDV ' + new Date(q.checkin_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) + '</div>'
       : '';
     return '<div class="next-item" data-id="' + q.id + '">' +
-      '<div class="next-card' + (locked ? ' locked' : '') + '">' +
+      '<div class="next-card' + (locked ? ' locked' : '') + (prepAlert ? ' prep-alert' : '') + '">' +
         '<div class="next-info" onclick="toggleNextDetail(\'' + q.id + '\')">' +
           '<div class="name">' + esc(q.client_name) + '</div>' +
           '<div class="meta">' + esc(detail) + '</div>' +
           appointmentBadge +
           (q.gift_card ? giftBadgeHtml(q.gift_card) : '') +
-          (locked ? '<div class="lock-note">' + lockNote + '</div>' : '') +
+          (locked ? '<div class="lock-note' + (prepAlert ? ' prep-alert-note' : '') + '">' + lockNote + '</div>' : '') +
         '</div>' +
         '<div class="next-btns">' +
           (locked ? '' : '<button class="btn btn-primary" onclick="startMine(\'' + q.id + '\')">Commencer</button>') +

@@ -20,7 +20,7 @@ const EDITABLE = [
   'printer_connection_type', 'printer_ip', 'printer_model',
   'caisse_inactivity_seconds', 'caisse_reopen_hour', 'currency',
   'rdv_slot_step_min', 'rdv_min_lead_min', 'rdv_max_advance_days',
-  'rdv_buffer_min', 'rdv_cancel_deadline_min'
+  'rdv_buffer_min', 'rdv_cancel_deadline_min', 'rdv_prep_alert_min'
 ];
 
 // Force la réouverture immédiate de la caisse (annule le verrouillage
@@ -105,6 +105,7 @@ router.get('/public', wrap(async (req, res) => {
     rdv_max_advance_days: s.rdv_max_advance_days ? Number(s.rdv_max_advance_days) : 0,
     rdv_buffer_min: s.rdv_buffer_min ? Number(s.rdv_buffer_min) : 0,
     rdv_cancel_deadline_min: s.rdv_cancel_deadline_min ? Number(s.rdv_cancel_deadline_min) : 0,
+    rdv_prep_alert_min: s.rdv_prep_alert_min ? Number(s.rdv_prep_alert_min) : 0,
     caisse_locked_until: caisseLockedUntil
   });
 }));
