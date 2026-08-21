@@ -351,35 +351,6 @@ router.put('/:id', requireAdminOrBarber, wrap(async (req, res) => {
 
   const { service_id, extras, barber_id, client_name, email, phone } = req.body;
 
-  // Un cadeau associé fige le contenu payé à l'achat — toute
-  // modification des suppléments ici (ajout OU retrait) casserait la
-  // logique. On bloque systématiquement dès qu'un cadeau non utilisé
-  // correspond à ce client, quel que soit le sens du changement.
-  if (req.barberId && Array.isArray(extras) && existing.status === 'in_progress') {
-    const key = clientKey(existing);
-    if (key) {
-      const [[currentExtraIds]] = await pool.query(
-        'SELECT GROUP_CONCAT(extra_id) AS ids FROM queue_extras WHERE queue_id = ?', [req.params.id]
-      );
-      const currentIds = (currentExtraIds.ids || '').split(',').filter(Boolean).sort();
-      const newIds = extras.slice().sort();
-      const changed = currentIds.length !== newIds.length || currentIds.some((id, i) => id !== newIds[i]);
-
-      if (changed) {
-        const [[gift]] = await pool.query(
-          'SELECT id FROM gift_cards WHERE salon_id = ? AND used_at IS NULL AND ' +
-          '(recipient_email = ? OR recipient_phone = ? OR recipient_name = ?) LIMIT 1',
-          [req.salon.id, existing.email || '', existing.phone || '', existing.client_name]
-        );
-        if (gift) {
-          return res.status(409).json({
-            error: 'Ce client utilise un cadeau — les suppléments ne sont pas modifiables. Terminez la coupe telle quelle.'
-          });
-        }
-      }
-    }
-  }
-
   // Un coiffeur ne peut pas ajouter un supplément à une coupe EN COURS
   // s'il y a déjà quelqu'un qui attend son tour derrière lui — ça le
   // retarderait sans qu'il le sache à l'avance. On ne bloque que
