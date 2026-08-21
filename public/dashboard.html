@@ -1600,7 +1600,7 @@ function openClientDrawer(id, source, directData) {
   // la synchro agenda mais ne devrait pas être "déplaçable"), et
   // uniquement s'il est encore à venir - inutile sur un RDV déjà
   // passé, ça n'ajoute que de l'information superflue.
-  drawerAppointmentId = (source === 'appointment' && c.status !== 'cancelled' && c.source !== 'walkin' && new Date(c.scheduled_at) > new Date()) ? c.id : null;
+  drawerAppointmentId = (source === 'appointment' && c.status !== 'cancelled' && c.source !== 'walkin' && c.scheduled_at > nowSalonDatetimeString()) ? c.id : null;
   drawerAppointmentData = drawerAppointmentId ? c : null;
   document.getElementById('drawer-appt-actions').style.display = drawerAppointmentId ? 'flex' : 'none';
 
@@ -3296,7 +3296,7 @@ function renderRdvList() {
           ' à ' + a.scheduled_at.slice(11, 16);
         // Annulable : un vrai RDV en ligne, pas encore annulé, à venir -
         // même règle que le tiroir client (openClientDrawer).
-        var cancelable = a.status !== 'cancelled' && a.source !== 'walkin' && new Date(a.scheduled_at) > new Date();
+        var cancelable = a.status !== 'cancelled' && a.source !== 'walkin' && a.scheduled_at > nowSalonDatetimeString();
         return '<div class="item">' +
           (cancelable ? '<input type="checkbox" class="rdv-check" data-id="' + a.id + '" ' + (rdvSelectedIds[a.id] ? 'checked' : '') + ' onchange="toggleRdvSelect(\'' + a.id + '\', this.checked)" style="margin-right:12px;flex-shrink:0">' : '<span style="width:28px;flex-shrink:0;display:inline-block"></span>') +
           '<div class="item-main" onclick="openClientDrawerForAppointment(\'' + a.id + '\')" style="cursor:pointer"><div class="item-name">' + esc(a.client_name) + ' — ' + when + ' ' + sourceBadge(a) + '</div>' +

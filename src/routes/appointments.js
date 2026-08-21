@@ -335,7 +335,13 @@ router.get('/', requireAdminOrBarber, wrap(async (req, res) => {
       else if (r.queue_status === 'cancelled') displayStatus = 'no_show';
 
       return Object.assign({}, r, {
-        scheduled_at: utcIso(r.scheduled_at),
+        // scheduled_at reste une chaîne locale de SALON (Europe/Paris)
+        // brute, JAMAIS passée par utcIso() - contrairement à
+        // created_at (vraie UTC), lui étiqueter 'Z' comme si c'était de
+        // l'UTC décale l'heure réelle de 1 à 2h (été/hiver), ce qui
+        // faisait apparaître un RDV déjà terminé comme "encore à venir"
+        // pendant ce délai (bouton Annuler resté actif à tort).
+        scheduled_at: r.scheduled_at,
         created_at: utcIso(r.created_at),
         display_status: displayStatus,
         note: noteByKey[clientKey(r)] || ''

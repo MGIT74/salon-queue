@@ -34,6 +34,24 @@ function esc(s) {
   return d.innerHTML;
 }
 
+/**
+ * Heure "de salon" actuelle (Europe/Paris) sous forme de texte
+ * "YYYY-MM-DD HH:MM:SS", pour comparer directement (par chaîne) à
+ * appointments.scheduled_at (texte local de salon brut, jamais de la
+ * vraie UTC) - jamais construire un objet Date à partir de
+ * scheduled_at pour un test passé/futur : le fuseau du NAVIGATEUR du
+ * client (pas forcément Paris) fausserait la comparaison, comme
+ * new Date(chaine_sans_Z) est interprété en heure locale du poste.
+ */
+function nowSalonDatetimeString() {
+  var parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'
+  }).formatToParts(new Date());
+  var get = function (type) { return parts.find(function (p) { return p.type === type; }).value; };
+  return get('year') + '-' + get('month') + '-' + get('day') + ' ' + get('hour') + ':' + get('minute') + ':' + get('second');
+}
+
 // Devise du salon (EUR par défaut) - chaque page la met à jour après
 // avoir chargé les réglages du salon (CURRENCY = data.currency).
 var CURRENCY = 'EUR';
