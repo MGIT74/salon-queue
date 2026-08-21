@@ -120,13 +120,8 @@
     /* Détail coiffeur déplié : tout en une seule colonne, rien en ligne
        qui pourrait déborder (boutons d'action, sous-onglets, horaires). */
     .barber-detail { padding: 16px; overflow-x: hidden; }
-    .barber-detail .item-actions {
-      display: flex; flex-direction: column; gap: 8px; width: 100%;
-    }
-    .barber-detail .item-actions .btn {
-      width: 100%; box-sizing: border-box; text-align: center;
-      white-space: normal; word-break: break-word; line-height: 1.3;
-    }
+    .barber-quick-actions { grid-template-columns: 1fr 1fr; }
+    .quick-action { font-size: 12px; padding: 12px 6px; }
 
     .subtabs {
       display: grid !important; grid-template-columns: 1fr 1fr; gap: 6px;
@@ -246,6 +241,18 @@
   .item-name { font-size: 16px; font-weight: 600; letter-spacing: -.015em; }
   .item-meta { font-size: 13px; color: var(--grey); margin-top: 2px; font-variant-numeric: tabular-nums; }
   .item-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+
+  .barber-quick-actions {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 18px;
+  }
+  .quick-action {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+    background: var(--fill); border: none; border-radius: 14px; padding: 14px 8px;
+    color: var(--ink); font-family: inherit; font-size: 12.5px; font-weight: 500;
+    cursor: pointer; transition: background .15s ease;
+  }
+  .quick-action:hover { background: var(--fill-2); }
+  .quick-action.danger { color: var(--red); }
   .item-actions .btn { font-size: 14px; padding: 9px 16px; }
 
   /* Listes Marketing (fidélité, cadeaux) : séparateur discret entre
@@ -344,7 +351,7 @@
   }
   .accordion-chevron { color: var(--grey); flex-shrink: 0; transition: transform .2s ease; }
   .accordion-head.on .accordion-chevron { transform: rotate(180deg); }
-  .accordion-body { margin-top: 18px; }
+  .accordion-body { margin-top: 18px; width: 100%; box-sizing: border-box; }
 
   /* Horaires */
   .day-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--sep); flex-wrap: wrap; }
@@ -457,7 +464,7 @@
   .totals .val { font-size: 19px; font-weight: 600; letter-spacing: -.025em; font-variant-numeric: tabular-nums; }
   .sheet-foot .btn { width: 100%; padding: 15px; font-size: 16px; }
 
-  @media (max-width: 900px) { .cols { grid-template-columns: 1fr; } .aside { position: static; } .grid2 { grid-template-columns: 1fr; } }
+  @media (max-width: 900px) { .cols { grid-template-columns: 1fr; } .aside { position: static; } .grid2 { grid-template-columns: 1fr !important; } }
 /* Panneau latéral (fiche client complète) */
 .client-drawer-backdrop {
   display: flex; position: fixed; inset: 0; z-index: 300; background: rgba(0,0,0,0.4);
@@ -2066,15 +2073,29 @@ function renderBarberDetail(b) {
     renderLeavesTab(b);
 
   return '<div class="barber-detail">' +
-    '<div class="item-actions" style="margin-bottom:16px">' +
-    '<button class="btn btn-soft" onclick="event.stopPropagation();renameBarber(\'' + b.id + '\')">Renommer</button>' +
-    (b.active
-      ? '<button class="btn btn-ghost" onclick="event.stopPropagation();archiveBarber(\'' + b.id + '\')">Désactiver</button>'
-      : '<button class="btn btn-soft" onclick="event.stopPropagation();restoreBarber(\'' + b.id + '\')">Réactiver</button>') +
-    '<button class="btn btn-soft" onclick="event.stopPropagation();document.getElementById(\'photo-input-' + b.id + '\').click()">Photo</button>' +
-    '<input type="file" accept="image/*" id="photo-input-' + b.id + '" style="display:none" onchange="event.stopPropagation();uploadBarberPhoto(\'' + b.id + '\', this)">' +
-    '<button class="btn btn-soft" onclick="event.stopPropagation();setBarberPin(\'' + b.id + '\',\'' + esc(b.name).replace(/'/g, "\\'") + '\')">' +
-    (b.has_pin ? 'Changer le code' : 'Définir un code') + '</button>' +
+    '<div class="barber-quick-actions">' +
+      '<button class="quick-action" onclick="event.stopPropagation();renameBarber(\'' + b.id + '\')">' +
+        '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>' +
+        '<span>Renommer</span>' +
+      '</button>' +
+      '<button class="quick-action" onclick="event.stopPropagation();document.getElementById(\'photo-input-' + b.id + '\').click()">' +
+        '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8a2 2 0 0 1 2-2h1.5l1-1.5h7l1 1.5H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/><circle cx="12" cy="13" r="3.2"/></svg>' +
+        '<span>Photo</span>' +
+      '</button>' +
+      '<input type="file" accept="image/*" id="photo-input-' + b.id + '" style="display:none" onchange="event.stopPropagation();uploadBarberPhoto(\'' + b.id + '\', this)">' +
+      '<button class="quick-action" onclick="event.stopPropagation();setBarberPin(\'' + b.id + '\',\'' + esc(b.name).replace(/'/g, "\\'") + '\')">' +
+        '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10.5" width="16" height="10" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></svg>' +
+        '<span>' + (b.has_pin ? 'Changer le code' : 'Définir un code') + '</span>' +
+      '</button>' +
+      (b.active
+        ? '<button class="quick-action danger" onclick="event.stopPropagation();archiveBarber(\'' + b.id + '\')">' +
+            '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 8l8 8M16 8l-8 8"/></svg>' +
+            '<span>Désactiver</span>' +
+          '</button>'
+        : '<button class="quick-action" onclick="event.stopPropagation();restoreBarber(\'' + b.id + '\')">' +
+            '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m9 12 2 2 4-4"/></svg>' +
+            '<span>Réactiver</span>' +
+          '</button>') +
     '</div>' +
     '<div class="subtabs" onclick="event.stopPropagation()">' +
     '<button class="' + (tab === 'horaires' ? 'on' : '') + '" onclick="switchBarberTab(\'' + b.id + '\',\'horaires\')">Horaires</button>' +
