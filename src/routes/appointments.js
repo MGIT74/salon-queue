@@ -305,6 +305,14 @@ router.get('/', requireAdminOrBarber, wrap(async (req, res) => {
     conditions.push('a.scheduled_at >= NOW()');
   }
 
+  // En mode 'all' sans mois précis (utilisé par la liste 'À venir' du
+  // dashboard, pour pouvoir filtrer/exporter n'importe quel statut, pas
+  // seulement les confirmés) : trier du plus récent au plus ancien,
+  // pas l'inverse - sinon, sur un salon avec beaucoup d'historique, la
+  // limite de 500 lignes se remplirait des plus VIEUX RDV et pourrait
+  // exclure les RDV à venir les plus proches.
+  const orderDirection = (req.query.all && !req.query.month) ? 'DESC' : 'ASC';
+
   const [rows] = await pool.query(
     `SELECT a.*, s.name AS service_name, b.name AS barber_name,
             q.status AS queue_status
@@ -313,7 +321,7 @@ router.get('/', requireAdminOrBarber, wrap(async (req, res) => {
      LEFT JOIN barbers b ON b.id = a.barber_id
      LEFT JOIN queue q ON q.id = a.promoted_queue_id
      WHERE ${conditions.join(' AND ')}
-     ORDER BY a.scheduled_at ASC LIMIT 500`,
+     ORDER BY a.scheduled_at ${orderDirection} LIMIT 500`,
     params
   );
 

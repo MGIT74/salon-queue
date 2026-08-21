@@ -3160,7 +3160,7 @@ function resetRdvListToUpcoming() {
   document.getElementById('rdv-list-title').textContent = 'À venir';
   document.getElementById('rdv-reset-btn').style.display = 'none';
 
-  api('/api/appointments').then(function (r) {
+  api('/api/appointments?all=1').then(function (r) {
     calUpcoming = r.items;
     renderRdvList();
   }).catch(function (e) { toast(e.message, true); });
