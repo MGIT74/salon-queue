@@ -72,6 +72,18 @@ html, body {
   transition: outline-color .15s ease, background .25s ease;
 }
 .fld input:focus, .fld select:focus, .fld textarea:focus { outline-color: var(--blue); }
+
+/* Les champs heure/date natifs se centrent par défaut sur mobile
+   (Safari/Chrome iOS notamment), contrairement à un champ texte
+   normal - décalage visuel vers la droite par rapport aux autres
+   champs du même formulaire. Forcé à gauche pour rester cohérent. */
+.fld input[type="time"], .fld input[type="date"] {
+  text-align: left;
+}
+.fld input[type="time"]::-webkit-datetime-edit,
+.fld input[type="date"]::-webkit-datetime-edit {
+  text-align: left; margin: 0; padding: 0;
+}
 .fld input::placeholder { color: var(--grey); opacity: .6; }
 
 /* Certains navigateurs mobiles (Chrome Android notamment) rendent
