@@ -150,18 +150,53 @@ initTheme();
    Remplacent alert()/confirm()/prompt() natifs par des fenêtres stylées
    cohérentes avec le reste de l'app. Toutes renvoient une Promise. */
 
+// Bloque le défilement de l'arrière-plan tant qu'au moins un popup est
+// ouvert - un simple overflow:hidden sur body ne suffit pas de façon
+// fiable partout (Safari iOS notamment laisse parfois défiler
+// l'arrière-plan "à travers" un popup ouvert, provoquant de petits
+// bugs d'interaction, ex: dans l'agenda en ajoutant un RDV). Un
+// compteur gère les popups imbriqués (ex: une confirmation ouverte
+// depuis un autre popup) sans débloquer trop tôt.
+var _modalLockCount = 0;
+var _modalScrollY = 0;
+
+function _lockBodyScroll() {
+  if (_modalLockCount === 0) {
+    _modalScrollY = window.scrollY || window.pageYOffset || 0;
+    document.body.style.position = 'fixed';
+    document.body.style.top = '-' + _modalScrollY + 'px';
+    document.body.style.left = '0';
+    document.body.style.right = '0';
+    document.body.style.overflow = 'hidden';
+  }
+  _modalLockCount++;
+}
+
+function _unlockBodyScroll() {
+  _modalLockCount = Math.max(0, _modalLockCount - 1);
+  if (_modalLockCount === 0) {
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.left = '';
+    document.body.style.right = '';
+    document.body.style.overflow = '';
+    window.scrollTo(0, _modalScrollY);
+  }
+}
+
 function _buildModal(innerHtml) {
   var overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
   overlay.innerHTML = '<div class="modal-box">' + innerHtml + '</div>';
   document.body.appendChild(overlay);
+  _lockBodyScroll();
   requestAnimationFrame(function () { overlay.classList.add('on'); });
   return overlay;
 }
 
 function _closeModal(overlay) {
   overlay.classList.remove('on');
-  setTimeout(function () { overlay.remove(); }, 180);
+  setTimeout(function () { overlay.remove(); _unlockBodyScroll(); }, 180);
 }
 
 function showAlert(message, opts) {

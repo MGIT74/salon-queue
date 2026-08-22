@@ -466,10 +466,12 @@ function saveVisitNote(appointmentId, key) {
 function openCancelModal(cancelToken) {
   pendingCancelToken = cancelToken;
   document.getElementById('cancel-modal-backdrop').classList.add('on');
+  _lockBodyScroll();
 }
 
 function closeCancelModal() {
   document.getElementById('cancel-modal-backdrop').classList.remove('on');
+  _unlockBodyScroll();
 }
 
 function confirmCancelUpcoming() {

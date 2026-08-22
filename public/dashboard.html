@@ -1710,6 +1710,7 @@ function openClientDrawer(id, source, directData) {
   document.getElementById('drawer-visits').innerHTML = '<div class="empty">Chargement…</div>';
   document.getElementById('drawer-visit-count').textContent = '';
   document.getElementById('client-drawer-backdrop').classList.add('on');
+  _lockBodyScroll();
 
   document.getElementById('drawer-marketing-section').style.display = 'none';
   api('/api/owner/client-marketing?email=' + encodeURIComponent(c.email || '') +
@@ -1799,7 +1800,10 @@ function saveDrawerNote() {
 }
 
 function closeClientDrawer() {
-  document.getElementById('client-drawer-backdrop').classList.remove('on');
+  var backdrop = document.getElementById('client-drawer-backdrop');
+  var wasOpen = backdrop.classList.contains('on');
+  backdrop.classList.remove('on');
+  if (wasOpen) _unlockBodyScroll();
   drawerClientId = null;
 }
 
@@ -1927,6 +1931,7 @@ function openTransferSheet(id, freeBarbers, busyBarberId) {
       '<div class="opt-meta">Disponible maintenant</div></div></div>';
   }).join('');
   document.getElementById('sheet-transfer').classList.add('on');
+  _lockBodyScroll();
 }
 
 function transferAndStart(id, barberId) {
@@ -1960,8 +1965,14 @@ function openQueueSheet(id) {
   document.getElementById('sq-title').textContent = editingQ.client_name;
   renderQueueSheet();
   document.getElementById('sheet-queue').classList.add('on');
+  _lockBodyScroll();
 }
-function closeSheet(id) { document.getElementById(id).classList.remove('on'); }
+function closeSheet(id) {
+  var el = document.getElementById(id);
+  var wasOpen = el.classList.contains('on');
+  el.classList.remove('on');
+  if (wasOpen) _unlockBodyScroll();
+}
 
 function renderQueueSheet() {
   document.getElementById('sq-services').innerHTML = services.filter(function (s) { return s.active; })
@@ -2066,6 +2077,7 @@ function openCatalogForm(table, id) {
     document.getElementById('sc-dur').value = item ? item.duration_min : (table === 'services' ? 30 : 10);
   }
   document.getElementById('sheet-catalog').classList.add('on');
+  _lockBodyScroll();
 }
 
 function saveCatalog() {
