@@ -1417,21 +1417,7 @@ document.getElementById('tabs').addEventListener('click', function (e) {
   document.querySelectorAll('.tab-panel').forEach(function (p) { p.classList.remove('on'); });
   document.getElementById('t-' + b.dataset.t).classList.add('on');
   if (b.dataset.t === 'settings') loadSettings();
-  if (b.dataset.t === 'clients') {
-    // Pré-remplit Du/Au avec la date du jour, une seule fois (jamais
-    // après un clic sur Réinitialiser, ni au changement d'onglet
-    // suivant) - un champ date vide affiche juste un petit point peu
-    // clair sur mobile.
-    if (!clientsDateDefaultsSet) {
-      clientsDateDefaultsSet = true;
-      var today = nowSalonDatetimeString().slice(0, 10);
-      document.getElementById('client-date-from').value = today;
-      document.getElementById('client-date-to').value = today;
-      clientsDateFrom = today;
-      clientsDateTo = today;
-    }
-    loadClients();
-  }
+  if (b.dataset.t === 'clients') loadClients();
   if (b.dataset.t === 'salons') loadChainTab();
   if (b.dataset.t === 'marketing') loadMarketingTab();
   if (b.dataset.t === 'caisse') loadCaisseTab();
@@ -2660,7 +2646,6 @@ var clientsPerPage = 25;
 var clientsTotalPages = 1;
 var clientsDateFrom = '';
 var clientsDateTo = '';
-var clientsDateDefaultsSet = false;
 var selectedClientIds = {};
 
 var STATUS_LABEL = {
@@ -3283,18 +3268,6 @@ function resetRdvListToUpcoming() {
   else if (calViewMode === 'week') renderWeekView();
   document.getElementById('rdv-list-title').textContent = 'À venir';
   document.getElementById('rdv-reset-btn').style.display = 'none';
-
-  // Pré-remplit Du/Au avec la date du jour au premier chargement
-  // uniquement (jamais si l'utilisateur a déjà choisi ses propres
-  // dates) - un champ date vide affiche juste un petit point peu
-  // clair sur mobile.
-  var fromEl = document.getElementById('rdv-filter-from');
-  var toEl = document.getElementById('rdv-filter-to');
-  if (!fromEl.value && !toEl.value) {
-    var today = nowSalonDatetimeString().slice(0, 10);
-    fromEl.value = today;
-    toEl.value = today;
-  }
 
   api('/api/appointments?all=1').then(function (r) {
     calUpcoming = r.items;
