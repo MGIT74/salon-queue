@@ -2239,9 +2239,10 @@ function renderScheduleTab(b) {
   var colorPicker = '<div style="margin-bottom:20px">' +
     '<label class="hint" style="display:block;margin-bottom:8px">Couleur dans l\'agenda</label>' +
     '<div style="display:flex;align-items:center;gap:10px">' +
-    '<input type="color" id="barber-color-' + b.id + '" value="' + currentColor + '" onchange="setBarberColor(\'' + b.id + '\', this.value)" ' +
+    '<input type="color" id="barber-color-' + b.id + '" value="' + currentColor + '" onchange="document.getElementById(\'barber-color-hex-' + b.id + '\').textContent = this.value" ' +
     'style="width:44px;height:44px;border:none;border-radius:12px;padding:0;cursor:pointer;background:none">' +
-    '<span class="hint" style="margin:0">' + currentColor + '</span>' +
+    '<span class="hint" id="barber-color-hex-' + b.id + '" style="margin:0">' + currentColor + '</span>' +
+    '<button class="btn btn-soft" style="padding:8px 14px;font-size:13px" onclick="setBarberColor(\'' + b.id + '\', document.getElementById(\'barber-color-' + b.id + '\').value)">Enregistrer</button>' +
     '</div></div>';
 
   var days = DAYS.map(function (dn, wd) {
