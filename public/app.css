@@ -40,6 +40,8 @@ html, body {
 .theme-btn .moon { display: none; }
 [data-theme="dark"] .theme-btn .sun { display: none; }
 [data-theme="dark"] .theme-btn .moon { display: block; }
+[data-theme="dark"] .sidebar-theme-btn .sun { display: none; }
+[data-theme="dark"] .sidebar-theme-btn .moon { display: block !important; }
 
 .btn {
   border: none; border-radius: 999px; font-family: inherit;
