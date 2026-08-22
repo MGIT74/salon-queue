@@ -954,10 +954,6 @@
 
     <div class="section-label">Salons de l'enseigne</div>
     <div id="salons-list"></div>
-
-    <div class="section-label" style="margin-top:28px">Coiffeurs de l'enseigne</div>
-    <p class="hint" style="margin:-6px 0 16px">Déplacez un coiffeur vers un autre de vos salons si besoin.</p>
-    <div id="chain-barbers-list" class="chain-barbers-target"></div>
   </div>
 
   <!-- ===== Onglet compte ===== -->
@@ -3987,10 +3983,9 @@ function deleteClient(id) {
 
 /* ============ Mes salons (chaîne / enseigne) ============ */
 var chainSalons = [];
-var chainBarbers = [];
 
 function loadChainTab() {
-  return Promise.all([loadSalonsList(), loadChainBarbers()]);
+  return loadSalonsList();
 }
 
 function loadSalonsList() {
@@ -4047,43 +4042,6 @@ function addSalon() {
     })
     .then(function () { toast('Salon créé'); })
     .catch(function (e) { toast(e.message, true); });
-}
-
-function loadChainBarbers() {
-  return api('/api/owner/barbers').then(function (r) {
-    chainBarbers = r.items;
-    renderChainBarbers();
-  }).catch(function (e) { toast(e.message, true); });
-}
-
-function renderChainBarbers() {
-  var html = chainBarbers.length === 0
-    ? '<div class="empty">Aucun coiffeur dans l\'enseigne</div>'
-    : chainBarbers.map(function (b) {
-        var options = chainSalons.map(function (s) {
-          return '<option value="' + s.id + '"' + (s.id === b.salon_id ? ' selected' : '') + '>' + esc(s.name) + '</option>';
-        }).join('');
-        return '<div class="item"><div class="item-main">' +
-          '<div class="item-name">' + esc(b.name) + (b.active ? '' : ' · inactif') + '</div>' +
-          '<div class="item-meta">' + esc(b.salon_name) + '</div>' +
-          '</div><div class="item-actions">' +
-          '<select onchange="moveBarber(\'' + b.id + '\', this.value)" style="padding:9px 12px;border:none;border-radius:8px;background:var(--fill);color:var(--ink);font-family:inherit;font-size:13px">' +
-          options + '</select></div></div>';
-      }).join('');
-
-  document.querySelectorAll('.chain-barbers-target').forEach(function (el) { el.innerHTML = html; });
-}
-
-function moveBarber(barberId, salonId) {
-  api('/api/owner/barbers/' + barberId + '/salon', { method: 'PUT', body: { salon_id: salonId } })
-    .then(function () {
-      // Le coiffeur peut sortir ou entrer dans le salon actuellement affiché :
-      // on resynchronise partout (Coiffeurs, "Je suis" dans File d'attente),
-      // pas seulement la liste de l'onglet Mes salons.
-      return Promise.all([loadChainBarbers(), loadBarbers()]);
-    })
-    .then(function () { toast('Coiffeur déplacé'); })
-    .catch(function (e) { toast(e.message, true); loadChainBarbers(); loadBarbers(); });
 }
 
 /* ============ Réglages ============ */
