@@ -554,17 +554,21 @@ router.get('/:id/client-history', requireAdmin, wrap(async (req, res) => {
   const key = clientKey(row);
   if (!key) return res.json({ ok: true, items: [] });
 
-  // Tous les salons de la MÊME ENSEIGNE, pas seulement celui-ci — un
-  // client peut avoir frequenté plusieurs salons du même propriétaire.
+  // Un salon reste indépendant des autres de la même enseigne (même
+  // principe que la fidélité/les comptes client) - historique limité
+  // à CE salon uniquement, plus toute l'enseigne. La source (RDV en
+  // ligne ou passage sans-RDV) vient de la ligne appointments liée à
+  // ce passage, si elle existe (toujours créée automatiquement,
+  // qu'il s'agisse d'un vrai RDV ou d'un check-in kiosk).
   const [allRows] = await pool.query(
     `SELECT q.id, q.client_name, q.email, q.phone, q.status, q.checkin_at, q.start_at, q.end_at,
-            q.total_price_cents, s.name AS service_name, sa.name AS salon_name
+            q.total_price_cents, s.name AS service_name, a.source AS source
      FROM queue q
      LEFT JOIN services s ON s.id = q.service_id
-     JOIN salons sa ON sa.id = q.salon_id
-     WHERE sa.owner_id = ?
+     LEFT JOIN appointments a ON a.promoted_queue_id = q.id
+     WHERE q.salon_id = ?
      ORDER BY q.checkin_at DESC LIMIT 1000`,
-    [req.ownerId]
+    [req.salon.id]
   );
 
   const items = allRows
@@ -589,13 +593,13 @@ router.get('/client-history-by-contact', requireAdmin, wrap(async (req, res) => 
 
   const [allRows] = await pool.query(
     `SELECT q.id, q.client_name, q.email, q.phone, q.status, q.checkin_at, q.start_at, q.end_at,
-            q.total_price_cents, s.name AS service_name, sa.name AS salon_name
+            q.total_price_cents, s.name AS service_name, a.source AS source
      FROM queue q
      LEFT JOIN services s ON s.id = q.service_id
-     JOIN salons sa ON sa.id = q.salon_id
-     WHERE sa.owner_id = ?
+     LEFT JOIN appointments a ON a.promoted_queue_id = q.id
+     WHERE q.salon_id = ?
      ORDER BY q.checkin_at DESC LIMIT 1000`,
-    [req.ownerId]
+    [req.salon.id]
   );
 
   const items = allRows

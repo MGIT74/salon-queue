@@ -1786,7 +1786,7 @@ function renderDrawerVisits(items) {
           day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
         });
         return '<div class="visit-row">' +
-          '<div class="visit-date">' + when + (v.salon_name ? ' · <span style="color:var(--blue)">' + esc(v.salon_name) + '</span>' : '') + '</div>' +
+          '<div class="visit-date">' + sourceBadge(v, true) + when + '</div>' +
           '<div class="visit-meta">' + esc(v.service_name || 'Prestation') +
           (v.total_price_cents ? ' · ' + eur(v.total_price_cents) : '') +
           ' · <span style="color:' + (STATUS_COLOR[v.status] || 'var(--grey)') + '">' + esc(STATUS_LABEL[v.status] || v.status) + '</span>' +
