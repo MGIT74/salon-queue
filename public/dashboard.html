@@ -422,6 +422,14 @@
   .stat-tile { background: var(--fill); border-radius: 14px; padding: 18px; text-align: center; }
   .stat-tile .v { font-size: 26px; font-weight: 600; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
   .stat-tile .l { font-size: 12.5px; color: var(--grey); margin-top: 3px; }
+  .stat-tile.wide { grid-column: 1 / -1; }
+  .stat-tile.warn { background: rgba(249,115,22,0.12); }
+  [data-theme="dark"] .stat-tile.warn { background: rgba(249,115,22,0.16); }
+  .stat-tile.warn .v { color: var(--orange, #f97316); }
+  .occ-bar { height: 6px; border-radius: 999px; background: var(--sep); margin-top: 10px; overflow: hidden; }
+  .occ-bar-fill { height: 100%; border-radius: 999px; background: var(--blue); transition: width .3s ease; }
+  .stats-range-picker { display: flex; gap: 10px; margin-bottom: 16px; }
+  .stats-range-picker .fld { margin: 0; flex: 1; }
 
   .leave-row { display: flex; align-items: center; justify-content: space-between; gap: 12px;
                background: var(--fill); border-radius: 12px; padding: 13px 15px; margin-bottom: 8px; }
@@ -2263,17 +2271,25 @@ function addBreakRow(btn) {
 
 function renderStatsTab(b) {
   var st = barberStatsState[b.id] || { period: 'day', offset: 0 };
+  var isRange = st.period === 'range';
+  var todayStr = nowSalonDatetimeString().slice(0, 10);
+
   return '<div class="period-picker">' +
-    ['day', 'week', 'month'].map(function (p) {
-      var label = p === 'day' ? 'Jour' : p === 'week' ? 'Semaine' : 'Mois';
+    ['day', 'week', 'month', 'range'].map(function (p) {
+      var label = p === 'day' ? 'Jour' : p === 'week' ? 'Semaine' : p === 'month' ? 'Mois' : 'Plage';
       return '<button class="' + (st.period === p ? 'on' : '') + '" onclick="setStatsPeriod(\'' + b.id + '\',\'' + p + '\')">' + label + '</button>';
     }).join('') +
     '</div>' +
-    '<div class="stats-nav">' +
-    '<button class="stats-nav-btn" onclick="navStats(\'' + b.id + '\',-1)">‹</button>' +
-    '<div class="stats-period-label" id="stats-label-' + b.id + '">…</div>' +
-    '<button class="stats-nav-btn" id="stats-next-' + b.id + '" onclick="navStats(\'' + b.id + '\',1)">›</button>' +
-    '</div>' +
+    (isRange
+      ? '<div class="stats-range-picker">' +
+        '<div class="fld"><label>Du</label><input type="date" id="stats-from-' + b.id + '" value="' + (st.customFrom || todayStr) + '" onchange="setStatsRange(\'' + b.id + '\')"></div>' +
+        '<div class="fld"><label>Au</label><input type="date" id="stats-to-' + b.id + '" value="' + (st.customTo || todayStr) + '" onchange="setStatsRange(\'' + b.id + '\')"></div>' +
+        '</div>'
+      : '<div class="stats-nav">' +
+        '<button class="stats-nav-btn" onclick="navStats(\'' + b.id + '\',-1)">‹</button>' +
+        '<div class="stats-period-label" id="stats-label-' + b.id + '">…</div>' +
+        '<button class="stats-nav-btn" id="stats-next-' + b.id + '" onclick="navStats(\'' + b.id + '\',1)">›</button>' +
+        '</div>') +
     '<div class="stats-grid" id="stats-grid-' + b.id + '">' +
     '<div class="stat-tile"><div class="v">—</div><div class="l">coupes terminées</div></div>' +
     '<div class="stat-tile"><div class="v">—</div><div class="l">encaissé</div></div>' +
@@ -2422,11 +2438,17 @@ function saveCapabilities(id) {
   }).catch(function (e) { toast(e.message, true); });
 }
 
-function periodRange(period, offset) {
+function periodRange(period, offset, custom) {
   var now = new Date();
   var start, end, label;
 
-  if (period === 'day') {
+  if (period === 'range' && custom && custom.from && custom.to) {
+    start = new Date(custom.from + 'T00:00:00');
+    end = new Date(custom.to + 'T00:00:00');
+    end.setDate(end.getDate() + 1); // fin exclusive, le jour "au" est inclus
+    label = start.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) + ' – ' +
+      new Date(custom.to + 'T00:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+  } else if (period === 'day') {
     start = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset);
     end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 1);
     var todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -2451,8 +2473,24 @@ function periodRange(period, offset) {
 }
 
 function setStatsPeriod(id, period) {
-  barberStatsState[id] = { period: period, offset: 0 };
+  var prevCustom = barberStatsState[id] || {};
+  var todayStr = nowSalonDatetimeString().slice(0, 10);
+  barberStatsState[id] = {
+    period: period, offset: 0,
+    customFrom: prevCustom.customFrom || todayStr,
+    customTo: prevCustom.customTo || todayStr
+  };
   renderBarbers();
+  loadBarberStats(id);
+}
+
+function setStatsRange(id) {
+  var st = barberStatsState[id];
+  var from = document.getElementById('stats-from-' + id).value;
+  var to = document.getElementById('stats-to-' + id).value;
+  if (!from || !to) return;
+  st.customFrom = from;
+  st.customTo = to;
   loadBarberStats(id);
 }
 
@@ -2463,21 +2501,42 @@ function navStats(id, dir) {
   loadBarberStats(id);
 }
 
+// Format YYYY-MM-DD à partir des composantes LOCALES d'une Date (pas
+// toISOString(), qui donnerait la date UTC - potentiellement le jour
+// d'avant/après selon l'heure d'été/hiver).
+function localDateStr(d) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
 function loadBarberStats(id) {
   var st = barberStatsState[id];
-  var range = periodRange(st.period, st.offset);
+  var range = periodRange(st.period, st.offset, { from: st.customFrom, to: st.customTo });
   var labelEl = document.getElementById('stats-label-' + id);
   var nextBtn = document.getElementById('stats-next-' + id);
   if (labelEl) labelEl.textContent = range.label;
   if (nextBtn) nextBtn.disabled = st.offset >= 0;
 
-  api('/api/barbers/' + id + '/stats?start=' + range.start.toISOString() + '&end=' + range.end.toISOString())
+  var endInclusive = new Date(range.end);
+  endInclusive.setDate(endInclusive.getDate() - 1);
+  var qs = 'start=' + range.start.toISOString() + '&end=' + range.end.toISOString() +
+    '&start_date=' + localDateStr(range.start) + '&end_date=' + localDateStr(endInclusive);
+
+  api('/api/barbers/' + id + '/stats?' + qs)
     .then(function (r) {
       var grid = document.getElementById('stats-grid-' + id);
       if (!grid) return;
+      var a = r.availability;
       grid.innerHTML =
         '<div class="stat-tile"><div class="v">' + r.done_count + '</div><div class="l">coupes terminées</div></div>' +
-        '<div class="stat-tile"><div class="v">' + eur(r.revenue_cents) + '</div><div class="l">encaissé</div></div>';
+        '<div class="stat-tile"><div class="v">' + eur(r.revenue_cents) + '</div><div class="l">encaissé</div></div>' +
+        (a ? (
+          '<div class="stat-tile wide">' +
+            '<div class="v">' + a.occupancy_pct + ' %</div><div class="l">taux d\'occupation (performance)</div>' +
+            '<div class="occ-bar"><div class="occ-bar-fill" style="width:' + Math.min(100, a.occupancy_pct) + '%"></div></div>' +
+          '</div>' +
+          '<div class="stat-tile"><div class="v">' + a.free_slots + '</div><div class="l">créneaux libres (≈)</div></div>' +
+          '<div class="stat-tile warn"><div class="v">' + eur(a.potential_revenue_cents) + '</div><div class="l">manque à gagner estimé</div></div>'
+        ) : '') ;
     })
     .catch(function (e) { toast(e.message, true); });
 }

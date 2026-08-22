@@ -1,6 +1,6 @@
 const express = require('express');
 const crypto = require('crypto');
-const { pool } = require('../db');
+const { pool, getSettings } = require('../db');
 const { activeBarberCount } = require('../lib/queueMath');
 const requireAdmin = require('../middleware/auth');
 const { loginRateLimiter } = require('../middleware/rateLimiter');
@@ -251,7 +251,7 @@ router.put('/:id/schedule', requireAdmin, wrap(async (req, res) => {
  * jour/heure entre le fuseau du serveur et celui du salon.
  */
 router.get('/:id/stats', requireAdmin, wrap(async (req, res) => {
-  const { start, end } = req.query;
+  const { start, end, start_date, end_date } = req.query;
   if (!start || !end) return res.status(400).json({ error: 'start et end requis (ISO)' });
 
   const [[owned]] = await pool.query(
@@ -264,14 +264,91 @@ router.get('/:id/stats', requireAdmin, wrap(async (req, res) => {
   const endSql = new Date(end).toISOString().slice(0, 19).replace('T', ' ');
 
   const [[row]] = await pool.query(
-    `SELECT COUNT(*) AS done_count, COALESCE(SUM(total_price_cents), 0) AS revenue_cents
+    `SELECT COUNT(*) AS done_count, COALESCE(SUM(total_price_cents), 0) AS revenue_cents,
+            COALESCE(SUM(TIMESTAMPDIFF(MINUTE, start_at, end_at)), 0) AS booked_minutes
      FROM queue
      WHERE barber_id = ? AND salon_id = ? AND status = 'done'
      AND end_at >= ? AND end_at < ?`,
     [req.params.id, req.salon.id, startSql, endSql]
   );
 
-  res.json({ ok: true, done_count: Number(row.done_count), revenue_cents: Number(row.revenue_cents) });
+  const doneCount = Number(row.done_count);
+  const revenueCents = Number(row.revenue_cents);
+  const bookedMinutes = Number(row.booked_minutes);
+
+  // Calcul des créneaux disponibles/libres : nécessite les dates
+  // locales de salon en jours calendaires précis (start_date/end_date,
+  // YYYY-MM-DD inclus) - jamais dérivées de start/end (UTC), qui
+  // décaleraient le jour selon l'heure d'été/hiver (même piège que
+  // scheduled_at ailleurs dans l'app).
+  var availability = null;
+  if (start_date && end_date) {
+    const [schedules] = await pool.query(
+      'SELECT weekday, start_time, end_time FROM barber_schedules WHERE barber_id = ? AND active = 1',
+      [req.params.id]
+    );
+    const [breaks] = await pool.query(
+      'SELECT weekday, start_time, end_time FROM barber_breaks WHERE barber_id = ? AND active = 1',
+      [req.params.id]
+    );
+    const [leaves] = await pool.query(
+      'SELECT start_date, end_date FROM barber_leaves WHERE barber_id = ?',
+      [req.params.id]
+    );
+    const settings = await getSettings(req.salon.id);
+    const slotStepMin = Number(settings.rdv_slot_step_min) || 15;
+
+    const schedByDay = {};
+    schedules.forEach((s) => { schedByDay[s.weekday] = s; });
+    const breaksByDay = {};
+    breaks.forEach((b) => {
+      if (!breaksByDay[b.weekday]) breaksByDay[b.weekday] = [];
+      breaksByDay[b.weekday].push(b);
+    });
+    const leaveRanges = leaves.map((l) => ({
+      start: l.start_date.toISOString().slice(0, 10),
+      end: l.end_date.toISOString().slice(0, 10)
+    }));
+
+    function timeToMin(t) { const [h, m] = String(t).split(':').map(Number); return h * 60 + m; }
+    function isOnLeave(dateStr) { return leaveRanges.some((l) => dateStr >= l.start && dateStr <= l.end); }
+
+    var availableMinutes = 0;
+    var d = new Date(start_date + 'T00:00:00Z');
+    const endD = new Date(end_date + 'T00:00:00Z');
+    while (d <= endD) {
+      const dateStr = d.toISOString().slice(0, 10);
+      const weekday = d.getUTCDay(); // 0=dimanche ... 6=samedi
+      if (!isOnLeave(dateStr)) {
+        const sched = schedByDay[weekday];
+        if (sched) {
+          var dayMinutes = timeToMin(sched.end_time) - timeToMin(sched.start_time);
+          (breaksByDay[weekday] || []).forEach((b) => {
+            dayMinutes -= Math.max(0, timeToMin(b.end_time) - timeToMin(b.start_time));
+          });
+          availableMinutes += Math.max(0, dayMinutes);
+        }
+      }
+      d.setUTCDate(d.getUTCDate() + 1);
+    }
+
+    const freeMinutes = Math.max(0, availableMinutes - bookedMinutes);
+    const occupancyPct = availableMinutes > 0 ? Math.round((100 * bookedMinutes) / availableMinutes) : 0;
+    const avgRevenuePerMinute = bookedMinutes > 0 ? revenueCents / bookedMinutes : 0;
+
+    availability = {
+      available_minutes: availableMinutes,
+      free_minutes: freeMinutes,
+      free_slots: Math.floor(freeMinutes / slotStepMin),
+      occupancy_pct: occupancyPct,
+      potential_revenue_cents: Math.round(freeMinutes * avgRevenuePerMinute)
+    };
+  }
+
+  res.json(Object.assign(
+    { ok: true, done_count: doneCount, revenue_cents: revenueCents, booked_minutes: bookedMinutes },
+    availability ? { availability: availability } : {}
+  ));
 }));
 
 /**
