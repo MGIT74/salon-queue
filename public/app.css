@@ -76,13 +76,13 @@ html, body {
 /* Les champs heure/date natifs se centrent par défaut sur mobile
    (Safari/Chrome iOS notamment), contrairement à un champ texte
    normal - décalage visuel vers la droite par rapport aux autres
-   champs du même formulaire. Forcé à gauche pour rester cohérent. */
+   champs du même formulaire. Le rendu interne (shadow DOM du
+   navigateur) ne répond pas de façon fiable à text-align - on réduit
+   plutôt la largeur du champ à celle de son contenu, pour qu'il n'y
+   ait plus d'espace vide où le centrer.
+   */
 .fld input[type="time"], .fld input[type="date"] {
-  text-align: left;
-}
-.fld input[type="time"]::-webkit-datetime-edit,
-.fld input[type="date"]::-webkit-datetime-edit {
-  text-align: left; margin: 0; padding: 0;
+  width: auto; min-width: 150px; max-width: 100%;
 }
 .fld input::placeholder { color: var(--grey); opacity: .6; }
 
