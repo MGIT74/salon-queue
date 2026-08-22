@@ -822,6 +822,8 @@
     <div class="card-box">
       <div class="admin-head" style="margin-bottom:14px">
         <h3 id="rdv-list-title" style="margin:0">À venir</h3>
+        <input id="rdv-search" type="text" placeholder="Rechercher un nom…" oninput="onRdvFilterChange()"
+               style="max-width:220px;padding:11px 16px;border:none;border-radius:999px;background:var(--fill);color:var(--ink);font-family:inherit;font-size:14px;outline:none">
         <button class="btn btn-soft" id="rdv-reset-btn" onclick="resetRdvListToUpcoming()" style="display:none">Voir tous les à venir</button>
       </div>
       <div class="grid4" style="margin-bottom:16px">
@@ -3444,6 +3446,7 @@ function renderRdvList() {
   var barberFilter = document.getElementById('rdv-filter-barber').value;
   var fromFilter = document.getElementById('rdv-filter-from').value;
   var toFilter = document.getElementById('rdv-filter-to').value;
+  var searchFilter = (document.getElementById('rdv-search').value || '').trim().toLowerCase();
 
   var items;
   if (calSelectedDate) {
@@ -3458,6 +3461,7 @@ function renderRdvList() {
   if (barberFilter) items = items.filter(function (a) { return a.barber_id === barberFilter; });
   if (fromFilter) items = items.filter(function (a) { return a.scheduled_at.slice(0, 10) >= fromFilter; });
   if (toFilter) items = items.filter(function (a) { return a.scheduled_at.slice(0, 10) <= toFilter; });
+  if (searchFilter) items = items.filter(function (a) { return (a.client_name || '').toLowerCase().indexOf(searchFilter) !== -1; });
 
   rdvCurrentItems = items;
   calAppointmentById && items.forEach(function (a) { calAppointmentById[a.id] = a; });
