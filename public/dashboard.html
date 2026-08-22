@@ -2235,6 +2235,20 @@ function renderBarberDetail(b) {
 }
 
 function renderScheduleTab(b) {
+  var currentColor = b.color || stableColorForId(b.id);
+  var colorPicker = '<div style="margin-bottom:20px">' +
+    '<label class="hint" style="display:block;margin-bottom:8px">Couleur dans l\'agenda</label>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+    DOT_COLORS.map(function (c) {
+      var isSelected = c.toLowerCase() === currentColor.toLowerCase();
+      return '<button onclick="setBarberColor(\'' + b.id + '\',\'' + c + '\')" title="' + c + '" style="' +
+        'width:30px;height:30px;border-radius:50%;background:' + c + ';cursor:pointer;padding:0;box-sizing:border-box;' +
+        'border:2px solid ' + (isSelected ? 'var(--ink)' : 'transparent') + ';' +
+        (isSelected ? 'box-shadow:0 0 0 2px var(--card),0 0 0 4px var(--ink);' : '') +
+        '"></button>';
+    }).join('') +
+    '</div></div>';
+
   var days = DAYS.map(function (dn, wd) {
     var s = (b.schedules || []).find(function (x) { return x.weekday === wd; });
     var on = Boolean(s);
@@ -2263,7 +2277,16 @@ function renderScheduleTab(b) {
       '</div>' +
       '</div>';
   }).join('');
-  return days + '<button class="btn btn-primary" style="margin-top:16px" onclick="saveSchedule(\'' + b.id + '\')">Enregistrer les horaires</button>';
+  return colorPicker + days + '<button class="btn btn-primary" style="margin-top:16px" onclick="saveSchedule(\'' + b.id + '\')">Enregistrer les horaires</button>';
+}
+
+function setBarberColor(id, color) {
+  api('/api/barbers/' + id, { method: 'PUT', body: { color: color } })
+    .then(function () {
+      toast('Couleur mise à jour');
+      return loadBarbers();
+    })
+    .catch(function (e) { toast(e.message, true); });
 }
 
 function addBreakRow(btn) {
@@ -2880,6 +2903,17 @@ function saveMarketingSettings() {
 /* ============ Caisse ============ */
 /* ============ Rendez-vous ============ */
 var DOT_COLORS = ['#3b82f6', '#f97316', '#10b981', '#a855f7', '#ec4899', '#eab308', '#14b8a6', '#ef4444'];
+
+// Couleur par défaut stable, dérivée de l'id du coiffeur (jamais de sa
+// position dans une liste triée) - ne change JAMAIS quand un autre
+// coiffeur est ajouté/supprimé/renommé, contrairement à un index de
+// tableau qui décale tout le monde. Utilisée uniquement tant que le
+// coiffeur n'a pas choisi sa propre couleur dans ses paramètres.
+function stableColorForId(id) {
+  var hash = 0;
+  for (var i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+  return DOT_COLORS[hash % DOT_COLORS.length];
+}
 var calAnchor = new Date(); // date de reference pour la periode affichee
 var calViewMode = 'month'; // 'month' | 'week' | 'day'
 var calMonthCache = {}; // 'YYYY-MM' -> items[]
@@ -2919,7 +2953,7 @@ function loadRdvTab() {
   api('/api/barbers?all=1').then(function (r) {
     var sel = document.getElementById('rdv-filter-barber');
     var sorted = r.items.slice().sort(function (a, b) { return a.name.localeCompare(b.name); });
-    sorted.forEach(function (b, i) { rdvBarberColors[b.id] = DOT_COLORS[i % DOT_COLORS.length]; rdvBarberPhotos[b.id] = b.photo_url || ''; });
+    sorted.forEach(function (b) { rdvBarberColors[b.id] = b.color || stableColorForId(b.id); rdvBarberPhotos[b.id] = b.photo_url || ''; });
     sel.innerHTML = '<option value="">Tous</option>' + sorted.map(function (b) {
       return '<option value="' + b.id + '">' + esc(b.name) + '</option>';
     }).join('');

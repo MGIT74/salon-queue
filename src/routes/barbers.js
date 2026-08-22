@@ -144,6 +144,12 @@ router.put('/:id', requireAdmin, wrap(async (req, res) => {
     sets.push('pin_code = ?'); params.push(req.body.pin_code || null);
   }
   if (req.body.photo_url !== undefined) { sets.push('photo_url = ?'); params.push(req.body.photo_url || null); }
+  if (req.body.color !== undefined) {
+    if (req.body.color && !/^#[0-9a-fA-F]{6}$/.test(req.body.color)) {
+      return res.status(400).json({ error: 'Couleur invalide (format #RRGGBB attendu)' });
+    }
+    sets.push('color = ?'); params.push(req.body.color || null);
+  }
 
   // Un seul mode possible par coiffeur, plus de "disponible partout"
   // implicite : le client envoie 'walkin' | 'online' | 'none', traduit

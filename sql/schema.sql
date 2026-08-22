@@ -640,3 +640,11 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 SET @idx4 := (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'clients' AND index_name = 'uniq_salon_client_email');
 SET @sql := IF(@idx4 = 0, 'ALTER TABLE clients ADD UNIQUE KEY uniq_salon_client_email (salon_id, email)', 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Couleur personnalisable de chaque coiffeur (agenda RDV) - si NULL,
+-- une couleur stable est dérivée de son id côté client (jamais de sa
+-- position dans une liste triée, qui décalerait les couleurs de tous
+-- les autres coiffeurs à chaque ajout/suppression).
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'barbers' AND column_name = 'color');
+SET @sql := IF(@c = 0, "ALTER TABLE barbers ADD COLUMN color VARCHAR(9) NULL", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
