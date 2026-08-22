@@ -2238,15 +2238,10 @@ function renderScheduleTab(b) {
   var currentColor = b.color || stableColorForId(b.id);
   var colorPicker = '<div style="margin-bottom:20px">' +
     '<label class="hint" style="display:block;margin-bottom:8px">Couleur dans l\'agenda</label>' +
-    '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
-    DOT_COLORS.map(function (c) {
-      var isSelected = c.toLowerCase() === currentColor.toLowerCase();
-      return '<button onclick="setBarberColor(\'' + b.id + '\',\'' + c + '\')" title="' + c + '" style="' +
-        'width:30px;height:30px;border-radius:50%;background:' + c + ';cursor:pointer;padding:0;box-sizing:border-box;' +
-        'border:2px solid ' + (isSelected ? 'var(--ink)' : 'transparent') + ';' +
-        (isSelected ? 'box-shadow:0 0 0 2px var(--card),0 0 0 4px var(--ink);' : '') +
-        '"></button>';
-    }).join('') +
+    '<div style="display:flex;align-items:center;gap:10px">' +
+    '<input type="color" id="barber-color-' + b.id + '" value="' + currentColor + '" onchange="setBarberColor(\'' + b.id + '\', this.value)" ' +
+    'style="width:44px;height:44px;border:none;border-radius:12px;padding:0;cursor:pointer;background:none">' +
+    '<span class="hint" style="margin:0">' + currentColor + '</span>' +
     '</div></div>';
 
   var days = DAYS.map(function (dn, wd) {
