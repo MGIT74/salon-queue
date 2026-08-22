@@ -317,9 +317,14 @@
   .cal-day-num { font-size: 13px; font-weight: 600; }
   .cal-dots { display: flex; gap: 2px; flex-wrap: wrap; justify-content: center; max-width: 100%; }
   .cal-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
-  .cal-legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--sep); }
-  .cal-legend-item { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--grey); }
-  .cal-legend-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .cal-legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--sep); }
+  .cal-legend-avatar {
+    width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0; border: 2px solid transparent;
+    display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 600; font-size: 14px;
+    cursor: pointer; padding: 0; transition: border-color .15s ease, opacity .15s ease; box-sizing: border-box;
+  }
+  .cal-legend-avatar.selected { border-color: var(--ink); box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--ink); }
+  .cal-legend-avatar.dimmed { opacity: .35; }
 
   /* Assistant "Ajouter un RDV" (admin) - parcours par étapes */
   .aa-step-title { font-size: 15px; font-weight: 600; margin-bottom: 12px; }
@@ -2877,6 +2882,20 @@ var calSelectedDate = null; // 'YYYY-MM-DD' ou null (= vue "a venir", hors calen
 var calAppointmentById = {}; // cache des RDV affiches, pour retrouver les infos au clic sans re-echapper du JSON en HTML
 var calUpcoming = [];
 var rdvBarberColors = {};
+var rdvBarberPhotos = {};
+var calBarberFilter = null;
+
+function applyCalBarberFilter(list) {
+  return calBarberFilter ? list.filter(function (a) { return a.barber_id === calBarberFilter; }) : list;
+}
+
+function toggleCalBarberFilter(barberId) {
+  calBarberFilter = calBarberFilter === barberId ? null : barberId;
+  if (calViewMode === 'month') renderMonthView();
+  else if (calViewMode === 'week') renderWeekView();
+  else renderDayView();
+  renderCalendarLegend(neededMonthKeys());
+}
 
 function ymd(d) {
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
@@ -2890,11 +2909,12 @@ function loadRdvTab() {
   calViewMode = 'month';
   calSelectedDate = null;
   calMonthCache = {};
+  calBarberFilter = null;
 
   api('/api/barbers?all=1').then(function (r) {
     var sel = document.getElementById('rdv-filter-barber');
     var sorted = r.items.slice().sort(function (a, b) { return a.name.localeCompare(b.name); });
-    sorted.forEach(function (b, i) { rdvBarberColors[b.id] = DOT_COLORS[i % DOT_COLORS.length]; });
+    sorted.forEach(function (b, i) { rdvBarberColors[b.id] = DOT_COLORS[i % DOT_COLORS.length]; rdvBarberPhotos[b.id] = b.photo_url || ''; });
     sel.innerHTML = '<option value="">Tous</option>' + sorted.map(function (b) {
       return '<option value="' + b.id + '">' + esc(b.name) + '</option>';
     }).join('');
@@ -2980,7 +3000,7 @@ function renderMonthView() {
   var daysInMonth = new Date(calAnchor.getFullYear(), calAnchor.getMonth() + 1, 0).getDate();
   var startOffset = (firstDay.getDay() + 6) % 7;
 
-  var monthAppts = appointmentsForRange(firstDay, new Date(calAnchor.getFullYear(), calAnchor.getMonth(), daysInMonth));
+  var monthAppts = applyCalBarberFilter(appointmentsForRange(firstDay, new Date(calAnchor.getFullYear(), calAnchor.getMonth(), daysInMonth)));
   var byDay = {};
   monthAppts.forEach(function (a) {
     var d = a.scheduled_at.slice(0, 10);
@@ -3260,7 +3280,7 @@ function renderWeekView() {
   document.getElementById('cal-month-label').textContent =
     start.getDate() + ' ' + monthNames[start.getMonth()] + ' – ' + end.getDate() + ' ' + monthNames[end.getMonth()] + ' ' + end.getFullYear();
 
-  var weekAppts = appointmentsForRange(start, end);
+  var weekAppts = applyCalBarberFilter(appointmentsForRange(start, end));
   var byDay = {};
   weekAppts.forEach(function (a) {
     var d = a.scheduled_at.slice(0, 10);
@@ -3295,7 +3315,7 @@ function renderDayView() {
   document.getElementById('cal-month-label').textContent =
     calAnchor.toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
 
-  var dayAppts = appointmentsForRange(calAnchor, calAnchor).sort(function (a, b) { return a.scheduled_at.localeCompare(b.scheduled_at); });
+  var dayAppts = applyCalBarberFilter(appointmentsForRange(calAnchor, calAnchor)).sort(function (a, b) { return a.scheduled_at.localeCompare(b.scheduled_at); });
   dayAppts.forEach(function (a) { calAppointmentById[a.id] = a; });
   var view = document.getElementById('cal-day-view');
   var addBtn = '<button class="btn btn-primary" style="width:100%;margin-bottom:14px" onclick="openAdminAddAppointment(\'' + ymd(calAnchor) + '\')">+ Ajouter un RDV</button>';
@@ -3328,7 +3348,14 @@ function renderCalendarLegend(keys) {
   document.getElementById('cal-legend').innerHTML = names.length === 0
     ? '<span class="hint" style="margin:0">Aucun coiffeur avec un RDV sur cette période</span>'
     : names.map(function (bid) {
-        return '<div class="cal-legend-item"><span class="cal-legend-dot" style="background:' + (rdvBarberColors[bid] || '#888') + '"></span>' + esc(seen[bid]) + '</div>';
+        var isSelected = calBarberFilter === bid;
+        var dimmed = calBarberFilter && !isSelected;
+        var photoStyle = rdvBarberPhotos[bid] ? 'background:url(&quot;' + esc(rdvBarberPhotos[bid]) + '&quot;) center/cover' : 'background:' + (rdvBarberColors[bid] || '#888');
+        return '<button class="cal-legend-avatar' + (isSelected ? ' selected' : '') + (dimmed ? ' dimmed' : '') + '" ' +
+          'title="' + esc(seen[bid]) + (isSelected ? ' (cliquer pour tout afficher)' : '') + '" ' +
+          'onclick="toggleCalBarberFilter(\'' + bid + '\')" style="' + photoStyle + '">' +
+          (rdvBarberPhotos[bid] ? '' : esc(seen[bid].charAt(0).toUpperCase())) +
+          '</button>';
       }).join('');
 }
 
