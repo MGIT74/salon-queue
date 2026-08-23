@@ -168,11 +168,16 @@
 
   .who { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 26px; }
   .who-label { font-size: 14px; color: var(--grey); }
-  .seg { display: flex; background: var(--fill); border-radius: 999px; padding: 4px; gap: 2px; flex-wrap: wrap; }
-  .seg button { border: none; background: none; color: var(--ink); font-family: inherit;
-                font-size: 15px; font-weight: 500; padding: 9px 20px; border-radius: 999px; cursor: pointer; }
-  .seg button.on { background: var(--card); font-weight: 600; box-shadow: var(--shadow); }
-  [data-theme="dark"] .seg button.on { background: #48484a; }
+  .seg { display: flex; background: none; border-radius: 0; padding: 0; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .seg-avatar {
+    width: 42px; height: 42px; border-radius: 50%; flex-shrink: 0; border: 2px solid transparent;
+    display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 600; font-size: 15px;
+    cursor: pointer; padding: 0; box-sizing: border-box; font-family: inherit;
+    transition: border-color .15s ease, transform .15s ease;
+  }
+  .seg-avatar.selected { border-color: var(--ink); box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--ink); }
+  .seg-avatar-all { background: var(--fill) !important; color: var(--grey); font-size: 12.5px; }
+  .seg-avatar-all.selected { color: var(--ink); }
 
   .cols { display: grid; grid-template-columns: 1fr 350px; gap: clamp(16px,2vw,26px); align-items: start; }
   .section-label { font-size: 12px; font-weight: 600; letter-spacing: .06em;
@@ -1579,15 +1584,18 @@ function extById(id) { return extras.find(function (e) { return e.id === id; });
 
 /* ============ Onglet file ============ */
 function renderSeg() {
-  var barberButtons = barbers.filter(function (b) { return b.active; })
-    .map(function (b) {
-      return '<button class="' + (me === b.id ? 'on' : '') + '" onclick="me=\'' + b.id + '\';renderSeg();renderQueue()">' +
-             esc(b.name) + '</button>';
-    }).join('');
+  var activeBarbers = barbers.filter(function (b) { return b.active; });
+  var barberButtons = activeBarbers.map(function (b) {
+    var photoStyle = b.photo_url ? 'background:url(&quot;' + esc(b.photo_url) + '&quot;) center/cover' : 'background:' + (b.color || stableColorForId(b.id));
+    return '<button class="seg-avatar' + (me === b.id ? ' selected' : '') + '" title="' + esc(b.name) + '" ' +
+      'onclick="me=\'' + b.id + '\';renderSeg();renderQueue()" style="' + photoStyle + '">' +
+      (b.photo_url ? '' : esc(b.name.charAt(0).toUpperCase())) +
+      '</button>';
+  }).join('');
 
-  var allButton = '<button class="' + (!me ? 'on' : '') + '" onclick="me=null;renderSeg();renderQueue()">Tout</button>';
+  var allButton = '<button class="seg-avatar seg-avatar-all' + (!me ? ' selected' : '') + '" title="Tout" onclick="me=null;renderSeg();renderQueue()">Tout</button>';
 
-  document.getElementById('seg').innerHTML = barbers.filter(function (b) { return b.active; }).length
+  document.getElementById('seg').innerHTML = activeBarbers.length
     ? allButton + barberButtons
     : '<span style="color:var(--grey);font-size:14px;padding:9px">Aucun coiffeur — ajoutez-en un dans l\'onglet Coiffeurs</span>';
 }
