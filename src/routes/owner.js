@@ -538,9 +538,14 @@ router.post('/caisse/close', requireAdmin, wrap(async (req, res) => {
  * Historique des clotures precedentes.
  */
 router.get('/caisse/closings', requireAdmin, wrap(async (req, res) => {
+  const conditions = ['salon_id = ?'];
+  const params = [req.salon.id];
+  if (req.query.date_from) { conditions.push('period_end >= ?'); params.push(req.query.date_from + ' 00:00:00'); }
+  if (req.query.date_to) { conditions.push('period_end <= ?'); params.push(req.query.date_to + ' 23:59:59'); }
+
   const [rows] = await pool.query(
-    'SELECT * FROM cash_closings WHERE salon_id = ? ORDER BY period_end DESC LIMIT 100',
-    [req.salon.id]
+    `SELECT * FROM cash_closings WHERE ${conditions.join(' AND ')} ORDER BY period_end DESC LIMIT 100`,
+    params
   );
   res.json({
     ok: true,

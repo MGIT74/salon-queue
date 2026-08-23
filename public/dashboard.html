@@ -755,6 +755,12 @@
       </h3>
       <div class="accordion-body" id="sales-detail-body" style="display:none">
       <p class="hint">Chaque vente encaissée, avec le coiffeur, les prestations/produits et le tarif.</p>
+      <div class="grid2" style="margin-bottom:12px">
+        <div class="fld" style="margin:0"><label for="sales-detail-from">Du</label>
+          <input type="date" id="sales-detail-from" onchange="onSalesDetailFilterChange()"></div>
+        <div class="fld" style="margin:0"><label for="sales-detail-to">Au</label>
+          <input type="date" id="sales-detail-to" onchange="onSalesDetailFilterChange()"></div>
+      </div>
       <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
         <div class="fld" style="margin:0"><label for="sales-detail-per-page">Par page</label>
           <select id="sales-detail-per-page" onchange="changeSalesDetailPerPage(this.value)">
@@ -776,6 +782,12 @@
         <svg class="accordion-chevron" id="closings-chevron" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
       </h3>
       <div class="accordion-body" id="closings-body" style="display:none">
+      <div class="grid2" style="margin-bottom:12px">
+        <div class="fld" style="margin:0"><label for="closings-from">Du</label>
+          <input type="date" id="closings-from" onchange="onClosingsFilterChange()"></div>
+        <div class="fld" style="margin:0"><label for="closings-to">Au</label>
+          <input type="date" id="closings-to" onchange="onClosingsFilterChange()"></div>
+      </div>
       <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
         <div class="fld" style="margin:0"><label for="closings-per-page">Par page</label>
           <select id="closings-per-page" onchange="changeClosingsPerPage(this.value)">
@@ -3747,6 +3759,44 @@ var caisseSalesDetailPerPage = 10;
 var caisseClosingsItems = [];
 var caisseClosingsPage = 1;
 var caisseClosingsPerPage = 10;
+var caissePeriodStart = null;
+
+function loadSalesDetail() {
+  var from = document.getElementById('sales-detail-from').value;
+  var to = document.getElementById('sales-detail-to').value;
+  var parts = [];
+  if (from) parts.push('date_from=' + encodeURIComponent(from));
+  if (to) parts.push('date_to=' + encodeURIComponent(to));
+  var url = parts.length
+    ? '/api/sales?' + parts.join('&')
+    : '/api/sales' + (caissePeriodStart ? '?since=' + encodeURIComponent(caissePeriodStart) : '');
+  api(url).then(function (rs) {
+    caisseSalesDetailItems = rs.items;
+    caisseSalesDetailPage = 1;
+    renderSalesDetailPage();
+  }).catch(function (e) { toast(e.message, true); });
+}
+
+function onSalesDetailFilterChange() {
+  loadSalesDetail();
+}
+
+function loadClosingsList() {
+  var from = document.getElementById('closings-from').value;
+  var to = document.getElementById('closings-to').value;
+  var parts = [];
+  if (from) parts.push('date_from=' + encodeURIComponent(from));
+  if (to) parts.push('date_to=' + encodeURIComponent(to));
+  api('/api/owner/caisse/closings' + (parts.length ? '?' + parts.join('&') : '')).then(function (r) {
+    caisseClosingsItems = r.items;
+    caisseClosingsPage = 1;
+    renderClosingsPage();
+  }).catch(function (e) { toast(e.message, true); });
+}
+
+function onClosingsFilterChange() {
+  loadClosingsList();
+}
 
 function renderPaginatedItemList(items, page, perPage, listElId, paginationElId, goToFnName, itemHtmlFn, emptyMsg) {
   var totalPages = Math.max(1, Math.ceil(items.length / perPage));
@@ -3849,19 +3899,11 @@ function loadCaisseTab() {
             '<span>' + eur(b.total_cents) + '</span></div>';
         }).join('');
 
-    var salesUrl = '/api/sales' + (r.period_start ? '?since=' + encodeURIComponent(r.period_start) : '');
-    api(salesUrl).then(function (rs) {
-      caisseSalesDetailItems = rs.items;
-      caisseSalesDetailPage = 1;
-      renderSalesDetailPage();
-    }).catch(function (e) { toast(e.message, true); });
+    caissePeriodStart = r.period_start;
+    loadSalesDetail();
   }).catch(function (e) { toast(e.message, true); });
 
-  api('/api/owner/caisse/closings').then(function (r) {
-    caisseClosingsItems = r.items;
-    caisseClosingsPage = 1;
-    renderClosingsPage();
-  }).catch(function (e) { toast(e.message, true); });
+  loadClosingsList();
 
   api('/api/settings').then(function (r) {
     document.getElementById('caisse-inactivity').value = r.settings.caisse_inactivity_seconds || 15;
