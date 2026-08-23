@@ -648,3 +648,28 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'barbers' AND column_name = 'color');
 SET @sql := IF(@c = 0, "ALTER TABLE barbers ADD COLUMN color VARCHAR(9) NULL", 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Horaires généraux du salon (Réglages > Calendrier) - un modèle par
+-- défaut global, indépendant des horaires propres à chaque coiffeur.
+CREATE TABLE IF NOT EXISTS salon_schedules (
+  id CHAR(36) PRIMARY KEY,
+  salon_id CHAR(36) NOT NULL,
+  weekday TINYINT NOT NULL,
+  start_time TIME NOT NULL,
+  end_time TIME NOT NULL,
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  UNIQUE KEY uniq_salon_day (salon_id, weekday),
+  FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Fermetures exceptionnelles du salon entier (férié, fermeture
+-- urgente...) - distinct des congés individuels de chaque coiffeur.
+CREATE TABLE IF NOT EXISTS salon_closures (
+  id CHAR(36) PRIMARY KEY,
+  salon_id CHAR(36) NOT NULL,
+  start_date DATE NOT NULL,
+  end_date DATE NOT NULL,
+  reason VARCHAR(255) NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

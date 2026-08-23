@@ -274,8 +274,38 @@ async function sendClientPasswordReset(salonId, to, resetUrl) {
   });
 }
 
+/**
+ * Fermeture exceptionnelle du salon (férié, fermeture urgente...) -
+ * envoyée à tous les clients connus du salon. Message par défaut
+ * générique, ou message personnalisé fourni par l'admin (ex: raison
+ * précise d'une fermeture d'urgence).
+ */
+async function sendSalonClosureNotice(salonId, to, info) {
+  const { tx, from, salon } = await getTransport(salonId);
+  const sameDay = info.startDate === info.endDate;
+  const whenText = sameDay
+    ? new Date(info.startDate + 'T00:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+    : new Date(info.startDate + 'T00:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' }) + ' au ' +
+      new Date(info.endDate + 'T00:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+
+  const customMessage = info.customMessage ? String(info.customMessage).trim() : '';
+  const defaultBody = `${salon} sera exceptionnellement fermé ${sameDay ? 'le' : 'du'} ${whenText}` +
+    (info.reason ? ` (${info.reason})` : '') + `.\n\nMerci de votre compréhension.`;
+  const bodyText = customMessage || defaultBody;
+
+  await tx.sendMail({
+    from,
+    to,
+    subject: `Fermeture exceptionnelle — ${salon}`,
+    text: `Bonjour ${info.clientName},\n\n${bodyText}\n\n${salon}`,
+    html: `<p>Bonjour ${info.clientName},</p>` +
+          `<p>${bodyText.replace(/\n/g, '<br>')}</p>` +
+          `<p>${salon}</p>`
+  });
+}
+
 module.exports = {
   sendTurnSoon, sendTest, sendGiftConfirmation, sendLoyaltyActivation, sendAppointmentConfirmation,
   sendAppointmentReminder, sendAppointmentCancelledByAdmin, sendAppointmentRescheduled,
-  sendClientVerificationEmail, sendClientPasswordReset, invalidateTransport
+  sendClientVerificationEmail, sendClientPasswordReset, sendSalonClosureNotice, invalidateTransport
 };

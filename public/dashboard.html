@@ -1079,6 +1079,25 @@
     </div>
 
     <div class="card-box">
+      <h3 class="accordion-head" onclick="toggleSettingsAccordion('salon-calendar')">
+        Calendrier
+        <svg class="accordion-chevron" id="salon-calendar-chevron" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </h3>
+      <div class="accordion-body" id="salon-calendar-body" style="display:none">
+
+      <h4 style="font-size:14.5px;font-weight:600;margin:0 0 4px">Horaires généraux du salon</h4>
+      <p class="hint">Modèle par défaut du salon, indépendant des horaires propres à chaque coiffeur (Coiffeurs &gt; Horaires).</p>
+      <div id="salon-schedule-days"></div>
+      <button class="btn btn-primary" style="margin-top:6px" onclick="saveSalonSchedule()">Enregistrer les horaires</button>
+
+      <h4 style="font-size:14.5px;font-weight:600;margin:26px 0 4px">Fermetures exceptionnelles</h4>
+      <p class="hint">Jours fériés, fermeture urgente... Le salon entier est fermé sur cette période, quel que soit le coiffeur.</p>
+      <div id="salon-closures-list" style="margin-bottom:16px"></div>
+      <button class="btn btn-soft" onclick="openAddSalonClosure()">+ Ajouter une fermeture</button>
+      </div>
+    </div>
+
+    <div class="card-box">
       <h3 class="accordion-head" onclick="toggleSettingsAccordion('smtp')">
         Envoi des emails (SMTP)
         <svg class="accordion-chevron" id="smtp-chevron" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
@@ -4534,6 +4553,8 @@ function openRdvSettings() {
   };
 }
 
+var salonClosuresItems = [];
+
 function loadSettings() {
   api('/api/settings').then(function (r) {
     var s = r.settings;
@@ -4547,6 +4568,9 @@ function loadSettings() {
     document.getElementById('set-pass').value = '';
     document.getElementById('pass-state').textContent = r.smtp_pass_set ? '· déjà enregistré' : '';
   }).catch(function (e) { toast(e.message, true); });
+
+  loadSalonSchedule();
+  loadSalonClosures();
 }
 
 function toggleSettingsAccordion(key) {
@@ -4555,6 +4579,158 @@ function toggleSettingsAccordion(key) {
   var isOpen = body.style.display !== 'none';
   body.style.display = isOpen ? 'none' : 'block';
   head.classList.toggle('on', !isOpen);
+}
+
+/* ============ Calendrier du salon (horaires généraux + fermetures) ============ */
+function loadSalonSchedule() {
+  api('/api/salon-calendar/schedule').then(function (r) {
+    renderSalonScheduleDays(r.schedules);
+  }).catch(function (e) { toast(e.message, true); });
+}
+
+function renderSalonScheduleDays(schedules) {
+  var html = DAYS.map(function (dn, wd) {
+    var s = (schedules || []).find(function (x) { return x.weekday === wd; });
+    var on = Boolean(s);
+    return '<div class="day-row' + (on ? '' : ' off') + '" data-day="' + wd + '">' +
+      '<div class="day-row-label">' +
+        '<div class="switch' + (on ? ' on' : '') + '" onclick="toggleDay(this)"></div>' +
+        '<span class="day-name">' + dn + '</span>' +
+      '</div>' +
+      '<div class="day-row-times">' +
+        '<input type="time" value="' + (s ? s.start_time.slice(0, 5) : '09:00') + '">' +
+        '<span class="to">à</span>' +
+        '<input type="time" value="' + (s ? s.end_time.slice(0, 5) : '19:00') + '">' +
+      '</div>' +
+      '</div>';
+  }).join('');
+  document.getElementById('salon-schedule-days').innerHTML = html;
+}
+
+function saveSalonSchedule() {
+  var box = document.getElementById('salon-schedule-days');
+  var schedules = Array.prototype.map.call(box.querySelectorAll('.day-row'), function (row) {
+    var times = row.querySelector('.day-row-times').querySelectorAll('input[type="time"]');
+    return {
+      weekday: Number(row.dataset.day),
+      active: row.querySelector('.switch').classList.contains('on'),
+      start_time: times[0].value,
+      end_time: times[1].value
+    };
+  });
+  api('/api/salon-calendar/schedule', { method: 'PUT', body: { schedules: schedules } })
+    .then(function () { toast('Horaires du salon enregistrés'); })
+    .catch(function (e) { toast(e.message, true); });
+}
+
+function loadSalonClosures() {
+  api('/api/salon-calendar/closures').then(function (r) {
+    salonClosuresItems = r.items;
+    renderSalonClosures();
+  }).catch(function (e) { toast(e.message, true); });
+}
+
+function renderSalonClosures() {
+  var list = document.getElementById('salon-closures-list');
+  list.innerHTML = salonClosuresItems.length === 0
+    ? '<div class="empty">Aucune fermeture prévue</div>'
+    : salonClosuresItems.map(function (c) {
+        var sameDay = c.start_date === c.end_date;
+        var from = new Date(c.start_date + 'T00:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+        var to = new Date(c.end_date + 'T00:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+        return '<div class="item"><div class="item-main">' +
+          '<div class="item-name">' + (sameDay ? from : from + ' → ' + to) + '</div>' +
+          (c.reason ? '<div class="item-meta">' + esc(c.reason) + '</div>' : '') +
+          '</div><div class="item-actions">' +
+          '<button class="btn btn-ghost" style="color:var(--red)" onclick="deleteSalonClosure(\'' + c.id + '\')">Supprimer</button>' +
+          '</div></div>';
+      }).join('');
+}
+
+function deleteSalonClosure(id) {
+  showConfirm('Supprimer cette fermeture ?', { title: 'Supprimer', danger: true, confirmLabel: 'Supprimer' })
+    .then(function (ok) {
+      if (!ok) return;
+      return api('/api/salon-calendar/closures/' + id, { method: 'DELETE' })
+        .then(function () { toast('Fermeture supprimée'); loadSalonClosures(); });
+    })
+    .catch(function (e) { toast(e.message, true); });
+}
+
+function openAddSalonClosure() {
+  var todayStr = nowSalonDatetimeString().slice(0, 10);
+  var overlay = _buildModal(
+    '<div class="modal-title">Ajouter une fermeture</div>' +
+    '<div class="fld"><label>Du</label><input type="date" id="asc-from" value="' + todayStr + '"></div>' +
+    '<div class="fld"><label>Au</label><input type="date" id="asc-to" value="' + todayStr + '"></div>' +
+    '<div class="fld"><label>Motif (optionnel)</label><input type="text" id="asc-reason" placeholder="Ex: jour férié, fermeture exceptionnelle…"></div>' +
+    '<div class="fld" style="margin-bottom:8px">' +
+      '<label style="display:flex;align-items:center;gap:8px;font-weight:400;cursor:pointer">' +
+        '<input type="checkbox" id="asc-send-email" onchange="ascToggleEmailOptions()"> Prévenir les clients par email' +
+      '</label>' +
+    '</div>' +
+    '<div id="asc-email-options" style="display:none">' +
+      '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px">' +
+        '<button type="button" class="cam-choice sel" id="asc-msg-default" onclick="ascSelectMsgType(\'default\')" style="display:flex;align-items:center;gap:10px;width:100%;padding:13px 15px;border:none;border-radius:12px;background:var(--fill);color:var(--ink);font-family:inherit;font-size:14.5px;font-weight:500;cursor:pointer;text-align:left">' +
+          '<span class="cam-dot"></span>Message par défaut' +
+        '</button>' +
+        '<button type="button" class="cam-choice" id="asc-msg-custom" onclick="ascSelectMsgType(\'custom\')" style="display:flex;align-items:center;gap:10px;width:100%;padding:13px 15px;border:none;border-radius:12px;background:var(--fill);color:var(--ink);font-family:inherit;font-size:14.5px;font-weight:500;cursor:pointer;text-align:left">' +
+          '<span class="cam-dot"></span>Message personnalisé' +
+        '</button>' +
+      '</div>' +
+      '<textarea class="modal-input" id="asc-custom-text" rows="3" style="display:none" placeholder="Ex: en raison d\'un dégât des eaux, le salon est exceptionnellement fermé…"></textarea>' +
+    '</div>' +
+    '<div class="modal-error" id="asc-error" style="display:none"></div>' +
+    '<div class="modal-actions">' +
+    '<button class="btn btn-soft" id="asc-cancel-btn">Annuler</button>' +
+    '<button class="btn btn-primary" id="asc-save-btn">Ajouter</button>' +
+    '</div>'
+  );
+
+  var ascMsgType = 'default';
+  window.ascSelectMsgType = function (type) {
+    ascMsgType = type;
+    overlay.querySelector('#asc-msg-default').classList.toggle('sel', type === 'default');
+    overlay.querySelector('#asc-msg-custom').classList.toggle('sel', type === 'custom');
+    overlay.querySelector('#asc-custom-text').style.display = type === 'custom' ? 'block' : 'none';
+  };
+  window.ascToggleEmailOptions = function () {
+    overlay.querySelector('#asc-email-options').style.display = overlay.querySelector('#asc-send-email').checked ? 'block' : 'none';
+  };
+
+  overlay.querySelector('#asc-cancel-btn').onclick = function () { _closeModal(overlay); };
+
+  overlay.querySelector('#asc-save-btn').onclick = function () {
+    var errEl = overlay.querySelector('#asc-error');
+    var from = overlay.querySelector('#asc-from').value;
+    var to = overlay.querySelector('#asc-to').value;
+    if (!from || !to) { errEl.textContent = 'Les 2 dates sont requises'; errEl.style.display = 'block'; return; }
+    if (to < from) { errEl.textContent = 'La date de fin doit être après la date de début'; errEl.style.display = 'block'; return; }
+
+    var sendEmail = overlay.querySelector('#asc-send-email').checked;
+    var customMessage = (sendEmail && ascMsgType === 'custom') ? overlay.querySelector('#asc-custom-text').value.trim() : '';
+
+    var btn = overlay.querySelector('#asc-save-btn');
+    btn.disabled = true; btn.textContent = 'Ajout…';
+
+    api('/api/salon-calendar/closures', {
+      method: 'POST',
+      body: {
+        start_date: from, end_date: to,
+        reason: overlay.querySelector('#asc-reason').value.trim(),
+        send_email: sendEmail,
+        custom_message: customMessage
+      }
+    }).then(function (r) {
+      _closeModal(overlay);
+      if (r.email) toast('Fermeture ajoutée — email envoyé à ' + r.email.sent + '/' + r.email.total + ' client(s)');
+      else toast('Fermeture ajoutée');
+      loadSalonClosures();
+    }).catch(function (e) {
+      btn.disabled = false; btn.textContent = 'Ajouter';
+      errEl.textContent = e.message; errEl.style.display = 'block';
+    });
+  };
 }
 
 function saveDeviceSettings() {

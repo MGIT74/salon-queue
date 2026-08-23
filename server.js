@@ -24,6 +24,7 @@ const catalogRoutes = require('./src/routes/catalog');
 const salesRoutes = require('./src/routes/sales');
 const barberRoutes = require('./src/routes/barbers');
 const settingsRoutes = require('./src/routes/settings');
+const salonCalendarRoutes = require('./src/routes/salonCalendar');
 const salonRoutes = require('./src/routes/salons');
 const ownerRoutes = require('./src/routes/owner');
 const signupRoutes = require('./src/routes/signup');
@@ -74,6 +75,7 @@ app.use('/api/catalog', catalogRoutes);
 app.use('/api/sales', salesRoutes);
 app.use('/api/barbers', barberRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/salon-calendar', salonCalendarRoutes);
 app.use('/api/owner', ownerRoutes);
 app.use('/api/client-auth', clientAuthRoutes);
 
