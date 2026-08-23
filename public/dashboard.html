@@ -4664,10 +4664,9 @@ function openAddSalonClosure() {
     '<div class="fld"><label>Du</label><input type="date" id="asc-from" value="' + todayStr + '"></div>' +
     '<div class="fld"><label>Au</label><input type="date" id="asc-to" value="' + todayStr + '"></div>' +
     '<div class="fld"><label>Motif (optionnel)</label><input type="text" id="asc-reason" placeholder="Ex: jour férié, fermeture exceptionnelle…"></div>' +
-    '<div class="fld" style="margin-bottom:8px">' +
-      '<label style="display:flex;align-items:center;gap:8px;font-weight:400;cursor:pointer">' +
-        '<input type="checkbox" id="asc-send-email" onchange="ascToggleEmailOptions()"> Prévenir les clients par email' +
-      '</label>' +
+    '<div style="display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 14px;background:var(--fill);border-radius:12px;margin-bottom:16px;cursor:pointer" onclick="ascToggleSendEmail()">' +
+      '<span style="font-size:14.5px">Prévenir les clients par email</span>' +
+      '<div class="switch" id="asc-send-email-switch"></div>' +
     '</div>' +
     '<div id="asc-email-options" style="display:none">' +
       '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px">' +
@@ -4694,8 +4693,10 @@ function openAddSalonClosure() {
     overlay.querySelector('#asc-msg-custom').classList.toggle('sel', type === 'custom');
     overlay.querySelector('#asc-custom-text').style.display = type === 'custom' ? 'block' : 'none';
   };
-  window.ascToggleEmailOptions = function () {
-    overlay.querySelector('#asc-email-options').style.display = overlay.querySelector('#asc-send-email').checked ? 'block' : 'none';
+  window.ascToggleSendEmail = function () {
+    var sw = overlay.querySelector('#asc-send-email-switch');
+    sw.classList.toggle('on');
+    overlay.querySelector('#asc-email-options').style.display = sw.classList.contains('on') ? 'block' : 'none';
   };
 
   overlay.querySelector('#asc-cancel-btn').onclick = function () { _closeModal(overlay); };
@@ -4707,7 +4708,7 @@ function openAddSalonClosure() {
     if (!from || !to) { errEl.textContent = 'Les 2 dates sont requises'; errEl.style.display = 'block'; return; }
     if (to < from) { errEl.textContent = 'La date de fin doit être après la date de début'; errEl.style.display = 'block'; return; }
 
-    var sendEmail = overlay.querySelector('#asc-send-email').checked;
+    var sendEmail = overlay.querySelector('#asc-send-email-switch').classList.contains('on');
     var customMessage = (sendEmail && ascMsgType === 'custom') ? overlay.querySelector('#asc-custom-text').value.trim() : '';
 
     var btn = overlay.querySelector('#asc-save-btn');
