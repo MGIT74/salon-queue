@@ -183,8 +183,6 @@
     transition: border-color .15s ease, transform .15s ease;
   }
   .seg-avatar.selected { border-color: var(--ink); box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--ink); }
-  .seg-avatar-all { background: var(--fill) !important; color: var(--grey); font-size: 12.5px; }
-  .seg-avatar-all.selected { color: var(--ink); }
 
   .cols { display: grid; grid-template-columns: 1fr 350px; gap: clamp(16px,2vw,26px); align-items: start; }
   .section-label { font-size: 12px; font-weight: 600; letter-spacing: .06em;
@@ -1595,17 +1593,21 @@ function renderSeg() {
   var activeBarbers = barbers.filter(function (b) { return b.active; });
   var barberButtons = activeBarbers.map(function (b) {
     var photoStyle = b.photo_url ? 'background:url(&quot;' + esc(b.photo_url) + '&quot;) center/cover' : 'background:' + (b.color || stableColorForId(b.id));
-    return '<button class="seg-avatar' + (me === b.id ? ' selected' : '') + '" title="' + esc(b.name) + '" ' +
-      'onclick="me=\'' + b.id + '\';renderSeg();renderQueue()" style="' + photoStyle + '">' +
+    return '<button class="seg-avatar' + (me === b.id ? ' selected' : '') + '" title="' + esc(b.name) + (me === b.id ? ' (cliquer pour tout afficher)' : '') + '" ' +
+      'onclick="toggleMeFilter(\'' + b.id + '\')" style="' + photoStyle + '">' +
       (b.photo_url ? '' : esc(b.name.charAt(0).toUpperCase())) +
       '</button>';
   }).join('');
 
-  var allButton = '<button class="seg-avatar seg-avatar-all' + (!me ? ' selected' : '') + '" title="Tout" onclick="me=null;renderSeg();renderQueue()">Tout</button>';
-
   document.getElementById('seg').innerHTML = activeBarbers.length
-    ? allButton + barberButtons
+    ? barberButtons
     : '<span style="color:var(--grey);font-size:14px;padding:9px">Aucun coiffeur — ajoutez-en un dans l\'onglet Coiffeurs</span>';
+}
+
+function toggleMeFilter(barberId) {
+  me = me === barberId ? null : barberId;
+  renderSeg();
+  renderQueue();
 }
 
 function chipsHtml(q) {
