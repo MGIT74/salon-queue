@@ -61,8 +61,8 @@ router.get('/closures', requireAdmin, wrap(async (req, res) => {
   res.json({
     ok: true,
     items: rows.map((r) => Object.assign({}, r, {
-      start_date: r.start_date.toISOString().slice(0, 10),
-      end_date: r.end_date.toISOString().slice(0, 10)
+      start_date: String(r.start_date).slice(0, 10),
+      end_date: String(r.end_date).slice(0, 10)
     }))
   });
 }));

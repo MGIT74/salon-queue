@@ -312,8 +312,8 @@ router.get('/:id/stats', requireAdmin, wrap(async (req, res) => {
       breaksByDay[b.weekday].push(b);
     });
     const leaveRanges = leaves.map((l) => ({
-      start: l.start_date.toISOString().slice(0, 10),
-      end: l.end_date.toISOString().slice(0, 10)
+      start: String(l.start_date).slice(0, 10),
+      end: String(l.end_date).slice(0, 10)
     }));
 
     function timeToMin(t) { const [h, m] = String(t).split(':').map(Number); return h * 60 + m; }
