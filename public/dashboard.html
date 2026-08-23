@@ -755,7 +755,18 @@
       </h3>
       <div class="accordion-body" id="sales-detail-body" style="display:none">
       <p class="hint">Chaque vente encaissée, avec le coiffeur, les prestations/produits et le tarif.</p>
+      <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+        <div class="fld" style="margin:0"><label for="sales-detail-per-page">Par page</label>
+          <select id="sales-detail-per-page" onchange="changeSalesDetailPerPage(this.value)">
+            <option value="5">5</option>
+            <option value="10" selected>10</option>
+            <option value="15">15</option>
+            <option value="20">20</option>
+          </select>
+        </div>
+      </div>
       <div id="caisse-sales-detail"></div>
+      <div class="clients-pagination" id="sales-detail-pagination"></div>
       </div>
     </div>
 
@@ -765,7 +776,18 @@
         <svg class="accordion-chevron" id="closings-chevron" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
       </h3>
       <div class="accordion-body" id="closings-body" style="display:none">
+      <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+        <div class="fld" style="margin:0"><label for="closings-per-page">Par page</label>
+          <select id="closings-per-page" onchange="changeClosingsPerPage(this.value)">
+            <option value="5">5</option>
+            <option value="10" selected>10</option>
+            <option value="15">15</option>
+            <option value="20">20</option>
+          </select>
+        </div>
+      </div>
       <div id="caisse-closings-list"></div>
+      <div class="clients-pagination" id="closings-pagination"></div>
       </div>
     </div>
 
@@ -3719,6 +3741,87 @@ function openCancelAppointmentsModal(ids) {
 }
 
 
+var caisseSalesDetailItems = [];
+var caisseSalesDetailPage = 1;
+var caisseSalesDetailPerPage = 10;
+var caisseClosingsItems = [];
+var caisseClosingsPage = 1;
+var caisseClosingsPerPage = 10;
+
+function renderPaginatedItemList(items, page, perPage, listElId, paginationElId, goToFnName, itemHtmlFn, emptyMsg) {
+  var totalPages = Math.max(1, Math.ceil(items.length / perPage));
+  var pageItems = items.slice((page - 1) * perPage, page * perPage);
+  var list = document.getElementById(listElId);
+  list.innerHTML = pageItems.length === 0
+    ? '<div class="empty">' + emptyMsg + '</div>'
+    : pageItems.map(itemHtmlFn).join('');
+
+  var pag = document.getElementById(paginationElId);
+  pag.innerHTML = totalPages <= 1 ? '' :
+    '<button onclick="' + goToFnName + '(' + (page - 1) + ')"' + (page <= 1 ? ' disabled' : '') + '>‹</button>' +
+    '<span class="page-label">Page ' + page + ' / ' + totalPages + '</span>' +
+    '<button onclick="' + goToFnName + '(' + (page + 1) + ')"' + (page >= totalPages ? ' disabled' : '') + '>›</button>';
+}
+
+function renderSalesDetailPage() {
+  var totalPages = Math.max(1, Math.ceil(caisseSalesDetailItems.length / caisseSalesDetailPerPage));
+  if (caisseSalesDetailPage > totalPages) caisseSalesDetailPage = totalPages;
+  renderPaginatedItemList(caisseSalesDetailItems, caisseSalesDetailPage, caisseSalesDetailPerPage,
+    'caisse-sales-detail', 'sales-detail-pagination', 'salesDetailGoToPage',
+    function (s) {
+      var when = new Date(s.created_at).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+      var itemsList = s.items.map(function (it) { return (it.quantity > 1 ? it.quantity + ' × ' : '') + it.item_name; }).join(', ');
+      var methodLabel2 = { especes: 'Espèces', cb: 'CB', autre: 'Autre' }[s.payment_method] || s.payment_method;
+      return '<div class="item"><div class="item-main">' +
+        '<div class="item-name">' + esc(s.barber_name || 'Non assigné') + ' — ' + eur(s.total_price_cents) + '</div>' +
+        '<div class="item-meta">' + esc(itemsList) + '</div>' +
+        '<div class="item-meta">' + when + ' · ' + methodLabel2 + '</div>' +
+        '</div></div>';
+    },
+    'Aucune vente sur cette période');
+}
+
+function changeSalesDetailPerPage(v) {
+  caisseSalesDetailPerPage = Number(v) || 10;
+  caisseSalesDetailPage = 1;
+  renderSalesDetailPage();
+}
+
+function salesDetailGoToPage(p) {
+  var totalPages = Math.max(1, Math.ceil(caisseSalesDetailItems.length / caisseSalesDetailPerPage));
+  if (p < 1 || p > totalPages) return;
+  caisseSalesDetailPage = p;
+  renderSalesDetailPage();
+}
+
+function renderClosingsPage() {
+  var totalPages = Math.max(1, Math.ceil(caisseClosingsItems.length / caisseClosingsPerPage));
+  if (caisseClosingsPage > totalPages) caisseClosingsPage = totalPages;
+  renderPaginatedItemList(caisseClosingsItems, caisseClosingsPage, caisseClosingsPerPage,
+    'caisse-closings-list', 'closings-pagination', 'closingsGoToPage',
+    function (c) {
+      var when = new Date(c.period_end).toLocaleString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+      return '<div class="item"><div class="item-main">' +
+        '<div class="item-name">' + when + ' — ' + eur(c.total_cents) + '</div>' +
+        '<div class="item-meta">' + c.sales_count + ' vente' + (c.sales_count > 1 ? 's' : '') + '</div>' +
+        '</div></div>';
+    },
+    'Aucune clôture pour le moment');
+}
+
+function changeClosingsPerPage(v) {
+  caisseClosingsPerPage = Number(v) || 10;
+  caisseClosingsPage = 1;
+  renderClosingsPage();
+}
+
+function closingsGoToPage(p) {
+  var totalPages = Math.max(1, Math.ceil(caisseClosingsItems.length / caisseClosingsPerPage));
+  if (p < 1 || p > totalPages) return;
+  caisseClosingsPage = p;
+  renderClosingsPage();
+}
+
 function loadCaisseTab() {
   api('/api/owner/caisse/current-period').then(function (r) {
     document.getElementById('caisse-period-since').textContent = r.period_start
@@ -3748,33 +3851,16 @@ function loadCaisseTab() {
 
     var salesUrl = '/api/sales' + (r.period_start ? '?since=' + encodeURIComponent(r.period_start) : '');
     api(salesUrl).then(function (rs) {
-      var list = document.getElementById('caisse-sales-detail');
-      list.innerHTML = rs.items.length === 0
-        ? '<div class="empty">Aucune vente sur cette période</div>'
-        : rs.items.map(function (s) {
-            var when = new Date(s.created_at).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
-            var itemsList = s.items.map(function (it) { return (it.quantity > 1 ? it.quantity + ' × ' : '') + it.item_name; }).join(', ');
-            var methodLabel2 = { especes: 'Espèces', cb: 'CB', autre: 'Autre' }[s.payment_method] || s.payment_method;
-            return '<div class="item"><div class="item-main">' +
-              '<div class="item-name">' + esc(s.barber_name || 'Non assigné') + ' — ' + eur(s.total_price_cents) + '</div>' +
-              '<div class="item-meta">' + esc(itemsList) + '</div>' +
-              '<div class="item-meta">' + when + ' · ' + methodLabel2 + '</div>' +
-              '</div></div>';
-          }).join('');
+      caisseSalesDetailItems = rs.items;
+      caisseSalesDetailPage = 1;
+      renderSalesDetailPage();
     }).catch(function (e) { toast(e.message, true); });
   }).catch(function (e) { toast(e.message, true); });
 
   api('/api/owner/caisse/closings').then(function (r) {
-    var list = document.getElementById('caisse-closings-list');
-    list.innerHTML = r.items.length === 0
-      ? '<div class="empty">Aucune clôture pour le moment</div>'
-      : r.items.map(function (c) {
-          var when = new Date(c.period_end).toLocaleString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-          return '<div class="item"><div class="item-main">' +
-            '<div class="item-name">' + when + ' — ' + eur(c.total_cents) + '</div>' +
-            '<div class="item-meta">' + c.sales_count + ' vente' + (c.sales_count > 1 ? 's' : '') + '</div>' +
-            '</div></div>';
-        }).join('');
+    caisseClosingsItems = r.items;
+    caisseClosingsPage = 1;
+    renderClosingsPage();
   }).catch(function (e) { toast(e.message, true); });
 
   api('/api/settings').then(function (r) {
