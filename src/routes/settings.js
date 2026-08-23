@@ -1,6 +1,6 @@
 const express = require('express');
 const { pool, getSettings, setSettings, getCaisseLockedUntil } = require('../db');
-const { sendTest, invalidateTransport } = require('../lib/mailer');
+const { sendTest, invalidateTransport, sendAppointmentConfirmation, sendAppointmentReminder, sendAppointmentCancelledByAdmin, sendAppointmentRescheduled, sendTurnSoon } = require('../lib/mailer');
 const requireAdmin = require('../middleware/auth');
 
 const router = express.Router();
@@ -93,6 +93,49 @@ router.post('/smtp/test', requireAdmin, wrap(async (req, res) => {
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
+}));
+
+/**
+ * Envoi de test pour un ou plusieurs des 5 modèles d'emails
+ * automatiques, avec des données d'exemple - permet de vérifier le
+ * rendu (personnalisé ou par défaut) sans avoir à créer un vrai RDV.
+ * Chaque type est essayé indépendamment, un échec sur l'un n'empêche
+ * pas les autres.
+ */
+router.post('/email-templates/test', requireAdmin, wrap(async (req, res) => {
+  const to = req.body.to;
+  const types = Array.isArray(req.body.types) ? req.body.types : [];
+  if (!to) return res.status(400).json({ error: 'Adresse de destination requise' });
+  if (!types.length) return res.status(400).json({ error: 'Sélectionnez au moins un modèle à tester' });
+
+  const sampleInfo = {
+    clientName: 'Jean Dupont',
+    when: 'vendredi 28 août à 15h30',
+    serviceName: 'Coupe + Barbe',
+    barberName: 'Alex',
+    cancelUrl: 'https://' + req.get('host') + '/rdv.html?salon=' + (req.salon.slug || '') + '&cancel=exemple'
+  };
+
+  const senders = {
+    confirmation: () => sendAppointmentConfirmation(req.salon.id, to, sampleInfo),
+    reminder: () => sendAppointmentReminder(req.salon.id, to, sampleInfo),
+    cancelled: () => sendAppointmentCancelledByAdmin(req.salon.id, to, sampleInfo),
+    rescheduled: () => sendAppointmentRescheduled(req.salon.id, to, sampleInfo),
+    turn_soon: () => sendTurnSoon(req.salon.id, to, sampleInfo.clientName, 12)
+  };
+
+  const results = {};
+  for (const type of types) {
+    if (!senders[type]) { results[type] = { ok: false, error: 'Type inconnu' }; continue; }
+    try {
+      await senders[type]();
+      results[type] = { ok: true };
+    } catch (err) {
+      results[type] = { ok: false, error: err.message };
+    }
+  }
+
+  res.json({ ok: true, results });
 }));
 
 // Réglages publics utiles à la borne (nom du salon uniquement)

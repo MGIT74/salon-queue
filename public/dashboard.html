@@ -1182,7 +1182,10 @@
           <textarea id="tpl-turn-soon-body" rows="4" placeholder="Bonjour {{client_name}}, votre tour est estimé dans environ {{wait_min}} minutes."></textarea></div>
       </div>
 
-      <button class="btn btn-primary" onclick="saveEmailTemplates()">Enregistrer les notifications</button>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="saveEmailTemplates()">Enregistrer les notifications</button>
+        <button class="btn btn-soft" onclick="openTestEmailTemplates()">Envoyer un email de test</button>
+      </div>
       </div>
     </div>
   </div>
@@ -4756,6 +4759,80 @@ function saveEmailTemplates() {
   api('/api/settings', { method: 'PUT', body: body })
     .then(function () { toast('Modèles enregistrés'); })
     .catch(function (e) { toast(e.message, true); });
+}
+
+var EMAIL_TPL_LABELS = {
+  confirmation: 'Confirmation de réservation',
+  reminder: 'Rappel avant un RDV',
+  cancelled: 'Annulation par le salon',
+  rescheduled: "Déplacement d'un RDV",
+  'turn-soon': 'Tour approche (file sans RDV)'
+};
+
+function openTestEmailTemplates() {
+  var overlay = _buildModal(
+    '<div class="modal-title">Envoyer un email de test</div>' +
+    '<div class="modal-message" style="margin-bottom:16px">Envoyé avec des données d\'exemple (nom, horaire, prestation fictifs) - utilise le modèle personnalisé s\'il est enregistré, sinon le message par défaut.</div>' +
+    '<div class="fld"><label for="tet-email">Email du destinataire</label>' +
+      '<input type="email" id="tet-email" placeholder="vous@exemple.com"></div>' +
+    '<label class="select-all-row" style="margin-bottom:10px">' +
+      '<input type="checkbox" id="tet-select-all" onchange="tetToggleSelectAll(this.checked)">' +
+      'Tout sélectionner' +
+    '</label>' +
+    '<div style="display:flex;flex-direction:column;gap:2px;margin-bottom:16px">' +
+    EMAIL_TPL_TYPES.map(function (type) {
+      return '<label style="display:flex;align-items:center;gap:10px;padding:9px 4px;font-weight:400;cursor:pointer">' +
+        '<input type="checkbox" class="tet-check" value="' + type + '" onchange="tetSyncSelectAll()">' +
+        EMAIL_TPL_LABELS[type] +
+        '</label>';
+    }).join('') +
+    '</div>' +
+    '<div class="modal-error" id="tet-error" style="display:none"></div>' +
+    '<div class="modal-actions">' +
+    '<button class="btn btn-soft" id="tet-cancel-btn">Fermer</button>' +
+    '<button class="btn btn-primary" id="tet-send-btn">Envoyer</button>' +
+    '</div>'
+  );
+
+  window.tetToggleSelectAll = function (checked) {
+    overlay.querySelectorAll('.tet-check').forEach(function (cb) { cb.checked = checked; });
+  };
+  window.tetSyncSelectAll = function () {
+    var checks = overlay.querySelectorAll('.tet-check');
+    var checkedCount = overlay.querySelectorAll('.tet-check:checked').length;
+    var selectAll = overlay.querySelector('#tet-select-all');
+    selectAll.checked = checkedCount === checks.length;
+    selectAll.indeterminate = checkedCount > 0 && checkedCount < checks.length;
+  };
+
+  overlay.querySelector('#tet-cancel-btn').onclick = function () { _closeModal(overlay); };
+
+  overlay.querySelector('#tet-send-btn').onclick = function () {
+    var errEl = overlay.querySelector('#tet-error');
+    var to = overlay.querySelector('#tet-email').value.trim();
+    var types = Array.prototype.map.call(overlay.querySelectorAll('.tet-check:checked'), function (cb) { return cb.value; });
+
+    if (!to) { errEl.textContent = 'Adresse email requise'; errEl.style.display = 'block'; return; }
+    if (!types.length) { errEl.textContent = 'Sélectionnez au moins un modèle à tester'; errEl.style.display = 'block'; return; }
+
+    var btn = overlay.querySelector('#tet-send-btn');
+    btn.disabled = true; btn.textContent = 'Envoi…';
+
+    api('/api/settings/email-templates/test', { method: 'POST', body: { to: to, types: types } })
+      .then(function (r) {
+        _closeModal(overlay);
+        var failedTypes = Object.keys(r.results).filter(function (t) { return !r.results[t].ok; });
+        if (failedTypes.length) {
+          toast('Envoyé, mais échec pour : ' + failedTypes.map(function (t) { return EMAIL_TPL_LABELS[t]; }).join(', '), true);
+        } else {
+          toast('Email(s) de test envoyé(s) à ' + to);
+        }
+      })
+      .catch(function (e) {
+        btn.disabled = false; btn.textContent = 'Envoyer';
+        errEl.textContent = e.message; errEl.style.display = 'block';
+      });
+  };
 }
 
 function saveSettings() {
