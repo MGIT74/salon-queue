@@ -1066,8 +1066,6 @@
       <p class="hint">Le nom affiché sur la borne et dans les emails.</p>
       <div class="grid2">
         <div class="fld"><label for="set-salon">Nom du salon</label><input id="set-salon" type="text"></div>
-        <div class="fld"><label for="set-notify">Prévenir le client X minutes avant son tour</label>
-          <input id="set-notify" type="number" min="5" max="120"></div>
         <div class="fld"><label for="set-currency">Devise</label>
           <select id="set-currency">
             <option value="EUR">Euro (€)</option>
@@ -1176,6 +1174,8 @@
       <div class="email-tpl-block" style="border-bottom:none;margin-bottom:0;padding-bottom:0">
         <h4>Tour approche (file d'attente sans RDV)</h4>
         <p class="hint">Jetons disponibles : {{client_name}}, {{wait_min}}, {{salon}}</p>
+        <div class="fld"><label for="set-notify">Prévenir le client X minutes avant son tour</label>
+          <input id="set-notify" type="number" min="5" max="120"></div>
         <div class="fld"><label for="tpl-turn-soon-subject">Sujet</label>
           <input id="tpl-turn-soon-subject" type="text" placeholder="Votre tour approche"></div>
         <div class="fld"><label for="tpl-turn-soon-body">Message</label>
@@ -4750,7 +4750,7 @@ function saveDeviceSettings() {
 var EMAIL_TPL_TYPES = ['confirmation', 'reminder', 'cancelled', 'rescheduled', 'turn-soon'];
 
 function saveEmailTemplates() {
-  var body = {};
+  var body = { notify_before_min: document.getElementById('set-notify').value };
   EMAIL_TPL_TYPES.forEach(function (type) {
     var key = type.replace(/-/g, '_');
     body['email_tpl_' + key + '_subject'] = document.getElementById('tpl-' + type + '-subject').value;
