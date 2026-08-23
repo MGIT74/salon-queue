@@ -47,10 +47,11 @@ html, body {
   border: none; border-radius: 999px; font-family: inherit;
   font-size: 15px; font-weight: 600; padding: 12px 22px;
   cursor: pointer; letter-spacing: -.01em;
-  transition: background .18s ease;
+  transition: background .18s ease, color .18s ease, box-shadow .18s ease,
+              transform .15s cubic-bezier(.34,1.56,.64,1);
   color: var(--ink); background: var(--fill);
 }
-.btn:active { transform: scale(.97); }
+.btn:active:not(:disabled) { transform: scale(.96); }
 .btn:disabled { opacity: .5; cursor: default; }
 .btn-primary { background: var(--blue); color: #fff; }
 .btn-primary:hover:not(:disabled) { background: var(--blue-hover); }
@@ -59,6 +60,18 @@ html, body {
 .btn-soft:hover { background: var(--fill-2); }
 .btn-ghost { background: none; color: var(--grey); font-weight: 500; }
 .btn-ghost:hover { color: var(--red); }
+
+/* Retour doux au clic pour tous les autres éléments cliquables de
+   l'app (onglets, avatars, bascules...) - avant, aucune transition
+   sur transform : le clic était sec, sans aucun effet visuel. */
+button, .switch, .clients-pagination button {
+  transition: background .18s ease, color .18s ease, border-color .18s ease,
+              box-shadow .18s ease, opacity .18s ease,
+              transform .15s cubic-bezier(.34,1.56,.64,1);
+}
+button:active:not(:disabled), .switch:active {
+  transform: scale(.95);
+}
 
 .fld { margin-bottom: 15px; }
 .fld label {
