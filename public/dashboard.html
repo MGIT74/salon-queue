@@ -67,7 +67,7 @@
   }
   .sidebar-logout:hover { background: rgba(255,59,48,0.1); }
   .sidebar-theme-btn { display: none; }
-  .sidebar-logout-mobile { display: none; }
+  .sidebar-logout-mobile { display: none !important; }
   .tabs button.on { background: var(--fill); font-weight: 600; }
   [data-theme="dark"] .tabs button.on { background: #3a3a3c; }
 
@@ -115,7 +115,7 @@
     }
 
     .sidebar-logout-mobile {
-      display: flex; flex-direction: column; align-items: center; gap: 3px;
+      display: flex !important; flex-direction: column; align-items: center; gap: 3px;
       flex: 1 0 auto; min-width: 60px; text-align: center; white-space: nowrap;
       border: none; background: none; color: var(--red) !important; font-family: inherit;
       font-size: 10px; font-weight: 500; padding: 8px 6px; cursor: pointer;
