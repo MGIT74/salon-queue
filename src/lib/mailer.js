@@ -282,21 +282,32 @@ async function sendClientPasswordReset(salonId, to, resetUrl) {
  */
 async function sendSalonClosureNotice(salonId, to, info) {
   const { tx, from, salon } = await getTransport(salonId);
+  const s = await getSettings(salonId);
   const sameDay = info.startDate === info.endDate;
   const whenText = sameDay
     ? new Date(info.startDate + 'T00:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
     : new Date(info.startDate + 'T00:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' }) + ' au ' +
       new Date(info.endDate + 'T00:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
 
-  const customMessage = info.customMessage ? String(info.customMessage).trim() : '';
+  // Priorité : message ponctuel tapé pour CETTE fermeture précise >
+  // modèle personnalisé enregistré dans Notifications email > message
+  // par défaut codé en dur.
+  const perInstanceMessage = info.customMessage ? String(info.customMessage).trim() : '';
+  const tokens = {
+    client_name: info.clientName, start_date: whenText, end_date: whenText,
+    when: whenText, reason: info.reason || '', salon
+  };
+  const customSubject = s.email_tpl_closure_subject ? applyTemplate(s.email_tpl_closure_subject, tokens) : '';
+  const templateBody = s.email_tpl_closure_body ? applyTemplate(s.email_tpl_closure_body, tokens) : '';
+
   const defaultBody = `${salon} sera exceptionnellement fermé ${sameDay ? 'le' : 'du'} ${whenText}` +
     (info.reason ? ` (${info.reason})` : '') + `.\n\nMerci de votre compréhension.`;
-  const bodyText = customMessage || defaultBody;
+  const bodyText = perInstanceMessage || templateBody || defaultBody;
 
   await tx.sendMail({
     from,
     to,
-    subject: `Fermeture exceptionnelle — ${salon}`,
+    subject: customSubject || `Fermeture exceptionnelle — ${salon}`,
     text: `Bonjour ${info.clientName},\n\n${bodyText}\n\n${salon}`,
     html: `<p>Bonjour ${info.clientName},</p>` +
           `<p>${bodyText.replace(/\n/g, '<br>')}</p>` +

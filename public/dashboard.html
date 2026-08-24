@@ -1173,7 +1173,7 @@
           <textarea id="tpl-rescheduled-body" rows="4" placeholder="Bonjour {{client_name}}, votre rendez-vous a été modifié. Nouvel horaire : {{when}}."></textarea></div>
       </div>
 
-      <div class="email-tpl-block" style="border-bottom:none;margin-bottom:0;padding-bottom:0">
+      <div class="email-tpl-block">
         <h4>Tour approche (file d'attente sans RDV)</h4>
         <p class="hint">Jetons disponibles : {{client_name}}, {{wait_min}}, {{salon}}</p>
         <div class="fld"><label for="set-notify">Prévenir le client X minutes avant son tour</label>
@@ -1182,6 +1182,15 @@
           <input id="tpl-turn-soon-subject" type="text" placeholder="Votre tour approche"></div>
         <div class="fld"><label for="tpl-turn-soon-body">Message</label>
           <textarea id="tpl-turn-soon-body" rows="4" placeholder="Bonjour {{client_name}}, votre tour est estimé dans environ {{wait_min}} minutes."></textarea></div>
+      </div>
+
+      <div class="email-tpl-block" style="border-bottom:none;margin-bottom:0;padding-bottom:0">
+        <h4>Fermeture exceptionnelle du salon</h4>
+        <p class="hint">Jetons disponibles : {{client_name}}, {{when}}, {{reason}}, {{salon}}. Utilisé comme message par défaut lors de l'ajout d'une fermeture (Calendrier), sauf si un message ponctuel est tapé pour cette fermeture précise.</p>
+        <div class="fld"><label for="tpl-closure-subject">Sujet</label>
+          <input id="tpl-closure-subject" type="text" placeholder="Fermeture exceptionnelle — {{salon}}"></div>
+        <div class="fld"><label for="tpl-closure-body">Message</label>
+          <textarea id="tpl-closure-body" rows="4" placeholder="Bonjour {{client_name}}, {{salon}} sera exceptionnellement fermé {{when}}{{reason}}."></textarea></div>
       </div>
 
       <div style="display:flex;gap:10px;flex-wrap:wrap">
@@ -4749,7 +4758,7 @@ function saveDeviceSettings() {
     .catch(function (e) { toast(e.message, true); });
 }
 
-var EMAIL_TPL_TYPES = ['confirmation', 'reminder', 'cancelled', 'rescheduled', 'turn-soon'];
+var EMAIL_TPL_TYPES = ['confirmation', 'reminder', 'cancelled', 'rescheduled', 'turn-soon', 'closure'];
 
 function saveEmailTemplates() {
   var body = { notify_before_min: document.getElementById('set-notify').value };
@@ -4768,7 +4777,8 @@ var EMAIL_TPL_LABELS = {
   reminder: 'Rappel avant un RDV',
   cancelled: 'Annulation par le salon',
   rescheduled: "Déplacement d'un RDV",
-  'turn-soon': 'Tour approche (file sans RDV)'
+  'turn-soon': 'Tour approche (file sans RDV)',
+  closure: 'Fermeture exceptionnelle du salon'
 };
 
 function openTestEmailTemplates() {

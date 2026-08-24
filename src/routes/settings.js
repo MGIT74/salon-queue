@@ -1,6 +1,6 @@
 const express = require('express');
 const { pool, getSettings, setSettings, getCaisseLockedUntil } = require('../db');
-const { sendTest, invalidateTransport, sendAppointmentConfirmation, sendAppointmentReminder, sendAppointmentCancelledByAdmin, sendAppointmentRescheduled, sendTurnSoon } = require('../lib/mailer');
+const { sendTest, invalidateTransport, sendAppointmentConfirmation, sendAppointmentReminder, sendAppointmentCancelledByAdmin, sendAppointmentRescheduled, sendTurnSoon, sendSalonClosureNotice } = require('../lib/mailer');
 const requireAdmin = require('../middleware/auth');
 
 const router = express.Router();
@@ -24,6 +24,7 @@ const EDITABLE = [
   'email_tpl_cancelled_subject', 'email_tpl_cancelled_body',
   'email_tpl_rescheduled_subject', 'email_tpl_rescheduled_body',
   'email_tpl_turn_soon_subject', 'email_tpl_turn_soon_body',
+  'email_tpl_closure_subject', 'email_tpl_closure_body',
   'caisse_inactivity_seconds', 'caisse_reopen_hour', 'currency',
   'rdv_slot_step_min', 'rdv_min_lead_min', 'rdv_max_advance_days',
   'rdv_buffer_min', 'rdv_cancel_deadline_min', 'rdv_prep_alert_min'
@@ -113,7 +114,10 @@ router.post('/email-templates/test', requireAdmin, wrap(async (req, res) => {
     when: 'vendredi 28 août à 15h30',
     serviceName: 'Coupe + Barbe',
     barberName: 'Alex',
-    cancelUrl: 'https://' + req.get('host') + '/rdv.html?salon=' + (req.salon.slug || '') + '&cancel=exemple'
+    cancelUrl: 'https://' + req.get('host') + '/rdv.html?salon=' + (req.salon.slug || '') + '&cancel=exemple',
+    reason: 'travaux',
+    startDate: '2026-08-28',
+    endDate: '2026-08-28'
   };
 
   const senders = {
@@ -121,7 +125,8 @@ router.post('/email-templates/test', requireAdmin, wrap(async (req, res) => {
     reminder: () => sendAppointmentReminder(req.salon.id, to, sampleInfo),
     cancelled: () => sendAppointmentCancelledByAdmin(req.salon.id, to, sampleInfo),
     rescheduled: () => sendAppointmentRescheduled(req.salon.id, to, sampleInfo),
-    turn_soon: () => sendTurnSoon(req.salon.id, to, sampleInfo.clientName, 12)
+    'turn-soon': () => sendTurnSoon(req.salon.id, to, sampleInfo.clientName, 12),
+    closure: () => sendSalonClosureNotice(req.salon.id, to, sampleInfo)
   };
 
   const results = {};
