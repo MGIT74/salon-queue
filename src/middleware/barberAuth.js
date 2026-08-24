@@ -22,7 +22,7 @@ module.exports = async function requireAdminOrBarber(req, res, next) {
   if (req.salon.owner_password_hash) {
     if (await verifyPassword(given, req.salon.owner_password_hash)) return next();
   } else {
-    const adminPw = (req.salon.admin_password || '').replace(/[\r\n]+$/, '').trim();
+    const adminPw = (req.salon.owner_admin_password || '').replace(/[\r\n]+$/, '').trim();
     if (adminPw && given === adminPw) return next();
   }
 

@@ -29,9 +29,10 @@ module.exports = async function resolveSalon(req, res, next) {
       });
     }
 
-    // requireAdmin lit req.salon.admin_password : on le fait pointer vers
-    // le mot de passe partagé du propriétaire, sans toucher requireAdmin.
-    salon.admin_password = salon.owner_admin_password;
+    // req.salon expose déjà owner_admin_password directement (issu de
+    // la requête SQL) - inutile et risqué de le recopier sous un autre
+    // nom sur req.salon, un objet partagé par de nombreuses routes qui
+    // pourrait un jour le sérialiser par erreur dans une réponse.
     req.salon = salon;
     req.ownerId = salon.owner_id;
     next();

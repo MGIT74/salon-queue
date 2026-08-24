@@ -108,7 +108,7 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
 
   const itemRows = items.map((it) => {
     const qty = Math.max(1, Number(it.quantity) || 1);
-    const unitPrice = Math.round(Number(it.unit_price_cents) || 0);
+    const unitPrice = Math.max(0, Math.round(Number(it.unit_price_cents) || 0));
     total += qty * unitPrice;
     return [crypto.randomUUID(), saleId, it.item_type || 'product', it.item_id || null, it.item_name || 'Article', unitPrice, qty];
   });
@@ -144,7 +144,7 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
       item_type: it.item_type || 'product',
       item_id: it.item_id || null,
       item_name: it.item_name || 'Article',
-      unit_price_cents: Math.round(Number(it.unit_price_cents) || 0),
+      unit_price_cents: Math.max(0, Math.round(Number(it.unit_price_cents) || 0)),
       quantity: Math.max(1, Number(it.quantity) || 1)
     }));
     const giftId = crypto.randomUUID();

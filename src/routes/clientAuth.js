@@ -281,7 +281,21 @@ router.put('/me', requireClient, wrap(async (req, res) => {
       [req.clientAccount.salon_id, email, req.clientAccount.id]
     );
     if (existing) return res.status(409).json({ error: 'Cet email est déjà utilisé par un autre compte' });
-    sets.push('email = ?'); params.push(email);
+
+    // Changer d'email doit forcer une nouvelle vérification - sinon
+    // le compte resterait marqué "vérifié" sans jamais avoir prouvé
+    // que ce client possède réellement cette nouvelle adresse.
+    const verifyToken = crypto.randomBytes(32).toString('hex');
+    const verifyExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    sets.push('email = ?', 'email_verified = 0', 'verify_token = ?', 'verify_token_expires = ?');
+    params.push(email, verifyToken, verifyExpires);
+
+    try {
+      const verifyUrl = appendParam(req.body.base_url, 'verify', verifyToken);
+      await sendClientVerificationEmail(req.clientAccount.salon_id, email, verifyUrl);
+    } catch (err) {
+      console.error('[client email change] envoi email échoué:', err.message);
+    }
   }
 
   if (new_password) {

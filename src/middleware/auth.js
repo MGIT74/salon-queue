@@ -36,7 +36,7 @@ module.exports = async function requireAdmin(req, res, next) {
       return next();
     }
 
-    const expected = (req.salon.admin_password || '').replace(/[\r\n]+$/, '').trim();
+    const expected = (req.salon.owner_admin_password || '').replace(/[\r\n]+$/, '').trim();
     if (!expected || given !== expected) {
       return res.status(401).json({ error: 'Mot de passe incorrect' });
     }

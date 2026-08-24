@@ -254,7 +254,7 @@ router.get('/availability', wrap(async (req, res) => {
   if (req.query.extras) {
     const extraIds = String(req.query.extras).split(',').filter(Boolean);
     if (extraIds.length) {
-      const [rows] = await pool.query('SELECT duration_min FROM extras WHERE id IN (?)', [extraIds]);
+      const [rows] = await pool.query('SELECT duration_min FROM extras WHERE id IN (?) AND salon_id = ?', [extraIds, req.salon.id]);
       extraDuration = rows.reduce((a, r) => a + r.duration_min, 0);
     }
   }
@@ -391,7 +391,7 @@ router.post('/', wrap(async (req, res) => {
   let extraDuration = 0;
   let extraNames = [];
   if (extraIds.length) {
-    const [rows] = await pool.query('SELECT id, name, duration_min FROM extras WHERE id IN (?)', [extraIds]);
+    const [rows] = await pool.query('SELECT id, name, duration_min FROM extras WHERE id IN (?) AND salon_id = ?', [extraIds, req.salon.id]);
     extraDuration = rows.reduce((a, r) => a + r.duration_min, 0);
     extraNames = rows.map((r) => r.name);
   }
@@ -504,7 +504,7 @@ router.post('/admin-create', requireAdminOrBarber, wrap(async (req, res) => {
   let extraDuration = 0;
   let extraNames = [];
   if (extraIds.length) {
-    const [rows] = await pool.query('SELECT id, name, duration_min FROM extras WHERE id IN (?)', [extraIds]);
+    const [rows] = await pool.query('SELECT id, name, duration_min FROM extras WHERE id IN (?) AND salon_id = ?', [extraIds, req.salon.id]);
     extraDuration = rows.reduce((a, r) => a + r.duration_min, 0);
     extraNames = rows.map((r) => r.name);
   }
