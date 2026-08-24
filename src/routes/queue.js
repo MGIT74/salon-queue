@@ -183,10 +183,22 @@ router.post('/checkin', wrap(async (req, res) => {
   }
 
   const id = crypto.randomUUID();
+
+  // Le coiffeur choisi (si précisé) doit appartenir à CE salon - même
+  // protection que pour les RDV (appointments.js), sinon un barber_id
+  // d'un autre salon (deviné/connu) était accepté tel quel.
+  let checkinBarberId = barber_id || null;
+  if (checkinBarberId) {
+    const [[ownedBarber]] = await pool.query(
+      'SELECT id FROM barbers WHERE id = ? AND salon_id = ? AND active = 1', [checkinBarberId, req.salon.id]
+    );
+    if (!ownedBarber) return res.status(404).json({ error: 'Coiffeur introuvable' });
+  }
+
   await pool.query(
     `INSERT INTO queue (id, salon_id, client_name, email, phone, service_id, barber_id, status)
      VALUES (?, ?, ?, ?, ?, ?, ?, 'waiting')`,
-    [id, req.salon.id, client_name, email || null, phone || null, service_id, barber_id || null]
+    [id, req.salon.id, client_name, email || null, phone || null, service_id, checkinBarberId]
   );
   if (Array.isArray(extras) && extras.length) {
     const values = extras.map((extraId) => [id, extraId]);
@@ -209,7 +221,7 @@ router.post('/checkin', wrap(async (req, res) => {
     await pool.query(
       `INSERT INTO appointments (id, salon_id, barber_id, client_name, email, phone, service_id, scheduled_at, status, promoted_queue_id, source)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, 'walkin')`,
-      [apptId, req.salon.id, barber_id || null, client_name, email || null, phone || null, service_id, nowParisDatetimeString(), id]
+      [apptId, req.salon.id, checkinBarberId, client_name, email || null, phone || null, service_id, nowParisDatetimeString(), id]
     );
     if (Array.isArray(extras) && extras.length) {
       await pool.query(
@@ -376,7 +388,17 @@ router.put('/:id', requireAdminOrBarber, wrap(async (req, res) => {
   const sets = [];
   const params = [];
   if (service_id) { sets.push('service_id = ?'); params.push(service_id); }
-  if (barber_id !== undefined && !req.barberId) { sets.push('barber_id = ?'); params.push(barber_id || null); }
+  if (barber_id !== undefined && !req.barberId) {
+    if (barber_id) {
+      // Le coiffeur choisi doit appartenir à CE salon - même protection
+      // que pour les RDV et le check-in kiosk.
+      const [[ownedBarber]] = await pool.query(
+        'SELECT id FROM barbers WHERE id = ? AND salon_id = ? AND active = 1', [barber_id, req.salon.id]
+      );
+      if (!ownedBarber) return res.status(404).json({ error: 'Coiffeur introuvable' });
+    }
+    sets.push('barber_id = ?'); params.push(barber_id || null);
+  }
 
   // Coordonnées du client (nom/email/téléphone) : réservé à l'admin
   // (pas au coiffeur, qui n'a de toute façon accès qu'à ses propres

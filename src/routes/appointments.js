@@ -410,6 +410,14 @@ router.post('/', wrap(async (req, res) => {
     }
     if (!finalBarberId) return res.status(409).json({ error: "Ce créneau n'est plus disponible" });
   } else {
+    // Le coiffeur demandé doit appartenir à CE salon - sans ça, un
+    // barber_id d'un autre salon (deviné/connu) était accepté tel
+    // quel, computeSlotsForBarber ne vérifiant lui-même aucun salon_id.
+    const [[ownedBarber]] = await pool.query(
+      'SELECT id FROM barbers WHERE id = ? AND salon_id = ? AND active = 1', [finalBarberId, req.salon.id]
+    );
+    if (!ownedBarber) return res.status(404).json({ error: 'Coiffeur introuvable' });
+
     const slots = await computeSlotsForBarber(finalBarberId, date, durationMin, rdvSettings);
     if (!slots.includes(time)) return res.status(409).json({ error: "Ce créneau n'est plus disponible" });
   }
@@ -509,6 +517,16 @@ router.post('/admin-create', requireAdminOrBarber, wrap(async (req, res) => {
     extraNames = rows.map((r) => r.name);
   }
   const durationMin = service.duration_min + extraDuration;
+
+  // Le coiffeur demandé doit appartenir à CE salon - protection
+  // identique à la route publique (voir plus haut), même si côté
+  // coiffeur connecté req.barberId est déjà garanti sûr par
+  // barberAuth.js (le PIN est vérifié avec salon_id) - reste utile
+  // pour le choix libre de l'admin.
+  const [[ownedBarber]] = await pool.query(
+    'SELECT id FROM barbers WHERE id = ? AND salon_id = ? AND active = 1', [barber_id, req.salon.id]
+  );
+  if (!ownedBarber) return res.status(404).json({ error: 'Coiffeur introuvable' });
 
   // Admin exempté du délai minimum de réservation (rdv_min_lead_min) et
   // de la fenêtre max à l'avance (pas vérifiée ici du tout) - ce sont
@@ -657,6 +675,13 @@ router.put('/:id/reschedule', requireAdmin, wrap(async (req, res) => {
 
   const finalBarberId = barber_id || appt.barber_id;
   if (!finalBarberId) return res.status(400).json({ error: 'Le coiffeur est requis' });
+
+  // Même protection que pour la création : le coiffeur choisi doit
+  // appartenir à CE salon.
+  const [[ownedBarber]] = await pool.query(
+    'SELECT id FROM barbers WHERE id = ? AND salon_id = ? AND active = 1', [finalBarberId, req.salon.id]
+  );
+  if (!ownedBarber) return res.status(404).json({ error: 'Coiffeur introuvable' });
 
   if (`${date} ${time}:00` < nowParisDatetimeString()) {
     return res.status(400).json({ error: 'Ce créneau est déjà passé.' });
