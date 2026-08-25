@@ -286,6 +286,7 @@ function loadSalonName() {
       var name = d.salon_name || 'Le Salon';
       CURRENCY = d.currency || 'EUR';
       rdvPrepAlertMin = Number(d.rdv_prep_alert_min) || 0;
+      applyAccentColor(d.accent_color);
       document.title = name + ' — Mon poste';
       var mark = document.getElementById('salon-mark');
       if (mark) mark.textContent = name.toUpperCase();

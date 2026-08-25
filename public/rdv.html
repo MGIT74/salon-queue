@@ -214,6 +214,7 @@ function loadCatalog() {
     barbers = r[2].items.filter(function (b) { return b.accepts_appointments; });
     var salonName = r[3].salon_name;
     CURRENCY = r[3].currency || 'EUR';
+    applyAccentColor(r[3].accent_color);
     document.title = 'Rendez-vous — ' + salonName;
     document.getElementById('salon-mark').textContent = salonName.toUpperCase();
     renderBarberGrid();

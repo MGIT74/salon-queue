@@ -1030,13 +1030,24 @@
     <div class="card-box">
       <h3>Logo du salon</h3>
       <p class="hint">Affiché à côté du nom du salon dans le dashboard. Une image carrée fonctionne mieux.</p>
-      <div style="display:flex;align-items:center;gap:16px">
+      <div style="display:flex;align-items:center;gap:16px;margin-bottom:22px">
         <div id="salon-logo-preview" onclick="document.getElementById('logo-input').click()"
              style="width:72px;height:72px;border-radius:16px;cursor:pointer;background:var(--fill);
              display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;
              color:var(--grey);font-size:12px;text-align:center;background-size:cover;background-position:center">Ajouter</div>
         <input type="file" id="logo-input" accept="image/*" style="display:none" onchange="uploadSalonLogo(this)">
         <div class="hint" style="margin:0">Cliquez sur le cadre pour choisir une image.</div>
+      </div>
+
+      <h4 style="font-size:14.5px;font-weight:600;margin:0 0 4px">Couleur d'accentuation</h4>
+      <p class="hint">Remplace le bleu par défaut de l'app (boutons, sélections, liens) par la couleur de votre choix.</p>
+      <div style="display:flex;align-items:center;gap:10px">
+        <input type="color" id="acc-accent-color" value="#0071e3"
+               style="width:44px;height:44px;border:none;border-radius:12px;padding:0;cursor:pointer;background:none"
+               onchange="document.getElementById('acc-accent-color-hex').textContent = this.value">
+        <span class="hint" id="acc-accent-color-hex" style="margin:0">#0071e3</span>
+        <button class="btn btn-soft" style="padding:8px 14px;font-size:13px" onclick="saveAccentColor()">Enregistrer</button>
+        <button class="btn btn-ghost" style="padding:8px 14px;font-size:13px" onclick="resetAccentColor()">Réinitialiser</button>
       </div>
     </div>
 
@@ -1358,6 +1369,14 @@ function loadCurrentSalonName() {
         } else {
           logoPreview.style.backgroundImage = '';
           logoPreview.textContent = 'Ajouter';
+        }
+      }
+      if (d.accent_color) {
+        applyAccentColor(d.accent_color);
+        var accentInput = document.getElementById('acc-accent-color');
+        if (accentInput) {
+          accentInput.value = d.accent_color;
+          document.getElementById('acc-accent-color-hex').textContent = d.accent_color;
         }
       }
       var giftPreview = document.getElementById('gift-tile-preview');
@@ -4386,6 +4405,26 @@ function uploadSalonLogo(input) {
     img.src = e.target.result;
   };
   reader.readAsDataURL(file);
+}
+
+function saveAccentColor() {
+  var hex = document.getElementById('acc-accent-color').value;
+  api('/api/settings', { method: 'PUT', body: { accent_color: hex } })
+    .then(function () {
+      applyAccentColor(hex);
+      toast('Couleur enregistrée');
+    })
+    .catch(function (e) { toast(e.message, true); });
+}
+
+function resetAccentColor() {
+  api('/api/settings', { method: 'PUT', body: { accent_color: '' } })
+    .then(function () {
+      document.getElementById('acc-accent-color').value = '#0071e3';
+      document.getElementById('acc-accent-color-hex').textContent = '#0071e3';
+      toast('Bleu par défaut restauré — rechargez la page pour le voir partout');
+    })
+    .catch(function (e) { toast(e.message, true); });
 }
 
 // Même principe que le logo — remplace l'icône 🎁 par défaut sur la

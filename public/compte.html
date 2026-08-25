@@ -871,6 +871,7 @@ function esc(s) {
       .then(function (d) {
         if (d.salon_name) document.getElementById('salon-mark').textContent = d.salon_name.toUpperCase();
         CURRENCY = d.currency || 'EUR';
+        applyAccentColor(d.accent_color);
       })
       .catch(function () {});
   }

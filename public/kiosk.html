@@ -331,6 +331,7 @@ function loadCatalog() {
     salonLogoUrl = r[2].logo_url || '';
     giftTileImage = r[2].gift_tile_image_url || '';
     CURRENCY = r[2].currency || 'EUR';
+    applyAccentColor(r[2].accent_color);
     document.getElementById('salon-name').textContent = salonName;
     document.getElementById('t-salon').textContent = salonName;
 

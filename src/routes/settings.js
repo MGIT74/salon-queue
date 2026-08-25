@@ -25,6 +25,7 @@ const EDITABLE = [
   'email_tpl_rescheduled_subject', 'email_tpl_rescheduled_body',
   'email_tpl_turn_soon_subject', 'email_tpl_turn_soon_body',
   'email_tpl_closure_subject', 'email_tpl_closure_body',
+  'accent_color',
   'caisse_inactivity_seconds', 'caisse_reopen_hour', 'currency',
   'rdv_slot_step_min', 'rdv_min_lead_min', 'rdv_max_advance_days',
   'rdv_buffer_min', 'rdv_cancel_deadline_min', 'rdv_prep_alert_min'
@@ -162,6 +163,7 @@ router.get('/public', wrap(async (req, res) => {
     rdv_buffer_min: s.rdv_buffer_min ? Number(s.rdv_buffer_min) : 0,
     rdv_cancel_deadline_min: s.rdv_cancel_deadline_min ? Number(s.rdv_cancel_deadline_min) : 0,
     rdv_prep_alert_min: s.rdv_prep_alert_min ? Number(s.rdv_prep_alert_min) : 0,
+    accent_color: s.accent_color || null,
     caisse_locked_until: caisseLockedUntil
   });
 }));

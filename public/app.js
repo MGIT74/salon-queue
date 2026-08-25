@@ -43,6 +43,45 @@ function esc(s) {
  * client (pas forcément Paris) fausserait la comparaison, comme
  * new Date(chaine_sans_Z) est interprété en heure locale du poste.
  */
+/**
+ * Couleur d'accentuation personnalisable (Compte > Logo du salon) -
+ * remplace le bleu Apple par défaut (--blue) partout dans l'app pour
+ * CE salon précis, avec des teintes dérivées automatiquement
+ * (survol plus foncé, fond léger plus clair/sombre selon le thème).
+ * Appelée sur chaque page avec la valeur de GET /api/settings/public
+ * - ne fait rien si aucune couleur personnalisée n'est enregistrée
+ * (garde le bleu Apple d'origine).
+ */
+function hexToRgb(hex) {
+  hex = hex.replace('#', '');
+  if (hex.length === 3) hex = hex.split('').map(function (c) { return c + c; }).join('');
+  var num = parseInt(hex, 16);
+  return { r: (num >> 16) & 255, g: (num >> 8) & 255, b: num & 255 };
+}
+
+function shadeColor(hex, percent) {
+  var rgb = hexToRgb(hex);
+  function adjust(c) {
+    var t = percent < 0 ? 0 : 255;
+    var p = Math.abs(percent) / 100;
+    return Math.round((t - c) * p + c);
+  }
+  var r = adjust(rgb.r), g = adjust(rgb.g), b = adjust(rgb.b);
+  return '#' + [r, g, b].map(function (c) { return c.toString(16).padStart(2, '0'); }).join('');
+}
+
+function applyAccentColor(hex) {
+  if (!hex || !/^#[0-9a-fA-F]{6}$/.test(hex)) return;
+  var hover = shadeColor(hex, -22);
+  var softLight = shadeColor(hex, 88);
+  var softDark = shadeColor(hex, -75);
+  var style = document.createElement('style');
+  style.textContent =
+    ':root { --blue: ' + hex + '; --blue-hover: ' + hover + '; --blue-soft: ' + softLight + '; }' +
+    '[data-theme="dark"] { --blue: ' + hex + '; --blue-hover: ' + hover + '; --blue-soft: ' + softDark + '; }';
+  document.head.appendChild(style);
+}
+
 function nowSalonDatetimeString() {
   var parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit',
