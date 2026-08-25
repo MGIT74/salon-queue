@@ -73,12 +73,13 @@ function shadeColor(hex, percent) {
 function applyAccentColor(hex) {
   if (!hex || !/^#[0-9a-fA-F]{6}$/.test(hex)) return;
   var hover = shadeColor(hex, -22);
-  var softLight = shadeColor(hex, 88);
-  var softDark = shadeColor(hex, -75);
+  // Ne touche JAMAIS --blue/--blue-hover/--blue-soft (couleur des
+  // étiquettes, badges de statut, icônes RDV...) - seulement --accent,
+  // utilisé uniquement par les boutons principaux et les vrais liens.
   var style = document.createElement('style');
   style.textContent =
-    ':root { --blue: ' + hex + '; --blue-hover: ' + hover + '; --blue-soft: ' + softLight + '; }' +
-    '[data-theme="dark"] { --blue: ' + hex + '; --blue-hover: ' + hover + '; --blue-soft: ' + softDark + '; }';
+    ':root { --accent: ' + hex + '; --accent-hover: ' + hover + '; }' +
+    '[data-theme="dark"] { --accent: ' + hex + '; --accent-hover: ' + hover + '; }';
   document.head.appendChild(style);
 }
 

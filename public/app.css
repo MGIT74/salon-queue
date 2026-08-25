@@ -2,6 +2,7 @@
   --bg: #f5f5f7; --card: #ffffff; --ink: #1d1d1f; --grey: #86868b;
   --sep: #d2d2d7; --fill: #f2f2f7; --fill-2: #e8e8ed;
   --blue: #0071e3; --blue-hover: #0058b9; --blue-soft: #e8f1fd;
+  --accent: #0071e3; --accent-hover: #0058b9;
   --green: #34c759; --green-hover: #28a746;
   --red: #ff3b30; --orange: #ff9500;
   --shadow: 0 1px 3px rgba(0,0,0,0.05);
@@ -11,6 +12,7 @@
   --bg: #000000; --card: #1c1c1e; --ink: #f5f5f7; --grey: #98989d;
   --sep: #38383a; --fill: #2c2c2e; --fill-2: #3a3a3c;
   --blue: #0a84ff; --blue-hover: #409cff; --blue-soft: #0a2540;
+  --accent: #0a84ff; --accent-hover: #409cff;
   --green: #30d158; --green-hover: #4ade7b;
   --red: #ff453a; --orange: #ff9f0a;
   --shadow: none;
@@ -53,8 +55,8 @@ html, body {
 }
 .btn:active:not(:disabled) { transform: scale(.96); }
 .btn:disabled { opacity: .5; cursor: default; }
-.btn-primary { background: var(--blue); color: #fff; }
-.btn-primary:hover:not(:disabled) { background: var(--blue-hover); }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
 .btn-green { background: var(--green); color: #fff; }
 .btn-green:hover:not(:disabled) { background: var(--green-hover); }
 .btn-soft:hover { background: var(--fill-2); }
