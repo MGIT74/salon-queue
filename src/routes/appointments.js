@@ -821,4 +821,4 @@ async function promoteTodayAppointments(salonId) {
   }
 }
 
-module.exports = { router, promoteTodayAppointments, nowParisDatetimeString };
+module.exports = { router, promoteTodayAppointments, nowParisDatetimeString, computeSlotsForBarber };

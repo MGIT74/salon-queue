@@ -26,6 +26,7 @@ const barberRoutes = require('./src/routes/barbers');
 const settingsRoutes = require('./src/routes/settings');
 const salonCalendarRoutes = require('./src/routes/salonCalendar');
 const salonRoutes = require('./src/routes/salons');
+const automationRoutes = require('./src/routes/automation');
 const ownerRoutes = require('./src/routes/owner');
 const signupRoutes = require('./src/routes/signup');
 const clientAuthRoutes = require('./src/routes/clientAuth');
@@ -61,6 +62,7 @@ app.use(express.static(path.join(__dirname, 'public'), {
 // Gestion des salons (super admin) — jamais scopée à un salon particulier,
 // donc montée AVANT resolveSalon.
 app.use('/api/super', salonRoutes);
+app.use('/api/automation', automationRoutes);
 
 // Inscription d'un nouveau propriétaire de salon : crée son propre salon,
 // donc ne peut pas dépendre d'un salon déjà résolu.
