@@ -20,8 +20,14 @@ function wrap(fn) {
  * l'ensemble d'entre eux en une seule exécution.
  */
 router.get('/salons', requireAutomationKey, wrap(async (req, res) => {
+  // L'email du propriétaire est inclus ici pour permettre l'envoi
+  // d'un rapport individuel à CHAQUE salon (pas un seul email combiné
+  // envoyé à une adresse fixe) - chaque propriétaire ne reçoit que le
+  // rapport de son ou ses propres salons.
   const [rows] = await pool.query(
-    "SELECT id, name, slug FROM salons WHERE active = 1 ORDER BY created_at"
+    `SELECT s.id, s.name, s.slug, o.email AS owner_email
+     FROM salons s JOIN owners o ON o.id = s.owner_id
+     WHERE s.active = 1 ORDER BY s.created_at`
   );
   res.json({ ok: true, items: rows });
 }));
