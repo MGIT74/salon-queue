@@ -107,7 +107,7 @@ router.get('/salons/:id/clients', requireAutomationKey, wrap(async (req, res) =>
   if (!salon) return res.status(404).json({ error: 'Salon introuvable ou inactif' });
 
   const [rows] = await pool.query(
-    `SELECT client_name, email, phone, MAX(end_at) AS last_visit, COUNT(*) AS visit_count
+    `SELECT MAX(client_name) AS client_name, email, MAX(phone) AS phone, MAX(end_at) AS last_visit, COUNT(*) AS visit_count
      FROM queue
      WHERE salon_id = ? AND status = 'done' AND email IS NOT NULL AND email != ''
      GROUP BY email
@@ -140,7 +140,7 @@ router.get('/salons/:id/inactive-clients', requireAutomationKey, wrap(async (req
   if (!salon) return res.status(404).json({ error: 'Salon introuvable ou inactif' });
 
   const [rows] = await pool.query(
-    `SELECT client_name, email, phone, MAX(end_at) AS last_visit, COUNT(*) AS visit_count
+    `SELECT MAX(client_name) AS client_name, email, MAX(phone) AS phone, MAX(end_at) AS last_visit, COUNT(*) AS visit_count
      FROM queue
      WHERE salon_id = ? AND status = 'done' AND email IS NOT NULL AND email != ''
      GROUP BY email
