@@ -119,11 +119,14 @@
   .empty { background: var(--card); border-radius: 14px; padding: 30px; text-align: center; color: var(--grey); font-size: 14px; box-shadow: var(--shadow); }
 
   .ai-chat-row {
-    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    display: grid; grid-template-columns: 1fr 210px 100px 100px 64px 90px 96px;
+    align-items: center; gap: 14px;
     background: var(--fill); border-radius: 12px; padding: 12px 16px; margin-bottom: 8px;
   }
-  .ai-chat-row .name { font-size: 14.5px; font-weight: 600; flex: 1; min-width: 140px; }
-  .ai-chat-row .meta { font-size: 12.5px; color: var(--grey); width: 210px; flex-shrink: 0; }
+  .ai-chat-row.head { background: none; padding: 0 16px 12px; margin-bottom: 0; }
+  .ai-chat-row .name { font-size: 14.5px; font-weight: 600; }
+  .ai-chat-row .meta { font-size: 12.5px; color: var(--grey); }
+  .ai-chat-row .toggle-col { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--grey); }
   .ai-chat-row .limit-input {
     width: 64px; padding: 7px 9px; border: none; border-radius: 8px; background: var(--card);
     color: var(--ink); font-family: inherit; font-size: 13.5px; text-align: center;
@@ -237,17 +240,18 @@
     <div class="card-box">
       <h3>Assistant IA — par salon</h3>
       <p class="hint">Active/désactive l'assistant et ajuste la limite mensuelle de questions gratuites, salon par salon.</p>
-      <div class="ai-chat-row" style="background:none;box-shadow:none;padding-top:0;padding-bottom:12px">
-        <div class="name" style="visibility:hidden">Toutes les enseignes</div>
-        <div class="meta" style="visibility:hidden">placeholder</div>
-        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--grey)">Activée
+      <div class="ai-chat-row head">
+        <div class="name"></div>
+        <div class="meta"></div>
+        <div class="toggle-col">Activée
           <div class="switch" id="ai-global-enabled-switch" onclick="toggleAiEnabledGlobal(this)"></div>
-        </label>
-        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--grey)">Gratuit
+        </div>
+        <div class="toggle-col">Gratuit
           <div class="switch" id="ai-global-unlimited-switch" onclick="toggleAiUnlimitedGlobal(this)"></div>
-        </label>
-        <div style="width:64px"></div>
-        <div style="width:78px"></div>
+        </div>
+        <div></div>
+        <div></div>
+        <button class="btn btn-ghost" style="padding:7px 10px;font-size:11.5px" onclick="resetAiCreditsGlobal()">Réinitialiser tout</button>
       </div>
       <div id="ai-chat-salons-list"><div class="empty">Chargement…</div></div>
     </div>
@@ -554,14 +558,15 @@ function loadAiChatOverview() {
           return '<div class="ai-chat-row">' +
             '<div class="name">' + esc(s.name) + '</div>' +
             '<div class="meta">' + usageLabel + '</div>' +
-            '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--grey)">Activée' +
+            '<div class="toggle-col">Activée' +
               '<div class="switch' + (s.ai_enabled ? ' on' : '') + '" onclick="toggleAiField(\'' + s.id + '\',\'ai_enabled\',' + (!s.ai_enabled) + ',this)" title="Activer/désactiver l\'IA"></div>' +
-            '</label>' +
-            '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--grey)">Gratuit' +
+            '</div>' +
+            '<div class="toggle-col">Gratuit' +
               '<div class="switch' + (s.unlimited ? ' on' : '') + '" onclick="toggleAiField(\'' + s.id + '\',\'unlimited\',' + (!s.unlimited) + ',this)" title="Rendre gratuit (illimité)"></div>' +
-            '</label>' +
+            '</div>' +
             '<input type="number" min="0" class="limit-input" value="' + s.monthly_credit_limit + '" id="ai-limit-' + s.id + '" ' + (s.unlimited ? 'disabled title="Sans effet tant que le salon est en gratuit/illimité"' : '') + '>' +
             '<button class="btn btn-soft" style="padding:7px 12px;font-size:12.5px" onclick="saveAiCreditLimit(\'' + s.id + '\')">Enregistrer</button>' +
+            '<button class="btn btn-ghost" style="padding:7px 10px;font-size:11.5px" onclick="resetAiCredits(\'' + s.id + '\')" title="Remettre ses crédits à sa limite tout de suite">Réinitialiser</button>' +
             '</div>';
         }).join('');
   }).catch(function (e) { toast(e.message, true); });
@@ -618,6 +623,24 @@ function saveAiCreditLimit(salonId) {
   superApi('/api/super/ai-chat/' + salonId, { method: 'PUT', body: { monthly_credit_limit: value } })
     .then(function () { toast('Limite mise à jour'); loadAiChatOverview(); })
     .catch(function (e) { toast(e.message, true); });
+}
+
+function resetAiCredits(salonId) {
+  superApi('/api/super/ai-chat/' + salonId + '/reset-credits', { method: 'PUT' })
+    .then(function () { toast('Crédits réinitialisés'); loadAiChatOverview(); })
+    .catch(function (e) { toast(e.message, true); });
+}
+
+function resetAiCreditsGlobal() {
+  showConfirm('Réinitialiser les crédits de TOUTES les enseignes actives dès maintenant ?', { title: 'Réinitialiser tout' }).then(function (ok) {
+    if (!ok) return;
+    superApi('/api/super/ai-chat-global/reset-credits', { method: 'PUT' })
+      .then(function (r) {
+        toast(r.salons_updated + ' enseigne(s) réinitialisée(s)');
+        loadAiChatOverview();
+      })
+      .catch(function (e) { toast(e.message, true); });
+  });
 }
 </script>
 </body>

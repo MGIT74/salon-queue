@@ -444,4 +444,53 @@ router.put('/ai-chat-global/enabled', requireSuperAdmin, wrap(async (req, res) =
   res.json({ ok: true, salons_updated: salonRows.length, ai_enabled: Boolean(enabled) });
 }));
 
+/**
+ * Remet immédiatement les crédits d'un salon précis à sa limite
+ * mensuelle (sans attendre le changement de mois) - utile après
+ * avoir dépanné un salon, ou pour lui offrir un nouveau quota tout de
+ * suite.
+ */
+router.put('/ai-chat/:salonId/reset-credits', requireSuperAdmin, wrap(async (req, res) => {
+  const salonId = req.params.salonId;
+  const [[salon]] = await pool.query('SELECT id FROM salons WHERE id = ?', [salonId]);
+  if (!salon) return res.status(404).json({ error: 'Salon introuvable' });
+
+  const month = new Date().toISOString().slice(0, 7);
+  const [[existing]] = await pool.query('SELECT * FROM ai_chat_credits WHERE salon_id = ?', [salonId]);
+
+  if (!existing) {
+    await pool.query(
+      'INSERT INTO ai_chat_credits (salon_id, credits_remaining, period_month, ai_enabled, monthly_credit_limit) VALUES (?, 10, ?, 1, 10)',
+      [salonId, month]
+    );
+  } else {
+    await pool.query(
+      'UPDATE ai_chat_credits SET credits_remaining = monthly_credit_limit, period_month = ?, questions_used_this_month = 0 WHERE salon_id = ?',
+      [month, salonId]
+    );
+  }
+
+  res.json({ ok: true });
+}));
+
+/**
+ * Même réinitialisation immédiate des crédits, mais pour TOUTES les
+ * enseignes actives en une seule fois.
+ */
+router.put('/ai-chat-global/reset-credits', requireSuperAdmin, wrap(async (req, res) => {
+  const month = new Date().toISOString().slice(0, 7);
+  const [salonRows] = await pool.query('SELECT id FROM salons WHERE active = 1');
+
+  for (const s of salonRows) {
+    await pool.query(
+      `INSERT INTO ai_chat_credits (salon_id, credits_remaining, period_month, ai_enabled, monthly_credit_limit)
+       VALUES (?, 10, ?, 1, 10)
+       ON DUPLICATE KEY UPDATE credits_remaining = monthly_credit_limit, period_month = VALUES(period_month), questions_used_this_month = 0`,
+      [s.id, month]
+    );
+  }
+
+  res.json({ ok: true, salons_updated: salonRows.length });
+}));
+
 module.exports = router;
