@@ -329,13 +329,15 @@ router.get('/ai-chat/overview', requireSuperAdmin, wrap(async (req, res) => {
   const [rows] = await pool.query(
     `SELECT s.id, s.name, s.slug,
             COALESCE(c.ai_enabled, 1) AS ai_enabled,
+            COALESCE(c.unlimited, 0) AS unlimited,
             COALESCE(c.monthly_credit_limit, 10) AS monthly_credit_limit,
-            CASE WHEN c.period_month = ? THEN c.credits_remaining ELSE COALESCE(c.monthly_credit_limit, 10) END AS credits_remaining
+            CASE WHEN c.period_month = ? THEN c.credits_remaining ELSE COALESCE(c.monthly_credit_limit, 10) END AS credits_remaining,
+            CASE WHEN c.period_month = ? THEN COALESCE(c.questions_used_this_month, 0) ELSE 0 END AS questions_used_this_month
      FROM salons s
      LEFT JOIN ai_chat_credits c ON c.salon_id = s.id
      WHERE s.active = 1
      ORDER BY s.name`,
-    [month]
+    [month, month]
   );
 
   const items = rows.map((r) => ({
@@ -343,25 +345,28 @@ router.get('/ai-chat/overview', requireSuperAdmin, wrap(async (req, res) => {
     name: r.name,
     slug: r.slug,
     ai_enabled: Boolean(r.ai_enabled),
+    unlimited: Boolean(r.unlimited),
     monthly_credit_limit: r.monthly_credit_limit,
     credits_remaining: r.credits_remaining,
-    credits_used_this_month: r.monthly_credit_limit - r.credits_remaining
+    questions_used_this_month: r.questions_used_this_month
   }));
 
   const totals = {
     salons_count: items.length,
     salons_enabled: items.filter((x) => x.ai_enabled).length,
-    total_credits_used_this_month: items.reduce((a, x) => a + x.credits_used_this_month, 0),
-    total_credits_allocated_this_month: items.reduce((a, x) => a + x.monthly_credit_limit, 0)
+    salons_unlimited: items.filter((x) => x.unlimited).length,
+    total_questions_used_this_month: items.reduce((a, x) => a + x.questions_used_this_month, 0),
+    total_credits_allocated_this_month: items.reduce((a, x) => a + (x.unlimited ? 0 : x.monthly_credit_limit), 0)
   };
 
   res.json({ ok: true, items, totals, period_month: month });
 }));
 
 /**
- * Active/désactive l'IA pour un salon précis, et/ou change sa limite
- * mensuelle de crédits gratuits - crée la ligne si elle n'existe pas
- * encore (salon qui n'a jamais utilisé le chat).
+ * Active/désactive l'IA pour un salon précis, change sa limite
+ * mensuelle de crédits gratuits, et/ou le passe en gratuit/illimité -
+ * crée la ligne si elle n'existe pas encore (salon qui n'a jamais
+ * utilisé le chat).
  */
 router.put('/ai-chat/:salonId', requireSuperAdmin, wrap(async (req, res) => {
   const salonId = req.params.salonId;
@@ -369,6 +374,7 @@ router.put('/ai-chat/:salonId', requireSuperAdmin, wrap(async (req, res) => {
   if (!salon) return res.status(404).json({ error: 'Salon introuvable' });
 
   const aiEnabled = req.body.ai_enabled !== undefined ? (req.body.ai_enabled ? 1 : 0) : null;
+  const unlimited = req.body.unlimited !== undefined ? (req.body.unlimited ? 1 : 0) : null;
   const monthlyLimit = req.body.monthly_credit_limit !== undefined ? Math.max(0, Number(req.body.monthly_credit_limit) || 0) : null;
   const month = new Date().toISOString().slice(0, 7);
 
@@ -376,13 +382,14 @@ router.put('/ai-chat/:salonId', requireSuperAdmin, wrap(async (req, res) => {
 
   if (!existing) {
     await pool.query(
-      'INSERT INTO ai_chat_credits (salon_id, credits_remaining, period_month, ai_enabled, monthly_credit_limit) VALUES (?, ?, ?, ?, ?)',
-      [salonId, monthlyLimit != null ? monthlyLimit : 10, month, aiEnabled != null ? aiEnabled : 1, monthlyLimit != null ? monthlyLimit : 10]
+      'INSERT INTO ai_chat_credits (salon_id, credits_remaining, period_month, ai_enabled, monthly_credit_limit, unlimited) VALUES (?, ?, ?, ?, ?, ?)',
+      [salonId, monthlyLimit != null ? monthlyLimit : 10, month, aiEnabled != null ? aiEnabled : 1, monthlyLimit != null ? monthlyLimit : 10, unlimited != null ? unlimited : 0]
     );
   } else {
     const sets = [];
     const params = [];
     if (aiEnabled != null) { sets.push('ai_enabled = ?'); params.push(aiEnabled); }
+    if (unlimited != null) { sets.push('unlimited = ?'); params.push(unlimited); }
     if (monthlyLimit != null) { sets.push('monthly_credit_limit = ?'); params.push(monthlyLimit); }
     if (sets.length) {
       params.push(salonId);
@@ -391,6 +398,28 @@ router.put('/ai-chat/:salonId', requireSuperAdmin, wrap(async (req, res) => {
   }
 
   res.json({ ok: true });
+}));
+
+/**
+ * Applique "gratuit/illimité" (ou le retire) à TOUTES les enseignes
+ * actives en une seule fois - crée la ligne pour les salons qui n'ont
+ * encore jamais utilisé le chat.
+ */
+router.put('/ai-chat-global/unlimited', requireSuperAdmin, wrap(async (req, res) => {
+  const unlimited = req.body.unlimited ? 1 : 0;
+  const month = new Date().toISOString().slice(0, 7);
+
+  const [salonRows] = await pool.query('SELECT id FROM salons WHERE active = 1');
+  for (const s of salonRows) {
+    await pool.query(
+      `INSERT INTO ai_chat_credits (salon_id, credits_remaining, period_month, ai_enabled, monthly_credit_limit, unlimited)
+       VALUES (?, 10, ?, 1, 10, ?)
+       ON DUPLICATE KEY UPDATE unlimited = VALUES(unlimited)`,
+      [s.id, month, unlimited]
+    );
+  }
+
+  res.json({ ok: true, salons_updated: salonRows.length, unlimited: Boolean(unlimited) });
 }));
 
 module.exports = router;

@@ -684,6 +684,8 @@ CREATE TABLE IF NOT EXISTS ai_chat_credits (
   period_month CHAR(7) NOT NULL,
   ai_enabled TINYINT(1) NOT NULL DEFAULT 1,
   monthly_credit_limit INT NOT NULL DEFAULT 10,
+  unlimited TINYINT(1) NOT NULL DEFAULT 0,
+  questions_used_this_month INT NOT NULL DEFAULT 0,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -698,4 +700,15 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 SET @c2 := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'ai_chat_credits' AND column_name = 'monthly_credit_limit');
 SET @sql := IF(@c2 = 0, 'ALTER TABLE ai_chat_credits ADD COLUMN monthly_credit_limit INT NOT NULL DEFAULT 10', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Gratuit/illimité par salon (ignore la limite de crédits) + compteur
+-- d'usage réel qui continue d'avancer même en illimité (pour les
+-- statistiques du super admin, indépendant du système de blocage).
+SET @c3 := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'ai_chat_credits' AND column_name = 'unlimited');
+SET @sql := IF(@c3 = 0, 'ALTER TABLE ai_chat_credits ADD COLUMN unlimited TINYINT(1) NOT NULL DEFAULT 0', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @c4 := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'ai_chat_credits' AND column_name = 'questions_used_this_month');
+SET @sql := IF(@c4 = 0, 'ALTER TABLE ai_chat_credits ADD COLUMN questions_used_this_month INT NOT NULL DEFAULT 0', 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;

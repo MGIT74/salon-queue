@@ -237,6 +237,10 @@
     <div class="card-box">
       <h3>Assistant IA — par salon</h3>
       <p class="hint">Active/désactive l'assistant et ajuste la limite mensuelle de questions gratuites, salon par salon.</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
+        <button class="btn btn-primary" style="padding:9px 16px;font-size:13.5px" onclick="setAiUnlimitedForAll(true)">Rendre gratuit pour toutes les enseignes</button>
+        <button class="btn btn-ghost" style="padding:9px 16px;font-size:13.5px" onclick="setAiUnlimitedForAll(false)">Retirer le gratuit pour toutes les enseignes</button>
+      </div>
       <div id="ai-chat-salons-list"><div class="empty">Chargement…</div></div>
     </div>
   </div>
@@ -522,36 +526,63 @@ function loadAiChatOverview() {
   superApi('/api/super/ai-chat/overview').then(function (r) {
     document.getElementById('ai-chat-kpi-grid').innerHTML =
       tile(r.totals.salons_enabled + '/' + r.totals.salons_count, "salons avec l'IA activée") +
-      tile(r.totals.total_credits_used_this_month, 'questions posées ce mois') +
-      tile(r.totals.total_credits_allocated_this_month, 'crédits alloués ce mois');
+      tile(r.totals.salons_unlimited, 'salons en gratuit/illimité') +
+      tile(r.totals.total_questions_used_this_month, 'questions posées ce mois') +
+      tile(r.totals.total_credits_allocated_this_month, 'crédits alloués ce mois (hors illimité)');
 
     document.getElementById('ai-chat-salons-list').innerHTML = r.items.length === 0
       ? '<div class="empty">Aucun salon</div>'
       : r.items.map(function (s) {
+          var usageLabel = s.unlimited
+            ? s.questions_used_this_month + ' questions ce mois (illimité)'
+            : s.questions_used_this_month + '/' + s.monthly_credit_limit + ' questions utilisées ce mois';
           return '<div class="ai-chat-row">' +
             '<div class="name">' + esc(s.name) + '</div>' +
-            '<div class="meta">' + s.credits_used_this_month + '/' + s.monthly_credit_limit + ' questions utilisées ce mois</div>' +
-            '<div class="switch' + (s.ai_enabled ? ' on' : '') + '" onclick="toggleAiEnabled(\'' + s.id + '\', ' + (!s.ai_enabled) + ', this)" title="Activer/désactiver l\'IA"></div>' +
-            '<input type="number" min="0" class="limit-input" value="' + s.monthly_credit_limit + '" id="ai-limit-' + s.id + '">' +
+            '<div class="meta">' + usageLabel + '</div>' +
+            '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--grey)">Activée' +
+              '<div class="switch' + (s.ai_enabled ? ' on' : '') + '" onclick="toggleAiField(\'' + s.id + '\',\'ai_enabled\',' + (!s.ai_enabled) + ',this)" title="Activer/désactiver l\'IA"></div>' +
+            '</label>' +
+            '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--grey)">Gratuit' +
+              '<div class="switch' + (s.unlimited ? ' on' : '') + '" onclick="toggleAiField(\'' + s.id + '\',\'unlimited\',' + (!s.unlimited) + ',this)" title="Rendre gratuit (illimité)"></div>' +
+            '</label>' +
+            '<input type="number" min="0" class="limit-input" value="' + s.monthly_credit_limit + '" id="ai-limit-' + s.id + '" ' + (s.unlimited ? 'disabled title="Sans effet tant que le salon est en gratuit/illimité"' : '') + '>' +
             '<button class="btn btn-soft" style="padding:7px 12px;font-size:12.5px" onclick="saveAiCreditLimit(\'' + s.id + '\')">Enregistrer</button>' +
             '</div>';
         }).join('');
   }).catch(function (e) { toast(e.message, true); });
 }
 
-function toggleAiEnabled(salonId, newValue, el) {
-  superApi('/api/super/ai-chat/' + salonId, { method: 'PUT', body: { ai_enabled: newValue } })
+function toggleAiField(salonId, field, newValue, el) {
+  var body = {};
+  body[field] = newValue;
+  superApi('/api/super/ai-chat/' + salonId, { method: 'PUT', body: body })
     .then(function () {
       el.classList.toggle('on', newValue);
-      toast(newValue ? 'IA activée' : 'IA désactivée');
+      toast('Mis à jour');
+      loadAiChatOverview();
     })
     .catch(function (e) { toast(e.message, true); });
+}
+
+function setAiUnlimitedForAll(unlimited) {
+  var msg = unlimited
+    ? "Rendre l'IA gratuite (illimitée) pour TOUTES les enseignes actives ?"
+    : "Repasser TOUTES les enseignes à leur limite mensuelle standard (retirer le mode gratuit) ?";
+  showConfirm(msg, { title: unlimited ? 'Rendre gratuit pour tous' : 'Retirer le gratuit pour tous' }).then(function (ok) {
+    if (!ok) return;
+    superApi('/api/super/ai-chat-global/unlimited', { method: 'PUT', body: { unlimited: unlimited } })
+      .then(function (r) {
+        toast(r.salons_updated + ' enseigne(s) mise(s) à jour');
+        loadAiChatOverview();
+      })
+      .catch(function (e) { toast(e.message, true); });
+  });
 }
 
 function saveAiCreditLimit(salonId) {
   var value = Number(document.getElementById('ai-limit-' + salonId).value) || 0;
   superApi('/api/super/ai-chat/' + salonId, { method: 'PUT', body: { monthly_credit_limit: value } })
-    .then(function () { toast('Limite mise à jour'); })
+    .then(function () { toast('Limite mise à jour'); loadAiChatOverview(); })
     .catch(function (e) { toast(e.message, true); });
 }
 </script>
