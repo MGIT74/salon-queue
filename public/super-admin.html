@@ -117,6 +117,25 @@
   .activity-time { font-size: 12.5px; color: var(--grey); }
 
   .empty { background: var(--card); border-radius: 14px; padding: 30px; text-align: center; color: var(--grey); font-size: 14px; box-shadow: var(--shadow); }
+
+  .ai-chat-row {
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    background: var(--fill); border-radius: 12px; padding: 12px 16px; margin-bottom: 8px;
+  }
+  .ai-chat-row .name { font-size: 14.5px; font-weight: 600; flex: 1; min-width: 140px; }
+  .ai-chat-row .meta { font-size: 12.5px; color: var(--grey); }
+  .ai-chat-row .limit-input {
+    width: 64px; padding: 7px 9px; border: none; border-radius: 8px; background: var(--card);
+    color: var(--ink); font-family: inherit; font-size: 13.5px; text-align: center;
+  }
+  .switch { position: relative; width: 46px; height: 28px; background: var(--sep);
+            border-radius: 999px; cursor: pointer; flex-shrink: 0;
+            transition: background .2s ease, transform .15s cubic-bezier(.34,1.56,.64,1); }
+  .switch:active { transform: scale(.93); }
+  .switch.on { background: var(--green); }
+  .switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px;
+                   border-radius: 50%; background: #fff; transition: transform .2s ease; }
+  .switch.on::after { transform: translateX(18px); }
 </style>
 </head>
 <body>
@@ -141,6 +160,7 @@
         <button data-t="owners"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l1-5h16l1 5"/><path d="M4 9v11h16V9"/><line x1="9" y1="20" x2="9" y2="14"/><line x1="15" y1="20" x2="15" y2="14"/></svg></span> Enseignes</button>
         <button data-t="email"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg></span> Email plateforme</button>
         <button data-t="activity"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="3" width="12" height="18" rx="2"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="12" y2="16"/></svg></span> Journal</button>
+        <button data-t="ai-chat"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg></span> Assistant IA</button>
       </nav>
       <button class="sidebar-logout" onclick="logout()">
         <span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></span>
@@ -206,6 +226,19 @@
 
   <div class="tab-panel" id="t-activity">
     <div id="activity-list"><div class="empty">Chargement…</div></div>
+  </div>
+
+  <div class="tab-panel" id="t-ai-chat">
+    <div class="kpi-grid" id="ai-chat-kpi-grid">
+      <div class="kpi-tile"><div class="v">—</div><div class="l">salons avec l'IA activée</div></div>
+      <div class="kpi-tile"><div class="v">—</div><div class="l">questions posées ce mois</div></div>
+      <div class="kpi-tile"><div class="v">—</div><div class="l">crédits alloués ce mois</div></div>
+    </div>
+    <div class="card-box">
+      <h3>Assistant IA — par salon</h3>
+      <p class="hint">Active/désactive l'assistant et ajuste la limite mensuelle de questions gratuites, salon par salon.</p>
+      <div id="ai-chat-salons-list"><div class="empty">Chargement…</div></div>
+    </div>
   </div>
 
     </div>
@@ -283,6 +316,7 @@ document.getElementById('tabs').addEventListener('click', function (e) {
   if (b.dataset.t === 'overview') loadOverview();
   if (b.dataset.t === 'activity') loadActivity();
   if (b.dataset.t === 'email') loadSmtp();
+  if (b.dataset.t === 'ai-chat') loadAiChatOverview();
 });
 
 function loadOverview() {
@@ -482,6 +516,43 @@ function loadActivity() {
             '<span class="activity-time">' + when + '</span></div>';
         }).join('');
   }).catch(function (e) { toast(e.message, true); });
+}
+
+function loadAiChatOverview() {
+  superApi('/api/super/ai-chat/overview').then(function (r) {
+    document.getElementById('ai-chat-kpi-grid').innerHTML =
+      tile(r.totals.salons_enabled + '/' + r.totals.salons_count, "salons avec l'IA activée") +
+      tile(r.totals.total_credits_used_this_month, 'questions posées ce mois') +
+      tile(r.totals.total_credits_allocated_this_month, 'crédits alloués ce mois');
+
+    document.getElementById('ai-chat-salons-list').innerHTML = r.items.length === 0
+      ? '<div class="empty">Aucun salon</div>'
+      : r.items.map(function (s) {
+          return '<div class="ai-chat-row">' +
+            '<div class="name">' + esc(s.name) + '</div>' +
+            '<div class="meta">' + s.credits_used_this_month + '/' + s.monthly_credit_limit + ' questions utilisées ce mois</div>' +
+            '<div class="switch' + (s.ai_enabled ? ' on' : '') + '" onclick="toggleAiEnabled(\'' + s.id + '\', ' + (!s.ai_enabled) + ', this)" title="Activer/désactiver l\'IA"></div>' +
+            '<input type="number" min="0" class="limit-input" value="' + s.monthly_credit_limit + '" id="ai-limit-' + s.id + '">' +
+            '<button class="btn btn-soft" style="padding:7px 12px;font-size:12.5px" onclick="saveAiCreditLimit(\'' + s.id + '\')">Enregistrer</button>' +
+            '</div>';
+        }).join('');
+  }).catch(function (e) { toast(e.message, true); });
+}
+
+function toggleAiEnabled(salonId, newValue, el) {
+  superApi('/api/super/ai-chat/' + salonId, { method: 'PUT', body: { ai_enabled: newValue } })
+    .then(function () {
+      el.classList.toggle('on', newValue);
+      toast(newValue ? 'IA activée' : 'IA désactivée');
+    })
+    .catch(function (e) { toast(e.message, true); });
+}
+
+function saveAiCreditLimit(salonId) {
+  var value = Number(document.getElementById('ai-limit-' + salonId).value) || 0;
+  superApi('/api/super/ai-chat/' + salonId, { method: 'PUT', body: { monthly_credit_limit: value } })
+    .then(function () { toast('Limite mise à jour'); })
+    .catch(function (e) { toast(e.message, true); });
 }
 </script>
 </body>

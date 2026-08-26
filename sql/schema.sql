@@ -680,8 +680,22 @@ CREATE TABLE IF NOT EXISTS salon_closures (
 -- par une tâche planifiée séparée - plus simple et robuste.
 CREATE TABLE IF NOT EXISTS ai_chat_credits (
   salon_id CHAR(36) PRIMARY KEY,
-  credits_remaining INT NOT NULL DEFAULT 100,
+  credits_remaining INT NOT NULL DEFAULT 10,
   period_month CHAR(7) NOT NULL,
+  ai_enabled TINYINT(1) NOT NULL DEFAULT 1,
+  monthly_credit_limit INT NOT NULL DEFAULT 10,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Colonnes ajoutées après coup (activation/désactivation par salon +
+-- limite de crédits personnalisable, gérées par le super admin) - le
+-- CREATE TABLE ci-dessus suffit pour une base neuve, ce bloc rattrape
+-- les bases existantes qui avaient déjà la table sans ces 2 colonnes.
+SET @c1 := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'ai_chat_credits' AND column_name = 'ai_enabled');
+SET @sql := IF(@c1 = 0, 'ALTER TABLE ai_chat_credits ADD COLUMN ai_enabled TINYINT(1) NOT NULL DEFAULT 1', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @c2 := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'ai_chat_credits' AND column_name = 'monthly_credit_limit');
+SET @sql := IF(@c2 = 0, 'ALTER TABLE ai_chat_credits ADD COLUMN monthly_credit_limit INT NOT NULL DEFAULT 10', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;

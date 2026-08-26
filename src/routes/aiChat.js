@@ -4,7 +4,7 @@ const requireAdmin = require('../middleware/auth');
 
 const router = express.Router();
 
-const FREE_CREDITS_PER_MONTH = 100;
+const DEFAULT_FREE_CREDITS_PER_MONTH = 10;
 const N8N_CHAT_WEBHOOK_URL = process.env.N8N_CHAT_WEBHOOK_URL;
 
 function wrap(fn) {
@@ -25,6 +25,9 @@ function currentMonthStr() {
  * salon. Le reset se fait "à la volée" à la première question du
  * mois plutôt que par une tâche planifiée séparée - plus simple,
  * jamais en retard, jamais dépendant d'un cron qui pourrait échouer.
+ * ai_enabled et monthly_credit_limit sont gérés par le super admin
+ * (voir routes/salons.js) - jamais réinitialisés ici, seul
+ * credits_remaining l'est au changement de mois.
  */
 async function getOrResetCredits(salonId) {
   const month = currentMonthStr();
@@ -32,26 +35,31 @@ async function getOrResetCredits(salonId) {
 
   if (!row) {
     await pool.query(
-      'INSERT INTO ai_chat_credits (salon_id, credits_remaining, period_month) VALUES (?, ?, ?)',
-      [salonId, FREE_CREDITS_PER_MONTH, month]
+      'INSERT INTO ai_chat_credits (salon_id, credits_remaining, period_month, ai_enabled, monthly_credit_limit) VALUES (?, ?, ?, 1, ?)',
+      [salonId, DEFAULT_FREE_CREDITS_PER_MONTH, month, DEFAULT_FREE_CREDITS_PER_MONTH]
     );
-    return { credits_remaining: FREE_CREDITS_PER_MONTH, period_month: month };
+    return { credits_remaining: DEFAULT_FREE_CREDITS_PER_MONTH, period_month: month, ai_enabled: true, monthly_credit_limit: DEFAULT_FREE_CREDITS_PER_MONTH };
   }
 
   if (row.period_month !== month) {
     await pool.query(
       'UPDATE ai_chat_credits SET credits_remaining = ?, period_month = ? WHERE salon_id = ?',
-      [FREE_CREDITS_PER_MONTH, month, salonId]
+      [row.monthly_credit_limit, month, salonId]
     );
-    return { credits_remaining: FREE_CREDITS_PER_MONTH, period_month: month };
+    return { credits_remaining: row.monthly_credit_limit, period_month: month, ai_enabled: Boolean(row.ai_enabled), monthly_credit_limit: row.monthly_credit_limit };
   }
 
-  return { credits_remaining: row.credits_remaining, period_month: row.period_month };
+  return {
+    credits_remaining: row.credits_remaining,
+    period_month: row.period_month,
+    ai_enabled: Boolean(row.ai_enabled),
+    monthly_credit_limit: row.monthly_credit_limit
+  };
 }
 
 router.get('/credits', requireAdmin, wrap(async (req, res) => {
   const credits = await getOrResetCredits(req.salon.id);
-  res.json({ ok: true, ...credits, free_credits_per_month: FREE_CREDITS_PER_MONTH });
+  res.json({ ok: true, ...credits });
 }));
 
 router.post('/message', requireAdmin, wrap(async (req, res) => {
@@ -60,6 +68,9 @@ router.post('/message', requireAdmin, wrap(async (req, res) => {
   if (!N8N_CHAT_WEBHOOK_URL) return res.status(500).json({ error: 'N8N_CHAT_WEBHOOK_URL non défini côté serveur' });
 
   const credits = await getOrResetCredits(req.salon.id);
+  if (!credits.ai_enabled) {
+    return res.status(403).json({ error: "L'assistant IA n'est pas activé pour votre salon." });
+  }
   if (credits.credits_remaining <= 0) {
     return res.status(402).json({
       error: 'Quota mensuel de questions atteint. Il sera renouvelé au début du mois prochain.',
