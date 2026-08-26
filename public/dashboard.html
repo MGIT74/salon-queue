@@ -4913,5 +4913,83 @@ function testSmtp() {
   });
 }
 </script>
+
+<!-- Chatbot IA -->
+<button class="ai-chat-fab" id="ai-chat-fab" onclick="toggleAiChat()" title="Assistant IA">
+  <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>
+</button>
+
+<div class="ai-chat-panel" id="ai-chat-panel" style="display:none">
+  <div class="ai-chat-header">
+    <span>Assistant IA</span>
+    <span class="ai-chat-credits" id="ai-chat-credits-label">…</span>
+    <button class="ai-chat-close" onclick="toggleAiChat()">✕</button>
+  </div>
+  <div class="ai-chat-messages" id="ai-chat-messages">
+    <div class="ai-chat-msg bot">Bonjour ! Posez-moi une question sur l'état de votre salon aujourd'hui — créneaux libres, chiffre d'affaires, prestation la plus demandée…</div>
+  </div>
+  <div class="ai-chat-input-row">
+    <input type="text" id="ai-chat-input" placeholder="Écrivez votre question…" onkeydown="if(event.key==='Enter')sendAiChatMessage()">
+    <button class="btn btn-primary" id="ai-chat-send-btn" onclick="sendAiChatMessage()">Envoyer</button>
+  </div>
+</div>
+
+<script>
+var aiChatOpen = false;
+var aiChatSending = false;
+
+function toggleAiChat() {
+  aiChatOpen = !aiChatOpen;
+  document.getElementById('ai-chat-panel').style.display = aiChatOpen ? 'flex' : 'none';
+  if (aiChatOpen) loadAiChatCredits();
+}
+
+function loadAiChatCredits() {
+  api('/api/ai-chat/credits').then(function (r) {
+    document.getElementById('ai-chat-credits-label').textContent = r.credits_remaining + '/' + r.free_credits_per_month + ' questions restantes ce mois';
+  }).catch(function () {});
+}
+
+function appendAiChatMessage(text, who) {
+  var box = document.getElementById('ai-chat-messages');
+  var div = document.createElement('div');
+  div.className = 'ai-chat-msg ' + who;
+  div.textContent = text;
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+}
+
+function sendAiChatMessage() {
+  if (aiChatSending) return;
+  var input = document.getElementById('ai-chat-input');
+  var message = input.value.trim();
+  if (!message) return;
+
+  appendAiChatMessage(message, 'user');
+  input.value = '';
+  aiChatSending = true;
+  document.getElementById('ai-chat-send-btn').disabled = true;
+
+  var typingDiv = document.createElement('div');
+  typingDiv.className = 'ai-chat-msg bot ai-chat-typing';
+  typingDiv.textContent = '…';
+  document.getElementById('ai-chat-messages').appendChild(typingDiv);
+
+  api('/api/ai-chat/message', { method: 'POST', body: { message: message } })
+    .then(function (r) {
+      typingDiv.remove();
+      appendAiChatMessage(r.answer, 'bot');
+      document.getElementById('ai-chat-credits-label').textContent = r.credits_remaining + '/100 questions restantes ce mois';
+    })
+    .catch(function (e) {
+      typingDiv.remove();
+      appendAiChatMessage(e.message, 'bot error');
+    })
+    .finally(function () {
+      aiChatSending = false;
+      document.getElementById('ai-chat-send-btn').disabled = false;
+    });
+}
+</script>
 </body>
 </html>

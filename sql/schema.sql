@@ -673,3 +673,15 @@ CREATE TABLE IF NOT EXISTS salon_closures (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Crédits du chatbot IA (Réglages > toujours 100 gratuits, remis à
+-- zéro chaque mois - period_month au format 'YYYY-MM'. Le reset est
+-- fait "à la volée" au moment de la première question du mois, pas
+-- par une tâche planifiée séparée - plus simple et robuste.
+CREATE TABLE IF NOT EXISTS ai_chat_credits (
+  salon_id CHAR(36) PRIMARY KEY,
+  credits_remaining INT NOT NULL DEFAULT 100,
+  period_month CHAR(7) NOT NULL,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
