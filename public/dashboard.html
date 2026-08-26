@@ -4946,7 +4946,7 @@ function toggleAiChat() {
 
 function loadAiChatCredits() {
   api('/api/ai-chat/credits').then(function (r) {
-    document.getElementById('ai-chat-credits-label').textContent = r.credits_remaining + '/' + r.free_credits_per_month + ' questions restantes ce mois';
+    document.getElementById('ai-chat-credits-label').textContent = r.credits_remaining + '/' + r.monthly_credit_limit + ' questions restantes ce mois';
   }).catch(function () {});
 }
 
@@ -4979,7 +4979,7 @@ function sendAiChatMessage() {
     .then(function (r) {
       typingDiv.remove();
       appendAiChatMessage(r.answer, 'bot');
-      document.getElementById('ai-chat-credits-label').textContent = r.credits_remaining + '/100 questions restantes ce mois';
+      document.getElementById('ai-chat-credits-label').textContent = r.credits_remaining + '/' + r.monthly_credit_limit + ' questions restantes ce mois';
     })
     .catch(function (e) {
       typingDiv.remove();

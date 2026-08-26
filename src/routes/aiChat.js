@@ -102,7 +102,7 @@ router.post('/message', requireAdmin, wrap(async (req, res) => {
     [newRemaining, req.salon.id]
   );
 
-  res.json({ ok: true, answer, credits_remaining: newRemaining });
+  res.json({ ok: true, answer, credits_remaining: newRemaining, monthly_credit_limit: credits.monthly_credit_limit });
 }));
 
 module.exports = router;
