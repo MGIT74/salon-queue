@@ -79,7 +79,7 @@ html, body {
 .ai-chat-input-row { display: flex; gap: 8px; padding: 12px 14px; border-top: 1px solid var(--sep); }
 .ai-chat-input-row input {
   flex: 1; border: none; border-radius: 999px; padding: 10px 14px; background: var(--fill);
-  color: var(--ink); font-family: inherit; font-size: 14px;
+  color: var(--ink); font-family: inherit; font-size: 16px;
 }
 .ai-chat-input-row .btn { padding: 10px 18px; font-size: 14px; }
 [data-theme="dark"] .sidebar-theme-btn .sun { display: none; }

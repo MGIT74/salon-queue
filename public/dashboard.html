@@ -4944,7 +4944,8 @@ var aiChatSending = false;
 function toggleAiChat() {
   aiChatOpen = !aiChatOpen;
   document.getElementById('ai-chat-panel').style.display = aiChatOpen ? 'flex' : 'none';
-  if (aiChatOpen) loadAiChatCredits();
+  if (aiChatOpen) { _lockBodyScroll(); loadAiChatCredits(); }
+  else { _unlockBodyScroll(); }
 }
 
 function loadAiChatCredits() {
