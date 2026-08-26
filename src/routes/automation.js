@@ -172,8 +172,14 @@ router.get('/salons/:id/inactive-clients', requireAutomationKey, wrap(async (req
  */
 router.post('/salons/:id/send-client-email', requireAutomationKey, wrap(async (req, res) => {
   const salonId = req.params.id;
-  const { emails, subject, message } = req.body;
-  if (!Array.isArray(emails) || emails.length === 0) return res.status(400).json({ error: 'Liste emails requise' });
+  const { subject, message } = req.body;
+  // Accepte un vrai tableau OU une chaîne séparée par des virgules
+  // (plus simple à produire de façon fiable pour un outil IA) -
+  // normalisé ici une bonne fois pour toutes.
+  const emails = Array.isArray(req.body.emails)
+    ? req.body.emails
+    : String(req.body.emails || '').split(',').map((e) => e.trim()).filter(Boolean);
+  if (emails.length === 0) return res.status(400).json({ error: 'Liste emails requise' });
   if (!subject || !message) return res.status(400).json({ error: 'Sujet et message requis' });
   if (emails.length > 100) return res.status(400).json({ error: 'Maximum 100 destinataires par envoi' });
 
