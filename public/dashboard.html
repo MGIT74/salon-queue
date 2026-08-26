@@ -4933,7 +4933,9 @@ function testSmtp() {
   </div>
   <div class="ai-chat-input-row">
     <input type="text" id="ai-chat-input" placeholder="Écrivez votre question…" onkeydown="if(event.key==='Enter')sendAiChatMessage()">
-    <button class="btn btn-primary" id="ai-chat-send-btn" onclick="sendAiChatMessage()">Envoyer</button>
+    <button class="btn btn-primary ai-chat-send-btn" id="ai-chat-send-btn" onclick="sendAiChatMessage()" title="Envoyer" aria-label="Envoyer">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+    </button>
   </div>
 </div>
 
