@@ -315,8 +315,24 @@ async function sendSalonClosureNotice(salonId, to, info) {
   });
 }
 
+/**
+ * Email libre à un client précis, sujet/message décidés au cas par
+ * cas (ex: relance "créneau disponible" via l'assistant IA) - jamais
+ * de modèle enregistré ici, c'est un message ponctuel à chaque appel.
+ */
+async function sendCustomClientEmail(salonId, to, clientName, subject, message) {
+  const { tx, from, salon } = await getTransport(salonId);
+  await tx.sendMail({
+    from,
+    to,
+    subject,
+    text: `Bonjour ${clientName},\n\n${message}\n\n${salon}`,
+    html: `<p>Bonjour ${clientName},</p><p>${String(message).replace(/\n/g, '<br>')}</p><p>${salon}</p>`
+  });
+}
+
 module.exports = {
   sendTurnSoon, sendTest, sendGiftConfirmation, sendLoyaltyActivation, sendAppointmentConfirmation,
   sendAppointmentReminder, sendAppointmentCancelledByAdmin, sendAppointmentRescheduled,
-  sendClientVerificationEmail, sendClientPasswordReset, sendSalonClosureNotice, invalidateTransport
+  sendClientVerificationEmail, sendClientPasswordReset, sendSalonClosureNotice, sendCustomClientEmail, invalidateTransport
 };

@@ -2,6 +2,7 @@ const express = require('express');
 const { pool, getSettings } = require('../db');
 const requireAutomationKey = require('../middleware/automationAuth');
 const { computeSlotsForBarber } = require('./appointments');
+const { sendCustomClientEmail } = require('../lib/mailer');
 
 const router = express.Router();
 
@@ -93,6 +94,117 @@ router.get('/salons/:id/daily-report', requireAutomationKey, wrap(async (req, re
     estimated_service_duration_min: durationMin,
     free_slots_today_estimate: freeSlots
   });
+}));
+
+/**
+ * Liste tous les clients connus du salon (une entrée par email
+ * distinct), avec leur dernière visite terminée. Pensé comme outil
+ * pour l'assistant IA - lecture seule, jamais d'envoi ici.
+ */
+router.get('/salons/:id/clients', requireAutomationKey, wrap(async (req, res) => {
+  const salonId = req.params.id;
+  const [[salon]] = await pool.query('SELECT id FROM salons WHERE id = ? AND active = 1', [salonId]);
+  if (!salon) return res.status(404).json({ error: 'Salon introuvable ou inactif' });
+
+  const [rows] = await pool.query(
+    `SELECT client_name, email, phone, MAX(end_at) AS last_visit, COUNT(*) AS visit_count
+     FROM queue
+     WHERE salon_id = ? AND status = 'done' AND email IS NOT NULL AND email != ''
+     GROUP BY email
+     ORDER BY last_visit DESC
+     LIMIT 300`,
+    [salonId]
+  );
+
+  res.json({
+    ok: true,
+    items: rows.map((r) => ({
+      client_name: r.client_name,
+      email: r.email,
+      phone: r.phone,
+      last_visit: String(r.last_visit).slice(0, 10),
+      visit_count: Number(r.visit_count)
+    }))
+  });
+}));
+
+/**
+ * Clients dont la dernière visite terminée remonte à plus de N jours
+ * (14 par défaut, "plus de 2 semaines") - pensé pour identifier qui
+ * relancer par email quand le salon a une journée creuse.
+ */
+router.get('/salons/:id/inactive-clients', requireAutomationKey, wrap(async (req, res) => {
+  const salonId = req.params.id;
+  const days = Math.max(1, parseInt(req.query.days, 10) || 14);
+  const [[salon]] = await pool.query('SELECT id FROM salons WHERE id = ? AND active = 1', [salonId]);
+  if (!salon) return res.status(404).json({ error: 'Salon introuvable ou inactif' });
+
+  const [rows] = await pool.query(
+    `SELECT client_name, email, phone, MAX(end_at) AS last_visit, COUNT(*) AS visit_count
+     FROM queue
+     WHERE salon_id = ? AND status = 'done' AND email IS NOT NULL AND email != ''
+     GROUP BY email
+     HAVING MAX(end_at) < DATE_SUB(NOW(), INTERVAL ? DAY)
+     ORDER BY last_visit ASC
+     LIMIT 300`,
+    [salonId, days]
+  );
+
+  res.json({
+    ok: true,
+    days_threshold: days,
+    items: rows.map((r) => ({
+      client_name: r.client_name,
+      email: r.email,
+      phone: r.phone,
+      last_visit: String(r.last_visit).slice(0, 10),
+      visit_count: Number(r.visit_count)
+    }))
+  });
+}));
+
+/**
+ * Envoie un email personnalisé à une liste précise de clients de CE
+ * salon (jamais à une adresse arbitraire - chaque email doit
+ * correspondre à un vrai client déjà venu dans ce salon, vérifié
+ * avant envoi). Utilise le SMTP propre du salon (même mécanisme que
+ * les emails automatiques existants).
+ */
+router.post('/salons/:id/send-client-email', requireAutomationKey, wrap(async (req, res) => {
+  const salonId = req.params.id;
+  const { emails, subject, message } = req.body;
+  if (!Array.isArray(emails) || emails.length === 0) return res.status(400).json({ error: 'Liste emails requise' });
+  if (!subject || !message) return res.status(400).json({ error: 'Sujet et message requis' });
+  if (emails.length > 100) return res.status(400).json({ error: 'Maximum 100 destinataires par envoi' });
+
+  const [[salon]] = await pool.query('SELECT id FROM salons WHERE id = ? AND active = 1', [salonId]);
+  if (!salon) return res.status(404).json({ error: 'Salon introuvable ou inactif' });
+
+  // Vérifie que chaque adresse correspond bien à un vrai client déjà
+  // venu dans CE salon - empêche l'outil d'être détourné pour envoyer
+  // à des adresses arbitraires.
+  const [knownRows] = await pool.query(
+    `SELECT DISTINCT email, client_name FROM queue WHERE salon_id = ? AND status = 'done' AND email IN (?)`,
+    [salonId, emails]
+  );
+  const known = new Map(knownRows.map((r) => [r.email.toLowerCase(), r.client_name]));
+
+  let sent = 0;
+  let skipped = 0;
+  const errors = [];
+
+  for (const email of emails) {
+    const clientName = known.get(String(email).toLowerCase());
+    if (!clientName) { skipped++; continue; }
+    try {
+      await sendCustomClientEmail(salonId, email, clientName, subject, message);
+      sent++;
+    } catch (err) {
+      errors.push({ email, error: err.message });
+    }
+  }
+
+  res.json({ ok: true, sent, skipped_unknown_client: skipped, errors });
 }));
 
 module.exports = router;
