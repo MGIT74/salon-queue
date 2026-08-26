@@ -1417,7 +1417,7 @@ function doLoginWithCurrentSlug(pw) {
     try { sessionStorage.setItem('pw', pw); } catch (e) {}
     document.getElementById('login').style.display = 'none';
     document.getElementById('app').style.display = '';
-    document.getElementById('ai-chat-fab').classList.add('visible');
+    checkAiChatAvailability();
     boot();
   }).catch(function (err) {
     setAdminPw('');
@@ -1522,7 +1522,7 @@ function exitImpersonation() {
     setImpersonateToken(impersonateToken);
     document.getElementById('login').style.display = 'none';
     document.getElementById('app').style.display = '';
-    document.getElementById('ai-chat-fab').classList.add('visible');
+    checkAiChatAvailability();
     startImpersonateBanner();
     boot();
     return;
@@ -1535,7 +1535,7 @@ function exitImpersonation() {
   api('/api/login', { method: 'POST', body: {} }).then(function () {
     document.getElementById('login').style.display = 'none';
     document.getElementById('app').style.display = '';
-    document.getElementById('ai-chat-fab').classList.add('visible');
+    checkAiChatAvailability();
     boot();
   }).catch(function () { setAdminPw(''); });
 })();
@@ -4950,9 +4950,25 @@ function toggleAiChat() {
   else { _unlockBodyScroll(); }
 }
 
+function checkAiChatAvailability() {
+  api('/api/ai-chat/credits').then(function (r) {
+    document.getElementById('ai-chat-fab').classList.toggle('visible', r.ai_enabled !== false);
+  }).catch(function () {
+    // En cas de doute (erreur réseau, etc.), on n'affiche pas le
+    // bouton plutôt que de risquer un chat qui refuse tout de suite.
+    document.getElementById('ai-chat-fab').classList.remove('visible');
+  });
+}
+
 function loadAiChatCredits() {
   api('/api/ai-chat/credits').then(function (r) {
     document.getElementById('ai-chat-credits-label').textContent = r.credits_remaining + '/' + r.monthly_credit_limit + ' questions restantes ce mois';
+    // Si désactivé entre-temps (pendant que le panneau était déjà
+    // ouvert), on masque aussi le bouton flottant en le refermant.
+    if (r.ai_enabled === false) {
+      document.getElementById('ai-chat-fab').classList.remove('visible');
+      if (aiChatOpen) toggleAiChat();
+    }
   }).catch(function () {});
 }
 
