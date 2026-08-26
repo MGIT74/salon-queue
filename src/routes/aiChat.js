@@ -82,7 +82,7 @@ router.post('/message', requireAdmin, wrap(async (req, res) => {
   try {
     const n8nRes = await fetch(N8N_CHAT_WEBHOOK_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-Automation-Key': process.env.AUTOMATION_API_KEY || '' },
       body: JSON.stringify({ salon_id: req.salon.id, salon_name: req.salon.name, message }),
       signal: AbortSignal.timeout(30000)
     });
