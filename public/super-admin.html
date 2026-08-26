@@ -237,9 +237,17 @@
     <div class="card-box">
       <h3>Assistant IA — par salon</h3>
       <p class="hint">Active/désactive l'assistant et ajuste la limite mensuelle de questions gratuites, salon par salon.</p>
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
-        <span class="hint" style="margin:0">Gratuit pour toutes les enseignes</span>
-        <div class="switch" id="ai-global-unlimited-switch" onclick="toggleAiUnlimitedGlobal(this)"></div>
+      <div class="ai-chat-row" style="background:none;box-shadow:none;padding-top:0;padding-bottom:12px">
+        <div class="name" style="visibility:hidden">Toutes les enseignes</div>
+        <div class="meta" style="visibility:hidden">placeholder</div>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--grey)">Activée
+          <div class="switch" id="ai-global-enabled-switch" onclick="toggleAiEnabledGlobal(this)"></div>
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--grey)">Gratuit
+          <div class="switch" id="ai-global-unlimited-switch" onclick="toggleAiUnlimitedGlobal(this)"></div>
+        </label>
+        <div style="width:64px"></div>
+        <div style="width:78px"></div>
       </div>
       <div id="ai-chat-salons-list"><div class="empty">Chargement…</div></div>
     </div>
@@ -530,9 +538,11 @@ function loadAiChatOverview() {
       tile(r.totals.total_questions_used_this_month, 'questions posées ce mois') +
       tile(r.totals.total_credits_allocated_this_month, 'crédits alloués ce mois (hors illimité)');
 
-    // La bascule globale reflète l'état réel : allumée seulement si
-    // TOUS les salons sont en gratuit/illimité.
+    // Les 2 bascules globales reflètent l'état réel : allumées
+    // seulement si TOUS les salons ont déjà cette valeur.
+    var allEnabled = r.items.length > 0 && r.items.every(function (s) { return s.ai_enabled; });
     var allUnlimited = r.items.length > 0 && r.items.every(function (s) { return s.unlimited; });
+    document.getElementById('ai-global-enabled-switch').classList.toggle('on', allEnabled);
     document.getElementById('ai-global-unlimited-switch').classList.toggle('on', allUnlimited);
 
     document.getElementById('ai-chat-salons-list').innerHTML = r.items.length === 0
@@ -567,6 +577,23 @@ function toggleAiField(salonId, field, newValue, el) {
       loadAiChatOverview();
     })
     .catch(function (e) { toast(e.message, true); });
+}
+
+function toggleAiEnabledGlobal(el) {
+  var newValue = !el.classList.contains('on');
+  var msg = newValue
+    ? "Activer l'assistant IA pour TOUTES les enseignes actives ?"
+    : "Désactiver l'assistant IA pour TOUTES les enseignes actives ?";
+  showConfirm(msg, { title: newValue ? 'Activer pour tous' : 'Désactiver pour tous', danger: !newValue }).then(function (ok) {
+    if (!ok) return;
+    superApi('/api/super/ai-chat-global/enabled', { method: 'PUT', body: { ai_enabled: newValue } })
+      .then(function (r) {
+        el.classList.toggle('on', newValue);
+        toast(r.salons_updated + ' enseigne(s) mise(s) à jour');
+        loadAiChatOverview();
+      })
+      .catch(function (e) { toast(e.message, true); });
+  });
 }
 
 function toggleAiUnlimitedGlobal(el) {

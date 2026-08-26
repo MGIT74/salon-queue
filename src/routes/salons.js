@@ -422,4 +422,26 @@ router.put('/ai-chat-global/unlimited', requireSuperAdmin, wrap(async (req, res)
   res.json({ ok: true, salons_updated: salonRows.length, unlimited: Boolean(unlimited) });
 }));
 
+/**
+ * Active/désactive l'assistant IA pour TOUTES les enseignes actives
+ * en une seule fois - même principe que l'action groupée sur
+ * "gratuit/illimité".
+ */
+router.put('/ai-chat-global/enabled', requireSuperAdmin, wrap(async (req, res) => {
+  const enabled = req.body.ai_enabled ? 1 : 0;
+  const month = new Date().toISOString().slice(0, 7);
+
+  const [salonRows] = await pool.query('SELECT id FROM salons WHERE active = 1');
+  for (const s of salonRows) {
+    await pool.query(
+      `INSERT INTO ai_chat_credits (salon_id, credits_remaining, period_month, ai_enabled, monthly_credit_limit, unlimited)
+       VALUES (?, 10, ?, ?, 10, 0)
+       ON DUPLICATE KEY UPDATE ai_enabled = VALUES(ai_enabled)`,
+      [s.id, month, enabled]
+    );
+  }
+
+  res.json({ ok: true, salons_updated: salonRows.length, ai_enabled: Boolean(enabled) });
+}));
+
 module.exports = router;
