@@ -493,4 +493,44 @@ router.put('/ai-chat-global/reset-credits', requireSuperAdmin, wrap(async (req, 
   res.json({ ok: true, salons_updated: salonRows.length });
 }));
 
+/**
+ * Gestion des clés d'API d'automatisation (n8n, projets futurs...) -
+ * jamais la valeur en clair renvoyée après création : seule
+ * l'empreinte (indirectement, via key_preview) permet de les
+ * distinguer ensuite.
+ */
+router.get('/api-keys', requireSuperAdmin, wrap(async (req, res) => {
+  const [rows] = await pool.query(
+    'SELECT id, name, key_preview, created_at, revoked_at, last_used_at FROM api_keys ORDER BY created_at DESC'
+  );
+  res.json({ ok: true, items: rows });
+}));
+
+router.post('/api-keys', requireSuperAdmin, wrap(async (req, res) => {
+  const name = (req.body.name || '').trim();
+  if (!name) return res.status(400).json({ error: 'Nom requis (ex: "Projet X")' });
+
+  const plainKey = crypto.randomBytes(32).toString('hex');
+  const hash = crypto.createHash('sha256').update(plainKey).digest('hex');
+  const preview = plainKey.slice(0, 8) + '...';
+  const id = crypto.randomUUID();
+
+  await pool.query(
+    'INSERT INTO api_keys (id, name, key_hash, key_preview) VALUES (?, ?, ?, ?)',
+    [id, name, hash, preview]
+  );
+
+  // Seule fois où la vraie clé est renvoyée - jamais récupérable
+  // après cette réponse.
+  res.json({ ok: true, id, key: plainKey });
+}));
+
+router.put('/api-keys/:id/revoke', requireSuperAdmin, wrap(async (req, res) => {
+  const [[key]] = await pool.query('SELECT id FROM api_keys WHERE id = ?', [req.params.id]);
+  if (!key) return res.status(404).json({ error: 'Clé introuvable' });
+
+  await pool.query('UPDATE api_keys SET revoked_at = NOW() WHERE id = ?', [req.params.id]);
+  res.json({ ok: true });
+}));
+
 module.exports = router;

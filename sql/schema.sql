@@ -712,3 +712,26 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 SET @c4 := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'ai_chat_credits' AND column_name = 'questions_used_this_month');
 SET @sql := IF(@c4 = 0, 'ALTER TABLE ai_chat_credits ADD COLUMN questions_used_this_month INT NOT NULL DEFAULT 0', 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Clés d'API d'automatisation (n8n, projets futurs...) - jamais la
+-- valeur en clair stockée, seulement une empreinte à sens unique
+-- (SHA-256) : même en cas de fuite de la base, aucune vraie clé n'en
+-- est extractible. La clé en clair n'est montrée qu'une seule fois,
+-- au moment de sa génération.
+CREATE TABLE IF NOT EXISTS api_keys (
+  id CHAR(36) PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  key_hash CHAR(64) NOT NULL UNIQUE,
+  key_preview VARCHAR(20) NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  revoked_at DATETIME NULL,
+  last_used_at DATETIME NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Migration en douceur de la clé déjà en service (AUTOMATION_API_KEY,
+-- utilisée par les workflows n8n existants) - jamais changée, juste
+-- enregistrée ici comme "clé historique" pour rentrer dans le
+-- nouveau système de gestion sans rien casser.
+INSERT INTO api_keys (id, name, key_hash, key_preview, created_at)
+SELECT UUID(), 'Clé historique (n8n)', '37fd11ef357895fedc4726d7367cae4ce9a4e285946eaed4d0981ba0d01bc22f', '735d830b...', NOW()
+WHERE NOT EXISTS (SELECT 1 FROM api_keys WHERE key_hash = '37fd11ef357895fedc4726d7367cae4ce9a4e285946eaed4d0981ba0d01bc22f');
