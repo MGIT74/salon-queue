@@ -47,8 +47,16 @@ html, body {
   position: fixed; bottom: 24px; right: 24px; z-index: 70;
   width: 56px; height: 56px; border-radius: 50%; border: none;
   background: var(--blue); color: #fff; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
+  display: none; align-items: center; justify-content: center;
   box-shadow: var(--shadow-lg);
+}
+.ai-chat-fab.visible { display: flex; }
+
+@media (max-width: 860px) {
+  /* Le menu du bas flottant occupe cet espace en mobile - sans ça, le
+     bouton et le panneau du chat lui rentrent dedans. */
+  .ai-chat-fab { bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
+  .ai-chat-panel { bottom: calc(164px + env(safe-area-inset-bottom, 0px)); max-height: calc(100vh - 210px); }
 }
 .ai-chat-panel {
   position: fixed; bottom: 92px; right: 24px; z-index: 70;

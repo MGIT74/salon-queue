@@ -1417,6 +1417,7 @@ function doLoginWithCurrentSlug(pw) {
     try { sessionStorage.setItem('pw', pw); } catch (e) {}
     document.getElementById('login').style.display = 'none';
     document.getElementById('app').style.display = '';
+    document.getElementById('ai-chat-fab').classList.add('visible');
     boot();
   }).catch(function (err) {
     setAdminPw('');
@@ -1521,6 +1522,7 @@ function exitImpersonation() {
     setImpersonateToken(impersonateToken);
     document.getElementById('login').style.display = 'none';
     document.getElementById('app').style.display = '';
+    document.getElementById('ai-chat-fab').classList.add('visible');
     startImpersonateBanner();
     boot();
     return;
@@ -1533,6 +1535,7 @@ function exitImpersonation() {
   api('/api/login', { method: 'POST', body: {} }).then(function () {
     document.getElementById('login').style.display = 'none';
     document.getElementById('app').style.display = '';
+    document.getElementById('ai-chat-fab').classList.add('visible');
     boot();
   }).catch(function () { setAdminPw(''); });
 })();
