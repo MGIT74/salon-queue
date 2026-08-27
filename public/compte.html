@@ -861,6 +861,10 @@ function esc(s) {
 }
 
 (function init() {
+  addPasswordToggle('li-pass');
+  addPasswordToggle('su-pass');
+  addPasswordToggle('rp-pass');
+
   // Toujours mettre à jour le nom du salon en haut de page, quel que
   // soit l'état de connexion — avant, cette mise à jour était sautée
   // dès qu'un client était déjà connecté (retour anticipé), laissant

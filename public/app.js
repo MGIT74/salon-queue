@@ -52,6 +52,39 @@ function esc(s) {
  * - ne fait rien si aucune couleur personnalisée n'est enregistrée
  * (garde le bleu Apple d'origine).
  */
+/**
+ * Bascule un champ mot de passe entre masqué/visible - ajoute
+ * dynamiquement l'icône œil juste après l'input ciblé (pas besoin de
+ * dupliquer le HTML sur chaque page, un seul appel par champ).
+ */
+function addPasswordToggle(inputId) {
+  var input = document.getElementById(inputId);
+  if (!input || input.dataset.toggleAdded) return;
+  input.dataset.toggleAdded = '1';
+
+  var wrapper = document.createElement('div');
+  wrapper.style.cssText = 'position:relative;display:flex';
+  input.parentNode.insertBefore(wrapper, input);
+  wrapper.appendChild(input);
+  input.style.paddingRight = '44px';
+  input.style.flex = '1';
+
+  var btn = document.createElement('button');
+  btn.type = 'button';
+  btn.setAttribute('aria-label', 'Afficher le mot de passe');
+  btn.style.cssText = 'position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--grey);padding:8px;display:flex;align-items:center;justify-content:center';
+  btn.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>';
+  btn.onclick = function () {
+    var showing = input.type === 'text';
+    input.type = showing ? 'password' : 'text';
+    btn.innerHTML = showing
+      ? '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>'
+      : '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.9 17.9A10.4 10.4 0 0112 19c-7 0-11-7-11-7a18.6 18.6 0 015.1-5.6M9.9 4.2A10.6 10.6 0 0112 4c7 0 11 7 11 7a18.5 18.5 0 01-2.2 3.1M14.1 14.1a3 3 0 11-4.2-4.2"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+    btn.setAttribute('aria-label', showing ? 'Afficher le mot de passe' : 'Masquer le mot de passe');
+  };
+  wrapper.appendChild(btn);
+}
+
 function hexToRgb(hex) {
   hex = hex.replace('#', '');
   if (hex.length === 3) hex = hex.split('').map(function (c) { return c + c; }).join('');

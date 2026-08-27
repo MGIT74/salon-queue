@@ -1515,6 +1515,8 @@ function exitImpersonation() {
   window.location.href = '/super-admin.html';
 }
 
+addPasswordToggle('pw');
+
 (function autoLogin() {
   // Lien d'assistance du super admin : accès temporaire sans mot de passe.
   var impersonateToken = new URLSearchParams(window.location.search).get('impersonate');
