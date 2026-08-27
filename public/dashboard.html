@@ -4966,8 +4966,17 @@ var aiChatSending = false;
 function toggleAiChat() {
   aiChatOpen = !aiChatOpen;
   document.getElementById('ai-chat-panel').style.display = aiChatOpen ? 'flex' : 'none';
-  if (aiChatOpen) { _lockBodyScroll(); loadAiChatCredits(); }
-  else { _unlockBodyScroll(); }
+  // Le blocage du défilement du fond ne sert qu'en mobile (où le
+  // panneau plein écran empêchait sinon de naviguer par-dessous) -
+  // en version web, le panneau reste un petit encart flottant, on
+  // doit pouvoir continuer à parcourir les menus derrière.
+  var isMobile = window.innerWidth <= 860;
+  if (aiChatOpen) {
+    if (isMobile) _lockBodyScroll();
+    loadAiChatCredits();
+  } else if (isMobile) {
+    _unlockBodyScroll();
+  }
 }
 
 function checkAiChatAvailability() {
