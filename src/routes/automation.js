@@ -288,16 +288,20 @@ router.get('/salons/:id/prices', requireAutomationKey, wrap(async (req, res) => 
   const [services, extras, products] = await Promise.all([
     pool.query('SELECT name, duration_min, price_cents FROM services WHERE salon_id = ? AND active = 1 ORDER BY sort_order', [salonId]),
     pool.query('SELECT name, duration_min, price_cents FROM extras WHERE salon_id = ? AND active = 1 ORDER BY sort_order', [salonId]),
-    pool.query('SELECT name, category, price_cents FROM products WHERE salon_id = ? AND active = 1 ORDER BY sort_order', [salonId])
+    pool.query('SELECT name, category, price_cents, stock_enabled, stock_quantity FROM products WHERE salon_id = ? AND active = 1 ORDER BY sort_order', [salonId])
   ]);
 
   const fmt = (rows) => rows[0].map((r) => Object.assign({}, r, { price_euros: r.price_cents / 100 }));
+
+  const productsWithStock = fmt(products).map((p) => Object.assign({}, p, {
+    stock_status: p.stock_enabled ? (p.stock_quantity > 0 ? p.stock_quantity + ' en stock' : 'rupture de stock') : 'illimité'
+  }));
 
   res.json({
     ok: true,
     services: fmt(services),
     extras: fmt(extras),
-    products: fmt(products)
+    products: productsWithStock
   });
 }));
 
@@ -508,6 +512,51 @@ router.get('/salons/:id/leave-check', requireAutomationKey, wrap(async (req, res
   });
 
   res.json({ ok: true, date: dateStr, items });
+}));
+
+/**
+ * Cartes cadeaux en attente d'utilisation et points de fidélité d'un
+ * client précis - recherché par nom, email ou téléphone (peu importe
+ * lequel, on essaie les 3).
+ */
+router.get('/salons/:id/client-gifts-loyalty', requireAutomationKey, wrap(async (req, res) => {
+  const salonId = req.params.id;
+  const [[salon]] = await pool.query('SELECT id FROM salons WHERE id = ? AND active = 1', [salonId]);
+  if (!salon) return res.status(404).json({ error: 'Salon introuvable ou inactif' });
+
+  const client = (req.query.client || '').trim();
+  if (!client) return res.status(400).json({ error: 'Paramètre client requis (nom, email ou téléphone)' });
+
+  const [gifts] = await pool.query(
+    `SELECT recipient_name, amount_cents, created_at FROM gift_cards
+     WHERE salon_id = ? AND used_at IS NULL
+       AND (recipient_email = ? OR recipient_phone = ? OR recipient_name LIKE ?)
+     ORDER BY created_at DESC`,
+    [salonId, client, client, '%' + client + '%']
+  );
+
+  const clientKeyLower = client.toLowerCase();
+  const [[loyalty]] = await pool.query(
+    `SELECT client_name, points, rewards_available, activated_at FROM loyalty_accounts
+     WHERE salon_id = ? AND (client_key = ? OR client_name LIKE ?)
+     LIMIT 1`,
+    [salonId, clientKeyLower, '%' + client + '%']
+  );
+
+  res.json({
+    ok: true,
+    pending_gift_cards: gifts.map((g) => ({
+      recipient_name: g.recipient_name,
+      amount_euros: g.amount_cents / 100,
+      created_at: String(g.created_at).slice(0, 10)
+    })),
+    loyalty: loyalty ? {
+      client_name: loyalty.client_name,
+      points: loyalty.points,
+      rewards_available: loyalty.rewards_available,
+      card_activated: Boolean(loyalty.activated_at)
+    } : null
+  });
 }));
 
 module.exports = router;
