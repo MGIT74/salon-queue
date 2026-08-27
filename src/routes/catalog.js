@@ -87,10 +87,12 @@ router.get('/products', wrap(async (req, res) => {
 router.post('/products', requireAdmin, wrap(async (req, res) => {
   const { name, price_cents, category, sort_order } = req.body;
   if (!name) return res.status(400).json({ error: 'Le nom est requis' });
+  const stockEnabled = req.body.stock_enabled ? 1 : 0;
+  const stockQuantity = Math.max(0, Number(req.body.stock_quantity) || 0);
   const id = await uniqueId('products', slugify(name));
   await pool.query(
-    'INSERT INTO products (id, salon_id, name, price_cents, category, sort_order) VALUES (?, ?, ?, ?, ?, ?)',
-    [id, req.salon.id, name, Number(price_cents) || 0, category || null, Number(sort_order) || 0]
+    'INSERT INTO products (id, salon_id, name, price_cents, category, sort_order, stock_enabled, stock_quantity) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    [id, req.salon.id, name, Number(price_cents) || 0, category || null, Number(sort_order) || 0, stockEnabled, stockQuantity]
   );
   const [[item]] = await pool.query('SELECT * FROM products WHERE id = ?', [id]);
   res.json({ ok: true, item });
@@ -103,8 +105,9 @@ router.put('/products/:id', requireAdmin, wrap(async (req, res) => {
   if (req.body.active !== undefined) { sets.push('active = ?'); params.push(req.body.active ? 1 : 0); }
   if (req.body.category !== undefined) { sets.push('category = ?'); params.push(req.body.category || null); }
   if (req.body.image_url !== undefined) { sets.push('image_url = ?'); params.push(req.body.image_url || null); }
-  ['price_cents', 'sort_order'].forEach((k) => {
-    if (req.body[k] !== undefined) { sets.push(k + ' = ?'); params.push(Number(req.body[k]) || 0); }
+  if (req.body.stock_enabled !== undefined) { sets.push('stock_enabled = ?'); params.push(req.body.stock_enabled ? 1 : 0); }
+  ['price_cents', 'sort_order', 'stock_quantity'].forEach((k) => {
+    if (req.body[k] !== undefined) { sets.push(k + ' = ?'); params.push(Math.max(0, Number(req.body[k]) || 0)); }
   });
   if (!sets.length) return res.json({ ok: true });
   params.push(req.params.id, req.salon.id);

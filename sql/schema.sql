@@ -291,6 +291,8 @@ CREATE TABLE IF NOT EXISTS products (
   category VARCHAR(100) NULL,
   active TINYINT(1) NOT NULL DEFAULT 1,
   sort_order INT NOT NULL DEFAULT 0,
+  stock_enabled TINYINT(1) NOT NULL DEFAULT 0,
+  stock_quantity INT NOT NULL DEFAULT 0,
   FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -735,3 +737,14 @@ CREATE TABLE IF NOT EXISTS api_keys (
 INSERT INTO api_keys (id, name, key_hash, key_preview, created_at)
 SELECT UUID(), 'Clé historique (n8n)', '37fd11ef357895fedc4726d7367cae4ce9a4e285946eaed4d0981ba0d01bc22f', '735d830b...', NOW()
 WHERE NOT EXISTS (SELECT 1 FROM api_keys WHERE key_hash = '37fd11ef357895fedc4726d7367cae4ce9a4e285946eaed4d0981ba0d01bc22f');
+
+-- Gestion de stock optionnelle par produit - décochée par défaut :
+-- le produit reste illimité (comportement d'origine, inchangé) tant
+-- que le stock n'est pas explicitement activé.
+SET @p1 := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'products' AND column_name = 'stock_enabled');
+SET @sql := IF(@p1 = 0, 'ALTER TABLE products ADD COLUMN stock_enabled TINYINT(1) NOT NULL DEFAULT 0', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @p2 := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'products' AND column_name = 'stock_quantity');
+SET @sql := IF(@p2 = 0, 'ALTER TABLE products ADD COLUMN stock_quantity INT NOT NULL DEFAULT 0', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;

@@ -1260,6 +1260,14 @@
         <div class="fld" id="sc-dur-fld"><label for="sc-dur">Durée (minutes)</label><input id="sc-dur" type="number" min="0" value="30"></div>
         <div class="fld"><label for="sc-price" id="sc-price-label">Prix (€)</label><input id="sc-price" type="number" min="0" step="0.5" value="20"></div>
       </div>
+      <div class="fld" id="sc-stock-toggle-fld" style="display:none">
+        <label style="display:flex;align-items:center;gap:8px;font-weight:400;cursor:pointer">
+          <input type="checkbox" id="sc-stock-enabled" onchange="document.getElementById('sc-stock-qty-fld').style.display=this.checked?'block':'none'" style="width:auto">
+          Activer le stock
+        </label>
+        <p class="hint" style="margin-top:4px">Décoché : le produit est illimité, toujours disponible à la vente.</p>
+      </div>
+      <div class="fld" id="sc-stock-qty-fld" style="display:none"><label for="sc-stock-qty">Quantité en stock</label><input id="sc-stock-qty" type="number" min="0" value="0"></div>
     </div>
     <div class="sheet-foot"><button class="btn btn-primary" onclick="saveCatalog()">Enregistrer</button></div>
   </div>
@@ -2157,7 +2165,7 @@ function renderCatalog(table) {
     ? '<div class="empty">Rien pour le moment</div>'
     : list.map(function (x) {
         var meta = table === 'products'
-          ? eur(x.price_cents)
+          ? eur(x.price_cents) + (x.stock_enabled ? ' · ' + (x.stock_quantity > 0 ? x.stock_quantity + ' en stock' : 'rupture de stock') : ' · illimité')
           : formatMinutes(x.duration_min) + ' · ' + (table === 'extras' ? '+ ' : '') + eur(x.price_cents);
         var photoStyle = x.image_url ? 'background:url(&quot;' + esc(x.image_url) + '&quot;) center/cover' : '';
         return '<div class="item' + (x.active ? '' : ' off') + '">' +
@@ -2217,6 +2225,13 @@ function openCatalogForm(table, id) {
   if (table !== 'products') {
     document.getElementById('sc-dur').value = item ? item.duration_min : (table === 'services' ? 30 : 10);
   }
+
+  document.getElementById('sc-stock-toggle-fld').style.display = table === 'products' ? 'block' : 'none';
+  var stockEnabled = table === 'products' && item ? Boolean(item.stock_enabled) : false;
+  document.getElementById('sc-stock-enabled').checked = stockEnabled;
+  document.getElementById('sc-stock-qty-fld').style.display = table === 'products' && stockEnabled ? 'block' : 'none';
+  document.getElementById('sc-stock-qty').value = item ? (item.stock_quantity || 0) : 0;
+
   document.getElementById('sheet-catalog').classList.add('on');
   _lockBodyScroll();
 }
@@ -2230,6 +2245,9 @@ function saveCatalog() {
   };
   if (editingCat.table !== 'products') {
     body.duration_min = Number(document.getElementById('sc-dur').value) || 0;
+  } else {
+    body.stock_enabled = document.getElementById('sc-stock-enabled').checked;
+    body.stock_quantity = Number(document.getElementById('sc-stock-qty').value) || 0;
   }
   var p = editingCat.id
     ? api('/api/catalog/' + editingCat.table + '/' + editingCat.id, { method: 'PUT', body: body })

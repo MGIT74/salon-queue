@@ -113,6 +113,27 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
     return [crypto.randomUUID(), saleId, it.item_type || 'product', it.item_id || null, it.item_name || 'Article', unitPrice, qty];
   });
 
+  // Vérifie le stock AVANT toute écriture - jamais de vente créée si
+  // un produit à stock géré n'a pas assez de quantité disponible
+  // (tout ou rien, pas de vente partiellement créée).
+  const productItems = items.filter((it) => (it.item_type || 'product') === 'product' && it.item_id);
+  if (productItems.length) {
+    const [stockRows] = await pool.query(
+      'SELECT id, name, stock_enabled, stock_quantity FROM products WHERE id IN (?) AND salon_id = ?',
+      [productItems.map((it) => it.item_id), req.salon.id]
+    );
+    const stockById = new Map(stockRows.map((r) => [r.id, r]));
+    for (const it of productItems) {
+      const qty = Math.max(1, Number(it.quantity) || 1);
+      const product = stockById.get(it.item_id);
+      if (product && product.stock_enabled && product.stock_quantity < qty) {
+        return res.status(409).json({
+          error: `Stock insuffisant pour "${product.name}" (${product.stock_quantity} restant, ${qty} demandé${qty > 1 ? 's' : ''})`
+        });
+      }
+    }
+  }
+
   await pool.query(
     'INSERT INTO sales (id, salon_id, barber_id, payment_method, total_price_cents) VALUES (?, ?, ?, ?, ?)',
     [saleId, req.salon.id, barberId, payment_method, total]
@@ -121,6 +142,17 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
     'INSERT INTO sale_items (id, sale_id, item_type, item_id, item_name, unit_price_cents, quantity) VALUES ?',
     [itemRows]
   );
+
+  // Décompte le stock des produits vendus (uniquement ceux dont la
+  // gestion de stock est activée - un produit illimité n'est jamais
+  // décompté).
+  for (const it of productItems) {
+    const qty = Math.max(1, Number(it.quantity) || 1);
+    await pool.query(
+      'UPDATE products SET stock_quantity = GREATEST(0, stock_quantity - ?) WHERE id = ? AND salon_id = ? AND stock_enabled = 1',
+      [qty, it.item_id, req.salon.id]
+    );
+  }
 
   if (queue_id) {
     // Ce passage vient d'être réellement payé : +1 point de fidélité.
