@@ -424,8 +424,19 @@ router.get('/salons/:id/revenue', requireAutomationKey, wrap(async (req, res) =>
 
 /**
  * Rendez-vous programmés sur une période (passée ou future) - "qui a
- * RDV demain", "combien de RDV cette semaine". Distinct de
- * /history (qui ne couvre que les prestations déjà terminées).
+ * RDV demain", "combien de RDV cette semaine", "qui ne s'est pas
+ * présenté sans prévenir". Distinct de /history (qui ne couvre que
+ * les prestations déjà terminées).
+ *
+ * 4 statuts possibles, calculés exactement comme dans le reste de
+ * l'app (jamais réinventés en double) :
+ * - confirmed : à venir, ou en cours d'attente/de coupe le jour même
+ * - cancelled : annulé (par le salon ou le client) avant même le jour J
+ * - completed : la prestation a bien été effectuée
+ * - no_show : le client ne s'est PAS présenté sans prévenir (le RDV
+ *   est passé à l'heure prévue en file d'attente, mais a été annulé
+ *   depuis la file plutôt qu'honoré - typiquement un no-show constaté
+ *   par le coiffeur/l'admin ce jour-là)
  */
 router.get('/salons/:id/appointments', requireAutomationKey, wrap(async (req, res) => {
   const salonId = req.params.id;
@@ -435,34 +446,41 @@ router.get('/salons/:id/appointments', requireAutomationKey, wrap(async (req, re
   const start = req.query.start || new Date().toISOString().slice(0, 10);
   const end = req.query.end || start;
   const barberId = req.query.barber_id || null;
+  const statusFilter = req.query.status || null; // confirmed | cancelled | completed | no_show
 
   const conditions = ['a.salon_id = ?', 'a.scheduled_at BETWEEN ? AND ?'];
   const params = [salonId, start + ' 00:00:00', end + ' 23:59:59'];
   if (barberId) { conditions.push('a.barber_id = ?'); params.push(barberId); }
 
   const [rows] = await pool.query(
-    `SELECT a.client_name, a.scheduled_at, a.status, s.name AS service_name, b.name AS barber_name
+    `SELECT a.client_name, a.scheduled_at, a.status, q.status AS queue_status,
+            s.name AS service_name, b.name AS barber_name
      FROM appointments a
      LEFT JOIN services s ON s.id = a.service_id
      LEFT JOIN barbers b ON b.id = a.barber_id
+     LEFT JOIN queue q ON q.id = a.promoted_queue_id
      WHERE ${conditions.join(' AND ')}
      ORDER BY a.scheduled_at ASC
      LIMIT 300`,
     params
   );
 
-  res.json({
-    ok: true,
-    start,
-    end,
-    items: rows.map((r) => ({
+  const items = rows.map((r) => {
+    let displayStatus = 'confirmed';
+    if (r.status === 'cancelled') displayStatus = 'cancelled';
+    else if (r.queue_status === 'done') displayStatus = 'completed';
+    else if (r.queue_status === 'cancelled') displayStatus = 'no_show';
+
+    return {
       client_name: r.client_name,
       when: String(r.scheduled_at),
-      status: r.status,
+      status: displayStatus,
       service_name: r.service_name,
       barber_name: r.barber_name
-    }))
-  });
+    };
+  }).filter((it) => !statusFilter || it.status === statusFilter);
+
+  res.json({ ok: true, start, end, status_filter: statusFilter, items });
 }));
 
 /**
