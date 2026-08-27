@@ -332,4 +332,182 @@ router.get('/salons/:id/barbers-schedules', requireAutomationKey, wrap(async (re
   res.json({ ok: true, items });
 }));
 
+/**
+ * Historique des prestations réellement effectuées (terminées) sur
+ * une période donnée - "qu'est-ce qui s'est passé du X au Y". Filtre
+ * optionnel par coiffeur. Toujours les vraies données facturées
+ * (queue.total_price_cents), jamais estimées.
+ */
+router.get('/salons/:id/history', requireAutomationKey, wrap(async (req, res) => {
+  const salonId = req.params.id;
+  const [[salon]] = await pool.query('SELECT id FROM salons WHERE id = ? AND active = 1', [salonId]);
+  if (!salon) return res.status(404).json({ error: 'Salon introuvable ou inactif' });
+
+  const start = req.query.start || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+  const end = req.query.end || new Date().toISOString().slice(0, 10);
+  const barberId = req.query.barber_id || null;
+
+  const conditions = ['q.salon_id = ?', "q.status = 'done'", 'q.end_at BETWEEN ? AND ?'];
+  const params = [salonId, start + ' 00:00:00', end + ' 23:59:59'];
+  if (barberId) { conditions.push('q.barber_id = ?'); params.push(barberId); }
+
+  const [rows] = await pool.query(
+    `SELECT q.client_name, q.end_at, q.total_price_cents, s.name AS service_name, b.name AS barber_name
+     FROM queue q
+     LEFT JOIN services s ON s.id = q.service_id
+     LEFT JOIN barbers b ON b.id = q.barber_id
+     WHERE ${conditions.join(' AND ')}
+     ORDER BY q.end_at DESC
+     LIMIT 300`,
+    params
+  );
+
+  res.json({
+    ok: true,
+    start,
+    end,
+    items: rows.map((r) => ({
+      client_name: r.client_name,
+      when: String(r.end_at),
+      service_name: r.service_name,
+      barber_name: r.barber_name,
+      price_euros: r.total_price_cents / 100
+    }))
+  });
+}));
+
+/**
+ * Chiffre d'affaires réellement encaissé sur n'importe quelle période
+ * (pas seulement aujourd'hui) - total, nombre de prestations, et
+ * répartition par coiffeur.
+ */
+router.get('/salons/:id/revenue', requireAutomationKey, wrap(async (req, res) => {
+  const salonId = req.params.id;
+  const [[salon]] = await pool.query('SELECT id FROM salons WHERE id = ? AND active = 1', [salonId]);
+  if (!salon) return res.status(404).json({ error: 'Salon introuvable ou inactif' });
+
+  const start = req.query.start || new Date().toISOString().slice(0, 10);
+  const end = req.query.end || new Date().toISOString().slice(0, 10);
+
+  const [[totalRow]] = await pool.query(
+    `SELECT COUNT(*) AS done_count, COALESCE(SUM(total_price_cents), 0) AS revenue_cents
+     FROM queue WHERE salon_id = ? AND status = 'done' AND end_at BETWEEN ? AND ?`,
+    [salonId, start + ' 00:00:00', end + ' 23:59:59']
+  );
+
+  const [byBarber] = await pool.query(
+    `SELECT b.name AS barber_name, COUNT(*) AS done_count, COALESCE(SUM(q.total_price_cents), 0) AS revenue_cents
+     FROM queue q LEFT JOIN barbers b ON b.id = q.barber_id
+     WHERE q.salon_id = ? AND q.status = 'done' AND q.end_at BETWEEN ? AND ?
+     GROUP BY q.barber_id, b.name
+     ORDER BY revenue_cents DESC`,
+    [salonId, start + ' 00:00:00', end + ' 23:59:59']
+  );
+
+  res.json({
+    ok: true,
+    start,
+    end,
+    total_revenue_euros: totalRow.revenue_cents / 100,
+    total_services: Number(totalRow.done_count),
+    by_barber: byBarber.map((r) => ({
+      barber_name: r.barber_name || 'Non assigné',
+      services_count: Number(r.done_count),
+      revenue_euros: r.revenue_cents / 100
+    }))
+  });
+}));
+
+/**
+ * Rendez-vous programmés sur une période (passée ou future) - "qui a
+ * RDV demain", "combien de RDV cette semaine". Distinct de
+ * /history (qui ne couvre que les prestations déjà terminées).
+ */
+router.get('/salons/:id/appointments', requireAutomationKey, wrap(async (req, res) => {
+  const salonId = req.params.id;
+  const [[salon]] = await pool.query('SELECT id FROM salons WHERE id = ? AND active = 1', [salonId]);
+  if (!salon) return res.status(404).json({ error: 'Salon introuvable ou inactif' });
+
+  const start = req.query.start || new Date().toISOString().slice(0, 10);
+  const end = req.query.end || start;
+  const barberId = req.query.barber_id || null;
+
+  const conditions = ['a.salon_id = ?', 'a.scheduled_at BETWEEN ? AND ?'];
+  const params = [salonId, start + ' 00:00:00', end + ' 23:59:59'];
+  if (barberId) { conditions.push('a.barber_id = ?'); params.push(barberId); }
+
+  const [rows] = await pool.query(
+    `SELECT a.client_name, a.scheduled_at, a.status, s.name AS service_name, b.name AS barber_name
+     FROM appointments a
+     LEFT JOIN services s ON s.id = a.service_id
+     LEFT JOIN barbers b ON b.id = a.barber_id
+     WHERE ${conditions.join(' AND ')}
+     ORDER BY a.scheduled_at ASC
+     LIMIT 300`,
+    params
+  );
+
+  res.json({
+    ok: true,
+    start,
+    end,
+    items: rows.map((r) => ({
+      client_name: r.client_name,
+      when: String(r.scheduled_at),
+      status: r.status,
+      service_name: r.service_name,
+      barber_name: r.barber_name
+    }))
+  });
+}));
+
+/**
+ * Vérifie les congés/disponibilité pour UNE DATE PRECISE donnée (pas
+ * seulement aujourd'hui) - comble la limite de "Statut des coiffeurs"
+ * (qui ne regarde que maintenant) et "Horaires des coiffeurs" (qui ne
+ * donne que le planning type sans tenir compte des congés).
+ */
+router.get('/salons/:id/leave-check', requireAutomationKey, wrap(async (req, res) => {
+  const salonId = req.params.id;
+  const [[salon]] = await pool.query('SELECT id FROM salons WHERE id = ? AND active = 1', [salonId]);
+  if (!salon) return res.status(404).json({ error: 'Salon introuvable ou inactif' });
+
+  const dateStr = req.query.date;
+  if (!dateStr) return res.status(400).json({ error: 'Paramètre date requis (YYYY-MM-DD)' });
+
+  const weekday = new Date(dateStr + 'T00:00:00Z').getUTCDay();
+
+  const [barbers] = await pool.query(
+    'SELECT id, name FROM barbers WHERE salon_id = ? AND active = 1 ORDER BY sort_order, name',
+    [salonId]
+  );
+  const [schedules] = await pool.query(
+    `SELECT bs.barber_id, bs.start_time, bs.end_time FROM barber_schedules bs
+     JOIN barbers b ON b.id = bs.barber_id
+     WHERE b.salon_id = ? AND bs.weekday = ? AND bs.active = 1`,
+    [salonId, weekday]
+  );
+  const [leaves] = await pool.query(
+    `SELECT bl.barber_id FROM barber_leaves bl
+     JOIN barbers b ON b.id = bl.barber_id
+     WHERE b.salon_id = ? AND ? BETWEEN bl.start_date AND bl.end_date`,
+    [salonId, dateStr]
+  );
+  const onLeaveIds = new Set(leaves.map((l) => l.barber_id));
+
+  const items = barbers.map((b) => {
+    const onLeave = onLeaveIds.has(b.id);
+    const schedule = schedules.find((s) => s.barber_id === b.id);
+    return {
+      name: b.name,
+      normally_works_that_day: Boolean(schedule),
+      hours: schedule ? schedule.start_time.slice(0, 5) + '-' + schedule.end_time.slice(0, 5) : null,
+      on_leave_that_day: onLeave,
+      actually_working: Boolean(schedule) && !onLeave
+    };
+  });
+
+  res.json({ ok: true, date: dateStr, items });
+}));
+
 module.exports = router;
