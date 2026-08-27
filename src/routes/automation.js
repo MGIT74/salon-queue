@@ -213,4 +213,123 @@ router.post('/salons/:id/send-client-email', requireAutomationKey, wrap(async (r
   res.json({ ok: true, sent, skipped_unknown_client: skipped, errors });
 }));
 
+/**
+ * Statut de chaque coiffeur du salon en ce moment précis : en poste
+ * (horaire du jour), en pause (créneau de pause du jour), en congé
+ * (période de congé couvrant aujourd'hui) - réutilise exactement la
+ * même logique que celle déjà utilisée ailleurs dans l'app (jamais
+ * réinventée).
+ */
+router.get('/salons/:id/barbers-status', requireAutomationKey, wrap(async (req, res) => {
+  const salonId = req.params.id;
+  const [[salon]] = await pool.query('SELECT id FROM salons WHERE id = ? AND active = 1', [salonId]);
+  if (!salon) return res.status(404).json({ error: 'Salon introuvable ou inactif' });
+
+  const [barbers] = await pool.query(
+    'SELECT id, name, active, accepts_appointments FROM barbers WHERE salon_id = ? ORDER BY sort_order, name',
+    [salonId]
+  );
+
+  const now = new Date();
+  const weekday = now.getDay();
+  const hhmm = now.toTimeString().slice(0, 8);
+  const todayStr = now.toISOString().slice(0, 10);
+
+  const [schedules] = await pool.query(
+    `SELECT bs.barber_id, bs.start_time, bs.end_time FROM barber_schedules bs
+     JOIN barbers b ON b.id = bs.barber_id
+     WHERE b.salon_id = ? AND bs.weekday = ? AND bs.active = 1`,
+    [salonId, weekday]
+  );
+  const [breaks] = await pool.query(
+    `SELECT bb.barber_id, bb.start_time, bb.end_time FROM barber_breaks bb
+     JOIN barbers b ON b.id = bb.barber_id
+     WHERE b.salon_id = ? AND bb.weekday = ? AND bb.active = 1`,
+    [salonId, weekday]
+  );
+  const [leaves] = await pool.query(
+    `SELECT bl.barber_id FROM barber_leaves bl
+     JOIN barbers b ON b.id = bl.barber_id
+     WHERE b.salon_id = ? AND ? BETWEEN bl.start_date AND bl.end_date`,
+    [salonId, todayStr]
+  );
+  const onLeaveIds = new Set(leaves.map((l) => l.barber_id));
+
+  const items = barbers.map((b) => {
+    const onLeave = onLeaveIds.has(b.id);
+    const todaySchedule = schedules.find((s) => s.barber_id === b.id);
+    const onDutyNow = !onLeave && Boolean(todaySchedule) && todaySchedule.start_time <= hhmm && hhmm < todaySchedule.end_time;
+    const onBreakNow = onDutyNow && breaks.some((br) => br.barber_id === b.id && br.start_time <= hhmm && hhmm < br.end_time);
+    return {
+      id: b.id,
+      name: b.name,
+      active: Boolean(b.active),
+      accepts_appointments: Boolean(b.accepts_appointments),
+      on_leave_today: onLeave,
+      working_today: Boolean(todaySchedule),
+      today_hours: todaySchedule ? todaySchedule.start_time.slice(0, 5) + '-' + todaySchedule.end_time.slice(0, 5) : null,
+      on_duty_now: onDutyNow,
+      on_break_now: Boolean(onBreakNow)
+    };
+  });
+
+  res.json({ ok: true, items });
+}));
+
+/**
+ * Tous les tarifs du salon en un seul appel : prestations,
+ * suppléments, produits en vente.
+ */
+router.get('/salons/:id/prices', requireAutomationKey, wrap(async (req, res) => {
+  const salonId = req.params.id;
+  const [[salon]] = await pool.query('SELECT id FROM salons WHERE id = ? AND active = 1', [salonId]);
+  if (!salon) return res.status(404).json({ error: 'Salon introuvable ou inactif' });
+
+  const [services, extras, products] = await Promise.all([
+    pool.query('SELECT name, duration_min, price_cents FROM services WHERE salon_id = ? AND active = 1 ORDER BY sort_order', [salonId]),
+    pool.query('SELECT name, duration_min, price_cents FROM extras WHERE salon_id = ? AND active = 1 ORDER BY sort_order', [salonId]),
+    pool.query('SELECT name, category, price_cents FROM products WHERE salon_id = ? AND active = 1 ORDER BY sort_order', [salonId])
+  ]);
+
+  const fmt = (rows) => rows[0].map((r) => Object.assign({}, r, { price_euros: r.price_cents / 100 }));
+
+  res.json({
+    ok: true,
+    services: fmt(services),
+    extras: fmt(extras),
+    products: fmt(products)
+  });
+}));
+
+/**
+ * Horaires généraux de chaque coiffeur (grille de la semaine type,
+ * pas seulement aujourd'hui) - utile pour répondre à "quand travaille
+ * untel habituellement ?".
+ */
+router.get('/salons/:id/barbers-schedules', requireAutomationKey, wrap(async (req, res) => {
+  const salonId = req.params.id;
+  const [[salon]] = await pool.query('SELECT id FROM salons WHERE id = ? AND active = 1', [salonId]);
+  if (!salon) return res.status(404).json({ error: 'Salon introuvable ou inactif' });
+
+  const [barbers] = await pool.query('SELECT id, name FROM barbers WHERE salon_id = ? AND active = 1 ORDER BY sort_order, name', [salonId]);
+  const [schedules] = await pool.query(
+    `SELECT bs.barber_id, bs.weekday, bs.start_time, bs.end_time FROM barber_schedules bs
+     JOIN barbers b ON b.id = bs.barber_id
+     WHERE b.salon_id = ? AND bs.active = 1
+     ORDER BY bs.weekday`,
+    [salonId]
+  );
+
+  const dayNames = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+  const items = barbers.map((b) => ({
+    id: b.id,
+    name: b.name,
+    weekly_schedule: schedules
+      .filter((s) => s.barber_id === b.id)
+      .map((s) => ({ day: dayNames[s.weekday], hours: s.start_time.slice(0, 5) + '-' + s.end_time.slice(0, 5) }))
+  }));
+
+  res.json({ ok: true, items });
+}));
+
 module.exports = router;
