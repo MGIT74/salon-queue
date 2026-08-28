@@ -196,6 +196,26 @@ router.get('/clients', requireAdmin, wrap(async (req, res) => {
 // Permet à un compte déjà connecté (même via l'ancien mot de passe partagé
 // en clair) d'ajouter un email de récupération, pour pouvoir ensuite
 // utiliser "mot de passe oublié". Ne change pas le mot de passe lui-même.
+/**
+ * Profil de l'owner connecté (nom + email) - pour préremplir le
+ * formulaire Compte côté dashboard. Le nom sert notamment à ce que
+ * l'assistant IA puisse s'adresser à l'admin par son prénom dès le
+ * premier échange, plutôt que de rester anonyme.
+ */
+router.get('/profile', requireAdmin, wrap(async (req, res) => {
+  const [[owner]] = await pool.query('SELECT name, email FROM owners WHERE id = ?', [req.ownerId]);
+  res.json({ ok: true, name: owner ? owner.name : null, email: owner ? owner.email : null });
+}));
+
+router.put('/name', requireAdmin, wrap(async (req, res) => {
+  const name = String(req.body.name || '').trim();
+  if (!name) return res.status(400).json({ error: 'Le nom est requis' });
+  if (name.length > 255) return res.status(400).json({ error: 'Nom trop long' });
+
+  await pool.query('UPDATE owners SET name = ? WHERE id = ?', [name, req.ownerId]);
+  res.json({ ok: true });
+}));
+
 router.put('/email', requireAdmin, wrap(async (req, res) => {
   const email = String(req.body.email || '').trim();
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {

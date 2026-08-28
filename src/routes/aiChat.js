@@ -89,10 +89,11 @@ router.post('/message', requireAdmin, wrap(async (req, res) => {
 
   let answer;
   try {
+    const [[owner]] = await pool.query('SELECT name FROM owners WHERE id = ?', [req.ownerId]);
     const n8nRes = await fetch(N8N_CHAT_WEBHOOK_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Automation-Key': process.env.AUTOMATION_API_KEY || '' },
-      body: JSON.stringify({ salon_id: req.salon.id, salon_name: req.salon.name, message }),
+      body: JSON.stringify({ salon_id: req.salon.id, salon_name: req.salon.name, admin_name: owner ? owner.name : null, message }),
       signal: AbortSignal.timeout(30000)
     });
     if (!n8nRes.ok) throw new Error('Le service IA a répondu avec une erreur (' + n8nRes.status + ')');

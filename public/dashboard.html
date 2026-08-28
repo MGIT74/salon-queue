@@ -1064,11 +1064,15 @@
     </div>
 
     <div class="card-box">
-      <h3>Email de récupération</h3>
-      <p class="hint">Ajoutez un email pour pouvoir utiliser "mot de passe oublié" en cas de besoin.</p>
-      <div class="fld"><label for="set-recovery-email">Email de récupération</label>
-        <input id="set-recovery-email" type="email" placeholder="vous@exemple.com"></div>
-      <button class="btn btn-primary" onclick="saveRecoveryEmail()">Enregistrer l'email</button>
+      <h3>Mon profil</h3>
+      <p class="hint">Votre nom permet notamment à l'assistant IA de s'adresser à vous directement. L'email sert aussi pour "mot de passe oublié".</p>
+      <div class="grid2">
+        <div class="fld"><label for="acc-owner-name">Votre nom</label>
+          <input id="acc-owner-name" type="text" placeholder="Prénom Nom"></div>
+        <div class="fld"><label for="acc-owner-email">Email</label>
+          <input id="acc-owner-email" type="email" placeholder="vous@exemple.com"></div>
+      </div>
+      <button class="btn btn-primary" onclick="saveOwnerProfile()">Enregistrer</button>
     </div>
   </div>
 
@@ -1564,6 +1568,7 @@ document.getElementById('tabs').addEventListener('click', function (e) {
   if (b.dataset.t === 'marketing') loadMarketingTab();
   if (b.dataset.t === 'caisse') loadCaisseTab();
   if (b.dataset.t === 'rdv') loadRdvTab();
+  if (b.dataset.t === 'account') loadOwnerProfile();
 });
 
 /* ============ Chargement ============ */
@@ -4504,11 +4509,22 @@ function changeOwnPassword() {
     .catch(function (e) { toast(e.message, true); });
 }
 
-function saveRecoveryEmail() {
-  var email = document.getElementById('set-recovery-email').value.trim();
-  if (!email) { toast('Adresse email requise', true); return; }
-  api('/api/owner/email', { method: 'PUT', body: { email: email } })
-    .then(function () { toast('Email de récupération enregistré'); })
+function loadOwnerProfile() {
+  api('/api/owner/profile').then(function (r) {
+    document.getElementById('acc-owner-name').value = r.name || '';
+    document.getElementById('acc-owner-email').value = r.email || '';
+  }).catch(function () {});
+}
+
+function saveOwnerProfile() {
+  var name = document.getElementById('acc-owner-name').value.trim();
+  var email = document.getElementById('acc-owner-email').value.trim();
+  var tasks = [];
+  if (name) tasks.push(api('/api/owner/name', { method: 'PUT', body: { name: name } }));
+  if (email) tasks.push(api('/api/owner/email', { method: 'PUT', body: { email: email } }));
+  if (!tasks.length) { toast('Rien à enregistrer', true); return; }
+  Promise.all(tasks)
+    .then(function () { toast('Profil mis à jour'); })
     .catch(function (e) { toast(e.message, true); });
 }
 
