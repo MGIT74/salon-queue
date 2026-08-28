@@ -748,3 +748,16 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 SET @p2 := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'products' AND column_name = 'stock_quantity');
 SET @sql := IF(@p2 = 0, 'ALTER TABLE products ADD COLUMN stock_quantity INT NOT NULL DEFAULT 0', 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Jetons d'assistance (super admin) - stockés en base plutôt qu'en
+-- mémoire du process Node, pour survivre à un redémarrage/redéploiement
+-- du serveur pendant les 10 minutes de validité (auparavant en Map en
+-- mémoire, silencieusement effacée à chaque redéploiement - source
+-- d'un vrai bug : le jeton semblait valide mais avait disparu).
+CREATE TABLE IF NOT EXISTS impersonation_tokens (
+  token VARCHAR(64) PRIMARY KEY,
+  owner_id CHAR(36) NOT NULL,
+  expires_at DATETIME NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (owner_id) REFERENCES owners(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
