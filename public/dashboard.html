@@ -4951,31 +4951,8 @@ function testSmtp() {
       .catch(function (e) { toast(e.message, true); });
   });
 }
-</script>
 
-<!-- Chatbot IA -->
-<button class="ai-chat-fab" id="ai-chat-fab" onclick="toggleAiChat()" title="Assistant IA">
-  <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M12 2.5l1.9 5.2a4 4 0 002.4 2.4L21.5 12l-5.2 1.9a4 4 0 00-2.4 2.4L12 21.5l-1.9-5.2a4 4 0 00-2.4-2.4L2.5 12l5.2-1.9a4 4 0 002.4-2.4L12 2.5z"/><path d="M19 3l.6 1.6L21.2 5l-1.6.6L19 7.2l-.6-1.6L16.8 5l1.6-.6L19 3z"/><path d="M5 15l.6 1.6L7.2 17l-1.6.6L5 19.2l-.6-1.6L2.8 17l1.6-.6L5 15z"/></svg>
-</button>
-
-<div class="ai-chat-panel" id="ai-chat-panel" style="display:none">
-  <div class="ai-chat-header">
-    <span>Assistant IA</span>
-    <span class="ai-chat-credits" id="ai-chat-credits-label">…</span>
-    <button class="ai-chat-close" onclick="toggleAiChat()">✕</button>
-  </div>
-  <div class="ai-chat-messages" id="ai-chat-messages">
-    <div class="ai-chat-msg bot">Bonjour ! Posez-moi une question sur l'état de votre salon aujourd'hui — créneaux libres, chiffre d'affaires, prestation la plus demandée…</div>
-  </div>
-  <div class="ai-chat-input-row">
-    <input type="text" id="ai-chat-input" placeholder="Écrivez votre question…" onkeydown="if(event.key==='Enter')sendAiChatMessage()">
-    <button class="btn btn-primary ai-chat-send-btn" id="ai-chat-send-btn" onclick="sendAiChatMessage()" title="Envoyer" aria-label="Envoyer">
-      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-    </button>
-  </div>
-</div>
-
-<script>
+/* ============ Chatbot IA ============ */
 var aiChatOpen = false;
 var aiChatSending = false;
 
@@ -5058,5 +5035,27 @@ function sendAiChatMessage() {
     });
 }
 </script>
+
+<!-- Chatbot IA -->
+<button class="ai-chat-fab" id="ai-chat-fab" onclick="toggleAiChat()" title="Assistant IA">
+  <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M12 2.5l1.9 5.2a4 4 0 002.4 2.4L21.5 12l-5.2 1.9a4 4 0 00-2.4 2.4L12 21.5l-1.9-5.2a4 4 0 00-2.4-2.4L2.5 12l5.2-1.9a4 4 0 002.4-2.4L12 2.5z"/><path d="M19 3l.6 1.6L21.2 5l-1.6.6L19 7.2l-.6-1.6L16.8 5l1.6-.6L19 3z"/><path d="M5 15l.6 1.6L7.2 17l-1.6.6L5 19.2l-.6-1.6L2.8 17l1.6-.6L5 15z"/></svg>
+</button>
+
+<div class="ai-chat-panel" id="ai-chat-panel" style="display:none">
+  <div class="ai-chat-header">
+    <span>Assistant IA</span>
+    <span class="ai-chat-credits" id="ai-chat-credits-label">…</span>
+    <button class="ai-chat-close" onclick="toggleAiChat()">✕</button>
+  </div>
+  <div class="ai-chat-messages" id="ai-chat-messages">
+    <div class="ai-chat-msg bot">Bonjour ! Posez-moi une question sur l'état de votre salon aujourd'hui — créneaux libres, chiffre d'affaires, prestation la plus demandée…</div>
+  </div>
+  <div class="ai-chat-input-row">
+    <input type="text" id="ai-chat-input" placeholder="Écrivez votre question…" onkeydown="if(event.key==='Enter')sendAiChatMessage()">
+    <button class="btn btn-primary ai-chat-send-btn" id="ai-chat-send-btn" onclick="sendAiChatMessage()" title="Envoyer" aria-label="Envoyer">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+    </button>
+  </div>
+</div>
 </body>
 </html>
