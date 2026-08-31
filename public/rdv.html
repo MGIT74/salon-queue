@@ -107,9 +107,9 @@
     <div class="fld"><label for="rdv-date">Date</label><input id="rdv-date" type="date" onchange="loadSlots()"></div>
     <div class="eyebrow" style="margin-top:20px">Créneaux disponibles</div>
     <div class="slots-grid" id="slots-grid"><div class="empty">Choisissez une date</div></div>
-    <div id="half-toggle" style="display:none;gap:8px;margin-bottom:22px">
-      <button class="btn btn-soft" id="half-morning" style="flex:1" onclick="showHalf('morning')">Matin</button>
-      <button class="btn btn-soft" id="half-afternoon" style="flex:1" onclick="showHalf('afternoon')">Après-midi</button>
+    <div id="half-toggle" class="half-toggle" style="display:none;margin-bottom:22px">
+      <button id="half-morning" onclick="showHalf('morning')">Matin</button>
+      <button id="half-afternoon" onclick="showHalf('afternoon')">Après-midi</button>
     </div>
     <button class="go" id="date-next-btn" onclick="goToContactStep()" disabled>Suivant</button>
   </section>
@@ -359,10 +359,8 @@ function renderHalf() {
 
 function showHalf(half) {
   currentHalf = half;
-  document.getElementById('half-morning').className = 'btn ' + (half === 'morning' ? 'btn-primary' : 'btn-soft');
-  document.getElementById('half-afternoon').className = 'btn ' + (half === 'afternoon' ? 'btn-primary' : 'btn-soft');
-  document.getElementById('half-morning').style.flex = '1';
-  document.getElementById('half-afternoon').style.flex = '1';
+  document.getElementById('half-morning').classList.toggle('sel', half === 'morning');
+  document.getElementById('half-afternoon').classList.toggle('sel', half === 'afternoon');
   renderHalf();
 }
 

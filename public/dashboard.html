@@ -1726,9 +1726,9 @@ function openRescheduleAppointment(id, data) {
     '<div class="fld" style="margin-bottom:10px"><label>Nouvelle date</label><input class="modal-input" type="date" id="rs-date" value="' + currentDate + '"></div>' +
     '<div class="aa-step-title">Créneau</div>' +
     '<div class="aa-slots" id="rs-slots"><span class="hint" style="margin:0">Chargement…</span></div>' +
-    '<div id="rs-half-toggle" style="display:none;gap:8px;margin-top:8px">' +
-      '<button class="btn btn-soft" id="rs-half-morning" style="flex:1" onclick="rsShowHalf(\'morning\')">Matin</button>' +
-      '<button class="btn btn-soft" id="rs-half-afternoon" style="flex:1" onclick="rsShowHalf(\'afternoon\')">Après-midi</button>' +
+    '<div id="rs-half-toggle" class="half-toggle" style="display:none;margin-top:8px">' +
+      '<button id="rs-half-morning" onclick="rsShowHalf(\'morning\')">Matin</button>' +
+      '<button id="rs-half-afternoon" onclick="rsShowHalf(\'afternoon\')">Après-midi</button>' +
     '</div>' +
     '<div class="modal-error" id="rs-error" style="display:none"></div>' +
     '<div class="modal-actions">' +
@@ -1753,10 +1753,8 @@ function openRescheduleAppointment(id, data) {
 
   window.rsShowHalf = function (half) {
     rsCurrentHalf = half;
-    overlay.querySelector('#rs-half-morning').className = 'btn ' + (half === 'morning' ? 'btn-primary' : 'btn-soft');
-    overlay.querySelector('#rs-half-afternoon').className = 'btn ' + (half === 'afternoon' ? 'btn-primary' : 'btn-soft');
-    overlay.querySelector('#rs-half-morning').style.flex = '1';
-    overlay.querySelector('#rs-half-afternoon').style.flex = '1';
+    overlay.querySelector('#rs-half-morning').classList.toggle('sel', half === 'morning');
+    overlay.querySelector('#rs-half-afternoon').classList.toggle('sel', half === 'afternoon');
     rsRenderHalf();
   };
 
@@ -3340,9 +3338,9 @@ function openAdminAddAppointment(dateStr) {
       '<button class="aa-back" onclick="aaGoStep(\'extras\')">‹ Retour</button>' +
       '<div class="aa-step-title">Créneau</div>' +
       '<div class="aa-slots" id="aa-slots"><span class="hint" style="margin:0">Chargement…</span></div>' +
-      '<div id="aa-half-toggle" style="display:none;gap:8px;margin-top:8px">' +
-        '<button class="btn btn-soft" id="aa-half-morning" style="flex:1" onclick="aaShowHalf(\'morning\')">Matin</button>' +
-        '<button class="btn btn-soft" id="aa-half-afternoon" style="flex:1" onclick="aaShowHalf(\'afternoon\')">Après-midi</button>' +
+      '<div id="aa-half-toggle" class="half-toggle" style="display:none;margin-top:8px">' +
+        '<button id="aa-half-morning" onclick="aaShowHalf(\'morning\')">Matin</button>' +
+        '<button id="aa-half-afternoon" onclick="aaShowHalf(\'afternoon\')">Après-midi</button>' +
       '</div>' +
     '</div>' +
 
@@ -3408,10 +3406,8 @@ function openAdminAddAppointment(dateStr) {
 
   window.aaShowHalf = function (half) {
     currentHalf = half;
-    overlay.querySelector('#aa-half-morning').className = 'btn ' + (half === 'morning' ? 'btn-primary' : 'btn-soft');
-    overlay.querySelector('#aa-half-afternoon').className = 'btn ' + (half === 'afternoon' ? 'btn-primary' : 'btn-soft');
-    overlay.querySelector('#aa-half-morning').style.flex = '1';
-    overlay.querySelector('#aa-half-afternoon').style.flex = '1';
+    overlay.querySelector('#aa-half-morning').classList.toggle('sel', half === 'morning');
+    overlay.querySelector('#aa-half-afternoon').classList.toggle('sel', half === 'afternoon');
     aaRenderHalf();
   };
 
