@@ -821,4 +821,22 @@ async function promoteTodayAppointments(salonId) {
   }
 }
 
+/**
+ * Suppression PERMANENTE et définitive d'un rendez-vous - fonctionne
+ * quel que soit son statut ou sa date (passé, terminé, déjà annulé...)
+ * contrairement à /admin-cancel qui ne fait que marquer "annulé" et
+ * n'agit que sur les RDV encore à venir. Aucun email envoyé - une
+ * suppression, ce n'est pas une annulation communiquée au client.
+ */
+router.delete('/:id', requireAdmin, wrap(async (req, res) => {
+  const [[appt]] = await pool.query(
+    'SELECT id FROM appointments WHERE id = ? AND salon_id = ?',
+    [req.params.id, req.salon.id]
+  );
+  if (!appt) return res.status(404).json({ error: 'Rendez-vous introuvable' });
+
+  await pool.query('DELETE FROM appointments WHERE id = ?', [req.params.id]);
+  res.json({ ok: true });
+}));
+
 module.exports = { router, promoteTodayAppointments, nowParisDatetimeString, computeSlotsForBarber };

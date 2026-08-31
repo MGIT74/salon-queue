@@ -945,6 +945,7 @@
           <button class="btn btn-soft" onclick="exportRdvCsv()">Télécharger CSV</button>
           <button class="btn btn-soft" onclick="exportRdvPdf()">Télécharger PDF</button>
           <button class="btn btn-ghost" id="rdv-bulk-cancel-btn" style="color:var(--red);display:none" onclick="openCancelAppointmentsModal(Object.keys(rdvSelectedIds))">Annuler la sélection</button>
+          <button class="btn btn-ghost" id="rdv-bulk-delete-btn" style="color:var(--red);display:none" onclick="openDeleteAppointmentsModal(Object.keys(rdvSelectedIds))">Supprimer la sélection</button>
         </div>
       </div>
       <label class="select-all-row">
@@ -3636,6 +3637,9 @@ function updateRdvExportBar() {
     return a && a.status !== 'cancelled' && a.source !== 'walkin' && a.scheduled_at > now;
   });
   document.getElementById('rdv-bulk-cancel-btn').style.display = hasCancelable ? 'inline-block' : 'none';
+  // "Supprimer" n'a aucune restriction de statut ou de date - toujours
+  // affiché dès qu'il y a une sélection, contrairement à "Annuler".
+  document.getElementById('rdv-bulk-delete-btn').style.display = count > 0 ? 'inline-block' : 'none';
 
   // Coche/décoche/indétermine la case 'Tout sélectionner' selon l'état
   // des cases de la page actuellement affichée.
@@ -3845,6 +3849,55 @@ function openCancelAppointmentsModal(ids) {
       _closeModal(overlay);
       if (failed) toast(failed + ' annulation(s) ont échoué sur ' + ids.length, true);
       else toast(plural ? 'Rendez-vous annulés' : 'Rendez-vous annulé');
+      clearRdvSelection();
+      closeClientDrawer();
+      Object.keys(calMonthCache).forEach(function (k) { delete calMonthCache[k]; });
+      loadCalendarPeriod();
+      resetRdvListToUpcoming();
+    });
+  };
+}
+
+/**
+ * Suppression PERMANENTE - contrairement à "Annuler", fonctionne sur
+ * n'importe quel statut (Terminé, Absent, déjà Annulé, RDV passé...) -
+ * aucun filtre, puisque le but est justement de nettoyer même les
+ * vieux RDV. Aucun email envoyé au client - ce n'est pas une
+ * annulation communiquée, juste un retrait de l'historique.
+ */
+function openDeleteAppointmentsModal(ids) {
+  ids = ids.filter(Boolean);
+  if (!ids.length) return;
+
+  var plural = ids.length > 1;
+
+  var overlay = _buildModal(
+    '<div class="modal-title">Supprimer ' + (plural ? ids.length + ' rendez-vous' : 'le rendez-vous') + '</div>' +
+    '<div class="modal-message" style="margin-bottom:16px">' +
+      'Cette suppression est <b>définitive</b> et irréversible - contrairement à une annulation, ' +
+      (plural ? 'ces rendez-vous disparaîtront' : 'ce rendez-vous disparaîtra') +
+      ' complètement, y compris de l\'historique. Aucun email n\'est envoyé au client.' +
+    '</div>' +
+    '<div class="modal-actions">' +
+    '<button class="btn btn-soft" id="dam-cancel-btn">Fermer</button>' +
+    '<button class="btn btn-primary modal-danger-btn" id="dam-confirm-btn">Supprimer définitivement</button>' +
+    '</div>'
+  );
+
+  overlay.querySelector('#dam-cancel-btn').onclick = function () { _closeModal(overlay); };
+
+  overlay.querySelector('#dam-confirm-btn').onclick = function () {
+    var btn = overlay.querySelector('#dam-confirm-btn');
+    btn.disabled = true; btn.textContent = 'Suppression…';
+
+    Promise.all(ids.map(function (id) {
+      return api('/api/appointments/' + id, { method: 'DELETE' })
+        .catch(function (e) { return { error: e.message }; });
+    })).then(function (results) {
+      var failed = results.filter(function (r) { return r && r.error; }).length;
+      _closeModal(overlay);
+      if (failed) toast(failed + ' suppression(s) ont échoué sur ' + ids.length, true);
+      else toast(plural ? 'Rendez-vous supprimés' : 'Rendez-vous supprimé');
       clearRdvSelection();
       closeClientDrawer();
       Object.keys(calMonthCache).forEach(function (k) { delete calMonthCache[k]; });
