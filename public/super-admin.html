@@ -202,12 +202,16 @@
       <h3>Ajouter une enseigne</h3>
       <p class="hint">Crée un propriétaire et son premier salon, avec un catalogue de départ.</p>
       <div class="grid2">
-        <div class="fld"><label for="new-name">Nom</label><input id="new-name" type="text" placeholder="Salon Rive Gauche"></div>
-        <div class="fld"><label for="new-slug">Identifiant (dans l'URL)</label><input id="new-slug" type="text" placeholder="salon-2" pattern="[a-z0-9-]+"></div>
+        <div class="fld"><label for="new-owner-name">Nom du client (optionnel)</label>
+          <input id="new-owner-name" type="text" placeholder="Prénom Nom"></div>
+        <div class="fld"><label for="new-name">Nom du salon</label><input id="new-name" type="text" placeholder="Salon Rive Gauche"></div>
       </div>
       <div class="grid2">
+        <div class="fld"><label for="new-slug">Identifiant (dans l'URL)</label><input id="new-slug" type="text" placeholder="salon-2" pattern="[a-z0-9-]+"></div>
         <div class="fld"><label for="new-email">Email du client (optionnel)</label>
           <input id="new-email" type="email" placeholder="client@exemple.com"></div>
+      </div>
+      <div class="grid2">
         <div class="fld"><label for="new-pw">Mot de passe admin</label><input id="new-pw" type="text" placeholder="Généré automatiquement si vide"></div>
       </div>
       <p class="hint" style="margin-top:-6px">Si renseigné, un email de confirmation est envoyé au client (comme pour une inscription), et il pourra se connecter directement avec son email.</p>
@@ -432,6 +436,7 @@ function renderOwners() {
 }
 
 function createSalon() {
+  var ownerName = document.getElementById('new-owner-name').value.trim();
   var name = document.getElementById('new-name').value.trim();
   var slug = document.getElementById('new-slug').value.trim().toLowerCase();
   var email = document.getElementById('new-email').value.trim();
@@ -441,9 +446,10 @@ function createSalon() {
 
   superApi('/api/super/salons', {
     method: 'POST',
-    body: { name: name, slug: slug, email: email, admin_password: pw, base_url: window.location.origin }
+    body: { owner_name: ownerName, name: name, slug: slug, email: email, admin_password: pw, base_url: window.location.origin }
   })
     .then(function (r) {
+      document.getElementById('new-owner-name').value = '';
       document.getElementById('new-name').value = '';
       document.getElementById('new-slug').value = '';
       document.getElementById('new-email').value = '';

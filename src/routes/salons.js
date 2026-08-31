@@ -44,6 +44,7 @@ router.get('/salons', requireSuperAdmin, wrap(async (req, res) => {
 router.post('/salons', requireSuperAdmin, wrap(async (req, res) => {
   const { name, slug, admin_password } = req.body;
   const email = String(req.body.email || '').trim();
+  const ownerName = String(req.body.owner_name || '').trim() || name;
   if (!name || !slug || !admin_password) {
     return res.status(400).json({ error: 'Nom, identifiant et mot de passe requis' });
   }
@@ -76,12 +77,12 @@ router.post('/salons', requireSuperAdmin, wrap(async (req, res) => {
     await pool.query(
       `INSERT INTO owners (id, name, email, admin_password, password_hash, verify_token, verify_token_expires)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [ownerId, name, email, admin_password, passwordHash, verifyToken, verifyExpires]
+      [ownerId, ownerName, email, admin_password, passwordHash, verifyToken, verifyExpires]
     );
   } else {
     await pool.query(
       'INSERT INTO owners (id, name, admin_password) VALUES (?, ?, ?)',
-      [ownerId, name, admin_password]
+      [ownerId, ownerName, admin_password]
     );
   }
 
