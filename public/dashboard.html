@@ -1726,6 +1726,10 @@ function openRescheduleAppointment(id, data) {
     '<div class="fld" style="margin-bottom:10px"><label>Nouvelle date</label><input class="modal-input" type="date" id="rs-date" value="' + currentDate + '"></div>' +
     '<div class="aa-step-title">Créneau</div>' +
     '<div class="aa-slots" id="rs-slots"><span class="hint" style="margin:0">Chargement…</span></div>' +
+    '<div id="rs-half-toggle" style="display:none;gap:8px;margin-top:8px">' +
+      '<button class="btn btn-soft" id="rs-half-morning" style="flex:1" onclick="rsShowHalf(\'morning\')">Matin</button>' +
+      '<button class="btn btn-soft" id="rs-half-afternoon" style="flex:1" onclick="rsShowHalf(\'afternoon\')">Après-midi</button>' +
+    '</div>' +
     '<div class="modal-error" id="rs-error" style="display:none"></div>' +
     '<div class="modal-actions">' +
     '<button class="btn btn-soft" id="rs-cancel-btn">Annuler</button>' +
@@ -1734,21 +1738,57 @@ function openRescheduleAppointment(id, data) {
   );
 
   var selectedTime = null;
+  var rsSlotsByHalf = { morning: [], afternoon: [] };
+  var rsCurrentHalf = 'afternoon';
+
+  function rsRenderHalf() {
+    var slotsEl = overlay.querySelector('#rs-slots');
+    var list = rsSlotsByHalf[rsCurrentHalf];
+    slotsEl.innerHTML = list.length
+      ? list.map(function (s) {
+          return '<button class="aa-slot" data-time="' + s.time + '" onclick="rsSelectSlot(this)">' + s.time + '</button>';
+        }).join('')
+      : '<span class="hint" style="margin:0">Aucun créneau ' + (rsCurrentHalf === 'morning' ? 'le matin' : "l'après-midi") + '</span>';
+  }
+
+  window.rsShowHalf = function (half) {
+    rsCurrentHalf = half;
+    overlay.querySelector('#rs-half-morning').className = 'btn ' + (half === 'morning' ? 'btn-primary' : 'btn-soft');
+    overlay.querySelector('#rs-half-afternoon').className = 'btn ' + (half === 'afternoon' ? 'btn-primary' : 'btn-soft');
+    overlay.querySelector('#rs-half-morning').style.flex = '1';
+    overlay.querySelector('#rs-half-afternoon').style.flex = '1';
+    rsRenderHalf();
+  };
 
   function loadRsSlots() {
     var slotsEl = overlay.querySelector('#rs-slots');
+    var toggleEl = overlay.querySelector('#rs-half-toggle');
     var barberId = overlay.querySelector('#rs-barber').value;
     var date = overlay.querySelector('#rs-date').value;
     selectedTime = null;
     overlay.querySelector('#rs-save-btn').disabled = true;
+    toggleEl.style.display = 'none';
     if (!barberId || !date) return;
     slotsEl.innerHTML = '<span class="hint" style="margin:0">Chargement…</span>';
     api('/api/appointments/availability?date=' + date + '&service_id=' + a.service_id + '&barber_id=' + barberId + '&exclude_appointment_id=' + a.id)
       .then(function (r) {
         if (!r.slots.length) { slotsEl.innerHTML = '<span class="hint" style="margin:0">Aucun créneau disponible ce jour-là</span>'; return; }
-        slotsEl.innerHTML = r.slots.map(function (s) {
-          return '<button class="aa-slot" data-time="' + s.time + '" onclick="rsSelectSlot(this)">' + s.time + '</button>';
-        }).join('');
+
+        // Même découpage matin (avant 12h) / après-midi (12h et
+        // après) que "Ajouter un RDV" - évite un popup interminable
+        // quand un coiffeur a beaucoup de créneaux libres dans la
+        // journée.
+        rsSlotsByHalf.morning = r.slots.filter(function (s) { return s.time < '12:00'; });
+        rsSlotsByHalf.afternoon = r.slots.filter(function (s) { return s.time >= '12:00'; });
+
+        if (!rsSlotsByHalf.morning.length) {
+          toggleEl.style.display = 'none';
+          rsCurrentHalf = 'afternoon';
+          rsRenderHalf();
+        } else {
+          toggleEl.style.display = 'flex';
+          rsShowHalf('morning');
+        }
       })
       .catch(function (e) { slotsEl.innerHTML = ''; toast(e.message, true); });
   }
