@@ -39,6 +39,8 @@
   </div>
 
   <div class="card-box" id="form-card">
+    <div class="fld"><label for="f-owner-name">Votre nom</label>
+      <input id="f-owner-name" type="text" placeholder="Prénom Nom" autocomplete="name"></div>
     <div class="fld"><label for="f-salon">Nom du salon</label>
       <input id="f-salon" type="text" placeholder="Le Salon" autocomplete="organization"></div>
     <div class="fld"><label for="f-slug">Identifiant (dans les liens de votre salon)</label>
@@ -86,13 +88,14 @@ document.getElementById('f-slug').addEventListener('input', function () {
 });
 
 function doSignup() {
+  var ownerName = document.getElementById('f-owner-name').value.trim();
   var salon = document.getElementById('f-salon').value.trim();
   var slug = document.getElementById('f-slug').value.trim();
   var email = document.getElementById('f-email').value.trim();
   var pw = document.getElementById('f-pw').value;
   var pw2 = document.getElementById('f-pw2').value;
 
-  if (!salon || !slug || !email || !pw) { toast('Tous les champs sont requis', true); return; }
+  if (!ownerName || !salon || !slug || !email || !pw) { toast('Tous les champs sont requis', true); return; }
   if (pw !== pw2) { toast('Les mots de passe ne correspondent pas', true); return; }
   if (pw.length < 6) { toast('Le mot de passe doit contenir au moins 6 caractères', true); return; }
 
@@ -102,7 +105,7 @@ function doSignup() {
   fetch('/api/signup', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ salon_name: salon, slug: slug, email: email, password: pw, base_url: window.location.origin })
+    body: JSON.stringify({ owner_name: ownerName, salon_name: salon, slug: slug, email: email, password: pw, base_url: window.location.origin })
   }).then(function (r) {
     return r.json().then(function (d) {
       if (!r.ok) throw new Error(d.error || 'Erreur');

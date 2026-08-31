@@ -17,9 +17,9 @@ function wrap(fn) {
 }
 
 router.post('/', wrap(async (req, res) => {
-  const { salon_name, slug, email, password } = req.body;
+  const { owner_name, salon_name, slug, email, password } = req.body;
 
-  if (!salon_name || !slug || !email || !password) {
+  if (!owner_name || !salon_name || !slug || !email || !password) {
     return res.status(400).json({ error: 'Tous les champs sont requis' });
   }
   if (!/^[a-z0-9-]+$/.test(slug)) {
@@ -48,7 +48,7 @@ router.post('/', wrap(async (req, res) => {
   await pool.query(
     `INSERT INTO owners (id, name, email, password_hash, admin_password, verify_token, verify_token_expires)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [ownerId, salon_name, email, passwordHash, '', verifyToken, verifyExpires]
+    [ownerId, owner_name, email, passwordHash, '', verifyToken, verifyExpires]
   );
 
   const salonId = crypto.randomUUID();
