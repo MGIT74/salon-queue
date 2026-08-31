@@ -4,6 +4,17 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Caisse</title>
+<script>
+  (function () {
+    try {
+      var saved = JSON.parse(sessionStorage.getItem('caisse-session') || 'null');
+      if (saved && saved.id && saved.pin) document.documentElement.classList.add('auth-checking');
+    } catch (e) {}
+  })();
+</script>
+<style>
+  html.auth-checking #login-screen { display: none; }
+</style>
 <link rel="stylesheet" href="/app.css?v=4">
 <style>
   html, body { min-height: 100%; }
@@ -421,6 +432,7 @@ function forceOpenCaisse() {
     .then(function (r) { return r.json(); })
     .then(function (d) {
       if (d.caisse_locked_until) {
+        document.documentElement.classList.remove('auth-checking');
         var when = new Date(d.caisse_locked_until).toLocaleString('fr-FR', {
           weekday: 'long', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
         });
@@ -437,7 +449,7 @@ function forceOpenCaisse() {
         showApp();
       }
     })
-    .catch(function () {});
+    .catch(function () { document.documentElement.classList.remove('auth-checking'); });
 })();
 
 /* ---------- Catalogue ---------- */

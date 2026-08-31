@@ -4,6 +4,16 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Super Admin</title>
+<script>
+  (function () {
+    try {
+      if (sessionStorage.getItem('super-pw')) document.documentElement.classList.add('auth-checking');
+    } catch (e) {}
+  })();
+</script>
+<style>
+  html.auth-checking #login-screen { display: none; }
+</style>
 <link rel="stylesheet" href="/app.css?v=4">
 <style>
   .wrap { max-width: none; margin: 0; padding: clamp(20px,2.2vw,36px); }
@@ -337,7 +347,10 @@ function logout() {
       document.getElementById('app-screen').style.display = 'block';
       boot();
     })
-    .catch(function () { SUPER_PW = ''; });
+    .catch(function () {
+      SUPER_PW = '';
+      document.documentElement.classList.remove('auth-checking');
+    });
 })();
 
 function superApi(path, opts) {

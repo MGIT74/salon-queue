@@ -4,6 +4,17 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Mon poste</title>
+<script>
+  (function () {
+    try {
+      var saved = JSON.parse(sessionStorage.getItem('poste-session') || 'null');
+      if (saved && saved.id && saved.pin) document.documentElement.classList.add('auth-checking');
+    } catch (e) {}
+  })();
+</script>
+<style>
+  html.auth-checking #login-screen { display: none; }
+</style>
 <link rel="stylesheet" href="/app.css?v=4">
 <style>
   html, body { min-height: 100%; }

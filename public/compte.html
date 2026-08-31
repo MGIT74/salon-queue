@@ -4,6 +4,16 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mon compte</title>
+<script>
+  (function () {
+    try {
+      if (localStorage.getItem('client_token')) document.documentElement.classList.add('auth-checking');
+    } catch (e) {}
+  })();
+</script>
+<style>
+  html.auth-checking #p-login { display: none !important; }
+</style>
 <link rel="stylesheet" href="/app.css?v=4">
 <style>
   html, body { min-height: 100%; }
@@ -379,6 +389,7 @@ function doLogout() {
   api('/api/client-auth/logout', { method: 'POST' }).catch(function () {});
   localStorage.removeItem('client_token');
   hideFooter();
+  document.documentElement.classList.remove('auth-checking');
   show('p-login');
 }
 
@@ -507,6 +518,7 @@ function refreshHomeInBackground() {
   }).catch(function () {
     localStorage.removeItem('client_token');
     hideFooter();
+    document.documentElement.classList.remove('auth-checking');
     show('p-login');
   });
 }
@@ -536,6 +548,7 @@ function loadProfile() {
   }).catch(function () {
     localStorage.removeItem('client_token');
     hideFooter();
+    document.documentElement.classList.remove('auth-checking');
     show('p-login');
   });
 }
@@ -886,10 +899,15 @@ function esc(s) {
     api('/api/client-auth/verify-email', { method: 'POST', body: { token: verifyToken } })
       .then(function () {
         window.history.replaceState({}, '', window.location.pathname + (SALON_SLUG ? '?salon=' + SALON_SLUG : ''));
+        document.documentElement.classList.remove('auth-checking');
         show('p-login');
         document.getElementById('login-err').textContent = '';
       })
-      .catch(function (e) { document.getElementById('login-err').textContent = e.message; show('p-login'); });
+      .catch(function (e) {
+        document.documentElement.classList.remove('auth-checking');
+        document.getElementById('login-err').textContent = e.message;
+        show('p-login');
+      });
     return;
   }
 
