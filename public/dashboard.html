@@ -1725,11 +1725,11 @@ function openRescheduleAppointment(id, data) {
     '</select></div>' +
     '<div class="fld" style="margin-bottom:10px"><label>Nouvelle date</label><input class="modal-input" type="date" id="rs-date" value="' + currentDate + '"></div>' +
     '<div class="aa-step-title">Créneau</div>' +
-    '<div class="aa-slots" id="rs-slots"><span class="hint" style="margin:0">Chargement…</span></div>' +
-    '<div id="rs-half-toggle" class="half-toggle" style="display:none;margin-top:8px">' +
+    '<div id="rs-half-toggle" class="half-toggle" style="display:none;margin-bottom:8px">' +
       '<button id="rs-half-morning" onclick="rsShowHalf(\'morning\')">Matin</button>' +
       '<button id="rs-half-afternoon" onclick="rsShowHalf(\'afternoon\')">Après-midi</button>' +
     '</div>' +
+    '<div class="aa-slots" id="rs-slots"><span class="hint" style="margin:0">Chargement…</span></div>' +
     '<div class="modal-error" id="rs-error" style="display:none"></div>' +
     '<div class="modal-actions">' +
     '<button class="btn btn-soft" id="rs-cancel-btn">Annuler</button>' +
@@ -3337,11 +3337,11 @@ function openAdminAddAppointment(dateStr) {
     '<div id="aa-step-datetime" style="display:none">' +
       '<button class="aa-back" onclick="aaGoStep(\'extras\')">‹ Retour</button>' +
       '<div class="aa-step-title">Créneau</div>' +
-      '<div class="aa-slots" id="aa-slots"><span class="hint" style="margin:0">Chargement…</span></div>' +
-      '<div id="aa-half-toggle" class="half-toggle" style="display:none;margin-top:8px">' +
+      '<div id="aa-half-toggle" class="half-toggle" style="display:none;margin-bottom:8px">' +
         '<button id="aa-half-morning" onclick="aaShowHalf(\'morning\')">Matin</button>' +
         '<button id="aa-half-afternoon" onclick="aaShowHalf(\'afternoon\')">Après-midi</button>' +
       '</div>' +
+      '<div class="aa-slots" id="aa-slots"><span class="hint" style="margin:0">Chargement…</span></div>' +
     '</div>' +
 
     '<div id="aa-step-contact" style="display:none">' +
