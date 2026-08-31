@@ -4984,7 +4984,7 @@ function checkAiChatAvailability() {
 
 function loadAiChatCredits() {
   api('/api/ai-chat/credits').then(function (r) {
-    document.getElementById('ai-chat-credits-label').textContent = r.credits_remaining + '/' + r.monthly_credit_limit + ' questions restantes ce mois';
+    document.getElementById('ai-chat-credits-label').textContent = r.unlimited ? 'Illimité' : (r.credits_remaining + '/' + r.monthly_credit_limit + ' questions restantes ce mois');
     // Si désactivé entre-temps (pendant que le panneau était déjà
     // ouvert), on masque aussi le bouton flottant en le refermant.
     if (r.ai_enabled === false) {
@@ -5023,7 +5023,7 @@ function sendAiChatMessage() {
     .then(function (r) {
       typingDiv.remove();
       appendAiChatMessage(r.answer, 'bot');
-      document.getElementById('ai-chat-credits-label').textContent = r.credits_remaining + '/' + r.monthly_credit_limit + ' questions restantes ce mois';
+      document.getElementById('ai-chat-credits-label').textContent = r.unlimited ? 'Illimité' : (r.credits_remaining + '/' + r.monthly_credit_limit + ' questions restantes ce mois');
     })
     .catch(function (e) {
       typingDiv.remove();
