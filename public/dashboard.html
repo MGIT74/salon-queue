@@ -4,6 +4,21 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dashboard</title>
+<script>
+  // Anti-flash : si une session (ou un lien d'assistance) est déjà présente,
+  // on masque l'écran de connexion avant même qu'il ait pu s'afficher, pour
+  // éviter qu'il n'apparaisse brièvement à chaque rafraîchissement de la page.
+  (function () {
+    try {
+      var hasSession = !!sessionStorage.getItem('pw');
+      var hasImpersonate = !!new URLSearchParams(window.location.search).get('impersonate');
+      if (hasSession || hasImpersonate) document.documentElement.classList.add('auth-checking');
+    } catch (e) {}
+  })();
+</script>
+<style>
+  html.auth-checking #login { display: none; }
+</style>
 <link rel="stylesheet" href="/app.css?v=4">
 <style>
   .wrap { max-width: none; margin: 0; padding: clamp(20px,2.2vw,36px); }
@@ -1552,7 +1567,10 @@ addPasswordToggle('pw');
     document.getElementById('app').style.display = '';
     checkAiChatAvailability();
     boot();
-  }).catch(function () { setAdminPw(''); });
+  }).catch(function () {
+    setAdminPw('');
+    document.documentElement.classList.remove('auth-checking');
+  });
 })();
 
 /* ============ Onglets ============ */
