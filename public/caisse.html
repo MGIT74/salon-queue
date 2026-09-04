@@ -744,12 +744,9 @@ function changeQty(index, delta) {
 
 function clearTicket() {
   if (!ticket.length) return;
-  showConfirm('Vider le ticket en cours ?', { title: 'Vider le ticket', danger: true }).then(function (ok) {
-    if (!ok) return;
-    ticket = [];
-    ticketQueueId = null;
-    renderTicket();
-  });
+  ticket = [];
+  ticketQueueId = null;
+  renderTicket();
 }
 
 function ticketTotal() {
