@@ -374,6 +374,38 @@
   .cal-legend-avatar.selected { border-color: var(--ink); box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--ink); }
   .cal-legend-avatar.dimmed { opacity: .35; }
 
+  /* --- Planning du jour (timeline temps réel) --- */
+  .timeline-scroll { overflow-x: auto; }
+  .timeline-inner { position: relative; min-width: 720px; }
+  .timeline-hours {
+    display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
+    padding-left: 130px; margin-bottom: 6px;
+  }
+  .timeline-hours span { font-size: 12px; color: var(--grey); }
+  .timeline-row { display: flex; align-items: center; min-height: 54px; border-top: 1px solid var(--sep); }
+  .timeline-row:first-child { border-top: none; }
+  .timeline-row-label { width: 130px; flex-shrink: 0; display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13.5px; padding-right: 10px; }
+  .timeline-row-label .dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .timeline-row-track { position: relative; flex: 1; height: 40px; }
+  .timeline-block {
+    position: absolute; top: 3px; bottom: 3px; border-radius: 8px; padding: 4px 10px;
+    font-size: 12.5px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis; cursor: pointer; display: flex; align-items: center;
+  }
+  .timeline-now-line {
+    position: absolute; top: 0; bottom: 0; width: 2px; background: var(--accent);
+    pointer-events: none; z-index: 5;
+  }
+  .timeline-now-line::before {
+    content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+    border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 7px solid var(--accent);
+  }
+  .timeline-now-line::after {
+    content: ''; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+    border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 7px solid var(--accent);
+  }
+  .timeline-empty { padding: 20px 0; text-align: center; color: var(--grey); font-size: 14px; }
+
   /* Assistant "Ajouter un RDV" (admin) - parcours par étapes */
   .aa-step-title { font-size: 15px; font-weight: 600; margin-bottom: 12px; }
   .aa-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px,1fr)); gap: 8px; margin-bottom: 6px; }
@@ -952,6 +984,16 @@
     </div>
     <p class="hint" style="margin-top:-8px">Réservés en ligne — ceux du jour apparaissent aussi automatiquement dans la file d'attente au moment prévu.</p>
     <div class="cal-barber-picker" id="cal-barber-picker"></div>
+
+    <div class="card-box" id="timeline-card">
+      <h3 style="margin-top:0">Planning du jour</h3>
+      <div class="timeline-scroll">
+        <div class="timeline-inner" id="timeline-inner">
+          <div class="timeline-hours" id="timeline-hours"></div>
+          <div id="timeline-rows"></div>
+        </div>
+      </div>
+    </div>
 
     <div class="card-box">
       <div class="cal-nav">
@@ -1637,6 +1679,7 @@ document.getElementById('tabs').addEventListener('click', function (e) {
   b.classList.add('on');
   document.querySelectorAll('.tab-panel').forEach(function (p) { p.classList.remove('on'); });
   document.getElementById('t-' + b.dataset.t).classList.add('on');
+  if (b.dataset.t !== 'rdv') stopTimelineAutoRefresh();
   if (b.dataset.t === 'settings') loadSettings();
   if (b.dataset.t === 'clients') loadClients();
   if (b.dataset.t === 'salons') loadChainTab();
@@ -3206,6 +3249,128 @@ function loadRdvTab() {
 
   setCalView('month');
   resetRdvListToUpcoming();
+  loadTimeline();
+  startTimelineAutoRefresh();
+}
+
+/* ---------- Planning du jour (timeline temps réel) ---------- */
+var timelineRefreshTimer = null;
+var timelineTickTimer = null;
+var timelineRange = { start: 9 * 60, end: 19 * 60 }; // en minutes depuis minuit
+
+function minutesFromScheduledAt(appt) {
+  var hm = appt.scheduled_at.slice(11, 16).split(':');
+  return Number(hm[0]) * 60 + Number(hm[1]);
+}
+
+function loadTimeline() {
+  var todayStr = ymd(new Date());
+  var mKey = monthKey(new Date());
+  api('/api/appointments?month=' + mKey + '&all=1').then(function (r) {
+    var todays = r.items.filter(function (a) {
+      return a.scheduled_at.slice(0, 10) === todayStr && a.status !== 'cancelled' && a.barber_id;
+    });
+    renderTimeline(todays);
+  }).catch(function () { /* silencieux : la timeline n'est qu'un complément visuel */ });
+}
+
+function renderTimeline(appts) {
+  var card = document.getElementById('timeline-card');
+  if (!card) return;
+
+  if (appts.length === 0) {
+    document.getElementById('timeline-hours').innerHTML = '';
+    document.getElementById('timeline-rows').innerHTML = '<div class="timeline-empty">Aucun rendez-vous aujourd\'hui</div>';
+    return;
+  }
+
+  // Plage horaire = étendue des RDV du jour, arrondie à l'heure, avec un
+  // minimum de 8h d'amplitude pour que ça reste lisible même avec 1 seul RDV.
+  var starts = appts.map(minutesFromScheduledAt);
+  var ends = appts.map(function (a) { return minutesFromScheduledAt(a) + Math.max(a.duration_min || 30, 15); });
+  var rangeStart = Math.floor(Math.min.apply(null, starts) / 60) * 60;
+  var rangeEnd = Math.ceil(Math.max.apply(null, ends) / 60) * 60;
+  if (rangeEnd - rangeStart < 8 * 60) rangeEnd = rangeStart + 8 * 60;
+  timelineRange = { start: rangeStart, end: rangeEnd };
+
+  var hourCount = (rangeEnd - rangeStart) / 60;
+  var hoursHtml = '';
+  for (var h = 0; h <= hourCount; h++) {
+    var totalMin = rangeStart + h * 60;
+    hoursHtml += '<span>' + String(Math.floor(totalMin / 60)).padStart(2, '0') + ':00</span>';
+  }
+  document.getElementById('timeline-hours').innerHTML = hoursHtml;
+  document.getElementById('timeline-hours').style.gridTemplateColumns = 'repeat(' + hourCount + ', 1fr)';
+
+  // Groupe par coiffeur, trié par nom pour un ordre stable.
+  var byBarber = {};
+  appts.forEach(function (a) {
+    if (!byBarber[a.barber_id]) byBarber[a.barber_id] = { name: a.barber_name || '?', items: [] };
+    byBarber[a.barber_id].items.push(a);
+  });
+  var barberIds = Object.keys(byBarber).sort(function (x, y) { return byBarber[x].name.localeCompare(byBarber[y].name); });
+
+  var rowsHtml = barberIds.map(function (bid) {
+    var b = byBarber[bid];
+    var color = rdvBarberColors[bid] || stableColorForId(bid);
+    var blocksHtml = b.items.map(function (a) {
+      var startMin = minutesFromScheduledAt(a);
+      var dur = Math.max(a.duration_min || 30, 15);
+      var leftPct = ((startMin - rangeStart) / (rangeEnd - rangeStart)) * 100;
+      var widthPct = (dur / (rangeEnd - rangeStart)) * 100;
+      var time = a.scheduled_at.slice(11, 16);
+      return '<div class="timeline-block" style="left:' + leftPct + '%;width:' + widthPct + '%;background:' + color + '" ' +
+        'title="' + esc(time + ' — ' + a.client_name + ' — ' + (a.service_name || '')) + '" ' +
+        'onclick="openClientDrawerForAppointment(\'' + a.id + '\')">' + esc(a.client_name) + '</div>';
+    }).join('');
+    return '<div class="timeline-row">' +
+      '<div class="timeline-row-label"><span class="dot" style="background:' + color + '"></span>' + esc(b.name) + '</div>' +
+      '<div class="timeline-row-track">' + blocksHtml + '</div>' +
+      '</div>';
+  }).join('');
+  document.getElementById('timeline-rows').innerHTML = rowsHtml;
+
+  updateTimelineNowLine();
+}
+
+function updateTimelineNowLine() {
+  var inner = document.getElementById('timeline-inner');
+  if (!inner || !document.getElementById('timeline-rows').children.length) return;
+
+  var existing = document.getElementById('timeline-now-line');
+  var now = new Date();
+  var nowMin = now.getHours() * 60 + now.getMinutes();
+
+  if (nowMin < timelineRange.start || nowMin > timelineRange.end) {
+    if (existing) existing.remove();
+    return;
+  }
+
+  var leftPct = ((nowMin - timelineRange.start) / (timelineRange.end - timelineRange.start)) * 100;
+  // 130px = largeur fixe de la colonne des noms, à décaler en plus du %.
+  var style = 'left: calc(130px + (100% - 130px) * ' + (leftPct / 100) + ')';
+  if (existing) {
+    existing.setAttribute('style', style);
+  } else {
+    var line = document.createElement('div');
+    line.id = 'timeline-now-line';
+    line.className = 'timeline-now-line';
+    line.setAttribute('style', style);
+    inner.appendChild(line);
+  }
+}
+
+function startTimelineAutoRefresh() {
+  stopTimelineAutoRefresh();
+  timelineTickTimer = setInterval(updateTimelineNowLine, 30000);
+  timelineRefreshTimer = setInterval(loadTimeline, 60000);
+}
+
+function stopTimelineAutoRefresh() {
+  if (timelineTickTimer) clearInterval(timelineTickTimer);
+  if (timelineRefreshTimer) clearInterval(timelineRefreshTimer);
+  timelineTickTimer = null;
+  timelineRefreshTimer = null;
 }
 
 function setCalView(mode) {
