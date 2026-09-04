@@ -200,7 +200,16 @@ function handleConnection(socket, opts) {
     idleTimer = setTimeout(processFrame, 80);
   });
 
-  socket.on('close', () => { clearTimeout(idleTimer); });
+  socket.on('close', () => {
+    clearTimeout(idleTimer);
+    // Si le client a fermé la connexion très vite après l'envoi (par
+    // exemple parce qu'il n'attend pas de réponse sur cette même ligne,
+    // comme en mode callback), le petit délai d'inactivité ci-dessus peut
+    // ne jamais se déclencher. La fermeture de connexion est en soi un
+    // signal sans ambiguïté qu'il n'y a plus rien à recevoir, donc on
+    // traite la trame ici aussi dans ce cas.
+    processFrame();
+  });
 
   function processFrame() {
     if (handled || !buffer.trim()) return;
