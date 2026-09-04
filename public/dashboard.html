@@ -898,6 +898,33 @@
         <div class="fld"><label for="set-tpe-api-key">Clé API <span id="tpe-key-state" class="hint" style="font-weight:400"></span></label>
           <input id="set-tpe-api-key" type="password" placeholder="Fournie par le prestataire"></div>
       </div>
+      <p class="hint" style="margin-top:14px">
+        Connexion réseau au terminal (le TPE et la caisse doivent être sur le même réseau local) :
+      </p>
+      <div class="grid2">
+        <div class="fld"><label for="set-tpe-ip">Adresse IP du TPE</label>
+          <input id="set-tpe-ip" type="text" placeholder="Ex: 192.168.1.50"></div>
+        <div class="fld"><label for="set-tpe-port">Port d'écoute TPE</label>
+          <input id="set-tpe-port" type="number" placeholder="20002"></div>
+      </div>
+      <div class="grid2">
+        <div class="fld"><label for="set-tpe-cash-register-id">Identifiant de caisse</label>
+          <input id="set-tpe-cash-register-id" type="text" placeholder="Fourni par le prestataire monétique"></div>
+        <div class="fld"><label for="set-tpe-cash-register-number">Numéro de caisse</label>
+          <input id="set-tpe-cash-register-number" type="text" placeholder="Ex: 01"></div>
+      </div>
+      <div class="grid2">
+        <div class="fld"><label for="set-tpe-reply-mode">Mode de réponse</label>
+          <select id="set-tpe-reply-mode" onchange="updateTpeCallbackVisibility()">
+            <option value="same">Sur la même connexion</option>
+            <option value="callback">Le TPE rappelle la caisse</option>
+          </select>
+        </div>
+        <div class="fld" id="tpe-callback-port-fld" style="display:none">
+          <label for="set-tpe-callback-port">Port d'écoute caisse</label>
+          <input id="set-tpe-callback-port" type="number" placeholder="20006">
+        </div>
+      </div>
       <button class="btn btn-primary" onclick="saveDeviceSettings()">Enregistrer</button>
       </div>
     </div>
@@ -4140,6 +4167,13 @@ function loadCaisseTab() {
     document.getElementById('set-tpe-terminal-number').value = r.settings.tpe_terminal_number || '';
     document.getElementById('set-tpe-api-key').value = '';
     document.getElementById('tpe-key-state').textContent = r.tpe_api_key_set ? '· déjà enregistrée' : '';
+    document.getElementById('set-tpe-ip').value = r.settings.tpe_ip || '';
+    document.getElementById('set-tpe-port').value = r.settings.tpe_port || '20002';
+    document.getElementById('set-tpe-cash-register-id').value = r.settings.tpe_cash_register_id || '';
+    document.getElementById('set-tpe-cash-register-number').value = r.settings.tpe_cash_register_number || '01';
+    document.getElementById('set-tpe-reply-mode').value = r.settings.tpe_reply_mode || 'same';
+    document.getElementById('set-tpe-callback-port').value = r.settings.tpe_callback_port || '20006';
+    updateTpeCallbackVisibility();
 
     EMAIL_TPL_TYPES.forEach(function (type) {
       var key = type.replace(/-/g, '_');
@@ -4951,12 +4985,23 @@ function openAddSalonClosure() {
   };
 }
 
+function updateTpeCallbackVisibility() {
+  var mode = document.getElementById('set-tpe-reply-mode').value;
+  document.getElementById('tpe-callback-port-fld').style.display = mode === 'callback' ? 'block' : 'none';
+}
+
 function saveDeviceSettings() {
   api('/api/settings', { method: 'PUT', body: {
     tpe_provider: document.getElementById('set-tpe-provider').value,
     tpe_merchant_id: document.getElementById('set-tpe-merchant-id').value,
     tpe_terminal_number: document.getElementById('set-tpe-terminal-number').value,
-    tpe_api_key: document.getElementById('set-tpe-api-key').value
+    tpe_api_key: document.getElementById('set-tpe-api-key').value,
+    tpe_ip: document.getElementById('set-tpe-ip').value.trim(),
+    tpe_port: document.getElementById('set-tpe-port').value || '20002',
+    tpe_cash_register_id: document.getElementById('set-tpe-cash-register-id').value.trim(),
+    tpe_cash_register_number: document.getElementById('set-tpe-cash-register-number').value.trim() || '01',
+    tpe_reply_mode: document.getElementById('set-tpe-reply-mode').value,
+    tpe_callback_port: document.getElementById('set-tpe-callback-port').value || '20006'
   }}).then(function () { toast('Terminal enregistré'); })
     .catch(function (e) { toast(e.message, true); });
 }

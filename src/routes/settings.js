@@ -19,6 +19,8 @@ const EDITABLE = [
   'smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_from',
   'printer_connection_type', 'printer_ip', 'printer_model',
   'tpe_provider', 'tpe_merchant_id', 'tpe_terminal_number', 'tpe_api_key',
+  'tpe_ip', 'tpe_port', 'tpe_cash_register_id', 'tpe_cash_register_number',
+  'tpe_reply_mode', 'tpe_callback_port',
   'email_tpl_confirmation_subject', 'email_tpl_confirmation_body',
   'email_tpl_reminder_subject', 'email_tpl_reminder_body',
   'email_tpl_cancelled_subject', 'email_tpl_cancelled_body',
