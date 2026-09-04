@@ -314,8 +314,13 @@ router.get('/', requireAdminOrBarber, wrap(async (req, res) => {
   const orderDirection = (req.query.all && !req.query.month) ? 'DESC' : 'ASC';
 
   const [rows] = await pool.query(
-    `SELECT a.*, s.name AS service_name, b.name AS barber_name,
-            q.status AS queue_status
+    `SELECT a.*, s.name AS service_name, s.duration_min AS service_duration_min, b.name AS barber_name,
+            q.status AS queue_status,
+            COALESCE((
+              SELECT SUM(e.duration_min) FROM appointment_extras ae
+              JOIN extras e ON e.id = ae.extra_id
+              WHERE ae.appointment_id = a.id
+            ), 0) AS extras_duration_min
      FROM appointments a
      LEFT JOIN services s ON s.id = a.service_id
      LEFT JOIN barbers b ON b.id = a.barber_id
@@ -352,7 +357,8 @@ router.get('/', requireAdminOrBarber, wrap(async (req, res) => {
         scheduled_at: r.scheduled_at,
         created_at: utcIso(r.created_at),
         display_status: displayStatus,
-        note: noteByKey[clientKey(r)] || ''
+        note: noteByKey[clientKey(r)] || '',
+        duration_min: (r.service_duration_min || 0) + Number(r.extras_duration_min || 0)
       });
     })
   });
