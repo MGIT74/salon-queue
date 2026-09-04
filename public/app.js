@@ -394,3 +394,21 @@ function attachClientAutocomplete(container, nameId, emailId, phoneId, fetchFn) 
 
   nameInput.addEventListener('blur', function () { setTimeout(hide, 150); });
 }
+
+/**
+ * Un coiffeur ne doit être proposable pour un RDV que s'il a au moins un
+ * jour d'horaire activé - sinon il n'aura jamais le moindre créneau
+ * disponible, quelle que soit la date choisie (ça ferait perdre du temps
+ * à l'admin comme au client, qui ne le découvriraient qu'à l'étape
+ * "créneau"). Aucune ligne d'horaire du tout = jamais configuré, pas
+ * "désactivé partout" - on le garde alors disponible par défaut, pour ne
+ * pas masquer un coiffeur qu'on vient de créer avant qu'il ait réglé ses
+ * horaires. Ne vérifie pas ici `accepts_appointments`/`active` : à
+ * l'appelant de les avoir déjà filtrés selon son propre contexte (ex:
+ * l'API publique /api/barbers exclut déjà les coiffeurs inactifs).
+ */
+function hasBookableSchedule(b) {
+  var schedules = b.schedules || [];
+  if (schedules.length === 0) return true;
+  return schedules.some(function (s) { return s.active; });
+}

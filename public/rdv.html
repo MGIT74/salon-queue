@@ -211,7 +211,7 @@ function loadCatalog() {
   ]).then(function (r) {
     services = r[0].items;
     extras = r[1].items;
-    barbers = r[2].items.filter(function (b) { return b.accepts_appointments; });
+    barbers = r[2].items.filter(function (b) { return b.accepts_appointments && hasBookableSchedule(b); });
     var salonName = r[3].salon_name;
     CURRENCY = r[3].currency || 'EUR';
     applyAccentColor(r[3].accent_color);

@@ -1827,15 +1827,17 @@ function cancelAppointmentByAdmin() {
  * choisie, ce qui faisait perdre du temps (on ne le découvrait qu'à
  * l'étape "créneau").
  */
-function hasBookableSchedule(b) {
-  if (!b.accepts_appointments || !b.active) return false;
-  var schedules = b.schedules || [];
-  // Aucune ligne d'horaire du tout = jamais configuré, pas "désactivé
-  // partout" - même logique que côté serveur (barbers.js) : on le garde
-  // "disponible" par défaut pour ne pas masquer un coiffeur qu'on vient
-  // de créer avant qu'il ait réglé ses horaires.
-  if (schedules.length === 0) return true;
-  return schedules.some(function (s) { return s.active; });
+/**
+ * Un coiffeur ne doit être proposable pour un RDV (admin) que s'il coche
+ * TOUTES ces conditions : accepte les RDV en ligne, est actif (pas un
+ * employé désactivé), ET a au moins un jour d'horaire activé (vérifié
+ * par hasBookableSchedule, partagée avec rdv.html/compte.html côté
+ * app.js) - sinon il n'aura jamais le moindre créneau disponible quelle
+ * que soit la date choisie, ce qui faisait perdre du temps (on ne le
+ * découvrait qu'à l'étape "créneau").
+ */
+function isBookableForAdmin(b) {
+  return Boolean(b.accepts_appointments && b.active && hasBookableSchedule(b));
 }
 
 /**
@@ -1848,7 +1850,7 @@ function openRescheduleAppointment(id, data) {
   data = data || drawerAppointmentData;
   if (!id || !data) return;
   var a = data;
-  var rdvBarbers = barbers.filter(hasBookableSchedule);
+  var rdvBarbers = barbers.filter(isBookableForAdmin);
   var currentDate = String(a.scheduled_at).slice(0, 10);
 
   var overlay = _buildModal(
@@ -3555,7 +3557,7 @@ function renderExpandPanel(dateStr, dayAppts) {
  * panneau du jour - email optionnel, mais coiffeur toujours requis.
  */
 function openAdminAddAppointment(dateStr) {
-  var rdvBarbers = barbers.filter(hasBookableSchedule);
+  var rdvBarbers = barbers.filter(isBookableForAdmin);
   var when = new Date(dateStr + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' });
 
   var state = { barberId: null, serviceId: null, extraIds: [], time: null };

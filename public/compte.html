@@ -620,7 +620,7 @@ function goBook(afterLoad) {
   ]).then(function (r) {
     bookServices = r[0].items;
     bookExtras = r[1].items;
-    bookBarbers = r[2].items.filter(function (b) { return b.accepts_appointments; });
+    bookBarbers = r[2].items.filter(function (b) { return b.accepts_appointments && hasBookableSchedule(b); });
     bookCatalogLoaded = true;
     renderBookBarberGrid();
     renderBookServiceGrid();
