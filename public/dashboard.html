@@ -598,6 +598,33 @@
 .clients-pagination button:disabled { opacity: .35; cursor: default; }
 .clients-pagination .page-label { font-size: 13.5px; color: var(--grey); }
 .client-check { width: 18px; height: 18px; margin-right: 12px; flex-shrink: 0; cursor: pointer; }
+
+/* --- Ticket Z (clôture de caisse imprimable) --- */
+.z-overlay {
+  display: none; position: fixed; inset: 0; z-index: 400; background: rgba(0,0,0,.5);
+  align-items: center; justify-content: center; padding: 20px;
+}
+.z-overlay.on { display: flex; }
+.z-box { background: #fff; color: #111; border-radius: 14px; padding: 26px; max-width: 360px; width: 100%; font-family: 'Courier New', monospace; }
+.z-box h2 { font-size: 16px; text-align: center; margin: 0 0 2px; }
+.z-box .z-num { text-align: center; font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+.z-box .sub { text-align: center; font-size: 12px; color: #666; margin-bottom: 16px; }
+.z-box .zline { display: flex; justify-content: space-between; font-size: 13px; padding: 3px 0; }
+.z-box .zline.total { border-top: 1px dashed #999; margin-top: 8px; padding-top: 8px; font-weight: 700; font-size: 14px; }
+.z-box .zline.grand { font-weight: 700; margin-top: 4px; }
+.z-box .zsection-label { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: #888; margin: 14px 0 4px; }
+.z-actions { display: flex; gap: 8px; margin-top: 18px; }
+.z-actions .btn { flex: 1; }
+@media print {
+  @page { size: 80mm auto; margin: 0; }
+  body * { visibility: hidden; }
+  .z-box, .z-box * { visibility: visible; }
+  .z-box {
+    position: fixed; top: 0; left: 0; width: 80mm; max-width: none;
+    box-shadow: none; border-radius: 0; padding: 4mm; font-size: 12px;
+  }
+  .z-actions { display: none; }
+}
 </style>
 </head>
 <body>
@@ -607,6 +634,10 @@
   <span>Mode assistance — connecté en tant que super admin sur l'enseigne de <b id="imp-salon-name">…</b></span>
   <span id="imp-countdown"></span>
   <button onclick="exitImpersonation()">Quitter</button>
+</div>
+
+<div class="z-overlay" id="z-overlay">
+  <div class="z-box" id="z-box"></div>
 </div>
 
 <!-- Connexion -->
@@ -4086,9 +4117,9 @@ function renderClosingsPage() {
     function (c) {
       var when = new Date(c.period_end).toLocaleString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
       return '<div class="item"><div class="item-main">' +
-        '<div class="item-name">' + when + ' — ' + eur(c.total_cents) + '</div>' +
+        '<div class="item-name">Z' + String(c.z_number || '?').padStart(3, '0') + ' — ' + when + ' — ' + eur(c.total_cents) + '</div>' +
         '<div class="item-meta">' + c.sales_count + ' vente' + (c.sales_count > 1 ? 's' : '') + '</div>' +
-        '</div></div>';
+        '</div><button class="btn btn-soft" style="font-size:12.5px;padding:8px 12px" onclick="printZTicket(\'' + c.id + '\')">Imprimer</button></div>';
     },
     'Aucune clôture pour le moment');
 }
@@ -4097,6 +4128,43 @@ function changeClosingsPerPage(v) {
   caisseClosingsPerPage = Number(v) || 10;
   caisseClosingsPage = 1;
   renderClosingsPage();
+}
+
+var ZTICKET_METHOD_LABELS = { especes: 'Espèces', cb: 'Carte bancaire', autre: 'Autre' };
+
+function printZTicket(id) {
+  api('/api/owner/caisse/closings/' + id).then(function (r) {
+    var salonName = (document.getElementById('app-salon-badge').textContent || 'Salon').trim();
+    var periodEndTxt = new Date(r.period_end).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' });
+    var periodStartTxt = r.period_start
+      ? new Date(r.period_start).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })
+      : 'Mise en service';
+
+    var breakdownHtml = Object.keys(r.breakdown).map(function (m) {
+      return '<div class="zline"><span>' + esc(ZTICKET_METHOD_LABELS[m] || m) + '</span><span>' + eur(r.breakdown[m]) + '</span></div>';
+    }).join('');
+
+    var html =
+      '<h2>' + esc(salonName) + '</h2>' +
+      '<div class="z-num">CLÔTURE Z' + String(r.z_number).padStart(3, '0') + '</div>' +
+      '<div class="sub">Du ' + esc(periodStartTxt) + '<br>au ' + esc(periodEndTxt) + '</div>' +
+      '<div class="zsection-label">Détail par mode de paiement</div>' +
+      (breakdownHtml || '<div class="zline"><span>Aucun détail</span></div>') +
+      '<div class="zline total"><span>Total (' + r.sales_count + ' vente' + (r.sales_count > 1 ? 's' : '') + ')</span><span>' + eur(r.total_cents) + '</span></div>' +
+      '<div class="zsection-label">Cumul depuis la mise en service</div>' +
+      '<div class="zline grand"><span>Grand total perpétuel</span><span>' + eur(r.grand_total_cents) + '</span></div>' +
+      '<div class="z-actions">' +
+        '<button class="btn btn-soft" onclick="closeZTicket()">Fermer</button>' +
+        '<button class="btn btn-primary" onclick="window.print()">Imprimer</button>' +
+      '</div>';
+
+    document.getElementById('z-box').innerHTML = html;
+    document.getElementById('z-overlay').classList.add('on');
+  }).catch(function (e) { toast(e.message, true); });
+}
+
+function closeZTicket() {
+  document.getElementById('z-overlay').classList.remove('on');
 }
 
 function closingsGoToPage(p) {
