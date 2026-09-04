@@ -111,7 +111,14 @@
   }
   .pay-grid button:disabled { opacity: .4; cursor: default; }
   .pay-grid button:active { transform: scale(.96); }
-  .clear-ticket-btn { background: none; border: none; color: var(--red); font-family: inherit; font-size: 13px; cursor: pointer; margin-top: 10px; width: 100%; text-align: center; }
+  .clear-ticket-btn {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    width: 100%; background: rgba(255,59,48,0.1); border: none; border-radius: 12px;
+    padding: 12px; margin-top: 10px; color: var(--red); font-family: inherit;
+    font-size: 13.5px; font-weight: 600; cursor: pointer;
+  }
+  .clear-ticket-btn:active { transform: scale(.97); }
+  .clear-ticket-btn svg { flex-shrink: 0; }
 
   .drawer-btn {
     display: flex; align-items: center; justify-content: center; gap: 10px;
@@ -267,7 +274,10 @@
           <button onclick="pay('especes')" id="pay-especes">Espèces</button>
           <button onclick="pay('cb')" id="pay-cb">CB</button>
         </div>
-        <button class="clear-ticket-btn" onclick="clearTicket()">Vider le ticket</button>
+        <button class="clear-ticket-btn" onclick="clearTicket()">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+          Vider le ticket
+        </button>
       </div>
 
       <div class="drawer-section">
