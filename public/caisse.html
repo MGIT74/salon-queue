@@ -258,6 +258,7 @@
           <button onclick="pay('cb')" id="pay-cb">CB</button>
         </div>
         <button class="clear-ticket-btn" onclick="clearTicket()">Vider le ticket</button>
+        <button class="clear-ticket-btn" onclick="openCashDrawer()">Ouvrir le tiroir-caisse</button>
       </div>
     </div>
   </div>
@@ -902,6 +903,14 @@ function finalizeSale(saleCtx) {
   }).then(function () {
     tpePendingSaleCtx = null;
     showReceipt(saleCtx.soldTicket, saleCtx.total, saleCtx.method);
+    // Paiement en espèces : impression automatique du ticket, ce qui
+    // déclenche aussi l'ouverture du tiroir-caisse si l'imprimante est
+    // configurée pour ça (réglage côté pilote Windows). Pas fait pour la
+    // carte : pas besoin d'ouvrir le tiroir, on laisse le choix
+    // d'imprimer ou non via le bouton du reçu.
+    if (saleCtx.method === 'especes') {
+      setTimeout(function () { window.print(); }, 150);
+    }
     ticket = [];
     ticketQueueId = null;
     loyaltyRewardsAvailable = 0;
@@ -935,6 +944,22 @@ function showReceipt(lines, total, method) {
 
 function closeReceipt() {
   document.getElementById('receipt-overlay').classList.remove('on');
+}
+
+// Ouvre le tiroir-caisse sans passer par une vente (pour rendre la
+// monnaie, déposer/retirer de l'argent, etc). Techniquement, on ne peut
+// pas envoyer l'ordre d'ouverture directement à l'imprimante depuis une
+// page web - on déclenche donc une impression minimale, qui ouvre le
+// tiroir si l'imprimante est configurée pour ça (réglage du pilote), au
+// prix d'un tout petit bout de papier qui avance.
+function openCashDrawer() {
+  toast('Ouverture du tiroir…');
+  document.getElementById('receipt-box').innerHTML = '<div style="height:1mm"></div>';
+  document.getElementById('receipt-overlay').classList.add('on');
+  setTimeout(function () {
+    window.print();
+    setTimeout(closeReceipt, 300);
+  }, 50);
 }
 </script>
 </body>
