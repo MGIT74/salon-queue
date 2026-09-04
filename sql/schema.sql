@@ -761,3 +761,22 @@ CREATE TABLE IF NOT EXISTS impersonation_tokens (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (owner_id) REFERENCES owners(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Numéro séquentiel du ticket Z (Z001, Z002...), exigé par la
+-- réglementation française sur les logiciels de caisse (loi anti-fraude
+-- TVA) : une clôture doit être identifiable par un numéro continu, sans
+-- trou, propre à chaque salon.
+SET @z1 := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'cash_closings' AND column_name = 'z_number');
+SET @sql := IF(@z1 = 0, 'ALTER TABLE cash_closings ADD COLUMN z_number INT NULL', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Numérote rétroactivement les clôtures déjà existantes (par ordre
+-- chronologique, par salon), pour que la colonne soit remplie même sur
+-- une base déjà en service.
+UPDATE cash_closings c
+JOIN (
+  SELECT id, ROW_NUMBER() OVER (PARTITION BY salon_id ORDER BY period_end ASC) AS rn
+  FROM cash_closings
+) t ON t.id = c.id
+SET c.z_number = t.rn
+WHERE c.z_number IS NULL;
