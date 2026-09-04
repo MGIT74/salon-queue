@@ -45,15 +45,16 @@
   .caisse-layout {
     display: grid; gap: 18px; align-items: start;
     grid-template-columns: 1fr 340px;
-    grid-template-areas: "grid ticket" "pending ticket";
+    grid-template-areas: "grid ticket" "pending ticket" ". drawer";
   }
   .caisse-grid-col { grid-area: grid; }
   .ticket-panel { grid-area: ticket; }
   .pending-section { grid-area: pending; }
+  .drawer-section { grid-area: drawer; }
   @media (max-width: 860px) {
     .caisse-layout {
       grid-template-columns: 1fr;
-      grid-template-areas: "grid" "ticket" "pending";
+      grid-template-areas: "grid" "ticket" "pending" "drawer";
     }
   }
 
@@ -111,6 +112,15 @@
   .pay-grid button:disabled { opacity: .4; cursor: default; }
   .pay-grid button:active { transform: scale(.96); }
   .clear-ticket-btn { background: none; border: none; color: var(--red); font-family: inherit; font-size: 13px; cursor: pointer; margin-top: 10px; width: 100%; text-align: center; }
+
+  .drawer-btn {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    width: 100%; background: var(--card); border: none; border-radius: 18px;
+    padding: 18px; box-shadow: var(--shadow); color: var(--ink); font-family: inherit;
+    font-size: 14.5px; font-weight: 600; cursor: pointer;
+  }
+  .drawer-btn:active { transform: scale(.97); }
+  .drawer-btn svg { flex-shrink: 0; opacity: .8; }
 
   .empty { background: var(--card); border-radius: 16px; padding: 30px 20px; text-align: center; color: var(--grey); font-size: 14px; box-shadow: var(--shadow); }
 
@@ -258,7 +268,13 @@
           <button onclick="pay('cb')" id="pay-cb">CB</button>
         </div>
         <button class="clear-ticket-btn" onclick="clearTicket()">Vider le ticket</button>
-        <button class="clear-ticket-btn" onclick="openCashDrawer()">Ouvrir le tiroir-caisse</button>
+      </div>
+
+      <div class="drawer-section">
+        <button class="drawer-btn" onclick="openCashDrawer()">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M2 11h20M9 15h6"/></svg>
+          Ouvrir le tiroir-caisse
+        </button>
       </div>
     </div>
   </div>
