@@ -162,9 +162,13 @@
   .tpe-box.fail .amount { color: var(--red); }
 
   @media print {
+    @page { size: 80mm auto; margin: 0; }
     body * { visibility: hidden; }
     .receipt-box, .receipt-box * { visibility: visible; }
-    .receipt-box { position: fixed; top: 0; left: 0; box-shadow: none; }
+    .receipt-box {
+      position: fixed; top: 0; left: 0; width: 80mm; max-width: none;
+      box-shadow: none; border-radius: 0; padding: 4mm; font-size: 12px;
+    }
     .receipt-actions { display: none; }
   }
 </style>
