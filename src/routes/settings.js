@@ -18,7 +18,6 @@ const EDITABLE = [
   'salon_name', 'notify_before_min', 'logo_url', 'gift_tile_image_url',
   'smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_from',
   'printer_connection_type', 'printer_ip', 'printer_model',
-  'tpe_provider', 'tpe_merchant_id', 'tpe_terminal_number', 'tpe_api_key',
   'tpe_ip', 'tpe_port', 'tpe_cash_register_id', 'tpe_cash_register_number',
   'tpe_reply_mode', 'tpe_callback_port',
   'email_tpl_confirmation_subject', 'email_tpl_confirmation_body',
@@ -47,9 +46,8 @@ router.get('/', requireAdmin, wrap(async (req, res) => {
   // seulement s'il est renseigné.
   res.json({
     ok: true,
-    settings: Object.assign({}, s, { smtp_pass: undefined, tpe_api_key: undefined }),
-    smtp_pass_set: Boolean(s.smtp_pass),
-    tpe_api_key_set: Boolean(s.tpe_api_key)
+    settings: Object.assign({}, s, { smtp_pass: undefined }),
+    smtp_pass_set: Boolean(s.smtp_pass)
   });
 }));
 
@@ -60,7 +58,6 @@ router.put('/', requireAdmin, wrap(async (req, res) => {
   });
   // Champ mot de passe laissé vide = on conserve l'ancien
   if (patch.smtp_pass === '') delete patch.smtp_pass;
-  if (patch.tpe_api_key === '') delete patch.tpe_api_key;
 
   // Un expéditeur sans adresse email valide n'est pas un en-tête From
   // exploitable — les fournisseurs comme Gmail rejettent silencieusement

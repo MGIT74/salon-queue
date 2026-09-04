@@ -877,29 +877,9 @@
       </h3>
       <div class="accordion-body" id="devices-body" style="display:none">
       <p class="hint">
-        Prépare la connexion avec ton terminal de paiement (ex: Nepting) — une fois ces informations enregistrées et
-        l'intégration développée, le montant du ticket sera envoyé automatiquement au TPE au moment de payer par
-        carte, sans avoir à le retaper. Renseigné par le prestataire qui gère ton terminal.
-      </p>
-      <div class="grid2">
-        <div class="fld"><label for="set-tpe-provider">Fournisseur</label>
-          <select id="set-tpe-provider">
-            <option value="">Non renseigné</option>
-            <option value="nepting">Nepting</option>
-            <option value="other">Autre</option>
-          </select>
-        </div>
-        <div class="fld"><label for="set-tpe-merchant-id">Numéro marchand</label>
-          <input id="set-tpe-merchant-id" type="text" placeholder="Ex: 2517873827"></div>
-      </div>
-      <div class="grid2">
-        <div class="fld"><label for="set-tpe-terminal-number">Numéro de terminal</label>
-          <input id="set-tpe-terminal-number" type="text" placeholder="Ex: 2"></div>
-        <div class="fld"><label for="set-tpe-api-key">Clé API <span id="tpe-key-state" class="hint" style="font-weight:400"></span></label>
-          <input id="set-tpe-api-key" type="password" placeholder="Fournie par le prestataire"></div>
-      </div>
-      <p class="hint" style="margin-top:14px">
-        Connexion réseau au terminal (le TPE et la caisse doivent être sur le même réseau local) :
+        Connexion avec ton terminal de paiement (ex: Nepting) — une fois ces informations enregistrées, le montant du
+        ticket est envoyé automatiquement au TPE au moment de payer par carte, sans avoir à le retaper. Renseigné par
+        le prestataire qui gère ton terminal. Le TPE et la caisse doivent être sur le même réseau local.
       </p>
       <div class="grid2">
         <div class="fld"><label for="set-tpe-ip">Adresse IP du TPE</label>
@@ -4162,11 +4142,6 @@ function loadCaisseTab() {
   api('/api/settings').then(function (r) {
     document.getElementById('caisse-inactivity').value = r.settings.caisse_inactivity_seconds || 15;
     document.getElementById('caisse-reopen-hour').value = r.settings.caisse_reopen_hour || '00:00';
-    document.getElementById('set-tpe-provider').value = r.settings.tpe_provider || '';
-    document.getElementById('set-tpe-merchant-id').value = r.settings.tpe_merchant_id || '';
-    document.getElementById('set-tpe-terminal-number').value = r.settings.tpe_terminal_number || '';
-    document.getElementById('set-tpe-api-key').value = '';
-    document.getElementById('tpe-key-state').textContent = r.tpe_api_key_set ? '· déjà enregistrée' : '';
     document.getElementById('set-tpe-ip').value = r.settings.tpe_ip || '';
     document.getElementById('set-tpe-port').value = r.settings.tpe_port || '20002';
     document.getElementById('set-tpe-cash-register-id').value = r.settings.tpe_cash_register_id || '';
@@ -4992,10 +4967,6 @@ function updateTpeCallbackVisibility() {
 
 function saveDeviceSettings() {
   api('/api/settings', { method: 'PUT', body: {
-    tpe_provider: document.getElementById('set-tpe-provider').value,
-    tpe_merchant_id: document.getElementById('set-tpe-merchant-id').value,
-    tpe_terminal_number: document.getElementById('set-tpe-terminal-number').value,
-    tpe_api_key: document.getElementById('set-tpe-api-key').value,
     tpe_ip: document.getElementById('set-tpe-ip').value.trim(),
     tpe_port: document.getElementById('set-tpe-port').value || '20002',
     tpe_cash_register_id: document.getElementById('set-tpe-cash-register-id').value.trim(),
