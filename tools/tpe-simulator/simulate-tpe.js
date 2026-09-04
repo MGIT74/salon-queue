@@ -177,6 +177,14 @@ function handleConnection(socket, opts) {
   const from = `${socket.remoteAddress}:${socket.remotePort}`;
   console.log(`\n[+] Connexion entrante de ${from} (comme le ferait la caisse vers le TPE)`);
 
+  // Sans ça, si l'autre côté ferme brutalement la connexion (par ex.
+  // juste après avoir reçu la réponse), Node considère l'erreur comme
+  // non gérée et plante tout le process. On l'ignore proprement à la
+  // place, en la logguant juste pour information.
+  socket.on('error', (err) => {
+    console.log(`[i] Connexion fermée côté client (${err.code || err.message}) - rien d'anormal si c'était après une réponse`);
+  });
+
   let buffer = '';
   let handled = false;
   let idleTimer = null;
