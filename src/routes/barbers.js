@@ -221,9 +221,15 @@ router.put('/:id/schedule', requireAdmin, wrap(async (req, res) => {
 
   await pool.query('DELETE FROM barber_schedules WHERE barber_id = ?', [req.params.id]);
 
+  // On garde une ligne par jour même désactivé (active=0), pas seulement
+  // les jours actifs : ça permet de distinguer "jamais configuré du
+  // tout" (aucune ligne en base - comportement par défaut : toujours
+  // disponible) de "explicitement décoché sur tous les jours" (des
+  // lignes existent, toutes inactives - ce coiffeur ne doit alors plus
+  // être proposable pour un RDV, cf. la liste "Ajouter un RDV").
   const rows = list
-    .filter((s) => s.active && s.start_time && s.end_time)
-    .map((s) => [crypto.randomUUID(), req.params.id, Number(s.weekday), s.start_time, s.end_time, 1]);
+    .filter((s) => s.start_time && s.end_time)
+    .map((s) => [crypto.randomUUID(), req.params.id, Number(s.weekday), s.start_time, s.end_time, s.active ? 1 : 0]);
 
   if (rows.length) {
     await pool.query(

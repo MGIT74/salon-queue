@@ -2558,7 +2558,7 @@ function renderScheduleTab(b) {
 
   var days = DAYS.map(function (dn, wd) {
     var s = (b.schedules || []).find(function (x) { return x.weekday === wd; });
-    var on = Boolean(s);
+    var on = Boolean(s && s.active);
     var myBreaks = (b.breaks || []).filter(function (x) { return x.weekday === wd; });
     return '<div class="day-row' + (on ? '' : ' off') + '" data-day="' + wd + '">' +
       '<div class="day-row-label">' +
