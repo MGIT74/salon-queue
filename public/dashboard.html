@@ -1829,7 +1829,7 @@ function openRescheduleAppointment(id, data) {
   data = data || drawerAppointmentData;
   if (!id || !data) return;
   var a = data;
-  var rdvBarbers = barbers.filter(function (b) { return b.accepts_appointments; });
+  var rdvBarbers = barbers.filter(function (b) { return b.accepts_appointments && b.active; });
   var currentDate = String(a.scheduled_at).slice(0, 10);
 
   var overlay = _buildModal(
@@ -3536,7 +3536,7 @@ function renderExpandPanel(dateStr, dayAppts) {
  * panneau du jour - email optionnel, mais coiffeur toujours requis.
  */
 function openAdminAddAppointment(dateStr) {
-  var rdvBarbers = barbers.filter(function (b) { return b.accepts_appointments; });
+  var rdvBarbers = barbers.filter(function (b) { return b.accepts_appointments && b.active; });
   var when = new Date(dateStr + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' });
 
   var state = { barberId: null, serviceId: null, extraIds: [], time: null };
