@@ -845,4 +845,4 @@ router.delete('/:id', requireAdmin, wrap(async (req, res) => {
   res.json({ ok: true });
 }));
 
-module.exports = { router, promoteTodayAppointments, nowParisDatetimeString, computeSlotsForBarber };
+module.exports = { router, promoteTodayAppointments, nowParisDatetimeString, nowInParis, computeSlotsForBarber };

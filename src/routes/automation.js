@@ -1,7 +1,7 @@
 const express = require('express');
 const { pool, getSettings } = require('../db');
 const requireAutomationKey = require('../middleware/automationAuth');
-const { computeSlotsForBarber } = require('./appointments');
+const { computeSlotsForBarber, nowInParis } = require('./appointments');
 const { sendCustomClientEmail } = require('../lib/mailer');
 
 const router = express.Router();
@@ -76,7 +76,7 @@ router.get('/salons/:id/daily-report', requireAutomationKey, wrap(async (req, re
   );
   const durationMin = Math.round(Number(avgDurationRow.avg_duration) || 30);
 
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = nowInParis().dateStr;
   let freeSlots = 0;
   for (const b of barbers) {
     const slots = await computeSlotsForBarber(b.id, todayStr, durationMin, settings, { skipLead: true });
@@ -230,10 +230,12 @@ router.get('/salons/:id/barbers-status', requireAutomationKey, wrap(async (req, 
     [salonId]
   );
 
-  const now = new Date();
-  const weekday = now.getDay();
-  const hhmm = now.toTimeString().slice(0, 8);
-  const todayStr = now.toISOString().slice(0, 10);
+  const nowParis = nowInParis();
+  const weekday = new Date(nowParis.dateStr + 'T00:00:00Z').getUTCDay();
+  const hh = String(Math.floor(nowParis.minutes / 60)).padStart(2, '0');
+  const mm = String(nowParis.minutes % 60).padStart(2, '0');
+  const hhmm = `${hh}:${mm}:00`;
+  const todayStr = nowParis.dateStr;
 
   const [schedules] = await pool.query(
     `SELECT bs.barber_id, bs.start_time, bs.end_time FROM barber_schedules bs
@@ -347,8 +349,9 @@ router.get('/salons/:id/history', requireAutomationKey, wrap(async (req, res) =>
   const [[salon]] = await pool.query('SELECT id FROM salons WHERE id = ? AND active = 1', [salonId]);
   if (!salon) return res.status(404).json({ error: 'Salon introuvable ou inactif' });
 
-  const start = req.query.start || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
-  const end = req.query.end || new Date().toISOString().slice(0, 10);
+  const todayParis = nowInParis().dateStr;
+  const start = req.query.start || new Date(new Date(todayParis + 'T00:00:00Z').getTime() - 30 * 86400000).toISOString().slice(0, 10);
+  const end = req.query.end || todayParis;
   const barberId = req.query.barber_id || null;
 
   const conditions = ['q.salon_id = ?', "q.status = 'done'", 'q.end_at BETWEEN ? AND ?'];
@@ -390,8 +393,8 @@ router.get('/salons/:id/revenue', requireAutomationKey, wrap(async (req, res) =>
   const [[salon]] = await pool.query('SELECT id FROM salons WHERE id = ? AND active = 1', [salonId]);
   if (!salon) return res.status(404).json({ error: 'Salon introuvable ou inactif' });
 
-  const start = req.query.start || new Date().toISOString().slice(0, 10);
-  const end = req.query.end || new Date().toISOString().slice(0, 10);
+  const start = req.query.start || nowInParis().dateStr;
+  const end = req.query.end || nowInParis().dateStr;
 
   const [[totalRow]] = await pool.query(
     `SELECT COUNT(*) AS done_count, COALESCE(SUM(total_price_cents), 0) AS revenue_cents
@@ -443,7 +446,7 @@ router.get('/salons/:id/appointments', requireAutomationKey, wrap(async (req, re
   const [[salon]] = await pool.query('SELECT id FROM salons WHERE id = ? AND active = 1', [salonId]);
   if (!salon) return res.status(404).json({ error: 'Salon introuvable ou inactif' });
 
-  const start = req.query.start || new Date().toISOString().slice(0, 10);
+  const start = req.query.start || nowInParis().dateStr;
   const end = req.query.end || start;
   const barberId = req.query.barber_id || null;
   const statusFilter = req.query.status || null; // confirmed | cancelled | completed | no_show
