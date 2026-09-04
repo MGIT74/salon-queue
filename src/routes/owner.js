@@ -545,13 +545,19 @@ router.post('/caisse/close', requireAdmin, wrap(async (req, res) => {
   });
 
   const id = crypto.randomUUID();
+  const [[{ maxZ }]] = await pool.query(
+    'SELECT COALESCE(MAX(z_number), 0) AS maxZ FROM cash_closings WHERE salon_id = ?',
+    [req.salon.id]
+  );
+  const zNumber = maxZ + 1;
+
   await pool.query(
-    `INSERT INTO cash_closings (id, salon_id, period_start, period_end, total_cents, sales_count, breakdown_json)
-     VALUES (?, ?, ?, NOW(), ?, ?, ?)`,
-    [id, req.salon.id, periodStart, total, sales.length, JSON.stringify(byMethod)]
+    `INSERT INTO cash_closings (id, salon_id, period_start, period_end, total_cents, sales_count, breakdown_json, z_number)
+     VALUES (?, ?, ?, NOW(), ?, ?, ?, ?)`,
+    [id, req.salon.id, periodStart, total, sales.length, JSON.stringify(byMethod), zNumber]
   );
 
-  res.json({ ok: true, id, total_cents: total, sales_count: sales.length });
+  res.json({ ok: true, id, z_number: zNumber, total_cents: total, sales_count: sales.length });
 }));
 
 /**
@@ -574,6 +580,7 @@ router.get('/caisse/closings', requireAdmin, wrap(async (req, res) => {
       try { breakdown = JSON.parse(r.breakdown_json || '{}'); } catch (e) { breakdown = {}; }
       return {
         id: r.id,
+        z_number: r.z_number,
         period_start: r.period_start ? utcIso(r.period_start) : null,
         period_end: utcIso(r.period_end),
         total_cents: r.total_cents,
@@ -581,6 +588,40 @@ router.get('/caisse/closings', requireAdmin, wrap(async (req, res) => {
         breakdown
       };
     })
+  });
+}));
+
+/**
+ * Détail d'une clôture précise, avec le "grand total perpétuel" (cumul
+ * de toutes les clôtures depuis la mise en service, jusqu'à celle-ci
+ * incluse) - exigé par la réglementation française sur les logiciels de
+ * caisse pour permettre la réconciliation lors d'un contrôle fiscal.
+ */
+router.get('/caisse/closings/:id', requireAdmin, wrap(async (req, res) => {
+  const [[row]] = await pool.query(
+    'SELECT * FROM cash_closings WHERE id = ? AND salon_id = ?',
+    [req.params.id, req.salon.id]
+  );
+  if (!row) return res.status(404).json({ error: 'Clôture introuvable' });
+
+  const [[{ grandTotal }]] = await pool.query(
+    'SELECT COALESCE(SUM(total_cents), 0) AS grandTotal FROM cash_closings WHERE salon_id = ? AND z_number <= ?',
+    [req.salon.id, row.z_number]
+  );
+
+  let breakdown = {};
+  try { breakdown = JSON.parse(row.breakdown_json || '{}'); } catch (e) { breakdown = {}; }
+
+  res.json({
+    ok: true,
+    id: row.id,
+    z_number: row.z_number,
+    period_start: row.period_start ? utcIso(row.period_start) : null,
+    period_end: utcIso(row.period_end),
+    total_cents: row.total_cents,
+    sales_count: row.sales_count,
+    breakdown,
+    grand_total_cents: Number(grandTotal)
   });
 }));
 
