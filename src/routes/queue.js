@@ -1,6 +1,6 @@
 const express = require('express');
 const crypto = require('crypto');
-const { pool, utcIso } = require('../db');
+const { pool, utcIso, getSettings } = require('../db');
 const { loadQueue, recompute, clientKey } = require('../lib/queueMath');
 const { promoteTodayAppointments, nowParisDatetimeString } = require('./appointments');
 const requireAdmin = require('../middleware/auth');
@@ -213,15 +213,16 @@ router.post('/checkin', wrap(async (req, res) => {
   // est déjà physiquement au salon.
   const apptId = crypto.randomUUID();
   try {
-    // scheduled_at est toujours exprimé en heure de salon (Europe/Paris),
+    // scheduled_at est toujours exprimé en heure de salon (réglable),
     // jamais en UTC — comme pour un RDV pris en ligne. Utiliser NOW() ici
     // stockerait l'heure serveur (UTC) dans une colonne "heure locale",
     // et l'agenda (qui affiche scheduled_at tel quel, sans conversion)
-    // se déciderait alors avec 1h à 2h de décalage.
+    // se déciderait alors avec un décalage selon le fuseau du salon.
+    const settings = await getSettings(req.salon.id);
     await pool.query(
       `INSERT INTO appointments (id, salon_id, barber_id, client_name, email, phone, service_id, scheduled_at, status, promoted_queue_id, source)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, 'walkin')`,
-      [apptId, req.salon.id, checkinBarberId, client_name, email || null, phone || null, service_id, nowParisDatetimeString(), id]
+      [apptId, req.salon.id, checkinBarberId, client_name, email || null, phone || null, service_id, nowParisDatetimeString(settings.timezone), id]
     );
     if (Array.isArray(extras) && extras.length) {
       await pool.query(
