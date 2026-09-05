@@ -1,6 +1,6 @@
 const express = require('express');
 const crypto = require('crypto');
-const { pool } = require('../db');
+const { pool, getSettings } = require('../db');
 const { hashPassword, verifyPassword } = require('../lib/password');
 const { sendClientVerificationEmail, sendClientPasswordReset } = require('../lib/mailer');
 const { clientKey } = require('../lib/queueMath');
@@ -195,8 +195,10 @@ router.get('/me', requireClient, wrap(async (req, res) => {
   );
   const loyaltyActivated = Boolean(loyalty && loyalty.activated_at);
 
-  // scheduled_at est une heure de SALON (Europe/Paris), jamais de
-  // l'UTC - comparaison avec l'heure de salon actuelle, pas UTC_TIMESTAMP().
+  const salonSettings = await getSettings(c.salon_id);
+
+  // scheduled_at est une heure de SALON (réglable), jamais de l'UTC -
+  // comparaison avec l'heure de salon actuelle, pas UTC_TIMESTAMP().
   // Exclut aussi un RDV déjà honoré en avance (client pris plus tôt que
   // prévu, cf. le correctif des créneaux dynamiques) : son statut reste
   // 'confirmed' indéfiniment côté appointments, seule la file liée
@@ -213,7 +215,7 @@ router.get('/me', requireClient, wrap(async (req, res) => {
      WHERE a.salon_id = ? AND LOWER(TRIM(a.email)) = ? AND a.status = 'confirmed' AND a.scheduled_at >= ?
        AND (q.status IS NULL OR q.status NOT IN ('done', 'cancelled'))
      ORDER BY a.scheduled_at ASC LIMIT 20`,
-    [c.salon_id, key, nowParisDatetimeString()]
+    [c.salon_id, key, nowParisDatetimeString(salonSettings.timezone)]
   );
 
   const upcomingAppointments = [];
