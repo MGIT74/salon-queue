@@ -20,15 +20,17 @@ function wrap(fn) {
 const SLOT_STEP_MIN = 15;
 
 /**
- * Heure "de salon" fiable (Europe/Paris), independante du fuseau
- * horaire configure sur le serveur - les horaires coiffeur
- * (barber_schedules) sont saisis en heure locale francaise, donc la
- * comparaison "creneau deja passe ?" doit se faire dans ce meme
- * referentiel, pas en UTC brut du serveur.
+ * Heure "de salon" fiable, indépendante du fuseau horaire configuré sur
+ * le serveur - les horaires coiffeur (barber_schedules) sont saisis en
+ * heure locale du salon, donc la comparaison "créneau déjà passé ?" doit
+ * se faire dans ce même référentiel, pas en UTC brut du serveur. Le
+ * fuseau du salon (réglages > Fuseau horaire) doit être passé en `tz` ;
+ * "Europe/Paris" reste le repli par défaut pour les appels qui n'ont pas
+ * encore ce contexte (compatibilité ascendante).
  */
-function nowInParis() {
+function nowInParis(tz) {
   const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit',
+    timeZone: tz || 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit',
     hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
   }).formatToParts(new Date());
   const get = (type) => parts.find((p) => p.type === type).value;
@@ -39,15 +41,15 @@ function nowInParis() {
 }
 
 /**
- * Chaîne datetime "heure de salon" (Europe/Paris) pour l'instant présent,
- * au format MySQL "YYYY-MM-DD HH:MM:SS" — à utiliser partout où une
- * valeur doit rejoindre scheduled_at (toujours exprimé en heure locale
- * de salon, jamais en UTC), pour rester dans le même référentiel que le
- * reste du module (créneaux, disponibilités, réservations).
+ * Chaîne datetime "heure de salon" pour l'instant présent, au format
+ * MySQL "YYYY-MM-DD HH:MM:SS" — à utiliser partout où une valeur doit
+ * rejoindre scheduled_at (toujours exprimé en heure locale de salon,
+ * jamais en UTC), pour rester dans le même référentiel que le reste du
+ * module (créneaux, disponibilités, réservations).
  */
-function nowParisDatetimeString() {
+function nowParisDatetimeString(tz) {
   const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit',
+    timeZone: tz || 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit',
     hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'
   }).formatToParts(new Date());
   const get = (type) => parts.find((p) => p.type === type).value;
@@ -55,21 +57,21 @@ function nowParisDatetimeString() {
 }
 
 /**
- * Convertit une date+heure exprimées en heure LOCALE de salon
- * (Europe/Paris) en le vrai instant UTC correspondant. Indispensable
- * dès qu'une valeur "heure de salon" (scheduled_at, saisie via le
- * formulaire de RDV) doit rejoindre une colonne qui est, elle, un vrai
- * timestamp UTC (checkin_at, start_at...) — sans cette conversion, les
- * deux référentiels se mélangent et tout calcul d'écart (verrouillage
- * "pas encore commencé", tri par heure d'arrivée...) dérive de 1h ou 2h
- * selon la saison.
+ * Convertit une date+heure exprimées en heure LOCALE de salon en le vrai
+ * instant UTC correspondant. Indispensable dès qu'une valeur "heure de
+ * salon" (scheduled_at, saisie via le formulaire de RDV) doit rejoindre
+ * une colonne qui est, elle, un vrai timestamp UTC (checkin_at,
+ * start_at...) — sans cette conversion, les deux référentiels se
+ * mélangent et tout calcul d'écart (verrouillage "pas encore commencé",
+ * tri par heure d'arrivée...) dérive selon le fuseau et la saison.
  */
-function parisLocalToUtcDate(dateStr, timeStr) {
+function parisLocalToUtcDate(dateStr, timeStr, tz) {
+  const zone = tz || 'Europe/Paris';
   const [y, mo, d] = dateStr.split('-').map(Number);
   const [hh, mi, se] = String(timeStr).split(':').map(Number);
   const guess = new Date(Date.UTC(y, mo - 1, d, hh, mi, se || 0));
   const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'Europe/Paris', hourCycle: 'h23',
+    timeZone: zone, hourCycle: 'h23',
     year: 'numeric', month: '2-digit', day: '2-digit',
     hour: '2-digit', minute: '2-digit', second: '2-digit'
   }).formatToParts(guess);
@@ -201,7 +203,7 @@ async function computeSlotsForBarber(barberId, dateStr, durationMin, rdvSettings
 
   const startMin = timeToMinutes(schedule.start_time);
   const endMin = timeToMinutes(schedule.end_time);
-  const paris = nowInParis();
+  const paris = nowInParis(rdvSettings.timezone);
   const isToday = dateStr === paris.dateStr;
   let nowMin = isToday ? paris.minutes : -1;
 
@@ -227,7 +229,7 @@ async function computeSlotsForBarber(barberId, dateStr, durationMin, rdvSettings
 function isBeyondAdvanceWindow(dateStr, rdvSettings) {
   const maxDays = Number(rdvSettings.rdv_max_advance_days) || 0;
   if (!maxDays) return false;
-  const todayStr = nowInParis().dateStr;
+  const todayStr = nowInParis(rdvSettings.timezone).dateStr;
   const diffDays = Math.round((new Date(dateStr + 'T00:00:00Z') - new Date(todayStr + 'T00:00:00Z')) / 86400000);
   return diffDays > maxDays;
 }
@@ -375,15 +377,16 @@ router.post('/', wrap(async (req, res) => {
   if (!email) return res.status(400).json({ error: "L'email est requis pour la confirmation" });
   if (!service_id || !date || !time) return res.status(400).json({ error: 'Prestation, date et créneau requis' });
 
+  const rdvSettings = await getSettings(req.salon.id);
+
   // Le champ 'min' du calendrier n'est qu'une protection côté
   // navigateur (fiable sur desktop, pas garantie sur toutes les
   // versions mobile/tablette) - on revérifie ici, côté serveur, que le
   // créneau demandé n'est pas déjà passé (heure de salon, pas UTC).
-  if (`${date} ${time}:00` < nowParisDatetimeString()) {
+  if (`${date} ${time}:00` < nowParisDatetimeString(rdvSettings.timezone)) {
     return res.status(400).json({ error: 'Ce créneau est déjà passé, choisissez une date/heure à venir.' });
   }
 
-  const rdvSettings = await getSettings(req.salon.id);
   if (isBeyondAdvanceWindow(date, rdvSettings)) {
     return res.status(400).json({ error: 'Cette date est trop éloignée, choisissez une date plus proche.' });
   }
@@ -476,7 +479,7 @@ router.post('/', wrap(async (req, res) => {
 
   // Si c'est pour aujourd'hui, on le fait apparaître tout de suite
   // dans la file (verrouillé jusqu'à l'heure prévue côté interface).
-  const today = nowInParis().dateStr;
+  const today = nowInParis(rdvSettings.timezone).dateStr;
   if (date === today) {
     await promoteAppointment({ id, salon_id: req.salon.id, barber_id: finalBarberId, client_name, email, phone, service_id, scheduled_at: scheduledAt }, extraIds);
   }
@@ -503,11 +506,11 @@ router.post('/admin-create', requireAdminOrBarber, wrap(async (req, res) => {
   if (!barber_id) return res.status(400).json({ error: 'Le coiffeur est requis' });
   if (!service_id || !date || !time) return res.status(400).json({ error: 'Prestation, date et créneau requis' });
 
-  if (`${date} ${time}:00` < nowParisDatetimeString()) {
+  const rdvSettings = await getSettings(req.salon.id);
+
+  if (`${date} ${time}:00` < nowParisDatetimeString(rdvSettings.timezone)) {
     return res.status(400).json({ error: 'Ce créneau est déjà passé, choisissez une date/heure à venir.' });
   }
-
-  const rdvSettings = await getSettings(req.salon.id);
 
   const [[service]] = await pool.query(
     'SELECT name, duration_min FROM services WHERE id = ? AND salon_id = ?', [service_id, req.salon.id]
@@ -574,7 +577,7 @@ router.post('/admin-create', requireAdminOrBarber, wrap(async (req, res) => {
     }
   }
 
-  const today = nowInParis().dateStr;
+  const today = nowInParis(rdvSettings.timezone).dateStr;
   if (date === today) {
     await promoteAppointment(
       { id, salon_id: req.salon.id, barber_id, client_name, email: email || null, phone, service_id, scheduled_at: scheduledAt },
@@ -605,7 +608,7 @@ router.post('/cancel', wrap(async (req, res) => {
   const rdvSettings = await getSettings(appt.salon_id);
   const deadlineMin = Number(rdvSettings.rdv_cancel_deadline_min) || 0;
   if (deadlineMin > 0) {
-    const minutesUntil = (new Date(appt.scheduled_at.replace(' ', 'T') + 'Z') - new Date(nowParisDatetimeString().replace(' ', 'T') + 'Z')) / 60000;
+    const minutesUntil = (new Date(appt.scheduled_at.replace(' ', 'T') + 'Z') - new Date(nowParisDatetimeString(rdvSettings.timezone).replace(' ', 'T') + 'Z')) / 60000;
     if (minutesUntil < deadlineMin) {
       return res.status(403).json({ error: "Trop tard pour annuler ce rendez-vous en ligne, contactez directement le salon." });
     }
@@ -689,7 +692,9 @@ router.put('/:id/reschedule', requireAdmin, wrap(async (req, res) => {
   );
   if (!ownedBarber) return res.status(404).json({ error: 'Coiffeur introuvable' });
 
-  if (`${date} ${time}:00` < nowParisDatetimeString()) {
+  const rdvSettings = await getSettings(req.salon.id);
+
+  if (`${date} ${time}:00` < nowParisDatetimeString(rdvSettings.timezone)) {
     return res.status(400).json({ error: 'Ce créneau est déjà passé.' });
   }
 
@@ -701,12 +706,11 @@ router.put('/:id/reschedule', requireAdmin, wrap(async (req, res) => {
   const extraDuration = extraLinks.reduce((a, e) => a + e.duration_min, 0);
   const durationMin = appt.duration_min + extraDuration;
 
-  const rdvSettings = await getSettings(req.salon.id);
   const slots = await computeSlotsForBarber(finalBarberId, date, durationMin, rdvSettings, { skipLead: true, excludeAppointmentId: appt.id });
   if (!slots.includes(time)) return res.status(409).json({ error: "Ce créneau n'est plus disponible" });
 
   const newScheduledAt = date + ' ' + time + ':00';
-  const today = nowInParis().dateStr;
+  const today = nowInParis(rdvSettings.timezone).dateStr;
   let stillPromotedId = appt.promoted_queue_id;
 
   if (appt.promoted_queue_id) {
@@ -714,7 +718,7 @@ router.put('/:id/reschedule', requireAdmin, wrap(async (req, res) => {
     if (q && q.status === 'waiting') {
       if (date === today) {
         // Même jour : on met juste à jour l'horaire/coiffeur de la ligne de file existante.
-        const checkinUtc = toMysqlDatetime(parisLocalToUtcDate(date, time + ':00'));
+        const checkinUtc = toMysqlDatetime(parisLocalToUtcDate(date, time + ':00', rdvSettings.timezone));
         await pool.query('UPDATE queue SET checkin_at = ?, barber_id = ? WHERE id = ?', [checkinUtc, finalBarberId, appt.promoted_queue_id]);
       } else {
         // Déplacé à un autre jour : retiré de la file d'aujourd'hui,
@@ -787,12 +791,13 @@ async function promoteAppointment(appt, extraIds) {
     return null;
   }
 
-  // appt.scheduled_at est en heure de salon (Europe/Paris) ; checkin_at
-  // est un vrai timestamp UTC comme le reste de la file — conversion
-  // obligatoire ici, sinon le verrouillage "pas encore commencé" et
-  // l'ordre d'arrivée dérivent de 1h à 2h selon la saison.
+  // appt.scheduled_at est en heure de salon (réglable, Europe/Paris par
+  // défaut) ; checkin_at est un vrai timestamp UTC comme le reste de la
+  // file — conversion obligatoire ici, sinon le verrouillage "pas encore
+  // commencé" et l'ordre d'arrivée dérivent selon le fuseau et la saison.
+  const settings = await getSettings(appt.salon_id);
   const checkinUtc = toMysqlDatetime(
-    parisLocalToUtcDate(appt.scheduled_at.slice(0, 10), appt.scheduled_at.slice(11, 19))
+    parisLocalToUtcDate(appt.scheduled_at.slice(0, 10), appt.scheduled_at.slice(11, 19), settings.timezone)
   );
 
   await pool.query(
@@ -815,7 +820,8 @@ async function promoteAppointment(appt, extraIds) {
  * besoin de tâche planifiée séparée.
  */
 async function promoteTodayAppointments(salonId) {
-  const today = nowInParis().dateStr;
+  const settings = await getSettings(salonId);
+  const today = nowInParis(settings.timezone).dateStr;
   const [rows] = await pool.query(
     `SELECT * FROM appointments
      WHERE salon_id = ? AND status = 'confirmed' AND promoted_queue_id IS NULL AND DATE(scheduled_at) = ?`,
