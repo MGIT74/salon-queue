@@ -1208,6 +1208,20 @@
     </div>
 
     <div class="card-box">
+      <h3>Fuseau horaire</h3>
+      <p class="hint">
+        Réglé selon l'emplacement réel du salon — sert à calculer les créneaux de RDV, les clôtures de caisse,
+        et qui est en poste maintenant. Si le salon est en métropole, en Guadeloupe, à La Réunion, etc., choisis
+        le fuseau correspondant pour que les horaires restent justes toute l'année (heure d'été/hiver gérée
+        automatiquement).
+      </p>
+      <div class="fld"><label for="set-timezone">Fuseau horaire du salon</label>
+        <select id="set-timezone"></select>
+      </div>
+      <button class="btn btn-primary" style="margin-top:6px" onclick="saveTimezone()">Enregistrer</button>
+    </div>
+
+    <div class="card-box">
       <h3 class="accordion-head" onclick="toggleSettingsAccordion('salon-calendar')">
         Calendrier
         <svg class="accordion-chevron" id="salon-calendar-chevron" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
@@ -1693,9 +1707,13 @@ document.getElementById('tabs').addEventListener('click', function (e) {
 function boot() {
   loadCurrentSalonName();
   loadSalonSwitcher();
-  // Devise du salon : utilisée par eur() partout dans le dashboard,
-  // chargée dès le départ (pas seulement à l'ouverture de Réglages).
-  api('/api/settings/public').then(function (r) { CURRENCY = r.currency || 'EUR'; }).catch(function () {});
+  // Devise et fuseau horaire du salon : utilisés respectivement par eur()
+  // et nowSalonDatetimeString() partout dans le dashboard, chargés dès le
+  // départ (pas seulement à l'ouverture de Réglages).
+  api('/api/settings/public').then(function (r) {
+    CURRENCY = r.currency || 'EUR';
+    SALON_TIMEZONE = r.timezone || 'Europe/Paris';
+  }).catch(function () {});
   loadCatalog()
     .then(loadBarbers)
     .then(refreshQueue)
@@ -5035,12 +5053,62 @@ function openRdvSettings() {
 
 var salonClosuresItems = [];
 
+/**
+ * Remplit le menu déroulant avec tous les fuseaux IANA connus du
+ * navigateur, chacun annoté de son décalage UTC actuel (ex: "Europe/Paris
+ * (UTC+2)") pour aider à choisir sans avoir à deviner. Rempli une seule
+ * fois (le menu ne se vide jamais entre deux ouvertures de l'onglet).
+ */
+function populateTimezoneSelect() {
+  var sel = document.getElementById('set-timezone');
+  if (!sel || sel.options.length) return;
+
+  var zones;
+  try {
+    zones = Intl.supportedValuesOf('timeZone');
+  } catch (e) {
+    // Repli si le navigateur ne supporte pas Intl.supportedValuesOf
+    // (rare, mais évite un menu vide) - centré sur la France et ses
+    // territoires, plus quelques fuseaux voisins courants.
+    zones = [
+      'Europe/Paris', 'Europe/Brussels', 'Europe/Zurich', 'Europe/London',
+      'America/Martinique', 'America/Guadeloupe', 'America/Cayenne', 'America/Miquelon',
+      'Indian/Reunion', 'Indian/Mayotte',
+      'Pacific/Noumea', 'Pacific/Tahiti', 'Pacific/Wallis',
+      'Africa/Casablanca'
+    ];
+  }
+
+  var now = new Date();
+  sel.innerHTML = zones.map(function (z) {
+    var offset = '';
+    try {
+      var parts = new Intl.DateTimeFormat('en-US', { timeZone: z, timeZoneName: 'shortOffset' }).formatToParts(now);
+      var found = parts.find(function (p) { return p.type === 'timeZoneName'; });
+      offset = found ? found.value : '';
+    } catch (e) { /* fuseau non reconnu par ce navigateur, affiché sans décalage */ }
+    return '<option value="' + z + '">' + z.replace(/_/g, ' ') + (offset ? ' (' + offset + ')' : '') + '</option>';
+  }).join('');
+}
+
+function saveTimezone() {
+  var tz = document.getElementById('set-timezone').value;
+  api('/api/settings', { method: 'PUT', body: { timezone: tz } })
+    .then(function () {
+      SALON_TIMEZONE = tz;
+      toast('Fuseau horaire enregistré');
+    })
+    .catch(function (e) { toast(e.message, true); });
+}
+
 function loadSettings() {
+  populateTimezoneSelect();
   api('/api/settings').then(function (r) {
     var s = r.settings;
     document.getElementById('set-salon').value = s.salon_name || '';
     document.getElementById('set-notify').value = s.notify_before_min || 30;
     document.getElementById('set-currency').value = s.currency || 'EUR';
+    document.getElementById('set-timezone').value = s.timezone || 'Europe/Paris';
     document.getElementById('set-host').value = s.smtp_host || '';
     document.getElementById('set-port').value = s.smtp_port || 587;
     document.getElementById('set-user').value = s.smtp_user || '';

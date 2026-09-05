@@ -116,9 +116,15 @@ function applyAccentColor(hex) {
   document.head.appendChild(style);
 }
 
+// Fuseau horaire du salon (Europe/Paris par défaut) - chaque page le met
+// à jour après avoir chargé les réglages (SALON_TIMEZONE = data.timezone),
+// comme CURRENCY ci-dessous. Utilisé pour tout affichage/calcul de date
+// "heure de salon" côté client, cohérent avec le calcul serveur.
+var SALON_TIMEZONE = 'Europe/Paris';
+
 function nowSalonDatetimeString() {
   var parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit',
+    timeZone: SALON_TIMEZONE, year: 'numeric', month: '2-digit', day: '2-digit',
     hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'
   }).formatToParts(new Date());
   var get = function (type) { return parts.find(function (p) { return p.type === type; }).value; };
