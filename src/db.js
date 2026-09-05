@@ -72,36 +72,40 @@ async function getCaisseLockedUntil(salonId, settings) {
 
   const reopenHour = /^\d{2}:\d{2}$/.test(settings.caisse_reopen_hour || '') ? settings.caisse_reopen_hour : '00:00';
 
-  // "08:00" dans le réglage est une heure de SALON (Europe/Paris), pas de
-  // l'UTC — appliquer setUTCHours() dessus décalait la réouverture de
-  // 1h à 2h selon la saison (ex: 08:00 réglé -> rouvrait à 10:00 réel
-  // en été). On détermine d'abord la date calendaire du lendemain EN
-  // HEURE DE SALON (peut différer de la date UTC selon l'heure de la
-  // clôture), puis on convertit correctement heure de salon -> UTC.
+  const tz = settings.timezone || 'Europe/Paris';
+
+  // "08:00" dans le réglage est une heure de SALON, pas de l'UTC —
+  // appliquer setUTCHours() dessus décalait la réouverture selon le
+  // fuseau et la saison (ex: 08:00 réglé -> rouvrait à 10:00 réel en
+  // été avec Europe/Paris). On détermine d'abord la date calendaire du
+  // lendemain EN HEURE DE SALON (peut différer de la date UTC selon
+  // l'heure de la clôture), puis on convertit correctement heure de
+  // salon -> UTC.
   const closingParisDateStr = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit'
+    timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit'
   }).format(closingDate);
   const nextDay = new Date(closingParisDateStr + 'T00:00:00Z');
   nextDay.setUTCDate(nextDay.getUTCDate() + 1);
   const nextDayStr = nextDay.toISOString().slice(0, 10);
 
-  const reopenAt = parisLocalToUtcDate(nextDayStr, reopenHour + ':00');
+  const reopenAt = parisLocalToUtcDate(nextDayStr, reopenHour + ':00', tz);
   return new Date() < reopenAt ? reopenAt.toISOString() : null;
 }
 
 /**
- * Convertit une date+heure exprimées en heure LOCALE de salon
- * (Europe/Paris) en le vrai instant UTC correspondant - détecte
- * automatiquement l'écart CET/CEST selon la date. Même logique que
+ * Convertit une date+heure exprimées en heure LOCALE de salon en le
+ * vrai instant UTC correspondant - détecte automatiquement l'écart
+ * avec l'UTC selon le fuseau (réglable) et la date. Même logique que
  * dans routes/appointments.js (dupliquée ici volontairement : petit
  * utilitaire autonome, pas de dépendance croisée entre modules).
  */
-function parisLocalToUtcDate(dateStr, timeStr) {
+function parisLocalToUtcDate(dateStr, timeStr, tz) {
+  const zone = tz || 'Europe/Paris';
   const [y, mo, d] = dateStr.split('-').map(Number);
   const [hh, mi, se] = String(timeStr).split(':').map(Number);
   const guess = new Date(Date.UTC(y, mo - 1, d, hh, mi, se || 0));
   const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'Europe/Paris', hourCycle: 'h23',
+    timeZone: zone, hourCycle: 'h23',
     year: 'numeric', month: '2-digit', day: '2-digit',
     hour: '2-digit', minute: '2-digit', second: '2-digit'
   }).formatToParts(guess);
