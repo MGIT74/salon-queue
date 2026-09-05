@@ -51,12 +51,15 @@ router.get('/', wrap(async (req, res) => {
     [req.salon.id]
   );
 
+  const settings = await getSettings(req.salon.id);
+  const tz = settings.timezone || 'Europe/Paris';
+
   // Heure de salon actuelle (jour + minutes depuis minuit) pour
   // déterminer si un coiffeur est actuellement en pause — le kiosk
   // s'appuie sur ce booléen tout calculé plutôt que de refaire ce calcul
   // côté navigateur (évite toute divergence de fuseau horaire).
   const nowParts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit',
+    timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit',
     hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
   }).formatToParts(new Date());
   const g = (t) => nowParts.find((p) => p.type === t).value;
