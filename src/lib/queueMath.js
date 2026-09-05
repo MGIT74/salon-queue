@@ -1,4 +1,4 @@
-const { pool, utcIso, getOwnerSettings } = require('../db');
+const { pool, utcIso, getOwnerSettings, getSettings } = require('../db');
 
 // Clé de rapprochement d'un client : email en priorité, sinon téléphone,
 // sinon nom — il n'existe pas de fiche client dédiée dans ce modèle,
@@ -151,11 +151,14 @@ async function loadQueue(salonId, statuses, onlyUnpaid) {
  * d'après leurs horaires. Sans horaire, tous les coiffeurs actifs comptent.
  */
 async function activeBarberCount(salonId) {
-  // Heure de salon (Europe/Paris), jamais l'heure du serveur (UTC) - une
-  // simple `new Date()` décalerait la fenêtre "en poste" de 1 à 2h selon
-  // la saison, tout au long de la journée (pas seulement la nuit).
+  // Heure de salon (réglable, Europe/Paris par défaut), jamais l'heure du
+  // serveur (UTC) - une simple `new Date()` décalerait la fenêtre "en
+  // poste" de 1 à 2h selon le fuseau et la saison, tout au long de la
+  // journée (pas seulement la nuit).
+  const settings = await getSettings(salonId);
+  const tz = settings.timezone || 'Europe/Paris';
   const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit',
+    timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit',
     hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'
   }).formatToParts(new Date());
   const g = (t) => parts.find((p) => p.type === t).value;
