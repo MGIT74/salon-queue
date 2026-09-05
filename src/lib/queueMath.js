@@ -151,6 +151,18 @@ async function loadQueue(salonId, statuses, onlyUnpaid) {
  * d'après leurs horaires. Sans horaire, tous les coiffeurs actifs comptent.
  */
 async function activeBarberCount(salonId) {
+  // Heure de salon (Europe/Paris), jamais l'heure du serveur (UTC) - une
+  // simple `new Date()` décalerait la fenêtre "en poste" de 1 à 2h selon
+  // la saison, tout au long de la journée (pas seulement la nuit).
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'
+  }).formatToParts(new Date());
+  const g = (t) => parts.find((p) => p.type === t).value;
+  const todayStr = `${g('year')}-${g('month')}-${g('day')}`;
+  const weekday = new Date(`${todayStr}T00:00:00Z`).getUTCDay();
+  const hhmm = `${g('hour')}:${g('minute')}:${g('second')}`;
+
   const [[barbers], [schedules], [leaves]] = await Promise.all([
     pool.query('SELECT id FROM barbers WHERE salon_id = ? AND active = 1', [salonId]),
     pool.query(
@@ -162,8 +174,8 @@ async function activeBarberCount(salonId) {
     pool.query(
       `SELECT bl.barber_id FROM barber_leaves bl
        JOIN barbers b ON b.id = bl.barber_id
-       WHERE b.salon_id = ? AND CURDATE() BETWEEN bl.start_date AND bl.end_date`,
-      [salonId]
+       WHERE b.salon_id = ? AND ? BETWEEN bl.start_date AND bl.end_date`,
+      [salonId, todayStr]
     )
   ]);
 
@@ -172,10 +184,6 @@ async function activeBarberCount(salonId) {
 
   if (available.length === 0) return 1;
   if (schedules.length === 0) return available.length;
-
-  const now = new Date();
-  const weekday = now.getDay();
-  const hhmm = now.toTimeString().slice(0, 8);
 
   const onDuty = available.filter((b) =>
     schedules.some((s) =>
