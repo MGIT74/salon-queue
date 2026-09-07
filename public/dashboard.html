@@ -1686,25 +1686,50 @@ addPasswordToggle('pw');
 })();
 
 /* ============ Onglets ============ */
+var VALID_TABS = ['queue', 'services', 'extras', 'products', 'marketing', 'caisse', 'rdv', 'barbers', 'clients', 'salons', 'account', 'settings'];
+
+/**
+ * Bascule vers l'onglet demandé (visuel + chargement des données propres
+ * à cet onglet), et met à jour l'URL (sans recharger la page ni polluer
+ * l'historique de navigation) pour que le rafraîchissement retombe sur
+ * le bon onglet plutôt que de toujours revenir à "File d'attente".
+ */
+function setActiveTab(tabName) {
+  if (VALID_TABS.indexOf(tabName) === -1) tabName = 'queue';
+
+  document.querySelectorAll('#tabs button').forEach(function (x) { x.classList.remove('on'); });
+  var btn = document.querySelector('#tabs button[data-t="' + tabName + '"]');
+  if (btn) btn.classList.add('on');
+  document.querySelectorAll('.tab-panel').forEach(function (p) { p.classList.remove('on'); });
+  document.getElementById('t-' + tabName).classList.add('on');
+
+  if (tabName !== 'rdv') stopTimelineAutoRefresh();
+  if (tabName === 'settings') loadSettings();
+  if (tabName === 'clients') loadClients();
+  if (tabName === 'salons') loadChainTab();
+  if (tabName === 'marketing') loadMarketingTab();
+  if (tabName === 'caisse') loadCaisseTab();
+  if (tabName === 'rdv') loadRdvTab();
+  if (tabName === 'account') loadOwnerProfile();
+
+  try { history.replaceState(null, '', location.pathname + location.search + '#' + tabName); } catch (e) {}
+}
+
 document.getElementById('tabs').addEventListener('click', function (e) {
   var b = e.target.closest('button');
   if (!b) return;
-  document.querySelectorAll('#tabs button').forEach(function (x) { x.classList.remove('on'); });
-  b.classList.add('on');
-  document.querySelectorAll('.tab-panel').forEach(function (p) { p.classList.remove('on'); });
-  document.getElementById('t-' + b.dataset.t).classList.add('on');
-  if (b.dataset.t !== 'rdv') stopTimelineAutoRefresh();
-  if (b.dataset.t === 'settings') loadSettings();
-  if (b.dataset.t === 'clients') loadClients();
-  if (b.dataset.t === 'salons') loadChainTab();
-  if (b.dataset.t === 'marketing') loadMarketingTab();
-  if (b.dataset.t === 'caisse') loadCaisseTab();
-  if (b.dataset.t === 'rdv') loadRdvTab();
-  if (b.dataset.t === 'account') loadOwnerProfile();
+  setActiveTab(b.dataset.t);
 });
 
 /* ============ Chargement ============ */
 function boot() {
+  // Restaure l'onglet actif depuis l'URL (#rdv, #caisse...) au lieu de
+  // toujours retomber sur "File d'attente" après un rafraîchissement.
+  // Le HTML statique affiche déjà "queue" par défaut, donc on ne fait
+  // rien de plus si aucun hash valide n'est présent.
+  var hashTab = (location.hash || '').replace('#', '');
+  if (VALID_TABS.indexOf(hashTab) !== -1 && hashTab !== 'queue') setActiveTab(hashTab);
+
   loadCurrentSalonName();
   loadSalonSwitcher();
   // Devise et fuseau horaire du salon : utilisés respectivement par eur()
@@ -1746,10 +1771,7 @@ function switchSalon(newSlug) {
   barberCapabilities = {}; barberLeaves = {};
   me = null;
 
-  document.querySelectorAll('#tabs button').forEach(function (x) { x.classList.remove('on'); });
-  document.querySelector('#tabs button[data-t="queue"]').classList.add('on');
-  document.querySelectorAll('.tab-panel').forEach(function (p) { p.classList.remove('on'); });
-  document.getElementById('t-queue').classList.add('on');
+  setActiveTab('queue');
 
   loadCurrentSalonName();
   loadCatalog().then(loadBarbers).then(refreshQueue).then(function () { toast('Salon changé'); });
