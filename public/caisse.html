@@ -42,6 +42,21 @@
   .topbar h1 { font-size: 22px; font-weight: 600; letter-spacing: -.03em; margin: 0; }
   .logout-btn { background: none; border: none; color: var(--grey); font-family: inherit; font-size: 14px; cursor: pointer; padding: 6px 0; }
 
+  /* --- Barre de bulles coiffeurs (sélection sans PIN) --- */
+  .barber-bubbles { display: flex; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; }
+  .barber-bubble {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    border: none; background: none; cursor: pointer; font-family: inherit; padding: 2px;
+  }
+  .barber-bubble .avatar {
+    width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    color: #fff; font-weight: 700; font-size: 16px; border: 3px solid transparent; box-sizing: border-box;
+    background-size: cover; background-position: center;
+  }
+  .barber-bubble.on .avatar { border-color: var(--ink); }
+  .barber-bubble .bname { font-size: 11px; color: var(--grey); max-width: 54px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .barber-bubble.on .bname { color: var(--ink); font-weight: 600; }
+
   .caisse-layout {
     display: grid; gap: 18px; align-items: start;
     grid-template-columns: 1fr 340px;
@@ -230,6 +245,8 @@
       <button class="logout-btn" onclick="logout()">Déconnexion</button>
     </div>
 
+    <div class="barber-bubbles" id="barber-bubbles"></div>
+
     <div class="caisse-layout">
       <div class="caisse-grid-col">
         <div class="cat-tabs" id="cat-tabs">
@@ -311,6 +328,13 @@
 mountThemeButton();
 
 var me = null;
+// Coiffeur "actif" (bulle sélectionnée) - distinct de `me` (celui dont
+// le PIN a ouvert la session). Toutes les actions de caisse (vente,
+// encaissements en attente) s'appliquent à ce coiffeur-là, pas
+// forcément à `me`. Changer de bulle ne redemande jamais de PIN - la
+// sécurité vient du fait qu'un PIN valide a déjà ouvert la tablette.
+var activeBarberId = null;
+var allBarbers = [];
 var catalog = { services: [], extras: [], products: [] };
 var ticket = []; // { item_type, item_id, item_name, unit_price_cents, quantity }
 var ticketQueueId = null; // coupe d'origine si le ticket vient d'un encaissement en attente
@@ -348,6 +372,7 @@ function barberApi(path, opts) {
   opts = opts || {};
   var headers = { 'Content-Type': 'application/json' };
   if (me) { headers['X-Barber-Id'] = me.id; headers['X-Barber-Pin'] = me.pin; }
+  if (activeBarberId) headers['X-Acting-As-Barber-Id'] = activeBarberId;
   if (SALON_SLUG) headers['X-Salon-Slug'] = SALON_SLUG;
   return fetch(path, {
     method: opts.method || 'GET',
@@ -414,6 +439,8 @@ function attemptLogin() {
 
 function logout() {
   me = null;
+  activeBarberId = null;
+  allBarbers = [];
   try { sessionStorage.removeItem('caisse-session'); } catch (e) {}
   pinBuffer = '';
   clearTimeout(inactivityTimer);
@@ -447,6 +474,8 @@ function showApp() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app-screen').style.display = 'block';
   document.getElementById('my-name').textContent = me.name;
+  activeBarberId = me.id;
+  loadBarberBubbles();
   loadCatalog();
   loadPendingPayments();
   loadMarketingSettings();
@@ -454,6 +483,46 @@ function showApp() {
   clearInterval(pendingPaymentsInterval);
   pendingPaymentsInterval = setInterval(loadPendingPayments, 5000);
   resetInactivityTimer();
+}
+
+/**
+ * Bulles de tous les coiffeurs actifs, toujours affichées - cliquer sur
+ * une bulle change juste `activeBarberId` (aucun appel réseau, aucun
+ * PIN), puis recharge ce qui dépend du coiffeur actif (encaissements en
+ * attente pour l'instant ; Timer/Agenda s'y ajouteront).
+ */
+function loadBarberBubbles() {
+  var headers = {};
+  if (SALON_SLUG) headers['X-Salon-Slug'] = SALON_SLUG;
+  fetch('/api/barbers', { headers: headers })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      allBarbers = d.items || [];
+      renderBarberBubbles();
+    })
+    .catch(function () {});
+}
+
+function renderBarberBubbles() {
+  var box = document.getElementById('barber-bubbles');
+  box.innerHTML = allBarbers.map(function (b) {
+    var color = b.color || stableColorForId(b.id);
+    var initial = (b.name || '?').trim().charAt(0).toUpperCase();
+    var avatarStyle = b.photo_url
+      ? 'background-image:url(\'' + b.photo_url + '\')'
+      : 'background:' + color;
+    return '<button class="barber-bubble' + (b.id === activeBarberId ? ' on' : '') + '" onclick="selectActiveBarber(\'' + b.id + '\')">' +
+      '<span class="avatar" style="' + avatarStyle + '">' + (b.photo_url ? '' : esc(initial)) + '</span>' +
+      '<span class="bname">' + esc(b.name) + '</span>' +
+      '</button>';
+  }).join('');
+}
+
+function selectActiveBarber(barberId) {
+  if (barberId === activeBarberId) return;
+  activeBarberId = barberId;
+  renderBarberBubbles();
+  loadPendingPayments();
 }
 
 function loadInactivitySetting() {
@@ -953,8 +1022,10 @@ var PAYMENT_LABELS = { especes: 'Espèces', cb: 'Carte bancaire' };
 
 function showReceipt(lines, total, method) {
   var when = new Date().toLocaleString('fr-FR');
+  var activeBarber = allBarbers.find(function (b) { return b.id === activeBarberId; });
+  var barberName = activeBarber ? activeBarber.name : me.name;
   var html = '<h2>' + esc(document.title.replace(' — Caisse', '')) + '</h2>' +
-    '<div class="sub">' + when + ' · ' + esc(me.name) + '</div>' +
+    '<div class="sub">' + when + ' · ' + esc(barberName) + '</div>' +
     lines.map(function (l) {
       return '<div class="rline"><span>' + l.quantity + ' × ' + esc(l.item_name) + '</span><span>' + eur(l.unit_price_cents * l.quantity) + '</span></div>';
     }).join('') +

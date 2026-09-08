@@ -3251,18 +3251,8 @@ function saveMarketingSettings() {
 
 /* ============ Caisse ============ */
 /* ============ Rendez-vous ============ */
-var DOT_COLORS = ['#3b82f6', '#f97316', '#10b981', '#a855f7', '#ec4899', '#eab308', '#14b8a6', '#ef4444'];
-
-// Couleur par défaut stable, dérivée de l'id du coiffeur (jamais de sa
-// position dans une liste triée) - ne change JAMAIS quand un autre
-// coiffeur est ajouté/supprimé/renommé, contrairement à un index de
-// tableau qui décale tout le monde. Utilisée uniquement tant que le
-// coiffeur n'a pas choisi sa propre couleur dans ses paramètres.
-function stableColorForId(id) {
-  var hash = 0;
-  for (var i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
-  return DOT_COLORS[hash % DOT_COLORS.length];
-}
+// DOT_COLORS et stableColorForId vivent désormais dans app.js (partagés
+// avec caisse.html pour les bulles de sélection de coiffeur).
 var calAnchor = new Date(); // date de reference pour la periode affichee
 var calViewMode = 'month'; // 'month' | 'week' | 'day'
 var calMonthCache = {}; // 'YYYY-MM' -> items[]

@@ -418,3 +418,13 @@ function hasBookableSchedule(b) {
   if (schedules.length === 0) return true;
   return schedules.some(function (s) { return s.active; });
 }
+
+// Palette de couleurs stables pour associer une couleur à un coiffeur
+// sans champ "color" explicite (bulles, timeline...) - le même id donne
+// toujours la même couleur, sans avoir besoin de la stocker en base.
+var DOT_COLORS = ['#3b82f6', '#f97316', '#10b981', '#a855f7', '#ec4899', '#eab308', '#14b8a6', '#ef4444'];
+function stableColorForId(id) {
+  var hash = 0;
+  for (var i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+  return DOT_COLORS[hash % DOT_COLORS.length];
+}
