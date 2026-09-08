@@ -72,7 +72,7 @@ router.get('/', wrap(async (req, res) => {
  */
 router.get('/pending-payment', requireAdminOrBarber, wrap(async (req, res) => {
   let rows = await loadQueue(req.salon.id, ['done'], true);
-  if (req.barberId) rows = rows.filter((r) => r.barber_id === req.barberId);
+  if (req.actingBarberId) rows = rows.filter((r) => r.barber_id === req.actingBarberId);
   rows = await attachGiftInfo(rows, req.salon.id);
 
   // Fidélité : cumulée au niveau du SALON, pas de toute l'enseigne -
@@ -114,7 +114,7 @@ router.post('/:id/defer-payment', requireAdminOrBarber, wrap(async (req, res) =>
     [req.params.id, req.salon.id]
   );
   if (!row) return res.status(404).json({ error: 'Client introuvable' });
-  if (req.barberId && row.barber_id && row.barber_id !== req.barberId) {
+  if (req.actingBarberId && row.barber_id && row.barber_id !== req.actingBarberId) {
     return res.status(403).json({ error: "Ce n'est pas votre client." });
   }
   if (row.paid_at) return res.status(409).json({ error: 'Ce client a déjà été encaissé.' });

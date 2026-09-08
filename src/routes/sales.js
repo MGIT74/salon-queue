@@ -87,7 +87,7 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
       [queue_id, req.salon.id]
     );
     if (!row) return res.status(404).json({ error: 'Client introuvable' });
-    if (req.barberId && row.barber_id !== req.barberId) {
+    if (req.actingBarberId && row.barber_id !== req.actingBarberId) {
       return res.status(403).json({ error: "Ce n'est pas votre client." });
     }
     if (row.paid_at) return res.status(409).json({ error: 'Ce client a déjà été encaissé.' });
@@ -102,7 +102,7 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
     queueRow = row;
   }
 
-  const barberId = req.barberId || (req.body.barber_id || null);
+  const barberId = req.actingBarberId || (req.body.barber_id || null);
   const saleId = crypto.randomUUID();
   let total = 0;
 
@@ -264,7 +264,7 @@ router.post('/gift-cards/:id/redeem', requireAdminOrBarber, wrap(async (req, res
     [queue_id, req.salon.id]
   );
   if (!queueRow) return res.status(404).json({ error: 'Client introuvable' });
-  if (req.barberId && queueRow.barber_id !== req.barberId) {
+  if (req.actingBarberId && queueRow.barber_id !== req.actingBarberId) {
     return res.status(403).json({ error: "Ce n'est pas votre client." });
   }
   if (queueRow.paid_at) return res.status(409).json({ error: 'Ce client a déjà été encaissé.' });

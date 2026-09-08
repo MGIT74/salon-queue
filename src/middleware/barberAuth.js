@@ -36,6 +36,28 @@ module.exports = async function requireAdminOrBarber(req, res, next) {
       );
       if (barber) {
         req.barberId = barber.id;
+        // Sélecteur par bulle (caisse partagée) : une fois qu'UN coiffeur
+        // s'est authentifié par son propre code PIN (ci-dessus), la
+        // tablette reste "ouverte" pour la journée - n'importe quel autre
+        // coiffeur peut ensuite se désigner comme agissant "pour lui"
+        // sans retaper de code, en envoyant son id dans cet en-tête. On
+        // vérifie seulement qu'il existe bien et appartient à ce salon
+        // (pas son PIN - la sécurité vient du fait que la session
+        // d'origine, elle, a bien été authentifiée par un PIN valide).
+        // Par défaut (en-tête absent - toutes les pages qui n'ont pas ce
+        // sélecteur, comme "Mon poste"), on retombe sur le coiffeur
+        // authentifié lui-même : aucun changement de comportement pour
+        // elles.
+        const actingAsId = req.get('X-Acting-As-Barber-Id');
+        if (actingAsId && actingAsId !== barber.id) {
+          const [[actingAs]] = await pool.query(
+            'SELECT id FROM barbers WHERE id = ? AND salon_id = ? AND active = 1 LIMIT 1',
+            [actingAsId, req.salon.id]
+          );
+          req.actingBarberId = actingAs ? actingAs.id : barber.id;
+        } else {
+          req.actingBarberId = barber.id;
+        }
         return next();
       }
     } catch (err) {
