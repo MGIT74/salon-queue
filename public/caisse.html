@@ -422,15 +422,17 @@ function logout() {
   renderPinDots();
 }
 
-// Deconnexion automatique apres 15s d'inactivite - utilise exactement
-// le meme mecanisme que le bouton "Deconnexion" (pas de mode "flou en
-// arriere-plan" : ca garantit qu'un autre coiffeur peut toujours se
-// reconnecter normalement juste apres, sans aucun etat residuel).
+// Déconnexion automatique par inactivité - DÉSACTIVÉE pour l'instant à la
+// demande du client (2026-09), le reste du mécanisme de caisse (heure de
+// réouverture après clôture, caisse_locked_until) n'est pas concerné et
+// continue de fonctionner normalement. Remettre AUTO_LOGOUT_ENABLED à
+// true pour la réactiver sans avoir à toucher au reste du code.
+var AUTO_LOGOUT_ENABLED = false;
 var inactivityTimer = null;
 var INACTIVITY_LIMIT_MS = 15000;
 
 function resetInactivityTimer() {
-  if (!me) return;
+  if (!AUTO_LOGOUT_ENABLED || !me) return;
   clearTimeout(inactivityTimer);
   inactivityTimer = setTimeout(logout, INACTIVITY_LIMIT_MS);
 }
