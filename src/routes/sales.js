@@ -229,7 +229,7 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
  * Historique des ventes (admin uniquement) — pour le suivi/reporting,
  * avec filtre par plage de dates optionnel.
  */
-router.get('/', requireAdmin, wrap(async (req, res) => {
+router.get('/', requireAdminOrBarber, wrap(async (req, res) => {
   const conditions = ['s.salon_id = ?'];
   const params = [req.salon.id];
   if (req.query.date_from) { conditions.push('s.created_at >= ?'); params.push(req.query.date_from + ' 00:00:00'); }
@@ -238,6 +238,13 @@ router.get('/', requireAdmin, wrap(async (req, res) => {
     const mysqlDatetime = String(req.query.since).replace('T', ' ').replace('Z', '');
     conditions.push('s.created_at > ?');
     params.push(mysqlDatetime);
+  }
+  // Filtre "historique de caisse" : n'importe quelle vente où ce
+  // coiffeur apparaît quelque part - qu'il ait fait toute la vente, OU
+  // qu'il ait juste vendu un des produits dedans (sale_items.barber_id).
+  if (req.query.barber_id) {
+    conditions.push('(s.barber_id = ? OR EXISTS (SELECT 1 FROM sale_items si2 WHERE si2.sale_id = s.id AND si2.barber_id = ?))');
+    params.push(req.query.barber_id, req.query.barber_id);
   }
 
   const [sales] = await pool.query(
