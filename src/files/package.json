@@ -1,0 +1,20 @@
+{
+  "name": "nepting-payment-service",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Service Node.js/Express de déclenchement de paiement via l'API locale Nepting/HiPay POS",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "nodemon app.js",
+    "tpe:simulator": "node ../../tools/tpe-simulator/simulate-tpe.js --port 20002 --delay 100"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "dotenv": "^16.4.5",
+    "@scalar/express-api-reference": "^0.4.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  }
+}
