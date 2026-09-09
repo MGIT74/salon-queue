@@ -204,6 +204,38 @@
     border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 7px solid var(--accent, var(--blue));
   }
   .timeline-empty { padding: 20px 0; text-align: center; color: var(--grey); font-size: 14px; }
+  .timeline-row-track { cursor: pointer; }
+  .timeline-row-track:hover { background: var(--fill); border-radius: 8px; }
+
+  /* --- Formulaire "Ajouter un RDV" (repris de "Mon poste") --- */
+  .aa-step-title { font-size: 15px; font-weight: 600; margin-bottom: 12px; }
+  .aa-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px,1fr)); gap: 8px; margin-bottom: 6px; }
+  .aa-card {
+    border: none; background: var(--fill); color: var(--ink); border-radius: 14px;
+    padding: 14px 10px; cursor: pointer; font-family: inherit; text-align: center;
+    font-size: 13.5px; font-weight: 600; transition: background .15s ease;
+  }
+  .aa-card .aa-meta { display: block; font-size: 11.5px; font-weight: 400; color: var(--grey); margin-top: 3px; }
+  .aa-card.sel { background: var(--blue); color: #fff; }
+  .aa-card.sel .aa-meta { color: rgba(255,255,255,.8); }
+  .aa-chips { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 6px; }
+  .aa-chip {
+    border: none; background: var(--fill); color: var(--ink); border-radius: 999px;
+    padding: 9px 13px; cursor: pointer; font-family: inherit; font-size: 12.5px; font-weight: 500;
+  }
+  .aa-chip .aa-meta { color: var(--grey); margin-left: 4px; }
+  .aa-chip.sel { background: var(--blue); color: #fff; }
+  .aa-chip.sel .aa-meta { color: rgba(255,255,255,.75); }
+  .aa-slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px,1fr)); gap: 7px; margin-bottom: 6px; }
+  .aa-slot { border: none; background: var(--fill); color: var(--ink); border-radius: 10px; padding: 10px 4px; cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 600; }
+  .aa-slot.sel { background: var(--blue); color: #fff; }
+  .aa-back { background: none; border: none; padding: 0; font-family: inherit; font-size: 13.5px; color: var(--blue); font-weight: 500; cursor: pointer; margin-bottom: 14px; }
+  .half-toggle { display: flex; background: var(--fill); border-radius: 10px; padding: 3px; gap: 2px; }
+  .half-toggle button {
+    flex: 1; border: none; background: none; color: var(--grey); font-family: inherit; font-size: 13px;
+    font-weight: 600; padding: 7px 14px; border-radius: 8px; cursor: pointer;
+  }
+  .half-toggle button.sel { background: var(--blue); color: #fff; }
 
   .caisse-layout {
     display: grid; gap: 18px; align-items: start;
@@ -567,7 +599,12 @@ function barberApi(path, opts) {
   opts = opts || {};
   var headers = { 'Content-Type': 'application/json' };
   if (me) { headers['X-Barber-Id'] = me.id; headers['X-Barber-Pin'] = me.pin; }
-  if (activeBarberId) headers['X-Acting-As-Barber-Id'] = activeBarberId;
+  // opts.actingAs permet de cibler un coiffeur précis pour CET appel
+  // seulement (ex: ajouter un RDV pour le coiffeur d'une ligne de la
+  // timeline, même si une autre bulle - ou aucune - est sélectionnée
+  // globalement), sans toucher à activeBarberId.
+  var actingAs = (opts.actingAs !== undefined) ? opts.actingAs : activeBarberId;
+  if (actingAs) headers['X-Acting-As-Barber-Id'] = actingAs;
   if (SALON_SLUG) headers['X-Salon-Slug'] = SALON_SLUG;
   return fetch(path, {
     method: opts.method || 'GET',
@@ -1241,7 +1278,14 @@ function renderAgendaTimeline(dateStr) {
     if (activeB && !activeB.accepts_appointments) {
       return '<div class="timeline-empty">' + esc(activeB.name) + ' ne prend pas de RDV en ligne (sans-rdv uniquement)</div>';
     }
-    return '<div class="timeline-empty">' + (activeBarberId ? 'Aucun rendez-vous pour ce coiffeur ce jour-là' : 'Aucun rendez-vous ce jour-là') + '</div>';
+    var emptyMsg = '<div class="timeline-empty">' + (activeBarberId ? 'Aucun rendez-vous pour ce coiffeur ce jour-là' : 'Aucun rendez-vous ce jour-là') + '</div>';
+    // Bouton de raccourci seulement si on sait pour QUI ajouter (une
+    // bulle précise sélectionnée) - en mode "Tous", pas de coiffeur
+    // évident à qui l'attribuer.
+    if (activeBarberId) {
+      emptyMsg += '<button class="btn btn-primary" style="width:100%;margin-top:10px" onclick="openCaisseAddAppointment(\'' + dateStr + '\',\'' + activeBarberId + '\')">+ Ajouter un RDV</button>';
+    }
+    return emptyMsg;
   }
 
   function apptMinutes(a) {
@@ -1281,11 +1325,12 @@ function renderAgendaTimeline(dateStr) {
       var time = a.scheduled_at.slice(11, 16);
       return '<div class="timeline-block" style="left:' + leftPct + '%;width:' + widthPct + '%;background:' + color + '" ' +
         'title="' + esc(time + ' — ' + a.client_name + ' — ' + (a.service_name || '')) + '" ' +
-        'onclick="openAgendaClientDrawer(\'' + a.id + '\')">' + esc(a.client_name) + '</div>';
+        'onclick="event.stopPropagation();openAgendaClientDrawer(\'' + a.id + '\')">' + esc(a.client_name) + '</div>';
     }).join('');
+    var trackClick = bid === 'unassigned' ? '' : ' onclick="openCaisseAddAppointment(\'' + dateStr + '\',\'' + bid + '\')" title="Cliquer pour ajouter un RDV"';
     return '<div class="timeline-row">' +
       '<div class="timeline-row-label"><span class="dot" style="background:' + color + '"></span>' + esc(b.name) + '</div>' +
-      '<div class="timeline-row-track">' + blocksHtml + '</div>' +
+      '<div class="timeline-row-track"' + trackClick + '>' + blocksHtml + '</div>' +
       '</div>';
   }).join('');
 
@@ -1329,16 +1374,49 @@ function openAgendaClientDrawer(id) {
         ? '<textarea id="acd-note" rows="2" style="width:100%;padding:11px 13px;border:none;border-radius:10px;background:var(--fill);color:var(--ink);font-family:inherit;font-size:14px;resize:vertical;margin-bottom:8px">' + esc(a.note || '') + '</textarea>' +
           '<button class="btn btn-soft" id="acd-save-note-btn" style="width:100%">Enregistrer la note</button>'
         : '<p class="hint" style="margin:0">Pas encore modifiable — ce RDV entrera dans la file le jour même.</p>') +
-    '</div>'
+    '</div>' +
+    (a.status !== 'cancelled'
+      ? '<button class="clear-ticket-btn" id="acd-cancel-btn" style="margin-top:14px">' +
+          '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M15 9l-6 6M9 9l6 6"/></svg>' +
+          'Annuler ce RDV' +
+        '</button>'
+      : '<p class="hint" style="margin-top:14px;color:var(--red)">Ce RDV est annulé.</p>')
   );
 
   overlay.querySelector('#acd-close-x').onclick = function () { _closeModal(overlay); };
+
+  var cancelBtn = overlay.querySelector('#acd-cancel-btn');
+  if (cancelBtn) {
+    cancelBtn.onclick = function () {
+      // Double confirmation pour une action irréversible et visible du
+      // client (email d'annulation envoyé) : une première confirmation
+      // simple, puis une seconde où il faut taper "ANNULER" en toutes
+      // lettres - protège d'un clic accidentel sur un écran partagé.
+      showConfirm('Annuler le RDV de ' + a.client_name + ' (' + when + ') ?', { title: 'Annuler ce RDV', danger: true, confirmLabel: 'Continuer' })
+        .then(function (ok) {
+          if (!ok) return;
+          return showPrompt('Tape ANNULER pour confirmer définitivement.', { title: 'Confirmation finale', requireExact: 'ANNULER', danger: true, confirmLabel: 'Annuler le RDV' });
+        })
+        .then(function (confirmed) {
+          if (!confirmed) return;
+          return barberApi('/api/appointments/' + a.id + '/admin-cancel', { method: 'POST', body: {}, actingAs: a.barber_id })
+            .then(function () {
+              a.status = 'cancelled';
+              _closeModal(overlay);
+              toast('RDV annulé');
+              Object.keys(calMonthCache).forEach(function (k) { delete calMonthCache[k]; });
+              loadAgendaPeriod();
+            });
+        })
+        .catch(function (e) { if (e) toast(e.message, true); });
+    };
+  }
 
   var saveBtn = overlay.querySelector('#acd-save-note-btn');
   if (saveBtn) {
     saveBtn.onclick = function () {
       var note = overlay.querySelector('#acd-note').value;
-      barberApi('/api/queue/' + a.promoted_queue_id + '/note', { method: 'PUT', body: { note: note } })
+      barberApi('/api/queue/' + a.promoted_queue_id + '/note', { method: 'PUT', body: { note: note }, actingAs: a.barber_id })
         .then(function () { a.note = note; toast('Note enregistrée'); })
         .catch(function (e) { toast(e.message, true); });
     };
@@ -1346,6 +1424,170 @@ function openAgendaClientDrawer(id) {
 }
 
 var agendaNowLineTimer = null;
+
+/**
+ * Ajout rapide d'un RDV depuis l'Agenda de la caisse, pour un coiffeur
+ * précis (celui de la ligne cliquée, ou de la bulle active) - jamais
+ * d'étape "choisir le coiffeur", il est déjà connu. Repris du formulaire
+ * de "Mon poste", adapté à catalog.services/extras et à barberId
+ * explicite (au lieu de me.id).
+ */
+function openCaisseAddAppointment(dateStr, barberId) {
+  var barber = allBarbers.find(function (b) { return b.id === barberId; });
+  var when = new Date(dateStr + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' });
+  var state = { serviceId: null, extraIds: [], time: null };
+
+  var overlay = _buildModal(
+    '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px">' +
+    '<div class="modal-title" style="margin-bottom:0">Ajouter un RDV — ' + esc(barber ? barber.name : '') + ' — ' + when + '</div>' +
+    '<button id="pa-close-x" style="background:var(--fill);border:none;width:30px;height:30px;border-radius:50%;color:var(--grey);font-size:14px;cursor:pointer;flex-shrink:0;margin-left:10px">✕</button>' +
+    '</div>' +
+
+    '<div id="pa-step-service">' +
+      '<div class="aa-step-title">Prestation</div>' +
+      '<div class="aa-grid">' + catalog.services.map(function (s) {
+        return '<button class="aa-card" data-id="' + s.id + '" onclick="paSelectService(this)">' + esc(s.name) +
+          '<span class="aa-meta">' + formatMinutes(s.duration_min) + ' · ' + eur(s.price_cents) + '</span></button>';
+      }).join('') + '</div>' +
+    '</div>' +
+
+    '<div id="pa-step-extras" style="display:none">' +
+      '<button class="aa-back" onclick="paGoStep(\'service\')">‹ Retour</button>' +
+      '<div class="aa-step-title">Suppléments (optionnels)</div>' +
+      '<div class="aa-chips">' + catalog.extras.map(function (e) {
+        return '<button class="aa-chip" data-id="' + e.id + '" onclick="paToggleExtra(this)">' + esc(e.name) + '<span class="aa-meta">+' + formatMinutes(e.duration_min) + '</span></button>';
+      }).join('') + '</div>' +
+      '<button class="btn btn-primary" style="width:100%;margin-top:10px" onclick="paGoStep(\'datetime\')">Suivant</button>' +
+    '</div>' +
+
+    '<div id="pa-step-datetime" style="display:none">' +
+      '<button class="aa-back" onclick="paGoStep(\'extras\')">‹ Retour</button>' +
+      '<div class="aa-step-title">Créneau</div>' +
+      '<div id="pa-half-toggle" class="half-toggle" style="display:none;margin-bottom:8px">' +
+        '<button id="pa-half-morning" onclick="paShowHalf(\'morning\')">Matin</button>' +
+        '<button id="pa-half-afternoon" onclick="paShowHalf(\'afternoon\')">Après-midi</button>' +
+      '</div>' +
+      '<div class="aa-slots" id="pa-slots"><span class="hint" style="margin:0">Chargement…</span></div>' +
+    '</div>' +
+
+    '<div id="pa-step-contact" style="display:none">' +
+      '<button class="aa-back" onclick="paGoStep(\'datetime\')">‹ Retour</button>' +
+      '<div class="aa-step-title" id="pa-contact-summary"></div>' +
+      '<div class="fld" style="margin-bottom:10px"><label>Nom du client</label><input class="modal-input" id="pa-name" type="text"></div>' +
+      '<div class="fld" style="margin-bottom:10px"><label>Email (optionnel)</label><input class="modal-input" id="pa-email" type="email"></div>' +
+      '<div class="fld" style="margin-bottom:14px"><label>Téléphone (optionnel)</label><input class="modal-input" id="pa-phone" type="tel"></div>' +
+      '<div class="modal-error" id="pa-error" style="display:none"></div>' +
+      '<div class="modal-actions">' +
+      '<button class="btn btn-soft" id="pa-cancel-btn">Annuler</button>' +
+      '<button class="btn btn-primary" id="pa-save-btn">Ajouter le RDV</button>' +
+      '</div>' +
+    '</div>'
+  );
+
+  var STEPS = ['service', 'extras', 'datetime', 'contact'];
+  attachClientAutocomplete(overlay, 'pa-name', 'pa-email', 'pa-phone', barberApi);
+
+  window.paGoStep = function (step) {
+    STEPS.forEach(function (s) { overlay.querySelector('#pa-step-' + s).style.display = s === step ? 'block' : 'none'; });
+    if (step === 'datetime') paLoadSlots();
+    if (step === 'contact') {
+      var s = catalog.services.find(function (x) { return x.id === state.serviceId; });
+      overlay.querySelector('#pa-contact-summary').textContent = when + ' à ' + state.time + ' — ' + (s ? s.name : '');
+    }
+  };
+
+  window.paSelectService = function (el) {
+    state.serviceId = el.dataset.id;
+    overlay.querySelectorAll('#pa-step-service .aa-card').forEach(function (c) { c.classList.remove('sel'); });
+    el.classList.add('sel');
+    paGoStep('extras');
+  };
+
+  window.paToggleExtra = function (el) {
+    var id = el.dataset.id;
+    var i = state.extraIds.indexOf(id);
+    if (i === -1) state.extraIds.push(id); else state.extraIds.splice(i, 1);
+    el.classList.toggle('sel');
+  };
+
+  var slotsByHalf = { morning: [], afternoon: [] };
+  var currentHalf = 'afternoon';
+
+  function paRenderHalf() {
+    var slotsEl = overlay.querySelector('#pa-slots');
+    var list = slotsByHalf[currentHalf];
+    slotsEl.innerHTML = list.length
+      ? list.map(function (s) {
+          return '<button class="aa-slot" data-time="' + s.time + '" onclick="paSelectSlot(this)">' + s.time + '</button>';
+        }).join('')
+      : '<span class="hint" style="margin:0">Aucun créneau ' + (currentHalf === 'morning' ? 'le matin' : "l'après-midi") + '</span>';
+  }
+
+  window.paShowHalf = function (half) {
+    currentHalf = half;
+    overlay.querySelector('#pa-half-morning').classList.toggle('sel', half === 'morning');
+    overlay.querySelector('#pa-half-afternoon').classList.toggle('sel', half === 'afternoon');
+    paRenderHalf();
+  };
+
+  function paLoadSlots() {
+    var slotsEl = overlay.querySelector('#pa-slots');
+    var toggleEl = overlay.querySelector('#pa-half-toggle');
+    slotsEl.innerHTML = '<span class="hint" style="margin:0">Chargement…</span>';
+    toggleEl.style.display = 'none';
+    barberApi('/api/appointments/availability?date=' + dateStr + '&service_id=' + state.serviceId + '&barber_id=' + barberId + '&extras=' + state.extraIds.join(','), { actingAs: barberId })
+      .then(function (r) {
+        if (!r.slots.length) { slotsEl.innerHTML = '<span class="hint" style="margin:0">Aucun créneau disponible ce jour-là</span>'; return; }
+
+        slotsByHalf.morning = r.slots.filter(function (s) { return s.time < '12:00'; });
+        slotsByHalf.afternoon = r.slots.filter(function (s) { return s.time >= '12:00'; });
+
+        if (!slotsByHalf.morning.length) {
+          toggleEl.style.display = 'none';
+          currentHalf = 'afternoon';
+          paRenderHalf();
+        } else {
+          toggleEl.style.display = 'flex';
+          paShowHalf('morning');
+        }
+      })
+      .catch(function (e) { slotsEl.innerHTML = ''; toast(e.message, true); });
+  }
+
+  window.paSelectSlot = function (el) {
+    state.time = el.dataset.time;
+    overlay.querySelectorAll('#pa-slots .aa-slot').forEach(function (c) { c.classList.remove('sel'); });
+    el.classList.add('sel');
+    paGoStep('contact');
+  };
+
+  overlay.querySelector('#pa-close-x').onclick = function () { _closeModal(overlay); };
+  overlay.querySelector('#pa-cancel-btn').onclick = function () { _closeModal(overlay); };
+
+  overlay.querySelector('#pa-save-btn').onclick = function () {
+    var errEl = overlay.querySelector('#pa-error');
+    var name = overlay.querySelector('#pa-name').value.trim();
+    if (!name) { errEl.textContent = 'Le nom du client est requis'; errEl.style.display = 'block'; return; }
+
+    barberApi('/api/appointments/admin-create', {
+      method: 'POST',
+      actingAs: barberId,
+      body: {
+        client_name: name,
+        email: overlay.querySelector('#pa-email').value.trim(),
+        phone: overlay.querySelector('#pa-phone').value.trim(),
+        service_id: state.serviceId, extras: state.extraIds,
+        date: dateStr, time: state.time, barber_id: barberId,
+        base_url: window.location.origin + '/rdv.html'
+      }
+    }).then(function () {
+      _closeModal(overlay);
+      toast('RDV ajouté');
+      Object.keys(calMonthCache).forEach(function (k) { delete calMonthCache[k]; });
+      loadAgendaPeriod();
+    }).catch(function (e) { errEl.textContent = e.message; errEl.style.display = 'block'; });
+  };
+}
 
 function startAgendaAutoRefresh() {
   stopAgendaAutoRefresh();
