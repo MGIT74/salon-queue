@@ -290,8 +290,10 @@ router.get('/', requireAdminOrBarber, wrap(async (req, res) => {
 
   // Un coiffeur connecté (PIN, pas admin) ne voit que SES propres RDV -
   // utilisé par 'Mon poste' pour son propre agenda, jamais l'admin
-  // complet du salon.
-  if (req.barberId) {
+  // complet du salon. L'Agenda de la caisse (vue multi-coiffeurs, filtre
+  // fait côté client par bulle sélectionnée) passe explicitement
+  // caisse_view=1 pour recevoir tout le monde, comme un admin.
+  if (req.barberId && req.query.caisse_view !== '1') {
     conditions.push('a.barber_id = ?');
     params.push(req.barberId);
   }
