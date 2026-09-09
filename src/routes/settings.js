@@ -15,7 +15,7 @@ function wrap(fn) {
 }
 
 const EDITABLE = [
-  'salon_name', 'notify_before_min', 'logo_url', 'gift_tile_image_url',
+  'salon_name', 'notify_before_min', 'logo_url', 'gift_tile_image_url', 'timezone',
   'smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_from',
   'printer_connection_type', 'printer_ip', 'printer_model',
   'tpe_ip', 'tpe_port', 'tpe_cash_register_id', 'tpe_cash_register_number',
@@ -29,7 +29,14 @@ const EDITABLE = [
   'accent_color',
   'caisse_inactivity_seconds', 'caisse_reopen_hour', 'currency',
   'rdv_slot_step_min', 'rdv_min_lead_min', 'rdv_max_advance_days',
-  'rdv_buffer_min', 'rdv_cancel_deadline_min', 'rdv_prep_alert_min'
+  'rdv_buffer_min', 'rdv_cancel_deadline_min', 'rdv_prep_alert_min',
+  // Informations légales (ticket de caisse) - voir CGI / loi anti-fraude TVA.
+  'legal_address', 'legal_phone', 'legal_email', 'legal_website',
+  'legal_siret', 'legal_vat_number', 'legal_form', 'legal_share_capital',
+  'legal_rcs_city', 'legal_naf_code', 'legal_register_number',
+  // TVA par catégorie - un taux pour les prestations, un pour les
+  // suppléments, un pour les produits (jamais par article individuel).
+  'vat_rate_service', 'vat_rate_extra', 'vat_rate_product'
 ];
 
 // Force la réouverture immédiate de la caisse (annule le verrouillage
@@ -59,6 +66,14 @@ router.put('/', requireAdmin, wrap(async (req, res) => {
   // Champ mot de passe laissé vide = on conserve l'ancien
   if (patch.smtp_pass === '') delete patch.smtp_pass;
 
+  // Un fuseau invalide planterait silencieusement tous les calculs
+  // d'heure de salon (créneaux, clôtures, "en poste") - on vérifie que
+  // c'est un identifiant IANA reconnu avant de l'accepter.
+  if (patch.timezone) {
+    try { new Intl.DateTimeFormat('en-US', { timeZone: patch.timezone }); }
+    catch (e) { return res.status(400).json({ error: 'Fuseau horaire invalide' }); }
+  }
+
   // Un expéditeur sans adresse email valide n'est pas un en-tête From
   // exploitable — les fournisseurs comme Gmail rejettent silencieusement
   // ces messages. On corrige automatiquement en y accolant l'email
@@ -67,6 +82,24 @@ router.put('/', requireAdmin, wrap(async (req, res) => {
     const existing = await getSettings(req.salon.id);
     const email = patch.smtp_user || existing.smtp_user;
     if (email) patch.smtp_from = `${patch.smtp_from} <${email}>`;
+  }
+
+  // Un SIRET mal formé ne serait détecté qu'au moment de l'impression
+  // d'un ticket - vaut mieux prévenir tout de suite (14 chiffres).
+  if (patch.legal_siret && !/^\d{14}$/.test(patch.legal_siret.replace(/\s/g, ''))) {
+    return res.status(400).json({ error: 'Le SIRET doit comporter exactement 14 chiffres' });
+  }
+
+  // Les 3 taux de TVA doivent être des pourcentages plausibles - un
+  // taux invalide fausserait silencieusement le calcul HT/TVA de
+  // chaque ticket imprimé.
+  for (const k of ['vat_rate_service', 'vat_rate_extra', 'vat_rate_product']) {
+    if (patch[k] !== undefined && patch[k] !== '') {
+      const n = Number(patch[k]);
+      if (!Number.isFinite(n) || n < 0 || n > 100) {
+        return res.status(400).json({ error: 'Le taux de TVA doit être un pourcentage entre 0 et 100' });
+      }
+    }
   }
 
   await setSettings(req.salon.id, patch);
@@ -163,6 +196,25 @@ router.get('/public', wrap(async (req, res) => {
     rdv_cancel_deadline_min: s.rdv_cancel_deadline_min ? Number(s.rdv_cancel_deadline_min) : 0,
     rdv_prep_alert_min: s.rdv_prep_alert_min ? Number(s.rdv_prep_alert_min) : 0,
     accent_color: s.accent_color || null,
+    timezone: s.timezone || 'Europe/Paris',
+    legal: {
+      address: s.legal_address || '',
+      phone: s.legal_phone || '',
+      email: s.legal_email || '',
+      website: s.legal_website || '',
+      siret: s.legal_siret || '',
+      vat_number: s.legal_vat_number || '',
+      legal_form: s.legal_form || '',
+      share_capital: s.legal_share_capital || '',
+      rcs_city: s.legal_rcs_city || '',
+      naf_code: s.legal_naf_code || '',
+      register_number: s.legal_register_number || ''
+    },
+    vat_rates: {
+      service: s.vat_rate_service !== undefined && s.vat_rate_service !== '' ? Number(s.vat_rate_service) : 20,
+      extra: s.vat_rate_extra !== undefined && s.vat_rate_extra !== '' ? Number(s.vat_rate_extra) : 20,
+      product: s.vat_rate_product !== undefined && s.vat_rate_product !== '' ? Number(s.vat_rate_product) : 20
+    },
     caisse_locked_until: caisseLockedUntil
   });
 }));
