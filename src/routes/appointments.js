@@ -632,15 +632,23 @@ router.post('/cancel', wrap(async (req, res) => {
  * via token, aucun email envoyé puisqu'il vient d'annuler lui-même).
  * Ici un email d'excuses est envoyé au client s'il a une adresse.
  */
-router.post('/:id/admin-cancel', requireAdmin, wrap(async (req, res) => {
+router.post('/:id/admin-cancel', requireAdminOrBarber, wrap(async (req, res) => {
   const [[appt]] = await pool.query(
-    `SELECT a.id, a.status, a.scheduled_at, a.promoted_queue_id, a.client_name, a.email, s.name AS service_name
+    `SELECT a.id, a.status, a.scheduled_at, a.barber_id, a.promoted_queue_id, a.client_name, a.email, s.name AS service_name
      FROM appointments a JOIN services s ON s.id = a.service_id
      WHERE a.id = ? AND a.salon_id = ?`,
     [req.params.id, req.salon.id]
   );
   if (!appt) return res.status(404).json({ error: 'Rendez-vous introuvable' });
   if (appt.status === 'cancelled') return res.status(409).json({ error: 'Ce rendez-vous est déjà annulé' });
+
+  // Un coiffeur (session PIN, pas admin) ne peut annuler que le RDV du
+  // coiffeur actif (lui-même par défaut, ou celui désigné par bulle
+  // depuis la caisse partagée) - jamais celui d'un autre sans être passé
+  // par cette sélection explicite.
+  if (req.actingBarberId && appt.barber_id && appt.barber_id !== req.actingBarberId) {
+    return res.status(403).json({ error: "Ce n'est pas le RDV de ce coiffeur." });
+  }
 
   await pool.query('UPDATE appointments SET status = ? WHERE id = ?', ['cancelled', appt.id]);
   if (appt.promoted_queue_id) {
