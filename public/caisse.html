@@ -416,6 +416,11 @@
   .receipt-box .sub { text-align: center; font-size: 12px; color: #666; margin-bottom: 16px; }
   .receipt-box .rline { display: flex; justify-content: space-between; font-size: 13px; padding: 3px 0; }
   .receipt-box .rtotal { border-top: 1px dashed #999; margin-top: 8px; padding-top: 8px; font-weight: 700; font-size: 14px; }
+  .receipt-box .rsep { border-top: 1px dashed #999; margin: 6px 0; }
+  .receipt-box .rlegal-line { font-size: 10.5px; color: #444; line-height: 1.5; }
+  .receipt-box .rvathead { font-weight: 700; font-size: 11px; }
+  .receipt-box .rline span { flex: 1; text-align: right; }
+  .receipt-box .rline span:first-child { text-align: left; }
   .receipt-actions { display: flex; gap: 8px; margin-top: 18px; }
   .receipt-actions .btn { flex: 1; }
 
@@ -660,6 +665,8 @@ function loadSalonName() {
       var name = d.salon_name || 'Le Salon';
       CURRENCY = d.currency || 'EUR';
       rdvPrepAlertMin = Number(d.rdv_prep_alert_min) || 0;
+      legalInfo = d.legal || {};
+      vatRates = d.vat_rates || { service: 20, extra: 20, product: 20 };
       applyAccentColor(d.accent_color);
       document.title = name + ' — Caisse';
       var mark = document.getElementById('salon-mark');
@@ -670,6 +677,8 @@ function loadSalonName() {
     .catch(function () {});
 }
 loadSalonName();
+var legalInfo = {};
+var vatRates = { service: 20, extra: 20, product: 20 };
 
 function barberApi(path, opts) {
   opts = opts || {};
@@ -2204,9 +2213,9 @@ function finalizeSale(saleCtx) {
       payment_method: saleCtx.method, items: saleCtx.soldTicket, queue_id: saleCtx.linkedQueueId,
       gift: saleCtx.gift, loyalty_redeem: saleCtx.usedLoyalty
     }
-  }).then(function () {
+  }).then(function (r) {
     tpePendingSaleCtx = null;
-    showReceipt(saleCtx.soldTicket, saleCtx.total, saleCtx.method);
+    showReceipt(saleCtx.soldTicket, saleCtx.total, saleCtx.method, { ticketId: r.sale && r.sale.id });
     // Paiement en espèces : impression automatique du ticket, ce qui
     // déclenche aussi l'ouverture du tiroir-caisse si l'imprimante est
     // configurée pour ça (réglage côté pilote Windows). Pas fait pour la
@@ -2230,20 +2239,105 @@ function finalizeSale(saleCtx) {
 
 var PAYMENT_LABELS = { especes: 'Espèces', cb: 'Carte bancaire' };
 
+/**
+ * Calcule le taux de TVA applicable à un article selon sa catégorie
+ * (prestation/supplément/produit) - jamais par article individuel,
+ * voir Réglages > TVA.
+ */
+function vatRateFor(itemType) {
+  if (itemType === 'service') return Number(vatRates.service) || 0;
+  if (itemType === 'extra') return Number(vatRates.extra) || 0;
+  return Number(vatRates.product) || 0;
+}
+
 function showReceipt(lines, total, method, opts) {
   opts = opts || {};
-  var when = opts.when ? new Date(opts.when).toLocaleString('fr-FR') : new Date().toLocaleString('fr-FR');
+  var whenDate = opts.when ? new Date(opts.when) : new Date();
+  var when = whenDate.toLocaleDateString('fr-FR') + ' - ' + whenDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
   var barberName = opts.barberName;
   if (!barberName) {
     var activeBarber = allBarbers.find(function (b) { return b.id === activeBarberId; });
-    barberName = activeBarber ? activeBarber.name : me.name;
+    barberName = activeBarber ? activeBarber.name : (me ? me.name : '');
   }
-  var html = '<h2>' + esc(document.title.replace(' — Caisse', '')) + '</h2>' +
-    '<div class="sub">' + when + ' · ' + esc(barberName) + '</div>' +
-    lines.map(function (l) {
-      return '<div class="rline"><span>' + l.quantity + ' × ' + esc(l.item_name) + '</span><span>' + eur(l.unit_price_cents * l.quantity) + '</span></div>';
-    }).join('') +
-    '<div class="rline rtotal"><span>Total (' + esc(PAYMENT_LABELS[method] || method) + ')</span><span>' + eur(total) + '</span></div>' +
+  var ticketNumber = opts.ticketId || ('T' + whenDate.getTime());
+  var salonName = document.title.replace(' — Caisse', '');
+
+  // En-tête : identité du salon, comme l'exige la loi sur chaque ticket.
+  var headHtml = '<h2>' + esc(salonName) + '</h2>';
+  if (legalInfo.address) headHtml += '<div class="rlegal-line">' + esc(legalInfo.address).replace(/\n/g, '<br>') + '</div>';
+  if (legalInfo.phone) headHtml += '<div class="rlegal-line">Tel : ' + esc(legalInfo.phone) + '</div>';
+  if (legalInfo.email) headHtml += '<div class="rlegal-line">Mail : ' + esc(legalInfo.email) + '</div>';
+  if (legalInfo.website) headHtml += '<div class="rlegal-line">' + esc(legalInfo.website) + '</div>';
+
+  var metaHtml = '<div class="rsep"></div>' +
+    '<div class="rline"><span>Date</span><span>' + when + '</span></div>' +
+    '<div class="rline"><span>Ticket n°</span><span>' + esc(ticketNumber) + '</span></div>' +
+    (barberName ? '<div class="rline"><span>Coiffeur</span><span>' + esc(barberName) + '</span></div>' : '') +
+    '<div class="rsep"></div>';
+
+  var itemsHtml = lines.map(function (l) {
+    return '<div class="rline"><span>' + l.quantity + ' × ' + esc(l.item_name) + '</span><span>' + eur(l.unit_price_cents * l.quantity) + '</span></div>';
+  }).join('');
+
+  var articleCount = lines.reduce(function (n, l) { return n + l.quantity; }, 0);
+  var summaryHtml = '<div class="rsep"></div>' +
+    '<div class="rline"><span>Nombre d\'articles</span><span>' + articleCount + '</span></div>' +
+    '<div class="rline rtotal"><span>TOTAL TTC</span><span>' + eur(total) + '</span></div>';
+
+  // Détail TVA par taux (regroupe les articles dont le taux calculé est
+  // identique, même s'ils viennent de catégories différentes) - ou la
+  // mention d'exonération si le salon n'est pas assujetti à la TVA
+  // (pas de n° de TVA renseigné).
+  var vatHtml = '';
+  if (legalInfo.vat_number) {
+    var byRate = {};
+    lines.forEach(function (l) {
+      var rate = vatRateFor(l.item_type);
+      var ttc = l.unit_price_cents * l.quantity;
+      var ht = rate > 0 ? ttc / (1 + rate / 100) : ttc;
+      if (!byRate[rate]) byRate[rate] = { ht: 0, ttc: 0 };
+      byRate[rate].ht += ht;
+      byRate[rate].ttc += ttc;
+    });
+    var totalHt = 0;
+    var rateRows = Object.keys(byRate).sort(function (a, b) { return b - a; }).map(function (rate) {
+      var g = byRate[rate];
+      totalHt += g.ht;
+      return '<div class="rline"><span>(' + rate + '%)</span><span>' + eur(Math.round(g.ht)) + '</span><span>' + eur(Math.round(g.ttc - g.ht)) + '</span><span>' + eur(Math.round(g.ttc)) + '</span></div>';
+    }).join('');
+    vatHtml = '<div class="rsep"></div>' +
+      '<div class="rline rvathead"><span>Taux</span><span>HT</span><span>TVA</span><span>TTC</span></div>' +
+      rateRows +
+      '<div class="rline"><span>TOTAL HT</span><span></span><span></span><span>' + eur(Math.round(totalHt)) + '</span></div>';
+  } else {
+    vatHtml = '<div class="rsep"></div><div class="rlegal-line" style="text-align:center">TVA non applicable, art. 293 B du CGI</div>';
+  }
+
+  var paymentHtml = '<div class="rsep"></div>' +
+    '<div class="rline rtotal"><span>' + esc(PAYMENT_LABELS[method] || method) + '</span><span>' + eur(total) + '</span></div>';
+
+  // Mentions légales obligatoires en pied de ticket.
+  var footerParts = [];
+  if (legalInfo.siret) {
+    var siretLine = 'SIRET ' + esc(legalInfo.siret);
+    if (legalInfo.naf_code) siretLine += ' - NAF ' + esc(legalInfo.naf_code);
+    footerParts.push(siretLine);
+  }
+  if (legalInfo.vat_number) footerParts.push('TVA Intracom ' + esc(legalInfo.vat_number));
+  if (legalInfo.legal_form || legalInfo.share_capital) {
+    footerParts.push([legalInfo.legal_form, legalInfo.share_capital ? 'Capital ' + esc(legalInfo.share_capital) + ' €' : ''].filter(Boolean).map(esc).join(' - '));
+  }
+  if (legalInfo.rcs_city && legalInfo.siret) {
+    var siren = legalInfo.siret.slice(0, 9);
+    footerParts.push('RCS ' + esc(legalInfo.rcs_city) + ' ' + siren);
+  }
+  if (legalInfo.register_number) footerParts.push('Caisse ' + esc(legalInfo.register_number));
+  var footerHtml = footerParts.length
+    ? '<div class="rsep"></div><div class="rlegal-line" style="text-align:center">' + footerParts.join('<br>') + '</div>'
+    : '';
+
+  var html = headHtml + metaHtml + itemsHtml + summaryHtml + vatHtml + paymentHtml + footerHtml +
+    '<div class="rlegal-line" style="text-align:center;margin-top:10px">Merci de votre visite</div>' +
     '<div class="receipt-actions">' +
       '<button class="btn btn-soft" onclick="closeReceipt()">Fermer</button>' +
       '<button class="btn btn-primary" onclick="window.print()">Imprimer</button>' +
@@ -2324,7 +2418,7 @@ function renderHistoryList() {
 
 function reprintSale(index) {
   var s = historySalesCache[index];
-  showReceipt(s.items, s.total_price_cents, s.payment_method, { when: s.created_at, barberName: s.barber_name || 'Non assigné' });
+  showReceipt(s.items, s.total_price_cents, s.payment_method, { when: s.created_at, barberName: s.barber_name || 'Non assigné', ticketId: s.id });
 }
 
 // Ouvre le tiroir-caisse sans passer par une vente (pour rendre la
