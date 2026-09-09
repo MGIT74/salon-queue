@@ -298,6 +298,12 @@
   }
   .ticket-line .qty-val { font-size: 13px; min-width: 14px; text-align: center; }
   .ticket-line .line-price { font-size: 13.5px; font-weight: 600; flex-shrink: 0; min-width: 52px; text-align: right; }
+  .line-seller-wrap { position: relative; width: 26px; height: 26px; flex-shrink: 0; display: inline-block; }
+  .line-seller-avatar {
+    width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; background-size: cover; background-position: center; pointer-events: none;
+  }
+  .line-seller-select { position: absolute; inset: 0; opacity: 0; border: none; cursor: pointer; width: 100%; height: 100%; }
   .ticket-total { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-top: 2px solid var(--sep); margin-bottom: 14px; }
   .ticket-total .label { font-size: 14px; color: var(--grey); }
   .ticket-total .amount { font-size: 24px; font-weight: 600; letter-spacing: -.02em; }
@@ -1879,7 +1885,12 @@ function renderItemGrid() {
 function addToTicket(itemType, itemId, itemName, unitPriceCents) {
   var existing = ticket.find(function (l) { return l.item_type === itemType && l.item_id === itemId; });
   if (existing) { existing.quantity++; } else {
-    ticket.push({ item_type: itemType, item_id: itemId, item_name: itemName, unit_price_cents: unitPriceCents, quantity: 1 });
+    // Le "vendeur" par ligne n'a de sens que pour un produit (voir
+    // renderTicket) - par défaut le coiffeur actif au moment de
+    // l'ajout, modifiable ensuite ligne par ligne si un autre coiffeur
+    // a en réalité vendu ce produit précis.
+    var lineBarberId = itemType === 'product' ? activeBarberId : null;
+    ticket.push({ item_type: itemType, item_id: itemId, item_name: itemName, unit_price_cents: unitPriceCents, quantity: 1, barber_id: lineBarberId });
   }
   renderTicket();
 }
@@ -1907,6 +1918,7 @@ function renderTicket() {
     ? '<div class="empty">Aucun article sélectionné</div>'
     : ticket.map(function (l, i) {
         return '<div class="ticket-line">' +
+          (l.item_type === 'product' ? lineSellerBubbleHtml(l, i) : '') +
           '<div class="name">' + esc(l.item_name) + '</div>' +
           '<div class="qty-ctrl">' +
             '<button onclick="changeQty(' + i + ',-1)">−</button>' +
@@ -1924,6 +1936,36 @@ function renderTicket() {
   });
   updateGiftVisibility();
   updateLoyaltyVisibility();
+}
+
+/**
+ * Petite bulle "qui a vendu ce produit" sur chaque ligne produit du
+ * ticket - par défaut le coiffeur actif au moment de l'ajout, mais
+ * modifiable indépendamment (ex: un autre coiffeur a vendu ce parfum
+ * au client d'un collègue). Sans effet sur les prestations/suppléments,
+ * qui restent attribués à toute la vente.
+ */
+function lineSellerBubbleHtml(line, index) {
+  var seller = allBarbers.find(function (b) { return b.id === line.barber_id; });
+  var color = seller ? (seller.color || stableColorForId(seller.id)) : 'var(--fill)';
+  var initial = seller ? (seller.name || '?').trim().charAt(0).toUpperCase() : '?';
+  var avatarStyle = seller && seller.photo_url
+    ? 'background-image:url(\'' + seller.photo_url + '\')'
+    : 'background:' + color + ';color:' + (seller ? '#fff' : 'var(--grey)');
+  return '<span class="line-seller-wrap" title="Qui a vendu ce produit ?">' +
+    '<span class="line-seller-avatar" style="' + avatarStyle + '">' + (seller && seller.photo_url ? '' : esc(initial)) + '</span>' +
+    '<select class="line-seller-select" onchange="setLineSeller(' + index + ',this.value)">' +
+      '<option value="">Non attribué</option>' +
+      allBarbers.map(function (b) {
+        return '<option value="' + b.id + '"' + (b.id === line.barber_id ? ' selected' : '') + '>' + esc(b.name) + '</option>';
+      }).join('') +
+    '</select>' +
+  '</span>';
+}
+
+function setLineSeller(index, barberId) {
+  ticket[index].barber_id = barberId || null;
+  renderTicket();
 }
 
 /* ---------- Paiement ---------- */
