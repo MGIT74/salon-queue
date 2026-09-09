@@ -1211,6 +1211,10 @@ function renderAgendaTimeline(dateStr) {
   appts.forEach(function (a) { calApptById[a.id] = a; });
 
   if (appts.length === 0) {
+    var activeB = activeBarberId && allBarbers.find(function (b) { return b.id === activeBarberId; });
+    if (activeB && !activeB.accepts_appointments) {
+      return '<div class="timeline-empty">' + esc(activeB.name) + ' ne prend pas de RDV en ligne (sans-rdv uniquement)</div>';
+    }
     return '<div class="timeline-empty">' + (activeBarberId ? 'Aucun rendez-vous pour ce coiffeur ce jour-là' : 'Aucun rendez-vous ce jour-là') + '</div>';
   }
 
