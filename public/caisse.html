@@ -54,8 +54,6 @@
     background-size: cover; background-position: center;
   }
   .barber-bubble.on .avatar { border-color: var(--ink); }
-  .barber-bubble .bname { font-size: 11px; color: var(--grey); max-width: 54px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .barber-bubble.on .bname { color: var(--ink); font-weight: 600; }
 
   /* --- Footer Timer / Agenda / Caisse (repris de "Mon poste") --- */
   .caisse-footer {
@@ -729,11 +727,19 @@ function renderBarberBubbles() {
     var avatarStyle = b.photo_url
       ? 'background-image:url(\'' + b.photo_url + '\')'
       : 'background:' + color;
-    return '<button class="barber-bubble' + (b.id === activeBarberId ? ' on' : '') + '" onclick="selectActiveBarber(\'' + b.id + '\')">' +
+    return '<button class="barber-bubble' + (b.id === activeBarberId ? ' on' : '') + '" onclick="selectActiveBarber(\'' + b.id + '\')" title="' + esc(b.name) + '">' +
       '<span class="avatar" style="' + avatarStyle + '">' + (b.photo_url ? '' : esc(initial)) + '</span>' +
-      '<span class="bname">' + esc(b.name) + '</span>' +
       '</button>';
   }).join('');
+  updateActiveBarberLabel();
+}
+
+function updateActiveBarberLabel() {
+  var el = document.getElementById('my-name');
+  if (!el) return;
+  if (!activeBarberId) { el.textContent = 'Tous'; return; }
+  var b = allBarbers.find(function (x) { return x.id === activeBarberId; });
+  el.textContent = b ? b.name : '—';
 }
 
 function selectActiveBarber(barberId) {
@@ -1098,6 +1104,24 @@ function apptsForRange(startDate, endDate) {
   });
 }
 
+/**
+ * Un petit point par coiffeur distinct ayant au moins un RDV ce jour-là
+ * (même couleur que sa bulle), plutôt qu'un simple point bleu générique -
+ * permet de voir en un coup d'œil qui a des créneaux sans ouvrir le jour.
+ */
+function calDayDotsHtml(dayAppts) {
+  var seen = {};
+  var dots = [];
+  dayAppts.forEach(function (a) {
+    var bid = a.barber_id || 'unassigned';
+    if (seen[bid]) return;
+    seen[bid] = true;
+    var color = bid === 'unassigned' ? 'var(--grey)' : stableColorForId(bid);
+    dots.push('<span class="cal-dot" style="background:' + color + '"></span>');
+  });
+  return dots.length ? '<div class="cal-dots">' + dots.join('') + '</div>' : '';
+}
+
 function renderCalMonth() {
   document.getElementById('cal-month-label').textContent = monthNames[calAnchor.getMonth()] + ' ' + calAnchor.getFullYear();
 
@@ -1125,11 +1149,10 @@ function renderCalMonth() {
     var weekHtml = weekDays.map(function (d) {
       if (d === null) return '<div class="cal-day empty"></div>';
       var dateStr = calAnchor.getFullYear() + '-' + String(calAnchor.getMonth() + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
-      var has = (byDay[dateStr] || []).length > 0;
       var classes = 'cal-day' + (dateStr === todayStr ? ' today' : '') + (dateStr === calSelectedDate ? ' selected' : '');
       return '<div class="' + classes + '" onclick="selectCalDay(\'' + dateStr + '\')">' +
         '<div class="cal-day-num">' + d + '</div>' +
-        (has ? '<div class="cal-dots"><span class="cal-dot"></span></div>' : '') +
+        calDayDotsHtml(byDay[dateStr] || []) +
         '</div>';
     }).join('');
 
@@ -1173,11 +1196,10 @@ function renderCalWeek() {
   for (var i = 0; i < 7; i++) {
     var d = addDays(start, i);
     var dateStr = ymd(d);
-    var has = (byDay[dateStr] || []).length > 0;
     var classes = 'cal-day' + (dateStr === todayStr ? ' today' : '') + (dateStr === calSelectedDate ? ' selected' : '');
     cells += '<div class="' + classes + '" onclick="selectCalDay(\'' + dateStr + '\')">' +
       '<div class="cal-day-num">' + d.getDate() + '</div>' +
-      (has ? '<div class="cal-dots"><span class="cal-dot"></span></div>' : '') +
+      calDayDotsHtml(byDay[dateStr] || []) +
       '</div>';
   }
 
