@@ -1991,6 +1991,7 @@ function openLineSellerModal(index) {
     '<div class="line-seller-options">' + options + '</div>'
   );
   overlay.querySelector('#lsm-close-x').onclick = function () { _closeModal(overlay); };
+  overlay.addEventListener('click', function (e) { if (e.target === overlay) _closeModal(overlay); });
   overlay.querySelectorAll('[data-close-modal]').forEach(function (btn) {
     btn.addEventListener('click', function () { _closeModal(overlay); }, { once: true });
   });
