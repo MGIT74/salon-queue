@@ -780,3 +780,14 @@ JOIN (
 ) t ON t.id = c.id
 SET c.z_number = t.rn
 WHERE c.z_number IS NULL;
+
+-- Coiffeur "vendeur" d'un produit précis (Barbe, Cire, Parfum...),
+-- distinct du coiffeur de toute la vente (sales.barber_id) - permet
+-- qu'un autre coiffeur que celui qui a fait la prestation soit crédité
+-- pour un produit qu'il a lui-même vendu au client. NULL = pas de
+-- vendeur spécifique (retombe sur sales.barber_id dans les stats).
+-- Uniquement pertinent pour item_type = 'product' - les prestations et
+-- suppléments restent attribués à la vente entière.
+SET @si1 := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'sale_items' AND column_name = 'barber_id');
+SET @sql := IF(@si1 = 0, 'ALTER TABLE sale_items ADD COLUMN barber_id CHAR(36) NULL, ADD CONSTRAINT fk_sale_items_barber FOREIGN KEY (barber_id) REFERENCES barbers(id) ON DELETE SET NULL', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
