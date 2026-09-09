@@ -19,6 +19,17 @@
   --shadow-lg: 0 12px 40px rgba(0,0,0,0.6);
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+/* Barre de défilement fine et discrète, cohérente avec le thème, pour
+   tout élément qui défile dans l'app (au lieu de la grosse barre par
+   défaut du navigateur) - un seul réglage ici plutôt que de le répéter
+   à chaque endroit qui défile. */
+* { scrollbar-width: thin; scrollbar-color: var(--sep) transparent; }
+*::-webkit-scrollbar { width: 6px; height: 6px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background: var(--sep); border-radius: 999px; }
+*::-webkit-scrollbar-thumb:hover { background: var(--grey); }
+
 html, body {
   margin: 0;
   background: var(--bg);

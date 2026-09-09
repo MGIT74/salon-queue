@@ -330,14 +330,7 @@
 
   .empty { background: var(--card); border-radius: 16px; padding: 30px 20px; text-align: center; color: var(--grey); font-size: 14px; box-shadow: var(--shadow); }
 
-  .pending-list {
-    margin-bottom: 18px; max-height: 340px; overflow-y: auto; padding-right: 10px;
-    scrollbar-width: thin; scrollbar-color: var(--sep) transparent;
-  }
-  .pending-list::-webkit-scrollbar { width: 6px; }
-  .pending-list::-webkit-scrollbar-track { background: transparent; }
-  .pending-list::-webkit-scrollbar-thumb { background: var(--sep); border-radius: 999px; }
-  .pending-list::-webkit-scrollbar-thumb:hover { background: var(--grey); }
+  .pending-list { margin-bottom: 18px; max-height: 340px; overflow-y: auto; padding-right: 10px; }
   .pending-card {
     display: flex; align-items: center; justify-content: space-between; gap: 12px;
     background: var(--card); border-radius: 14px; padding: 14px 16px; margin-bottom: 8px;
