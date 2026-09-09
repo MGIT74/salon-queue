@@ -57,6 +57,25 @@
   .barber-bubble .bname { font-size: 11px; color: var(--grey); max-width: 54px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .barber-bubble.on .bname { color: var(--ink); font-weight: 600; }
 
+  /* --- Footer Timer / Agenda / Caisse (repris de "Mon poste") --- */
+  .caisse-footer {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
+    display: flex; justify-content: space-around; align-items: center;
+    background: var(--card); box-shadow: 0 -6px 20px rgba(0,0,0,.1);
+    border-radius: 20px 20px 0 0; padding: 10px 8px calc(10px + env(safe-area-inset-bottom, 0px));
+  }
+  .caisse-footer button {
+    background: none; border: none; font-family: inherit; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    font-size: 11.5px; color: var(--grey); padding: 4px 18px; flex: 1;
+  }
+  .caisse-footer button .ic { display: block; }
+  .caisse-footer button.on { color: var(--blue); font-weight: 600; }
+  body.has-caisse-footer #app-screen { padding-bottom: 84px; }
+  body.has-caisse-footer .toast { bottom: 100px; }
+  .caisse-tab-panel { display: none; }
+  .caisse-tab-panel.on { display: block; }
+
   .caisse-layout {
     display: grid; gap: 18px; align-items: start;
     grid-template-columns: 1fr 340px;
@@ -247,6 +266,15 @@
 
     <div class="barber-bubbles" id="barber-bubbles"></div>
 
+    <div class="caisse-tab-panel" id="panel-timer">
+      <p class="hint" style="text-align:center;padding:40px 0">Timer — à venir (étape 3)</p>
+    </div>
+
+    <div class="caisse-tab-panel" id="panel-agenda">
+      <p class="hint" style="text-align:center;padding:40px 0">Agenda — à venir (étape 4)</p>
+    </div>
+
+    <div class="caisse-tab-panel on" id="panel-caisse">
     <div class="caisse-layout">
       <div class="caisse-grid-col">
         <div class="cat-tabs" id="cat-tabs">
@@ -304,7 +332,23 @@
         </button>
       </div>
     </div>
+    </div>
   </div>
+</div>
+
+<div class="caisse-footer" id="caisse-footer" style="display:none">
+  <button id="nav-timer" onclick="switchCaisseTab('timer')">
+    <svg class="ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>
+    Timer
+  </button>
+  <button id="nav-agenda" onclick="switchCaisseTab('agenda')">
+    <svg class="ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5.5" width="16" height="15" rx="2.5"/><path d="M4 9.5h16"/><path d="M8 3.5v3.5M16 3.5v3.5"/></svg>
+    Agenda
+  </button>
+  <button id="nav-caisse" class="on" onclick="switchCaisseTab('caisse')">
+    <svg class="ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2.5"/><path d="M2 10h20"/><path d="M6 15h4"/></svg>
+    Caisse
+  </button>
 </div>
 
 <div class="receipt-overlay" id="receipt-overlay">
@@ -445,6 +489,8 @@ function logout() {
   pinBuffer = '';
   clearTimeout(inactivityTimer);
   document.getElementById('app-screen').style.display = 'none';
+  document.getElementById('caisse-footer').style.display = 'none';
+  document.body.classList.remove('has-caisse-footer');
   document.getElementById('login-screen').style.display = 'block';
   renderPinDots();
 }
@@ -473,6 +519,8 @@ var pendingPaymentsInterval = null;
 function showApp() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app-screen').style.display = 'block';
+  document.getElementById('caisse-footer').style.display = 'flex';
+  document.body.classList.add('has-caisse-footer');
   document.getElementById('my-name').textContent = me.name;
   activeBarberId = me.id;
   loadBarberBubbles();
@@ -483,6 +531,16 @@ function showApp() {
   clearInterval(pendingPaymentsInterval);
   pendingPaymentsInterval = setInterval(loadPendingPayments, 5000);
   resetInactivityTimer();
+}
+
+var CAISSE_TABS = ['timer', 'agenda', 'caisse'];
+
+function switchCaisseTab(tab) {
+  if (CAISSE_TABS.indexOf(tab) === -1) tab = 'caisse';
+  CAISSE_TABS.forEach(function (t) {
+    document.getElementById('panel-' + t).classList.toggle('on', t === tab);
+    document.getElementById('nav-' + t).classList.toggle('on', t === tab);
+  });
 }
 
 /**
