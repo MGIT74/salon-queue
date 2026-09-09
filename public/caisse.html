@@ -76,6 +76,75 @@
   .caisse-tab-panel { display: none; }
   .caisse-tab-panel.on { display: block; }
 
+  /* --- Onglet Timer (repris de "Mon poste") --- */
+  .active-card {
+    background: var(--card); border-radius: 20px; padding: 26px 22px; text-align: center;
+    box-shadow: var(--shadow); margin-bottom: 22px;
+  }
+  .active-card .name { font-size: 22px; font-weight: 600; letter-spacing: -.02em; margin-bottom: 6px; }
+  .chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-bottom: 20px; }
+  .chip { font-size: 12.5px; font-weight: 500; padding: 5px 11px; border-radius: 999px; background: var(--fill); color: var(--ink); }
+  .chip.main { background: var(--blue-soft); color: var(--blue); font-weight: 600; }
+  .big-timer { font-size: 48px; font-weight: 600; letter-spacing: -.05em; font-variant-numeric: tabular-nums; color: var(--green); line-height: 1; margin-bottom: 4px; }
+  .big-timer.over { color: var(--red); }
+  .timer-sub { font-size: 13px; color: var(--grey); margin-bottom: 20px; }
+  .timer-sub.over { color: var(--red); font-weight: 500; }
+  .active-card .btn { width: 100%; margin-bottom: 8px; padding: 14px; font-size: 15px; }
+
+  #extras-picker { text-align: left; background: var(--fill); border-radius: 14px; padding: 14px; margin-bottom: 12px; }
+  .extra-opt { display: flex; align-items: center; gap: 10px; padding: 8px 2px; font-size: 14.5px; cursor: pointer; }
+  .extra-opt input { width: 18px; height: 18px; }
+  .extra-price { margin-left: auto; color: var(--grey); font-size: 13px; }
+  #extras-picker .btn { margin-top: 6px; }
+
+  .note-block { text-align: left; margin-bottom: 14px; }
+  .note-block label { display: block; font-size: 13px; font-weight: 600; color: var(--grey); margin-bottom: 6px; }
+  .note-block textarea {
+    width: 100%; padding: 12px 14px; border: none; border-radius: 12px; background: var(--fill);
+    color: var(--ink); font-family: inherit; font-size: 14.5px; resize: vertical; margin-bottom: 8px;
+  }
+
+  .section-label { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--grey); margin: 0 0 12px 2px; }
+  .next-item { margin-bottom: 10px; }
+  .next-card {
+    background: var(--card); border-radius: 16px; padding: 18px;
+    box-shadow: var(--shadow); display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;
+  }
+  .next-card.locked { opacity: .7; }
+  .next-card.prep-alert {
+    opacity: 1; box-shadow: 0 0 0 2px var(--orange, #f97316);
+    animation: prep-pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes prep-pulse {
+    0%, 100% { box-shadow: 0 0 0 2px var(--orange, #f97316); }
+    50% { box-shadow: 0 0 0 4px var(--orange, #f97316); }
+  }
+  .next-info { cursor: pointer; flex: 1; min-width: 140px; }
+  .next-info .name { font-size: 16px; font-weight: 600; letter-spacing: -.02em; }
+  .next-info .meta { font-size: 13px; color: var(--grey); margin-top: 2px; }
+  .next-btns { display: flex; gap: 8px; flex-shrink: 0; }
+  .next-card .btn { flex-shrink: 0; padding: 11px 16px; font-size: 13.5px; }
+  .btn-outline-red {
+    background: none; border: 1.5px solid var(--red); color: var(--red);
+    border-radius: 999px; font-family: inherit; font-weight: 600; cursor: pointer;
+  }
+
+  .next-detail {
+    background: var(--fill); border-radius: 16px; padding: 16px 18px; margin-top: 8px;
+    text-align: left;
+  }
+  .detail-row { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--sep); }
+  .detail-row:last-of-type { border-bottom: none; margin-bottom: 10px; }
+  .detail-label { font-size: 13px; color: var(--grey); }
+  .detail-value { font-size: 13.5px; font-weight: 500; text-align: right; word-break: break-word; }
+  .next-detail label { display: block; font-size: 12.5px; font-weight: 600; color: var(--grey); margin-bottom: 6px; }
+  .next-detail textarea {
+    width: 100%; padding: 11px 13px; border: none; border-radius: 10px; background: var(--card);
+    color: var(--ink); font-family: inherit; font-size: 14px; resize: vertical; margin-bottom: 8px;
+  }
+  .lock-note { font-size: 12px; color: var(--orange); margin-top: 4px; }
+  .lock-note.prep-alert-note { font-weight: 700; }
+
   .caisse-layout {
     display: grid; gap: 18px; align-items: start;
     grid-template-columns: 1fr 340px;
@@ -267,7 +336,9 @@
     <div class="barber-bubbles" id="barber-bubbles"></div>
 
     <div class="caisse-tab-panel" id="panel-timer">
-      <p class="hint" style="text-align:center;padding:40px 0">Timer — à venir (étape 3)</p>
+      <div id="active-zone"></div>
+      <div class="section-label">À suivre</div>
+      <div id="next-zone"></div>
     </div>
 
     <div class="caisse-tab-panel" id="panel-agenda">
@@ -401,6 +472,7 @@ function loadSalonName() {
     .then(function (d) {
       var name = d.salon_name || 'Le Salon';
       CURRENCY = d.currency || 'EUR';
+      rdvPrepAlertMin = Number(d.rdv_prep_alert_min) || 0;
       applyAccentColor(d.accent_color);
       document.title = name + ' — Caisse';
       var mark = document.getElementById('salon-mark');
@@ -541,6 +613,8 @@ function switchCaisseTab(tab) {
     document.getElementById('panel-' + t).classList.toggle('on', t === tab);
     document.getElementById('nav-' + t).classList.toggle('on', t === tab);
   });
+  if (tab === 'timer') startTimerAutoRefresh();
+  else stopTimerAutoRefresh();
 }
 
 /**
@@ -581,6 +655,294 @@ function selectActiveBarber(barberId) {
   activeBarberId = barberId;
   renderBarberBubbles();
   loadPendingPayments();
+  extrasPickerOpen = false;
+  nextDetailOpen = {};
+  renderActive(true);
+  renderNext();
+}
+
+/* ---------- Onglet Timer (repris de "Mon poste", scopé au coiffeur actif) ---------- */
+var queue = [];
+var extrasPickerOpen = false;
+var nextDetailOpen = {}; // { [queueId]: true }
+var rdvPrepAlertMin = 0;
+var timerRefreshIntervalId = null;
+var timerRenderIntervalId = null;
+
+function startTimerAutoRefresh() {
+  stopTimerAutoRefresh();
+  refreshTimer();
+  timerRefreshIntervalId = setInterval(refreshTimer, 4000);
+  timerRenderIntervalId = setInterval(function () { renderActive(); }, 1000);
+}
+
+function stopTimerAutoRefresh() {
+  if (timerRefreshIntervalId) clearInterval(timerRefreshIntervalId);
+  if (timerRenderIntervalId) clearInterval(timerRenderIntervalId);
+  timerRefreshIntervalId = null;
+  timerRenderIntervalId = null;
+}
+
+function refreshTimer() {
+  if (!me) return;
+  return barberApi('/api/queue').then(function (r) {
+    queue = r.queue;
+    renderActive();
+    renderNext();
+  }).catch(function (e) { toast(e.message, true); });
+}
+
+function myActive() {
+  if (!activeBarberId) return null;
+  return queue.find(function (q) { return q.status === 'in_progress' && q.barber_id === activeBarberId; });
+}
+
+function cutTimerDisplay(cut) {
+  var elapsedSec = Math.max(Math.floor((Date.now() - new Date(cut.start_at).getTime()) / 1000), 0);
+  var remainSec = (cut.total_duration_min || 0) * 60 - elapsedSec;
+  if (remainSec >= 0) return { text: mmss(remainSec), over: false, label: 'Temps restant' };
+  return { text: '+' + formatMinutes(Math.ceil(Math.abs(remainSec) / 60)), over: true, label: 'En retard' };
+}
+
+function chipsHtml(q) {
+  return '<div class="chips"><span class="chip main">' + esc(q.service.name) + '</span>' +
+    q.extras.map(function (x) { return '<span class="chip">+ ' + esc(x.name) + '</span>'; }).join('') + '</div>';
+}
+
+function renderActive(force) {
+  var cur = myActive();
+  var zone = document.getElementById('active-zone');
+  if (!zone) return;
+  if (!cur) {
+    zone.innerHTML = '<div class="empty">Aucune coupe en cours</div>';
+    return;
+  }
+  var t = cutTimerDisplay(cur);
+
+  // Si l'utilisateur est en train d'interagir dans cette carte (panneau
+  // de suppléments ouvert, note en cours de frappe), on se contente de
+  // rafraîchir le minuteur sans reconstruire tout le HTML — sinon les
+  // cases cochées et le texte tapé seraient perdus à chaque tick.
+  var timerEl = document.getElementById('active-timer-value');
+  var subEl = document.getElementById('active-timer-sub');
+  var userIsEditing = !force && (extrasPickerOpen ||
+    (zone.contains(document.activeElement) && document.activeElement !== document.body));
+
+  if (userIsEditing && timerEl) {
+    timerEl.textContent = t.text;
+    timerEl.classList.toggle('over', t.over);
+    if (subEl) {
+      subEl.textContent = t.label + ' · prévu ' + formatMinutes(cur.total_duration_min) + ' · ' + eur(cur.total_price_cents);
+      subEl.classList.toggle('over', t.over);
+    }
+    return;
+  }
+
+  var extraIds = cur.extras.map(function (e) { return e.id; });
+  var extrasOptions = catalog.extras.map(function (e) {
+    return '<label class="extra-opt"><input type="checkbox" value="' + e.id + '"' +
+      (extraIds.indexOf(e.id) !== -1 ? ' checked' : '') + '> ' + esc(e.name) +
+      ' <span class="extra-price">+' + eur(e.price_cents) + '</span></label>';
+  }).join('');
+
+  zone.innerHTML =
+    '<div class="active-card">' +
+      '<div class="name">' + esc(cur.client_name) + '</div>' +
+      (cur.is_appointment
+        ? '<div class="hint" style="color:var(--blue);margin:-4px 0 6px">📅 Rendez-vous</div>'
+        : '') +
+      chipsHtml(cur) +
+      '<div class="big-timer' + (t.over ? ' over' : '') + '" id="active-timer-value">' + t.text + '</div>' +
+      '<div class="timer-sub' + (t.over ? ' over' : '') + '" id="active-timer-sub">' + t.label + ' · prévu ' + formatMinutes(cur.total_duration_min) + ' · ' + eur(cur.total_price_cents) + '</div>' +
+      (cur.gift_card
+        ? '<div class="hint" style="color:var(--green);margin:8px 0">🎁 Cadeau — supplément non modifiable, terminez la coupe telle quelle.</div>'
+        : '<button class="btn btn-soft" onclick="toggleExtrasPicker()">Ajouter un supplément</button>' +
+          '<div id="extras-picker" style="display:' + (extrasPickerOpen ? 'block' : 'none') + '">' + extrasOptions +
+            '<button class="btn btn-primary" onclick="saveExtras(\'' + cur.id + '\')">Valider</button>' +
+          '</div>') +
+      '<div class="note-block">' +
+        '<label for="client-note">Note sur ce client</label>' +
+        '<textarea id="client-note" rows="2" placeholder="Ex: préfère dégradé américain, allergie...">' + esc(cur.note || '') + '</textarea>' +
+        '<button class="btn btn-soft" onclick="saveNote(\'' + cur.id + '\')">Enregistrer la note</button>' +
+      '</div>' +
+      '<button class="btn btn-green" onclick="finishMine(\'' + cur.id + '\')">Terminer</button>' +
+    '</div>';
+}
+
+function toggleExtrasPicker() {
+  extrasPickerOpen = !extrasPickerOpen;
+  var el = document.getElementById('extras-picker');
+  if (el) el.style.display = extrasPickerOpen ? 'block' : 'none';
+}
+
+function hasNextWaitingForMe() {
+  return queue.some(function (q) {
+    return q.status === 'waiting' && (!q.barber_id || q.barber_id === activeBarberId);
+  });
+}
+
+function saveExtras(id) {
+  var ids = Array.prototype.map.call(
+    document.querySelectorAll('#extras-picker input[type="checkbox"]:checked'),
+    function (c) { return c.value; }
+  );
+
+  var cur = myActive();
+  var isAdding = cur && ids.length > cur.extras.length;
+  if (isAdding && hasNextWaitingForMe()) {
+    extrasPickerOpen = false;
+    if (document.activeElement) document.activeElement.blur();
+    renderActive(true);
+    toast('Un client attend déjà son tour — ajouter un supplément le retarderait.', true);
+    return;
+  }
+
+  barberApi('/api/queue/' + id, { method: 'PUT', body: { extras: ids } })
+    .then(function () {
+      extrasPickerOpen = false;
+      if (document.activeElement) document.activeElement.blur();
+      renderActive(true);
+      toast('Suppléments mis à jour');
+      return refreshTimer();
+    })
+    .catch(function (e) {
+      extrasPickerOpen = false;
+      if (document.activeElement) document.activeElement.blur();
+      renderActive(true);
+      toast(e.message, true);
+    });
+}
+
+function saveNote(id) {
+  var note = document.getElementById('client-note').value;
+  barberApi('/api/queue/' + id + '/note', { method: 'PUT', body: { note: note } })
+    .then(function () { toast('Note enregistrée'); })
+    .catch(function (e) { toast(e.message, true); });
+}
+
+function renderNext() {
+  var zone = document.getElementById('next-zone');
+  if (!zone) return;
+  if (myActive()) {
+    zone.innerHTML = '<div class="empty">Terminez la coupe en cours pour passer à la suivante</div>';
+    return;
+  }
+
+  var userIsEditing = zone.contains(document.activeElement) && document.activeElement !== document.body;
+  if (userIsEditing && zone.children.length) return;
+
+  var mine = queue.filter(function (q) {
+    return q.status === 'waiting' && (q.barber_id === activeBarberId || !q.barber_id);
+  }).sort(function (a, b) { return new Date(a.checkin_at) - new Date(b.checkin_at); });
+
+  if (mine.length === 0) {
+    zone.innerHTML = '<div class="empty">Personne en attente pour ce coiffeur pour le moment</div>';
+    return;
+  }
+
+  zone.innerHTML = mine.map(function (q, i) {
+    var isAppointmentNotYet = Boolean(q.is_appointment) && new Date(q.checkin_at) > new Date();
+    var locked = i > 0 || isAppointmentNotYet;
+    var detail = q.service.name + (q.extras.length ? ' + ' + q.extras.map(function (x) { return x.name; }).join(', ') : '');
+    var open = Boolean(nextDetailOpen[q.id]);
+    var minutesUntil = isAppointmentNotYet ? Math.round((new Date(q.checkin_at) - new Date()) / 60000) : null;
+    var prepAlert = isAppointmentNotYet && rdvPrepAlertMin > 0 && minutesUntil <= rdvPrepAlertMin;
+    var lockNote = isAppointmentNotYet
+      ? (prepAlert ? '⏰ Préparez-vous — RDV dans ' + Math.max(minutesUntil, 0) + ' min' : 'RDV à ' + new Date(q.checkin_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }))
+      : 'En attente de son tour';
+    var appointmentBadge = (q.is_appointment && !isAppointmentNotYet)
+      ? '<div class="meta" style="color:var(--blue)">📅 RDV ' + new Date(q.checkin_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) + '</div>'
+      : '';
+    return '<div class="next-item" data-id="' + q.id + '">' +
+      '<div class="next-card' + (locked ? ' locked' : '') + (prepAlert ? ' prep-alert' : '') + '">' +
+        '<div class="next-info" onclick="toggleNextDetail(\'' + q.id + '\')">' +
+          '<div class="name">' + esc(q.client_name) + '</div>' +
+          '<div class="meta">' + esc(detail) + '</div>' +
+          appointmentBadge +
+          (q.gift_card ? giftBadgeHtml(q.gift_card) : '') +
+          (locked ? '<div class="lock-note' + (prepAlert ? ' prep-alert-note' : '') + '">' + lockNote + '</div>' : '') +
+        '</div>' +
+        '<div class="next-btns">' +
+          (locked ? '' : '<button class="btn btn-primary" onclick="startMine(\'' + q.id + '\')">Commencer</button>') +
+          '<button class="btn btn-outline-red" onclick="cancelMine(\'' + q.id + '\')">Absent</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="next-detail" id="next-detail-' + q.id + '" style="display:' + (open ? 'block' : 'none') + '">' +
+        '<div class="detail-row"><span class="detail-label">Client</span><span class="detail-value">' + esc(q.client_name) + '</span></div>' +
+        (q.email ? '<div class="detail-row"><span class="detail-label">Email</span><span class="detail-value">' + esc(q.email) + '</span></div>' : '') +
+        (q.phone ? '<div class="detail-row"><span class="detail-label">Téléphone</span><span class="detail-value">' + esc(q.phone) + '</span></div>' : '') +
+        (q.gift_card ? giftDetailHtml(q.gift_card) : '') +
+        '<label>Note sur ce client</label>' +
+        '<textarea id="next-note-' + q.id + '" rows="2" placeholder="Ex: préfère dégradé américain, allergie...">' + esc(q.note || '') + '</textarea>' +
+        '<button class="btn btn-soft" onclick="saveNextNote(\'' + q.id + '\')">Enregistrer la note</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function giftBadgeHtml(gift) {
+  var productNames = gift.items
+    .filter(function (it) { return it.item_type === 'product'; })
+    .map(function (it) { return (it.quantity > 1 ? it.quantity + ' × ' : '') + it.item_name; })
+    .join(', ');
+  var label = productNames ? '🎁 Cadeau — à remettre : ' + esc(productNames) : '🎁 Cadeau';
+  return '<div class="meta" style="color:var(--green)">' + label + '</div>';
+}
+
+function giftDetailHtml(gift) {
+  var itemsList = gift.items.map(function (it) { return it.quantity + ' × ' + esc(it.item_name); }).join(', ');
+  return '<div class="detail-row" style="flex-direction:column;align-items:flex-start;gap:4px">' +
+    '<span class="detail-label" style="color:var(--green)">🎁 Cadeau (' + eur(gift.amount_cents) + ')</span>' +
+    '<span class="detail-value" style="font-weight:400">' + itemsList + '</span>' +
+    '</div>';
+}
+
+function toggleNextDetail(id) {
+  nextDetailOpen[id] = !nextDetailOpen[id];
+  var el = document.getElementById('next-detail-' + id);
+  if (el) el.style.display = nextDetailOpen[id] ? 'block' : 'none';
+}
+
+function saveNextNote(id) {
+  var note = document.getElementById('next-note-' + id).value;
+  barberApi('/api/queue/' + id + '/note', { method: 'PUT', body: { note: note } })
+    .then(function () { toast('Note enregistrée'); })
+    .catch(function (e) { toast(e.message, true); });
+}
+
+function cancelMine(id) {
+  var q = queue.find(function (x) { return x.id === id; });
+  var name = q ? q.client_name : 'ce client';
+  showConfirm('Marquer ' + name + ' comme absent ? Il sera retiré de la file.', { title: 'Client absent', danger: true, confirmLabel: 'Marquer absent' })
+    .then(function (ok) {
+      if (!ok) return;
+      barberApi('/api/queue/' + id + '/cancel', { method: 'POST', body: {} })
+        .then(refreshTimer)
+        .then(function () { toast('Client marqué absent'); })
+        .catch(function (e) { toast(e.message, true); });
+    });
+}
+
+function startMine(id) {
+  extrasPickerOpen = false;
+  barberApi('/api/queue/' + id + '/start', { method: 'POST', body: { barber_id: activeBarberId } })
+    .then(refreshTimer)
+    .catch(function (e) { toast(e.message, true); });
+}
+
+function finishMine(id) {
+  extrasPickerOpen = false;
+  var cur = queue.find(function (q) { return q.id === id; });
+  barberApi('/api/queue/' + id + '/finish', { method: 'POST', body: {} })
+    .then(function () {
+      if (cur && cur.gift_card) {
+        toast('Coupe terminée — ' + cur.client_name + ' a un cadeau à récupérer, direction la caisse');
+      } else {
+        toast('Coupe terminée — envoyez le client à la caisse');
+      }
+      return refreshTimer();
+    })
+    .catch(function (e) { toast(e.message, true); });
 }
 
 function loadInactivitySetting() {
