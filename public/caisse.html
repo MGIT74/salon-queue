@@ -145,6 +145,68 @@
   .lock-note { font-size: 12px; color: var(--orange); margin-top: 4px; }
   .lock-note.prep-alert-note { font-weight: 700; }
 
+  /* --- Onglet Agenda : calendrier (repris de "Mon poste") --- */
+  .cal-nav { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+  .cal-nav-row1 { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .cal-nav-row1 .cal-month-label { flex: 1; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cal-nav-row2 { display: flex; justify-content: center; }
+  .cal-month-label { font-size: 16px; font-weight: 600; letter-spacing: -.02em; text-transform: capitalize; }
+  .cal-view-switch { display: flex; background: var(--fill); border-radius: 10px; padding: 3px; gap: 2px; }
+  .cal-view-switch button {
+    border: none; background: none; color: var(--grey); font-family: inherit; font-size: 13px; font-weight: 600;
+    padding: 7px 14px; border-radius: 8px; cursor: pointer;
+  }
+  .cal-view-switch button.on { background: var(--blue); color: #fff; }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  .cal-week-row { margin-bottom: 4px; }
+  .cal-expand-panel { background: var(--fill); border-radius: 14px; padding: 16px 18px; margin: 6px 0 10px; }
+  .cal-expand-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; font-size: 14.5px; text-transform: capitalize; }
+  .cal-weekday { text-align: center; font-size: 12px; color: var(--grey); font-weight: 600; padding: 6px 0 10px; }
+  .cal-day {
+    min-height: 56px; border-radius: 10px; background: var(--fill); cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+    padding: 6px 2px;
+  }
+  .cal-day.empty { background: none; cursor: default; }
+  .cal-day.today { box-shadow: inset 0 0 0 2px var(--blue); }
+  .cal-day.selected { background: var(--blue); }
+  .cal-day.selected .cal-day-num { color: #fff; }
+  .cal-day-num { font-size: 13px; font-weight: 600; }
+  .cal-dots { display: flex; gap: 2px; }
+  .cal-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--blue); }
+
+  /* --- Planning du jour (timeline), utilisée dans l'Agenda --- */
+  .timeline-scroll { overflow-x: auto; }
+  .timeline-inner { position: relative; min-width: 620px; }
+  .timeline-hours {
+    display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
+    padding-left: 110px; margin-bottom: 6px;
+  }
+  .timeline-hours span { font-size: 12px; color: var(--grey); }
+  .timeline-row { display: flex; align-items: center; min-height: 54px; border-top: 1px solid var(--sep); }
+  .timeline-row:first-child { border-top: none; }
+  .timeline-row-label { width: 110px; flex-shrink: 0; display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13px; padding-right: 8px; }
+  .timeline-row-label .dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .timeline-row-track { position: relative; flex: 1; height: 40px; }
+  .timeline-block {
+    position: absolute; top: 3px; bottom: 3px; border-radius: 8px; padding: 4px 10px;
+    font-size: 12.5px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis; cursor: pointer; display: flex; align-items: center;
+  }
+  .timeline-now-line {
+    position: absolute; top: 0; bottom: 0; width: 2px; background: var(--accent, var(--blue));
+    pointer-events: none; z-index: 5;
+  }
+  .timeline-now-line::before {
+    content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+    border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 7px solid var(--accent, var(--blue));
+  }
+  .timeline-now-line::after {
+    content: ''; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+    border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 7px solid var(--accent, var(--blue));
+  }
+  .timeline-empty { padding: 20px 0; text-align: center; color: var(--grey); font-size: 14px; }
+
   .caisse-layout {
     display: grid; gap: 18px; align-items: start;
     grid-template-columns: 1fr 340px;
@@ -342,7 +404,26 @@
     </div>
 
     <div class="caisse-tab-panel" id="panel-agenda">
-      <p class="hint" style="text-align:center;padding:40px 0">Agenda — à venir (étape 4)</p>
+      <div class="cal-nav">
+        <div class="cal-nav-row1">
+          <button class="btn btn-soft" onclick="calShiftPeriod(-1)">‹</button>
+          <div class="cal-month-label" id="cal-month-label"></div>
+          <button class="btn btn-soft" onclick="calShiftPeriod(1)">›</button>
+        </div>
+        <div class="cal-nav-row2">
+          <div class="cal-view-switch">
+            <button id="cal-view-month" class="on" onclick="setCalView('month')">Mois</button>
+            <button id="cal-view-week" onclick="setCalView('week')">Semaine</button>
+            <button id="cal-view-day" onclick="setCalView('day')">Jour</button>
+          </div>
+        </div>
+      </div>
+      <div class="cal-grid" id="cal-weekdays">
+        <div class="cal-weekday">Lun</div><div class="cal-weekday">Mar</div><div class="cal-weekday">Mer</div>
+        <div class="cal-weekday">Jeu</div><div class="cal-weekday">Ven</div><div class="cal-weekday">Sam</div><div class="cal-weekday">Dim</div>
+      </div>
+      <div id="cal-days"></div>
+      <div id="cal-day-view" style="display:none"></div>
     </div>
 
     <div class="caisse-tab-panel on" id="panel-caisse">
@@ -613,8 +694,13 @@ function switchCaisseTab(tab) {
     document.getElementById('panel-' + t).classList.toggle('on', t === tab);
     document.getElementById('nav-' + t).classList.toggle('on', t === tab);
   });
-  if (tab === 'timer') startTimerAutoRefresh();
-  else stopTimerAutoRefresh();
+  if (tab === 'timer') startTimerAutoRefresh(); else stopTimerAutoRefresh();
+  if (tab === 'agenda') {
+    startAgendaAutoRefresh();
+    if (!calBooted) { calBooted = true; loadAgendaPeriod(); }
+  } else {
+    stopAgendaAutoRefresh();
+  }
 }
 
 /**
@@ -651,14 +737,21 @@ function renderBarberBubbles() {
 }
 
 function selectActiveBarber(barberId) {
-  if (barberId === activeBarberId) return;
-  activeBarberId = barberId;
+  // Recliquer sur la bulle déjà active la désélectionne (mode "tout le
+  // monde", utile pour l'Agenda) - Timer/Caisse retombent alors sur le
+  // coiffeur authentifié (voir barberApi : en-tête omis si vide).
+  activeBarberId = (barberId === activeBarberId) ? null : barberId;
   renderBarberBubbles();
   loadPendingPayments();
   extrasPickerOpen = false;
   nextDetailOpen = {};
   renderActive(true);
   renderNext();
+  if (calBooted) {
+    if (calViewMode === 'day') renderCalDay();
+    else if (calViewMode === 'month') renderCalMonth();
+    else renderCalWeek();
+  }
 }
 
 /* ---------- Onglet Timer (repris de "Mon poste", scopé au coiffeur actif) ---------- */
@@ -943,6 +1036,298 @@ function finishMine(id) {
       return refreshTimer();
     })
     .catch(function (e) { toast(e.message, true); });
+}
+
+/* ---------- Onglet Agenda : calendrier (repris de "Mon poste") + Planning du jour ---------- */
+var calAnchor = new Date();
+var calViewMode = 'month';
+var calMonthCache = {};
+var calSelectedDate = null;
+var calBooted = false;
+var calApptById = {};
+var monthNames = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+
+function ymd(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function monthKey(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
+function addDays(d, n) { var r = new Date(d); r.setDate(r.getDate() + n); return r; }
+function startOfWeek(d) { var day = (d.getDay() + 6) % 7; return addDays(d, -day); }
+
+function setCalView(mode) {
+  calViewMode = mode;
+  ['month', 'week', 'day'].forEach(function (m) { document.getElementById('cal-view-' + m).classList.toggle('on', m === mode); });
+  document.getElementById('cal-weekdays').style.display = mode === 'day' ? 'none' : 'grid';
+  document.getElementById('cal-days').style.display = mode === 'day' ? 'none' : 'grid';
+  document.getElementById('cal-day-view').style.display = mode === 'day' ? 'block' : 'none';
+  loadAgendaPeriod();
+}
+
+function calShiftPeriod(delta) {
+  if (calViewMode === 'month') calAnchor = new Date(calAnchor.getFullYear(), calAnchor.getMonth() + delta, 1);
+  else if (calViewMode === 'week') calAnchor = addDays(calAnchor, delta * 7);
+  else calAnchor = addDays(calAnchor, delta);
+  loadAgendaPeriod();
+}
+
+function neededMonthKeys() {
+  if (calViewMode !== 'week') return [monthKey(calAnchor)];
+  var start = startOfWeek(calAnchor);
+  var end = addDays(start, 6);
+  var keys = [monthKey(start), monthKey(end)];
+  return keys.filter(function (k, i) { return keys.indexOf(k) === i; });
+}
+
+function loadAgendaPeriod() {
+  var keys = neededMonthKeys();
+  var toFetch = keys.filter(function (k) { return !calMonthCache[k]; });
+  Promise.all(toFetch.map(function (k) {
+    return barberApi('/api/appointments?month=' + k + '&all=1&caisse_view=1').then(function (r) { calMonthCache[k] = r.items; });
+  })).then(function () {
+    if (calViewMode === 'month') renderCalMonth();
+    else if (calViewMode === 'week') renderCalWeek();
+    else renderCalDay();
+  }).catch(function (e) { toast(e.message, true); });
+}
+
+function apptsForRange(startDate, endDate) {
+  var startStr = ymd(startDate), endStr = ymd(endDate);
+  var all = [];
+  neededMonthKeys().forEach(function (k) { all = all.concat(calMonthCache[k] || []); });
+  return all.filter(function (a) {
+    var d = a.scheduled_at.slice(0, 10);
+    return d >= startStr && d <= endStr && a.status !== 'cancelled';
+  });
+}
+
+function renderCalMonth() {
+  document.getElementById('cal-month-label').textContent = monthNames[calAnchor.getMonth()] + ' ' + calAnchor.getFullYear();
+
+  var firstDay = new Date(calAnchor.getFullYear(), calAnchor.getMonth(), 1);
+  var daysInMonth = new Date(calAnchor.getFullYear(), calAnchor.getMonth() + 1, 0).getDate();
+  var startOffset = (firstDay.getDay() + 6) % 7;
+
+  var monthAppts = apptsForRange(firstDay, new Date(calAnchor.getFullYear(), calAnchor.getMonth(), daysInMonth));
+  var byDay = {};
+  monthAppts.forEach(function (a) {
+    var d = a.scheduled_at.slice(0, 10);
+    if (!byDay[d]) byDay[d] = [];
+    byDay[d].push(a);
+  });
+
+  var todayStr = ymd(new Date());
+  var dayCells = [];
+  for (var i = 0; i < startOffset; i++) dayCells.push(null);
+  for (var day = 1; day <= daysInMonth; day++) dayCells.push(day);
+  while (dayCells.length % 7 !== 0) dayCells.push(null);
+
+  var html = '';
+  for (var w = 0; w < dayCells.length; w += 7) {
+    var weekDays = dayCells.slice(w, w + 7);
+    var weekHtml = weekDays.map(function (d) {
+      if (d === null) return '<div class="cal-day empty"></div>';
+      var dateStr = calAnchor.getFullYear() + '-' + String(calAnchor.getMonth() + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+      var has = (byDay[dateStr] || []).length > 0;
+      var classes = 'cal-day' + (dateStr === todayStr ? ' today' : '') + (dateStr === calSelectedDate ? ' selected' : '');
+      return '<div class="' + classes + '" onclick="selectCalDay(\'' + dateStr + '\')">' +
+        '<div class="cal-day-num">' + d + '</div>' +
+        (has ? '<div class="cal-dots"><span class="cal-dot"></span></div>' : '') +
+        '</div>';
+    }).join('');
+
+    html += '<div class="cal-grid cal-week-row">' + weekHtml + '</div>';
+
+    var selectedInThisWeek = calSelectedDate && weekDays.some(function (d) {
+      if (d === null) return false;
+      var dateStr = calAnchor.getFullYear() + '-' + String(calAnchor.getMonth() + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+      return dateStr === calSelectedDate;
+    });
+    if (selectedInThisWeek) html += renderCalExpandPanel(calSelectedDate);
+  }
+  document.getElementById('cal-days').innerHTML = html;
+}
+
+function renderCalExpandPanel(dateStr) {
+  var when = new Date(dateStr + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' });
+  return '<div class="cal-expand-panel">' +
+    '<div class="cal-expand-head"><strong style="text-transform:capitalize">' + when + '</strong>' +
+    '<button class="btn btn-soft" onclick="event.stopPropagation();selectCalDay(null)">Fermer</button></div>' +
+    renderAgendaTimeline(dateStr) +
+    '</div>';
+}
+
+function renderCalWeek() {
+  var start = startOfWeek(calAnchor);
+  var end = addDays(start, 6);
+  document.getElementById('cal-month-label').textContent =
+    start.getDate() + ' ' + monthNames[start.getMonth()] + ' – ' + end.getDate() + ' ' + monthNames[end.getMonth()] + ' ' + end.getFullYear();
+
+  var weekAppts = apptsForRange(start, end);
+  var byDay = {};
+  weekAppts.forEach(function (a) {
+    var d = a.scheduled_at.slice(0, 10);
+    if (!byDay[d]) byDay[d] = [];
+    byDay[d].push(a);
+  });
+
+  var todayStr = ymd(new Date());
+  var cells = '';
+  for (var i = 0; i < 7; i++) {
+    var d = addDays(start, i);
+    var dateStr = ymd(d);
+    var has = (byDay[dateStr] || []).length > 0;
+    var classes = 'cal-day' + (dateStr === todayStr ? ' today' : '') + (dateStr === calSelectedDate ? ' selected' : '');
+    cells += '<div class="' + classes + '" onclick="selectCalDay(\'' + dateStr + '\')">' +
+      '<div class="cal-day-num">' + d.getDate() + '</div>' +
+      (has ? '<div class="cal-dots"><span class="cal-dot"></span></div>' : '') +
+      '</div>';
+  }
+
+  var html = '<div class="cal-grid cal-week-row">' + cells + '</div>';
+  if (calSelectedDate) html += renderCalExpandPanel(calSelectedDate);
+  document.getElementById('cal-days').innerHTML = html;
+}
+
+function renderCalDay() {
+  document.getElementById('cal-month-label').textContent =
+    calAnchor.toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+  document.getElementById('cal-day-view').innerHTML = renderAgendaTimeline(ymd(calAnchor));
+}
+
+function selectCalDay(dateStr) {
+  calSelectedDate = (!dateStr || dateStr === calSelectedDate) ? null : dateStr;
+  if (calViewMode === 'month') renderCalMonth();
+  else if (calViewMode === 'week') renderCalWeek();
+}
+
+/**
+ * Le "Planning du jour" (timeline par coiffeur, comme dans le dashboard),
+ * pour une date donnée - filtré au coiffeur actif si une bulle est
+ * sélectionnée, sinon tout le monde. Remplace la simple liste texte des
+ * RDV utilisée dans "Mon poste".
+ */
+function renderAgendaTimeline(dateStr) {
+  var d = new Date(dateStr + 'T00:00:00');
+  var appts = apptsForRange(d, d);
+  if (activeBarberId) appts = appts.filter(function (a) { return a.barber_id === activeBarberId; });
+  appts.forEach(function (a) { calApptById[a.id] = a; });
+
+  if (appts.length === 0) {
+    return '<div class="timeline-empty">' + (activeBarberId ? 'Aucun rendez-vous pour ce coiffeur ce jour-là' : 'Aucun rendez-vous ce jour-là') + '</div>';
+  }
+
+  function apptMinutes(a) {
+    var hm = a.scheduled_at.slice(11, 16).split(':');
+    return Number(hm[0]) * 60 + Number(hm[1]);
+  }
+
+  var starts = appts.map(apptMinutes);
+  var ends = appts.map(function (a) { return apptMinutes(a) + Math.max(a.duration_min || 30, 15); });
+  var rangeStart = Math.floor(Math.min.apply(null, starts) / 60) * 60;
+  var rangeEnd = Math.ceil(Math.max.apply(null, ends) / 60) * 60;
+  if (rangeEnd - rangeStart < 8 * 60) rangeEnd = rangeStart + 8 * 60;
+
+  var hourCount = (rangeEnd - rangeStart) / 60;
+  var hoursHtml = '';
+  for (var h = 0; h <= hourCount; h++) {
+    var totalMin = rangeStart + h * 60;
+    hoursHtml += '<span>' + String(Math.floor(totalMin / 60)).padStart(2, '0') + ':00</span>';
+  }
+
+  var byBarber = {};
+  appts.forEach(function (a) {
+    var key = a.barber_id || 'unassigned';
+    if (!byBarber[key]) byBarber[key] = { name: a.barber_name || 'Non assigné', items: [] };
+    byBarber[key].items.push(a);
+  });
+  var barberIds = Object.keys(byBarber).sort(function (x, y) { return byBarber[x].name.localeCompare(byBarber[y].name); });
+
+  var rowsHtml = barberIds.map(function (bid) {
+    var b = byBarber[bid];
+    var color = bid === 'unassigned' ? 'var(--grey)' : stableColorForId(bid);
+    var blocksHtml = b.items.map(function (a) {
+      var startMin = apptMinutes(a);
+      var dur = Math.max(a.duration_min || 30, 15);
+      var leftPct = ((startMin - rangeStart) / (rangeEnd - rangeStart)) * 100;
+      var widthPct = (dur / (rangeEnd - rangeStart)) * 100;
+      var time = a.scheduled_at.slice(11, 16);
+      return '<div class="timeline-block" style="left:' + leftPct + '%;width:' + widthPct + '%;background:' + color + '" ' +
+        'title="' + esc(time + ' — ' + a.client_name + ' — ' + (a.service_name || '')) + '" ' +
+        'onclick="openAgendaClientDrawer(\'' + a.id + '\')">' + esc(a.client_name) + '</div>';
+    }).join('');
+    return '<div class="timeline-row">' +
+      '<div class="timeline-row-label"><span class="dot" style="background:' + color + '"></span>' + esc(b.name) + '</div>' +
+      '<div class="timeline-row-track">' + blocksHtml + '</div>' +
+      '</div>';
+  }).join('');
+
+  var nowLineHtml = '';
+  if (dateStr === ymd(new Date())) {
+    var now = new Date();
+    var nowMin = now.getHours() * 60 + now.getMinutes();
+    if (nowMin >= rangeStart && nowMin <= rangeEnd) {
+      var leftFrac = (nowMin - rangeStart) / (rangeEnd - rangeStart);
+      nowLineHtml = '<div class="timeline-now-line" style="left: calc(110px + (100% - 110px) * ' + leftFrac + ')"></div>';
+    }
+  }
+
+  return '<div class="timeline-scroll"><div class="timeline-inner">' +
+    '<div class="timeline-hours" style="grid-template-columns:repeat(' + hourCount + ',1fr)">' + hoursHtml + '</div>' +
+    rowsHtml + nowLineHtml +
+    '</div></div>';
+}
+
+function openAgendaClientDrawer(id) {
+  var a = calApptById[id];
+  if (!a) return;
+
+  var when = new Date(a.scheduled_at.replace(' ', 'T')).toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' }) +
+    ' à ' + a.scheduled_at.slice(11, 16);
+
+  var overlay = _buildModal(
+    '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px">' +
+    '<div class="modal-title" style="margin-bottom:0">' + esc(a.client_name) + '</div>' +
+    '<button id="acd-close-x" style="background:var(--fill);border:none;width:30px;height:30px;border-radius:50%;color:var(--grey);font-size:14px;cursor:pointer;flex-shrink:0;margin-left:10px">✕</button>' +
+    '</div>' +
+    '<div class="detail-row"><span class="detail-label">Quand</span><span class="detail-value" style="text-transform:capitalize">' + when + '</span></div>' +
+    '<div class="detail-row"><span class="detail-label">Coiffeur</span><span class="detail-value">' + esc(a.barber_name || 'Non assigné') + '</span></div>' +
+    '<div class="detail-row"><span class="detail-label">Prestation</span><span class="detail-value">' + esc(a.service_name) + '</span></div>' +
+    (a.email ? '<div class="detail-row"><span class="detail-label">Email</span><span class="detail-value">' + esc(a.email) + '</span></div>' : '') +
+    (a.phone ? '<div class="detail-row"><span class="detail-label">Téléphone</span><span class="detail-value">' + esc(a.phone) + '</span></div>' : '') +
+    (a.client_note ? '<div class="detail-row" style="flex-direction:column;align-items:flex-start;gap:2px"><span class="detail-label">📝 Note du client (RDV)</span><span class="detail-value" style="font-weight:400">' + esc(a.client_note) + '</span></div>' : '') +
+    '<div style="margin-top:14px">' +
+      '<label style="display:block;font-size:12.5px;font-weight:600;color:var(--grey);margin-bottom:6px">Note interne</label>' +
+      (a.promoted_queue_id
+        ? '<textarea id="acd-note" rows="2" style="width:100%;padding:11px 13px;border:none;border-radius:10px;background:var(--fill);color:var(--ink);font-family:inherit;font-size:14px;resize:vertical;margin-bottom:8px">' + esc(a.note || '') + '</textarea>' +
+          '<button class="btn btn-soft" id="acd-save-note-btn" style="width:100%">Enregistrer la note</button>'
+        : '<p class="hint" style="margin:0">Pas encore modifiable — ce RDV entrera dans la file le jour même.</p>') +
+    '</div>'
+  );
+
+  overlay.querySelector('#acd-close-x').onclick = function () { _closeModal(overlay); };
+
+  var saveBtn = overlay.querySelector('#acd-save-note-btn');
+  if (saveBtn) {
+    saveBtn.onclick = function () {
+      var note = overlay.querySelector('#acd-note').value;
+      barberApi('/api/queue/' + a.promoted_queue_id + '/note', { method: 'PUT', body: { note: note } })
+        .then(function () { a.note = note; toast('Note enregistrée'); })
+        .catch(function (e) { toast(e.message, true); });
+    };
+  }
+}
+
+var agendaNowLineTimer = null;
+
+function startAgendaAutoRefresh() {
+  stopAgendaAutoRefresh();
+  agendaNowLineTimer = setInterval(function () {
+    if (calViewMode === 'day') renderCalDay();
+    else if (calSelectedDate) { if (calViewMode === 'month') renderCalMonth(); else renderCalWeek(); }
+  }, 30000);
+}
+
+function stopAgendaAutoRefresh() {
+  if (agendaNowLineTimer) clearInterval(agendaNowLineTimer);
+  agendaNowLineTimer = null;
 }
 
 function loadInactivitySetting() {
