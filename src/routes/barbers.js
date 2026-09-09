@@ -287,9 +287,24 @@ router.get('/:id/stats', requireAdmin, wrap(async (req, res) => {
     [req.params.id, req.salon.id, startSql, endSql]
   );
 
+  // Produits vendus attribués à CE coiffeur (vendeur de la ligne, ou à
+  // défaut le coiffeur de toute la vente) - séparé du CA prestations
+  // car non lié au temps passé, ne doit jamais fausser le calcul de
+  // revenu potentiel par minute libre ci-dessous.
+  const [[productRow]] = await pool.query(
+    `SELECT COUNT(*) AS product_count, COALESCE(SUM(si.unit_price_cents * si.quantity), 0) AS product_revenue_cents
+     FROM sale_items si JOIN sales s ON s.id = si.sale_id
+     WHERE s.salon_id = ? AND si.item_type = 'product'
+       AND COALESCE(si.barber_id, s.barber_id) = ?
+       AND s.created_at >= ? AND s.created_at < ?`,
+    [req.salon.id, req.params.id, startSql, endSql]
+  );
+
   const doneCount = Number(row.done_count);
   const revenueCents = Number(row.revenue_cents);
   const bookedMinutes = Number(row.booked_minutes);
+  const productCount = Number(productRow.product_count);
+  const productRevenueCents = Number(productRow.product_revenue_cents);
 
   // Calcul des créneaux disponibles/libres : nécessite les dates
   // locales de salon en jours calendaires précis (start_date/end_date,
@@ -361,7 +376,14 @@ router.get('/:id/stats', requireAdmin, wrap(async (req, res) => {
   }
 
   res.json(Object.assign(
-    { ok: true, done_count: doneCount, revenue_cents: revenueCents, booked_minutes: bookedMinutes },
+    {
+      ok: true, done_count: doneCount,
+      revenue_cents: revenueCents + productRevenueCents,
+      service_revenue_cents: revenueCents,
+      product_count: productCount,
+      product_revenue_cents: productRevenueCents,
+      booked_minutes: bookedMinutes
+    },
     availability ? { availability: availability } : {}
   ));
 }));

@@ -405,25 +405,67 @@ router.get('/salons/:id/revenue', requireAutomationKey, wrap(async (req, res) =>
     [salonId, start + ' 00:00:00', end + ' 23:59:59']
   );
 
-  const [byBarber] = await pool.query(
-    `SELECT b.name AS barber_name, COUNT(*) AS done_count, COALESCE(SUM(q.total_price_cents), 0) AS revenue_cents
+  const [byBarberServices] = await pool.query(
+    `SELECT q.barber_id, b.name AS barber_name, COUNT(*) AS done_count, COALESCE(SUM(q.total_price_cents), 0) AS revenue_cents
      FROM queue q LEFT JOIN barbers b ON b.id = q.barber_id
      WHERE q.salon_id = ? AND q.status = 'done' AND q.end_at BETWEEN ? AND ?
-     GROUP BY q.barber_id, b.name
-     ORDER BY revenue_cents DESC`,
+     GROUP BY q.barber_id, b.name`,
     [salonId, start + ' 00:00:00', end + ' 23:59:59']
   );
+
+  // Produits vendus (vendeur de la ligne, ou à défaut le coiffeur de
+  // toute la vente) - séparé des prestations ci-dessus, puis fusionné
+  // par coiffeur juste en dessous, pour ne rien compter deux fois.
+  const [byBarberProducts] = await pool.query(
+    `SELECT COALESCE(si.barber_id, s.barber_id) AS barber_id, b.name AS barber_name,
+            COUNT(*) AS product_count, COALESCE(SUM(si.unit_price_cents * si.quantity), 0) AS product_revenue_cents
+     FROM sale_items si JOIN sales s ON s.id = si.sale_id
+     LEFT JOIN barbers b ON b.id = COALESCE(si.barber_id, s.barber_id)
+     WHERE s.salon_id = ? AND si.item_type = 'product' AND s.created_at BETWEEN ? AND ?
+     GROUP BY COALESCE(si.barber_id, s.barber_id), b.name`,
+    [salonId, start + ' 00:00:00', end + ' 23:59:59']
+  );
+
+  const byBarberMap = new Map();
+  byBarberServices.forEach((r) => {
+    byBarberMap.set(r.barber_id, {
+      barber_name: r.barber_name || 'Non assigné',
+      services_count: Number(r.done_count),
+      service_revenue_cents: Number(r.revenue_cents),
+      product_count: 0,
+      product_revenue_cents: 0
+    });
+  });
+  byBarberProducts.forEach((r) => {
+    const entry = byBarberMap.get(r.barber_id) || {
+      barber_name: r.barber_name || 'Non assigné',
+      services_count: 0, service_revenue_cents: 0,
+      product_count: 0, product_revenue_cents: 0
+    };
+    entry.product_count = Number(r.product_count);
+    entry.product_revenue_cents = Number(r.product_revenue_cents);
+    byBarberMap.set(r.barber_id, entry);
+  });
+
+  const byBarber = [...byBarberMap.values()].sort((a, b) =>
+    (b.service_revenue_cents + b.product_revenue_cents) - (a.service_revenue_cents + a.product_revenue_cents)
+  );
+
+  const totalProductRevenueCents = byBarberProducts.reduce((sum, r) => sum + Number(r.product_revenue_cents), 0);
 
   res.json({
     ok: true,
     start,
     end,
-    total_revenue_euros: totalRow.revenue_cents / 100,
+    total_revenue_euros: (Number(totalRow.revenue_cents) + totalProductRevenueCents) / 100,
     total_services: Number(totalRow.done_count),
     by_barber: byBarber.map((r) => ({
-      barber_name: r.barber_name || 'Non assigné',
-      services_count: Number(r.done_count),
-      revenue_euros: r.revenue_cents / 100
+      barber_name: r.barber_name,
+      services_count: r.services_count,
+      service_revenue_euros: r.service_revenue_cents / 100,
+      product_count: r.product_count,
+      product_revenue_euros: r.product_revenue_cents / 100,
+      revenue_euros: (r.service_revenue_cents + r.product_revenue_cents) / 100
     }))
   });
 }));
