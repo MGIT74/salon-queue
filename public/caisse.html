@@ -1216,6 +1216,10 @@ function renderCalDay() {
 
 function selectCalDay(dateStr) {
   calSelectedDate = (!dateStr || dateStr === calSelectedDate) ? null : dateStr;
+  // calAnchor doit suivre la sélection, sinon passer ensuite en vue
+  // "Jour" affiche une date au hasard (celle où calAnchor était resté)
+  // au lieu du jour qu'on vient de choisir.
+  if (calSelectedDate) calAnchor = new Date(calSelectedDate + 'T00:00:00');
   if (calViewMode === 'month') renderCalMonth();
   else if (calViewMode === 'week') renderCalWeek();
 }
