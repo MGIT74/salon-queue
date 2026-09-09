@@ -1222,6 +1222,53 @@
     </div>
 
     <div class="card-box">
+      <h3>Informations légales</h3>
+      <p class="hint">
+        Affichées sur les tickets de caisse imprimés, comme l'exige la loi anti-fraude TVA. Le SIRET a déjà été
+        renseigné à la création du compte ; les autres champs sont à compléter ici.
+      </p>
+      <div class="fld"><label for="set-legal-address">Adresse complète</label>
+        <textarea id="set-legal-address" rows="2" placeholder="46 rue René Nicod, 01100 Oyonnax, France"></textarea>
+      </div>
+      <div class="fld"><label for="set-legal-phone">Téléphone</label>
+        <input id="set-legal-phone" type="text" placeholder="09 52 62 93 52"></div>
+      <div class="fld"><label for="set-legal-email">Email de contact</label>
+        <input id="set-legal-email" type="email" placeholder="contact@monsalon.com"></div>
+      <div class="fld"><label for="set-legal-website">Site web</label>
+        <input id="set-legal-website" type="text" placeholder="https://monsalon.com"></div>
+      <div class="fld"><label for="set-legal-siret">Numéro SIRET</label>
+        <input id="set-legal-siret" type="text" inputmode="numeric" maxlength="14" placeholder="14 chiffres"></div>
+      <div class="fld"><label for="set-legal-vat">Numéro de TVA intracommunautaire</label>
+        <input id="set-legal-vat" type="text" placeholder="Laisser vide si non assujetti à la TVA"></div>
+      <div class="fld"><label for="set-legal-form">Forme juridique</label>
+        <input id="set-legal-form" type="text" placeholder="SASU, SARL, EI..."></div>
+      <div class="fld"><label for="set-legal-capital">Capital social (si société)</label>
+        <input id="set-legal-capital" type="text" placeholder="1000"></div>
+      <div class="fld"><label for="set-legal-rcs">Ville d'immatriculation RCS</label>
+        <input id="set-legal-rcs" type="text" placeholder="Bourg-En-Bresse"></div>
+      <div class="fld"><label for="set-legal-naf">Code NAF / APE</label>
+        <input id="set-legal-naf" type="text" placeholder="9602A"></div>
+      <div class="fld"><label for="set-legal-register">Numéro de caisse</label>
+        <input id="set-legal-register" type="text" placeholder="1"></div>
+      <button class="btn btn-primary" style="margin-top:6px" onclick="saveLegalInfo()">Enregistrer</button>
+    </div>
+
+    <div class="card-box">
+      <h3>TVA</h3>
+      <p class="hint">
+        Un taux différent est possible pour chaque catégorie d'article, appliqué à tous ses articles pour le
+        calcul du détail HT/TVA sur le ticket de caisse. Laisser vide si non assujetti à la TVA.
+      </p>
+      <div class="fld"><label for="set-vat-service">Prestations (%)</label>
+        <input id="set-vat-service" type="number" min="0" max="100" step="0.1" placeholder="20"></div>
+      <div class="fld"><label for="set-vat-extra">Suppléments (%)</label>
+        <input id="set-vat-extra" type="number" min="0" max="100" step="0.1" placeholder="20"></div>
+      <div class="fld"><label for="set-vat-product">Produits (%)</label>
+        <input id="set-vat-product" type="number" min="0" max="100" step="0.1" placeholder="20"></div>
+      <button class="btn btn-primary" style="margin-top:6px" onclick="saveVatRates()">Enregistrer</button>
+    </div>
+
+    <div class="card-box">
       <h3 class="accordion-head" onclick="toggleSettingsAccordion('salon-calendar')">
         Calendrier
         <svg class="accordion-chevron" id="salon-calendar-chevron" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
@@ -5127,10 +5174,52 @@ function loadSettings() {
     document.getElementById('set-from').value = s.smtp_from || '';
     document.getElementById('set-pass').value = '';
     document.getElementById('pass-state').textContent = r.smtp_pass_set ? '· déjà enregistré' : '';
+    document.getElementById('set-legal-address').value = s.legal_address || '';
+    document.getElementById('set-legal-phone').value = s.legal_phone || '';
+    document.getElementById('set-legal-email').value = s.legal_email || '';
+    document.getElementById('set-legal-website').value = s.legal_website || '';
+    document.getElementById('set-legal-siret').value = s.legal_siret || '';
+    document.getElementById('set-legal-vat').value = s.legal_vat_number || '';
+    document.getElementById('set-legal-form').value = s.legal_form || '';
+    document.getElementById('set-legal-capital').value = s.legal_share_capital || '';
+    document.getElementById('set-legal-rcs').value = s.legal_rcs_city || '';
+    document.getElementById('set-legal-naf').value = s.legal_naf_code || '';
+    document.getElementById('set-legal-register').value = s.legal_register_number || '';
+    document.getElementById('set-vat-service').value = s.vat_rate_service || '';
+    document.getElementById('set-vat-extra').value = s.vat_rate_extra || '';
+    document.getElementById('set-vat-product').value = s.vat_rate_product || '';
   }).catch(function (e) { toast(e.message, true); });
 
   loadSalonSchedule();
   loadSalonClosures();
+}
+
+function saveLegalInfo() {
+  var siret = document.getElementById('set-legal-siret').value.replace(/\s/g, '').trim();
+  if (siret && !/^\d{14}$/.test(siret)) { toast('Le SIRET doit comporter exactement 14 chiffres', true); return; }
+  api('/api/settings', { method: 'PUT', body: {
+    legal_address: document.getElementById('set-legal-address').value,
+    legal_phone: document.getElementById('set-legal-phone').value,
+    legal_email: document.getElementById('set-legal-email').value,
+    legal_website: document.getElementById('set-legal-website').value,
+    legal_siret: siret,
+    legal_vat_number: document.getElementById('set-legal-vat').value,
+    legal_form: document.getElementById('set-legal-form').value,
+    legal_share_capital: document.getElementById('set-legal-capital').value,
+    legal_rcs_city: document.getElementById('set-legal-rcs').value,
+    legal_naf_code: document.getElementById('set-legal-naf').value,
+    legal_register_number: document.getElementById('set-legal-register').value
+  }}).then(function () { toast('Informations légales enregistrées'); })
+    .catch(function (e) { toast(e.message, true); });
+}
+
+function saveVatRates() {
+  api('/api/settings', { method: 'PUT', body: {
+    vat_rate_service: document.getElementById('set-vat-service').value,
+    vat_rate_extra: document.getElementById('set-vat-extra').value,
+    vat_rate_product: document.getElementById('set-vat-product').value
+  }}).then(function () { toast('Taux de TVA enregistrés'); })
+    .catch(function (e) { toast(e.message, true); });
 }
 
 function toggleSettingsAccordion(key) {
