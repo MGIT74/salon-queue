@@ -251,16 +251,17 @@ router.post('/:id/start', requireAdminOrBarber, wrap(async (req, res) => {
   );
   if (!row) return res.status(404).json({ error: 'Client introuvable' });
 
-  // Un coiffeur connecté par PIN (pas admin) ne peut agir qu'en son propre
-  // nom, et seulement sur un client déjà assigné à lui ou non-assigné —
+  // Un coiffeur connecté par PIN (pas admin) ne peut agir qu'au nom du
+  // coiffeur actif (bulle sélectionnée - lui-même par défaut), et
+  // seulement sur un client déjà assigné à ce coiffeur ou non-assigné —
   // jamais démarrer le client de quelqu'un d'autre.
-  if (req.barberId) {
-    if (row.barber_id && row.barber_id !== req.barberId) {
+  if (req.actingBarberId) {
+    if (row.barber_id && row.barber_id !== req.actingBarberId) {
       return res.status(403).json({ error: 'Ce client attend un autre coiffeur.' });
     }
   }
 
-  const barberId = req.barberId || req.body.barber_id || row.barber_id || null;
+  const barberId = req.actingBarberId || req.body.barber_id || row.barber_id || null;
 
   if (barberId) {
     const [[busy]] = await pool.query(
@@ -313,13 +314,13 @@ router.post('/:id/start', requireAdminOrBarber, wrap(async (req, res) => {
 }));
 
 router.post('/:id/finish', requireAdminOrBarber, wrap(async (req, res) => {
-  if (req.barberId) {
+  if (req.actingBarberId) {
     const [[row]] = await pool.query(
       'SELECT barber_id FROM queue WHERE id = ? AND salon_id = ?',
       [req.params.id, req.salon.id]
     );
     if (!row) return res.status(404).json({ error: 'Client introuvable' });
-    if (row.barber_id !== req.barberId) {
+    if (row.barber_id !== req.actingBarberId) {
       return res.status(403).json({ error: "Ce n'est pas votre client en cours." });
     }
   }
@@ -332,13 +333,13 @@ router.post('/:id/finish', requireAdminOrBarber, wrap(async (req, res) => {
 }));
 
 router.post('/:id/cancel', requireAdminOrBarber, wrap(async (req, res) => {
-  if (req.barberId) {
+  if (req.actingBarberId) {
     const [[row]] = await pool.query(
       'SELECT barber_id FROM queue WHERE id = ? AND salon_id = ?',
       [req.params.id, req.salon.id]
     );
     if (!row) return res.status(404).json({ error: 'Client introuvable' });
-    if (row.barber_id && row.barber_id !== req.barberId) {
+    if (row.barber_id && row.barber_id !== req.actingBarberId) {
       return res.status(403).json({ error: "Ce n'est pas votre client." });
     }
   }
@@ -358,7 +359,7 @@ router.put('/:id', requireAdminOrBarber, wrap(async (req, res) => {
   );
   if (!existing) return res.status(404).json({ error: 'Client introuvable' });
 
-  if (req.barberId && existing.barber_id !== req.barberId) {
+  if (req.actingBarberId && existing.barber_id !== req.actingBarberId) {
     return res.status(403).json({ error: "Ce n'est pas votre client." });
   }
 
@@ -368,7 +369,7 @@ router.put('/:id', requireAdminOrBarber, wrap(async (req, res) => {
   // s'il y a déjà quelqu'un qui attend son tour derrière lui — ça le
   // retarderait sans qu'il le sache à l'avance. On ne bloque que
   // l'AJOUT (la liste s'agrandit), pas le retrait d'un supplément.
-  if (req.barberId && Array.isArray(extras) && existing.status === 'in_progress') {
+  if (req.actingBarberId && Array.isArray(extras) && existing.status === 'in_progress') {
     const [[{ n: currentExtrasCount }]] = await pool.query(
       'SELECT COUNT(*) AS n FROM queue_extras WHERE queue_id = ?', [req.params.id]
     );
@@ -376,7 +377,7 @@ router.put('/:id', requireAdminOrBarber, wrap(async (req, res) => {
       const [[nextWaiting]] = await pool.query(
         `SELECT id FROM queue WHERE salon_id = ? AND status = 'waiting'
          AND (barber_id IS NULL OR barber_id = ?) LIMIT 1`,
-        [req.salon.id, req.barberId]
+        [req.salon.id, req.actingBarberId]
       );
       if (nextWaiting) {
         return res.status(409).json({
@@ -541,7 +542,7 @@ router.put('/:id/note', requireAdminOrBarber, wrap(async (req, res) => {
     [req.params.id, req.salon.id]
   );
   if (!row) return res.status(404).json({ error: 'Client introuvable' });
-  if (req.barberId && row.barber_id && row.barber_id !== req.barberId) {
+  if (req.actingBarberId && row.barber_id && row.barber_id !== req.actingBarberId) {
     return res.status(403).json({ error: "Ce n'est pas votre client." });
   }
 
