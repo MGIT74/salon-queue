@@ -498,11 +498,11 @@ router.post('/', wrap(async (req, res) => {
  */
 router.post('/admin-create', requireAdminOrBarber, wrap(async (req, res) => {
   const { client_name, email, phone, service_id, extras, date, time } = req.body;
-  // Un coiffeur connecté (PIN) ne peut créer un RDV que pour LUI-MÊME
-  // - le coiffeur envoyé dans le corps de la requête est ignoré dans
-  // ce cas, on force sa propre identité pour éviter qu'il n'en crée un
-  // pour un collègue. L'admin garde le choix libre du coiffeur.
-  const barber_id = req.barberId || req.body.barber_id;
+  // Un coiffeur connecté (PIN) ne peut créer un RDV que pour le coiffeur
+  // actif (lui-même par défaut, ou celui désigné par bulle depuis la
+  // caisse partagée) - le coiffeur envoyé dans le corps de la requête
+  // est ignoré dans ce cas. L'admin garde le choix libre du coiffeur.
+  const barber_id = req.actingBarberId || req.body.barber_id;
   const clientNote = req.body.client_note ? String(req.body.client_note).slice(0, 500) : null;
   if (!client_name) return res.status(400).json({ error: 'Le nom est requis' });
   if (!barber_id) return res.status(400).json({ error: 'Le coiffeur est requis' });
