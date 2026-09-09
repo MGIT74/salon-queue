@@ -298,27 +298,21 @@
   }
   .ticket-line .qty-val { font-size: 13px; min-width: 14px; text-align: center; }
   .ticket-line .line-price { font-size: 13.5px; font-weight: 600; flex-shrink: 0; min-width: 52px; text-align: right; }
-  .line-seller-wrap { position: relative; width: 26px; height: 26px; flex-shrink: 0; display: inline-block; }
   .line-seller-avatar {
     width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
     font-size: 11px; font-weight: 700; background-size: cover; background-position: center;
-    border: none; padding: 0; cursor: pointer; font-family: inherit;
+    border: none; padding: 0; cursor: pointer; font-family: inherit; flex-shrink: 0;
   }
-  .line-seller-popover {
-    position: absolute; top: 32px; left: 0; z-index: 40; min-width: 150px;
-    background: var(--card); border-radius: 12px; box-shadow: var(--shadow);
-    padding: 6px; display: none;
-  }
-  .line-seller-popover.on { display: block; }
+  .line-seller-options { display: flex; flex-direction: column; gap: 4px; }
   .line-seller-opt {
-    display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 10px;
-    background: none; border: none; border-radius: 8px; cursor: pointer;
-    font-family: inherit; font-size: 13px; color: var(--ink); text-align: left;
+    display: flex; align-items: center; gap: 10px; width: 100%; padding: 11px 12px;
+    background: var(--fill); border: none; border-radius: 10px; cursor: pointer;
+    font-family: inherit; font-size: 14px; color: var(--ink); text-align: left;
   }
-  .line-seller-opt:hover { background: var(--fill); }
-  .line-seller-opt .dot { width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; color: #fff; background-size: cover; background-position: center; }
-  .line-seller-opt.sel { font-weight: 600; }
-  .line-seller-opt.unassigned .dot { background: var(--fill); border: 1.5px dashed var(--grey); }
+  .line-seller-opt:hover { background: var(--sep); }
+  .line-seller-opt .dot { width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: #fff; background-size: cover; background-position: center; }
+  .line-seller-opt.sel { font-weight: 700; box-shadow: inset 0 0 0 2px var(--blue); }
+  .line-seller-opt.unassigned .dot { background: var(--card); border: 1.5px dashed var(--grey); color: var(--grey); }
   .ticket-total { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-top: 2px solid var(--sep); margin-bottom: 14px; }
   .ticket-total .label { font-size: 14px; color: var(--grey); }
   .ticket-total .amount { font-size: 24px; font-weight: 600; letter-spacing: -.02em; }
@@ -1967,36 +1961,36 @@ function lineSellerBubbleHtml(line, index) {
   var avatarStyle = seller && seller.photo_url
     ? 'background-image:url(\'' + seller.photo_url + '\')'
     : 'background:' + color + ';color:' + (seller ? '#fff' : 'var(--grey)');
+  return '<button type="button" class="line-seller-avatar" style="' + avatarStyle + '" title="Qui a vendu ce produit ?" onclick="openLineSellerModal(' + index + ')">' +
+    (seller && seller.photo_url ? '' : esc(initial)) +
+  '</button>';
+}
 
-  var options = '<button class="line-seller-opt unassigned' + (!line.barber_id ? ' sel' : '') + '" onclick="setLineSeller(' + index + ',null)">' +
+function openLineSellerModal(index) {
+  var line = ticket[index];
+  var options = '<button class="line-seller-opt unassigned' + (!line.barber_id ? ' sel' : '') + '" data-close-modal onclick="setLineSeller(' + index + ',null)">' +
     '<span class="dot">–</span>Non attribué</button>' +
     allBarbers.map(function (b) {
       var bColor = b.color || stableColorForId(b.id);
       var bInitial = (b.name || '?').trim().charAt(0).toUpperCase();
       var bStyle = b.photo_url ? 'background-image:url(\'' + b.photo_url + '\')' : 'background:' + bColor;
-      return '<button class="line-seller-opt' + (b.id === line.barber_id ? ' sel' : '') + '" onclick="setLineSeller(' + index + ',\'' + b.id + '\')">' +
+      return '<button class="line-seller-opt' + (b.id === line.barber_id ? ' sel' : '') + '" data-close-modal onclick="setLineSeller(' + index + ',\'' + b.id + '\')">' +
         '<span class="dot" style="' + bStyle + '">' + (b.photo_url ? '' : esc(bInitial)) + '</span>' + esc(b.name) +
         '</button>';
     }).join('');
 
-  return '<span class="line-seller-wrap">' +
-    '<button type="button" class="line-seller-avatar" style="' + avatarStyle + '" title="Qui a vendu ce produit ?" onclick="event.stopPropagation();toggleLineSellerPopover(' + index + ')">' +
-      (seller && seller.photo_url ? '' : esc(initial)) +
-    '</button>' +
-    '<div class="line-seller-popover" id="line-seller-popover-' + index + '">' + options + '</div>' +
-  '</span>';
+  var overlay = _buildModal(
+    '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px">' +
+    '<div class="modal-title" style="margin-bottom:0">Qui a vendu "' + esc(line.item_name) + '" ?</div>' +
+    '<button id="lsm-close-x" style="background:var(--fill);border:none;width:30px;height:30px;border-radius:50%;color:var(--grey);font-size:14px;cursor:pointer;flex-shrink:0;margin-left:10px">✕</button>' +
+    '</div>' +
+    '<div class="line-seller-options">' + options + '</div>'
+  );
+  overlay.querySelector('#lsm-close-x').onclick = function () { _closeModal(overlay); };
+  overlay.querySelectorAll('[data-close-modal]').forEach(function (btn) {
+    btn.addEventListener('click', function () { _closeModal(overlay); }, { once: true });
+  });
 }
-
-function toggleLineSellerPopover(index) {
-  var wasOpen = document.getElementById('line-seller-popover-' + index).classList.contains('on');
-  document.querySelectorAll('.line-seller-popover.on').forEach(function (p) { p.classList.remove('on'); });
-  if (!wasOpen) document.getElementById('line-seller-popover-' + index).classList.add('on');
-}
-
-document.addEventListener('click', function (e) {
-  if (e.target.closest('.line-seller-wrap')) return;
-  document.querySelectorAll('.line-seller-popover.on').forEach(function (p) { p.classList.remove('on'); });
-});
 
 function setLineSeller(index, barberId) {
   ticket[index].barber_id = barberId || null;
