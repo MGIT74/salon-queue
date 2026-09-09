@@ -106,11 +106,31 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
   const saleId = crypto.randomUUID();
   let total = 0;
 
+  // Un coiffeur "vendeur" par ligne n'a de sens que pour un produit
+  // (Barbe, Cire, Parfum...) - jamais pour une prestation/supplément,
+  // qui reste attribué à toute la vente (barberId ci-dessus). On
+  // valide que chaque id envoyé appartient bien à CE salon avant de
+  // l'utiliser, comme pour tout autre id de coiffeur dans l'app - sinon
+  // silencieusement ignoré (pas de blocage de la vente pour ça).
+  const lineBarberIds = [...new Set(
+    items.filter((it) => (it.item_type || 'product') === 'product' && it.barber_id).map((it) => it.barber_id)
+  )];
+  let validLineBarberIds = new Set();
+  if (lineBarberIds.length) {
+    const [rows] = await pool.query(
+      'SELECT id FROM barbers WHERE id IN (?) AND salon_id = ? AND active = 1',
+      [lineBarberIds, req.salon.id]
+    );
+    validLineBarberIds = new Set(rows.map((r) => r.id));
+  }
+
   const itemRows = items.map((it) => {
     const qty = Math.max(1, Number(it.quantity) || 1);
     const unitPrice = Math.max(0, Math.round(Number(it.unit_price_cents) || 0));
     total += qty * unitPrice;
-    return [crypto.randomUUID(), saleId, it.item_type || 'product', it.item_id || null, it.item_name || 'Article', unitPrice, qty];
+    const itemType = it.item_type || 'product';
+    const lineBarberId = itemType === 'product' && it.barber_id && validLineBarberIds.has(it.barber_id) ? it.barber_id : null;
+    return [crypto.randomUUID(), saleId, itemType, it.item_id || null, it.item_name || 'Article', unitPrice, qty, lineBarberId];
   });
 
   // Vérifie le stock AVANT toute écriture - jamais de vente créée si
@@ -139,7 +159,7 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
     [saleId, req.salon.id, barberId, payment_method, total]
   );
   await pool.query(
-    'INSERT INTO sale_items (id, sale_id, item_type, item_id, item_name, unit_price_cents, quantity) VALUES ?',
+    'INSERT INTO sale_items (id, sale_id, item_type, item_id, item_name, unit_price_cents, quantity, barber_id) VALUES ?',
     [itemRows]
   );
 
