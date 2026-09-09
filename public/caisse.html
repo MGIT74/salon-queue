@@ -303,16 +303,20 @@
     font-size: 11px; font-weight: 700; background-size: cover; background-position: center;
     border: none; padding: 0; cursor: pointer; font-family: inherit; flex-shrink: 0;
   }
-  .line-seller-options { display: flex; flex-direction: column; gap: 4px; }
+  .line-seller-options { display: flex; flex-wrap: wrap; gap: 14px; justify-content: center; padding: 4px 0; }
   .line-seller-opt {
-    display: flex; align-items: center; gap: 10px; width: 100%; padding: 11px 12px;
-    background: var(--fill); border: none; border-radius: 10px; cursor: pointer;
-    font-family: inherit; font-size: 14px; color: var(--ink); text-align: left;
+    display: flex; flex-direction: column; align-items: center; gap: 6px; width: 76px;
+    background: none; border: none; cursor: pointer; font-family: inherit; padding: 4px;
   }
-  .line-seller-opt:hover { background: var(--sep); }
-  .line-seller-opt .dot { width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: #fff; background-size: cover; background-position: center; }
-  .line-seller-opt.sel { font-weight: 700; box-shadow: inset 0 0 0 2px var(--blue); }
-  .line-seller-opt.unassigned .dot { background: var(--card); border: 1.5px dashed var(--grey); color: var(--grey); }
+  .line-seller-opt .dot {
+    width: 52px; height: 52px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 18px; font-weight: 700; color: #fff; background-size: cover; background-position: center;
+    border: 3px solid transparent; box-sizing: border-box;
+  }
+  .line-seller-opt .lbl { font-size: 12px; color: var(--ink); text-align: center; max-width: 76px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .line-seller-opt.sel .dot { border-color: var(--blue); box-shadow: 0 0 0 2px var(--card), 0 0 10px 2px var(--blue); }
+  .line-seller-opt.sel .lbl { font-weight: 700; }
+  .line-seller-opt.unassigned .dot { background: var(--fill); border: 1.5px dashed var(--grey); color: var(--grey); font-size: 22px; }
   .ticket-total { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-top: 2px solid var(--sep); margin-bottom: 14px; }
   .ticket-total .label { font-size: 14px; color: var(--grey); }
   .ticket-total .amount { font-size: 24px; font-weight: 600; letter-spacing: -.02em; }
@@ -1969,13 +1973,13 @@ function lineSellerBubbleHtml(line, index) {
 function openLineSellerModal(index) {
   var line = ticket[index];
   var options = '<button class="line-seller-opt unassigned' + (!line.barber_id ? ' sel' : '') + '" data-close-modal onclick="setLineSeller(' + index + ',null)">' +
-    '<span class="dot">–</span>Non attribué</button>' +
+    '<span class="dot">–</span><span class="lbl">Non attribué</span></button>' +
     allBarbers.map(function (b) {
       var bColor = b.color || stableColorForId(b.id);
       var bInitial = (b.name || '?').trim().charAt(0).toUpperCase();
       var bStyle = b.photo_url ? 'background-image:url(\'' + b.photo_url + '\')' : 'background:' + bColor;
       return '<button class="line-seller-opt' + (b.id === line.barber_id ? ' sel' : '') + '" data-close-modal onclick="setLineSeller(' + index + ',\'' + b.id + '\')">' +
-        '<span class="dot" style="' + bStyle + '">' + (b.photo_url ? '' : esc(bInitial)) + '</span>' + esc(b.name) +
+        '<span class="dot" style="' + bStyle + '">' + (b.photo_url ? '' : esc(bInitial)) + '</span><span class="lbl">' + esc(b.name) + '</span>' +
         '</button>';
     }).join('');
 
