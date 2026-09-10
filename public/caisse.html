@@ -76,8 +76,17 @@
   .caisse-footer button.on { color: var(--blue); font-weight: 600; }
   body.has-caisse-footer #app-screen { padding-bottom: 84px; }
   body.has-caisse-footer .toast { bottom: 100px; }
-  .caisse-tab-panel { display: none; }
+  .caisse-tab-panel { display: none; position: relative; }
   .caisse-tab-panel.on { display: block; }
+  .tab-lock-overlay {
+    display: none; position: absolute; inset: 0; z-index: 60; background: var(--bg);
+    flex-direction: column; align-items: center; justify-content: center; text-align: center;
+    padding: 40px 24px; gap: 12px;
+  }
+  .caisse-tab-panel.locked .tab-lock-overlay { display: flex; }
+  .tab-lock-overlay .ic { color: var(--grey); opacity: .6; }
+  .tab-lock-overlay .msg { font-size: 15px; font-weight: 600; max-width: 280px; }
+  .tab-lock-overlay .sub { font-size: 13px; color: var(--grey); max-width: 280px; }
 
   /* --- Onglet Timer (repris de "Mon poste") --- */
   .active-card {
@@ -496,6 +505,11 @@
     <div class="barber-bubbles" id="barber-bubbles"></div>
 
     <div class="caisse-tab-panel" id="panel-timer">
+      <div class="tab-lock-overlay">
+        <svg class="ic" viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+        <div class="msg">Veuillez sélectionner votre profil</div>
+        <div class="sub">Touchez votre bulle en haut de l'écran pour utiliser le Timer.</div>
+      </div>
       <div id="active-zone"></div>
       <div class="section-label">À suivre</div>
       <div id="next-zone"></div>
@@ -525,6 +539,11 @@
     </div>
 
     <div class="caisse-tab-panel on" id="panel-caisse">
+    <div class="tab-lock-overlay">
+      <svg class="ic" viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+      <div class="msg">Veuillez sélectionner votre profil</div>
+      <div class="sub">Touchez votre bulle en haut de l'écran pour utiliser la Caisse.</div>
+    </div>
     <div class="caisse-layout">
       <div class="caisse-grid-col">
         <div class="cat-tabs" id="cat-tabs">
@@ -796,6 +815,7 @@ function showApp() {
   document.body.classList.add('has-caisse-footer');
   document.getElementById('my-name').textContent = me.name;
   activeBarberId = me.id;
+  updateTabLockState();
   loadBarberBubbles();
   loadCatalog();
   loadPendingPayments();
@@ -814,6 +834,7 @@ function switchCaisseTab(tab) {
     document.getElementById('panel-' + t).classList.toggle('on', t === tab);
     document.getElementById('nav-' + t).classList.toggle('on', t === tab);
   });
+  updateTabLockState();
   if (tab === 'timer') startTimerAutoRefresh(); else stopTimerAutoRefresh();
   if (tab === 'agenda') {
     startAgendaAutoRefresh();
@@ -882,6 +903,7 @@ function selectActiveBarber(barberId) {
   // coiffeur authentifié (voir barberApi : en-tête omis si vide).
   activeBarberId = (barberId === activeBarberId) ? null : barberId;
   renderBarberBubbles();
+  updateTabLockState();
   loadPendingPayments();
   extrasPickerOpen = false;
   nextDetailOpen = {};
@@ -892,6 +914,20 @@ function selectActiveBarber(barberId) {
     else if (calViewMode === 'month') renderCalMonth();
     else renderCalWeek();
   }
+}
+
+/**
+ * Timer et Caisse exigent un coiffeur clairement identifié (aucun
+ * fallback silencieux sur "celui qui a ouvert la tablette ce matin") -
+ * sans bulle sélectionnée, on bloque ces deux onglets avec un message
+ * clair plutôt que de laisser agir au nom du mauvais coiffeur.
+ * L'Agenda n'est volontairement PAS concerné : aucune bulle sélectionnée
+ * y est un mode à part entière ("Tous les coiffeurs"), pas une erreur.
+ */
+function updateTabLockState() {
+  var locked = !activeBarberId;
+  document.getElementById('panel-timer').classList.toggle('locked', locked);
+  document.getElementById('panel-caisse').classList.toggle('locked', locked);
 }
 
 /* ---------- Onglet Timer (repris de "Mon poste", scopé au coiffeur actif) ---------- */
