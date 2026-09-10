@@ -354,7 +354,7 @@ router.post('/gift-cards/:id/resend', requireAdmin, wrap(async (req, res) => {
  */
 router.get('/loyalty-accounts', requireAdmin, wrap(async (req, res) => {
   const [rows] = await pool.query(
-    'SELECT client_name, client_key, points, rewards_available, activated_at, updated_at FROM loyalty_accounts ' +
+    'SELECT client_name, client_key, recipient_email, points, rewards_available, activated_at, updated_at FROM loyalty_accounts ' +
     'WHERE salon_id = ? AND activated_at IS NOT NULL ORDER BY updated_at DESC LIMIT 300',
     [req.salon.id]
   );
