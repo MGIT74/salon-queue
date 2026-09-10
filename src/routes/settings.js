@@ -15,7 +15,7 @@ function wrap(fn) {
 }
 
 const EDITABLE = [
-  'salon_name', 'notify_before_min', 'logo_url', 'gift_tile_image_url', 'timezone',
+  'salon_name', 'notify_before_min', 'logo_url', 'gift_tile_image_url', 'loyalty_card_image_url', 'timezone',
   'smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_from',
   'printer_connection_type', 'printer_ip', 'printer_model',
   'tpe_ip', 'tpe_port', 'tpe_cash_register_id', 'tpe_cash_register_number',
@@ -186,6 +186,7 @@ router.get('/public', wrap(async (req, res) => {
     salon_name: s.salon_name || 'Le Salon',
     logo_url: s.logo_url || null,
     gift_tile_image_url: s.gift_tile_image_url || null,
+    loyalty_card_image_url: s.loyalty_card_image_url || null,
     caisse_inactivity_seconds: s.caisse_inactivity_seconds ? Number(s.caisse_inactivity_seconds) : 15,
     caisse_reopen_hour: s.caisse_reopen_hour || '00:00',
     currency: s.currency || 'EUR',
