@@ -3333,10 +3333,12 @@ function renderGiftCardsList() {
         var itemsList = g.items.map(function (it) { return (it.quantity > 1 ? it.quantity + ' × ' : '') + it.item_name; }).join(', ');
         var statusLabel = g.used_at ? 'Utilisé' : 'Non utilisé';
         var statusColor = g.used_at ? 'var(--grey)' : 'var(--green)';
+        var boughtOn = new Date(g.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
         return '<div class="item">' +
           '<div class="item-main"><div class="item-name">' + esc(g.recipient_name) + ' — ' + eur(g.amount_cents) + '</div>' +
           '<div class="item-meta">' + esc(itemsList) + '</div>' +
-          '<div class="item-meta">' + esc(g.recipient_email) + ' · ' + esc(g.recipient_phone) + ' · code ' + esc(g.code || '—') + '</div></div>' +
+          '<div class="item-meta">' + esc(g.recipient_email) + ' · ' + esc(g.recipient_phone) + ' · code ' + esc(g.code || '—') + '</div>' +
+          '<div class="item-meta">Coiffeur : ' + esc(g.barber_name || 'Non désigné') + ' · Acheté le ' + boughtOn + '</div></div>' +
           '<div class="item-actions">' +
             (g.used_at ? '' : '<button class="btn btn-soft" onclick="resendGiftCode(\'' + g.id + '\')" style="font-size:13px;padding:6px 12px">Renvoyer le code</button>') +
             '<span style="color:' + statusColor + ';font-size:13px;font-weight:600;align-self:center">' + statusLabel + '</span>' +
