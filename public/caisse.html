@@ -316,7 +316,8 @@
   }
   .ticket-panel h3 { font-size: 15px; margin: 0 0 12px; }
   .ticket-lines { flex: 1; overflow-y: auto; margin-bottom: 14px; min-height: 60px; }
-  .ticket-line { display: flex; align-items: center; gap: 8px; padding: 9px 0; border-bottom: 1px solid var(--sep); animation: line-in .2s ease; }
+  .ticket-line { display: flex; align-items: center; gap: 8px; padding: 9px 0; border-bottom: 1px solid var(--sep); }
+  .ticket-line.enter { animation: line-in .2s ease; }
   @keyframes line-in {
     from { opacity: 0; transform: translateX(-8px); }
     to { opacity: 1; transform: translateX(0); }
@@ -2081,6 +2082,7 @@ function renderItemGrid() {
 /* ---------- Ticket ---------- */
 function addToTicket(itemType, itemId, itemName, unitPriceCents) {
   var existing = ticket.find(function (l) { return l.item_type === itemType && l.item_id === itemId; });
+  var newIndex = null;
   if (existing) { existing.quantity++; } else {
     // Le "vendeur" par ligne n'a de sens que pour un produit (voir
     // renderTicket) - par défaut le coiffeur actif au moment de
@@ -2088,8 +2090,12 @@ function addToTicket(itemType, itemId, itemName, unitPriceCents) {
     // a en réalité vendu ce produit précis.
     var lineBarberId = itemType === 'product' ? activeBarberId : null;
     ticket.push({ item_type: itemType, item_id: itemId, item_name: itemName, unit_price_cents: unitPriceCents, quantity: 1, barber_id: lineBarberId });
+    newIndex = ticket.length - 1;
   }
-  renderTicket();
+  // Seule une ligne VRAIMENT nouvelle rejoue l'animation d'entrée - un
+  // simple +1 de quantité sur une ligne déjà là ne doit jamais faire
+  // clignoter tout le ticket à chaque ajout.
+  renderTicket(newIndex);
 }
 
 function changeQty(index, delta) {
@@ -2110,11 +2116,11 @@ function ticketTotal() {
   return ticket.reduce(function (a, l) { return a + l.unit_price_cents * l.quantity; }, 0);
 }
 
-function renderTicket() {
+function renderTicket(justAddedIndex) {
   document.getElementById('ticket-lines').innerHTML = ticket.length === 0
     ? '<div class="empty">Aucun article sélectionné</div>'
     : ticket.map(function (l, i) {
-        return '<div class="ticket-line">' +
+        return '<div class="ticket-line' + (i === justAddedIndex ? ' enter' : '') + '">' +
           (l.item_type === 'product' ? lineSellerBubbleHtml(l, i) : '') +
           '<div class="name">' + esc(l.item_name) + '</div>' +
           '<div class="qty-ctrl">' +
