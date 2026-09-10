@@ -55,9 +55,9 @@
   #loyalty-section .card-shine {
     position: absolute; top: 0; left: -60%; width: 40%; height: 100%;
     background: linear-gradient(75deg, transparent, rgba(255,255,255,.35), transparent);
-    transform: skewX(-20deg); animation: card-shine-sweep 1.8s ease-in-out .3s 1;
-    pointer-events: none; z-index: 2;
+    transform: skewX(-20deg); pointer-events: none; z-index: 2;
   }
+  #loyalty-section .card-shine.play { animation: card-shine-sweep 1.8s ease-in-out .3s 1; }
   @keyframes card-shine-sweep {
     0% { left: -60%; }
     100% { left: 130%; }
@@ -390,6 +390,20 @@ function show(id) {
   document.querySelectorAll('.panel').forEach(function (p) { p.classList.remove('on'); });
   document.getElementById(id).classList.add('on');
   window.scrollTo(0, 0);
+
+  // L'effet d'éclat de la carte fidélité est une animation CSS - elle ne
+  // se déclenche jamais si l'élément est révélé APRÈS avoir été construit
+  // dans un panneau display:none (cas de tous les panneaux ici), donc on
+  // la (re)joue explicitement en JS à chaque fois que ce panneau devient
+  // réellement visible, plutôt que de compter sur le chargement de page.
+  if (id === 'p-home') {
+    var shine = document.querySelector('#loyalty-section .card-shine');
+    if (shine) {
+      shine.classList.remove('play');
+      void shine.offsetWidth; // force le navigateur à "oublier" l'animation précédente
+      shine.classList.add('play');
+    }
+  }
 }
 
 function showFooter(activeId) {
