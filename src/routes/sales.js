@@ -366,7 +366,11 @@ router.get('/gift-cards/lookup', wrap(async (req, res) => {
   if (!code) return res.status(400).json({ error: 'Code requis' });
 
   const [[gift]] = await pool.query(
-    'SELECT * FROM gift_cards WHERE salon_id = ? AND code = ?',
+    `SELECT g.*, s.barber_id, b.name AS barber_name, b.active AS barber_active, b.accepts_appointments
+     FROM gift_cards g
+     JOIN sales s ON s.id = g.sale_id
+     LEFT JOIN barbers b ON b.id = s.barber_id
+     WHERE g.salon_id = ? AND g.code = ?`,
     [req.salon.id, code]
   );
   if (!gift) return res.status(404).json({ error: 'Code introuvable pour ce salon' });
@@ -374,6 +378,15 @@ router.get('/gift-cards/lookup', wrap(async (req, res) => {
 
   let items = [];
   try { items = JSON.parse(gift.items_json || '[]'); } catch (e) { items = []; }
+
+  // Le coiffeur désigné (celui dont la bulle était sélectionnée à la
+  // vente) ne doit être proposé que s'il est toujours actif ET accepte
+  // toujours les RDV/le kiosk aujourd'hui - sinon on retombe sur le
+  // comportement normal (laisser choisir), plutôt que d'imposer un
+  // coiffeur qui n'est peut-être plus disponible.
+  const designatedBarber = (gift.barber_id && gift.barber_active && gift.accepts_appointments)
+    ? { id: gift.barber_id, name: gift.barber_name }
+    : null;
 
   res.json({
     ok: true,
@@ -383,6 +396,7 @@ router.get('/gift-cards/lookup', wrap(async (req, res) => {
       recipient_email: gift.recipient_email,
       recipient_phone: gift.recipient_phone,
       amount_cents: gift.amount_cents,
+      designated_barber: designatedBarber,
       items
     }
   });
