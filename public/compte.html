@@ -49,6 +49,12 @@
     background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center;
   }
   #loyalty-section .card-points-block { text-align: right; }
+  /* Même taille de texte et même espacement que la carte cadeau
+     (.gift-card .big / .lbl ci-dessous), pour que les deux cartes
+     paraissent de la même famille visuelle malgré des couleurs différentes. */
+  #loyalty-section .card { margin-bottom: 12px; }
+  #loyalty-section .card .big { font-size: 24px; }
+  #loyalty-section .card .lbl { font-size: 12.5px; }
 
   /* Léger effet d'éclat qui balaie la carte une fois au chargement -
      purement décoratif, s'arrête de lui-même (animation non bouclée). */
@@ -107,6 +113,16 @@
   .gift-card.used .lbl, .gift-card.used .gift-code { color: var(--grey); }
   .gift-card.used .card-logo { background: var(--card); }
   .gift-card .used-badge { font-size: 11.5px; margin-top: 8px; text-align: center; }
+
+  /* Carte cadeau avec image de fond personnalisée (Réglages > Marketing)
+     - dégradé sombre superposé par-dessus la photo, même principe que la
+     carte de fidélité, pour garder le texte blanc toujours lisible. */
+  .gift-card.has-bg { background-size: cover; background-position: center; }
+  .gift-card.has-bg::before {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(135deg, rgba(0,0,0,.55), rgba(0,0,0,.25));
+  }
+  .gift-card.has-bg > * { position: relative; z-index: 1; }
   .gift-badge { display: inline-block; margin-top: 10px; background: var(--orange, #f97316);
                 color: #fff; font-size: 13px; font-weight: 600; padding: 5px 12px; border-radius: 999px; }
 
@@ -663,16 +679,35 @@ function renderGiftCards(giftCards) {
     '</div>';
   }).join('');
 
-  // Même logo que la carte de fidélité, une fois qu'on le connaît (chargé
-  // séparément via /api/settings/public - voir plus bas).
-  if (currentSalonLogoForCards) {
-    sorted.forEach(function (g) {
-      var el = document.getElementById('gift-card-logo-' + g.id);
-      if (el) { el.style.backgroundImage = 'url("' + currentSalonLogoForCards + '")'; el.textContent = ''; }
-    });
-  }
+  // Logo du salon + image de fond personnalisée, si déjà connus (sinon
+  // appliqués plus tard dès que /api/settings/public répond - voir
+  // applyGiftCardDesign, appelée dans les deux sens pour ne pas dépendre
+  // de l'ordre d'arrivée des deux appels réseau).
+  applyGiftCardDesign();
 }
 var currentSalonLogoForCards = '';
+var currentGiftCardImageForCards = '';
+
+/**
+ * Applique le logo du salon et l'image de fond personnalisée (Réglages >
+ * Marketing) à toutes les cartes cadeaux NON utilisées déjà affichées -
+ * appelée aussi bien après le rendu de la liste (renderGiftCards) qu'après
+ * le chargement des réglages, quel que soit l'ordre d'arrivée des deux
+ * appels réseau concernés.
+ */
+function applyGiftCardDesign() {
+  document.querySelectorAll('.gift-card:not(.used)').forEach(function (card) {
+    if (currentGiftCardImageForCards) {
+      card.classList.add('has-bg');
+      card.style.backgroundImage = 'url("' + currentGiftCardImageForCards + '")';
+    }
+    var logo = card.querySelector('.card-logo');
+    if (logo && currentSalonLogoForCards) {
+      logo.style.backgroundImage = 'url("' + currentSalonLogoForCards + '")';
+      logo.textContent = '';
+    }
+  });
+}
 
 function loadProfile() {
   api('/api/client-auth/me').then(function (d) {
@@ -1034,11 +1069,9 @@ function esc(s) {
         // on le mémorise, et on rafraîchit celles déjà affichées le cas
         // échéant plutôt que de dépendre de l'ordre d'arrivée des deux appels.
         currentSalonLogoForCards = d.logo_url || '';
-        if (currentSalonLogoForCards) {
-          document.querySelectorAll('.gift-card .card-logo').forEach(function (el) {
-            el.style.backgroundImage = 'url("' + currentSalonLogoForCards + '")';
-            el.textContent = '';
-          });
+        currentGiftCardImageForCards = d.gift_card_image_url || '';
+        if (currentSalonLogoForCards || currentGiftCardImageForCards) {
+          applyGiftCardDesign();
         }
       })
       .catch(function () {});
