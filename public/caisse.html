@@ -2215,7 +2215,7 @@ function finalizeSale(saleCtx) {
     }
   }).then(function (r) {
     tpePendingSaleCtx = null;
-    showReceipt(saleCtx.soldTicket, saleCtx.total, saleCtx.method, { ticketId: r.sale && r.sale.id });
+    showReceipt(saleCtx.soldTicket, saleCtx.total, saleCtx.method, { ticketNumber: r.sale && r.sale.ticket_number });
     // Paiement en espèces : impression automatique du ticket, ce qui
     // déclenche aussi l'ouverture du tiroir-caisse si l'imprimante est
     // configurée pour ça (réglage côté pilote Windows). Pas fait pour la
@@ -2259,7 +2259,7 @@ function showReceipt(lines, total, method, opts) {
     var activeBarber = allBarbers.find(function (b) { return b.id === activeBarberId; });
     barberName = activeBarber ? activeBarber.name : (me ? me.name : '');
   }
-  var ticketNumber = opts.ticketId || ('T' + whenDate.getTime());
+  var ticketNumber = opts.ticketNumber ? String(opts.ticketNumber).padStart(6, '0') : ('T' + whenDate.getTime());
   var salonName = document.title.replace(' — Caisse', '');
 
   // En-tête : identité du salon, comme l'exige la loi sur chaque ticket.
@@ -2418,7 +2418,7 @@ function renderHistoryList() {
 
 function reprintSale(index) {
   var s = historySalesCache[index];
-  showReceipt(s.items, s.total_price_cents, s.payment_method, { when: s.created_at, barberName: s.barber_name || 'Non assigné', ticketId: s.id });
+  showReceipt(s.items, s.total_price_cents, s.payment_method, { when: s.created_at, barberName: s.barber_name || 'Non assigné', ticketNumber: s.ticket_number });
 }
 
 // Ouvre le tiroir-caisse sans passer par une vente (pour rendre la
