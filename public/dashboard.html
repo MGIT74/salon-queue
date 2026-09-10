@@ -818,6 +818,25 @@
     </div>
 
     <div class="card-box">
+      <h3>Design de la carte cadeau (compte client)</h3>
+      <p class="hint">
+        Image de fond affichée derrière le montant de chaque carte cadeau, sur le compte client. Même format
+        recommandé : <strong>720 × 320 px</strong>, recadrée et compressée automatiquement.
+      </p>
+      <div style="display:flex;align-items:center;gap:16px">
+        <div id="gift-card-design-preview" onclick="document.getElementById('gift-card-design-input').click()"
+             style="width:180px;height:80px;border-radius:14px;cursor:pointer;background:var(--fill);
+             display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;
+             color:var(--grey);font-size:12px;text-align:center;background-size:cover;background-position:center">Aucune image</div>
+        <input type="file" id="gift-card-design-input" accept="image/*" style="display:none" onchange="uploadGiftCardImage(this)">
+        <div>
+          <div class="hint" style="margin:0 0 6px">Cliquez sur le cadre pour choisir une image.</div>
+          <button class="btn btn-ghost" onclick="removeGiftCardImage()" style="font-size:13px;padding:6px 12px">Retirer l'image (dégradé par défaut)</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card-box">
       <h3>Image "Utiliser un cadeau" (kiosk)</h3>
       <p class="hint">Remplace l'icône 🎁 par défaut sur la tuile du kiosk. Une image carrée fonctionne mieux.</p>
       <div style="display:flex;align-items:center;gap:16px">
@@ -1543,6 +1562,7 @@ var currentSalonName = '';
 var currentSalonLogo = '';
 var currentGiftTileImage = '';
 var currentLoyaltyCardImage = '';
+var currentGiftCardImage = '';
 
 function loadCurrentSalonName() {
   // Si l'URL ne precise pas de salon (lien universel, pas un lien
@@ -1616,6 +1636,17 @@ function loadCurrentSalonName() {
         } else {
           loyaltyCardPreview.style.backgroundImage = '';
           loyaltyCardPreview.textContent = 'Aucune image';
+        }
+      }
+      currentGiftCardImage = d.gift_card_image_url || '';
+      var giftCardDesignPreview = document.getElementById('gift-card-design-preview');
+      if (giftCardDesignPreview) {
+        if (currentGiftCardImage) {
+          giftCardDesignPreview.style.backgroundImage = 'url("' + currentGiftCardImage + '")';
+          giftCardDesignPreview.textContent = '';
+        } else {
+          giftCardDesignPreview.style.backgroundImage = '';
+          giftCardDesignPreview.textContent = 'Aucune image';
         }
       }
       renderBarbers();
@@ -5048,6 +5079,47 @@ function removeLoyaltyCardImage() {
   api('/api/settings', { method: 'PUT', body: { loyalty_card_image_url: '' } })
     .then(loadCurrentSalonName)
     .then(function () { toast('Fond uni par défaut restauré'); })
+    .catch(function (e) { toast(e.message, true); });
+}
+
+/** Même recadrage 720x320 que la carte fidélité, pour la carte cadeau. */
+function uploadGiftCardImage(input) {
+  var file = input.files && input.files[0];
+  if (!file) return;
+
+  var TARGET_W = 720, TARGET_H = 320;
+  var reader = new FileReader();
+  reader.onload = function (e) {
+    var img = new Image();
+    img.onload = function () {
+      var canvas = document.createElement('canvas');
+      canvas.width = TARGET_W; canvas.height = TARGET_H;
+      var ctx = canvas.getContext('2d');
+      var targetRatio = TARGET_W / TARGET_H;
+      var srcRatio = img.width / img.height;
+      var sx, sy, sw, sh;
+      if (srcRatio > targetRatio) {
+        sh = img.height; sw = sh * targetRatio; sx = (img.width - sw) / 2; sy = 0;
+      } else {
+        sw = img.width; sh = sw / targetRatio; sx = 0; sy = (img.height - sh) / 2;
+      }
+      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, TARGET_W, TARGET_H);
+      var dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+
+      api('/api/settings', { method: 'PUT', body: { gift_card_image_url: dataUrl } })
+        .then(loadCurrentSalonName)
+        .then(function () { toast('Image mise à jour'); })
+        .catch(function (e) { toast(e.message, true); });
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeGiftCardImage() {
+  api('/api/settings', { method: 'PUT', body: { gift_card_image_url: '' } })
+    .then(loadCurrentSalonName)
+    .then(function () { toast('Dégradé par défaut restauré'); })
     .catch(function (e) { toast(e.message, true); });
 }
 
