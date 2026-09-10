@@ -290,7 +290,11 @@ router.put('/marketing-settings', requireAdmin, wrap(async (req, res) => {
  */
 router.get('/gift-cards', requireAdmin, wrap(async (req, res) => {
   const [rows] = await pool.query(
-    'SELECT * FROM gift_cards WHERE salon_id = ? ORDER BY created_at DESC LIMIT 300',
+    `SELECT g.*, b.name AS barber_name
+     FROM gift_cards g
+     LEFT JOIN sales s ON s.id = g.sale_id
+     LEFT JOIN barbers b ON b.id = s.barber_id
+     WHERE g.salon_id = ? ORDER BY g.created_at DESC LIMIT 300`,
     [req.salon.id]
   );
   res.json({
@@ -306,6 +310,7 @@ router.get('/gift-cards', requireAdmin, wrap(async (req, res) => {
         amount_cents: g.amount_cents,
         items,
         code: g.code,
+        barber_name: g.barber_name || null,
         used_at: g.used_at ? utcIso(g.used_at) : null,
         created_at: utcIso(g.created_at)
       };
