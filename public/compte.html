@@ -40,6 +40,32 @@
   .card .big { font-size: 28px; font-weight: 700; letter-spacing: -.02em; }
   .card .lbl { font-size: 13px; color: var(--grey); margin-top: 2px; }
 
+  /* Carte fidélité en mise en page "vraie carte" : logo à gauche,
+     points à droite (comme une carte de fidélité/membre physique). */
+  #loyalty-section .card { position: relative; overflow: hidden; }
+  #loyalty-section .card-top-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+  #loyalty-section .card-logo {
+    width: 44px; height: 44px; border-radius: 12px; background: var(--card); flex-shrink: 0;
+    background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center;
+  }
+  #loyalty-section .card-points-block { text-align: right; }
+
+  /* Léger effet d'éclat qui balaie la carte une fois au chargement -
+     purement décoratif, s'arrête de lui-même (animation non bouclée). */
+  #loyalty-section .card-shine {
+    position: absolute; top: 0; left: -60%; width: 40%; height: 100%;
+    background: linear-gradient(75deg, transparent, rgba(255,255,255,.35), transparent);
+    transform: skewX(-20deg); animation: card-shine-sweep 1.8s ease-in-out .3s 1;
+    pointer-events: none; z-index: 2;
+  }
+  @keyframes card-shine-sweep {
+    0% { left: -60%; }
+    100% { left: 130%; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #loyalty-section .card-shine { display: none; }
+  }
+
   /* Carte fidélité avec image de fond personnalisée (Réglages > Marketing)
      - dégradé sombre superposé pour garder le texte blanc lisible peu
      importe les couleurs de la photo choisie. */
@@ -53,6 +79,7 @@
   }
   #loyalty-section .card.has-bg > * { position: relative; z-index: 1; }
   #loyalty-section .card.has-bg .lbl { color: rgba(255,255,255,.85); }
+  #loyalty-section .card.has-bg .card-logo { background-color: rgba(255,255,255,.15); }
   .gift-badge { display: inline-block; margin-top: 10px; background: var(--orange, #f97316);
                 color: #fff; font-size: 13px; font-weight: 600; padding: 5px 12px; border-radius: 999px; }
 
@@ -203,8 +230,14 @@
     <div id="loyalty-section">
       <div class="eyebrow">Fidélité</div>
       <div class="card">
-        <div class="big" id="loyalty-points">0</div>
-        <div class="lbl">points de fidélité</div>
+        <div class="card-shine"></div>
+        <div class="card-top-row">
+          <div class="card-logo" id="loyalty-card-logo"></div>
+          <div class="card-points-block">
+            <div class="big" id="loyalty-points">0</div>
+            <div class="lbl">points de fidélité</div>
+          </div>
+        </div>
         <div id="loyalty-gift"></div>
       </div>
     </div>
@@ -905,6 +938,10 @@ function esc(s) {
         if (loyaltyCard && d.loyalty_card_image_url) {
           loyaltyCard.classList.add('has-bg');
           loyaltyCard.style.backgroundImage = 'url("' + d.loyalty_card_image_url + '")';
+        }
+        var loyaltyLogo = document.getElementById('loyalty-card-logo');
+        if (loyaltyLogo && d.logo_url) {
+          loyaltyLogo.style.backgroundImage = 'url("' + d.logo_url + '")';
         }
       })
       .catch(function () {});
