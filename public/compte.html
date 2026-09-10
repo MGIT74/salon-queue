@@ -107,6 +107,10 @@
     letter-spacing: .12em; background: rgba(255,255,255,.15); border-radius: 8px; padding: 8px 12px;
     text-align: center;
   }
+  .gift-card:not(.used) .gift-code { cursor: pointer; user-select: none; transition: background .15s ease; }
+  .gift-card:not(.used) .gift-code:active { background: rgba(255,255,255,.3); }
+  .gift-card .gift-code .copy-ic { font-size: 13px; opacity: .75; letter-spacing: 0; }
+  .gift-card .gift-code.copied { background: rgba(16,185,129,.35); }
   .gift-card.used {
     background: var(--fill); color: var(--grey); filter: grayscale(1); opacity: .7;
   }
@@ -674,7 +678,9 @@ function renderGiftCards(giftCards) {
           '<div class="lbl">carte cadeau</div>' +
         '</div>' +
       '</div>' +
-      '<div class="gift-code">' + esc(g.code || '—') + '</div>' +
+      (g.used
+        ? '<div class="gift-code">' + esc(g.code || '—') + '</div>'
+        : '<div class="gift-code" data-code="' + esc(g.code || '') + '" onclick="copyGiftCode(this)" title="Toucher pour copier">' + esc(g.code || '—') + ' <span class="copy-ic">⧉</span></div>') +
       (g.used ? '<div class="used-badge">Déjà utilisée</div>' : '') +
     '</div>';
   }).join('');
@@ -687,6 +693,45 @@ function renderGiftCards(giftCards) {
 }
 var currentSalonLogoForCards = '';
 var currentGiftCardImageForCards = '';
+
+/**
+ * Copie le code cadeau au clic, avec un petit retour visuel ("Copié !").
+ * Repli sur execCommand('copy') si l'API Clipboard moderne échoue (vieux
+ * navigateur, ou contexte non sécurisé) plutôt que de ne rien faire.
+ */
+function copyGiftCode(el) {
+  var code = el.getAttribute('data-code');
+  if (!code) return;
+
+  function showCopied() {
+    var original = el.getAttribute('data-original') || el.innerHTML;
+    el.setAttribute('data-original', original);
+    el.classList.add('copied');
+    el.innerHTML = 'Copié ! ✓';
+    toast('Code copié !');
+    setTimeout(function () {
+      el.classList.remove('copied');
+      el.innerHTML = original;
+    }, 1500);
+  }
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(code).then(showCopied).catch(function () { fallbackCopy(code, showCopied); });
+  } else {
+    fallbackCopy(code, showCopied);
+  }
+}
+
+function fallbackCopy(text, onSuccess) {
+  var ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand('copy'); onSuccess(); } catch (e) { toast('Impossible de copier automatiquement : ' + text, true); }
+  document.body.removeChild(ta);
+}
 
 /**
  * Applique le logo du salon et l'image de fond personnalisée (Réglages >
