@@ -202,6 +202,7 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
     }
   }
 
+  let giftResult = null;
   if (gift) {
     const itemsSnapshot = items.map((it) => ({
       item_type: it.item_type || 'product',
@@ -218,6 +219,7 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
       [giftId, req.salon.id, saleId, gift.recipient_name, gift.recipient_phone, gift.recipient_email, total, JSON.stringify(itemsSnapshot), code]
     );
 
+    let giftEmailSent = true;
     try {
       await sendGiftConfirmation(req.salon.id, gift.recipient_email, {
         recipientName: gift.recipient_name,
@@ -228,12 +230,17 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
     } catch (err) {
       // N'empêche jamais la vente si l'email échoue (ex. SMTP salon pas
       // configuré) — le code reste consultable par le super admin/admin
-      // si besoin, juste journalisé pour investigation.
+      // si besoin, journalisé pour investigation, ET remonté au
+      // frontend (giftEmailSent = false) pour que le coiffeur sache
+      // qu'il doit donner le code au client autrement (le ticket
+      // imprimé ne contient pas le code cadeau aujourd'hui).
+      giftEmailSent = false;
       console.error('[gift] envoi email de confirmation échoué:', err.message);
     }
+    giftResult = { code, email_sent: giftEmailSent };
   }
 
-  res.json({ ok: true, sale: { id: saleId, total_price_cents: total, payment_method, barber_id: barberId, ticket_number: ticketNumber } });
+  res.json({ ok: true, sale: { id: saleId, total_price_cents: total, payment_method, barber_id: barberId, ticket_number: ticketNumber }, gift: giftResult });
 }));
 
 /**
