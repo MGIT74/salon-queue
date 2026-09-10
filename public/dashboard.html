@@ -886,6 +886,7 @@
         </div>
       </div>
       <p class="hint">Points et récompenses en attente, tous salons de l'enseigne confondus.</p>
+      <div class="fld" style="margin-bottom:12px"><input id="loyalty-search" type="text" placeholder="Rechercher (nom, email)…" oninput="filterLoyaltyAccounts(this.value)"></div>
       <div class="loyalty-info-grid loyalty-info-head">
         <div class="f">Email</div><div class="f">Points</div><div class="f">Récompenses</div>
         <div class="f">Activé le</div><div class="f">Dernière activité</div>
@@ -906,6 +907,7 @@
         </div>
       </div>
       <p class="hint">Historique des cadeaux achetés dans ce salon.</p>
+      <div class="fld" style="margin-bottom:12px"><input id="gift-search" type="text" placeholder="Rechercher (nom, email, téléphone, code, coiffeur)…" oninput="filterGiftCards(this.value)"></div>
       <div class="gift-info-grid gift-info-head">
         <div class="f">Email</div><div class="f">Téléphone</div><div class="f">Code</div>
         <div class="f">Coiffeur</div><div class="f">Acheté le</div><div class="f">Utilisé le</div>
@@ -3275,8 +3277,10 @@ var STATUS_COLOR = {
 };
 
 /* ============ Marketing (fidélité + cadeaux) ============ */
+var loyaltyAccountsDataAll = [];
 var loyaltyAccountsData = [];
 var loyaltyPage = 1, loyaltyPerPage = 10;
+var giftCardsDataAll = [];
 var giftCardsData = [];
 var giftsPage = 1, giftsPerPage = 10;
 
@@ -3288,16 +3292,49 @@ function loadMarketingTab() {
   }).catch(function (e) { toast(e.message, true); });
 
   api('/api/owner/loyalty-accounts').then(function (r) {
+    loyaltyAccountsDataAll = r.items;
     loyaltyAccountsData = r.items;
     loyaltyPage = 1;
+    document.getElementById('loyalty-search').value = '';
     renderLoyaltyAccountsList();
   }).catch(function (e) { toast(e.message, true); });
 
   api('/api/owner/gift-cards').then(function (r) {
+    giftCardsDataAll = r.items;
     giftCardsData = r.items;
     giftsPage = 1;
+    document.getElementById('gift-search').value = '';
     renderGiftCardsList();
   }).catch(function (e) { toast(e.message, true); });
+}
+
+/**
+ * Filtre côté client (toutes les données sont déjà chargées) - pas
+ * besoin d'un aller-retour serveur pour une simple recherche texte sur
+ * une liste plafonnée à 300 éléments.
+ */
+function filterLoyaltyAccounts(query) {
+  query = query.trim().toLowerCase();
+  loyaltyAccountsData = !query ? loyaltyAccountsDataAll : loyaltyAccountsDataAll.filter(function (a) {
+    return (a.client_name || '').toLowerCase().indexOf(query) !== -1 ||
+      (a.recipient_email || '').toLowerCase().indexOf(query) !== -1 ||
+      (a.client_key || '').toLowerCase().indexOf(query) !== -1;
+  });
+  loyaltyPage = 1;
+  renderLoyaltyAccountsList();
+}
+
+function filterGiftCards(query) {
+  query = query.trim().toLowerCase();
+  giftCardsData = !query ? giftCardsDataAll : giftCardsDataAll.filter(function (g) {
+    return (g.recipient_name || '').toLowerCase().indexOf(query) !== -1 ||
+      (g.recipient_email || '').toLowerCase().indexOf(query) !== -1 ||
+      (g.recipient_phone || '').toLowerCase().indexOf(query) !== -1 ||
+      (g.code || '').toLowerCase().indexOf(query) !== -1 ||
+      (g.barber_name || '').toLowerCase().indexOf(query) !== -1;
+  });
+  giftsPage = 1;
+  renderGiftCardsList();
 }
 
 function renderPaginationControls(containerId, page, perPage, total, goFn) {
