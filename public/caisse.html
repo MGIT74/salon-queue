@@ -817,7 +817,19 @@ function switchCaisseTab(tab) {
   if (tab === 'timer') startTimerAutoRefresh(); else stopTimerAutoRefresh();
   if (tab === 'agenda') {
     startAgendaAutoRefresh();
-    if (!calBooted) { calBooted = true; loadAgendaPeriod(); }
+    if (!calBooted) {
+      calBooted = true;
+      // Les horaires du salon peuvent arriver après le premier rendu
+      // (deux appels réseau distincts) - on relance un rendu une fois
+      // connus, pour ne jamais laisser l'ancien calcul "8h minimum"
+      // s'afficher même brièvement.
+      loadSalonScheduleForTimeline().then(function () {
+        if (calViewMode === 'day') renderCalDay();
+        else if (calViewMode === 'month') renderCalMonth();
+        else renderCalWeek();
+      });
+      loadAgendaPeriod();
+    }
   } else {
     stopAgendaAutoRefresh();
   }
@@ -1380,9 +1392,22 @@ function renderAgendaTimeline(dateStr) {
 
   var starts = appts.map(apptMinutes);
   var ends = appts.map(function (a) { return apptMinutes(a) + Math.max(a.duration_min || 30, 15); });
-  var rangeStart = Math.floor(Math.min.apply(null, starts) / 60) * 60;
-  var rangeEnd = Math.ceil(Math.max.apply(null, ends) / 60) * 60;
-  if (rangeEnd - rangeStart < 8 * 60) rangeEnd = rangeStart + 8 * 60;
+  var apptMin = Math.min.apply(null, starts);
+  var apptMax = Math.max.apply(null, ends);
+
+  // Plage horaire = les heures d'ouverture réelles du salon ce jour-là,
+  // étendue uniquement si un RDV dépasse ces horaires - jamais un
+  // minimum arbitraire qui ignorerait l'heure de fermeture réelle.
+  var weekday = new Date(dateStr + 'T00:00:00').getDay();
+  var salonDay = salonScheduleByWeekday && salonScheduleByWeekday[weekday];
+  var baseStart = salonDay ? salonDay.startMin : Math.floor(apptMin / 60) * 60;
+  var baseEnd = salonDay ? salonDay.endMin : Math.ceil(apptMax / 60) * 60;
+
+  var rangeStart = Math.floor(Math.min(baseStart, apptMin) / 60) * 60;
+  var rangeEnd = Math.ceil(Math.max(baseEnd, apptMax) / 60) * 60;
+  // Filet minimal seulement si vraiment rien de mieux à afficher (aucun
+  // horaire salon configuré ce jour-là ET un unique RDV très court).
+  if (rangeEnd - rangeStart < 4 * 60) rangeEnd = rangeStart + 4 * 60;
 
   var hourCount = (rangeEnd - rangeStart) / 60;
   var hoursHtml = '';
@@ -1509,6 +1534,31 @@ function openAgendaClientDrawer(id) {
 }
 
 var agendaNowLineTimer = null;
+var salonScheduleByWeekday = null; // { [0-6]: {startMin, endMin} } - chargé une seule fois
+
+function timeStrToMinutes(t) {
+  var hm = t.slice(0, 5).split(':');
+  return Number(hm[0]) * 60 + Number(hm[1]);
+}
+
+/**
+ * Charge une seule fois les horaires généraux du salon (Réglages >
+ * Calendrier), pour servir de vraie référence à la plage horaire du
+ * Planning du jour - même correctif que celui appliqué au Planning du
+ * jour du dashboard (bug : la timeline pouvait s'afficher bien après la
+ * fermeture réelle du salon).
+ */
+function loadSalonScheduleForTimeline() {
+  if (salonScheduleByWeekday) return Promise.resolve(salonScheduleByWeekday);
+  return barberApi('/api/salon-calendar/schedule').then(function (r) {
+    salonScheduleByWeekday = {};
+    (r.schedules || []).forEach(function (s) {
+      if (!s.active) return;
+      salonScheduleByWeekday[s.weekday] = { startMin: timeStrToMinutes(s.start_time), endMin: timeStrToMinutes(s.end_time) };
+    });
+    return salonScheduleByWeekday;
+  }).catch(function () { salonScheduleByWeekday = {}; return salonScheduleByWeekday; });
+}
 
 /**
  * Ajout rapide d'un RDV depuis l'Agenda de la caisse, pour un coiffeur
