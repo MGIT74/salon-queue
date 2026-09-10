@@ -39,6 +39,20 @@
   .card { background: var(--fill); border-radius: 18px; padding: 18px; margin-bottom: 16px; }
   .card .big { font-size: 28px; font-weight: 700; letter-spacing: -.02em; }
   .card .lbl { font-size: 13px; color: var(--grey); margin-top: 2px; }
+
+  /* Carte fidélité avec image de fond personnalisée (Réglages > Marketing)
+     - dégradé sombre superposé pour garder le texte blanc lisible peu
+     importe les couleurs de la photo choisie. */
+  #loyalty-section .card.has-bg {
+    position: relative; background-size: cover; background-position: center;
+    color: #fff; overflow: hidden;
+  }
+  #loyalty-section .card.has-bg::before {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(135deg, rgba(0,0,0,.6), rgba(0,0,0,.25));
+  }
+  #loyalty-section .card.has-bg > * { position: relative; z-index: 1; }
+  #loyalty-section .card.has-bg .lbl { color: rgba(255,255,255,.85); }
   .gift-badge { display: inline-block; margin-top: 10px; background: var(--orange, #f97316);
                 color: #fff; font-size: 13px; font-weight: 600; padding: 5px 12px; border-radius: 999px; }
 
@@ -887,6 +901,11 @@ function esc(s) {
         if (d.salon_name) document.getElementById('salon-mark').textContent = d.salon_name.toUpperCase();
         CURRENCY = d.currency || 'EUR';
         applyAccentColor(d.accent_color);
+        var loyaltyCard = document.querySelector('#loyalty-section .card');
+        if (loyaltyCard && d.loyalty_card_image_url) {
+          loyaltyCard.classList.add('has-bg');
+          loyaltyCard.style.backgroundImage = 'url("' + d.loyalty_card_image_url + '")';
+        }
       })
       .catch(function () {});
   }
