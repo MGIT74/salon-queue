@@ -798,6 +798,26 @@
     </div>
 
     <div class="card-box">
+      <h3>Design de la carte fidélité (compte client)</h3>
+      <p class="hint">
+        Image de fond affichée derrière les points de fidélité, sur le compte client. Format recommandé :
+        <strong>720 × 320 px</strong> (rectangle horizontal) — l'image est automatiquement recadrée et compressée
+        à cette taille, elle restera toujours légère peu importe la photo d'origine.
+      </p>
+      <div style="display:flex;align-items:center;gap:16px">
+        <div id="loyalty-card-preview" onclick="document.getElementById('loyalty-card-input').click()"
+             style="width:180px;height:80px;border-radius:14px;cursor:pointer;background:var(--fill);
+             display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;
+             color:var(--grey);font-size:12px;text-align:center;background-size:cover;background-position:center">Aucune image</div>
+        <input type="file" id="loyalty-card-input" accept="image/*" style="display:none" onchange="uploadLoyaltyCardImage(this)">
+        <div>
+          <div class="hint" style="margin:0 0 6px">Cliquez sur le cadre pour choisir une image.</div>
+          <button class="btn btn-ghost" onclick="removeLoyaltyCardImage()" style="font-size:13px;padding:6px 12px">Retirer l'image (fond uni par défaut)</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card-box">
       <h3>Image "Utiliser un cadeau" (kiosk)</h3>
       <p class="hint">Remplace l'icône 🎁 par défaut sur la tuile du kiosk. Une image carrée fonctionne mieux.</p>
       <div style="display:flex;align-items:center;gap:16px">
@@ -1522,6 +1542,7 @@ var currentSalonName = '';
 
 var currentSalonLogo = '';
 var currentGiftTileImage = '';
+var currentLoyaltyCardImage = '';
 
 function loadCurrentSalonName() {
   // Si l'URL ne precise pas de salon (lien universel, pas un lien
@@ -1584,6 +1605,17 @@ function loadCurrentSalonName() {
         } else {
           giftPreview.style.backgroundImage = '';
           giftPreview.textContent = '🎁';
+        }
+      }
+      currentLoyaltyCardImage = d.loyalty_card_image_url || '';
+      var loyaltyCardPreview = document.getElementById('loyalty-card-preview');
+      if (loyaltyCardPreview) {
+        if (currentLoyaltyCardImage) {
+          loyaltyCardPreview.style.backgroundImage = 'url("' + currentLoyaltyCardImage + '")';
+          loyaltyCardPreview.textContent = '';
+        } else {
+          loyaltyCardPreview.style.backgroundImage = '';
+          loyaltyCardPreview.textContent = 'Aucune image';
         }
       }
       renderBarbers();
@@ -4963,6 +4995,59 @@ function removeGiftTileImage() {
   api('/api/settings', { method: 'PUT', body: { gift_tile_image_url: '' } })
     .then(loadCurrentSalonName)
     .then(function () { toast('Icône par défaut restaurée'); })
+    .catch(function (e) { toast(e.message, true); });
+}
+
+/**
+ * Recadre toujours l'image envoyée en 720x320 (ratio carte fidélité,
+ * "rectangle" horizontal) puis compresse en JPEG - garantit une image
+ * toujours légère côté compte client, peu importe la photo d'origine
+ * envoyée ici (même mécanisme que le tile cadeau du kiosk, en rectangle
+ * plutôt qu'en carré).
+ */
+function uploadLoyaltyCardImage(input) {
+  var file = input.files && input.files[0];
+  if (!file) return;
+
+  var TARGET_W = 720, TARGET_H = 320;
+  var reader = new FileReader();
+  reader.onload = function (e) {
+    var img = new Image();
+    img.onload = function () {
+      var canvas = document.createElement('canvas');
+      canvas.width = TARGET_W; canvas.height = TARGET_H;
+      var ctx = canvas.getContext('2d');
+      var targetRatio = TARGET_W / TARGET_H;
+      var srcRatio = img.width / img.height;
+      var sx, sy, sw, sh;
+      if (srcRatio > targetRatio) {
+        // Image source plus large que la cible : on rogne les côtés.
+        sh = img.height;
+        sw = sh * targetRatio;
+        sx = (img.width - sw) / 2; sy = 0;
+      } else {
+        // Image source plus haute que la cible : on rogne haut/bas.
+        sw = img.width;
+        sh = sw / targetRatio;
+        sx = 0; sy = (img.height - sh) / 2;
+      }
+      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, TARGET_W, TARGET_H);
+      var dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+
+      api('/api/settings', { method: 'PUT', body: { loyalty_card_image_url: dataUrl } })
+        .then(loadCurrentSalonName)
+        .then(function () { toast('Image mise à jour'); })
+        .catch(function (e) { toast(e.message, true); });
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeLoyaltyCardImage() {
+  api('/api/settings', { method: 'PUT', body: { loyalty_card_image_url: '' } })
+    .then(loadCurrentSalonName)
+    .then(function () { toast('Fond uni par défaut restauré'); })
     .catch(function (e) { toast(e.message, true); });
 }
 
