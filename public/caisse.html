@@ -2130,8 +2130,20 @@ function updateGiftVisibility() {
   }
 }
 
+// Empêche tout second clic (double-tap, ou re-clic pendant que le
+// serveur traite déjà la vente) de déclencher une deuxième vente
+// complète avant que la première ait fini de répondre - sans ce verrou,
+// un simple temps de réponse un peu long (ex: envoi de l'email du code
+// cadeau) pouvait faire encaisser deux fois le même ticket.
+var paymentInFlight = false;
+
+function setPayButtonsLocked(locked) {
+  document.getElementById('pay-especes').disabled = locked || ticket.length === 0;
+  document.getElementById('pay-cb').disabled = locked || ticket.length === 0;
+}
+
 function pay(method) {
-  if (!ticket.length) return;
+  if (!ticket.length || paymentInFlight) return;
 
   var gift = null;
   if (document.getElementById('gift-checkbox').checked) {
@@ -2145,6 +2157,9 @@ function pay(method) {
     gift = { recipient_name: gName, recipient_phone: gPhone, recipient_email: gEmail };
   }
 
+  paymentInFlight = true;
+  setPayButtonsLocked(true);
+
   var total = ticketTotal();
   var soldTicket = ticket.slice();
   var linkedQueueId = ticketQueueId;
@@ -2155,6 +2170,18 @@ function pay(method) {
     startTpePayment(saleCtx);
     return;
   }
+
+  // Espèces : même écran d'attente que la carte (sans les boutons
+  // Annuler/Réessayer) - l'encaissement peut prendre un instant (ex.
+  // envoi de l'email du code cadeau), sans retour visuel on pouvait
+  // croire que ça avait planté et recliquer.
+  var box = document.getElementById('tpe-box');
+  box.classList.remove('fail');
+  document.getElementById('tpe-spinner').style.display = 'block';
+  document.getElementById('tpe-amount').textContent = eur(saleCtx.total);
+  document.getElementById('tpe-msg').textContent = 'Encaissement en cours…';
+  document.getElementById('tpe-actions').style.display = 'none';
+  document.getElementById('tpe-overlay').classList.add('on');
 
   finalizeSale(saleCtx);
 }
@@ -2194,15 +2221,24 @@ function showTpeFailure(message) {
   document.getElementById('tpe-amount').textContent = 'Échec du paiement';
   document.getElementById('tpe-msg').textContent = message;
   document.getElementById('tpe-actions').style.display = 'flex';
+  // L'utilisateur doit pouvoir choisir "Annuler" (retour au ticket) ou
+  // "Réessayer" - dans les deux cas ce n'est plus "en cours de
+  // traitement", donc on débloque les boutons de paiement.
+  paymentInFlight = false;
+  setPayButtonsLocked(false);
 }
 
 function cancelTpePayment() {
   tpePendingSaleCtx = null;
+  paymentInFlight = false;
+  setPayButtonsLocked(false);
   document.getElementById('tpe-overlay').classList.remove('on');
 }
 
 function retryTpePayment() {
   if (!tpePendingSaleCtx) return;
+  paymentInFlight = true;
+  setPayButtonsLocked(true);
   startTpePayment(tpePendingSaleCtx);
 }
 
@@ -2215,7 +2251,16 @@ function finalizeSale(saleCtx) {
     }
   }).then(function (r) {
     tpePendingSaleCtx = null;
+    paymentInFlight = false;
+    document.getElementById('tpe-overlay').classList.remove('on');
     showReceipt(saleCtx.soldTicket, saleCtx.total, saleCtx.method, { ticketNumber: r.sale && r.sale.ticket_number });
+    // Si un cadeau a été créé, on avertit toujours le coiffeur si l'email
+    // du code n'est pas parti (SMTP non configuré, panne...) - sans ça,
+    // le client repart sans son code et personne ne s'en aperçoit avant
+    // qu'il ne rappelle pour se plaindre.
+    if (r.gift && !r.gift.email_sent) {
+      toast('⚠️ Email du code cadeau NON envoyé - notez ce code pour le client : ' + r.gift.code, true);
+    }
     // Paiement en espèces : impression automatique du ticket, ce qui
     // déclenche aussi l'ouverture du tiroir-caisse si l'imprimante est
     // configurée pour ça (réglage côté pilote Windows). Pas fait pour la
@@ -2234,7 +2279,16 @@ function finalizeSale(saleCtx) {
     document.getElementById('gift-email').value = '';
     renderTicket();
     loadPendingPayments();
-  }).catch(function (e) { toast(e.message, true); });
+  }).catch(function (e) {
+    // Échec (réseau, validation serveur...) - le ticket n'a PAS été
+    // vidé, donc le coiffeur peut corriger et refaire un essai : il faut
+    // impérativement débloquer les boutons, sinon la caisse reste
+    // bloquée jusqu'au rafraîchissement de la page.
+    paymentInFlight = false;
+    setPayButtonsLocked(false);
+    document.getElementById('tpe-overlay').classList.remove('on');
+    toast(e.message, true);
+  });
 }
 
 var PAYMENT_LABELS = { especes: 'Espèces', cb: 'Carte bancaire' };
