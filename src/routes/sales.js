@@ -69,6 +69,17 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
     if (!gift.recipient_name || !gift.recipient_phone || !gift.recipient_email) {
       return res.status(400).json({ error: 'Nom, téléphone et email du bénéficiaire sont requis pour un cadeau' });
     }
+    // Le coiffeur actif (bulle sélectionnée) au moment de la vente
+    // devient le coiffeur DÉSIGNÉ pour ce cadeau - le bénéficiaire
+    // n'aura plus à en choisir un lui-même au kiosk/à la réservation en
+    // ligne. Le vrai blocage se fait côté caisse.html (qui connaît
+    // fidèlement l'état de sélection de bulle) - ce contrôle-ci n'est
+    // qu'un filet de sécurité pour un appel direct à l'API sans session
+    // de coiffeur du tout (ex: admin sans barber_id explicite dans le
+    // corps de la requête).
+    if (!req.actingBarberId && !req.body.barber_id) {
+      return res.status(400).json({ error: 'Veuillez sélectionner votre profil (bulle coiffeur) avant de créer un cadeau' });
+    }
   }
 
   // Si la vente correspond à une coupe terminée précise (venant de "En

@@ -2147,6 +2147,17 @@ function pay(method) {
 
   var gift = null;
   if (document.getElementById('gift-checkbox').checked) {
+    // Le coiffeur actif (bulle sélectionnée) devient le coiffeur DÉSIGNÉ
+    // pour ce cadeau - le bénéficiaire n'aura plus à en choisir un lui-
+    // même au kiosk/à la réservation en ligne. Sans bulle sélectionnée,
+    // ce lien ne pourrait jamais se faire correctement (on retomberait
+    // sur "peu importe qui a ouvert la tablette ce matin-là", pas
+    // forcément le bon coiffeur) - on bloque donc ici plutôt que de
+    // laisser passer un cadeau mal attribué.
+    if (!activeBarberId) {
+      toast('Veuillez sélectionner votre profil (bulle coiffeur) avant de créer un cadeau', true);
+      return;
+    }
     var gName = document.getElementById('gift-name').value.trim();
     var gPhone = document.getElementById('gift-phone').value.trim();
     var gEmail = document.getElementById('gift-email').value.trim();
