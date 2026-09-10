@@ -322,6 +322,8 @@
   }
   .gift-info-grid .f { font-size: 12.5px; color: var(--grey); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .gift-info-grid .f b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .gift-info-head { margin-top: 0; padding-bottom: 6px; border-bottom: 1px solid var(--sep); }
+  .gift-info-head .f { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; font-weight: 600; }
   @media (max-width: 900px) {
     .gift-info-grid { grid-template-columns: 1fr 1fr; }
   }
@@ -889,6 +891,10 @@
         </div>
       </div>
       <p class="hint">Historique des cadeaux achetés dans ce salon.</p>
+      <div class="gift-info-grid gift-info-head">
+        <div class="f">Email</div><div class="f">Téléphone</div><div class="f">Code</div>
+        <div class="f">Coiffeur</div><div class="f">Acheté le</div><div class="f">Utilisé le</div>
+      </div>
       <div id="gift-cards-list"></div>
       <div class="clients-pagination" id="gifts-pagination"></div>
     </div>
@@ -3343,17 +3349,13 @@ function renderGiftCardsList() {
         var statusLabel = g.used_at ? 'Utilisé' : 'Non utilisé';
         var statusColor = g.used_at ? 'var(--grey)' : 'var(--green)';
         var fmtDate = function (iso) { return new Date(iso).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }); };
-        var infoFields = [
-          ['Email', esc(g.recipient_email)],
-          ['Téléphone', esc(g.recipient_phone)],
-          ['Code', esc(g.code || '—')],
-          ['Coiffeur', esc(g.barber_name || 'Non désigné')],
-          ['Acheté le', fmtDate(g.created_at)]
-        ];
-        if (g.used_at) infoFields.push(['Utilisé le', fmtDate(g.used_at)]);
-        var infoGrid = infoFields.map(function (f) {
-          return '<div class="f">' + f[0] + ' : <b>' + f[1] + '</b></div>';
-        }).join('');
+        var infoGrid = ['<div class="f"><b>' + esc(g.recipient_email) + '</b></div>',
+          '<div class="f"><b>' + esc(g.recipient_phone) + '</b></div>',
+          '<div class="f"><b>' + esc(g.code || '—') + '</b></div>',
+          '<div class="f"><b>' + esc(g.barber_name || 'Non désigné') + '</b></div>',
+          '<div class="f"><b>' + fmtDate(g.created_at) + '</b></div>',
+          '<div class="f">' + (g.used_at ? '<b>' + fmtDate(g.used_at) + '</b>' : '') + '</div>'
+        ].join('');
         return '<div class="item">' +
           '<div class="item-main"><div class="item-name">' + esc(g.recipient_name) + ' — ' + eur(g.amount_cents) + '</div>' +
           '<div class="item-meta">' + esc(itemsList) + '</div>' +
