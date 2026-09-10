@@ -316,6 +316,12 @@
     background: none; padding: 14px 4px; margin-bottom: 0;
   }
   #loyalty-accounts-list .item:last-child, #gift-cards-list .item:last-child { border-bottom: none; }
+  .gift-info-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 4px 16px;
+    margin-top: 8px;
+  }
+  .gift-info-grid .f { font-size: 12.5px; color: var(--grey); }
+  .gift-info-grid .f b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
 
   .card-box { background: var(--card); border-radius: 16px; padding: 22px; box-shadow: var(--shadow);
               margin-bottom: 14px; transition: background .25s ease; }
@@ -3333,12 +3339,22 @@ function renderGiftCardsList() {
         var itemsList = g.items.map(function (it) { return (it.quantity > 1 ? it.quantity + ' × ' : '') + it.item_name; }).join(', ');
         var statusLabel = g.used_at ? 'Utilisé' : 'Non utilisé';
         var statusColor = g.used_at ? 'var(--grey)' : 'var(--green)';
-        var boughtOn = new Date(g.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        var fmtDate = function (iso) { return new Date(iso).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }); };
+        var infoFields = [
+          ['Email', esc(g.recipient_email)],
+          ['Téléphone', esc(g.recipient_phone)],
+          ['Code', esc(g.code || '—')],
+          ['Coiffeur', esc(g.barber_name || 'Non désigné')],
+          ['Acheté le', fmtDate(g.created_at)]
+        ];
+        if (g.used_at) infoFields.push(['Utilisé le', fmtDate(g.used_at)]);
+        var infoGrid = infoFields.map(function (f) {
+          return '<div class="f">' + f[0] + ' : <b>' + f[1] + '</b></div>';
+        }).join('');
         return '<div class="item">' +
           '<div class="item-main"><div class="item-name">' + esc(g.recipient_name) + ' — ' + eur(g.amount_cents) + '</div>' +
           '<div class="item-meta">' + esc(itemsList) + '</div>' +
-          '<div class="item-meta">' + esc(g.recipient_email) + ' · ' + esc(g.recipient_phone) + ' · code ' + esc(g.code || '—') + '</div>' +
-          '<div class="item-meta">Coiffeur : ' + esc(g.barber_name || 'Non désigné') + ' · Acheté le ' + boughtOn + '</div></div>' +
+          '<div class="gift-info-grid">' + infoGrid + '</div></div>' +
           '<div class="item-actions">' +
             (g.used_at ? '' : '<button class="btn btn-soft" onclick="resendGiftCode(\'' + g.id + '\')" style="font-size:13px;padding:6px 12px">Renvoyer le code</button>') +
             '<span style="color:' + statusColor + ';font-size:13px;font-weight:600;align-self:center">' + statusLabel + '</span>' +
