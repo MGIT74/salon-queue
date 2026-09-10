@@ -791,3 +791,21 @@ WHERE c.z_number IS NULL;
 SET @si1 := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'sale_items' AND column_name = 'barber_id');
 SET @sql := IF(@si1 = 0, 'ALTER TABLE sale_items ADD COLUMN barber_id CHAR(36) NULL, ADD CONSTRAINT fk_sale_items_barber FOREIGN KEY (barber_id) REFERENCES barbers(id) ON DELETE SET NULL', 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Numéro de ticket séquentiel par salon (bien plus lisible sur un ticket
+-- imprimé que l'identifiant technique de la vente) - même principe que
+-- z_number pour les clôtures de caisse.
+SET @st1 := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'sales' AND column_name = 'ticket_number');
+SET @sql := IF(@st1 = 0, 'ALTER TABLE sales ADD COLUMN ticket_number INT NULL', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Numérote rétroactivement les ventes déjà existantes (par ordre
+-- chronologique, par salon), pour que la colonne soit remplie même sur
+-- une base déjà en service.
+UPDATE sales s
+JOIN (
+  SELECT id, ROW_NUMBER() OVER (PARTITION BY salon_id ORDER BY created_at ASC) AS rn
+  FROM sales
+) t ON t.id = s.id
+SET s.ticket_number = t.rn
+WHERE s.ticket_number IS NULL;
