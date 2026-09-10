@@ -324,6 +324,17 @@
   .gift-info-grid .f b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
   .gift-info-head { margin-top: 0; padding-bottom: 6px; border-bottom: 1px solid var(--sep); }
   .gift-info-head .f { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; font-weight: 600; }
+  .loyalty-info-grid {
+    display: grid; grid-template-columns: 220px 90px 130px 120px 130px; gap: 4px 12px;
+    margin-top: 8px;
+  }
+  .loyalty-info-grid .f { font-size: 12.5px; color: var(--grey); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .loyalty-info-grid .f b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .loyalty-info-head { margin-top: 0; padding-bottom: 6px; border-bottom: 1px solid var(--sep); }
+  .loyalty-info-head .f { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; font-weight: 600; }
+  @media (max-width: 900px) {
+    .loyalty-info-grid { grid-template-columns: 1fr 1fr; }
+  }
   @media (max-width: 900px) {
     .gift-info-grid { grid-template-columns: 1fr 1fr; }
   }
@@ -875,6 +886,10 @@
         </div>
       </div>
       <p class="hint">Points et récompenses en attente, tous salons de l'enseigne confondus.</p>
+      <div class="loyalty-info-grid loyalty-info-head">
+        <div class="f">Email</div><div class="f">Points</div><div class="f">Récompenses</div>
+        <div class="f">Activé le</div><div class="f">Dernière activité</div>
+      </div>
       <div id="loyalty-accounts-list"></div>
       <div class="clients-pagination" id="loyalty-pagination"></div>
     </div>
@@ -3314,11 +3329,17 @@ function renderLoyaltyAccountsList() {
   list.innerHTML = loyaltyAccountsData.length === 0
     ? '<div class="empty">Aucun client fidèle pour le moment</div>'
     : pageItems.map(function (a) {
+        var fmtDate = function (iso) { return iso ? new Date(iso).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : ''; };
+        var infoGrid = [
+          '<div class="f"><b>' + esc(a.recipient_email || a.client_key || '—') + '</b></div>',
+          '<div class="f"><b>' + a.points + '</b></div>',
+          '<div class="f">' + (a.rewards_available > 0 ? '<b>' + a.rewards_available + ' disponible' + (a.rewards_available > 1 ? 's' : '') + '</b>' : '') + '</div>',
+          '<div class="f"><b>' + fmtDate(a.activated_at) + '</b></div>',
+          '<div class="f"><b>' + fmtDate(a.updated_at) + '</b></div>'
+        ].join('');
         return '<div class="item">' +
           '<div class="item-main"><div class="item-name">' + esc(a.client_name) + '</div>' +
-          '<div class="item-meta">' + a.points + ' point' + (a.points > 1 ? 's' : '') +
-          (a.rewards_available > 0 ? ' · ' + a.rewards_available + ' récompense' + (a.rewards_available > 1 ? 's' : '') + ' disponible' + (a.rewards_available > 1 ? 's' : '') : '') +
-          '</div></div></div>';
+          '<div class="loyalty-info-grid">' + infoGrid + '</div></div></div>';
       }).join('');
 
   renderPaginationControls('loyalty-pagination', loyaltyPage, loyaltyPerPage, loyaltyAccountsData.length, 'goToLoyaltyPage');
