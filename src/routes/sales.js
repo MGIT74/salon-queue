@@ -154,9 +154,20 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
     }
   }
 
+  // Numéro de ticket séquentiel par salon (bien plus lisible sur un
+  // ticket imprimé que l'identifiant technique saleId) - même principe
+  // que z_number pour les clôtures de caisse. Léger risque théorique de
+  // collision en cas d'écritures strictement simultanées sur le même
+  // salon (pas de verrou dédié), jugé négligeable pour un usage caisse
+  // mono-salon normal.
+  const [[{ next_ticket_number: ticketNumber }]] = await pool.query(
+    'SELECT COALESCE(MAX(ticket_number), 0) + 1 AS next_ticket_number FROM sales WHERE salon_id = ?',
+    [req.salon.id]
+  );
+
   await pool.query(
-    'INSERT INTO sales (id, salon_id, barber_id, payment_method, total_price_cents) VALUES (?, ?, ?, ?, ?)',
-    [saleId, req.salon.id, barberId, payment_method, total]
+    'INSERT INTO sales (id, salon_id, barber_id, payment_method, total_price_cents, ticket_number) VALUES (?, ?, ?, ?, ?, ?)',
+    [saleId, req.salon.id, barberId, payment_method, total, ticketNumber]
   );
   await pool.query(
     'INSERT INTO sale_items (id, sale_id, item_type, item_id, item_name, unit_price_cents, quantity, barber_id) VALUES ?',
@@ -222,7 +233,7 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
     }
   }
 
-  res.json({ ok: true, sale: { id: saleId, total_price_cents: total, payment_method, barber_id: barberId } });
+  res.json({ ok: true, sale: { id: saleId, total_price_cents: total, payment_method, barber_id: barberId, ticket_number: ticketNumber } });
 }));
 
 /**
