@@ -107,10 +107,10 @@
     letter-spacing: .12em; background: rgba(255,255,255,.15); border-radius: 8px; padding: 8px 12px;
     text-align: center;
   }
-  .gift-card:not(.used) .gift-code { cursor: pointer; user-select: none; transition: background .15s ease; }
+  .gift-card:not(.used) .gift-code { cursor: pointer; user-select: none; transition: background .15s ease; display: flex; align-items: center; justify-content: center; gap: 8px; }
   .gift-card:not(.used) .gift-code:active { background: rgba(255,255,255,.3); }
-  .gift-card .gift-code .copy-ic { font-size: 13px; opacity: .75; letter-spacing: 0; }
-  .gift-card .gift-code.copied { background: rgba(16,185,129,.35); }
+  .gift-card .gift-code .copy-ic { display: flex; opacity: .6; flex-shrink: 0; }
+  .gift-card .gift-code.copied .copy-ic { opacity: 1; color: #34d399; }
   .gift-card.used {
     background: var(--fill); color: var(--grey); filter: grayscale(1); opacity: .7;
   }
@@ -680,7 +680,12 @@ function renderGiftCards(giftCards) {
       '</div>' +
       (g.used
         ? '<div class="gift-code">' + esc(g.code || '—') + '</div>'
-        : '<div class="gift-code" data-code="' + esc(g.code || '') + '" onclick="copyGiftCode(this)" title="Toucher pour copier">' + esc(g.code || '—') + ' <span class="copy-ic">⧉</span></div>') +
+        : '<div class="gift-code" data-code="' + esc(g.code || '') + '" onclick="copyGiftCode(this)" title="Toucher pour copier">' +
+            '<span class="code-text">' + esc(g.code || '—') + '</span>' +
+            '<span class="copy-ic">' +
+              '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>' +
+            '</span>' +
+          '</div>') +
       (g.used ? '<div class="used-badge">Déjà utilisée</div>' : '') +
     '</div>';
   }).join('');
@@ -695,23 +700,24 @@ var currentSalonLogoForCards = '';
 var currentGiftCardImageForCards = '';
 
 /**
- * Copie le code cadeau au clic, avec un petit retour visuel ("Copié !").
- * Repli sur execCommand('copy') si l'API Clipboard moderne échoue (vieux
- * navigateur, ou contexte non sécurisé) plutôt que de ne rien faire.
+ * Copie le code cadeau au clic - retour visuel discret (l'icône devient
+ * une coche verte un instant, le code reste toujours affiché) + un
+ * toast. Repli sur execCommand('copy') si l'API Clipboard moderne
+ * échoue (vieux navigateur, ou contexte non sécurisé).
  */
 function copyGiftCode(el) {
   var code = el.getAttribute('data-code');
   if (!code) return;
 
   function showCopied() {
-    var original = el.getAttribute('data-original') || el.innerHTML;
-    el.setAttribute('data-original', original);
+    var icEl = el.querySelector('.copy-ic');
+    var originalIcon = icEl.innerHTML;
+    icEl.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
     el.classList.add('copied');
-    el.innerHTML = 'Copié ! ✓';
     toast('Code copié !');
     setTimeout(function () {
       el.classList.remove('copied');
-      el.innerHTML = original;
+      icEl.innerHTML = originalIcon;
     }, 1500);
   }
 
