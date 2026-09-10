@@ -1222,7 +1222,11 @@
     </div>
 
     <div class="card-box">
-      <h3>Informations légales</h3>
+      <h3 class="accordion-head" onclick="toggleSettingsAccordion('salon-legal')">
+        Informations légales
+        <svg class="accordion-chevron" id="salon-legal-chevron" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </h3>
+      <div class="accordion-body" id="salon-legal-body" style="display:none">
       <p class="hint">
         Affichées sur les tickets de caisse imprimés, comme l'exige la loi anti-fraude TVA. Le SIRET a déjà été
         renseigné à la création du compte ; les autres champs sont à compléter ici.
@@ -1251,10 +1255,15 @@
       <div class="fld"><label for="set-legal-register">Numéro de caisse</label>
         <input id="set-legal-register" type="text" placeholder="1"></div>
       <button class="btn btn-primary" style="margin-top:6px" onclick="saveLegalInfo()">Enregistrer</button>
+      </div>
     </div>
 
     <div class="card-box">
-      <h3>TVA</h3>
+      <h3 class="accordion-head" onclick="toggleSettingsAccordion('salon-vat')">
+        TVA
+        <svg class="accordion-chevron" id="salon-vat-chevron" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </h3>
+      <div class="accordion-body" id="salon-vat-body" style="display:none">
       <p class="hint">
         Un taux différent est possible pour chaque catégorie d'article, appliqué à tous ses articles pour le
         calcul du détail HT/TVA sur le ticket de caisse. Laisser vide si non assujetti à la TVA.
@@ -1266,6 +1275,7 @@
       <div class="fld"><label for="set-vat-product">Produits (%)</label>
         <input id="set-vat-product" type="number" min="0" max="100" step="0.1" placeholder="20"></div>
       <button class="btn btn-primary" style="margin-top:6px" onclick="saveVatRates()">Enregistrer</button>
+      </div>
     </div>
 
     <div class="card-box">
