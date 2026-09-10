@@ -1056,16 +1056,6 @@
     <p class="hint" style="margin-top:-8px">Réservés en ligne — ceux du jour apparaissent aussi automatiquement dans la file d'attente au moment prévu.</p>
     <div class="cal-barber-picker" id="cal-barber-picker"></div>
 
-    <div class="card-box" id="timeline-card">
-      <h3 style="margin-top:0">Planning du jour</h3>
-      <div class="timeline-scroll">
-        <div class="timeline-inner" id="timeline-inner">
-          <div class="timeline-hours" id="timeline-hours"></div>
-          <div id="timeline-rows"></div>
-        </div>
-      </div>
-    </div>
-
     <div class="card-box">
       <div class="cal-nav">
         <button class="btn btn-soft" onclick="calShiftPeriod(-1)">‹</button>
@@ -1855,7 +1845,7 @@ function setActiveTab(tabName) {
   document.querySelectorAll('.tab-panel').forEach(function (p) { p.classList.remove('on'); });
   document.getElementById('t-' + tabName).classList.add('on');
 
-  if (tabName !== 'rdv') stopTimelineAutoRefresh();
+  if (tabName !== 'rdv') stopCalendarNowRefresh();
   if (tabName === 'settings') loadSettings();
   if (tabName === 'clients') loadClients();
   if (tabName === 'salons') loadChainTab();
@@ -3501,15 +3491,16 @@ function loadRdvTab() {
 
   setCalView('month');
   resetRdvListToUpcoming();
-  loadTimeline();
-  startTimelineAutoRefresh();
+  // Charge les horaires du salon avant tout, pour que la timeline du
+  // jour (dès qu'un jour sera sélectionné) affiche la bonne plage dès
+  // le premier clic plutôt que d'attendre un second rendu.
+  loadSalonScheduleForTimeline();
+  startCalendarNowRefresh();
 }
 
-/* ---------- Planning du jour (timeline temps réel) ---------- */
-var timelineRefreshTimer = null;
-var timelineTickTimer = null;
-var timelineRange = { start: 9 * 60, end: 19 * 60 }; // en minutes depuis minuit
+/* ---------- Planning du jour, intégré au calendrier (comme la Caisse) ---------- */
 var salonScheduleByWeekday = null; // { [0-6]: {startMin, endMin} } - chargé une seule fois
+var calNowRefreshTimer = null;
 
 function minutesFromScheduledAt(appt) {
   var hm = appt.scheduled_at.slice(11, 16).split(':');
@@ -3524,9 +3515,8 @@ function timeStrToMinutes(t) {
 /**
  * Charge une seule fois les horaires généraux du salon (Réglages >
  * Calendrier), pour servir de vraie référence à la plage horaire du
- * Planning du jour - remplace l'ancienne règle "minimum 8h d'amplitude"
- * qui ignorait complètement l'heure de fermeture réelle et pouvait
- * afficher la timeline bien après la fermeture du salon.
+ * Planning du jour - jamais un minimum arbitraire qui ignorerait l'heure
+ * de fermeture réelle.
  */
 function loadSalonScheduleForTimeline() {
   if (salonScheduleByWeekday) return Promise.resolve(salonScheduleByWeekday);
@@ -3540,50 +3530,31 @@ function loadSalonScheduleForTimeline() {
   }).catch(function () { salonScheduleByWeekday = {}; return salonScheduleByWeekday; });
 }
 
-function loadTimeline() {
-  var todayStr = ymd(new Date());
-  var mKey = monthKey(new Date());
-  Promise.all([
-    loadSalonScheduleForTimeline(),
-    api('/api/appointments?month=' + mKey + '&all=1')
-  ]).then(function (results) {
-    var r = results[1];
-    var todays = r.items.filter(function (a) {
-      return a.scheduled_at.slice(0, 10) === todayStr && a.status !== 'cancelled' && a.barber_id;
-    });
-    renderTimeline(todays, new Date().getDay());
-  }).catch(function () { /* silencieux : la timeline n'est qu'un complément visuel */ });
-}
-
-function renderTimeline(appts, weekday) {
-  var card = document.getElementById('timeline-card');
-  if (!card) return;
-
-  if (appts.length === 0) {
-    document.getElementById('timeline-hours').innerHTML = '';
-    document.getElementById('timeline-rows').innerHTML = '<div class="timeline-empty">Aucun rendez-vous aujourd\'hui</div>';
-    return;
+/**
+ * Timeline "Planning du jour" par coiffeur pour une date donnée -
+ * affichée directement à l'intérieur du calendrier (panneau d'expansion
+ * Mois/Semaine, ou vue Jour), à la place de l'ancienne longue liste
+ * texte des RDV - même principe que l'Agenda de la caisse, bien plus
+ * ergonomique qu'une liste qui s'allonge indéfiniment.
+ */
+function renderDayTimelineHtml(dateStr, dayAppts) {
+  if (dayAppts.length === 0) {
+    return '<div class="timeline-empty">Aucun rendez-vous ce jour-là</div>';
   }
 
-  // Plage horaire = les heures d'ouverture réelles du salon ce jour-là
-  // (Réglages > Calendrier), étendue uniquement si un RDV dépasse ces
-  // horaires (ex: RDV tardif exceptionnel) - jamais un minimum arbitraire
-  // qui ignorerait l'heure de fermeture réelle.
-  var starts = appts.map(minutesFromScheduledAt);
-  var ends = appts.map(function (a) { return minutesFromScheduledAt(a) + Math.max(a.duration_min || 30, 15); });
+  var starts = dayAppts.map(minutesFromScheduledAt);
+  var ends = dayAppts.map(function (a) { return minutesFromScheduledAt(a) + Math.max(a.duration_min || 30, 15); });
   var apptMin = Math.min.apply(null, starts);
   var apptMax = Math.max.apply(null, ends);
 
+  var weekday = new Date(dateStr + 'T00:00:00').getDay();
   var salonDay = salonScheduleByWeekday && salonScheduleByWeekday[weekday];
   var baseStart = salonDay ? salonDay.startMin : Math.floor(apptMin / 60) * 60;
   var baseEnd = salonDay ? salonDay.endMin : Math.ceil(apptMax / 60) * 60;
 
   var rangeStart = Math.floor(Math.min(baseStart, apptMin) / 60) * 60;
   var rangeEnd = Math.ceil(Math.max(baseEnd, apptMax) / 60) * 60;
-  // Filet minimal seulement si vraiment rien de mieux à afficher (aucun
-  // horaire salon configuré ce jour-là ET un unique RDV très court).
   if (rangeEnd - rangeStart < 4 * 60) rangeEnd = rangeStart + 4 * 60;
-  timelineRange = { start: rangeStart, end: rangeEnd };
 
   var hourCount = (rangeEnd - rangeStart) / 60;
   var hoursHtml = '';
@@ -3591,20 +3562,18 @@ function renderTimeline(appts, weekday) {
     var totalMin = rangeStart + h * 60;
     hoursHtml += '<span>' + String(Math.floor(totalMin / 60)).padStart(2, '0') + ':00</span>';
   }
-  document.getElementById('timeline-hours').innerHTML = hoursHtml;
-  document.getElementById('timeline-hours').style.gridTemplateColumns = 'repeat(' + hourCount + ', 1fr)';
 
-  // Groupe par coiffeur, trié par nom pour un ordre stable.
   var byBarber = {};
-  appts.forEach(function (a) {
-    if (!byBarber[a.barber_id]) byBarber[a.barber_id] = { name: a.barber_name || '?', items: [] };
-    byBarber[a.barber_id].items.push(a);
+  dayAppts.forEach(function (a) {
+    var key = a.barber_id || 'unassigned';
+    if (!byBarber[key]) byBarber[key] = { name: a.barber_name || 'Non assigné', items: [] };
+    byBarber[key].items.push(a);
   });
   var barberIds = Object.keys(byBarber).sort(function (x, y) { return byBarber[x].name.localeCompare(byBarber[y].name); });
 
   var rowsHtml = barberIds.map(function (bid) {
     var b = byBarber[bid];
-    var color = rdvBarberColors[bid] || stableColorForId(bid);
+    var color = bid === 'unassigned' ? 'var(--grey)' : (rdvBarberColors[bid] || stableColorForId(bid));
     var blocksHtml = b.items.map(function (a) {
       var startMin = minutesFromScheduledAt(a);
       var dur = Math.max(a.duration_min || 30, 15);
@@ -3613,56 +3582,47 @@ function renderTimeline(appts, weekday) {
       var time = a.scheduled_at.slice(11, 16);
       return '<div class="timeline-block" style="left:' + leftPct + '%;width:' + widthPct + '%;background:' + color + '" ' +
         'title="' + esc(time + ' — ' + a.client_name + ' — ' + (a.service_name || '')) + '" ' +
-        'onclick="openClientDrawerForAppointment(\'' + a.id + '\')">' + esc(a.client_name) + '</div>';
+        'onclick="event.stopPropagation();openClientDrawerForAppointment(\'' + a.id + '\')">' + esc(a.client_name) + '</div>';
     }).join('');
     return '<div class="timeline-row">' +
       '<div class="timeline-row-label"><span class="dot" style="background:' + color + '"></span>' + esc(b.name) + '</div>' +
       '<div class="timeline-row-track">' + blocksHtml + '</div>' +
       '</div>';
   }).join('');
-  document.getElementById('timeline-rows').innerHTML = rowsHtml;
 
-  updateTimelineNowLine();
-}
-
-function updateTimelineNowLine() {
-  var inner = document.getElementById('timeline-inner');
-  if (!inner || !document.getElementById('timeline-rows').children.length) return;
-
-  var existing = document.getElementById('timeline-now-line');
-  var now = new Date();
-  var nowMin = now.getHours() * 60 + now.getMinutes();
-
-  if (nowMin < timelineRange.start || nowMin > timelineRange.end) {
-    if (existing) existing.remove();
-    return;
+  var nowLineHtml = '';
+  if (dateStr === ymd(new Date())) {
+    var now = new Date();
+    var nowMin = now.getHours() * 60 + now.getMinutes();
+    if (nowMin >= rangeStart && nowMin <= rangeEnd) {
+      var leftFrac = (nowMin - rangeStart) / (rangeEnd - rangeStart);
+      nowLineHtml = '<div class="timeline-now-line" style="left: calc(130px + (100% - 130px) * ' + leftFrac + ')"></div>';
+    }
   }
 
-  var leftPct = ((nowMin - timelineRange.start) / (timelineRange.end - timelineRange.start)) * 100;
-  // 130px = largeur fixe de la colonne des noms, à décaler en plus du %.
-  var style = 'left: calc(130px + (100% - 130px) * ' + (leftPct / 100) + ')';
-  if (existing) {
-    existing.setAttribute('style', style);
-  } else {
-    var line = document.createElement('div');
-    line.id = 'timeline-now-line';
-    line.className = 'timeline-now-line';
-    line.setAttribute('style', style);
-    inner.appendChild(line);
-  }
+  return '<div class="timeline-scroll"><div class="timeline-inner">' +
+    '<div class="timeline-hours" style="grid-template-columns:repeat(' + hourCount + ',1fr)">' + hoursHtml + '</div>' +
+    rowsHtml + nowLineHtml +
+    '</div></div>';
 }
 
-function startTimelineAutoRefresh() {
-  stopTimelineAutoRefresh();
-  timelineTickTimer = setInterval(updateTimelineNowLine, 30000);
-  timelineRefreshTimer = setInterval(loadTimeline, 60000);
+/**
+ * Réaffiche la vue active toutes les 30s tant que l'onglet RDV est
+ * ouvert - fait avancer le trait "maintenant" et récupère les nouveaux
+ * RDV du jour sans action de l'utilisateur.
+ */
+function startCalendarNowRefresh() {
+  stopCalendarNowRefresh();
+  calNowRefreshTimer = setInterval(function () {
+    if (calViewMode === 'day') renderDayView();
+    else if (calViewMode === 'week') renderWeekView();
+    else renderMonthView();
+  }, 30000);
 }
 
-function stopTimelineAutoRefresh() {
-  if (timelineTickTimer) clearInterval(timelineTickTimer);
-  if (timelineRefreshTimer) clearInterval(timelineRefreshTimer);
-  timelineTickTimer = null;
-  timelineRefreshTimer = null;
+function stopCalendarNowRefresh() {
+  if (calNowRefreshTimer) clearInterval(calNowRefreshTimer);
+  calNowRefreshTimer = null;
 }
 
 function setCalView(mode) {
@@ -3799,27 +3759,13 @@ function renderMonthView() {
  */
 function renderExpandPanel(dateStr, dayAppts) {
   var when = new Date(dateStr + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' });
-  var sorted = dayAppts.slice().sort(function (a, b) { return a.scheduled_at.localeCompare(b.scheduled_at); });
-
-  sorted.forEach(function (a) { calAppointmentById[a.id] = a; });
-
-  var rows = sorted.length === 0
-    ? '<div class="empty">Aucun rendez-vous ce jour-là</div>'
-    : sorted.map(function (a) {
-        var time = a.scheduled_at.slice(11, 16);
-        return '<div class="cal-expand-row" onclick="openClientDrawerForAppointment(\'' + a.id + '\')">' +
-          '<div class="cal-day-view-time">' + time + '</div>' +
-          '<div class="cal-day-view-dot" style="background:' + (rdvBarberColors[a.barber_id] || '#888') + '"></div>' +
-          '<div style="flex:1"><div class="cal-day-view-name">' + esc(a.client_name) + ' ' + sourceBadge(a) + '</div>' +
-          '<div class="cal-day-view-meta">' + esc(a.service_name) + (a.barber_name ? ' avec ' + esc(a.barber_name) : '') + '</div></div>' +
-          '</div>';
-      }).join('');
+  dayAppts.forEach(function (a) { calAppointmentById[a.id] = a; });
 
   return '<div class="cal-expand-panel">' +
     '<div class="cal-expand-head"><strong style="text-transform:capitalize">' + when + '</strong>' +
     '<button class="btn btn-soft" onclick="event.stopPropagation();selectCalendarDay(null)">Fermer</button></div>' +
     '<button class="btn btn-primary" style="width:100%;margin-bottom:14px" onclick="event.stopPropagation();openAdminAddAppointment(\'' + dateStr + '\')">+ Ajouter un RDV</button>' +
-    rows +
+    renderDayTimelineHtml(dateStr, dayAppts) +
     '</div>';
 }
 
@@ -4054,23 +4000,14 @@ function renderDayView() {
   document.getElementById('cal-month-label').textContent =
     calAnchor.toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
 
-  var dayAppts = applyCalBarberFilter(appointmentsForRange(calAnchor, calAnchor)).sort(function (a, b) { return a.scheduled_at.localeCompare(b.scheduled_at); });
+  var dateStr = ymd(calAnchor);
+  var dayAppts = applyCalBarberFilter(appointmentsForRange(calAnchor, calAnchor));
   dayAppts.forEach(function (a) { calAppointmentById[a.id] = a; });
   var view = document.getElementById('cal-day-view');
-  var addBtn = '<button class="btn btn-primary" style="width:100%;margin-bottom:14px" onclick="openAdminAddAppointment(\'' + ymd(calAnchor) + '\')">+ Ajouter un RDV</button>';
-  view.innerHTML = addBtn + (dayAppts.length === 0
-    ? '<div class="empty">Aucun rendez-vous ce jour-là</div>'
-    : '<div class="cal-day-view-list">' + dayAppts.map(function (a) {
-        var time = a.scheduled_at.slice(11, 16);
-        return '<div class="cal-day-view-appt" style="cursor:pointer" onclick="openClientDrawerForAppointment(\'' + a.id + '\')">' +
-          '<div class="cal-day-view-time">' + time + '</div>' +
-          '<div class="cal-day-view-dot" style="background:' + (rdvBarberColors[a.barber_id] || '#888') + '"></div>' +
-          '<div><div class="cal-day-view-name">' + esc(a.client_name) + ' ' + sourceBadge(a) + '</div>' +
-          '<div class="cal-day-view-meta">' + esc(a.service_name) + (a.barber_name ? ' avec ' + esc(a.barber_name) : '') + '</div></div>' +
-          '</div>';
-      }).join('') + '</div>');
+  var addBtn = '<button class="btn btn-primary" style="width:100%;margin-bottom:14px" onclick="openAdminAddAppointment(\'' + dateStr + '\')">+ Ajouter un RDV</button>';
+  view.innerHTML = addBtn + renderDayTimelineHtml(dateStr, dayAppts);
 
-  calSelectedDate = ymd(calAnchor);
+  calSelectedDate = dateStr;
   document.getElementById('rdv-list-title').textContent = 'Le ' + calAnchor.toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' });
   document.getElementById('rdv-reset-btn').style.display = 'inline-block';
   renderRdvList();
