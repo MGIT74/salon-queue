@@ -360,7 +360,7 @@
   .cal-week-row { margin-bottom: 4px; }
   .cal-expand-panel {
     background: var(--fill); border-radius: 14px; padding: 16px 18px; margin: 6px 0 10px;
-    animation: cal-expand .18s ease;
+    animation: cal-expand .18s ease; min-width: 0; grid-column: 1 / -1;
   }
   @keyframes cal-expand { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
   .cal-expand-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; font-size: 14.5px; text-transform: capitalize; }
@@ -397,7 +397,7 @@
   .cal-legend-avatar.dimmed { opacity: .35; }
 
   /* --- Planning du jour (timeline temps réel) --- */
-  .timeline-scroll { overflow-x: auto; }
+  .timeline-scroll { overflow-x: auto; width: 100%; max-width: 100%; }
   .timeline-inner { position: relative; min-width: 720px; }
   .timeline-hours {
     display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
@@ -3642,7 +3642,7 @@ function setCalView(mode) {
     document.getElementById('cal-view-' + m).classList.toggle('on', m === mode);
   });
   document.getElementById('cal-weekdays').style.display = mode === 'day' ? 'none' : 'grid';
-  document.getElementById('cal-days').style.display = mode === 'day' ? 'none' : 'grid';
+  document.getElementById('cal-days').style.display = mode === 'day' ? 'none' : 'block';
   document.getElementById('cal-day-view').style.display = mode === 'day' ? 'block' : 'none';
   loadCalendarPeriod();
 }
