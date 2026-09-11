@@ -32,7 +32,6 @@
     display: flex; align-items: center; gap: 6px; background: var(--fill); border-radius: 999px;
     padding: 6px 13px 6px 9px; font-size: 13px; font-weight: 500;
   }
-  .gift-summary-chip .chip-icon { font-size: 15px; line-height: 1; }
   .gift-summary-chip .chip-qty { color: var(--accent, var(--blue)); font-weight: 700; }
 
   .svc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px,1fr)); gap: 10px; margin-bottom: 22px; }
@@ -90,6 +89,17 @@
     <h1>Prendre rendez-vous</h1>
   </div>
 
+  <div class="gift-summary-box" id="gift-summary-box" style="display:none">
+    <div class="gift-summary-barber" id="gift-summary-barber-row">
+      <span class="gift-summary-avatar" id="gift-summary-avatar"></span>
+      <div>
+        <div class="gift-summary-label">Rendez-vous avec</div>
+        <div class="gift-summary-name" id="gift-summary-name"></div>
+      </div>
+    </div>
+    <div class="gift-summary-items" id="gift-summary-items"></div>
+  </div>
+
   <section class="panel on" id="p-barber">
     <div class="eyebrow" id="barber-eyebrow">Choisissez votre coiffeur</div>
     <div class="svc-grid" id="barber-grid"></div>
@@ -121,16 +131,6 @@
 
   <section class="panel" id="p-datetime">
     <button class="back" onclick="show('p-extras')">‹ Retour</button>
-    <div class="gift-summary-box" id="gift-summary-box" style="display:none">
-      <div class="gift-summary-barber" id="gift-summary-barber-row">
-        <span class="gift-summary-avatar" id="gift-summary-avatar"></span>
-        <div>
-          <div class="gift-summary-label">Rendez-vous avec</div>
-          <div class="gift-summary-name" id="gift-summary-name"></div>
-        </div>
-      </div>
-      <div class="gift-summary-items" id="gift-summary-items"></div>
-    </div>
     <div class="fld"><label for="rdv-date">Date</label><input id="rdv-date" type="date" onchange="loadSlots()"></div>
     <div class="eyebrow" style="margin-top:20px">Créneaux disponibles</div>
     <div id="half-toggle" class="half-toggle" style="display:none;margin-bottom:14px">
@@ -205,6 +205,7 @@ function api(path, opts) {
 function show(id) {
   document.querySelectorAll('.panel').forEach(function (p) { p.classList.remove('on'); });
   document.getElementById(id).classList.add('on');
+  renderGiftSummaryBox();
   window.scrollTo(0, 0);
 }
 
@@ -286,7 +287,6 @@ function selectBarber(el, id) {
   if (activeGift) {
     // Prestation et suppléments déjà déterminés par le cadeau -
     // seuls le coiffeur puis la date/heure restent à choisir.
-    renderGiftSummaryBox();
     show('p-datetime');
     var today = new Date().toISOString().slice(0, 10);
     document.getElementById('rdv-date').min = today;
@@ -324,11 +324,7 @@ function renderGiftSummaryBox() {
   }
 
   document.getElementById('gift-summary-items').innerHTML = activeGift.items.map(function (it) {
-    return '<span class="gift-summary-chip">' +
-      '<span class="chip-icon">' + iconForItem(it.item_name) + '</span>' +
-      (it.quantity > 1 ? '<span class="chip-qty">' + it.quantity + '×</span>' : '') +
-      esc(it.item_name) +
-    '</span>';
+    return '<span class="gift-summary-chip"><span class="chip-qty">' + (it.quantity || 1) + '×</span> ' + esc(it.item_name) + '</span>';
   }).join('');
   box.style.display = 'block';
 }
@@ -522,7 +518,6 @@ function submitAppointment() {
     var s = services.find(function (x) { return x.id === selService; });
     var when = new Date(selDate + 'T' + selSlot.time).toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' }) + ' à ' + selSlot.time;
     document.getElementById('confirm-details').textContent = when + ' — ' + s.name + (activeGift ? ' (cadeau utilisé — présentez ce cadeau à votre coiffeur)' : '');
-    activeGift = null;
     show('p-confirmed');
   }).catch(function (e) {
     toast(e.message, true);
