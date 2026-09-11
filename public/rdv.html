@@ -130,7 +130,8 @@
   </section>
 
   <section class="panel" id="p-datetime">
-    <button class="back" onclick="show('p-extras')">‹ Retour</button>
+    <button class="back" id="datetime-back-btn" onclick="show('p-extras')">‹ Retour</button>
+    <button class="back" id="datetime-cancel-btn" style="display:none;color:var(--red)" onclick="cancelGiftBooking()">Annuler</button>
     <div class="fld"><label for="rdv-date">Date</label><input id="rdv-date" type="date" onchange="loadSlots()"></div>
     <div class="eyebrow" style="margin-top:20px">Créneaux disponibles</div>
     <div id="half-toggle" class="half-toggle" style="display:none;margin-bottom:14px">
@@ -206,7 +207,24 @@ function show(id) {
   document.querySelectorAll('.panel').forEach(function (p) { p.classList.remove('on'); });
   document.getElementById(id).classList.add('on');
   renderGiftSummaryBox();
+  // Un cadeau fixe déjà la prestation et les suppléments - revenir en
+  // arrière depuis l'étape date/heure ne doit surtout pas permettre de
+  // rouvrir l'étape suppléments et d'en ajouter un en plus du cadeau.
+  // On isole donc le client : plus de retour possible, seulement un
+  // abandon explicite (double confirmation) qui repart de zéro.
+  document.getElementById('datetime-back-btn').style.display = activeGift ? 'none' : 'block';
+  document.getElementById('datetime-cancel-btn').style.display = activeGift ? 'block' : 'none';
   window.scrollTo(0, 0);
+}
+
+/**
+ * Abandonne l'utilisation du cadeau en cours (double confirmation :
+ * clic sur le bouton, puis validation de la boîte de dialogue) et
+ * repart entièrement de zéro, comme un nouveau client qui arrive.
+ */
+function cancelGiftBooking() {
+  if (!confirm('Annuler l’utilisation de ce cadeau et recommencer une réservation depuis le début ?')) return;
+  startNewBooking();
 }
 
 function iconForItem(name) {
