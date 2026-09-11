@@ -993,10 +993,20 @@ function lookupBookGiftCode() {
  * contenu du cadeau en cours d'utilisation - reprend le même fond
  * personnalisé (Réglages > Marketing) que la carte cadeau du compte.
  */
+var BOOKING_PANELS = ['p-book-barber', 'p-book-gift-code', 'p-book-service', 'p-book-extras', 'p-book-datetime', 'p-book-confirm', 'p-book-confirmed'];
+
 function renderGiftSummaryBox() {
   var box = document.getElementById('gift-summary-box');
   if (!box) return;
-  if (!activeBookGift) { box.style.display = 'none'; return; }
+  var currentPanel = document.querySelector('.panel.on');
+  var inBookingFlow = currentPanel && BOOKING_PANELS.indexOf(currentPanel.id) !== -1;
+  // Le cadeau reste actif en mémoire tant que la réservation n'est ni
+  // finalisée ni annulée - mais si le client quitte vers Accueil/Compte
+  // via la barre du bas sans faire ni l'un ni l'autre, cet encart (situé
+  // hors des panneaux pour rester visible tout au long de la
+  // réservation) ne doit surtout pas continuer à traîner ailleurs dans
+  // l'app.
+  if (!activeBookGift || !inBookingFlow) { box.style.display = 'none'; return; }
 
   if (currentGiftCardImageForCards) {
     box.classList.add('has-bg');
