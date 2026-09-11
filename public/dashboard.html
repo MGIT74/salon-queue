@@ -408,7 +408,7 @@
   .timeline-row:first-child { border-top: none; }
   .timeline-row-label { width: 130px; flex-shrink: 0; display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13.5px; padding-right: 10px; }
   .timeline-row-label .dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
-  .timeline-row-track { position: relative; flex: 1; height: 40px; }
+  .timeline-row-track { position: relative; flex: 1; height: 40px; cursor: pointer; }
   .timeline-block {
     position: absolute; top: 3px; bottom: 3px; border-radius: 8px; padding: 4px 10px;
     font-size: 12.5px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden;
@@ -3538,17 +3538,35 @@ function loadSalonScheduleForTimeline() {
  * ergonomique qu'une liste qui s'allonge indéfiniment.
  */
 function renderDayTimelineHtml(dateStr, dayAppts) {
-  if (dayAppts.length === 0) {
-    return '<div class="timeline-empty">Aucun rendez-vous ce jour-là</div>';
+  var weekday = new Date(dateStr + 'T00:00:00').getDay();
+  var salonDay = salonScheduleByWeekday && salonScheduleByWeekday[weekday];
+
+  // Même un jour totalement vide doit garder une ligne cliquable par
+  // coiffeur (pour ajouter un RDV directement) - on part donc toujours
+  // de la liste des coiffeurs bookables, pas seulement de ceux qui ont
+  // déjà un RDV ce jour-là.
+  var byBarber = {};
+  barbers.filter(isBookableForAdmin).forEach(function (b) {
+    byBarber[b.id] = { name: b.name, items: [] };
+  });
+  dayAppts.forEach(function (a) {
+    var key = a.barber_id || 'unassigned';
+    if (!byBarber[key]) byBarber[key] = { name: a.barber_name || 'Non assigné', items: [] };
+    byBarber[key].items.push(a);
+  });
+  var barberIds = Object.keys(byBarber).sort(function (x, y) { return byBarber[x].name.localeCompare(byBarber[y].name); });
+
+  if (barberIds.length === 0) {
+    return '<div class="timeline-empty">Aucun coiffeur disponible</div>';
   }
 
-  var starts = dayAppts.map(minutesFromScheduledAt);
-  var ends = dayAppts.map(function (a) { return minutesFromScheduledAt(a) + Math.max(a.duration_min || 30, 15); });
+  var starts = dayAppts.length ? dayAppts.map(minutesFromScheduledAt) : [salonDay ? salonDay.startMin : 9 * 60];
+  var ends = dayAppts.length
+    ? dayAppts.map(function (a) { return minutesFromScheduledAt(a) + Math.max(a.duration_min || 30, 15); })
+    : [salonDay ? salonDay.endMin : 19 * 60];
   var apptMin = Math.min.apply(null, starts);
   var apptMax = Math.max.apply(null, ends);
 
-  var weekday = new Date(dateStr + 'T00:00:00').getDay();
-  var salonDay = salonScheduleByWeekday && salonScheduleByWeekday[weekday];
   var baseStart = salonDay ? salonDay.startMin : Math.floor(apptMin / 60) * 60;
   var baseEnd = salonDay ? salonDay.endMin : Math.ceil(apptMax / 60) * 60;
 
@@ -3563,17 +3581,10 @@ function renderDayTimelineHtml(dateStr, dayAppts) {
     hoursHtml += '<span>' + String(Math.floor(totalMin / 60)).padStart(2, '0') + ':00</span>';
   }
 
-  var byBarber = {};
-  dayAppts.forEach(function (a) {
-    var key = a.barber_id || 'unassigned';
-    if (!byBarber[key]) byBarber[key] = { name: a.barber_name || 'Non assigné', items: [] };
-    byBarber[key].items.push(a);
-  });
-  var barberIds = Object.keys(byBarber).sort(function (x, y) { return byBarber[x].name.localeCompare(byBarber[y].name); });
-
   var rowsHtml = barberIds.map(function (bid) {
     var b = byBarber[bid];
     var color = bid === 'unassigned' ? 'var(--grey)' : (rdvBarberColors[bid] || stableColorForId(bid));
+    var rowBarberArg = bid === 'unassigned' ? '' : bid;
     var blocksHtml = b.items.map(function (a) {
       var startMin = minutesFromScheduledAt(a);
       var dur = Math.max(a.duration_min || 30, 15);
@@ -3586,7 +3597,7 @@ function renderDayTimelineHtml(dateStr, dayAppts) {
     }).join('');
     return '<div class="timeline-row">' +
       '<div class="timeline-row-label"><span class="dot" style="background:' + color + '"></span>' + esc(b.name) + '</div>' +
-      '<div class="timeline-row-track">' + blocksHtml + '</div>' +
+      '<div class="timeline-row-track" onclick="openAdminAddAppointment(\'' + dateStr + '\',\'' + rowBarberArg + '\')">' + blocksHtml + '</div>' +
       '</div>';
   }).join('');
 
@@ -3764,7 +3775,6 @@ function renderExpandPanel(dateStr, dayAppts) {
   return '<div class="cal-expand-panel">' +
     '<div class="cal-expand-head"><strong style="text-transform:capitalize">' + when + '</strong>' +
     '<button class="btn btn-soft" onclick="event.stopPropagation();selectCalendarDay(null)">Fermer</button></div>' +
-    '<button class="btn btn-primary" style="width:100%;margin-bottom:14px" onclick="event.stopPropagation();openAdminAddAppointment(\'' + dateStr + '\')">+ Ajouter un RDV</button>' +
     renderDayTimelineHtml(dateStr, dayAppts) +
     '</div>';
 }
@@ -3773,11 +3783,11 @@ function renderExpandPanel(dateStr, dayAppts) {
  * Ajout manuel d'un RDV par l'admin (ex: client au téléphone) depuis le
  * panneau du jour - email optionnel, mais coiffeur toujours requis.
  */
-function openAdminAddAppointment(dateStr) {
+function openAdminAddAppointment(dateStr, preselectedBarberId) {
   var rdvBarbers = barbers.filter(isBookableForAdmin);
   var when = new Date(dateStr + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' });
 
-  var state = { barberId: null, serviceId: null, extraIds: [], time: null };
+  var state = { barberId: preselectedBarberId || null, serviceId: null, extraIds: [], time: null };
 
   var overlay = _buildModal(
     '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px">' +
@@ -3838,6 +3848,14 @@ function openAdminAddAppointment(dateStr) {
   var STEPS = ['barber', 'service', 'extras', 'datetime', 'contact'];
   attachClientAutocomplete(overlay, 'aa-name', 'aa-email', 'aa-phone', api);
 
+  // Clic sur la ligne d'un coiffeur précis dans le planning (au lieu du
+  // gros bouton générique) : on sait déjà qui, on saute directement à la
+  // prestation - exactement le principe déjà en place sur la Caisse.
+  if (preselectedBarberId) {
+    var preBtn = overlay.querySelector('#aa-step-barber .aa-card[data-id="' + preselectedBarberId + '"]');
+    if (preBtn) preBtn.classList.add('sel');
+  }
+
   window.aaGoStep = function (step) {
     STEPS.forEach(function (s) { overlay.querySelector('#aa-step-' + s).style.display = s === step ? 'block' : 'none'; });
     if (step === 'datetime') aaLoadSlots();
@@ -3846,6 +3864,8 @@ function openAdminAddAppointment(dateStr) {
       overlay.querySelector('#aa-contact-summary').textContent = when + ' à ' + state.time + ' — ' + (s ? s.name : '');
     }
   };
+
+  if (preselectedBarberId) aaGoStep('service');
 
   window.aaSelectBarber = function (el) {
     state.barberId = el.dataset.id;
@@ -4004,8 +4024,7 @@ function renderDayView() {
   var dayAppts = applyCalBarberFilter(appointmentsForRange(calAnchor, calAnchor));
   dayAppts.forEach(function (a) { calAppointmentById[a.id] = a; });
   var view = document.getElementById('cal-day-view');
-  var addBtn = '<button class="btn btn-primary" style="width:100%;margin-bottom:14px" onclick="openAdminAddAppointment(\'' + dateStr + '\')">+ Ajouter un RDV</button>';
-  view.innerHTML = addBtn + renderDayTimelineHtml(dateStr, dayAppts);
+  view.innerHTML = renderDayTimelineHtml(dateStr, dayAppts);
 
   calSelectedDate = dateStr;
   document.getElementById('rdv-list-title').textContent = 'Le ' + calAnchor.toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' });
