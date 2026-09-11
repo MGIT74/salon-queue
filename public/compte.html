@@ -105,12 +105,13 @@
   .gift-card .gift-code {
     margin-top: 14px; font-family: 'Courier New', monospace; font-size: 15px; font-weight: 700;
     letter-spacing: .12em; background: rgba(255,255,255,.15); border-radius: 8px; padding: 8px 12px;
-    text-align: center;
+    text-align: center; color: rgba(255,255,255,.85);
   }
-  .gift-card:not(.used) .gift-code { cursor: pointer; user-select: none; transition: background .15s ease; display: flex; align-items: center; justify-content: center; gap: 8px; }
-  .gift-card:not(.used) .gift-code:active { background: rgba(255,255,255,.3); }
-  .gift-card .gift-code .copy-ic { display: flex; opacity: .6; flex-shrink: 0; }
-  .gift-card .gift-code.copied .copy-ic { opacity: 1; color: #34d399; }
+  .gift-card .gift-use-btn {
+    display: block; width: 100%; margin-top: 10px; background: #fff; color: #7c3aed; border: none;
+    border-radius: 10px; padding: 11px; font-family: inherit; font-size: 14.5px; font-weight: 700; cursor: pointer;
+  }
+  .gift-card .gift-use-btn:active { transform: scale(.98); }
   .gift-card.used {
     background: var(--fill); color: var(--grey); filter: grayscale(1); opacity: .7;
   }
@@ -732,8 +733,8 @@ function renderGiftCards(giftCards) {
           return '<span class="gift-item-chip">' + (it.quantity > 1 ? it.quantity + ' × ' : '') + esc(it.name) + '</span>';
         }).join('') + '</div>'
       : '';
-    return '<div class="gift-card' + (g.used ? ' used' : '') + '">' +
-      (g.used ? '' : '<div class="card-shine"></div>') +
+    return '<div class="gift-card">' +
+      '<div class="card-shine"></div>' +
       '<div class="card-top-row">' +
         '<div class="card-logo" id="gift-card-logo-' + g.id + '">🎁</div>' +
         '<div class="card-points-block">' +
@@ -742,15 +743,8 @@ function renderGiftCards(giftCards) {
         '</div>' +
       '</div>' +
       itemsHtml +
-      (g.used
-        ? '<div class="gift-code">' + esc(g.code || '—') + '</div>'
-        : '<div class="gift-code" data-code="' + esc(g.code || '') + '" onclick="copyGiftCode(this)" title="Toucher pour copier">' +
-            '<span class="code-text">' + esc(g.code || '—') + '</span>' +
-            '<span class="copy-ic">' +
-              '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>' +
-            '</span>' +
-          '</div>') +
-      (g.used ? '<div class="used-badge">Déjà utilisée</div>' : '') +
+      '<div class="gift-code">' + esc(g.code || '—') + '</div>' +
+      '<button class="gift-use-btn" onclick="useGiftFromAccount(\'' + esc(g.code) + '\')">Utiliser ce cadeau</button>' +
     '</div>';
   }).join('');
 
@@ -762,46 +756,6 @@ function renderGiftCards(giftCards) {
 }
 var currentSalonLogoForCards = '';
 var currentGiftCardImageForCards = '';
-
-/**
- * Copie le code cadeau au clic - retour visuel discret (l'icône devient
- * une coche verte un instant, le code reste toujours affiché) + un
- * toast. Repli sur execCommand('copy') si l'API Clipboard moderne
- * échoue (vieux navigateur, ou contexte non sécurisé).
- */
-function copyGiftCode(el) {
-  var code = el.getAttribute('data-code');
-  if (!code) return;
-
-  function showCopied() {
-    var icEl = el.querySelector('.copy-ic');
-    var originalIcon = icEl.innerHTML;
-    icEl.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
-    el.classList.add('copied');
-    toast('Code copié !');
-    setTimeout(function () {
-      el.classList.remove('copied');
-      icEl.innerHTML = originalIcon;
-    }, 1500);
-  }
-
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(code).then(showCopied).catch(function () { fallbackCopy(code, showCopied); });
-  } else {
-    fallbackCopy(code, showCopied);
-  }
-}
-
-function fallbackCopy(text, onSuccess) {
-  var ta = document.createElement('textarea');
-  ta.value = text;
-  ta.style.position = 'fixed';
-  ta.style.opacity = '0';
-  document.body.appendChild(ta);
-  ta.select();
-  try { document.execCommand('copy'); onSuccess(); } catch (e) { toast('Impossible de copier automatiquement : ' + text, true); }
-  document.body.removeChild(ta);
-}
 
 /**
  * Applique le logo du salon et l'image de fond personnalisée (Réglages >
@@ -947,6 +901,28 @@ function selectBookBarber(el, id) {
 }
 
 /* ---------- Utiliser un cadeau (réservation) ---------- */
+/**
+ * Depuis le bouton "Utiliser ce cadeau" d'une carte du compte : plus
+ * besoin de copier/coller le code, on l'a déjà. Charge le catalogue si
+ * besoin (goBook) puis relance directement la même recherche que la
+ * saisie manuelle - le client atterrit directement sur le choix du
+ * coiffeur/créneau.
+ */
+function useGiftFromAccount(code) {
+  goBook(function () {
+    document.getElementById('bk-gift-code-input').value = code;
+    document.getElementById('bk-gift-code-error').textContent = '';
+    lookupBookGiftCode();
+    // lookupBookGiftCode() est asynchrone (appel réseau) - si une erreur
+    // survient (carte déjà utilisée entre-temps, code invalide...), on
+    // bascule sur l'écran de saisie pour que le client voie le message
+    // au lieu de rester silencieusement bloqué sur un écran caché.
+    setTimeout(function () {
+      if (document.getElementById('bk-gift-code-error').textContent) show('p-book-gift-code');
+    }, 600);
+  });
+}
+
 function openBookGiftCodeScreen() {
   document.getElementById('bk-gift-code-input').value = '';
   document.getElementById('bk-gift-code-error').textContent = '';
