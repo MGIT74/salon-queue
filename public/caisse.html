@@ -976,7 +976,7 @@ function loadTicketDraft(barberId) {
     ticketQueueId = r.draft.ticketQueueId;
     loyaltyDiscount = r.draft.loyaltyDiscount;
     loyaltyRewardsAvailable = r.draft.loyaltyRewardsAvailable;
-    renderActive(true);
+    renderTicket();
   }).catch(function () {});
 }
 
@@ -999,6 +999,7 @@ function selectActiveBarber(barberId) {
   nextDetailOpen = {};
   renderActive(true);
   renderNext();
+  renderTicket();
   if (calBooted) {
     if (calViewMode === 'day') renderCalDay();
     else if (calViewMode === 'month') renderCalMonth();
