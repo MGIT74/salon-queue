@@ -208,6 +208,38 @@
 
   .back { background: none; border: none; padding: 0; font-family: inherit; font-size: 15px;
           color: var(--accent); font-weight: 500; cursor: pointer; margin-bottom: 18px; }
+
+  /* Encart cadeau lors d'une réservation via un code (même esprit "vraie
+     carte" que la carte cadeau du compte - fond perso + dégradé sombre
+     superposé pour garder le texte lisible). */
+  .gift-summary-box {
+    position: relative; overflow: hidden; border-radius: 18px; padding: 16px 18px; margin-bottom: 20px;
+    background: linear-gradient(135deg, #7c3aed, #db2777); color: #fff;
+  }
+  .gift-summary-box.has-bg { background-size: cover; background-position: center; }
+  .gift-summary-box.has-bg::before {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(135deg, rgba(0,0,0,.55), rgba(0,0,0,.25));
+  }
+  .gift-summary-box > * { position: relative; z-index: 1; }
+  .gift-summary-tag {
+    display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 700;
+    letter-spacing: .04em; text-transform: uppercase; color: rgba(255,255,255,.85); margin-bottom: 12px;
+  }
+  .gift-summary-barber { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .gift-summary-avatar {
+    width: 46px; height: 46px; border-radius: 50%; flex-shrink: 0; box-sizing: border-box;
+    display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 17px;
+    background-size: cover; background-position: center; border: 2px solid rgba(255,255,255,.5);
+  }
+  .gift-summary-label { font-size: 12px; color: rgba(255,255,255,.75); margin-bottom: 1px; }
+  .gift-summary-name { font-size: 16px; font-weight: 700; }
+  .gift-summary-items { display: flex; flex-wrap: wrap; gap: 8px; }
+  .gift-summary-chip {
+    display: flex; align-items: center; gap: 6px; background: rgba(255,255,255,.18); border-radius: 999px;
+    padding: 6px 13px; font-size: 13px; font-weight: 500;
+  }
+  .gift-summary-chip .chip-qty { font-weight: 700; }
   .confirm-box { text-align: center; padding: 20px 0; }
   .confirm-box .check {
     width: 56px; height: 56px; border-radius: 50%; background: var(--green); margin: 0 auto 18px;
@@ -328,6 +360,17 @@
     <div class="msg" id="password-msg"></div>
   </section>
   <!-- Réservation intégrée -->
+  <div class="gift-summary-box" id="gift-summary-box" style="display:none">
+    <div class="gift-summary-tag">🎁 Carte cadeau</div>
+    <div class="gift-summary-barber" id="gift-summary-barber-row">
+      <span class="gift-summary-avatar" id="gift-summary-avatar"></span>
+      <div>
+        <div class="gift-summary-label">Rendez-vous avec</div>
+        <div class="gift-summary-name" id="gift-summary-name"></div>
+      </div>
+    </div>
+    <div class="gift-summary-items" id="gift-summary-items"></div>
+  </div>
   <section class="panel" id="p-book-barber">
     <div class="eyebrow" id="bk-barber-eyebrow">Choisissez votre coiffeur</div>
     <div class="svc-grid" id="bk-barber-grid"></div>
@@ -358,7 +401,8 @@
   </section>
 
   <section class="panel" id="p-book-datetime">
-    <button class="back" onclick="show('p-book-extras')">‹ Retour</button>
+    <button class="back" id="bk-datetime-back-btn" onclick="show('p-book-extras')">‹ Retour</button>
+    <button class="back" id="bk-datetime-cancel-btn" style="display:none;color:var(--red)" onclick="cancelBookGift()">Annuler</button>
     <div class="fld"><label for="bk-date">Date</label><input id="bk-date" type="date" onchange="loadBookSlots()"></div>
     <div class="eyebrow" style="margin-top:20px">Créneaux disponibles</div>
     <div id="bk-half-toggle" class="half-toggle" style="display:none;margin-bottom:14px">
@@ -448,6 +492,13 @@ function show(id) {
   document.querySelectorAll('.panel').forEach(function (p) { p.classList.remove('on'); });
   document.getElementById(id).classList.add('on');
   window.scrollTo(0, 0);
+  renderGiftSummaryBox();
+  var backBtn = document.getElementById('bk-datetime-back-btn');
+  var cancelBtn = document.getElementById('bk-datetime-cancel-btn');
+  if (backBtn && cancelBtn) {
+    backBtn.style.display = activeBookGift ? 'none' : 'block';
+    cancelBtn.style.display = activeBookGift ? 'block' : 'none';
+  }
 
   // L'effet d'éclat des cartes (fidélité + cadeaux) est une animation CSS
   // - elle ne se déclenche jamais si l'élément est révélé APRÈS avoir été
@@ -929,6 +980,64 @@ function lookupBookGiftCode() {
   });
 }
 
+/**
+ * Rappelle, tout au long de la réservation, le coiffeur retenu et le
+ * contenu du cadeau en cours d'utilisation - reprend le même fond
+ * personnalisé (Réglages > Marketing) que la carte cadeau du compte.
+ */
+function renderGiftSummaryBox() {
+  var box = document.getElementById('gift-summary-box');
+  if (!box) return;
+  if (!activeBookGift) { box.style.display = 'none'; return; }
+
+  if (currentGiftCardImageForCards) {
+    box.classList.add('has-bg');
+    box.style.backgroundImage = 'url(\'' + currentGiftCardImageForCards + '\')';
+  } else {
+    box.classList.remove('has-bg');
+    box.style.backgroundImage = '';
+  }
+
+  var barber = activeBookGift.designated_barber || bookBarbers.find(function (b) { return b.id === selBookBarber; });
+  var barberRow = document.getElementById('gift-summary-barber-row');
+  if (barber) {
+    var avatarEl = document.getElementById('gift-summary-avatar');
+    if (barber.photo_url) {
+      avatarEl.setAttribute('style', 'background-image:url(\'' + barber.photo_url + '\')');
+      avatarEl.textContent = '';
+    } else {
+      avatarEl.setAttribute('style', 'background:' + stableColorForId(barber.id));
+      avatarEl.textContent = (barber.name || '?').trim().charAt(0).toUpperCase();
+    }
+    document.getElementById('gift-summary-name').textContent = barber.name;
+    barberRow.style.display = 'flex';
+  } else {
+    barberRow.style.display = 'none';
+  }
+
+  document.getElementById('gift-summary-items').innerHTML = activeBookGift.items.map(function (it) {
+    // Seuls les produits ont une quantité qui a du sens à afficher.
+    var qty = (it.item_type === 'product' && it.quantity > 0) ? '<span class="chip-qty">' + it.quantity + '×</span> ' : '';
+    return '<span class="gift-summary-chip">' + qty + esc(it.item_name) + '</span>';
+  }).join('');
+  box.style.display = 'block';
+}
+
+/**
+ * Abandonne l'utilisation du cadeau en cours (double confirmation) et
+ * repart de la toute première étape - un cadeau fixe déjà la
+ * prestation et les suppléments, revenir en arrière depuis l'étape
+ * date/heure ne doit surtout pas permettre d'en rajouter un.
+ */
+function cancelBookGift() {
+  if (!confirm('Annuler l’utilisation de ce cadeau et recommencer une réservation depuis le début ?')) return;
+  selBookBarber = null; selBookService = null; selBookExtras = []; selBookDate = null; selBookSlot = null; activeBookGift = null;
+  document.getElementById('bk-barber-eyebrow').textContent = 'Choisissez votre coiffeur';
+  document.getElementById('bk-date').value = '';
+  document.querySelectorAll('#bk-barber-grid .svc-card').forEach(function (c) { c.classList.remove('sel'); });
+  show('p-book-barber');
+}
+
 function renderBookServiceGrid() {
   document.getElementById('bk-svc-grid').innerHTML = bookServices.map(function (s) {
     return '<button class="svc-card' + (selBookService === s.id ? ' sel' : '') + '" data-id="' + s.id + '" onclick="selectBookService(this,\'' + s.id + '\')">' +
@@ -1057,11 +1166,11 @@ function submitBookAppointment() {
     var s = bookServices.find(function (x) { return x.id === selBookService; });
     var when = new Date(selBookDate + 'T' + selBookSlot.time).toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' }) + ' à ' + selBookSlot.time;
     document.getElementById('bk-confirm-details').textContent = when + ' — ' + s.name + (activeBookGift ? ' (cadeau utilisé — présentez-le à votre coiffeur)' : '');
+    show('p-book-confirmed');
     selBookBarber = null; selBookService = null; selBookExtras = []; selBookDate = null; selBookSlot = null; activeBookGift = null;
     document.getElementById('bk-barber-eyebrow').textContent = 'Choisissez votre coiffeur';
     document.getElementById('bk-date').value = '';
     document.getElementById('bk-note').value = '';
-    show('p-book-confirmed');
     hideFooter();
   }).catch(function (e) {
     toast(e.message, true);
