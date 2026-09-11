@@ -112,6 +112,12 @@
     border-radius: 10px; padding: 11px; font-family: inherit; font-size: 14.5px; font-weight: 700; cursor: pointer;
   }
   .gift-card .gift-use-btn:active { transform: scale(.98); }
+  .gift-card .gift-walkin-note {
+    display: flex; align-items: center; justify-content: center; gap: 8px; text-align: center;
+    margin-top: 10px; background: rgba(255,255,255,.15); color: #fff;
+    border-radius: 10px; padding: 11px; font-size: 13px; font-weight: 600; line-height: 1.35;
+  }
+  .gift-card .gift-walkin-note svg { flex-shrink: 0; }
   .gift-card.used {
     background: var(--fill); color: var(--grey); filter: grayscale(1); opacity: .7;
   }
@@ -744,7 +750,7 @@ function renderGiftCards(giftCards) {
       '</div>' +
       itemsHtml +
       '<div class="gift-code">' + esc(g.code || '—') + '</div>' +
-      '<button class="gift-use-btn" onclick="useGiftFromAccount(\'' + esc(g.code) + '\')">Utiliser ce cadeau</button>' +
+      '<button class="gift-use-btn" onclick="useGiftFromAccount(this, \'' + esc(g.code) + '\')">Utiliser ce cadeau</button>' +
     '</div>';
   }).join('');
 
@@ -903,23 +909,36 @@ function selectBookBarber(el, id) {
 /* ---------- Utiliser un cadeau (réservation) ---------- */
 /**
  * Depuis le bouton "Utiliser ce cadeau" d'une carte du compte : plus
- * besoin de copier/coller le code, on l'a déjà. Charge le catalogue si
- * besoin (goBook) puis relance directement la même recherche que la
- * saisie manuelle - le client atterrit directement sur le choix du
- * coiffeur/créneau.
+ * besoin de copier/coller le code, on l'a déjà. Vérifie d'abord si ce
+ * cadeau est lié à un coiffeur "sans rendez-vous" (auquel cas il ne
+ * peut pas être réservé en ligne - le bouton se transforme alors en
+ * simple message, sans jamais quitter la page). Sinon, charge le
+ * catalogue si besoin (goBook) puis relance directement la même
+ * recherche que la saisie manuelle - le client atterrit directement sur
+ * le choix du coiffeur/créneau.
  */
-function useGiftFromAccount(code) {
-  goBook(function () {
-    document.getElementById('bk-gift-code-input').value = code;
-    document.getElementById('bk-gift-code-error').textContent = '';
-    lookupBookGiftCode();
-    // lookupBookGiftCode() est asynchrone (appel réseau) - si une erreur
-    // survient (carte déjà utilisée entre-temps, code invalide...), on
-    // bascule sur l'écran de saisie pour que le client voie le message
-    // au lieu de rester silencieusement bloqué sur un écran caché.
-    setTimeout(function () {
-      if (document.getElementById('bk-gift-code-error').textContent) show('p-book-gift-code');
-    }, 600);
+function useGiftFromAccount(btn, code) {
+  btn.disabled = true;
+  btn.textContent = 'Vérification…';
+
+  apiForBooking('/api/sales/gift-cards/lookup?code=' + encodeURIComponent(code)).then(function (r) {
+    if (r.gift.walk_in_only) {
+      var note = document.createElement('div');
+      note.className = 'gift-walkin-note';
+      note.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-4.5-4.2-7-7.7-7-11a7 7 0 0 1 14 0c0 3.3-2.5 6.8-7 11Z"/><circle cx="12" cy="10" r="2.5"/></svg>' +
+        'Utilisable uniquement en salon, sans rendez-vous';
+      btn.replaceWith(note);
+      return;
+    }
+    goBook(function () {
+      document.getElementById('bk-gift-code-input').value = code;
+      document.getElementById('bk-gift-code-error').textContent = '';
+      lookupBookGiftCode();
+    });
+  }).catch(function (e) {
+    btn.disabled = false;
+    btn.textContent = 'Utiliser ce cadeau';
+    toast(e.message, true);
   });
 }
 
@@ -937,6 +956,10 @@ function lookupBookGiftCode() {
 
   apiForBooking('/api/sales/gift-cards/lookup?code=' + encodeURIComponent(code)).then(function (r) {
     var g = r.gift;
+    if (g.walk_in_only) {
+      errEl.textContent = 'Ce cadeau est utilisable uniquement en salon, sans rendez-vous — présentez-vous directement avec ce code.';
+      return;
+    }
     var serviceItem = g.items.find(function (it) { return it.item_type === 'service'; });
     if (!serviceItem || !serviceItem.item_id) {
       errEl.textContent = "Ce cadeau ne comprend pas de prestation réservable en ligne — présentez-vous directement au salon.";

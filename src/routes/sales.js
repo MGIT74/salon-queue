@@ -388,6 +388,13 @@ router.get('/gift-cards/lookup', wrap(async (req, res) => {
     ? { id: gift.barber_id, name: gift.barber_name, photo_url: gift.barber_photo_url }
     : null;
 
+  // Un coiffeur "sans rendez-vous" (accepts_appointments=0) ne peut pas
+  // être réservé en ligne - si le cadeau lui est explicitement lié, il
+  // faut bloquer toute réservation en ligne plutôt que de laisser le
+  // client choisir un autre coiffeur à sa place (le cadeau a été pensé
+  // pour être honoré précisément par ce coiffeur-là, en salon).
+  const walkInOnly = Boolean(gift.barber_id) && !gift.accepts_appointments;
+
   res.json({
     ok: true,
     gift: {
@@ -397,6 +404,7 @@ router.get('/gift-cards/lookup', wrap(async (req, res) => {
       recipient_phone: gift.recipient_phone,
       amount_cents: gift.amount_cents,
       designated_barber: designatedBarber,
+      walk_in_only: walkInOnly,
       items
     }
   });

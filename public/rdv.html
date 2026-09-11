@@ -393,6 +393,10 @@ function lookupGiftCode() {
 
   api('/api/sales/gift-cards/lookup?code=' + encodeURIComponent(code)).then(function (r) {
     var g = r.gift;
+    if (g.walk_in_only) {
+      errEl.textContent = 'Ce cadeau est utilisable uniquement en salon, sans rendez-vous — présentez-vous directement avec ce code.';
+      return;
+    }
     var serviceItem = g.items.find(function (it) { return it.item_type === 'service'; });
     if (!serviceItem || !serviceItem.item_id) {
       errEl.textContent = "Ce cadeau ne comprend pas de prestation réservable en ligne — présentez-vous directement au salon.";
