@@ -688,6 +688,7 @@ var allBarbers = [];
 var catalog = { services: [], extras: [], products: [] };
 var ticket = []; // { item_type, item_id, item_name, unit_price_cents, quantity }
 var ticketQueueId = null; // coupe d'origine si le ticket vient d'un encaissement en attente
+var ticketDraftsCache = {}; // { [barberId]: draft } - copie locale des brouillons serveur, pour un affichage instantané au changement de bulle (rafraîchie en tâche de fond, jamais bloquante)
 var loyaltyRewardsAvailable = 0; // récompenses dispo pour le client du ticket en cours
 var loyaltyDiscount = null; // { index, originalPrice, type } si une réduction fidélité est appliquée
 var marketingSettings = { loyalty_service_discount_pct: 50, loyalty_product_discount_pct: 20 };
@@ -840,6 +841,7 @@ function showApp() {
   document.getElementById('my-name').textContent = me.name;
   activeBarberId = me.id;
   updateTabLockState();
+  preloadTicketDrafts();
   loadTicketDraft(activeBarberId);
   loadBarberBubbles();
   loadCatalog();
@@ -930,16 +932,14 @@ function updateActiveBarberLabel() {
  */
 function saveTicketDraft(barberId) {
   if (!barberId) return;
-  barberApi('/api/ticket-draft', {
-    method: 'PUT',
-    actingAs: barberId,
-    body: {
-      ticket: ticket,
-      ticketQueueId: ticketQueueId,
-      loyaltyDiscount: loyaltyDiscount,
-      loyaltyRewardsAvailable: loyaltyRewardsAvailable
-    }
-  }).catch(function () {});
+  var snapshot = {
+    ticket: ticket,
+    ticketQueueId: ticketQueueId,
+    loyaltyDiscount: loyaltyDiscount,
+    loyaltyRewardsAvailable: loyaltyRewardsAvailable
+  };
+  ticketDraftsCache[barberId] = snapshot; // à jour tout de suite, pas d'attente réseau
+  barberApi('/api/ticket-draft', { method: 'PUT', actingAs: barberId, body: snapshot }).catch(function () {});
 }
 
 var ticketSaveTimer = null;
@@ -956,27 +956,45 @@ function scheduleTicketSave() {
 }
 
 /**
- * Recharge le brouillon du coiffeur donné depuis le serveur, ou repart
- * sur un ticket vide s'il n'en a pas (ou plus aucune bulle
- * sélectionnée). Réinitialise tout de suite en local (affichage
- * immédiat, pas de flash de l'ancien ticket) puis complète dès que la
- * réponse serveur arrive.
+ * Recharge le brouillon du coiffeur donné : affichage immédiat depuis le
+ * cache local préchargé (pas d'attente réseau perceptible en changeant
+ * de bulle), puis vérification en tâche de fond auprès du serveur pour
+ * rattraper un éventuel changement fait depuis un autre appareil.
  */
 function loadTicketDraft(barberId) {
-  ticket = [];
-  ticketQueueId = null;
-  loyaltyDiscount = null;
-  loyaltyRewardsAvailable = 0;
+  var cached = barberId ? ticketDraftsCache[barberId] : null;
+  ticket = cached ? cached.ticket : [];
+  ticketQueueId = cached ? cached.ticketQueueId : null;
+  loyaltyDiscount = cached ? cached.loyaltyDiscount : null;
+  loyaltyRewardsAvailable = cached ? cached.loyaltyRewardsAvailable : 0;
   if (!barberId) return;
   barberApi('/api/ticket-draft', { actingAs: barberId }).then(function (r) {
     // Le coiffeur a pu re-changer de bulle avant que cette réponse
     // n'arrive - dans ce cas elle ne le concerne plus, on l'ignore.
-    if (activeBarberId !== barberId || !r.draft) return;
-    ticket = r.draft.ticket;
-    ticketQueueId = r.draft.ticketQueueId;
-    loyaltyDiscount = r.draft.loyaltyDiscount;
-    loyaltyRewardsAvailable = r.draft.loyaltyRewardsAvailable;
+    if (activeBarberId !== barberId) return;
+    var draft = r.draft || { ticket: [], ticketQueueId: null, loyaltyDiscount: null, loyaltyRewardsAvailable: 0 };
+    ticketDraftsCache[barberId] = draft;
+    ticket = draft.ticket;
+    ticketQueueId = draft.ticketQueueId;
+    loyaltyDiscount = draft.loyaltyDiscount;
+    loyaltyRewardsAvailable = draft.loyaltyRewardsAvailable;
     renderTicket();
+  }).catch(function () {});
+}
+
+/** Précharge en une seule fois les brouillons de tous les coiffeurs du salon. */
+function preloadTicketDrafts() {
+  barberApi('/api/ticket-draft/all').then(function (r) {
+    ticketDraftsCache = r.drafts || {};
+    // Si le brouillon du coiffeur déjà actif vient d'arriver, on
+    // resynchronise l'affichage tout de suite (utile juste après la
+    // connexion, avant que loadTicketDraft n'ait eu le temps de finir).
+    if (activeBarberId && ticketDraftsCache[activeBarberId]) {
+      var d = ticketDraftsCache[activeBarberId];
+      ticket = d.ticket; ticketQueueId = d.ticketQueueId;
+      loyaltyDiscount = d.loyaltyDiscount; loyaltyRewardsAvailable = d.loyaltyRewardsAvailable;
+      renderTicket();
+    }
   }).catch(function () {});
 }
 

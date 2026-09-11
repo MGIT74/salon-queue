@@ -21,6 +21,30 @@ function wrap(fn) {
  * cliquant sur sa bulle. GET renvoie un ticket vide (pas d'erreur) s'il
  * n'a rien en cours - évite à la caisse de gérer un cas "404" à part.
  */
+/**
+ * Tous les brouillons du salon en un seul appel, pour préchargement côté
+ * tablette (affichage instantané en changeant de bulle, sans attendre
+ * un aller-retour réseau par coiffeur). Portée par salon, pas par
+ * coiffeur agissant - n'importe quelle session tablette du salon peut
+ * précharger l'ensemble.
+ */
+router.get('/all', requireAdminOrBarber, wrap(async (req, res) => {
+  const [rows] = await pool.query(
+    'SELECT barber_id, ticket_json, ticket_queue_id, loyalty_discount_json, loyalty_rewards_available FROM ticket_drafts WHERE salon_id = ?',
+    [req.salon.id]
+  );
+  const drafts = {};
+  rows.forEach((row) => {
+    drafts[row.barber_id] = {
+      ticket: row.ticket_json ? JSON.parse(row.ticket_json) : [],
+      ticketQueueId: row.ticket_queue_id,
+      loyaltyDiscount: row.loyalty_discount_json ? JSON.parse(row.loyalty_discount_json) : null,
+      loyaltyRewardsAvailable: row.loyalty_rewards_available || 0
+    };
+  });
+  res.json({ ok: true, drafts });
+}));
+
 router.get('/', requireAdminOrBarber, wrap(async (req, res) => {
   if (!req.actingBarberId) return res.json({ ok: true, draft: null });
 
