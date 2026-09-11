@@ -669,10 +669,11 @@ function populateHome(d) {
  */
 function renderGiftCards(giftCards) {
   var section = document.getElementById('gift-cards-section');
-  if (!giftCards.length) { section.style.display = 'none'; return; }
+  // Une carte déjà utilisée n'a plus d'utilité dans le compte du client -
+  // inutile de l'y laisser traîner, grisée, indéfiniment.
+  var sorted = giftCards.filter(function (g) { return !g.used; });
+  if (!sorted.length) { section.style.display = 'none'; return; }
   section.style.display = 'block';
-
-  var sorted = giftCards.slice().sort(function (a, b) { return Number(a.used) - Number(b.used); });
 
   document.getElementById('gift-cards-list').innerHTML = sorted.map(function (g) {
     var itemsHtml = (g.items && g.items.length)
