@@ -18,6 +18,11 @@
           color: var(--accent); font-weight: 500; cursor: pointer; margin-bottom: 18px; }
   .eyebrow { font-size: 15px; font-weight: 600; color: var(--grey); margin-bottom: 14px; }
 
+  .gift-summary-box { background: var(--card); border: 1px solid var(--sep); border-radius: 14px; padding: 14px 16px; margin-bottom: 20px; }
+  .gift-summary-barber { font-size: 14.5px; font-weight: 600; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+  .gift-summary-items { display: flex; flex-wrap: wrap; gap: 6px; }
+  .gift-summary-chip { background: var(--fill); border-radius: 999px; padding: 4px 11px; font-size: 12.5px; color: var(--grey); }
+
   .svc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px,1fr)); gap: 10px; margin-bottom: 22px; }
   .svc-card {
     border: none; background: var(--fill); color: var(--ink); border-radius: 18px;
@@ -104,6 +109,10 @@
 
   <section class="panel" id="p-datetime">
     <button class="back" onclick="show('p-extras')">‹ Retour</button>
+    <div class="gift-summary-box" id="gift-summary-box" style="display:none">
+      <div class="gift-summary-barber" id="gift-summary-barber"></div>
+      <div class="gift-summary-items" id="gift-summary-items"></div>
+    </div>
     <div class="fld"><label for="rdv-date">Date</label><input id="rdv-date" type="date" onchange="loadSlots()"></div>
     <div class="eyebrow" style="margin-top:20px">Créneaux disponibles</div>
     <div id="half-toggle" class="half-toggle" style="display:none;margin-bottom:14px">
@@ -258,6 +267,7 @@ function selectBarber(el, id) {
   if (activeGift) {
     // Prestation et suppléments déjà déterminés par le cadeau -
     // seuls le coiffeur puis la date/heure restent à choisir.
+    renderGiftSummaryBox();
     show('p-datetime');
     var today = new Date().toISOString().slice(0, 10);
     document.getElementById('rdv-date').min = today;
@@ -266,6 +276,26 @@ function selectBarber(el, id) {
     return;
   }
   show('p-service');
+}
+
+/**
+ * Rappelle, sur l'étape date/heure, le coiffeur retenu et le contenu du
+ * cadeau en cours d'utilisation - sans ça le client ne voit plus du
+ * tout ce qui a été offert une fois passé cet écran.
+ */
+function renderGiftSummaryBox() {
+  var box = document.getElementById('gift-summary-box');
+  if (!activeGift) { box.style.display = 'none'; return; }
+
+  var barberName = activeGift.designated_barber
+    ? activeGift.designated_barber.name
+    : (barbers.find(function (b) { return b.id === selBarber; }) || {}).name;
+
+  document.getElementById('gift-summary-barber').textContent = barberName ? ('✂️ Avec ' + barberName) : '';
+  document.getElementById('gift-summary-items').innerHTML = activeGift.items.map(function (it) {
+    return '<span class="gift-summary-chip">' + (it.quantity > 1 ? it.quantity + ' × ' : '') + esc(it.item_name) + '</span>';
+  }).join('');
+  box.style.display = 'block';
 }
 
 /* ---------- Utiliser un cadeau ---------- */
