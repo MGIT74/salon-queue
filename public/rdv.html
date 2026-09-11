@@ -565,6 +565,7 @@ function submitAppointment() {
       client_name: name, email: email, phone: phone || null,
       service_id: selService, extras: selExtras,
       barber_id: selSlot.barberId, date: selDate, time: selSlot.time,
+      gift_id: activeGift ? activeGift.id : null,
       base_url: window.location.origin + window.location.pathname + (SALON_SLUG ? '?salon=' + SALON_SLUG : '')
     }
   }).then(function () {

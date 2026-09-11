@@ -133,6 +133,32 @@ async function sendGiftConfirmation(salonId, to, info) {
   });
 }
 
+/**
+ * Envoyé quand un rendez-vous pris avec un cadeau est annulé - l'ancien
+ * code est définitivement invalidé (remplacé), ce nouveau code est donc
+ * le seul désormais valable pour ce même cadeau.
+ */
+async function sendGiftCodeRenewed(salonId, to, info) {
+  const { tx, from, salon } = await getTransport(salonId);
+  const itemsList = info.items.map((it) => `${it.quantity} × ${it.item_name}`).join(', ');
+  await tx.sendMail({
+    from,
+    to,
+    subject: 'Nouveau code pour votre cadeau — ' + salon,
+    text: `Bonjour ${info.recipientName},\n\n` +
+          `Le rendez-vous que vous aviez pris avec votre cadeau de ${info.amountEur} chez ${salon} a été annulé.\n\n` +
+          `Votre ancien code n'est plus valable. Voici votre nouveau code, à utiliser pour reprendre un rendez-vous quand vous le souhaitez :\n\n` +
+          `Contenu : ${itemsList}\n\n` +
+          `Nouveau code : ${info.code}\n\n${salon}`,
+    html: `<p>Bonjour ${info.recipientName},</p>` +
+          `<p>Le rendez-vous que vous aviez pris avec votre cadeau de <strong>${info.amountEur}</strong> chez ${salon} a été annulé.</p>` +
+          `<p>Votre ancien code n'est plus valable. Voici votre nouveau code, à utiliser pour reprendre un rendez-vous quand vous le souhaitez :</p>` +
+          `<p>Contenu : ${itemsList}</p>` +
+          `<p style="font-size:20px;font-weight:700;letter-spacing:2px">${info.code}</p>` +
+          `<p>${salon}</p>`
+  });
+}
+
 async function sendTest(salonId, to) {
   const { tx, from, salon } = await getTransport(salonId);
   await tx.sendMail({
@@ -332,7 +358,7 @@ async function sendCustomClientEmail(salonId, to, clientName, subject, message) 
 }
 
 module.exports = {
-  sendTurnSoon, sendTest, sendGiftConfirmation, sendLoyaltyActivation, sendAppointmentConfirmation,
+  sendTurnSoon, sendTest, sendGiftConfirmation, sendGiftCodeRenewed, sendLoyaltyActivation, sendAppointmentConfirmation,
   sendAppointmentReminder, sendAppointmentCancelledByAdmin, sendAppointmentRescheduled,
   sendClientVerificationEmail, sendClientPasswordReset, sendSalonClosureNotice, sendCustomClientEmail, invalidateTransport
 };

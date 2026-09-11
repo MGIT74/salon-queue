@@ -375,6 +375,7 @@ router.get('/gift-cards/lookup', wrap(async (req, res) => {
   );
   if (!gift) return res.status(404).json({ error: 'Code introuvable pour ce salon' });
   if (gift.used_at) return res.status(409).json({ error: 'Ce cadeau a déjà été utilisé' });
+  if (gift.pending_appointment_id) return res.status(409).json({ error: 'Ce cadeau sert déjà à un rendez-vous en attente - annulez-le pour en reprendre un nouveau.' });
 
   let items = [];
   try { items = JSON.parse(gift.items_json || '[]'); } catch (e) { items = []; }

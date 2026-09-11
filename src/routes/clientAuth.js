@@ -257,7 +257,7 @@ router.get('/me', requireClient, wrap(async (req, res) => {
   // Cartes cadeaux reçues par ce client sur ce salon (même clé de
   // rapprochement que RDV/passages ci-dessus : email, en priorité).
   const [giftCards] = await pool.query(
-    `SELECT id, code, amount_cents, items_json, used_at, created_at
+    `SELECT id, code, amount_cents, items_json, used_at, pending_appointment_id, created_at
      FROM gift_cards
      WHERE salon_id = ? AND LOWER(TRIM(recipient_email)) = ?
      ORDER BY created_at DESC LIMIT 20`,
@@ -280,7 +280,7 @@ router.get('/me', requireClient, wrap(async (req, res) => {
         // chaque article, qui n'a pas à être visible du bénéficiaire
         // (seul le montant total du cadeau est pertinent pour lui).
         items: items.map((it) => ({ name: it.item_name, quantity: it.quantity })),
-        used: Boolean(g.used_at), created_at: g.created_at
+        used: Boolean(g.used_at), pending: Boolean(g.pending_appointment_id), created_at: g.created_at
       };
     })
   });

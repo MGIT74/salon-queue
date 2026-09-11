@@ -779,7 +779,9 @@ function renderGiftCards(giftCards) {
       '</div>' +
       itemsHtml +
       '<div class="gift-code">' + esc(g.code || '—') + '</div>' +
-      '<button class="gift-use-btn" onclick="useGiftFromAccount(this, \'' + esc(g.code) + '\')">Utiliser ce cadeau</button>' +
+      (g.pending
+        ? '<div class="gift-walkin-note"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>Un rendez-vous est déjà en attente avec ce cadeau</div>'
+        : '<button class="gift-use-btn" onclick="useGiftFromAccount(this, \'' + esc(g.code) + '\')">Utiliser ce cadeau</button>') +
     '</div>';
   }).join('');
 
@@ -1206,6 +1208,7 @@ function submitBookAppointment() {
         client_name: me.profile.name, email: me.profile.email, phone: me.profile.phone || null,
         service_id: selBookService, extras: selBookExtras, client_note: note || null,
         barber_id: selBookSlot.barberId, date: selBookDate, time: selBookSlot.time,
+        gift_id: activeBookGift ? activeBookGift.id : null,
         base_url: window.location.origin + '/rdv.html' + (bookSalonSlug ? '?salon=' + bookSalonSlug : '')
       }
     });

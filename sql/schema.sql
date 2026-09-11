@@ -828,3 +828,20 @@ CREATE TABLE IF NOT EXISTS ticket_drafts (
   FOREIGN KEY (barber_id) REFERENCES barbers(id) ON DELETE CASCADE,
   FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Un cadeau reserve en ligne pour un rendez-vous ne doit plus pouvoir
+-- servir a en prendre un autre tant que celui-ci n'est ni honore ni
+-- annule - sans ca, le meme code non encore "vraiment" consomme (used_at
+-- reste NULL jusqu'a l'encaissement en salon) permettait de reserver un
+-- nombre illimite de rendez-vous. NULL = libre, sinon reference le RDV
+-- qui bloque actuellement ce cadeau.
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'gift_cards' AND column_name = 'pending_appointment_id');
+SET @sql := IF(@c = 0, "ALTER TABLE gift_cards ADD COLUMN pending_appointment_id CHAR(36) NULL", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Cote RDV : quel cadeau (s'il y en a un) a servi a le prendre - permet
+-- de retrouver et liberer ce cadeau (nouveau code envoye, ancien
+-- invalide) si ce rendez-vous precis est annule.
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'appointments' AND column_name = 'gift_card_id');
+SET @sql := IF(@c = 0, "ALTER TABLE appointments ADD COLUMN gift_card_id CHAR(36) NULL", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
