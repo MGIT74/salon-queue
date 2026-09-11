@@ -18,21 +18,37 @@
           color: var(--accent); font-weight: 500; cursor: pointer; margin-bottom: 18px; }
   .eyebrow { font-size: 15px; font-weight: 600; color: var(--grey); margin-bottom: 14px; }
 
-  .gift-summary-box { background: var(--card); border: 1px solid var(--sep); border-radius: 16px; padding: 16px 18px; margin-bottom: 20px; }
+  /* Encart cadeau sur la page RDV - même esprit "vraie carte" que la
+     carte cadeau du compte client (dégradé par défaut, ou photo perso
+     avec dégradé sombre superposé pour garder le texte lisible). */
+  .gift-summary-box {
+    position: relative; overflow: hidden; border-radius: 18px; padding: 16px 18px; margin-bottom: 20px;
+    background: linear-gradient(135deg, #7c3aed, #db2777); color: #fff;
+  }
+  .gift-summary-box.has-bg { background-size: cover; background-position: center; }
+  .gift-summary-box.has-bg::before {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(135deg, rgba(0,0,0,.55), rgba(0,0,0,.25));
+  }
+  .gift-summary-box > * { position: relative; z-index: 1; }
+  .gift-summary-tag {
+    display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 700;
+    letter-spacing: .04em; text-transform: uppercase; color: rgba(255,255,255,.85); margin-bottom: 12px;
+  }
   .gift-summary-barber { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
   .gift-summary-avatar {
     width: 46px; height: 46px; border-radius: 50%; flex-shrink: 0; box-sizing: border-box;
     display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 17px;
-    background-size: cover; background-position: center;
+    background-size: cover; background-position: center; border: 2px solid rgba(255,255,255,.5);
   }
-  .gift-summary-label { font-size: 12px; color: var(--grey); margin-bottom: 1px; }
+  .gift-summary-label { font-size: 12px; color: rgba(255,255,255,.75); margin-bottom: 1px; }
   .gift-summary-name { font-size: 16px; font-weight: 700; }
   .gift-summary-items { display: flex; flex-wrap: wrap; gap: 8px; }
   .gift-summary-chip {
-    display: flex; align-items: center; gap: 6px; background: var(--fill); border-radius: 999px;
-    padding: 6px 13px 6px 9px; font-size: 13px; font-weight: 500;
+    display: flex; align-items: center; gap: 6px; background: rgba(255,255,255,.18); border-radius: 999px;
+    padding: 6px 13px; font-size: 13px; font-weight: 500;
   }
-  .gift-summary-chip .chip-qty { color: var(--accent, var(--blue)); font-weight: 700; }
+  .gift-summary-chip .chip-qty { font-weight: 700; }
 
   .svc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px,1fr)); gap: 10px; margin-bottom: 22px; }
   .svc-card {
@@ -90,6 +106,7 @@
   </div>
 
   <div class="gift-summary-box" id="gift-summary-box" style="display:none">
+    <div class="gift-summary-tag">🎁 Carte cadeau</div>
     <div class="gift-summary-barber" id="gift-summary-barber-row">
       <span class="gift-summary-avatar" id="gift-summary-avatar"></span>
       <div>
@@ -245,6 +262,7 @@ function iconForItem(name) {
 }
 
 var services = [], extras = [], barbers = [];
+var giftCardImageUrl = '';
 var selBarber = null, selService = null, selExtras = [], selDate = null, selSlot = null;
 var activeGift = null;
 
@@ -261,6 +279,7 @@ function loadCatalog() {
     barbers = r[2].items.filter(function (b) { return b.accepts_appointments && hasBookableSchedule(b); });
     var salonName = r[3].salon_name;
     CURRENCY = r[3].currency || 'EUR';
+    giftCardImageUrl = r[3].gift_card_image_url || '';
     applyAccentColor(r[3].accent_color);
     document.title = 'Rendez-vous — ' + salonName;
     document.getElementById('salon-mark').textContent = salonName.toUpperCase();
@@ -324,6 +343,14 @@ function renderGiftSummaryBox() {
   var box = document.getElementById('gift-summary-box');
   if (!activeGift) { box.style.display = 'none'; return; }
 
+  if (giftCardImageUrl) {
+    box.classList.add('has-bg');
+    box.style.backgroundImage = 'url(\'' + giftCardImageUrl + '\')';
+  } else {
+    box.classList.remove('has-bg');
+    box.style.backgroundImage = '';
+  }
+
   var barber = activeGift.designated_barber || barbers.find(function (b) { return b.id === selBarber; });
   var barberRow = document.getElementById('gift-summary-barber-row');
   if (barber) {
@@ -342,7 +369,11 @@ function renderGiftSummaryBox() {
   }
 
   document.getElementById('gift-summary-items').innerHTML = activeGift.items.map(function (it) {
-    return '<span class="gift-summary-chip"><span class="chip-qty">' + (it.quantity || 1) + '×</span> ' + esc(it.item_name) + '</span>';
+    // Seuls les produits ont une quantité qui a du sens à afficher (on
+    // peut offrir 3 flacons de parfum) - une prestation ne se répète
+    // pas comme ça, "1x Coupe et barbe" n'apporte rien et alourdit.
+    var qty = (it.item_type === 'product' && it.quantity > 0) ? '<span class="chip-qty">' + it.quantity + '×</span> ' : '';
+    return '<span class="gift-summary-chip">' + qty + esc(it.item_name) + '</span>';
   }).join('');
   box.style.display = 'block';
 }
