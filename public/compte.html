@@ -168,6 +168,20 @@
   .client-footer button.on { color: var(--blue); font-weight: 600; }
   body.has-footer .wrap { padding-bottom: 90px; }
 
+  /* Barre du bas remplacée par un simple bouton Annuler pendant les
+     étapes créneau/confirmation d'une réservation par cadeau - le
+     client doit être isolé de toute navigation (Accueil, Réserver,
+     Compte...) qui casserait le parcours en cours. */
+  .client-footer-gift-lock {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 50; display: none;
+    background: var(--card, #fff); box-shadow: 0 -6px 20px rgba(0,0,0,.1);
+    border-radius: 20px 20px 0 0; padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+  .client-footer-gift-lock button {
+    display: block; width: 100%; background: none; border: none; font-family: inherit;
+    font-size: 15px; font-weight: 600; color: var(--red); cursor: pointer; padding: 8px;
+  }
+
   .modal-backdrop {
     display: none; position: fixed; inset: 0; z-index: 100;
     background: rgba(0,0,0,.45); align-items: center; justify-content: center; padding: 20px;
@@ -456,6 +470,10 @@
   </button>
 </div>
 
+<div class="client-footer-gift-lock" id="client-footer-gift-lock">
+  <button onclick="cancelBookGift()">Annuler l'utilisation du cadeau</button>
+</div>
+
 <div class="modal-backdrop" id="cancel-modal-backdrop" onclick="if(event.target===this)closeCancelModal()">
   <div class="modal-box">
     <h2 style="margin-bottom:10px">Annuler ce rendez-vous ?</h2>
@@ -506,6 +524,17 @@ function show(id) {
     backBtn.style.display = activeBookGift ? 'none' : 'block';
     cancelBtn.style.display = activeBookGift ? 'block' : 'none';
   }
+
+  // Une fois le cadeau engagé jusqu'au choix du créneau (ou la
+  // confirmation), le client ne doit plus pouvoir se balader vers
+  // Accueil/Réserver/Compte via la barre du bas - ça casserait le
+  // parcours en cours (cf. l'encart resté coincé signalé plus tôt). La
+  // barre normale est remplacée par un simple bouton Annuler, seule
+  // sortie possible tant que ce n'est pas fini.
+  var giftLocked = activeBookGift && ['p-book-datetime', 'p-book-confirm'].indexOf(id) !== -1;
+  document.getElementById('client-footer-gift-lock').style.display = giftLocked ? 'block' : 'none';
+  document.getElementById('client-footer').style.display = giftLocked ? 'none' : '';
+  if (giftLocked) document.body.classList.add('has-footer');
 
   // L'effet d'éclat des cartes (fidélité + cadeaux) est une animation CSS
   // - elle ne se déclenche jamais si l'élément est révélé APRÈS avoir été
