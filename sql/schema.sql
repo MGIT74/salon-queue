@@ -809,3 +809,22 @@ JOIN (
 ) t ON t.id = s.id
 SET s.ticket_number = t.rn
 WHERE s.ticket_number IS NULL;
+
+-- Ticket en cours de construction en Caisse (avant paiement), sauvegardé
+-- côté serveur par coiffeur - même principe que les coupes en attente
+-- d'encaissement (queue.status='done' + barber_id) : peu importe le
+-- rechargement de page ou l'appareil, le coiffeur retrouve exactement
+-- son ticket en cliquant sur sa bulle. Une seule ligne par coiffeur
+-- (barber_id en clé primaire) puisqu'il ne peut avoir qu'un seul ticket
+-- en cours à la fois.
+CREATE TABLE IF NOT EXISTS ticket_drafts (
+  barber_id CHAR(36) PRIMARY KEY,
+  salon_id CHAR(36) NOT NULL,
+  ticket_json LONGTEXT NULL,
+  ticket_queue_id CHAR(36) NULL,
+  loyalty_discount_json TEXT NULL,
+  loyalty_rewards_available INT NOT NULL DEFAULT 0,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (barber_id) REFERENCES barbers(id) ON DELETE CASCADE,
+  FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

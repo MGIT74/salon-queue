@@ -688,7 +688,6 @@ var allBarbers = [];
 var catalog = { services: [], extras: [], products: [] };
 var ticket = []; // { item_type, item_id, item_name, unit_price_cents, quantity }
 var ticketQueueId = null; // coupe d'origine si le ticket vient d'un encaissement en attente
-var ticketDrafts = {}; // { [barberId]: { ticket, ticketQueueId, loyaltyDiscount, loyaltyRewardsAvailable } } - brouillon du ticket en cours de chaque coiffeur, gardé le temps de la session tablette
 var loyaltyRewardsAvailable = 0; // récompenses dispo pour le client du ticket en cours
 var loyaltyDiscount = null; // { index, originalPrice, type } si une réduction fidélité est appliquée
 var marketingSettings = { loyalty_service_discount_pct: 50, loyalty_product_discount_pct: 20 };
@@ -841,6 +840,7 @@ function showApp() {
   document.getElementById('my-name').textContent = me.name;
   activeBarberId = me.id;
   updateTabLockState();
+  loadTicketDraft(activeBarberId);
   loadBarberBubbles();
   loadCatalog();
   loadPendingPayments();
@@ -923,30 +923,61 @@ function updateActiveBarberLabel() {
 }
 
 /**
- * Range l'état du ticket en cours (lignes, coupe d'origine, réduction
- * fidélité) dans le brouillon du coiffeur donné, pour le retrouver
- * intact s'il revient plus tard sur sa bulle.
+ * Enregistre côté serveur l'état du ticket en cours (lignes, coupe
+ * d'origine, réduction fidélité) pour le coiffeur donné - même principe
+ * que les coupes en attente d'encaissement : ça survit à un rechargement
+ * de page ou un changement d'appareil, pas seulement en mémoire.
  */
 function saveTicketDraft(barberId) {
   if (!barberId) return;
-  ticketDrafts[barberId] = {
-    ticket: ticket,
-    ticketQueueId: ticketQueueId,
-    loyaltyDiscount: loyaltyDiscount,
-    loyaltyRewardsAvailable: loyaltyRewardsAvailable
-  };
+  barberApi('/api/ticket-draft', {
+    method: 'PUT',
+    actingAs: barberId,
+    body: {
+      ticket: ticket,
+      ticketQueueId: ticketQueueId,
+      loyaltyDiscount: loyaltyDiscount,
+      loyaltyRewardsAvailable: loyaltyRewardsAvailable
+    }
+  }).catch(function () {});
+}
+
+var ticketSaveTimer = null;
+/**
+ * À appeler après chaque modification du ticket en cours (ajout,
+ * quantité, réduction fidélité...) - sauvegarde différée de quelques
+ * centaines de ms pour ne pas spammer le serveur à chaque clic, tout en
+ * gardant le brouillon à jour si la page est rechargée entre-temps.
+ */
+function scheduleTicketSave() {
+  if (!activeBarberId) return;
+  clearTimeout(ticketSaveTimer);
+  ticketSaveTimer = setTimeout(function () { saveTicketDraft(activeBarberId); }, 500);
 }
 
 /**
- * Recharge le brouillon du coiffeur donné, ou repart sur un ticket vide
- * s'il n'en a pas (ou plus aucune bulle sélectionnée).
+ * Recharge le brouillon du coiffeur donné depuis le serveur, ou repart
+ * sur un ticket vide s'il n'en a pas (ou plus aucune bulle
+ * sélectionnée). Réinitialise tout de suite en local (affichage
+ * immédiat, pas de flash de l'ancien ticket) puis complète dès que la
+ * réponse serveur arrive.
  */
 function loadTicketDraft(barberId) {
-  var draft = barberId ? ticketDrafts[barberId] : null;
-  ticket = draft ? draft.ticket : [];
-  ticketQueueId = draft ? draft.ticketQueueId : null;
-  loyaltyDiscount = draft ? draft.loyaltyDiscount : null;
-  loyaltyRewardsAvailable = draft ? draft.loyaltyRewardsAvailable : 0;
+  ticket = [];
+  ticketQueueId = null;
+  loyaltyDiscount = null;
+  loyaltyRewardsAvailable = 0;
+  if (!barberId) return;
+  barberApi('/api/ticket-draft', { actingAs: barberId }).then(function (r) {
+    // Le coiffeur a pu re-changer de bulle avant que cette réponse
+    // n'arrive - dans ce cas elle ne le concerne plus, on l'ignore.
+    if (activeBarberId !== barberId || !r.draft) return;
+    ticket = r.draft.ticket;
+    ticketQueueId = r.draft.ticketQueueId;
+    loyaltyDiscount = r.draft.loyaltyDiscount;
+    loyaltyRewardsAvailable = r.draft.loyaltyRewardsAvailable;
+    renderActive(true);
+  }).catch(function () {});
 }
 
 function selectActiveBarber(barberId) {
@@ -954,8 +985,10 @@ function selectActiveBarber(barberId) {
   // monde", utile pour l'Agenda) - Timer/Caisse retombent alors sur le
   // coiffeur authentifié (voir barberApi : en-tête omis si vide).
   // Le ticket en cours appartient au coiffeur, pas à la tablette : on
-  // range son brouillon avant de partir, et on recharge celui du
-  // coiffeur qui arrive (ou un ticket vide s'il n'en a pas).
+  // range son brouillon avant de partir (tout de suite, pas de
+  // sauvegarde différée en cours), et on recharge celui du coiffeur qui
+  // arrive (ou un ticket vide s'il n'en a pas).
+  clearTimeout(ticketSaveTimer);
   saveTicketDraft(activeBarberId);
   activeBarberId = (barberId === activeBarberId) ? null : barberId;
   loadTicketDraft(activeBarberId);
@@ -2068,6 +2101,7 @@ function usePendingForTicket(queueId) {
   loyaltyRewardsAvailable = q.loyalty_rewards_available || 0;
   loyaltyDiscount = null;
   renderTicket();
+  scheduleTicketSave();
   toast('Ticket de ' + q.client_name + ' chargé — choisissez le paiement');
 }
 
@@ -2129,6 +2163,7 @@ function addToTicket(itemType, itemId, itemName, unitPriceCents) {
   // simple +1 de quantité sur une ligne déjà là ne doit jamais faire
   // clignoter tout le ticket à chaque ajout.
   renderTicket(newIndex);
+  scheduleTicketSave();
 }
 
 function changeQty(index, delta) {
@@ -2136,6 +2171,7 @@ function changeQty(index, delta) {
   if (ticket[index].quantity <= 0) ticket.splice(index, 1);
   if (!ticket.length) ticketQueueId = null;
   renderTicket();
+  scheduleTicketSave();
 }
 
 function clearTicket() {
@@ -2143,6 +2179,7 @@ function clearTicket() {
   ticket = [];
   ticketQueueId = null;
   renderTicket();
+  scheduleTicketSave();
 }
 
 function ticketTotal() {
@@ -2223,6 +2260,7 @@ function openLineSellerModal(index) {
 function setLineSeller(index, barberId) {
   ticket[index].barber_id = barberId || null;
   renderTicket();
+  scheduleTicketSave();
 }
 
 /* ---------- Paiement ---------- */
@@ -2253,7 +2291,7 @@ function toggleLoyaltyDiscount(type) {
     ticket[loyaltyDiscount.index].item_name = loyaltyDiscount.originalName;
     var wasType = loyaltyDiscount.type;
     loyaltyDiscount = null;
-    if (wasType === type) { renderTicket(); return; }
+    if (wasType === type) { renderTicket(); scheduleTicketSave(); return; }
   }
 
   var idx = ticket.findIndex(function (l) { return l.item_type === type; });
@@ -2267,6 +2305,7 @@ function toggleLoyaltyDiscount(type) {
   ticket[idx].unit_price_cents = Math.round(originalPrice * factor);
   ticket[idx].item_name = originalName + ' (fidélité -' + pct + '%)';
   renderTicket();
+  scheduleTicketSave();
 }
 
 function toggleGiftFields() {
@@ -2442,6 +2481,7 @@ function finalizeSale(saleCtx) {
     ticketQueueId = null;
     loyaltyRewardsAvailable = 0;
     loyaltyDiscount = null;
+    scheduleTicketSave();
     document.getElementById('gift-checkbox').checked = false;
     document.getElementById('gift-name').value = '';
     document.getElementById('gift-phone').value = '';
