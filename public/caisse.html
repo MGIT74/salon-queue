@@ -688,6 +688,7 @@ var allBarbers = [];
 var catalog = { services: [], extras: [], products: [] };
 var ticket = []; // { item_type, item_id, item_name, unit_price_cents, quantity }
 var ticketQueueId = null; // coupe d'origine si le ticket vient d'un encaissement en attente
+var ticketDrafts = {}; // { [barberId]: { ticket, ticketQueueId, loyaltyDiscount, loyaltyRewardsAvailable } } - brouillon du ticket en cours de chaque coiffeur, gardé le temps de la session tablette
 var loyaltyRewardsAvailable = 0; // récompenses dispo pour le client du ticket en cours
 var loyaltyDiscount = null; // { index, originalPrice, type } si une réduction fidélité est appliquée
 var marketingSettings = { loyalty_service_discount_pct: 50, loyalty_product_discount_pct: 20 };
@@ -921,11 +922,43 @@ function updateActiveBarberLabel() {
   el.textContent = b ? b.name : '—';
 }
 
+/**
+ * Range l'état du ticket en cours (lignes, coupe d'origine, réduction
+ * fidélité) dans le brouillon du coiffeur donné, pour le retrouver
+ * intact s'il revient plus tard sur sa bulle.
+ */
+function saveTicketDraft(barberId) {
+  if (!barberId) return;
+  ticketDrafts[barberId] = {
+    ticket: ticket,
+    ticketQueueId: ticketQueueId,
+    loyaltyDiscount: loyaltyDiscount,
+    loyaltyRewardsAvailable: loyaltyRewardsAvailable
+  };
+}
+
+/**
+ * Recharge le brouillon du coiffeur donné, ou repart sur un ticket vide
+ * s'il n'en a pas (ou plus aucune bulle sélectionnée).
+ */
+function loadTicketDraft(barberId) {
+  var draft = barberId ? ticketDrafts[barberId] : null;
+  ticket = draft ? draft.ticket : [];
+  ticketQueueId = draft ? draft.ticketQueueId : null;
+  loyaltyDiscount = draft ? draft.loyaltyDiscount : null;
+  loyaltyRewardsAvailable = draft ? draft.loyaltyRewardsAvailable : 0;
+}
+
 function selectActiveBarber(barberId) {
   // Recliquer sur la bulle déjà active la désélectionne (mode "tout le
   // monde", utile pour l'Agenda) - Timer/Caisse retombent alors sur le
   // coiffeur authentifié (voir barberApi : en-tête omis si vide).
+  // Le ticket en cours appartient au coiffeur, pas à la tablette : on
+  // range son brouillon avant de partir, et on recharge celui du
+  // coiffeur qui arrive (ou un ticket vide s'il n'en a pas).
+  saveTicketDraft(activeBarberId);
   activeBarberId = (barberId === activeBarberId) ? null : barberId;
+  loadTicketDraft(activeBarberId);
   renderBarberBubbles();
   updateTabLockState();
   loadPendingPayments();
