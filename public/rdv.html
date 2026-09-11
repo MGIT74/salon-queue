@@ -18,10 +18,22 @@
           color: var(--accent); font-weight: 500; cursor: pointer; margin-bottom: 18px; }
   .eyebrow { font-size: 15px; font-weight: 600; color: var(--grey); margin-bottom: 14px; }
 
-  .gift-summary-box { background: var(--card); border: 1px solid var(--sep); border-radius: 14px; padding: 14px 16px; margin-bottom: 20px; }
-  .gift-summary-barber { font-size: 14.5px; font-weight: 600; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
-  .gift-summary-items { display: flex; flex-wrap: wrap; gap: 6px; }
-  .gift-summary-chip { background: var(--fill); border-radius: 999px; padding: 4px 11px; font-size: 12.5px; color: var(--grey); }
+  .gift-summary-box { background: var(--card); border: 1px solid var(--sep); border-radius: 16px; padding: 16px 18px; margin-bottom: 20px; }
+  .gift-summary-barber { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .gift-summary-avatar {
+    width: 46px; height: 46px; border-radius: 50%; flex-shrink: 0; box-sizing: border-box;
+    display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 17px;
+    background-size: cover; background-position: center;
+  }
+  .gift-summary-label { font-size: 12px; color: var(--grey); margin-bottom: 1px; }
+  .gift-summary-name { font-size: 16px; font-weight: 700; }
+  .gift-summary-items { display: flex; flex-wrap: wrap; gap: 8px; }
+  .gift-summary-chip {
+    display: flex; align-items: center; gap: 6px; background: var(--fill); border-radius: 999px;
+    padding: 6px 13px 6px 9px; font-size: 13px; font-weight: 500;
+  }
+  .gift-summary-chip .chip-icon { font-size: 15px; line-height: 1; }
+  .gift-summary-chip .chip-qty { color: var(--accent, var(--blue)); font-weight: 700; }
 
   .svc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px,1fr)); gap: 10px; margin-bottom: 22px; }
   .svc-card {
@@ -110,7 +122,13 @@
   <section class="panel" id="p-datetime">
     <button class="back" onclick="show('p-extras')">‹ Retour</button>
     <div class="gift-summary-box" id="gift-summary-box" style="display:none">
-      <div class="gift-summary-barber" id="gift-summary-barber"></div>
+      <div class="gift-summary-barber" id="gift-summary-barber-row">
+        <span class="gift-summary-avatar" id="gift-summary-avatar"></span>
+        <div>
+          <div class="gift-summary-label">Rendez-vous avec</div>
+          <div class="gift-summary-name" id="gift-summary-name"></div>
+        </div>
+      </div>
       <div class="gift-summary-items" id="gift-summary-items"></div>
     </div>
     <div class="fld"><label for="rdv-date">Date</label><input id="rdv-date" type="date" onchange="loadSlots()"></div>
@@ -202,6 +220,7 @@ function iconForItem(name) {
   if (n.indexOf('huile') !== -1 || n.indexOf('soin') !== -1) return '💧';
   if (n.indexOf('cire') !== -1 || n.indexOf('gel') !== -1) return '🧴';
   if (n.indexOf('zéro') !== -1 || n.indexOf('zero') !== -1) return '🪒';
+  if (n.indexOf('parfum') !== -1) return '🌸';
   if (n.indexOf('coupe') !== -1) return '✂️';
   return '✂️';
 }
@@ -287,13 +306,29 @@ function renderGiftSummaryBox() {
   var box = document.getElementById('gift-summary-box');
   if (!activeGift) { box.style.display = 'none'; return; }
 
-  var barberName = activeGift.designated_barber
-    ? activeGift.designated_barber.name
-    : (barbers.find(function (b) { return b.id === selBarber; }) || {}).name;
+  var barber = activeGift.designated_barber || barbers.find(function (b) { return b.id === selBarber; });
+  var barberRow = document.getElementById('gift-summary-barber-row');
+  if (barber) {
+    var avatarEl = document.getElementById('gift-summary-avatar');
+    if (barber.photo_url) {
+      avatarEl.setAttribute('style', 'background-image:url(\'' + barber.photo_url + '\')');
+      avatarEl.textContent = '';
+    } else {
+      avatarEl.setAttribute('style', 'background:' + stableColorForId(barber.id));
+      avatarEl.textContent = (barber.name || '?').trim().charAt(0).toUpperCase();
+    }
+    document.getElementById('gift-summary-name').textContent = barber.name;
+    barberRow.style.display = 'flex';
+  } else {
+    barberRow.style.display = 'none';
+  }
 
-  document.getElementById('gift-summary-barber').textContent = barberName ? ('✂️ Avec ' + barberName) : '';
   document.getElementById('gift-summary-items').innerHTML = activeGift.items.map(function (it) {
-    return '<span class="gift-summary-chip">' + (it.quantity > 1 ? it.quantity + ' × ' : '') + esc(it.item_name) + '</span>';
+    return '<span class="gift-summary-chip">' +
+      '<span class="chip-icon">' + iconForItem(it.item_name) + '</span>' +
+      (it.quantity > 1 ? '<span class="chip-qty">' + it.quantity + '×</span>' : '') +
+      esc(it.item_name) +
+    '</span>';
   }).join('');
   box.style.display = 'block';
 }

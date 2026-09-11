@@ -366,7 +366,7 @@ router.get('/gift-cards/lookup', wrap(async (req, res) => {
   if (!code) return res.status(400).json({ error: 'Code requis' });
 
   const [[gift]] = await pool.query(
-    `SELECT g.*, s.barber_id, b.name AS barber_name, b.active AS barber_active, b.accepts_appointments
+    `SELECT g.*, s.barber_id, b.name AS barber_name, b.photo_url AS barber_photo_url, b.active AS barber_active, b.accepts_appointments
      FROM gift_cards g
      JOIN sales s ON s.id = g.sale_id
      LEFT JOIN barbers b ON b.id = s.barber_id
@@ -385,7 +385,7 @@ router.get('/gift-cards/lookup', wrap(async (req, res) => {
   // comportement normal (laisser choisir), plutôt que d'imposer un
   // coiffeur qui n'est peut-être plus disponible.
   const designatedBarber = (gift.barber_id && gift.barber_active && gift.accepts_appointments)
-    ? { id: gift.barber_id, name: gift.barber_name }
+    ? { id: gift.barber_id, name: gift.barber_name, photo_url: gift.barber_photo_url }
     : null;
 
   res.json({
