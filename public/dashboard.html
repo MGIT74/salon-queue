@@ -377,7 +377,8 @@
   .item { background: var(--card); border-radius: 14px; padding: 14px 18px; margin-bottom: 8px;
           display: flex; align-items: center; gap: 14px; box-shadow: var(--shadow); flex-wrap: wrap; transition: background .25s ease; }
   .item.off { opacity: .5; }
-  #rdv-list .item { border-bottom: 1px solid var(--sep); border-radius: 0; box-shadow: none; background: none; padding: 16px 4px; }
+  #rdv-list .item { border-bottom: 1px solid var(--sep); border-radius: 0; box-shadow: none; background: none; padding: 16px 4px; flex-wrap: nowrap; overflow-x: auto; }
+  #clients-list .item { flex-wrap: nowrap; overflow-x: auto; }
   #rdv-list .item:last-child { border-bottom: none; }
   #caisse-sales-detail .item, #caisse-closings-list .item {
     border-bottom: 1px solid var(--sep); border-radius: 0; box-shadow: none; background: none; padding: 14px 4px;
@@ -456,7 +457,7 @@
   }
 
   .rdv-info-grid {
-    display: grid; grid-template-columns: 160px 170px 150px 130px 190px 120px 340px; gap: 4px 12px;
+    display: grid; grid-template-columns: 160px 170px 150px 130px 190px 120px 110px; gap: 4px 12px;
     margin-top: 8px;
   }
   .rdv-info-grid .f { font-size: 12.5px; color: var(--grey); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1260,7 +1261,7 @@
         <input type="checkbox" id="rdv-select-all" onchange="toggleSelectAllRdv(this.checked)">
         Tout sélectionner
       </label>
-      <div class="item" style="border-radius:0;box-shadow:none;background:none;padding:0 4px;margin-bottom:0">
+      <div class="item" style="border-radius:0;box-shadow:none;background:none;padding:0 4px;margin-bottom:0;flex-wrap:nowrap">
         <input type="checkbox" class="rdv-check" style="margin-right:12px;flex-shrink:0;visibility:hidden" tabindex="-1" disabled>
         <div class="rdv-info-grid rdv-info-head" style="margin-top:0">
           <div class="f">Nom</div><div class="f">Prestation</div><div class="f">Date</div>
@@ -1326,7 +1327,7 @@
       <input type="checkbox" id="clients-select-all" onchange="toggleSelectAllClients(this.checked)">
       Tout sélectionner
     </label>
-    <div class="item" style="background:none;box-shadow:none;border-radius:0;padding:0 18px;margin-bottom:0">
+    <div class="item" style="background:none;box-shadow:none;border-radius:0;padding:0 18px;margin-bottom:0;flex-wrap:nowrap">
       <input type="checkbox" class="client-check" style="visibility:hidden" tabindex="-1" disabled>
       <div class="client-info-grid client-info-head" style="margin-top:0">
         <div class="f">Nom</div><div class="f">Prestation</div><div class="f">Date</div>
