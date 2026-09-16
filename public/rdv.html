@@ -16,6 +16,12 @@
   .panel.on { display: block; }
   .back { background: none; border: none; padding: 0; font-family: inherit; font-size: 15px;
           color: var(--accent); font-weight: 500; cursor: pointer; margin-bottom: 18px; }
+  .gift-cancel-btn {
+    display: inline-flex; align-items: center; gap: 7px; background: rgba(255,59,48,.12);
+    color: var(--red); border: none; border-radius: 10px; padding: 9px 16px 9px 12px;
+    font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; margin-bottom: 18px;
+  }
+  .gift-cancel-btn:active { background: rgba(255,59,48,.22); }
   .eyebrow { font-size: 15px; font-weight: 600; color: var(--grey); margin-bottom: 14px; }
 
   /* Encart cadeau sur la page RDV - même esprit "vraie carte" que la
@@ -148,7 +154,10 @@
 
   <section class="panel" id="p-datetime">
     <button class="back" id="datetime-back-btn" onclick="show('p-extras')">‹ Retour</button>
-    <button class="back" id="datetime-cancel-btn" style="display:none;color:var(--red)" onclick="cancelGiftBooking()">Annuler</button>
+    <button class="gift-cancel-btn" id="datetime-cancel-btn" style="display:none" onclick="cancelGiftBooking()">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      Annuler l'utilisation du cadeau
+    </button>
     <div class="fld"><label for="rdv-date">Date</label><input id="rdv-date" type="date" onchange="loadSlots()"></div>
     <div class="eyebrow" style="margin-top:20px">Créneaux disponibles</div>
     <div id="half-toggle" class="half-toggle" style="display:none;margin-bottom:14px">
@@ -230,7 +239,7 @@ function show(id) {
   // On isole donc le client : plus de retour possible, seulement un
   // abandon explicite (double confirmation) qui repart de zéro.
   document.getElementById('datetime-back-btn').style.display = activeGift ? 'none' : 'block';
-  document.getElementById('datetime-cancel-btn').style.display = activeGift ? 'block' : 'none';
+  document.getElementById('datetime-cancel-btn').style.display = activeGift ? 'inline-flex' : 'none';
   window.scrollTo(0, 0);
 }
 

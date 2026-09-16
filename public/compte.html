@@ -229,6 +229,12 @@
 
   .back { background: none; border: none; padding: 0; font-family: inherit; font-size: 15px;
           color: var(--accent); font-weight: 500; cursor: pointer; margin-bottom: 18px; }
+  .gift-cancel-btn {
+    display: inline-flex; align-items: center; gap: 7px; background: rgba(255,59,48,.12);
+    color: var(--red); border: none; border-radius: 10px; padding: 9px 16px 9px 12px;
+    font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; margin-bottom: 18px;
+  }
+  .gift-cancel-btn:active { background: rgba(255,59,48,.22); }
 
   /* Encart cadeau lors d'une réservation via un code (même esprit "vraie
      carte" que la carte cadeau du compte - fond perso + dégradé sombre
@@ -423,7 +429,10 @@
 
   <section class="panel" id="p-book-datetime">
     <button class="back" id="bk-datetime-back-btn" onclick="show('p-book-extras')">‹ Retour</button>
-    <button class="back" id="bk-datetime-cancel-btn" style="display:none;color:var(--red)" onclick="cancelBookGift()">Annuler</button>
+    <button class="gift-cancel-btn" id="bk-datetime-cancel-btn" style="display:none" onclick="cancelBookGift()">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      Annuler l'utilisation du cadeau
+    </button>
     <div class="fld"><label for="bk-date">Date</label><input id="bk-date" type="date" onchange="loadBookSlots()"></div>
     <div class="eyebrow" style="margin-top:20px">Créneaux disponibles</div>
     <div id="bk-half-toggle" class="half-toggle" style="display:none;margin-bottom:14px">
@@ -522,7 +531,7 @@ function show(id) {
   var cancelBtn = document.getElementById('bk-datetime-cancel-btn');
   if (backBtn && cancelBtn) {
     backBtn.style.display = activeBookGift ? 'none' : 'block';
-    cancelBtn.style.display = activeBookGift ? 'block' : 'none';
+    cancelBtn.style.display = activeBookGift ? 'inline-flex' : 'none';
   }
 
   // Une fois le cadeau engagé jusqu'au choix du créneau (ou la
@@ -765,7 +774,8 @@ function renderGiftCards(giftCards) {
   document.getElementById('gift-cards-list').innerHTML = sorted.map(function (g) {
     var itemsHtml = (g.items && g.items.length)
       ? '<div class="gift-items">' + g.items.map(function (it) {
-          return '<span class="gift-item-chip">' + (it.quantity > 1 ? it.quantity + ' × ' : '') + esc(it.name) + '</span>';
+          var qty = (it.type === 'product' && it.quantity > 1) ? it.quantity + ' × ' : '';
+          return '<span class="gift-item-chip">' + qty + esc(it.name) + '</span>';
         }).join('') + '</div>'
       : '';
     return '<div class="gift-card">' +

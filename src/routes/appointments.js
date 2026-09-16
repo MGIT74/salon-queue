@@ -533,7 +533,8 @@ router.post('/', wrap(async (req, res) => {
       when,
       serviceName: service.name + (extraNames.length ? ' + ' + extraNames.join(', ') : ''),
       barberName: barber ? barber.name : null,
-      cancelUrl
+      cancelUrl,
+      giftNote: gift_id ? 'Ce rendez-vous est réglé avec votre carte cadeau - présentez-vous en salon, rien à payer sur place.' : null
     });
   } catch (err) {
     console.error('[rdv] envoi email de confirmation échoué:', err.message);

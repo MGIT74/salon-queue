@@ -279,7 +279,7 @@ router.get('/me', requireClient, wrap(async (req, res) => {
         // Seulement le nom et la quantité - jamais le prix unitaire de
         // chaque article, qui n'a pas à être visible du bénéficiaire
         // (seul le montant total du cadeau est pertinent pour lui).
-        items: items.map((it) => ({ name: it.item_name, quantity: it.quantity })),
+        items: items.map((it) => ({ name: it.item_name, quantity: it.quantity, type: it.item_type })),
         used: Boolean(g.used_at), pending: Boolean(g.pending_appointment_id), created_at: g.created_at
       };
     })

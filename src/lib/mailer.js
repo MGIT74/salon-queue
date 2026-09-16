@@ -174,7 +174,8 @@ async function sendAppointmentConfirmation(salonId, to, info) {
   const s = await getSettings(salonId);
   const tokens = {
     client_name: info.clientName, when: info.when, service_name: info.serviceName,
-    barber_name: info.barberName || '', salon, cancel_url: info.cancelUrl
+    barber_name: info.barberName || '', salon, cancel_url: info.cancelUrl,
+    gift_info: info.giftNote || ''
   };
   const customSubject = s.email_tpl_confirmation_subject ? applyTemplate(s.email_tpl_confirmation_subject, tokens) : '';
   const customBody = s.email_tpl_confirmation_body ? applyTemplate(s.email_tpl_confirmation_body, tokens) : '';
@@ -186,13 +187,15 @@ async function sendAppointmentConfirmation(salonId, to, info) {
     text: customBody ||
       (`Bonjour ${info.clientName},\n\n` +
        `Votre rendez-vous chez ${salon} est confirmé :\n` +
-       `${info.when} — ${info.serviceName}${info.barberName ? ' avec ' + info.barberName : ''}\n\n` +
-       `Besoin d'annuler ? ${info.cancelUrl}\n\n${salon}`),
+       `${info.when} — ${info.serviceName}${info.barberName ? ' avec ' + info.barberName : ''}\n` +
+       (info.giftNote ? `\n🎁 ${info.giftNote}\n` : '') +
+       `\nBesoin d'annuler ? ${info.cancelUrl}\n\n${salon}`),
     html: customBody
       ? customBody.replace(/\n/g, '<br>')
       : (`<p>Bonjour ${info.clientName},</p>` +
          `<p>Votre rendez-vous chez ${salon} est confirmé :</p>` +
          `<p><strong>${info.when}</strong><br>${info.serviceName}${info.barberName ? ' avec ' + info.barberName : ''}</p>` +
+         (info.giftNote ? `<p>🎁 ${info.giftNote}</p>` : '') +
          `<p><a href="${info.cancelUrl}">Annuler ce rendez-vous</a></p>` +
          `<p>${salon}</p>`)
   });

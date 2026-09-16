@@ -96,6 +96,7 @@
      uniquement dans la sidebar, aussi bien en desktop qu'en mobile. */
   .theme-btn { display: none; }
   .sidebar-logout-mobile { display: none !important; }
+  .mobile-more-btn, .mobile-more-overlay, .mobile-more-sheet { display: none !important; }
   .tabs button.on { background: var(--fill); font-weight: 600; }
   [data-theme="dark"] .tabs button.on { background: #3a3a3c; }
 
@@ -142,27 +143,62 @@
       display: none;
     }
 
-    .sidebar-logout-mobile {
+    /* Onglets secondaires : plus dans la barre du bas (défilement
+       horizontal invisible et peu découvrable avec 13 entrées) - ils
+       vivent désormais uniquement dans la feuille "Plus" ci-dessous. */
+    .tabs button.mobile-secondary { display: none; }
+
+    .sidebar-logout-mobile { display: none !important; }
+
+    .mobile-more-btn {
       display: flex !important; flex-direction: column; align-items: center; gap: 3px;
       flex: 1 0 auto; min-width: 60px; text-align: center; white-space: nowrap;
-      border: none; background: none; color: var(--red) !important; font-family: inherit;
+      border: none; background: none; color: var(--ink); font-family: inherit;
       font-size: 10px; font-weight: 500; padding: 8px 6px; cursor: pointer;
     }
-    .sidebar-logout-mobile .ic { width: 100%; justify-content: center; display: inline-flex; color: var(--red) !important; }
+    .mobile-more-btn .ic { width: 100%; justify-content: center; display: inline-flex; }
+    .mobile-more-btn.on { color: var(--blue); font-weight: 600; }
 
-    /* Bouton clair/sombre déplacé dans le menu du bas plutôt qu'en
-       bulle flottante séparée au-dessus (qui gênait, trop proche du
-       menu et facile à confondre avec un onglet). */
-    .sidebar-theme-btn {
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      gap: 3px; flex: 1 0 auto; min-width: 60px; width: auto; padding: 8px 6px;
-      margin-top: 0; border: none; background: none; border-radius: 0;
-      color: var(--grey); font-size: 10px; cursor: pointer; white-space: nowrap;
-    }
-    .sidebar-theme-btn:hover { background: none; }
-    .sidebar-theme-btn .ic { width: 100%; }
+    /* Bouton clair/sombre : déplacé dans la feuille "Plus" sur mobile
+       plutôt qu'en bulle flottante séparée au-dessus (qui gênait, trop
+       proche du menu et facile à confondre avec un onglet). */
+    .sidebar-theme-btn { display: none; }
 
     .main-content { padding-top: 76px; padding-bottom: 106px; margin-left: 0; }
+
+    /* Feuille "Plus" - les onglets secondaires (Prestations,
+       Suppléments, Produits, Marketing, Coiffeurs, Mes salons, Compte,
+       Réglages), le thème et la déconnexion, tous invisibles/perdus
+       dans l'ancien défilement horizontal, retrouvés ici d'un coup
+       d'œil, sans avoir à deviner qu'il fallait scroller. */
+    .mobile-more-overlay {
+      display: none; position: fixed; inset: 0; z-index: 70;
+      background: rgba(0,0,0,.35);
+    }
+    .mobile-more-overlay.on { display: block; animation: more-fade .18s ease; }
+    .mobile-more-sheet {
+      display: none; position: fixed; left: 0; right: 0; bottom: 0; z-index: 71;
+      background: var(--card); border-radius: 20px 20px 0 0; padding: 8px 10px calc(14px + env(safe-area-inset-bottom, 0px));
+      box-shadow: 0 -10px 30px rgba(0,0,0,0.28); max-height: 70vh; overflow-y: auto;
+    }
+    .mobile-more-sheet.on { display: block; animation: more-slide-up .22s ease; }
+    .mobile-more-handle { width: 36px; height: 4px; border-radius: 999px; background: var(--sep); margin: 6px auto 10px; }
+    .mobile-more-sheet button {
+      display: flex; align-items: center; gap: 12px; width: 100%; background: none; border: none;
+      font-family: inherit; font-size: 15px; color: var(--ink); padding: 13px 8px; cursor: pointer;
+      text-align: left; border-radius: 10px;
+    }
+    .mobile-more-sheet button:active { background: var(--fill); }
+    .mobile-more-sheet button .ic { display: flex; color: var(--grey); flex-shrink: 0; }
+    .mobile-more-sep { height: 1px; background: var(--sep); margin: 6px 4px; }
+    .mobile-more-logout { color: var(--red) !important; }
+    .mobile-more-logout .ic { color: var(--red) !important; }
+
+    @keyframes more-fade { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes more-slide-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  }
+
+  @media (max-width: 860px) {
 
     /* Détail coiffeur déplié : tout en une seule colonne, rien en ligne
        qui pourrait déborder (boutons d'action, sous-onglets, horaires). */
@@ -720,18 +756,21 @@
       </div>
       <nav class="tabs" id="tabs">
         <button class="on" data-t="queue"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></span> File d'attente</button>
-        <button data-t="services"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg></span> Prestations</button>
-        <button data-t="extras"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg></span> Suppléments</button>
-        <button data-t="products"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg></span> Produits</button>
-        <button data-t="marketing"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12v6a2 2 0 01-2 2H6a2 2 0 01-2-2v-6M2 7l10-5 10 5-10 5-10-5z"/><path d="M6 10v6a6 3 0 0012 0v-6"/></svg></span> Marketing</button>
+        <button class="mobile-secondary" data-t="services"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg></span> Prestations</button>
+        <button class="mobile-secondary" data-t="extras"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg></span> Suppléments</button>
+        <button class="mobile-secondary" data-t="products"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg></span> Produits</button>
+        <button class="mobile-secondary" data-t="marketing"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12v6a2 2 0 01-2 2H6a2 2 0 01-2-2v-6M2 7l10-5 10 5-10 5-10-5z"/><path d="M6 10v6a6 3 0 0012 0v-6"/></svg></span> Marketing</button>
         <button data-t="caisse"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M2 11h20M7 15h2M12 15h5"/></svg></span> Caisse</button>
         <button data-t="rdv"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span> Rendez-vous</button>
-        <button data-t="barbers"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-6 8-6s8 2 8 6"/></svg></span> Coiffeurs</button>
+        <button class="mobile-secondary" data-t="barbers"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-6 8-6s8 2 8 6"/></svg></span> Coiffeurs</button>
         <button data-t="clients"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 00-3-3.87"/><path d="M15.5 3.13a4 4 0 010 7.75"/></svg></span> Clients</button>
-        <button data-t="salons"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l1-5h16l1 5"/><path d="M4 9v11h16V9"/><line x1="9" y1="20" x2="9" y2="14"/><line x1="15" y1="20" x2="15" y2="14"/></svg></span> Mes salons</button>
-        <button data-t="account"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M7 18c1-2.3 2.8-3.8 5-3.8s4 1.5 5 3.8"/></svg></span> Compte</button>
-        <button data-t="settings"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></span> Réglages</button>
+        <button class="mobile-secondary" data-t="salons"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l1-5h16l1 5"/><path d="M4 9v11h16V9"/><line x1="9" y1="20" x2="9" y2="14"/><line x1="15" y1="20" x2="15" y2="14"/></svg></span> Mes salons</button>
+        <button class="mobile-secondary" data-t="account"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M7 18c1-2.3 2.8-3.8 5-3.8s4 1.5 5 3.8"/></svg></span> Compte</button>
+        <button class="mobile-secondary" data-t="settings"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></span> Réglages</button>
         <button class="sidebar-logout-mobile" onclick="logout()"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></span> Déconnexion</button>
+        <button class="mobile-more-btn" id="mobile-more-btn" onclick="toggleMoreSheet()" type="button">
+          <span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.5" fill="currentColor" stroke="none"/></svg></span> Plus
+        </button>
       </nav>
       <button class="sidebar-logout" onclick="logout()">
         <span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></span>
@@ -745,6 +784,22 @@
         <span class="label">Thème</span>
       </button>
     </aside>
+
+    <div class="mobile-more-overlay" id="mobile-more-overlay" onclick="closeMoreSheet()"></div>
+    <div class="mobile-more-sheet" id="mobile-more-sheet">
+      <div class="mobile-more-handle"></div>
+      <button onclick="setActiveTab('services'); closeMoreSheet();"><span class="ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg></span> Prestations</button>
+      <button onclick="setActiveTab('extras'); closeMoreSheet();"><span class="ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg></span> Suppléments</button>
+      <button onclick="setActiveTab('products'); closeMoreSheet();"><span class="ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg></span> Produits</button>
+      <button onclick="setActiveTab('marketing'); closeMoreSheet();"><span class="ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12v6a2 2 0 01-2 2H6a2 2 0 01-2-2v-6M2 7l10-5 10 5-10 5-10-5z"/><path d="M6 10v6a6 3 0 0012 0v-6"/></svg></span> Marketing</button>
+      <button onclick="setActiveTab('barbers'); closeMoreSheet();"><span class="ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-6 8-6s8 2 8 6"/></svg></span> Coiffeurs</button>
+      <button onclick="setActiveTab('salons'); closeMoreSheet();"><span class="ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l1-5h16l1 5"/><path d="M4 9v11h16V9"/><line x1="9" y1="20" x2="9" y2="14"/><line x1="15" y1="20" x2="15" y2="14"/></svg></span> Mes salons</button>
+      <button onclick="setActiveTab('account'); closeMoreSheet();"><span class="ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M7 18c1-2.3 2.8-3.8 5-3.8s4 1.5 5 3.8"/></svg></span> Compte</button>
+      <button onclick="setActiveTab('settings'); closeMoreSheet();"><span class="ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></span> Réglages</button>
+      <div class="mobile-more-sep"></div>
+      <button onclick="toggleTheme(); closeMoreSheet();"><span class="ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4.5"/><path d="M12 2.5v2.5M12 19v2.5M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M2.5 12H5M19 12h2.5M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></svg></span> Changer de thème</button>
+      <button class="mobile-more-logout" onclick="logout()"><span class="ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></span> Déconnexion</button>
+    </div>
 
     <div class="main-content">
 
@@ -1836,12 +1891,37 @@ var VALID_TABS = ['queue', 'services', 'extras', 'products', 'marketing', 'caiss
  * l'historique de navigation) pour que le rafraîchissement retombe sur
  * le bon onglet plutôt que de toujours revenir à "File d'attente".
  */
+/**
+ * Feuille "Plus" (mobile uniquement) - regroupe les onglets secondaires
+ * qui n'ont plus leur place dans la barre du bas (Prestations,
+ * Suppléments, Produits, Marketing, Coiffeurs, Mes salons, Compte,
+ * Réglages), plus le thème et la déconnexion.
+ */
+function toggleMoreSheet() {
+  var isOpen = document.getElementById('mobile-more-sheet').classList.contains('on');
+  if (isOpen) closeMoreSheet(); else openMoreSheet();
+}
+function openMoreSheet() {
+  document.getElementById('mobile-more-overlay').classList.add('on');
+  document.getElementById('mobile-more-sheet').classList.add('on');
+}
+function closeMoreSheet() {
+  document.getElementById('mobile-more-overlay').classList.remove('on');
+  document.getElementById('mobile-more-sheet').classList.remove('on');
+}
+
 function setActiveTab(tabName) {
   if (VALID_TABS.indexOf(tabName) === -1) tabName = 'queue';
 
   document.querySelectorAll('#tabs button').forEach(function (x) { x.classList.remove('on'); });
   var btn = document.querySelector('#tabs button[data-t="' + tabName + '"]');
   if (btn) btn.classList.add('on');
+  // Le bouton "Plus" n'a pas de data-t propre (il ouvre une feuille,
+  // pas un onglet) - sur mobile, s'allumer lui-même quand l'onglet
+  // actif est l'un de ceux qu'il cache évite que la barre du bas ne
+  // montre plus aucun onglet sélectionné.
+  var moreBtn = document.getElementById('mobile-more-btn');
+  if (moreBtn) moreBtn.classList.toggle('on', !!(btn && btn.classList.contains('mobile-secondary')));
   document.querySelectorAll('.tab-panel').forEach(function (p) { p.classList.remove('on'); });
   document.getElementById('t-' + tabName).classList.add('on');
 
