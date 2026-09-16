@@ -1266,6 +1266,7 @@
           <option value="50">50</option>
         </select>
       </div>
+      <button class="btn btn-soft" onclick="importClientsCsv()">Importer CSV</button>
       <button class="btn btn-primary" onclick="addManualClient()">+ Ajouter un client</button>
     </div>
 
@@ -5121,6 +5122,157 @@ function addManualClient() {
       return loadClients();
     }).catch(function (e) { errEl.textContent = e.message; errEl.style.display = 'block'; });
   };
+}
+
+/* ============ Import CSV de clients ============ */
+
+/**
+ * Ouvre le sélecteur de fichier, lit le CSV choisi et lance l'import
+ * (après confirmation). Volontairement souple sur le format : accepte
+ * ; ou , comme séparateur, avec ou sans ligne d'en-tête, en-têtes en
+ * français ou en anglais (Nom/Name, Email/Mail, Téléphone/Phone…) -
+ * accepte notamment tel quel le CSV généré par "Télécharger CSV" plus
+ * haut dans cet onglet.
+ */
+function importClientsCsv() {
+  var input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.csv,text/csv';
+  input.style.display = 'none';
+  document.body.appendChild(input);
+
+  input.onchange = function () {
+    var file = input.files && input.files[0];
+    document.body.removeChild(input);
+    if (!file) return;
+
+    var reader = new FileReader();
+    reader.onerror = function () { toast('Impossible de lire ce fichier', true); };
+    reader.onload = function (e) {
+      var clients;
+      try {
+        clients = parseClientsCsv(String(e.target.result));
+      } catch (err) {
+        toast('Fichier CSV illisible : ' + err.message, true);
+        return;
+      }
+      if (!clients.length) {
+        toast('Aucun client valide trouvé dans ce fichier (colonne "Nom" requise)', true);
+        return;
+      }
+      confirmImportClients(clients);
+    };
+    reader.readAsText(file, 'utf-8');
+  };
+
+  input.click();
+}
+
+var CSV_HEADER_ALIASES = {
+  name: ['nom', 'name', 'client', 'nomduclient', 'nomcomplet', 'fullname'],
+  email: ['email', 'e-mail', 'mail', 'courriel'],
+  phone: ['telephone', 'tel', 'phone', 'mobile', 'portable', 'gsm', 'numero', 'numerodetelephone']
+};
+
+// Enlève accents/espaces/casse pour comparer les en-têtes sans se soucier
+// des variantes ("Téléphone", "N° de téléphone", "TELEPHONE"…).
+function _normalizeCsvHeader(h) {
+  return String(h || '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().replace(/[^a-z]/g, '');
+}
+
+function _parseCsvLine(line, delim) {
+  var out = [], cur = '', inQuotes = false;
+  for (var i = 0; i < line.length; i++) {
+    var ch = line[i];
+    if (inQuotes) {
+      if (ch === '"') { if (line[i + 1] === '"') { cur += '"'; i++; } else inQuotes = false; }
+      else cur += ch;
+    } else if (ch === '"') inQuotes = true;
+    else if (ch === delim) { out.push(cur); cur = ''; }
+    else cur += ch;
+  }
+  out.push(cur);
+  return out.map(function (v) { return v.trim(); });
+}
+
+function parseClientsCsv(text) {
+  text = text.replace(/^\uFEFF/, ''); // BOM éventuel (Excel)
+  var lines = text.split(/\r\n|\r|\n/).filter(function (l) { return l.trim() !== ''; });
+  if (!lines.length) return [];
+
+  var sample = lines[0];
+  var delim = (sample.match(/;/g) || []).length >= (sample.match(/,/g) || []).length ? ';' : ',';
+  var rows = lines.map(function (l) { return _parseCsvLine(l, delim); });
+
+  // Repère les colonnes reconnues dans la 1re ligne ; si aucune ne
+  // correspond, on suppose qu'il n'y a pas d'en-tête et on retombe sur
+  // l'ordre par défaut nom;email;téléphone.
+  var colMap = {};
+  rows[0].forEach(function (h, i) {
+    var norm = _normalizeCsvHeader(h);
+    Object.keys(CSV_HEADER_ALIASES).forEach(function (field) {
+      if (!colMap[field] && CSV_HEADER_ALIASES[field].indexOf(norm) !== -1) colMap[field] = i;
+    });
+  });
+  var hasHeader = Object.keys(colMap).length > 0;
+  if (!hasHeader) colMap = { name: 0, email: 1, phone: 2 };
+  var dataRows = hasHeader ? rows.slice(1) : rows;
+
+  var out = [];
+  dataRows.forEach(function (row) {
+    var name = colMap.name !== undefined ? (row[colMap.name] || '').trim() : '';
+    if (!name) return; // ligne sans nom = ignorée
+    out.push({
+      name: name,
+      email: colMap.email !== undefined ? (row[colMap.email] || '').trim() : '',
+      phone: colMap.phone !== undefined ? (row[colMap.phone] || '').trim() : ''
+    });
+  });
+  return out;
+}
+
+function confirmImportClients(clients) {
+  var n = clients.length;
+  showConfirm(
+    n + ' client' + (n > 1 ? 's' : '') + ' trouvé' + (n > 1 ? 's' : '') + ' dans ce fichier. Les importer ?',
+    { title: 'Importer des clients', confirmLabel: 'Importer' }
+  ).then(function (ok) {
+    if (ok) runClientsImport(clients);
+  });
+}
+
+/**
+ * Import réel, en parallèle limité (4 à la fois) pour rester rapide sur
+ * de gros fichiers sans bombarder le serveur. Chaque client est ajouté
+ * via le même endpoint que "+ Ajouter un client" (historique 'Terminé').
+ * Les échecs individuels n'interrompent pas le reste de l'import.
+ */
+function runClientsImport(clients) {
+  var total = clients.length;
+  var idx = 0, okCount = 0, failCount = 0;
+  var CONCURRENCY = 4;
+
+  toast('Import de ' + total + ' client' + (total > 1 ? 's' : '') + ' en cours…');
+
+  function worker() {
+    if (idx >= total) return Promise.resolve();
+    var c = clients[idx++];
+    return api('/api/queue/manual-client', {
+      method: 'POST',
+      body: { client_name: c.name, email: c.email, phone: c.phone }
+    }).then(function () { okCount++; }, function () { failCount++; }).then(worker);
+  }
+
+  var workers = [];
+  for (var i = 0; i < Math.min(CONCURRENCY, total); i++) workers.push(worker());
+
+  Promise.all(workers).then(loadClients).then(function () {
+    var msg = okCount + ' client' + (okCount > 1 ? 's' : '') + ' importé' + (okCount > 1 ? 's' : '');
+    if (failCount) msg += ', ' + failCount + ' échec' + (failCount > 1 ? 's' : '');
+    toast(msg, failCount > 0 && okCount === 0);
+  });
 }
 
 function deleteSelectedClients() {
