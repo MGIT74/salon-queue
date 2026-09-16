@@ -31,7 +31,12 @@ function mountThemeButton() {
 function esc(s) {
   var d = document.createElement('div');
   d.textContent = s == null ? '' : s;
-  return d.innerHTML;
+  // textContent -> innerHTML n'échappe que &, < et > : les guillemets
+  // simples/doubles passent tels quels. Insuffisant pour une valeur
+  // ensuite placée DANS un attribut HTML (ex: style="...&quot;VALEUR&quot;...")
+  // - un guillemet non échappé y termine prématurément l'attribut et
+  // permet d'injecter un attribut/évènement arbitraire juste après.
+  return d.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 /**

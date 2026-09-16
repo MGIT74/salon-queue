@@ -4,7 +4,7 @@ const { pool, getPlatformSettings, setPlatformSettings } = require('../db');
 const { sendTestEmail, sendVerificationEmail, invalidateTransport } = require('../lib/platformMailer');
 const { hashPassword } = require('../lib/password');
 const { createToken } = require('../lib/impersonation');
-const { loginRateLimiter } = require('../middleware/rateLimiter');
+const { isBlocked, recordFailure, recordSuccess } = require('../middleware/rateLimiter');
 
 const router = express.Router();
 
@@ -17,20 +17,70 @@ function wrap(fn) {
   };
 }
 
+function timingSafeStringEqual(a, b) {
+  const bufA = Buffer.from(String(a));
+  const bufB = Buffer.from(String(b));
+  if (bufA.length !== bufB.length) {
+    crypto.timingSafeEqual(bufA, bufA);
+    return false;
+  }
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
+function superAdminRlKey(req) {
+  const ip = req.ip || (req.connection && req.connection.remoteAddress) || 'unknown';
+  return 'super-admin:' + ip;
+}
+
+// Protège TOUTES les routes super admin (liste/création de salons,
+// paramètres plateforme, et surtout /impersonate qui donne accès à
+// n'importe quel salon client) - pas seulement une route /login
+// dédiée. Rate limité directement ici : sans ça, le mot de passe
+// pouvait être deviné en boucle sur n'importe quelle autre route,
+// jamais bloqué (seul /login l'était). Un mot de passe compromis ici
+// compromet toute la plateforme, d'où la vigilance renforcée.
 function requireSuperAdmin(req, res, next) {
   const expected = (process.env.SUPER_ADMIN_PASSWORD || '').replace(/[\r\n]+$/, '').trim();
   if (!expected) return res.status(500).json({ error: 'SUPER_ADMIN_PASSWORD non défini côté serveur' });
-  const given = req.get('X-Super-Admin-Password') || req.query.pw;
-  if (given !== expected) return res.status(401).json({ error: 'Mot de passe incorrect' });
+
+  const rlKey = superAdminRlKey(req);
+  const retryAfterSec = isBlocked(rlKey);
+  if (retryAfterSec) {
+    res.set('Retry-After', String(retryAfterSec));
+    return res.status(429).json({
+      error: 'Trop de tentatives, réessayez dans ' + Math.ceil(retryAfterSec / 60) + ' min.'
+    });
+  }
+
+  // Plus de fallback ?pw= dans l'URL (logs serveur, historique navigateur,
+  // en-tête Referer) - en-tête dédié uniquement.
+  const given = req.get('X-Super-Admin-Password') || '';
+  if (!timingSafeStringEqual(given, expected)) {
+    recordFailure(rlKey);
+    return res.status(401).json({ error: 'Mot de passe incorrect' });
+  }
+  recordSuccess(rlKey);
   next();
 }
 
-router.post('/login', loginRateLimiter('super-admin-login'), wrap(async (req, res) => {
+router.post('/login', wrap(async (req, res) => {
   const expected = (process.env.SUPER_ADMIN_PASSWORD || '').replace(/[\r\n]+$/, '').trim();
   if (!expected) return res.status(500).json({ error: 'SUPER_ADMIN_PASSWORD non défini côté serveur' });
-  if ((req.body.password || '') !== expected) {
+
+  const rlKey = superAdminRlKey(req);
+  const retryAfterSec = isBlocked(rlKey);
+  if (retryAfterSec) {
+    res.set('Retry-After', String(retryAfterSec));
+    return res.status(429).json({
+      error: 'Trop de tentatives, réessayez dans ' + Math.ceil(retryAfterSec / 60) + ' min.'
+    });
+  }
+
+  if (!timingSafeStringEqual(req.body.password || '', expected)) {
+    recordFailure(rlKey);
     return res.status(401).json({ error: 'Mot de passe incorrect' });
   }
+  recordSuccess(rlKey);
   res.json({ ok: true });
 }));
 
