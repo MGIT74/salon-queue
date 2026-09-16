@@ -22,6 +22,16 @@
     font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; margin-bottom: 18px;
   }
   .gift-cancel-btn:active { background: rgba(255,59,48,.22); }
+
+  .modal-backdrop {
+    display: none; position: fixed; inset: 0; z-index: 100;
+    background: rgba(0,0,0,.45); align-items: center; justify-content: center; padding: 20px;
+  }
+  .modal-backdrop.on { display: flex; }
+  .modal-box {
+    background: var(--card); border-radius: 20px; padding: 24px; max-width: 380px; width: 100%;
+    box-shadow: 0 20px 60px rgba(0,0,0,.3);
+  }
   .eyebrow { font-size: 15px; font-weight: 600; color: var(--grey); margin-bottom: 14px; }
 
   /* Encart cadeau sur la page RDV - même esprit "vraie carte" que la
@@ -104,6 +114,19 @@
 </style>
 </head>
 <body>
+
+<div class="modal-backdrop" id="gift-cancel-modal-backdrop" onclick="if(event.target===this)closeGiftCancelModal()">
+  <div class="modal-box">
+    <div style="width:48px;height:48px;border-radius:50%;background:rgba(255,59,48,.12);display:flex;align-items:center;justify-content:center;margin-bottom:14px">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="var(--red)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-4.5-4.2-7-7.7-7-11a7 7 0 0 1 14 0c0 3.3-2.5 6.8-7 11Z"/><path d="M9.5 10.5l2 2 3-3.5"/></svg>
+    </div>
+    <h2 style="margin-bottom:10px">Annuler l'utilisation du cadeau ?</h2>
+    <p style="color:var(--grey);font-size:14.5px;margin-bottom:20px">Le cadeau reste intact et pourra être utilisé plus tard - vous recommencerez juste cette réservation depuis le début.</p>
+    <button class="go" style="background:var(--red)" onclick="confirmCancelGiftBooking()">Oui, annuler cette réservation</button>
+    <button class="go" style="background:var(--fill);color:var(--ink);margin-top:10px" onclick="closeGiftCancelModal()">Non, continuer</button>
+  </div>
+</div>
+
 
 <div class="wrap">
   <div class="rdv-header">
@@ -249,7 +272,13 @@ function show(id) {
  * repart entièrement de zéro, comme un nouveau client qui arrive.
  */
 function cancelGiftBooking() {
-  if (!confirm('Annuler l’utilisation de ce cadeau et recommencer une réservation depuis le début ?')) return;
+  document.getElementById('gift-cancel-modal-backdrop').classList.add('on');
+}
+function closeGiftCancelModal() {
+  document.getElementById('gift-cancel-modal-backdrop').classList.remove('on');
+}
+function confirmCancelGiftBooking() {
+  closeGiftCancelModal();
   startNewBooking();
 }
 

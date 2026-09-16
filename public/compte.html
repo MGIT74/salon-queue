@@ -500,6 +500,19 @@
   </div>
 </div>
 
+<div class="modal-backdrop" id="gift-cancel-modal-backdrop" onclick="if(event.target===this)closeGiftCancelModal()">
+  <div class="modal-box">
+    <div style="width:48px;height:48px;border-radius:50%;background:rgba(255,59,48,.12);display:flex;align-items:center;justify-content:center;margin-bottom:14px">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="var(--red)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-4.5-4.2-7-7.7-7-11a7 7 0 0 1 14 0c0 3.3-2.5 6.8-7 11Z"/><path d="M9.5 10.5l2 2 3-3.5"/></svg>
+    </div>
+    <h2 style="margin-bottom:10px">Annuler l'utilisation du cadeau ?</h2>
+    <p style="color:var(--grey);font-size:14.5px;margin-bottom:20px">Le cadeau reste intact et pourra être utilisé plus tard - vous recommencerez juste cette réservation depuis le début.</p>
+    <button class="go" style="background:var(--red)" onclick="confirmCancelBookGift()">Oui, annuler cette réservation</button>
+    <button class="go" style="background:var(--fill);color:var(--ink);margin-top:10px" onclick="closeGiftCancelModal()">Non, continuer</button>
+  </div>
+
+</div>
+
 <script src="/app.js?v=5"></script>
 <script>
 mountThemeButton();
@@ -1097,7 +1110,13 @@ function renderGiftSummaryBox() {
  * date/heure ne doit surtout pas permettre d'en rajouter un.
  */
 function cancelBookGift() {
-  if (!confirm('Annuler l’utilisation de ce cadeau et recommencer une réservation depuis le début ?')) return;
+  document.getElementById('gift-cancel-modal-backdrop').classList.add('on');
+}
+function closeGiftCancelModal() {
+  document.getElementById('gift-cancel-modal-backdrop').classList.remove('on');
+}
+function confirmCancelBookGift() {
+  closeGiftCancelModal();
   selBookBarber = null; selBookService = null; selBookExtras = []; selBookDate = null; selBookSlot = null; activeBookGift = null;
   document.getElementById('bk-barber-eyebrow').textContent = 'Choisissez votre coiffeur';
   document.getElementById('bk-date').value = '';
