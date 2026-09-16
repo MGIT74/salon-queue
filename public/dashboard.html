@@ -1954,6 +1954,8 @@ function buildMobileExpandPanel() {
   document.getElementById('mobile-expand-panel').innerHTML = Array.prototype.map.call(source, function (b) { return b.outerHTML; }).join('');
 }
 
+var mobileMoreScrollY = 0;
+
 function toggleMobileExpanded() {
   var panel = document.getElementById('mobile-expand-panel');
   var moreBtn = document.getElementById('mobile-more-btn');
@@ -1964,6 +1966,25 @@ function toggleMobileExpanded() {
   // La bulle de l'assistant IA remonte au-dessus du panneau pendant
   // qu'il est ouvert, pour ne jamais rester coincée dessous.
   document.body.classList.toggle('mobile-more-open', expanding);
+
+  // Empêche le fond de défiler pendant que le panneau est ouvert - un
+  // simple overflow:hidden sur le body ne suffit pas de façon fiable
+  // sur Safari iOS (le fond "rebondit" et défile quand même au doigt),
+  // donc on fige carrément la page en place (position:fixed) et on
+  // restitue la position de défilement exacte à la fermeture.
+  if (expanding) {
+    mobileMoreScrollY = window.scrollY;
+    document.body.style.position = 'fixed';
+    document.body.style.top = (-mobileMoreScrollY) + 'px';
+    document.body.style.left = '0';
+    document.body.style.right = '0';
+  } else {
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.left = '';
+    document.body.style.right = '';
+    window.scrollTo(0, mobileMoreScrollY);
+  }
 }
 
 document.getElementById('mobile-expand-panel').addEventListener('click', function (e) {
