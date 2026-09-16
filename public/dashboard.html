@@ -465,7 +465,56 @@
   .rdv-info-head { margin-top: 0; padding-bottom: 6px; border-bottom: 1px solid var(--sep); }
   .rdv-info-head .f { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; font-weight: 600; }
   @media (max-width: 900px) {
-    .rdv-info-grid { grid-template-columns: 1fr 1fr; }
+    /* Sur mobile, la grille tabulaire (7 colonnes) devient illisible en
+       1fr 1fr (texte tronqué partout) - on passe plutôt à une carte :
+       nom + statut sur la même ligne en haut, puis prestation, date et
+       coiffeur en pleine largeur (plus la place de tronquer), email et
+       téléphone en petit en bas. Les libellés d'en-tête n'ont plus lieu
+       d'être avec cette mise en page auto-explicative. */
+    #rdv-list-head, .rdv-info-head { display: none; }
+    #rdv-list .item {
+      align-items: flex-start; flex-wrap: wrap; overflow-x: visible;
+      padding: 14px 4px;
+    }
+    .rdv-info-grid {
+      display: grid; width: 100%;
+      grid-template-columns: 1fr auto;
+      grid-template-areas:
+        "nom    statut"
+        "presta presta"
+        "date   date"
+        "coif   coif"
+        "email  tel";
+      gap: 5px 10px;
+    }
+    .rdv-info-grid .f {
+      white-space: normal; overflow: visible; text-overflow: clip;
+    }
+    .rdv-info-grid .f:nth-child(1) { grid-area: nom; font-size: 15.5px; }
+    .rdv-info-grid .f:nth-child(1) b { font-weight: 700; }
+    .rdv-info-grid .f:nth-child(2) { grid-area: presta; }
+    .rdv-info-grid .f:nth-child(3) { grid-area: date; color: var(--grey); font-size: 12px; }
+    .rdv-info-grid .f:nth-child(4) { grid-area: coif; }
+    .rdv-info-grid .f:nth-child(5) {
+      grid-area: email; font-size: 11.5px; color: var(--grey);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .rdv-info-grid .f:nth-child(6) {
+      grid-area: tel; font-size: 11.5px; color: var(--grey); text-align: right;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .rdv-info-grid .f:nth-child(7) {
+      grid-area: statut; text-align: right; flex-shrink: 0;
+    }
+    .rdv-info-grid .f:nth-child(7) b {
+      display: inline-block; padding: 3px 10px; border-radius: 999px;
+      background: var(--fill); font-size: 11.5px;
+    }
+    #rdv-list .item-actions {
+      width: 100%; justify-content: flex-end; margin: 4px 0 0;
+      padding-left: 30px; box-sizing: border-box;
+    }
+  }
   }
 
   .card-box { background: var(--card); border-radius: 16px; padding: 22px; box-shadow: var(--shadow);
@@ -1261,7 +1310,7 @@
         <input type="checkbox" id="rdv-select-all" onchange="toggleSelectAllRdv(this.checked)">
         Tout sélectionner
       </label>
-      <div class="item" style="border-radius:0;box-shadow:none;background:none;padding:0 4px;margin-bottom:0;flex-wrap:nowrap">
+      <div class="item" id="rdv-list-head" style="border-radius:0;box-shadow:none;background:none;padding:0 4px;margin-bottom:0;flex-wrap:nowrap">
         <input type="checkbox" class="rdv-check" style="margin-right:12px;flex-shrink:0;visibility:hidden" tabindex="-1" disabled>
         <div class="rdv-info-grid rdv-info-head" style="margin-top:0">
           <div class="f">Nom</div><div class="f">Prestation</div><div class="f">Date</div>
