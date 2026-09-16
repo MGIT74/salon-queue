@@ -845,3 +845,19 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'appointments' AND column_name = 'gift_card_id');
 SET @sql := IF(@c = 0, "ALTER TABLE appointments ADD COLUMN gift_card_id CHAR(36) NULL", 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Journal d'activite : trace des actions sensibles (catalogue, coiffeurs,
+-- salons, compte, clients, cloture de caisse...) pour audit - affiche
+-- dans Parametres > Journal d'activite cote dashboard. Ecriture "best
+-- effort" (src/lib/activityLog.js) : une erreur d'ecriture ne bloque
+-- jamais l'action metier elle-meme.
+CREATE TABLE IF NOT EXISTS activity_log (
+  id CHAR(36) PRIMARY KEY,
+  salon_id CHAR(36) NOT NULL,
+  actor VARCHAR(120) NOT NULL DEFAULT 'Admin',
+  action VARCHAR(60) NOT NULL,
+  description VARCHAR(500) NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE,
+  INDEX idx_activity_log_salon_created (salon_id, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

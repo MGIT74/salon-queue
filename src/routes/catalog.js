@@ -1,8 +1,12 @@
 const express = require('express');
 const { pool } = require('../db');
 const requireAdmin = require('../middleware/auth');
+const { logActivity } = require('../lib/activityLog');
 
 const router = express.Router();
+
+const TABLE_LABEL = { services: 'Prestation', extras: 'Supplément', products: 'Produit' };
+
 
 function wrap(fn) {
   return function (req, res) {
@@ -50,6 +54,7 @@ async function uniqueId(table, base) {
       [id, salon.id, name, Number(duration_min) || 0, Number(price_cents) || 0, Number(sort_order) || 0]
     );
     const [[item]] = await pool.query(`SELECT * FROM ${table} WHERE id = ?`, [id]);
+    logActivity(salon.id, 'catalog_create', TABLE_LABEL[table] + ' "' + name + '" créée');
     res.json({ ok: true, item });
   }));
 
@@ -63,13 +68,27 @@ async function uniqueId(table, base) {
       if (req.body[k] !== undefined) { sets.push(k + ' = ?'); params.push(Number(req.body[k]) || 0); }
     });
     if (!sets.length) return res.json({ ok: true });
+
+    const [[before]] = await pool.query(`SELECT name FROM ${table} WHERE id = ? AND salon_id = ?`, [req.params.id, req.salon.id]);
+    const label = TABLE_LABEL[table] + ' "' + (req.body.name || (before ? before.name : req.params.id)) + '"';
+
     params.push(req.params.id, req.salon.id);
     await pool.query(`UPDATE ${table} SET ${sets.join(', ')} WHERE id = ? AND salon_id = ?`, params);
+
+    if (req.body.active !== undefined) {
+      logActivity(req.salon.id, req.body.active ? 'catalog_restore' : 'catalog_archive', label + (req.body.active ? ' réactivée' : ' archivée'));
+    } else if (req.body.image_url !== undefined) {
+      logActivity(req.salon.id, req.body.image_url ? 'catalog_image_add' : 'catalog_image_remove', 'Photo ' + (req.body.image_url ? 'ajoutée' : 'supprimée') + ' pour ' + label);
+    } else {
+      logActivity(req.salon.id, 'catalog_edit', label + ' modifiée');
+    }
     res.json({ ok: true });
   }));
 
   router.delete('/' + table + '/:id', requireAdmin, wrap(async (req, res) => {
+    const [[before]] = await pool.query(`SELECT name FROM ${table} WHERE id = ? AND salon_id = ?`, [req.params.id, req.salon.id]);
     await pool.query(`UPDATE ${table} SET active = 0 WHERE id = ? AND salon_id = ?`, [req.params.id, req.salon.id]);
+    logActivity(req.salon.id, 'catalog_archive', TABLE_LABEL[table] + ' "' + (before ? before.name : req.params.id) + '" archivée');
     res.json({ ok: true, archived: true });
   }));
 });
@@ -95,6 +114,7 @@ router.post('/products', requireAdmin, wrap(async (req, res) => {
     [id, req.salon.id, name, Number(price_cents) || 0, category || null, Number(sort_order) || 0, stockEnabled, stockQuantity]
   );
   const [[item]] = await pool.query('SELECT * FROM products WHERE id = ?', [id]);
+  logActivity(req.salon.id, 'catalog_create', 'Produit "' + name + '" créé');
   res.json({ ok: true, item });
 }));
 
@@ -110,13 +130,27 @@ router.put('/products/:id', requireAdmin, wrap(async (req, res) => {
     if (req.body[k] !== undefined) { sets.push(k + ' = ?'); params.push(Math.max(0, Number(req.body[k]) || 0)); }
   });
   if (!sets.length) return res.json({ ok: true });
+
+  const [[before]] = await pool.query('SELECT name FROM products WHERE id = ? AND salon_id = ?', [req.params.id, req.salon.id]);
+  const label = 'Produit "' + (req.body.name || (before ? before.name : req.params.id)) + '"';
+
   params.push(req.params.id, req.salon.id);
   await pool.query(`UPDATE products SET ${sets.join(', ')} WHERE id = ? AND salon_id = ?`, params);
+
+  if (req.body.active !== undefined) {
+    logActivity(req.salon.id, req.body.active ? 'catalog_restore' : 'catalog_archive', label + (req.body.active ? ' réactivé' : ' archivé'));
+  } else if (req.body.image_url !== undefined) {
+    logActivity(req.salon.id, req.body.image_url ? 'catalog_image_add' : 'catalog_image_remove', 'Photo ' + (req.body.image_url ? 'ajoutée' : 'supprimée') + ' pour ' + label);
+  } else {
+    logActivity(req.salon.id, 'catalog_edit', label + ' modifié');
+  }
   res.json({ ok: true });
 }));
 
 router.delete('/products/:id', requireAdmin, wrap(async (req, res) => {
+  const [[before]] = await pool.query('SELECT name FROM products WHERE id = ? AND salon_id = ?', [req.params.id, req.salon.id]);
   await pool.query('UPDATE products SET active = 0 WHERE id = ? AND salon_id = ?', [req.params.id, req.salon.id]);
+  logActivity(req.salon.id, 'catalog_archive', 'Produit "' + (before ? before.name : req.params.id) + '" archivé');
   res.json({ ok: true, archived: true });
 }));
 

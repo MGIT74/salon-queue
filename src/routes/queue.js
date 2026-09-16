@@ -5,6 +5,7 @@ const { loadQueue, recompute, clientKey } = require('../lib/queueMath');
 const { promoteTodayAppointments, nowParisDatetimeString } = require('./appointments');
 const requireAdmin = require('../middleware/auth');
 const requireAdminOrBarber = require('../middleware/barberAuth');
+const { logActivity } = require('../lib/activityLog');
 
 const router = express.Router();
 
@@ -146,7 +147,25 @@ router.post('/manual-client', requireAdmin, wrap(async (req, res) => {
      VALUES (?, ?, ?, ?, ?, ?, 'done', NOW(), NOW(), NOW(), ?, ?)`,
     [id, req.salon.id, String(client_name).trim(), email || null, phone || null, service_id || null, totalPriceCents, totalDurationMin]
   );
+  // req.body.source === 'csv_import' : appelé en boucle par l'import CSV
+  // (voir /manual-client/import-log plus bas) - une ligne de journal par
+  // client noierait le journal, un seul résumé suffit pour tout le lot.
+  if (req.body.source !== 'csv_import') {
+    logActivity(req.salon.id, 'client_manual_add', 'Client "' + String(client_name).trim() + '" ajouté manuellement');
+  }
   res.json({ ok: true, id });
+}));
+
+/**
+ * Résumé unique après un import CSV (voir importClientsCsv côté
+ * dashboard) : évite une ligne de journal par client importé.
+ */
+router.post('/manual-client/import-log', requireAdmin, wrap(async (req, res) => {
+  const count = Number(req.body.count) || 0;
+  if (count > 0) {
+    logActivity(req.salon.id, 'client_csv_import', count + ' client' + (count > 1 ? 's' : '') + ' importé' + (count > 1 ? 's' : '') + ' depuis un fichier CSV');
+  }
+  res.json({ ok: true });
 }));
 
 // --- Public : check-in à la borne ---------------------------------------
@@ -528,8 +547,10 @@ router.get('/history', requireAdmin, wrap(async (req, res) => {
 
 // --- Coiffeur : suppression définitive (nettoyage de données test) ------
 router.delete('/:id', requireAdmin, wrap(async (req, res) => {
+  const [[before]] = await pool.query('SELECT client_name FROM queue WHERE id = ? AND salon_id = ?', [req.params.id, req.salon.id]);
   await pool.query('DELETE FROM queue WHERE id = ? AND salon_id = ?', [req.params.id, req.salon.id]);
   await recompute(req.salon.id);
+  if (before) logActivity(req.salon.id, 'client_delete', 'Fiche client "' + before.client_name + '" supprimée définitivement');
   res.json({ ok: true, deleted: true });
 }));
 
