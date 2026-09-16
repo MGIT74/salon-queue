@@ -116,14 +116,19 @@
     .sidebar {
       position: fixed; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); left: 12px; right: 12px; top: auto; width: auto;
       display: flex; flex-direction: row; align-items: center; gap: 4px;
-      border-radius: 20px; padding: 6px 8px;
-      z-index: 60; box-shadow: 0 10px 30px rgba(0,0,0,0.28);
+      z-index: 60;
       max-height: calc(100vh - 100px); overflow-y: auto;
-      background: rgba(255,255,255,.65); backdrop-filter: blur(20px) saturate(180%);
-      -webkit-backdrop-filter: blur(20px) saturate(180%);
-      border: 0.5px solid rgba(255,255,255,.4);
+      /* Pas de background/backdrop-filter/box-shadow ici : cet élément
+         est l'ANCÊTRE direct de .sidebar-brand, qui doit rester fixé en
+         haut de l'écran (position:fixed;top:0) même en mobile. Or tout
+         backdrop-filter (ou transform) posé ici créerait un nouveau
+         "containing block" pour ce descendant en position:fixed, et son
+         top:0 se recalerait alors par rapport à CETTE boîte — ancrée en
+         bas de l'écran — au lieu du viewport : le nom du salon se
+         retrouverait piégé dans la barre du bas. L'habillage visuel
+         (pilule flloutée) est donc posé sur .tabs, qui est un simple
+         frère de .sidebar-brand, pas un ancêtre. */
     }
-    [data-theme="dark"] .sidebar { background: rgba(28,28,30,.55); border-color: rgba(255,255,255,.08); }
 
     .sidebar-brand {
       position: fixed; top: 0; left: 0; right: 0; z-index: 61;
@@ -140,7 +145,14 @@
 
     body.impersonating .sidebar-brand { top: 44px; }
 
-    .tabs { flex: 1; flex-direction: row; overflow-x: hidden; gap: 2px; align-items: center; }
+    .tabs {
+      flex: 1; flex-direction: row; overflow-x: hidden; gap: 2px; align-items: center;
+      border-radius: 20px; padding: 6px 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.28);
+      background: rgba(255,255,255,.65); backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      border: 0.5px solid rgba(255,255,255,.4); box-sizing: border-box;
+    }
+    [data-theme="dark"] .tabs { background: rgba(28,28,30,.55); border-color: rgba(255,255,255,.08); }
     .tabs button {
       flex-direction: column; gap: 3px; font-size: 10px; padding: 8px 6px;
       flex: 1 0 auto; min-width: 60px; text-align: center; white-space: nowrap;
