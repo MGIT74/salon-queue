@@ -1260,9 +1260,12 @@
         <input type="checkbox" id="rdv-select-all" onchange="toggleSelectAllRdv(this.checked)">
         Tout sélectionner
       </label>
-      <div class="rdv-info-grid rdv-info-head" style="padding-left:32px">
-        <div class="f">Prestation</div><div class="f">Coiffeur</div><div class="f">Email</div>
-        <div class="f">Téléphone</div><div class="f">Statut</div>
+      <div class="item" style="border-bottom:1px solid var(--sep);border-radius:0;box-shadow:none;background:none;padding:0 4px 6px;margin-bottom:0">
+        <input type="checkbox" class="rdv-check" style="margin-right:12px;flex-shrink:0;visibility:hidden" tabindex="-1" disabled>
+        <div class="rdv-info-grid rdv-info-head" style="margin-top:0">
+          <div class="f">Prestation</div><div class="f">Coiffeur</div><div class="f">Email</div>
+          <div class="f">Téléphone</div><div class="f">Statut</div>
+        </div>
       </div>
       <div id="rdv-list"></div>
       <div class="clients-pagination" id="rdv-pagination"></div>
@@ -1319,9 +1322,12 @@
       <input type="checkbox" id="clients-select-all" onchange="toggleSelectAllClients(this.checked)">
       Tout sélectionner
     </label>
-    <div class="client-info-grid client-info-head" style="padding-left:50px">
-      <div class="f">Nom</div><div class="f">Prestation</div><div class="f">Date</div>
-      <div class="f">Email</div><div class="f">Prix</div><div class="f">Durée</div>
+    <div class="item" style="background:none;box-shadow:none;border-radius:0;padding:0 18px 6px;margin-bottom:0">
+      <input type="checkbox" class="client-check" style="visibility:hidden" tabindex="-1" disabled>
+      <div class="client-info-grid client-info-head" style="margin-top:0">
+        <div class="f">Nom</div><div class="f">Prestation</div><div class="f">Date</div>
+        <div class="f">Email</div><div class="f">Prix</div><div class="f">Durée</div>
+      </div>
     </div>
     <div id="clients-list"></div>
     <div class="clients-pagination" id="clients-pagination"></div>
