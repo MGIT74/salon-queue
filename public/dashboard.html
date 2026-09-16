@@ -456,8 +456,8 @@
   }
 
   .rdv-info-grid {
-    display: grid; grid-template-columns: 220px 140px 210px 130px 90px; gap: 4px 12px;
-    margin-top: 8px;
+    display: grid; grid-template-columns: 180px 200px 140px 210px 130px 90px; gap: 4px 24px;
+    justify-content: space-between; margin-top: 8px;
   }
   .rdv-info-grid .f { font-size: 12.5px; color: var(--grey); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .rdv-info-grid .f b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
@@ -1263,8 +1263,12 @@
       <div class="item" style="border-radius:0;box-shadow:none;background:none;padding:0 4px;margin-bottom:0">
         <input type="checkbox" class="rdv-check" style="margin-right:12px;flex-shrink:0;visibility:hidden" tabindex="-1" disabled>
         <div class="rdv-info-grid rdv-info-head" style="margin-top:0">
-          <div class="f">Prestation</div><div class="f">Coiffeur</div><div class="f">Email</div>
-          <div class="f">Téléphone</div><div class="f">Statut</div>
+          <div class="f">Nom</div><div class="f">Prestation</div><div class="f">Coiffeur</div>
+          <div class="f">Email</div><div class="f">Téléphone</div><div class="f">Statut</div>
+        </div>
+        <div class="item-actions" style="display:flex;align-items:center;gap:12px;visibility:hidden">
+          <button class="btn btn-soft" style="padding:6px 10px;font-size:13px" tabindex="-1">Déplacer</button>
+          <button class="btn btn-ghost" style="padding:6px 10px;font-size:13px" tabindex="-1">Annuler</button>
         </div>
       </div>
       <div id="rdv-list"></div>
@@ -4556,6 +4560,7 @@ function renderRdvList() {
         var cancelable = a.status !== 'cancelled' && a.source !== 'walkin' && a.scheduled_at > nowSalonDatetimeString();
 
         var infoGrid = [
+          '<div class="f"><b>' + esc(a.client_name) + '</b></div>',
           '<div class="f"><b>' + esc(a.service_name) + '</b></div>',
           '<div class="f"><b>' + esc(a.barber_name || 'Premier disponible') + '</b></div>',
           '<div class="f"><b>' + esc(a.email || '—') + '</b></div>',
@@ -4563,13 +4568,23 @@ function renderRdvList() {
           '<div class="f"><b style="color:' + (statusColors[a.display_status] || 'var(--grey)') + '">' + (statusLabels[a.display_status] || a.display_status) + '</b></div>'
         ].join('');
 
+        // Les boutons d'action sont toujours rendus (mêmes classes, même
+        // texte) pour que cette zone garde exactement la même largeur sur
+        // toutes les lignes — seulement rendus invisibles (visibility, pas
+        // display) quand le RDV n'est pas annulable. Sans ça, la grille
+        // n'aurait pas la même largeur disponible d'une ligne à l'autre et
+        // se désalignerait (colonne Statut en particulier).
+        var actionsHtml =
+          '<button class="btn btn-soft" style="padding:6px 10px;font-size:13px' + (cancelable ? '' : ';visibility:hidden;pointer-events:none') + '"' +
+          (cancelable ? ' onclick="openRescheduleAppointment(\'' + a.id + '\', calAppointmentById[\'' + a.id + '\'])"' : ' tabindex="-1"') + '>Déplacer</button>' +
+          '<button class="btn btn-ghost" style="color:var(--red);padding:6px 10px;font-size:13px' + (cancelable ? '' : ';visibility:hidden;pointer-events:none') + '"' +
+          (cancelable ? ' onclick="openCancelAppointmentsModal([\'' + a.id + '\'])"' : ' tabindex="-1"') + '>Annuler</button>';
+
         return '<div class="item">' +
           '<input type="checkbox" class="rdv-check" data-id="' + a.id + '" ' + (rdvSelectedIds[a.id] ? 'checked' : '') + ' onchange="toggleRdvSelect(\'' + a.id + '\', this.checked)" style="margin-right:12px;flex-shrink:0">' +
-          '<div class="item-main" onclick="openClientDrawerForAppointment(\'' + a.id + '\')" style="cursor:pointer"><div class="item-name">' + esc(a.client_name) + ' — ' + when + ' ' + sourceBadge(a) + '</div>' +
+          '<div class="item-main" onclick="openClientDrawerForAppointment(\'' + a.id + '\')" style="cursor:pointer"><div class="item-name">' + when + ' ' + sourceBadge(a) + '</div>' +
           '<div class="rdv-info-grid">' + infoGrid + '</div></div>' +
-          '<div class="item-actions" style="display:flex;align-items:center;gap:12px">' +
-          (cancelable ? '<button class="btn btn-soft" style="padding:6px 10px;font-size:13px" onclick="openRescheduleAppointment(\'' + a.id + '\', calAppointmentById[\'' + a.id + '\'])">Déplacer</button>' : '') +
-          (cancelable ? '<button class="btn btn-ghost" style="color:var(--red);padding:6px 10px;font-size:13px" onclick="openCancelAppointmentsModal([\'' + a.id + '\'])">Annuler</button>' : '') +
+          '<div class="item-actions" style="display:flex;align-items:center;gap:12px">' + actionsHtml +
           '</div>' +
           '</div>';
       }).join('');
