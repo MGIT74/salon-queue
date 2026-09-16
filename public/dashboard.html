@@ -443,6 +443,30 @@
     .gift-info-grid { grid-template-columns: 1fr 1fr; }
   }
 
+  .client-info-grid {
+    display: grid; grid-template-columns: minmax(200px,2fr) 120px minmax(180px,1.5fr) 90px 90px; gap: 4px 12px;
+    margin-top: 8px;
+  }
+  .client-info-grid .f { font-size: 12.5px; color: var(--grey); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .client-info-grid .f b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .client-info-head { margin-top: 0; padding-bottom: 6px; border-bottom: 1px solid var(--sep); }
+  .client-info-head .f { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; font-weight: 600; }
+  @media (max-width: 900px) {
+    .client-info-grid { grid-template-columns: 1fr 1fr; }
+  }
+
+  .rdv-info-grid {
+    display: grid; grid-template-columns: minmax(160px,1.5fr) 130px minmax(180px,1.5fr) 130px 90px; gap: 4px 12px;
+    margin-top: 8px;
+  }
+  .rdv-info-grid .f { font-size: 12.5px; color: var(--grey); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rdv-info-grid .f b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .rdv-info-head { margin-top: 0; padding-bottom: 6px; border-bottom: 1px solid var(--sep); }
+  .rdv-info-head .f { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; font-weight: 600; }
+  @media (max-width: 900px) {
+    .rdv-info-grid { grid-template-columns: 1fr 1fr; }
+  }
+
   .card-box { background: var(--card); border-radius: 16px; padding: 22px; box-shadow: var(--shadow);
               margin-bottom: 14px; transition: background .25s ease; }
   .card-box h3 { font-size: 17px; font-weight: 600; letter-spacing: -.02em; margin: 0 0 4px; }
@@ -1236,6 +1260,10 @@
         <input type="checkbox" id="rdv-select-all" onchange="toggleSelectAllRdv(this.checked)">
         Tout sélectionner
       </label>
+      <div class="rdv-info-grid rdv-info-head" style="padding-left:32px">
+        <div class="f">Prestation</div><div class="f">Coiffeur</div><div class="f">Email</div>
+        <div class="f">Téléphone</div><div class="f">Statut</div>
+      </div>
       <div id="rdv-list"></div>
       <div class="clients-pagination" id="rdv-pagination"></div>
     </div>
@@ -1291,6 +1319,10 @@
       <input type="checkbox" id="clients-select-all" onchange="toggleSelectAllClients(this.checked)">
       Tout sélectionner
     </label>
+    <div class="client-info-grid client-info-head" style="padding-left:50px">
+      <div class="f">Prestation</div><div class="f">Date</div><div class="f">Email</div>
+      <div class="f">Prix</div><div class="f">Durée</div>
+    </div>
     <div id="clients-list"></div>
     <div class="clients-pagination" id="clients-pagination"></div>
   </div>
@@ -4516,13 +4548,20 @@ function renderRdvList() {
         // Annulable : un vrai RDV en ligne, pas encore annulé, à venir -
         // même règle que le tiroir client (openClientDrawer).
         var cancelable = a.status !== 'cancelled' && a.source !== 'walkin' && a.scheduled_at > nowSalonDatetimeString();
+
+        var infoGrid = [
+          '<div class="f"><b>' + esc(a.service_name) + '</b></div>',
+          '<div class="f"><b>' + esc(a.barber_name || 'Premier disponible') + '</b></div>',
+          '<div class="f"><b>' + esc(a.email || '—') + '</b></div>',
+          '<div class="f"><b>' + esc(a.phone || '—') + '</b></div>',
+          '<div class="f"><b style="color:' + (statusColors[a.display_status] || 'var(--grey)') + '">' + (statusLabels[a.display_status] || a.display_status) + '</b></div>'
+        ].join('');
+
         return '<div class="item">' +
           '<input type="checkbox" class="rdv-check" data-id="' + a.id + '" ' + (rdvSelectedIds[a.id] ? 'checked' : '') + ' onchange="toggleRdvSelect(\'' + a.id + '\', this.checked)" style="margin-right:12px;flex-shrink:0">' +
           '<div class="item-main" onclick="openClientDrawerForAppointment(\'' + a.id + '\')" style="cursor:pointer"><div class="item-name">' + esc(a.client_name) + ' — ' + when + ' ' + sourceBadge(a) + '</div>' +
-          '<div class="item-meta">' + esc(a.service_name) + (a.barber_name ? ' avec ' + esc(a.barber_name) : ' · premier disponible') + '</div>' +
-          '<div class="item-meta">' + esc(a.email || '') + (a.phone ? ' · ' + esc(a.phone) : '') + '</div></div>' +
+          '<div class="rdv-info-grid">' + infoGrid + '</div></div>' +
           '<div class="item-actions" style="display:flex;align-items:center;gap:12px">' +
-          '<span style="color:' + (statusColors[a.display_status] || 'var(--grey)') + ';font-size:13px;font-weight:600">' + (statusLabels[a.display_status] || a.display_status) + '</span>' +
           (cancelable ? '<button class="btn btn-soft" style="padding:6px 10px;font-size:13px" onclick="openRescheduleAppointment(\'' + a.id + '\', calAppointmentById[\'' + a.id + '\'])">Déplacer</button>' : '') +
           (cancelable ? '<button class="btn btn-ghost" style="color:var(--red);padding:6px 10px;font-size:13px" onclick="openCancelAppointmentsModal([\'' + a.id + '\'])">Annuler</button>' : '') +
           '</div>' +
@@ -5123,6 +5162,7 @@ function renderClients() {
           (c.extra_names.length ? ' + ' + c.extra_names.join(', ') : '');
         var stuck = c.status === 'in_progress' &&
           (Date.now() - new Date(c.start_at || c.checkin_at).getTime()) > 90 * 60000;
+        var dur = durationBadge(c.start_at, c.end_at).replace(/^ · /, '');
 
         var actions = '';
         if (c.status === 'waiting' || c.status === 'in_progress') {
@@ -5131,7 +5171,15 @@ function renderClients() {
         }
         actions += '<button class="btn btn-ghost" onclick="deleteClient(\'' + c.id + '\')">Supprimer</button>';
 
-        return '<div class="item' + (stuck ? '' : '') + '">' +
+        var infoGrid = [
+          '<div class="f"><b>' + esc(detail) + '</b></div>',
+          '<div class="f"><b>' + when + '</b></div>',
+          '<div class="f"><b>' + esc(c.email || '—') + '</b></div>',
+          '<div class="f">' + (c.total_price_cents ? '<b>' + eur(c.total_price_cents) + '</b>' : '') + '</div>',
+          '<div class="f">' + (dur ? '<b>' + dur + '</b>' : '') + '</div>'
+        ].join('');
+
+        return '<div class="item">' +
           '<input type="checkbox" class="client-check"' + (selectedClientIds[c.id] ? ' checked' : '') +
           ' onclick="event.stopPropagation()" onchange="toggleClientSelect(\'' + c.id + '\', this.checked)">' +
           '<div class="item-main" onclick="openClientDrawer(\'' + c.id + '\', \'history\')" style="cursor:pointer">' +
@@ -5140,10 +5188,7 @@ function renderClients() {
               esc(STATUS_LABEL[c.status] || c.status) + '</span>' +
               (stuck ? ' <span class="chip" style="background:var(--orange);color:#fff;font-size:11px">bloqué</span>' : '') +
             '</div>' +
-            '<div class="item-meta">' + esc(detail) + ' · ' + when +
-              (c.email ? ' · ' + esc(c.email) : '') +
-              (c.total_price_cents ? ' · ' + eur(c.total_price_cents) : '') +
-              durationBadge(c.start_at, c.end_at) + '</div>' +
+            '<div class="client-info-grid">' + infoGrid + '</div>' +
           '</div>' +
           '<div class="item-actions" onclick="event.stopPropagation()">' + actions + '</div>' +
         '</div>';
