@@ -213,7 +213,7 @@
   .timeline-hours span { font-size: 12px; color: var(--grey); }
   .timeline-row { display: flex; align-items: center; min-height: 54px; border-top: 1px solid var(--sep); }
   .timeline-row:first-child { border-top: none; }
-  .timeline-row-label { width: 110px; flex-shrink: 0; display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13px; padding-right: 8px; }
+  .timeline-row-label { width: 22px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; padding-right: 0; }
   .timeline-row-label .dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
   .timeline-row-track { position: relative; flex: 1; height: 40px; }
   .timeline-block {
@@ -1539,7 +1539,7 @@ function renderAgendaTimeline(dateStr) {
     }).join('');
     var trackClick = bid === 'unassigned' ? '' : ' onclick="openCaisseAddAppointment(\'' + dateStr + '\',\'' + bid + '\')" title="Cliquer pour ajouter un RDV"';
     return '<div class="timeline-row">' +
-      '<div class="timeline-row-label"><span class="dot" style="background:' + color + '"></span>' + esc(b.name) + '</div>' +
+      '<div class="timeline-row-label" title="' + esc(b.name) + '"><span class="dot" style="background:' + color + '"></span></div>' +
       '<div class="timeline-row-track"' + trackClick + '>' + blocksHtml + '</div>' +
       '</div>';
   }).join('');
