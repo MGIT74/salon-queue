@@ -456,7 +456,7 @@
   }
 
   .rdv-info-grid {
-    display: grid; grid-template-columns: 200px 180px 140px 200px 130px 90px; gap: 4px 12px;
+    display: grid; grid-template-columns: 160px 170px 150px 130px 190px 120px 90px; gap: 4px 12px;
     margin-top: 8px;
   }
   .rdv-info-grid .f { font-size: 12.5px; color: var(--grey); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1263,8 +1263,8 @@
       <div class="item" style="border-radius:0;box-shadow:none;background:none;padding:0 4px;margin-bottom:0">
         <input type="checkbox" class="rdv-check" style="margin-right:12px;flex-shrink:0;visibility:hidden" tabindex="-1" disabled>
         <div class="rdv-info-grid rdv-info-head" style="margin-top:0">
-          <div class="f">Nom</div><div class="f">Prestation</div><div class="f">Coiffeur</div>
-          <div class="f">Email</div><div class="f">Téléphone</div><div class="f">Statut</div>
+          <div class="f">Nom</div><div class="f">Prestation</div><div class="f">Date</div>
+          <div class="f">Coiffeur</div><div class="f">Email</div><div class="f">Téléphone</div><div class="f">Statut</div>
         </div>
         <div class="item-actions" style="display:flex;align-items:center;gap:12px;visibility:hidden">
           <button class="btn btn-soft" style="padding:6px 10px;font-size:13px" tabindex="-1">Déplacer</button>
@@ -4553,8 +4553,8 @@ function renderRdvList() {
         // ambigu, insensible au fuseau), l'heure directement depuis la
         // chaîne brute (comme partout ailleurs dans le calendrier).
         var dateOnly = new Date(a.scheduled_at.slice(0, 10) + 'T00:00:00');
-        var when = dateOnly.toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'short' }) +
-          ' à ' + a.scheduled_at.slice(11, 16);
+        var whenShort = dateOnly.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }) +
+          ' ' + a.scheduled_at.slice(11, 16);
         // Annulable : un vrai RDV en ligne, pas encore annulé, à venir -
         // même règle que le tiroir client (openClientDrawer).
         var cancelable = a.status !== 'cancelled' && a.source !== 'walkin' && a.scheduled_at > nowSalonDatetimeString();
@@ -4562,6 +4562,7 @@ function renderRdvList() {
         var infoGrid = [
           '<div class="f"><b>' + esc(a.client_name) + '</b></div>',
           '<div class="f"><b>' + esc(a.service_name) + '</b></div>',
+          '<div class="f"><b>' + whenShort + ' ' + sourceBadge(a, true) + '</b></div>',
           '<div class="f"><b>' + esc(a.barber_name || 'Premier disponible') + '</b></div>',
           '<div class="f"><b>' + esc(a.email || '—') + '</b></div>',
           '<div class="f"><b>' + esc(a.phone || '—') + '</b></div>',
@@ -4582,7 +4583,7 @@ function renderRdvList() {
 
         return '<div class="item">' +
           '<input type="checkbox" class="rdv-check" data-id="' + a.id + '" ' + (rdvSelectedIds[a.id] ? 'checked' : '') + ' onchange="toggleRdvSelect(\'' + a.id + '\', this.checked)" style="margin-right:12px;flex-shrink:0">' +
-          '<div class="item-main" onclick="openClientDrawerForAppointment(\'' + a.id + '\')" style="cursor:pointer"><div class="item-name">' + when + ' ' + sourceBadge(a) + '</div>' +
+          '<div class="item-main" onclick="openClientDrawerForAppointment(\'' + a.id + '\')" style="cursor:pointer">' +
           '<div class="rdv-info-grid">' + infoGrid + '</div></div>' +
           '<div class="item-actions" style="display:flex;align-items:center;gap:12px">' + actionsHtml +
           '</div>' +
