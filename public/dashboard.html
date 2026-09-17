@@ -2030,7 +2030,19 @@ addPasswordToggle('pw');
     document.getElementById('app').style.display = '';
     checkAiChatAvailability();
     startImpersonateBanner();
-    boot();
+    // setTimeout (et non un appel direct) : ce script continue de
+    // s'exécuter après ce point (déclarations de var/fonctions plus bas
+    // dans le fichier), alors que les deux autres chemins de connexion
+    // (clic sur "Se connecter", ou reprise de session ci-dessous)
+    // n'appellent boot() que dans un .then() de fetch - donc toujours
+    // après la fin de l'exécution du script. Appeler boot() de façon
+    // synchrone ICI le faisait s'exécuter avant que des var déclarées
+    // plus bas (VALID_TABS, MOBILE_PINNED_DEFAULT...) aient leur valeur
+    // assignée (juste 'undefined' via le hoisting) - d'où des plantages
+    // du type "Cannot read properties of undefined" selon la fonction
+    // atteinte en premier. setTimeout(...,0) reproduit le même
+    // comportement "après la fin du script" que les deux autres chemins.
+    setTimeout(boot, 0);
     return;
   }
 
