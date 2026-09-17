@@ -2070,11 +2070,20 @@ var MOBILE_PINNED_KEY = 'dashboard_mobile_pinned_tabs_v1';
 var MOBILE_PINNED_DEFAULT = ['queue', 'caisse', 'rdv', 'clients'];
 
 function getMobilePinned() {
+  // Solides même si appelée avant que MOBILE_PINNED_KEY/DEFAULT (déclarées
+  // plus bas dans le script) ne soient assignées : c'est le cas du lien
+  // d'assistance super admin, qui appelle boot() immédiatement au chargement
+  // de la page plutôt qu'après un clic sur "Se connecter" (le temps que le
+  // script s'exécute jusqu'au bout) - sans ce filet, ça plantait avec
+  // "Cannot read properties of undefined (reading 'slice')", bloquant tout
+  // le reste du chargement du dashboard en mode assistance.
+  var key = (typeof MOBILE_PINNED_KEY !== 'undefined' && MOBILE_PINNED_KEY) || 'dashboard_mobile_pinned_tabs_v1';
+  var fallback = (typeof MOBILE_PINNED_DEFAULT !== 'undefined' && MOBILE_PINNED_DEFAULT) || ['queue', 'caisse', 'rdv', 'clients'];
   try {
-    var saved = JSON.parse(localStorage.getItem(MOBILE_PINNED_KEY) || 'null');
+    var saved = JSON.parse(localStorage.getItem(key) || 'null');
     if (Array.isArray(saved) && saved.length) return saved;
   } catch (e) {}
-  return MOBILE_PINNED_DEFAULT.slice();
+  return fallback.slice();
 }
 
 function renderMobilePinned() {
@@ -2179,17 +2188,28 @@ document.getElementById('tabs').addEventListener('click', function (e) {
 
 /* ============ Chargement ============ */
 function boot() {
-  renderMobilePinned();
+  try {
+    renderMobilePinned();
 
-  // Restaure l'onglet actif depuis l'URL (#rdv, #caisse...) au lieu de
-  // toujours retomber sur "File d'attente" après un rafraîchissement.
-  // Le HTML statique affiche déjà "queue" par défaut, donc on ne fait
-  // rien de plus si aucun hash valide n'est présent.
-  var hashTab = (location.hash || '').replace('#', '');
-  if (VALID_TABS.indexOf(hashTab) !== -1 && hashTab !== 'queue') setActiveTab(hashTab);
+    // Restaure l'onglet actif depuis l'URL (#rdv, #caisse...) au lieu de
+    // toujours retomber sur "File d'attente" après un rafraîchissement.
+    // Le HTML statique affiche déjà "queue" par défaut, donc on ne fait
+    // rien de plus si aucun hash valide n'est présent.
+    var hashTab = (location.hash || '').replace('#', '');
+    if (VALID_TABS.indexOf(hashTab) !== -1 && hashTab !== 'queue') setActiveTab(hashTab);
 
-  loadCurrentSalonName();
-  loadSalonSwitcher();
+    loadCurrentSalonName();
+    loadSalonSwitcher();
+  } catch (err) {
+    // Une erreur ici (avant même le chargement des données) ne doit
+    // jamais laisser le dashboard bloqué sur "Chargement..." sans
+    // aucune indication visible - vécu une fois avec getMobilePinned()
+    // en mode assistance (lien direct, sans passer par le clic de
+    // connexion normal qui laisse le temps au script de finir de
+    // s'exécuter).
+    console.error('boot() (partie synchrone) a échoué :', err);
+    toast('Erreur au chargement : ' + err.message, true);
+  }
   // Devise et fuseau horaire du salon : utilisés respectivement par eur()
   // et nowSalonDatetimeString() partout dans le dashboard, chargés dès le
   // départ (pas seulement à l'ouverture de Réglages).
@@ -2203,6 +2223,10 @@ function boot() {
     .then(function () {
       setInterval(function () { renderQueue(); }, 1000);
       subscribeQueue(refreshQueue);
+    })
+    .catch(function (err) {
+      console.error('boot() a échoué :', err);
+      toast('Erreur au chargement : ' + err.message, true);
     });
 }
 
