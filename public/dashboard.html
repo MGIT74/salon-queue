@@ -694,14 +694,14 @@
   .cal-legend-avatar.dimmed { opacity: .35; }
 
   /* --- Planning du jour (timeline temps réel) --- */
-  .timeline-scroll { overflow-x: auto; width: 100%; max-width: 100%; }
-  .timeline-inner { position: relative; min-width: 720px; }
+  .timeline-scroll { overflow-x: auto; width: 100%; max-width: 100%; position: relative; }
+  .timeline-inner { position: relative; }
   .timeline-hours {
     display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
-    padding-left: 130px; margin-bottom: 6px;
+    padding-left: 22px; margin-bottom: 6px;
   }
   .timeline-hours span { font-size: 12px; color: var(--grey); }
-  .timeline-row { display: flex; align-items: center; min-height: 54px; border-top: 1px solid var(--sep); }
+  .timeline-row { display: flex; align-items: center; min-height: 54px; border-top: 1px solid var(--sep); position: relative; }
   .timeline-row:first-child { border-top: none; }
   .timeline-row-label { width: 22px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; padding-right: 0; }
   .timeline-row-label .dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
@@ -724,6 +724,27 @@
     border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 7px solid var(--accent);
   }
   .timeline-empty { padding: 20px 0; text-align: center; color: var(--grey); font-size: 14px; }
+  /* Repères de minutes en fond, sous les créneaux - une ligne fine tous les
+     15 min (via background-size en %, calculé selon la plage affichée). */
+  .timeline-minute-grid {
+    position: absolute; left: 22px; right: 0; top: 0; bottom: 0; pointer-events: none; z-index: 0;
+    background-image: linear-gradient(to right, var(--sep) 1px, transparent 1px);
+    background-repeat: repeat-x; background-position: left top;
+  }
+  .timeline-zoom-ctrl {
+    display: flex; align-items: center; justify-content: flex-end; gap: 6px;
+    margin-bottom: 8px;
+  }
+  .timeline-zoom-ctrl-inner {
+    display: flex; align-items: center; gap: 6px; background: var(--fill); border-radius: 999px; padding: 4px 6px;
+  }
+  .timeline-zoom-ctrl button {
+    width: 22px; height: 22px; border-radius: 50%; border: none; background: var(--card); color: var(--ink);
+    font-size: 14px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    font-family: inherit; line-height: 1;
+  }
+  .timeline-zoom-ctrl span { font-size: 11px; color: var(--grey); min-width: 32px; text-align: center; }
+  #dash-timeline .timeline-zoom-ctrl { pointer-events: auto; }
 
   /* Assistant "Ajouter un RDV" (admin) - parcours par étapes */
   .aa-step-title { font-size: 15px; font-weight: 600; margin-bottom: 12px; }
@@ -2516,6 +2537,7 @@ function loadDashboardTab() {
       return a.scheduled_at.slice(0, 10) === todayStr && a.status !== 'cancelled';
     });
     todayAppts.forEach(function (a) { calAppointmentById[a.id] = a; });
+    dashTimelineCache = { dateStr: todayStr, appts: todayAppts };
     document.getElementById('dash-timeline').innerHTML = renderDayTimelineHtml(todayStr, todayAppts);
   }).catch(function () {
     document.getElementById('dash-timeline').innerHTML = '<div class="empty">Impossible de charger le chrono du jour</div>';
@@ -4276,6 +4298,9 @@ function loadSalonScheduleForTimeline() {
  * texte des RDV - même principe que l'Agenda de la caisse, bien plus
  * ergonomique qu'une liste qui s'allonge indéfiniment.
  */
+var timelineZoom = 1; // partagé entre l'onglet RDV et l'aperçu du Dashboard
+var dashTimelineCache = null; // {dateStr, appts} - pour re-rendre au zoom sans re-fetcher
+
 function renderDayTimelineHtml(dateStr, dayAppts) {
   var weekday = new Date(dateStr + 'T00:00:00').getDay();
   var salonDay = salonScheduleByWeekday && salonScheduleByWeekday[weekday];
@@ -4346,14 +4371,53 @@ function renderDayTimelineHtml(dateStr, dayAppts) {
     var nowMin = now.getHours() * 60 + now.getMinutes();
     if (nowMin >= rangeStart && nowMin <= rangeEnd) {
       var leftFrac = (nowMin - rangeStart) / (rangeEnd - rangeStart);
-      nowLineHtml = '<div class="timeline-now-line" style="left: calc(130px + (100% - 130px) * ' + leftFrac + ')"></div>';
+      nowLineHtml = '<div class="timeline-now-line" style="left: calc(22px + (100% - 22px) * ' + leftFrac + ')"></div>';
     }
   }
 
-  return '<div class="timeline-scroll"><div class="timeline-inner">' +
-    '<div class="timeline-hours" style="grid-template-columns:repeat(' + hourCount + ',1fr)">' + hoursHtml + '</div>' +
-    rowsHtml + nowLineHtml +
+  // Repère de minutes en fond : une ligne fine tous les quarts d'heure.
+  // background-size en % du conteneur = 15 min exprimees en pourcentage
+  // de la plage totale affichee (rangeEnd - rangeStart).
+  var minuteStepPct = (15 / (rangeEnd - rangeStart)) * 100;
+  var minuteGridHtml = '<div class="timeline-minute-grid" style="background-size:' + minuteStepPct + '% 100%"></div>';
+
+  // Largeur ajustable au zoom : ~90px/heure a zoom 1 (comme le minimum
+  // fixe d'avant, mais qui suit desormais le nombre d'heures affichees
+  // au lieu d'une largeur fixe qui coupait les plages courtes ou
+  // ecrasait les plages longues).
+  var innerWidth = Math.round(hourCount * 90 * timelineZoom);
+  var zoomPct = Math.round(timelineZoom * 100);
+  var zoomCtrl = '<div class="timeline-zoom-ctrl"><div class="timeline-zoom-ctrl-inner">' +
+    '<button type="button" onclick="event.stopPropagation();adjustTimelineZoom(-1)" title="Dézoomer">−</button>' +
+    '<span>' + zoomPct + '%</span>' +
+    '<button type="button" onclick="event.stopPropagation();adjustTimelineZoom(1)" title="Zoomer">+</button>' +
     '</div></div>';
+
+  return zoomCtrl + '<div class="timeline-scroll"><div class="timeline-inner" style="min-width:' + innerWidth + 'px">' +
+    '<div class="timeline-hours" style="grid-template-columns:repeat(' + hourCount + ',1fr)">' + hoursHtml + '</div>' +
+    minuteGridHtml + rowsHtml + nowLineHtml +
+    '</div></div>';
+}
+
+/**
+ * +1 pour zoomer, -1 pour dézoomer (pas de 20%, borné entre 60% et
+ * 250%). Ré-affiche tous les plannings jour actuellement visibles avec
+ * les données déjà en mémoire, sans nouvel appel réseau.
+ */
+function adjustTimelineZoom(delta) {
+  timelineZoom = Math.max(0.6, Math.min(2.5, +(timelineZoom + delta * 0.2).toFixed(2)));
+
+  if (dashTimelineCache) {
+    var dashEl = document.getElementById('dash-timeline');
+    if (dashEl) dashEl.innerHTML = renderDayTimelineHtml(dashTimelineCache.dateStr, dashTimelineCache.appts);
+  }
+  if (typeof calViewMode !== 'undefined') {
+    if (calViewMode === 'day') renderDayView();
+    else if (calSelectedDate) {
+      if (calViewMode === 'month') renderMonthView();
+      else if (calViewMode === 'week') renderWeekView();
+    }
+  }
 }
 
 /**
