@@ -713,7 +713,7 @@
   }
   .timeline-now-line {
     position: absolute; top: 0; bottom: 0; width: 2px; background: var(--accent);
-    pointer-events: none; z-index: 5;
+    z-index: 5; cursor: help;
   }
   .timeline-now-line::before {
     content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%);
@@ -745,6 +745,7 @@
   }
   .timeline-zoom-ctrl span { font-size: 11px; color: var(--grey); min-width: 32px; text-align: center; }
   #dash-timeline .timeline-zoom-ctrl { pointer-events: auto; }
+  #dash-timeline .timeline-now-line { pointer-events: auto; }
 
   /* Assistant "Ajouter un RDV" (admin) - parcours par étapes */
   .aa-step-title { font-size: 15px; font-weight: 600; margin-bottom: 12px; }
@@ -4366,12 +4367,18 @@ function renderDayTimelineHtml(dateStr, dayAppts) {
   }).join('');
 
   var nowLineHtml = '';
-  if (dateStr === ymd(new Date())) {
-    var now = new Date();
-    var nowMin = now.getHours() * 60 + now.getMinutes();
+  // On compare a l'heure du SALON (fuseau horaire configure), pas celle du
+  // navigateur qui affiche la page - sinon la ligne se decale des qu'on
+  // consulte le planning depuis un appareil regle sur un autre fuseau
+  // (session d'assistance, deplacement...), meme si l'heure du navigateur
+  // est correcte pour LUI.
+  var nowStr = nowSalonDatetimeString(); // "YYYY-MM-DD HH:MM:SS", heure du salon
+  if (dateStr === nowStr.slice(0, 10)) {
+    var nowMin = Number(nowStr.slice(11, 13)) * 60 + Number(nowStr.slice(14, 16));
     if (nowMin >= rangeStart && nowMin <= rangeEnd) {
       var leftFrac = (nowMin - rangeStart) / (rangeEnd - rangeStart);
-      nowLineHtml = '<div class="timeline-now-line" style="left: calc(22px + (100% - 22px) * ' + leftFrac + ')"></div>';
+      nowLineHtml = '<div class="timeline-now-line" title="Maintenant — ' + nowStr.slice(11, 16) + '" ' +
+        'style="left: calc(22px + (100% - 22px) * ' + leftFrac + ')"></div>';
     }
   }
 
