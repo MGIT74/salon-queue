@@ -69,6 +69,17 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
     if (!gift.recipient_name || !gift.recipient_phone || !gift.recipient_email) {
       return res.status(400).json({ error: 'Nom, téléphone et email du bénéficiaire sont requis pour un cadeau' });
     }
+    // Le coiffeur actif (bulle sélectionnée) au moment de la vente
+    // devient le coiffeur DÉSIGNÉ pour ce cadeau - le bénéficiaire
+    // n'aura plus à en choisir un lui-même au kiosk/à la réservation en
+    // ligne. Le vrai blocage se fait côté caisse.html (qui connaît
+    // fidèlement l'état de sélection de bulle) - ce contrôle-ci n'est
+    // qu'un filet de sécurité pour un appel direct à l'API sans session
+    // de coiffeur du tout (ex: admin sans barber_id explicite dans le
+    // corps de la requête).
+    if (!req.actingBarberId && !req.body.barber_id) {
+      return res.status(400).json({ error: 'Veuillez sélectionner votre profil (bulle coiffeur) avant de créer un cadeau' });
+    }
   }
 
   // Si la vente correspond à une coupe terminée précise (venant de "En
@@ -87,7 +98,7 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
       [queue_id, req.salon.id]
     );
     if (!row) return res.status(404).json({ error: 'Client introuvable' });
-    if (req.barberId && row.barber_id !== req.barberId) {
+    if (req.actingBarberId && row.barber_id !== req.actingBarberId) {
       return res.status(403).json({ error: "Ce n'est pas votre client." });
     }
     if (row.paid_at) return res.status(409).json({ error: 'Ce client a déjà été encaissé.' });
@@ -102,15 +113,35 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
     queueRow = row;
   }
 
-  const barberId = req.barberId || (req.body.barber_id || null);
+  const barberId = req.actingBarberId || (req.body.barber_id || null);
   const saleId = crypto.randomUUID();
   let total = 0;
+
+  // Un coiffeur "vendeur" par ligne n'a de sens que pour un produit
+  // (Barbe, Cire, Parfum...) - jamais pour une prestation/supplément,
+  // qui reste attribué à toute la vente (barberId ci-dessus). On
+  // valide que chaque id envoyé appartient bien à CE salon avant de
+  // l'utiliser, comme pour tout autre id de coiffeur dans l'app - sinon
+  // silencieusement ignoré (pas de blocage de la vente pour ça).
+  const lineBarberIds = [...new Set(
+    items.filter((it) => (it.item_type || 'product') === 'product' && it.barber_id).map((it) => it.barber_id)
+  )];
+  let validLineBarberIds = new Set();
+  if (lineBarberIds.length) {
+    const [rows] = await pool.query(
+      'SELECT id FROM barbers WHERE id IN (?) AND salon_id = ? AND active = 1',
+      [lineBarberIds, req.salon.id]
+    );
+    validLineBarberIds = new Set(rows.map((r) => r.id));
+  }
 
   const itemRows = items.map((it) => {
     const qty = Math.max(1, Number(it.quantity) || 1);
     const unitPrice = Math.max(0, Math.round(Number(it.unit_price_cents) || 0));
     total += qty * unitPrice;
-    return [crypto.randomUUID(), saleId, it.item_type || 'product', it.item_id || null, it.item_name || 'Article', unitPrice, qty];
+    const itemType = it.item_type || 'product';
+    const lineBarberId = itemType === 'product' && it.barber_id && validLineBarberIds.has(it.barber_id) ? it.barber_id : null;
+    return [crypto.randomUUID(), saleId, itemType, it.item_id || null, it.item_name || 'Article', unitPrice, qty, lineBarberId];
   });
 
   // Vérifie le stock AVANT toute écriture - jamais de vente créée si
@@ -134,12 +165,23 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
     }
   }
 
+  // Numéro de ticket séquentiel par salon (bien plus lisible sur un
+  // ticket imprimé que l'identifiant technique saleId) - même principe
+  // que z_number pour les clôtures de caisse. Léger risque théorique de
+  // collision en cas d'écritures strictement simultanées sur le même
+  // salon (pas de verrou dédié), jugé négligeable pour un usage caisse
+  // mono-salon normal.
+  const [[{ next_ticket_number: ticketNumber }]] = await pool.query(
+    'SELECT COALESCE(MAX(ticket_number), 0) + 1 AS next_ticket_number FROM sales WHERE salon_id = ?',
+    [req.salon.id]
+  );
+
   await pool.query(
-    'INSERT INTO sales (id, salon_id, barber_id, payment_method, total_price_cents) VALUES (?, ?, ?, ?, ?)',
-    [saleId, req.salon.id, barberId, payment_method, total]
+    'INSERT INTO sales (id, salon_id, barber_id, payment_method, total_price_cents, ticket_number) VALUES (?, ?, ?, ?, ?, ?)',
+    [saleId, req.salon.id, barberId, payment_method, total, ticketNumber]
   );
   await pool.query(
-    'INSERT INTO sale_items (id, sale_id, item_type, item_id, item_name, unit_price_cents, quantity) VALUES ?',
+    'INSERT INTO sale_items (id, sale_id, item_type, item_id, item_name, unit_price_cents, quantity, barber_id) VALUES ?',
     [itemRows]
   );
 
@@ -171,6 +213,7 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
     }
   }
 
+  let giftResult = null;
   if (gift) {
     const itemsSnapshot = items.map((it) => ({
       item_type: it.item_type || 'product',
@@ -187,6 +230,7 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
       [giftId, req.salon.id, saleId, gift.recipient_name, gift.recipient_phone, gift.recipient_email, total, JSON.stringify(itemsSnapshot), code]
     );
 
+    let giftEmailSent = true;
     try {
       await sendGiftConfirmation(req.salon.id, gift.recipient_email, {
         recipientName: gift.recipient_name,
@@ -197,19 +241,24 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
     } catch (err) {
       // N'empêche jamais la vente si l'email échoue (ex. SMTP salon pas
       // configuré) — le code reste consultable par le super admin/admin
-      // si besoin, juste journalisé pour investigation.
+      // si besoin, journalisé pour investigation, ET remonté au
+      // frontend (giftEmailSent = false) pour que le coiffeur sache
+      // qu'il doit donner le code au client autrement (le ticket
+      // imprimé ne contient pas le code cadeau aujourd'hui).
+      giftEmailSent = false;
       console.error('[gift] envoi email de confirmation échoué:', err.message);
     }
+    giftResult = { code, email_sent: giftEmailSent };
   }
 
-  res.json({ ok: true, sale: { id: saleId, total_price_cents: total, payment_method, barber_id: barberId } });
+  res.json({ ok: true, sale: { id: saleId, total_price_cents: total, payment_method, barber_id: barberId, ticket_number: ticketNumber }, gift: giftResult });
 }));
 
 /**
  * Historique des ventes (admin uniquement) — pour le suivi/reporting,
  * avec filtre par plage de dates optionnel.
  */
-router.get('/', requireAdmin, wrap(async (req, res) => {
+router.get('/', requireAdminOrBarber, wrap(async (req, res) => {
   const conditions = ['s.salon_id = ?'];
   const params = [req.salon.id];
   if (req.query.date_from) { conditions.push('s.created_at >= ?'); params.push(req.query.date_from + ' 00:00:00'); }
@@ -218,6 +267,13 @@ router.get('/', requireAdmin, wrap(async (req, res) => {
     const mysqlDatetime = String(req.query.since).replace('T', ' ').replace('Z', '');
     conditions.push('s.created_at > ?');
     params.push(mysqlDatetime);
+  }
+  // Filtre "historique de caisse" : n'importe quelle vente où ce
+  // coiffeur apparaît quelque part - qu'il ait fait toute la vente, OU
+  // qu'il ait juste vendu un des produits dedans (sale_items.barber_id).
+  if (req.query.barber_id) {
+    conditions.push('(s.barber_id = ? OR EXISTS (SELECT 1 FROM sale_items si2 WHERE si2.sale_id = s.id AND si2.barber_id = ?))');
+    params.push(req.query.barber_id, req.query.barber_id);
   }
 
   const [sales] = await pool.query(
@@ -264,7 +320,7 @@ router.post('/gift-cards/:id/redeem', requireAdminOrBarber, wrap(async (req, res
     [queue_id, req.salon.id]
   );
   if (!queueRow) return res.status(404).json({ error: 'Client introuvable' });
-  if (req.barberId && queueRow.barber_id !== req.barberId) {
+  if (req.actingBarberId && queueRow.barber_id !== req.actingBarberId) {
     return res.status(403).json({ error: "Ce n'est pas votre client." });
   }
   if (queueRow.paid_at) return res.status(409).json({ error: 'Ce client a déjà été encaissé.' });
@@ -310,14 +366,35 @@ router.get('/gift-cards/lookup', wrap(async (req, res) => {
   if (!code) return res.status(400).json({ error: 'Code requis' });
 
   const [[gift]] = await pool.query(
-    'SELECT * FROM gift_cards WHERE salon_id = ? AND code = ?',
+    `SELECT g.*, s.barber_id, b.name AS barber_name, b.photo_url AS barber_photo_url, b.active AS barber_active, b.accepts_appointments
+     FROM gift_cards g
+     JOIN sales s ON s.id = g.sale_id
+     LEFT JOIN barbers b ON b.id = s.barber_id
+     WHERE g.salon_id = ? AND g.code = ?`,
     [req.salon.id, code]
   );
   if (!gift) return res.status(404).json({ error: 'Code introuvable pour ce salon' });
   if (gift.used_at) return res.status(409).json({ error: 'Ce cadeau a déjà été utilisé' });
+  if (gift.pending_appointment_id) return res.status(409).json({ error: 'Ce cadeau sert déjà à un rendez-vous en attente - annulez-le pour en reprendre un nouveau.' });
 
   let items = [];
   try { items = JSON.parse(gift.items_json || '[]'); } catch (e) { items = []; }
+
+  // Le coiffeur désigné (celui dont la bulle était sélectionnée à la
+  // vente) ne doit être proposé que s'il est toujours actif ET accepte
+  // toujours les RDV/le kiosk aujourd'hui - sinon on retombe sur le
+  // comportement normal (laisser choisir), plutôt que d'imposer un
+  // coiffeur qui n'est peut-être plus disponible.
+  const designatedBarber = (gift.barber_id && gift.barber_active && gift.accepts_appointments)
+    ? { id: gift.barber_id, name: gift.barber_name, photo_url: gift.barber_photo_url }
+    : null;
+
+  // Un coiffeur "sans rendez-vous" (accepts_appointments=0) ne peut pas
+  // être réservé en ligne - si le cadeau lui est explicitement lié, il
+  // faut bloquer toute réservation en ligne plutôt que de laisser le
+  // client choisir un autre coiffeur à sa place (le cadeau a été pensé
+  // pour être honoré précisément par ce coiffeur-là, en salon).
+  const walkInOnly = Boolean(gift.barber_id) && !gift.accepts_appointments;
 
   res.json({
     ok: true,
@@ -327,6 +404,8 @@ router.get('/gift-cards/lookup', wrap(async (req, res) => {
       recipient_email: gift.recipient_email,
       recipient_phone: gift.recipient_phone,
       amount_cents: gift.amount_cents,
+      designated_barber: designatedBarber,
+      walk_in_only: walkInOnly,
       items
     }
   });

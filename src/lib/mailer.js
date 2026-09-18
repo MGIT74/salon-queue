@@ -133,6 +133,32 @@ async function sendGiftConfirmation(salonId, to, info) {
   });
 }
 
+/**
+ * Envoyé quand un rendez-vous pris avec un cadeau est annulé - l'ancien
+ * code est définitivement invalidé (remplacé), ce nouveau code est donc
+ * le seul désormais valable pour ce même cadeau.
+ */
+async function sendGiftCodeRenewed(salonId, to, info) {
+  const { tx, from, salon } = await getTransport(salonId);
+  const itemsList = info.items.map((it) => `${it.quantity} × ${it.item_name}`).join(', ');
+  await tx.sendMail({
+    from,
+    to,
+    subject: 'Nouveau code pour votre cadeau — ' + salon,
+    text: `Bonjour ${info.recipientName},\n\n` +
+          `Le rendez-vous que vous aviez pris avec votre cadeau de ${info.amountEur} chez ${salon} a été annulé.\n\n` +
+          `Votre ancien code n'est plus valable. Voici votre nouveau code, à utiliser pour reprendre un rendez-vous quand vous le souhaitez :\n\n` +
+          `Contenu : ${itemsList}\n\n` +
+          `Nouveau code : ${info.code}\n\n${salon}`,
+    html: `<p>Bonjour ${info.recipientName},</p>` +
+          `<p>Le rendez-vous que vous aviez pris avec votre cadeau de <strong>${info.amountEur}</strong> chez ${salon} a été annulé.</p>` +
+          `<p>Votre ancien code n'est plus valable. Voici votre nouveau code, à utiliser pour reprendre un rendez-vous quand vous le souhaitez :</p>` +
+          `<p>Contenu : ${itemsList}</p>` +
+          `<p style="font-size:20px;font-weight:700;letter-spacing:2px">${info.code}</p>` +
+          `<p>${salon}</p>`
+  });
+}
+
 async function sendTest(salonId, to) {
   const { tx, from, salon } = await getTransport(salonId);
   await tx.sendMail({
@@ -148,7 +174,8 @@ async function sendAppointmentConfirmation(salonId, to, info) {
   const s = await getSettings(salonId);
   const tokens = {
     client_name: info.clientName, when: info.when, service_name: info.serviceName,
-    barber_name: info.barberName || '', salon, cancel_url: info.cancelUrl
+    barber_name: info.barberName || '', salon, cancel_url: info.cancelUrl,
+    gift_info: info.giftNote || ''
   };
   const customSubject = s.email_tpl_confirmation_subject ? applyTemplate(s.email_tpl_confirmation_subject, tokens) : '';
   const customBody = s.email_tpl_confirmation_body ? applyTemplate(s.email_tpl_confirmation_body, tokens) : '';
@@ -160,13 +187,15 @@ async function sendAppointmentConfirmation(salonId, to, info) {
     text: customBody ||
       (`Bonjour ${info.clientName},\n\n` +
        `Votre rendez-vous chez ${salon} est confirmé :\n` +
-       `${info.when} — ${info.serviceName}${info.barberName ? ' avec ' + info.barberName : ''}\n\n` +
-       `Besoin d'annuler ? ${info.cancelUrl}\n\n${salon}`),
+       `${info.when} — ${info.serviceName}${info.barberName ? ' avec ' + info.barberName : ''}\n` +
+       (info.giftNote ? `\n🎁 ${info.giftNote}\n` : '') +
+       `\nBesoin d'annuler ? ${info.cancelUrl}\n\n${salon}`),
     html: customBody
       ? customBody.replace(/\n/g, '<br>')
       : (`<p>Bonjour ${info.clientName},</p>` +
          `<p>Votre rendez-vous chez ${salon} est confirmé :</p>` +
          `<p><strong>${info.when}</strong><br>${info.serviceName}${info.barberName ? ' avec ' + info.barberName : ''}</p>` +
+         (info.giftNote ? `<p>🎁 ${info.giftNote}</p>` : '') +
          `<p><a href="${info.cancelUrl}">Annuler ce rendez-vous</a></p>` +
          `<p>${salon}</p>`)
   });
@@ -332,7 +361,7 @@ async function sendCustomClientEmail(salonId, to, clientName, subject, message) 
 }
 
 module.exports = {
-  sendTurnSoon, sendTest, sendGiftConfirmation, sendLoyaltyActivation, sendAppointmentConfirmation,
+  sendTurnSoon, sendTest, sendGiftConfirmation, sendGiftCodeRenewed, sendLoyaltyActivation, sendAppointmentConfirmation,
   sendAppointmentReminder, sendAppointmentCancelledByAdmin, sendAppointmentRescheduled,
   sendClientVerificationEmail, sendClientPasswordReset, sendSalonClosureNotice, sendCustomClientEmail, invalidateTransport
 };

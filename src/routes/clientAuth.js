@@ -254,13 +254,35 @@ router.get('/me', requireClient, wrap(async (req, res) => {
     [c.salon_id, key]
   );
 
+  // Cartes cadeaux reçues par ce client sur ce salon (même clé de
+  // rapprochement que RDV/passages ci-dessus : email, en priorité).
+  const [giftCards] = await pool.query(
+    `SELECT id, code, amount_cents, items_json, used_at, pending_appointment_id, created_at
+     FROM gift_cards
+     WHERE salon_id = ? AND LOWER(TRIM(recipient_email)) = ?
+     ORDER BY created_at DESC LIMIT 20`,
+    [c.salon_id, key]
+  );
+
   res.json({
     ok: true,
     profile: { name: c.name, email: c.email, phone: c.phone },
     loyalty_activated: loyaltyActivated,
     loyalty: loyaltyActivated ? { points: loyalty.points, rewards_available: loyalty.rewards_available } : null,
     upcoming_appointments: upcomingAppointments,
-    recent_visits: recentVisits
+    recent_visits: recentVisits,
+    gift_cards: giftCards.map((g) => {
+      let items = [];
+      try { items = JSON.parse(g.items_json || '[]'); } catch (e) { items = []; }
+      return {
+        id: g.id, code: g.code, amount_cents: g.amount_cents,
+        // Seulement le nom et la quantité - jamais le prix unitaire de
+        // chaque article, qui n'a pas à être visible du bénéficiaire
+        // (seul le montant total du cadeau est pertinent pour lui).
+        items: items.map((it) => ({ name: it.item_name, quantity: it.quantity, type: it.item_type })),
+        used: Boolean(g.used_at), pending: Boolean(g.pending_appointment_id), created_at: g.created_at
+      };
+    })
   });
 }));
 

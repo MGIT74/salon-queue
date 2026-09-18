@@ -2,6 +2,7 @@ const express = require('express');
 const crypto = require('crypto');
 const { pool } = require('../db');
 const requireAdmin = require('../middleware/auth');
+const requireAdminOrBarber = require('../middleware/barberAuth');
 const { sendSalonClosureNotice } = require('../lib/mailer');
 
 const router = express.Router();
@@ -22,7 +23,7 @@ function wrap(fn) {
  * les horaires individuels de chaque coiffeur) - purement informatif/
  * affichage du salon dans son ensemble.
  */
-router.get('/schedule', requireAdmin, wrap(async (req, res) => {
+router.get('/schedule', requireAdminOrBarber, wrap(async (req, res) => {
   const [rows] = await pool.query(
     'SELECT weekday, start_time, end_time, active FROM salon_schedules WHERE salon_id = ?',
     [req.salon.id]

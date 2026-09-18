@@ -780,3 +780,84 @@ JOIN (
 ) t ON t.id = c.id
 SET c.z_number = t.rn
 WHERE c.z_number IS NULL;
+
+-- Coiffeur "vendeur" d'un produit précis (Barbe, Cire, Parfum...),
+-- distinct du coiffeur de toute la vente (sales.barber_id) - permet
+-- qu'un autre coiffeur que celui qui a fait la prestation soit crédité
+-- pour un produit qu'il a lui-même vendu au client. NULL = pas de
+-- vendeur spécifique (retombe sur sales.barber_id dans les stats).
+-- Uniquement pertinent pour item_type = 'product' - les prestations et
+-- suppléments restent attribués à la vente entière.
+SET @si1 := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'sale_items' AND column_name = 'barber_id');
+SET @sql := IF(@si1 = 0, 'ALTER TABLE sale_items ADD COLUMN barber_id CHAR(36) NULL, ADD CONSTRAINT fk_sale_items_barber FOREIGN KEY (barber_id) REFERENCES barbers(id) ON DELETE SET NULL', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Numéro de ticket séquentiel par salon (bien plus lisible sur un ticket
+-- imprimé que l'identifiant technique de la vente) - même principe que
+-- z_number pour les clôtures de caisse.
+SET @st1 := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'sales' AND column_name = 'ticket_number');
+SET @sql := IF(@st1 = 0, 'ALTER TABLE sales ADD COLUMN ticket_number INT NULL', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Numérote rétroactivement les ventes déjà existantes (par ordre
+-- chronologique, par salon), pour que la colonne soit remplie même sur
+-- une base déjà en service.
+UPDATE sales s
+JOIN (
+  SELECT id, ROW_NUMBER() OVER (PARTITION BY salon_id ORDER BY created_at ASC) AS rn
+  FROM sales
+) t ON t.id = s.id
+SET s.ticket_number = t.rn
+WHERE s.ticket_number IS NULL;
+
+-- Ticket en cours de construction en Caisse (avant paiement), sauvegardé
+-- côté serveur par coiffeur - même principe que les coupes en attente
+-- d'encaissement (queue.status='done' + barber_id) : peu importe le
+-- rechargement de page ou l'appareil, le coiffeur retrouve exactement
+-- son ticket en cliquant sur sa bulle. Une seule ligne par coiffeur
+-- (barber_id en clé primaire) puisqu'il ne peut avoir qu'un seul ticket
+-- en cours à la fois.
+CREATE TABLE IF NOT EXISTS ticket_drafts (
+  barber_id CHAR(36) PRIMARY KEY,
+  salon_id CHAR(36) NOT NULL,
+  ticket_json LONGTEXT NULL,
+  ticket_queue_id CHAR(36) NULL,
+  loyalty_discount_json TEXT NULL,
+  loyalty_rewards_available INT NOT NULL DEFAULT 0,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (barber_id) REFERENCES barbers(id) ON DELETE CASCADE,
+  FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Un cadeau reserve en ligne pour un rendez-vous ne doit plus pouvoir
+-- servir a en prendre un autre tant que celui-ci n'est ni honore ni
+-- annule - sans ca, le meme code non encore "vraiment" consomme (used_at
+-- reste NULL jusqu'a l'encaissement en salon) permettait de reserver un
+-- nombre illimite de rendez-vous. NULL = libre, sinon reference le RDV
+-- qui bloque actuellement ce cadeau.
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'gift_cards' AND column_name = 'pending_appointment_id');
+SET @sql := IF(@c = 0, "ALTER TABLE gift_cards ADD COLUMN pending_appointment_id CHAR(36) NULL", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Cote RDV : quel cadeau (s'il y en a un) a servi a le prendre - permet
+-- de retrouver et liberer ce cadeau (nouveau code envoye, ancien
+-- invalide) si ce rendez-vous precis est annule.
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'appointments' AND column_name = 'gift_card_id');
+SET @sql := IF(@c = 0, "ALTER TABLE appointments ADD COLUMN gift_card_id CHAR(36) NULL", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Journal d'activite : trace des actions sensibles (catalogue, coiffeurs,
+-- salons, compte, clients, cloture de caisse...) pour audit - affiche
+-- dans Parametres > Journal d'activite cote dashboard. Ecriture "best
+-- effort" (src/lib/activityLog.js) : une erreur d'ecriture ne bloque
+-- jamais l'action metier elle-meme.
+CREATE TABLE IF NOT EXISTS activity_log (
+  id CHAR(36) PRIMARY KEY,
+  salon_id CHAR(36) NOT NULL,
+  actor VARCHAR(120) NOT NULL DEFAULT 'Admin',
+  action VARCHAR(60) NOT NULL,
+  description VARCHAR(500) NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE,
+  INDEX idx_activity_log_salon_created (salon_id, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -40,6 +40,149 @@
   .login h1 { margin-bottom: 8px; }
   .login p { color: var(--grey); font-size: 15px; margin: 0 0 24px; }
 
+  /* ============ Onglet Dashboard ============ */
+  .dash-hero {
+    display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 20px;
+    margin-bottom: 22px;
+  }
+  .dash-title { margin: 0; font-size: 26px; font-weight: 700; }
+  .dash-title span { color: var(--blue); }
+  .dash-subtitle { color: var(--grey); font-size: 14px; margin-top: 4px; text-transform: capitalize; }
+  .dash-kpis { display: flex; gap: 28px; flex-wrap: wrap; }
+  .dash-kpi { display: flex; align-items: center; gap: 10px; }
+  .dash-kpi-ic {
+    width: 34px; height: 34px; border-radius: 10px; background: var(--fill);
+    display: flex; align-items: center; justify-content: center; color: var(--grey); flex-shrink: 0;
+  }
+  .dash-kpi-v { font-size: 24px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .dash-kpi-l { font-size: 12px; color: var(--grey); }
+
+  .dash-pills { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
+  .dash-pill {
+    display: flex; align-items: center; gap: 8px; background: var(--card); border-radius: 999px;
+    padding: 9px 16px; font-size: 13px; color: var(--grey); box-shadow: var(--shadow);
+  }
+  .dash-pill b { color: var(--ink); font-variant-numeric: tabular-nums; }
+  .dash-pill-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+  .dash-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 16px; }
+  .dash-grid-2 { grid-template-columns: 1fr 1.4fr; }
+  .dash-card {
+    background: var(--card); border-radius: 18px; padding: 20px; box-shadow: var(--shadow);
+    display: flex; flex-direction: column; min-width: 0;
+  }
+  .dash-card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .dash-card-head h3 { margin: 0; font-size: 15px; font-weight: 600; }
+  .dash-card-head span { font-size: 13px; color: var(--grey); font-weight: 600; }
+
+  .dash-card-profile { align-items: center; text-align: center; justify-content: center; gap: 4px; }
+  .dash-profile-photo {
+    width: 72px; height: 72px; border-radius: 50%; background: var(--fill); margin-bottom: 10px;
+    background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center;
+    font-size: 26px; font-weight: 700; color: #fff; flex-shrink: 0;
+  }
+  .dash-profile-name { font-weight: 700; font-size: 15.5px; }
+  .dash-profile-role { color: var(--grey); font-size: 12.5px; margin-bottom: 12px; }
+  .dash-profile-badge {
+    background: var(--fill); border-radius: 999px; padding: 6px 14px; font-size: 13px; font-weight: 700;
+  }
+
+  .dash-leader-tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+  .dash-leader-tab {
+    flex: 1; padding: 6px 4px; border: none; border-radius: 8px; background: var(--fill); color: var(--grey);
+    font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit;
+  }
+  .dash-leader-tab.on { background: var(--blue); color: #fff; }
+  .dash-leader-row { display: flex; align-items: center; gap: 9px; padding: 7px 0; border-bottom: 1px solid var(--sep); }
+  .dash-leader-row:last-child { border-bottom: none; }
+  .dash-leader-rank {
+    width: 18px; text-align: center; font-size: 13px; font-weight: 700; color: var(--grey); flex-shrink: 0;
+  }
+  .dash-leader-avatar {
+    width: 28px; height: 28px; border-radius: 50%; background: var(--fill); background-size: cover;
+    background-position: center; display: flex; align-items: center; justify-content: center;
+    font-size: 11.5px; font-weight: 700; color: #fff; flex-shrink: 0;
+  }
+  .dash-leader-name { flex: 1; font-size: 12.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dash-leader-value { font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+
+  .dash-big-num { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; margin-bottom: 4px; }
+  .dash-bars { display: flex; align-items: flex-end; gap: 8px; height: 70px; flex: 1; }
+  .dash-bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; height: 100%; justify-content: flex-end; }
+  .dash-bar { width: 100%; max-width: 18px; border-radius: 5px; background: var(--fill); min-height: 4px; }
+  .dash-bar.today { background: var(--blue); }
+  .dash-bar-label { font-size: 10.5px; color: var(--grey); text-transform: uppercase; }
+
+  .dash-card-gauge { align-items: center; justify-content: center; }
+  .dash-gauge-wrap { position: relative; width: 120px; height: 120px; }
+  .dash-gauge { width: 120px; height: 120px; transform: rotate(-90deg); }
+  .dash-gauge-bg { fill: none; stroke: var(--fill); stroke-width: 10; }
+  .dash-gauge-fg { fill: none; stroke: var(--blue); stroke-width: 10; stroke-linecap: round; transition: stroke-dasharray .4s ease; }
+  .dash-gauge-center {
+    position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  }
+  .dash-gauge-num { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .dash-gauge-label { font-size: 11.5px; color: var(--grey); }
+
+  .dash-card-list { overflow: hidden; }
+  .dash-rdv-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--sep); }
+  .dash-rdv-row:last-child { border-bottom: none; }
+  .dash-rdv-ic {
+    width: 30px; height: 30px; border-radius: 50%; background: var(--fill); flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; color: var(--grey);
+  }
+  .dash-rdv-name { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dash-rdv-when { font-size: 11.5px; color: var(--grey); }
+
+  .dash-cat-row {
+    display: flex; align-items: center; justify-content: space-between; padding: 11px 0;
+    border-bottom: 1px solid var(--sep); cursor: pointer;
+  }
+  .dash-cat-row:last-child { border-bottom: none; }
+  .dash-cat-row:hover { color: var(--blue); }
+  .dash-cat-row b { font-variant-numeric: tabular-nums; }
+
+  .dash-week-cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; flex: 1; align-items: end; }
+  .dash-week-day { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .dash-week-day-label { font-size: 11px; color: var(--grey); text-transform: uppercase; }
+  .dash-week-day-count {
+    width: 34px; height: 34px; border-radius: 10px; background: var(--fill); display: flex; align-items: center;
+    justify-content: center; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums;
+  }
+  .dash-week-day.today .dash-week-day-count { background: var(--blue); color: #fff; }
+
+  @media (max-width: 1100px) {
+    .dash-grid { grid-template-columns: 1fr 1fr; }
+    .dash-grid-2 { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 640px) {
+    .dash-grid { grid-template-columns: 1fr; }
+    .dash-kpis { gap: 18px; }
+  }
+
+  /* Sélecteur de salon (login multi-salons) : cartes carrées côte à
+     côte plutôt qu'une liste de boutons pleine largeur empilés. */
+  .salon-pick-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(120px,1fr));
+    gap: 10px; margin-top: 4px;
+  }
+  .salon-pick-card {
+    aspect-ratio: 1; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 10px; padding: 12px 8px; border-radius: 18px;
+    background: var(--fill); border: 1px solid transparent; cursor: pointer;
+    font-family: inherit; color: var(--ink); transition: background .15s ease, transform .1s ease;
+  }
+  .salon-pick-card:hover { background: var(--fill-2); }
+  .salon-pick-card:active { transform: scale(.96); }
+  .salon-pick-card .salon-pick-icon {
+    width: 40px; height: 40px; border-radius: 50%; background: var(--blue-soft);
+    color: var(--blue); display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .salon-pick-card .salon-pick-name {
+    font-size: 13.5px; font-weight: 600; text-align: center; line-height: 1.25;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+
   /* Disposition en sidebar (comme les applications modernes) */
   .app-shell { display: flex; align-items: flex-start; gap: 26px; }
   .sidebar {
@@ -87,15 +230,16 @@
     font-weight: 500; padding: 11px 14px; border-radius: 12px; cursor: pointer; margin-top: 4px;
   }
   .sidebar-theme-btn:hover { background: var(--fill); }
-  .sidebar-theme-btn .ic { width: 20px; height: 18px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; opacity: .75; }
-  .sidebar-theme-btn .moon { display: none; }
-  [data-theme="dark"] .sidebar-theme-btn .sun { display: none; }
-  [data-theme="dark"] .sidebar-theme-btn .moon { display: block; }
+  .sidebar-theme-btn .ic, #mobile-theme-btn .ic { width: 20px; height: 18px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; opacity: .75; }
+  .sidebar-theme-btn .moon, #mobile-theme-btn .moon { display: none; }
+  [data-theme="dark"] .sidebar-theme-btn .sun, [data-theme="dark"] #mobile-theme-btn .sun { display: none; }
+  [data-theme="dark"] .sidebar-theme-btn .moon, [data-theme="dark"] #mobile-theme-btn .moon { display: block; }
   /* La bulle flottante en haut à droite gênait certains boutons des
      écrans (export, actions...) - le bouton clair/sombre vit désormais
      uniquement dans la sidebar, aussi bien en desktop qu'en mobile. */
   .theme-btn { display: none; }
   .sidebar-logout-mobile { display: none !important; }
+  .mobile-action, .mobile-more-btn { display: none !important; }
   .tabs button.on { background: var(--fill); font-weight: 600; }
   [data-theme="dark"] .tabs button.on { background: #3a3a3c; }
 
@@ -115,54 +259,127 @@
     .sidebar {
       position: fixed; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); left: 12px; right: 12px; top: auto; width: auto;
       display: flex; flex-direction: row; align-items: center; gap: 4px;
-      border-radius: 20px; padding: 6px 8px;
-      z-index: 60; box-shadow: 0 10px 30px rgba(0,0,0,0.28);
+      z-index: 60;
+      max-height: calc(100vh - 100px); overflow-y: auto;
+      background: none; padding: 0; box-shadow: none; border: none;
+      /* Reset explicite : sans ça, le fond/padding/ombre de la règle
+         desktop de base (.sidebar plus haut) refont surface ici, car
+         cette media query mobile ne les redéclare plus depuis qu'ils
+         ont été déplacés sur .tabs (voir plus bas) - ce qui créait un
+         second rectangle de fond derrière la pilule flottante. */
     }
 
     .sidebar-brand {
       position: fixed; top: 0; left: 0; right: 0; z-index: 61;
       display: flex; align-items: center; justify-content: space-between; gap: 10px;
       margin: 0; padding: 12px 16px; border-bottom: none; border-radius: 0 0 18px 18px;
-      background: var(--card); box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+      background: rgba(255,255,255,.65); backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.12);
       overflow: hidden; width: 100%; box-sizing: border-box;
     }
+    [data-theme="dark"] .sidebar-brand { background: rgba(28,28,30,.55); }
     .sidebar-brand .name { font-size: 14px; flex: 1 1 auto; min-width: 0; }
     .sidebar-brand select { width: auto; margin: 0; max-width: 42vw; flex-shrink: 0; box-sizing: border-box; }
 
     body.impersonating .sidebar-brand { top: 44px; }
 
-    .tabs { flex: 1; flex-direction: row; overflow-x: auto; gap: 2px; -webkit-overflow-scrolling: touch; }
+    .tabs {
+      flex: 1; flex-direction: row; overflow-x: hidden; gap: 2px; align-items: center;
+      border-radius: 20px; padding: 6px 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.28);
+      background: rgba(255,255,255,.65); backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      border: 0.5px solid rgba(255,255,255,.4); box-sizing: border-box;
+    }
+    [data-theme="dark"] .tabs { background: rgba(28,28,30,.55); border-color: rgba(255,255,255,.08); }
     .tabs button {
       flex-direction: column; gap: 3px; font-size: 10px; padding: 8px 6px;
       flex: 1 0 auto; min-width: 60px; text-align: center; white-space: nowrap;
     }
     .tabs button .ic { width: 100%; justify-content: center; }
 
-    .sidebar-logout {
-      display: none;
-    }
+    .sidebar-logout { display: none; }
+    .sidebar-theme-btn { display: none; }
 
-    .sidebar-logout-mobile {
+    /* Barre repliée (par défaut) : seuls les 4 onglets épinglés par le
+       coiffeur/gérant (JS, mémorisé sur cet appareil) sont visibles,
+       plus le bouton Plus. Les tuiles d'action (Thème, Déconnexion) et
+       tous les autres onglets restent masqués tant que la barre n'est
+       pas dépliée. */
+    .tabs button[data-t] { display: none; }
+    .tabs button[data-t].mobile-pinned { display: flex; }
+    .mobile-more-btn {
       display: flex !important; flex-direction: column; align-items: center; gap: 3px;
       flex: 1 0 auto; min-width: 60px; text-align: center; white-space: nowrap;
-      border: none; background: none; color: var(--red) !important; font-family: inherit;
+      border: none; background: none; color: var(--ink); font-family: inherit;
       font-size: 10px; font-weight: 500; padding: 8px 6px; cursor: pointer;
     }
-    .sidebar-logout-mobile .ic { width: 100%; justify-content: center; display: inline-flex; color: var(--red) !important; }
-
-    /* Bouton clair/sombre déplacé dans le menu du bas plutôt qu'en
-       bulle flottante séparée au-dessus (qui gênait, trop proche du
-       menu et facile à confondre avec un onglet). */
-    .sidebar-theme-btn {
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      gap: 3px; flex: 1 0 auto; min-width: 60px; width: auto; padding: 8px 6px;
-      margin-top: 0; border: none; background: none; border-radius: 0;
-      color: var(--grey); font-size: 10px; cursor: pointer; white-space: nowrap;
-    }
-    .sidebar-theme-btn:hover { background: none; }
-    .sidebar-theme-btn .ic { width: 100%; }
+    .mobile-more-btn .ic { width: 100%; justify-content: center; display: inline-flex; }
+    .mobile-more-btn.on { color: var(--blue); font-weight: 600; }
 
     .main-content { padding-top: 76px; padding-bottom: 106px; margin-left: 0; }
+
+    .mobile-more-btn .ic svg { transition: transform .2s ease; }
+    .mobile-more-btn.expanded-state .ic svg { transform: rotate(180deg); }
+
+    /* Panneau "Plus" - flotte au-dessus de la barre compacte (pas
+       collé dessus : petit écart bien visible), fond translucide et
+       flouté façon verre dépoli plutôt qu'une carte opaque comme le
+       reste de l'app, pour bien le distinguer comme un calque
+       temporaire par-dessus le contenu plutôt qu'une partie fixe de
+       l'interface. Reconstruit à chaque ouverture à partir des vrais
+       boutons de #tabs (mêmes icônes, même logique de clic), donc
+       jamais désynchronisé de l'état épinglé/actif réel. */
+    #mobile-expand-panel {
+      position: fixed; left: 12px; right: 12px;
+      bottom: calc(12px + 68px + 10px + env(safe-area-inset-bottom, 0px));
+      z-index: 59; border-radius: 20px; padding: 10px 8px;
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px 2px;
+      max-height: 50vh; overflow-y: auto; overscroll-behavior: contain;
+      background: rgba(255,255,255,.65); backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      border: 0.5px solid rgba(255,255,255,.4);
+      box-shadow: 0 12px 34px rgba(0,0,0,.22);
+      opacity: 0; visibility: hidden; transform: translateY(10px) scale(.97); pointer-events: none;
+      /* visibility passe à hidden seulement APRES le fondu (délai =
+         durée de l'opacity) : ouverture instantanée, fermeture propre.
+         Sans ça, Safari iOS laisse parfois un rectangle flouté fantôme
+         affiché derrière le contenu même une fois opacity:0, tant
+         qu'aucun repaint n'est déclenché - visibility:hidden force le
+         navigateur à vraiment cesser de peindre le backdrop-filter. */
+      transition: opacity .18s ease, transform .18s ease, visibility 0s linear .18s;
+    }
+    [data-theme="dark"] #mobile-expand-panel {
+      background: rgba(28,28,30,.55); border-color: rgba(255,255,255,.08);
+    }
+    #mobile-expand-panel.on {
+      opacity: 1; visibility: visible; transform: translateY(0) scale(1); pointer-events: auto;
+      transition: opacity .18s ease, transform .18s ease, visibility 0s linear 0s;
+    }
+    #mobile-expand-panel button {
+      display: flex !important; flex-direction: column; align-items: center; gap: 4px;
+      font-size: 10px; padding: 8px 2px; text-align: center; white-space: nowrap;
+      border: none; background: none; color: var(--ink); font-family: inherit; cursor: pointer;
+    }
+    #mobile-expand-panel button .ic {
+      width: 34px; height: 34px; margin: 0 auto; border-radius: 10px;
+      display: inline-flex; align-items: center; justify-content: center;
+      background: rgba(120,120,128,.16);
+    }
+    #mobile-expand-panel button.mobile-pinned { color: var(--blue); font-weight: 600; }
+    #mobile-expand-panel button.mobile-pinned .ic { background: var(--blue); color: #fff; }
+    #mobile-expand-panel button.mobile-action-danger { color: var(--red); }
+    #mobile-expand-panel button.mobile-action-danger .ic { color: var(--red); }
+
+    /* La bulle de l'assistant IA (et son panneau de chat) doit rester
+       visible et non recouverte : elle remonte au-dessus du panneau
+       "Plus" pendant qu'il est ouvert, au lieu de rester à sa place
+       habituelle juste au-dessus de la barre du bas. */
+    body.mobile-more-open .ai-chat-fab { bottom: calc(12px + 68px + 10px + 312px + 14px + env(safe-area-inset-bottom, 0px)) !important; }
+    body.mobile-more-open .ai-chat-panel { bottom: calc(12px + 68px + 10px + 312px + 14px + 68px + env(safe-area-inset-bottom, 0px)) !important; }
+  }
+
+  @media (max-width: 860px) {
 
     /* Détail coiffeur déplié : tout en une seule colonne, rien en ligne
        qui pourrait déborder (boutons d'action, sous-onglets, horaires). */
@@ -280,7 +497,8 @@
   .item { background: var(--card); border-radius: 14px; padding: 14px 18px; margin-bottom: 8px;
           display: flex; align-items: center; gap: 14px; box-shadow: var(--shadow); flex-wrap: wrap; transition: background .25s ease; }
   .item.off { opacity: .5; }
-  #rdv-list .item { border-bottom: 1px solid var(--sep); border-radius: 0; box-shadow: none; background: none; padding: 16px 4px; }
+  #rdv-list .item { border-bottom: 1px solid var(--sep); border-radius: 0; box-shadow: none; background: none; padding: 16px 4px; flex-wrap: nowrap; overflow-x: auto; }
+  #clients-list .item { flex-wrap: nowrap; overflow-x: auto; }
   #rdv-list .item:last-child { border-bottom: none; }
   #caisse-sales-detail .item, #caisse-closings-list .item {
     border-bottom: 1px solid var(--sep); border-radius: 0; box-shadow: none; background: none; padding: 14px 4px;
@@ -291,7 +509,14 @@
     width: 52px; height: 52px; border-radius: 12px; background: var(--fill); flex-shrink: 0;
     cursor: pointer; display: flex; align-items: center; justify-content: center;
     color: var(--grey); font-size: 10.5px; text-align: center; line-height: 1.2;
+    position: relative;
   }
+  .cat-photo-remove {
+    position: absolute; top: -6px; right: -6px; width: 20px; height: 20px; border-radius: 50%;
+    background: var(--red); color: #fff; border: 2px solid var(--card); box-sizing: content-box;
+    display: flex; align-items: center; justify-content: center; padding: 0; cursor: pointer;
+  }
+  .cat-photo-remove svg { width: 10px; height: 10px; }
   .item-name { font-size: 16px; font-weight: 600; letter-spacing: -.015em; }
   .item-meta { font-size: 13px; color: var(--grey); margin-top: 2px; font-variant-numeric: tabular-nums; }
   .item-actions { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -316,6 +541,100 @@
     background: none; padding: 14px 4px; margin-bottom: 0;
   }
   #loyalty-accounts-list .item:last-child, #gift-cards-list .item:last-child { border-bottom: none; }
+  .gift-info-grid {
+    display: grid; grid-template-columns: 210px 130px 120px 130px 110px 110px; gap: 4px 12px;
+    margin-top: 8px;
+  }
+  .gift-info-grid .f { font-size: 12.5px; color: var(--grey); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .gift-info-grid .f b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .gift-info-head { margin-top: 0; padding-bottom: 6px; border-bottom: 1px solid var(--sep); }
+  .gift-info-head .f { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; font-weight: 600; }
+  .loyalty-info-grid {
+    display: grid; grid-template-columns: 220px 90px 130px 120px 130px; gap: 4px 12px;
+    margin-top: 8px;
+  }
+  .loyalty-info-grid .f { font-size: 12.5px; color: var(--grey); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .loyalty-info-grid .f b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .loyalty-info-head { margin-top: 0; padding-bottom: 6px; border-bottom: 1px solid var(--sep); }
+  .loyalty-info-head .f { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; font-weight: 600; }
+  @media (max-width: 900px) {
+    .loyalty-info-grid { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 900px) {
+    .gift-info-grid { grid-template-columns: 1fr 1fr; }
+  }
+
+  .client-info-grid {
+    display: grid; grid-template-columns: 220px 180px 110px 190px 90px 90px; gap: 4px 12px;
+    margin-top: 8px;
+  }
+  .client-info-grid .f { font-size: 12.5px; color: var(--grey); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .client-info-grid .f b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .client-info-head { margin-top: 0; padding-bottom: 6px; border-bottom: 1px solid var(--sep); }
+  .client-info-head .f { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; font-weight: 600; }
+  @media (max-width: 900px) {
+    .client-info-grid { grid-template-columns: 1fr 1fr; }
+  }
+
+  .rdv-info-grid {
+    display: grid; grid-template-columns: 160px 170px 150px 130px 190px 120px 110px; gap: 4px 12px;
+    margin-top: 8px;
+  }
+  .rdv-info-grid .f { font-size: 12.5px; color: var(--grey); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rdv-info-grid .f b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .rdv-info-head { margin-top: 0; padding-bottom: 6px; border-bottom: 1px solid var(--sep); }
+  .rdv-info-head .f { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; font-weight: 600; }
+  @media (max-width: 900px) {
+    /* Sur mobile, la grille tabulaire (7 colonnes) devient illisible en
+       1fr 1fr (texte tronqué partout) - on passe plutôt à une carte :
+       nom + statut sur la même ligne en haut, puis prestation, date et
+       coiffeur en pleine largeur (plus la place de tronquer), email et
+       téléphone en petit en bas. Les libellés d'en-tête n'ont plus lieu
+       d'être avec cette mise en page auto-explicative. */
+    #rdv-list-head, .rdv-info-head { display: none; }
+    #rdv-list .item {
+      align-items: flex-start; flex-wrap: wrap; overflow-x: visible;
+      padding: 14px 4px;
+    }
+    .rdv-info-grid {
+      display: grid; width: 100%;
+      grid-template-columns: 1fr auto;
+      grid-template-areas:
+        "nom    statut"
+        "presta presta"
+        "date   date"
+        "coif   coif"
+        "email  tel";
+      gap: 5px 10px;
+    }
+    .rdv-info-grid .f {
+      white-space: normal; overflow: visible; text-overflow: clip;
+    }
+    .rdv-info-grid .f:nth-child(1) { grid-area: nom; font-size: 15.5px; }
+    .rdv-info-grid .f:nth-child(1) b { font-weight: 700; }
+    .rdv-info-grid .f:nth-child(2) { grid-area: presta; }
+    .rdv-info-grid .f:nth-child(3) { grid-area: date; color: var(--grey); font-size: 12px; }
+    .rdv-info-grid .f:nth-child(4) { grid-area: coif; }
+    .rdv-info-grid .f:nth-child(5) {
+      grid-area: email; font-size: 11.5px; color: var(--grey);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .rdv-info-grid .f:nth-child(6) {
+      grid-area: tel; font-size: 11.5px; color: var(--grey); text-align: right;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .rdv-info-grid .f:nth-child(7) {
+      grid-area: statut; text-align: right; flex-shrink: 0;
+    }
+    .rdv-info-grid .f:nth-child(7) b {
+      display: inline-block; padding: 3px 10px; border-radius: 999px;
+      background: var(--fill); font-size: 11.5px;
+    }
+    #rdv-list .item-actions {
+      width: 100%; justify-content: flex-end; margin: 4px 0 0;
+      padding-left: 30px; box-sizing: border-box;
+    }
+  }
 
   .card-box { background: var(--card); border-radius: 16px; padding: 22px; box-shadow: var(--shadow);
               margin-bottom: 14px; transition: background .25s ease; }
@@ -338,7 +657,7 @@
   .cal-week-row { margin-bottom: 4px; }
   .cal-expand-panel {
     background: var(--fill); border-radius: 14px; padding: 16px 18px; margin: 6px 0 10px;
-    animation: cal-expand .18s ease;
+    animation: cal-expand .18s ease; min-width: 0; grid-column: 1 / -1;
   }
   @keyframes cal-expand { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
   .cal-expand-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; font-size: 14.5px; text-transform: capitalize; }
@@ -375,18 +694,15 @@
   .cal-legend-avatar.dimmed { opacity: .35; }
 
   /* --- Planning du jour (timeline temps réel) --- */
-  .timeline-scroll { overflow-x: auto; }
-  .timeline-inner { position: relative; min-width: 720px; }
-  .timeline-hours {
-    display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
-    padding-left: 130px; margin-bottom: 6px;
-  }
-  .timeline-hours span { font-size: 12px; color: var(--grey); }
-  .timeline-row { display: flex; align-items: center; min-height: 54px; border-top: 1px solid var(--sep); }
+  .timeline-scroll { overflow-x: auto; width: 100%; max-width: 100%; position: relative; }
+  .timeline-inner { position: relative; }
+  .timeline-hours { position: relative; height: 18px; margin-bottom: 6px; }
+  .timeline-hours span { position: absolute; top: 0; font-size: 12px; color: var(--grey); white-space: nowrap; transform: translateX(-1px); }
+  .timeline-row { display: flex; align-items: center; min-height: 54px; border-top: 1px solid var(--sep); position: relative; }
   .timeline-row:first-child { border-top: none; }
-  .timeline-row-label { width: 130px; flex-shrink: 0; display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13.5px; padding-right: 10px; }
+  .timeline-row-label { width: 22px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; padding-right: 0; }
   .timeline-row-label .dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
-  .timeline-row-track { position: relative; flex: 1; height: 40px; }
+  .timeline-row-track { position: relative; flex: 1; height: 40px; cursor: pointer; }
   .timeline-block {
     position: absolute; top: 3px; bottom: 3px; border-radius: 8px; padding: 4px 10px;
     font-size: 12.5px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden;
@@ -394,7 +710,7 @@
   }
   .timeline-now-line {
     position: absolute; top: 0; bottom: 0; width: 2px; background: var(--accent);
-    pointer-events: none; z-index: 5;
+    z-index: 5; cursor: help;
   }
   .timeline-now-line::before {
     content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%);
@@ -405,6 +721,28 @@
     border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 7px solid var(--accent);
   }
   .timeline-empty { padding: 20px 0; text-align: center; color: var(--grey); font-size: 14px; }
+  /* Repères de minutes en fond, sous les créneaux - une ligne fine tous les
+     15 min (via background-size en %, calculé selon la plage affichée). */
+  .timeline-minute-grid {
+    position: absolute; left: 22px; right: 0; top: 0; bottom: 0; pointer-events: none; z-index: 0;
+    background-image: linear-gradient(to right, var(--sep) 1px, transparent 1px);
+    background-repeat: repeat-x; background-position: left top;
+  }
+  .timeline-zoom-ctrl {
+    display: flex; align-items: center; justify-content: flex-end; gap: 6px;
+    margin-bottom: 8px;
+  }
+  .timeline-zoom-ctrl-inner {
+    display: flex; align-items: center; gap: 6px; background: var(--fill); border-radius: 999px; padding: 4px 6px;
+  }
+  .timeline-zoom-ctrl button {
+    width: 22px; height: 22px; border-radius: 50%; border: none; background: var(--card); color: var(--ink);
+    font-size: 14px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    font-family: inherit; line-height: 1;
+  }
+  .timeline-zoom-ctrl span { font-size: 11px; color: var(--grey); min-width: 32px; text-align: center; }
+  #dash-timeline .timeline-zoom-ctrl, #caisse-timeline .timeline-zoom-ctrl { pointer-events: auto; }
+  #dash-timeline .timeline-now-line, #caisse-timeline .timeline-now-line { pointer-events: auto; }
 
   /* Assistant "Ajouter un RDV" (admin) - parcours par étapes */
   .aa-step-title { font-size: 15px; font-weight: 600; margin-bottom: 12px; }
@@ -697,7 +1035,8 @@
         </select>
       </div>
       <nav class="tabs" id="tabs">
-        <button class="on" data-t="queue"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></span> File d'attente</button>
+        <button class="on" data-t="dashboard"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg></span> Dashboard</button>
+        <button data-t="queue"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></span> File d'attente</button>
         <button data-t="services"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg></span> Prestations</button>
         <button data-t="extras"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg></span> Suppléments</button>
         <button data-t="products"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg></span> Produits</button>
@@ -709,7 +1048,11 @@
         <button data-t="salons"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l1-5h16l1 5"/><path d="M4 9v11h16V9"/><line x1="9" y1="20" x2="9" y2="14"/><line x1="15" y1="20" x2="15" y2="14"/></svg></span> Mes salons</button>
         <button data-t="account"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M7 18c1-2.3 2.8-3.8 5-3.8s4 1.5 5 3.8"/></svg></span> Compte</button>
         <button data-t="settings"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></span> Réglages</button>
-        <button class="sidebar-logout-mobile" onclick="logout()"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></span> Déconnexion</button>
+        <button class="mobile-action" id="mobile-theme-btn" onclick="toggleTheme()" type="button"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" class="sun"><circle cx="12" cy="12" r="4.5"/><path d="M12 2.5v2.5M12 19v2.5M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M2.5 12H5M19 12h2.5M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></svg><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" class="moon"><path d="M20.4 14.7A8.5 8.5 0 0 1 9.3 3.6a.6.6 0 0 0-.8-.7A9.5 9.5 0 1 0 21.1 15.5a.6.6 0 0 0-.7-.8Z"/></svg></span> Thème</button>
+        <button class="mobile-action mobile-action-danger" onclick="logout()" type="button"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></span> Déconnexion</button>
+        <button class="mobile-more-btn" id="mobile-more-btn" type="button">
+          <span class="ic"><svg id="mobile-more-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.5" fill="currentColor" stroke="none"/></svg></span> Plus
+        </button>
       </nav>
       <button class="sidebar-logout" onclick="logout()">
         <span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></span>
@@ -724,10 +1067,96 @@
       </button>
     </aside>
 
+    <div id="mobile-expand-panel"></div>
+
     <div class="main-content">
 
   <!-- ===== Onglet file ===== -->
-  <div class="tab-panel on" id="t-queue">
+  <!-- ===== Onglet Dashboard ===== -->
+  <div class="tab-panel on" id="t-dashboard">
+    <div class="dash-hero">
+      <div>
+        <h2 class="dash-title">Bienvenue, <span id="dash-salon-name">—</span></h2>
+        <div class="dash-subtitle" id="dash-date"></div>
+      </div>
+      <div class="dash-kpis">
+        <div class="dash-kpi">
+          <span class="dash-kpi-ic"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="4"/><path d="M17 11a4 4 0 1 0 0-8"/><path d="M1 21v-1a6 6 0 0 1 12 0v1"/><path d="M17 13a6 6 0 0 1 6 6v1"/></svg></span>
+          <div><div class="dash-kpi-v" id="dash-kpi-barbers">0</div><div class="dash-kpi-l">Coiffeurs actifs</div></div>
+        </div>
+        <div class="dash-kpi">
+          <span class="dash-kpi-ic"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-1a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v1"/><circle cx="12" cy="7" r="4"/></svg></span>
+          <div><div class="dash-kpi-v" id="dash-kpi-clients">0</div><div class="dash-kpi-l">Clients</div></div>
+        </div>
+        <div class="dash-kpi">
+          <span class="dash-kpi-ic"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
+          <div><div class="dash-kpi-v" id="dash-kpi-rdv">0</div><div class="dash-kpi-l">RDV à venir</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="dash-pills">
+      <div class="dash-pill"><span class="dash-pill-dot" style="background:var(--blue)"></span>En attente <b id="dash-pill-wait">0</b></div>
+      <div class="dash-pill"><span class="dash-pill-dot" style="background:var(--green)"></span>Occupation <b id="dash-pill-occ">0 %</b></div>
+      <div class="dash-pill"><span class="dash-pill-dot" style="background:var(--orange)"></span>Au fauteuil <b id="dash-pill-active">0</b></div>
+      <div class="dash-pill"><span class="dash-pill-dot" style="background:var(--ink)"></span>Encaissé aujourd'hui <b id="dash-pill-rev">0,00 €</b></div>
+    </div>
+
+    <div class="dash-grid">
+      <div class="dash-card dash-card-leader">
+        <div class="dash-card-head"><h3>Classement du jour</h3></div>
+        <div class="dash-leader-tabs">
+          <button class="dash-leader-tab on" data-metric="revenue" onclick="setDashLeaderMetric('revenue')">CA</button>
+          <button class="dash-leader-tab" data-metric="speed" onclick="setDashLeaderMetric('speed')">Rapidité</button>
+          <button class="dash-leader-tab" data-metric="products" onclick="setDashLeaderMetric('products')">Produits</button>
+        </div>
+        <div id="dash-leader-list"></div>
+      </div>
+
+      <div class="dash-card">
+        <div class="dash-card-head"><h3>CA de la semaine</h3></div>
+        <div class="dash-big-num" id="dash-week-total">0,00 €</div>
+        <div class="dash-bars" id="dash-week-bars"></div>
+      </div>
+
+      <div class="dash-card dash-card-gauge">
+        <div class="dash-card-head" style="width:100%"><h3>File d'attente</h3></div>
+        <div class="dash-gauge-wrap">
+          <svg class="dash-gauge" viewBox="0 0 120 120">
+            <circle class="dash-gauge-bg" cx="60" cy="60" r="52"></circle>
+            <circle class="dash-gauge-fg" id="dash-gauge-fg" cx="60" cy="60" r="52"></circle>
+          </svg>
+          <div class="dash-gauge-center">
+            <div class="dash-gauge-num" id="dash-gauge-num">0</div>
+            <div class="dash-gauge-label" id="dash-gauge-label">en attente</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="dash-card dash-card-list">
+        <div class="dash-card-head"><h3>Prochains RDV</h3><span id="dash-rdv-count-label">0</span></div>
+        <div id="dash-rdv-list"></div>
+      </div>
+    </div>
+
+    <div class="dash-grid dash-grid-2">
+      <div class="dash-card">
+        <div class="dash-card-head"><h3>Catalogue</h3></div>
+        <div id="dash-catalog-list"></div>
+      </div>
+      <div class="dash-card">
+        <div class="dash-card-head"><h3>Cette semaine</h3></div>
+        <div class="dash-week-cal" id="dash-week-cal"></div>
+      </div>
+    </div>
+
+    <div class="dash-card" style="margin-bottom:16px">
+      <div class="dash-card-head"><h3>Planning du jour</h3></div>
+      <div id="dash-timeline" style="pointer-events:none"><div class="empty">Chargement…</div></div>
+    </div>
+  </div>
+
+  <div class="tab-panel" id="t-queue">
     <div class="stats">
       <div class="stat"><div class="v" id="s-wait">0</div><div class="l">en attente</div></div>
       <div class="stat"><div class="v" id="s-queue">0 min</div><div class="l">de file</div></div>
@@ -798,6 +1227,45 @@
     </div>
 
     <div class="card-box">
+      <h3>Design de la carte fidélité (compte client)</h3>
+      <p class="hint">
+        Image de fond affichée derrière les points de fidélité, sur le compte client. Format recommandé :
+        <strong>720 × 320 px</strong> (rectangle horizontal) — l'image est automatiquement recadrée et compressée
+        à cette taille, elle restera toujours légère peu importe la photo d'origine.
+      </p>
+      <div style="display:flex;align-items:center;gap:16px">
+        <div id="loyalty-card-preview" onclick="document.getElementById('loyalty-card-input').click()"
+             style="width:180px;height:80px;border-radius:14px;cursor:pointer;background:var(--fill);
+             display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;
+             color:var(--grey);font-size:12px;text-align:center;background-size:cover;background-position:center">Aucune image</div>
+        <input type="file" id="loyalty-card-input" accept="image/*" style="display:none" onchange="uploadLoyaltyCardImage(this)">
+        <div>
+          <div class="hint" style="margin:0 0 6px">Cliquez sur le cadre pour choisir une image.</div>
+          <button class="btn btn-ghost" onclick="removeLoyaltyCardImage()" style="font-size:13px;padding:6px 12px">Retirer l'image (fond uni par défaut)</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card-box">
+      <h3>Design de la carte cadeau (compte client)</h3>
+      <p class="hint">
+        Image de fond affichée derrière le montant de chaque carte cadeau, sur le compte client. Même format
+        recommandé : <strong>720 × 320 px</strong>, recadrée et compressée automatiquement.
+      </p>
+      <div style="display:flex;align-items:center;gap:16px">
+        <div id="gift-card-design-preview" onclick="document.getElementById('gift-card-design-input').click()"
+             style="width:180px;height:80px;border-radius:14px;cursor:pointer;background:var(--fill);
+             display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;
+             color:var(--grey);font-size:12px;text-align:center;background-size:cover;background-position:center">Aucune image</div>
+        <input type="file" id="gift-card-design-input" accept="image/*" style="display:none" onchange="uploadGiftCardImage(this)">
+        <div>
+          <div class="hint" style="margin:0 0 6px">Cliquez sur le cadre pour choisir une image.</div>
+          <button class="btn btn-ghost" onclick="removeGiftCardImage()" style="font-size:13px;padding:6px 12px">Retirer l'image (dégradé par défaut)</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card-box">
       <h3>Image "Utiliser un cadeau" (kiosk)</h3>
       <p class="hint">Remplace l'icône 🎁 par défaut sur la tuile du kiosk. Une image carrée fonctionne mieux.</p>
       <div style="display:flex;align-items:center;gap:16px">
@@ -825,6 +1293,11 @@
         </div>
       </div>
       <p class="hint">Points et récompenses en attente, tous salons de l'enseigne confondus.</p>
+      <div class="fld" style="margin-bottom:12px"><input id="loyalty-search" type="text" placeholder="Rechercher (nom, email)…" oninput="filterLoyaltyAccounts(this.value)"></div>
+      <div class="loyalty-info-grid loyalty-info-head">
+        <div class="f">Email</div><div class="f">Points</div><div class="f">Récompenses</div>
+        <div class="f">Activé le</div><div class="f">Dernière activité</div>
+      </div>
       <div id="loyalty-accounts-list"></div>
       <div class="clients-pagination" id="loyalty-pagination"></div>
     </div>
@@ -841,6 +1314,11 @@
         </div>
       </div>
       <p class="hint">Historique des cadeaux achetés dans ce salon.</p>
+      <div class="fld" style="margin-bottom:12px"><input id="gift-search" type="text" placeholder="Rechercher (nom, email, téléphone, code, coiffeur)…" oninput="filterGiftCards(this.value)"></div>
+      <div class="gift-info-grid gift-info-head">
+        <div class="f">Email</div><div class="f">Téléphone</div><div class="f">Code</div>
+        <div class="f">Coiffeur</div><div class="f">Acheté le</div><div class="f">Utilisé le</div>
+      </div>
       <div id="gift-cards-list"></div>
       <div class="clients-pagination" id="gifts-pagination"></div>
     </div>
@@ -848,6 +1326,11 @@
 
   <!-- ===== Onglet caisse ===== -->
   <div class="tab-panel" id="t-caisse">
+    <div class="card-box">
+      <h3>Planning du jour</h3>
+      <div id="caisse-timeline" style="pointer-events:none"><div class="empty">Chargement…</div></div>
+    </div>
+
     <div class="card-box">
       <h3>Période en cours</h3>
       <p class="hint" id="caisse-period-since">Depuis le début.</p>
@@ -985,16 +1468,6 @@
     <p class="hint" style="margin-top:-8px">Réservés en ligne — ceux du jour apparaissent aussi automatiquement dans la file d'attente au moment prévu.</p>
     <div class="cal-barber-picker" id="cal-barber-picker"></div>
 
-    <div class="card-box" id="timeline-card">
-      <h3 style="margin-top:0">Planning du jour</h3>
-      <div class="timeline-scroll">
-        <div class="timeline-inner" id="timeline-inner">
-          <div class="timeline-hours" id="timeline-hours"></div>
-          <div id="timeline-rows"></div>
-        </div>
-      </div>
-    </div>
-
     <div class="card-box">
       <div class="cal-nav">
         <button class="btn btn-soft" onclick="calShiftPeriod(-1)">‹</button>
@@ -1065,6 +1538,17 @@
         <input type="checkbox" id="rdv-select-all" onchange="toggleSelectAllRdv(this.checked)">
         Tout sélectionner
       </label>
+      <div class="item" id="rdv-list-head" style="border-radius:0;box-shadow:none;background:none;padding:0 4px;margin-bottom:0;flex-wrap:nowrap">
+        <input type="checkbox" class="rdv-check" style="margin-right:12px;flex-shrink:0;visibility:hidden" tabindex="-1" disabled>
+        <div class="rdv-info-grid rdv-info-head" style="margin-top:0">
+          <div class="f">Nom</div><div class="f">Prestation</div><div class="f">Date</div>
+          <div class="f">Coiffeur</div><div class="f">Email</div><div class="f">Téléphone</div><div class="f">Statut</div>
+        </div>
+        <div class="item-actions" style="display:flex;align-items:center;gap:12px;visibility:hidden">
+          <button class="btn btn-soft" style="padding:6px 10px;font-size:13px" tabindex="-1">Déplacer</button>
+          <button class="btn btn-ghost" style="padding:6px 10px;font-size:13px" tabindex="-1">Annuler</button>
+        </div>
+      </div>
       <div id="rdv-list"></div>
       <div class="clients-pagination" id="rdv-pagination"></div>
     </div>
@@ -1102,6 +1586,7 @@
           <option value="50">50</option>
         </select>
       </div>
+      <button class="btn btn-soft" onclick="importClientsCsv()">Importer CSV</button>
       <button class="btn btn-primary" onclick="addManualClient()">+ Ajouter un client</button>
     </div>
 
@@ -1119,6 +1604,13 @@
       <input type="checkbox" id="clients-select-all" onchange="toggleSelectAllClients(this.checked)">
       Tout sélectionner
     </label>
+    <div class="item" style="background:none;box-shadow:none;border-radius:0;padding:0 18px;margin-bottom:0;flex-wrap:nowrap">
+      <input type="checkbox" class="client-check" style="visibility:hidden" tabindex="-1" disabled>
+      <div class="client-info-grid client-info-head" style="margin-top:0">
+        <div class="f">Nom</div><div class="f">Prestation</div><div class="f">Date</div>
+        <div class="f">Email</div><div class="f">Prix</div><div class="f">Durée</div>
+      </div>
+    </div>
     <div id="clients-list"></div>
     <div class="clients-pagination" id="clients-pagination"></div>
   </div>
@@ -1219,6 +1711,63 @@
         <select id="set-timezone"></select>
       </div>
       <button class="btn btn-primary" style="margin-top:6px" onclick="saveTimezone()">Enregistrer</button>
+    </div>
+
+    <div class="card-box">
+      <h3 class="accordion-head" onclick="toggleSettingsAccordion('salon-legal')">
+        Informations légales
+        <svg class="accordion-chevron" id="salon-legal-chevron" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </h3>
+      <div class="accordion-body" id="salon-legal-body" style="display:none">
+      <p class="hint">
+        Affichées sur les tickets de caisse imprimés, comme l'exige la loi anti-fraude TVA. Le SIRET a déjà été
+        renseigné à la création du compte ; les autres champs sont à compléter ici.
+      </p>
+      <div class="fld"><label for="set-legal-address">Adresse complète</label>
+        <textarea id="set-legal-address" rows="2" placeholder="46 rue René Nicod, 01100 Oyonnax, France"></textarea>
+      </div>
+      <div class="fld"><label for="set-legal-phone">Téléphone</label>
+        <input id="set-legal-phone" type="text" placeholder="09 52 62 93 52"></div>
+      <div class="fld"><label for="set-legal-email">Email de contact</label>
+        <input id="set-legal-email" type="email" placeholder="contact@monsalon.com"></div>
+      <div class="fld"><label for="set-legal-website">Site web</label>
+        <input id="set-legal-website" type="text" placeholder="https://monsalon.com"></div>
+      <div class="fld"><label for="set-legal-siret">Numéro SIRET</label>
+        <input id="set-legal-siret" type="text" inputmode="numeric" maxlength="14" placeholder="14 chiffres"></div>
+      <div class="fld"><label for="set-legal-vat">Numéro de TVA intracommunautaire</label>
+        <input id="set-legal-vat" type="text" placeholder="Laisser vide si non assujetti à la TVA"></div>
+      <div class="fld"><label for="set-legal-form">Forme juridique</label>
+        <input id="set-legal-form" type="text" placeholder="SASU, SARL, EI..."></div>
+      <div class="fld"><label for="set-legal-capital">Capital social (si société)</label>
+        <input id="set-legal-capital" type="text" placeholder="1000"></div>
+      <div class="fld"><label for="set-legal-rcs">Ville d'immatriculation RCS</label>
+        <input id="set-legal-rcs" type="text" placeholder="Bourg-En-Bresse"></div>
+      <div class="fld"><label for="set-legal-naf">Code NAF / APE</label>
+        <input id="set-legal-naf" type="text" placeholder="9602A"></div>
+      <div class="fld"><label for="set-legal-register">Numéro de caisse</label>
+        <input id="set-legal-register" type="text" placeholder="1"></div>
+      <button class="btn btn-primary" style="margin-top:6px" onclick="saveLegalInfo()">Enregistrer</button>
+      </div>
+    </div>
+
+    <div class="card-box">
+      <h3 class="accordion-head" onclick="toggleSettingsAccordion('salon-vat')">
+        TVA
+        <svg class="accordion-chevron" id="salon-vat-chevron" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </h3>
+      <div class="accordion-body" id="salon-vat-body" style="display:none">
+      <p class="hint">
+        Un taux différent est possible pour chaque catégorie d'article, appliqué à tous ses articles pour le
+        calcul du détail HT/TVA sur le ticket de caisse. Laisser vide si non assujetti à la TVA.
+      </p>
+      <div class="fld"><label for="set-vat-service">Prestations (%)</label>
+        <input id="set-vat-service" type="number" min="0" max="100" step="0.1" placeholder="20"></div>
+      <div class="fld"><label for="set-vat-extra">Suppléments (%)</label>
+        <input id="set-vat-extra" type="number" min="0" max="100" step="0.1" placeholder="20"></div>
+      <div class="fld"><label for="set-vat-product">Produits (%)</label>
+        <input id="set-vat-product" type="number" min="0" max="100" step="0.1" placeholder="20"></div>
+      <button class="btn btn-primary" style="margin-top:6px" onclick="saveVatRates()">Enregistrer</button>
+      </div>
     </div>
 
     <div class="card-box">
@@ -1340,6 +1889,21 @@
         <button class="btn btn-primary" onclick="saveEmailTemplates()">Enregistrer les notifications</button>
         <button class="btn btn-soft" onclick="openTestEmailTemplates()">Envoyer un email de test</button>
       </div>
+      </div>
+    </div>
+
+    <div class="card-box">
+      <h3 class="accordion-head" onclick="toggleSettingsAccordion('activity-log')">
+        Journal d'activité
+        <svg class="accordion-chevron" id="activity-log-chevron" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </h3>
+      <div class="accordion-body" id="activity-log-body" style="display:none">
+      <p class="hint">
+        Historique des actions sensibles effectuées sur ce compte : catalogue, coiffeurs, salons, clients,
+        clôtures de caisse, réglages… Utile pour retrouver qui a fait quoi, et quand.
+      </p>
+      <div id="activity-log-list"></div>
+      <div class="clients-pagination" id="activity-log-pagination"></div>
       </div>
     </div>
   </div>
@@ -1465,6 +2029,8 @@ var currentSalonName = '';
 
 var currentSalonLogo = '';
 var currentGiftTileImage = '';
+var currentLoyaltyCardImage = '';
+var currentGiftCardImage = '';
 
 function loadCurrentSalonName() {
   // Si l'URL ne precise pas de salon (lien universel, pas un lien
@@ -1527,6 +2093,28 @@ function loadCurrentSalonName() {
         } else {
           giftPreview.style.backgroundImage = '';
           giftPreview.textContent = '🎁';
+        }
+      }
+      currentLoyaltyCardImage = d.loyalty_card_image_url || '';
+      var loyaltyCardPreview = document.getElementById('loyalty-card-preview');
+      if (loyaltyCardPreview) {
+        if (currentLoyaltyCardImage) {
+          loyaltyCardPreview.style.backgroundImage = 'url("' + currentLoyaltyCardImage + '")';
+          loyaltyCardPreview.textContent = '';
+        } else {
+          loyaltyCardPreview.style.backgroundImage = '';
+          loyaltyCardPreview.textContent = 'Aucune image';
+        }
+      }
+      currentGiftCardImage = d.gift_card_image_url || '';
+      var giftCardDesignPreview = document.getElementById('gift-card-design-preview');
+      if (giftCardDesignPreview) {
+        if (currentGiftCardImage) {
+          giftCardDesignPreview.style.backgroundImage = 'url("' + currentGiftCardImage + '")';
+          giftCardDesignPreview.textContent = '';
+        } else {
+          giftCardDesignPreview.style.backgroundImage = '';
+          giftCardDesignPreview.textContent = 'Aucune image';
         }
       }
       renderBarbers();
@@ -1603,9 +2191,14 @@ function showLoginSalonPicker(salons, pw) {
   pendingLoginSalons = salons;
   pendingLoginPw = pw;
   var body = '<div class="modal-title">Choisissez un salon</div>' +
+    '<div class="salon-pick-grid">' +
     salons.map(function (s, i) {
-      return '<button class="btn btn-soft" style="width:100%;margin-bottom:8px;text-align:left" onclick="selectLoginSalon(' + i + ')">' + esc(s.name) + '</button>';
-    }).join('');
+      return '<button class="salon-pick-card" onclick="selectLoginSalon(' + i + ')">' +
+        '<span class="salon-pick-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l1-5h16l1 5"/><path d="M4 9v11h16V9"/><line x1="9" y1="20" x2="9" y2="14"/><line x1="15" y1="20" x2="15" y2="14"/></svg></span>' +
+        '<span class="salon-pick-name">' + esc(s.name) + '</span>' +
+        '</button>';
+    }).join('') +
+    '</div>';
   loginPickerOverlay = _buildModal(body);
   loginPickerOverlay.addEventListener('click', function (e) { if (e.target === loginPickerOverlay) _closeModal(loginPickerOverlay); });
 }
@@ -1666,7 +2259,19 @@ addPasswordToggle('pw');
     document.getElementById('app').style.display = '';
     checkAiChatAvailability();
     startImpersonateBanner();
-    boot();
+    // setTimeout (et non un appel direct) : ce script continue de
+    // s'exécuter après ce point (déclarations de var/fonctions plus bas
+    // dans le fichier), alors que les deux autres chemins de connexion
+    // (clic sur "Se connecter", ou reprise de session ci-dessous)
+    // n'appellent boot() que dans un .then() de fetch - donc toujours
+    // après la fin de l'exécution du script. Appeler boot() de façon
+    // synchrone ICI le faisait s'exécuter avant que des var déclarées
+    // plus bas (VALID_TABS, MOBILE_PINNED_DEFAULT...) aient leur valeur
+    // assignée (juste 'undefined' via le hoisting) - d'où des plantages
+    // du type "Cannot read properties of undefined" selon la fonction
+    // atteinte en premier. setTimeout(...,0) reproduit le même
+    // comportement "après la fin du script" que les deux autres chemins.
+    setTimeout(boot, 0);
     return;
   }
 
@@ -1686,27 +2291,335 @@ addPasswordToggle('pw');
 })();
 
 /* ============ Onglets ============ */
+var VALID_TABS = ['dashboard', 'queue', 'services', 'extras', 'products', 'marketing', 'caisse', 'rdv', 'barbers', 'clients', 'salons', 'account', 'settings'];
+
+/**
+ * Bascule vers l'onglet demandé (visuel + chargement des données propres
+ * à cet onglet), et met à jour l'URL (sans recharger la page ni polluer
+ * l'historique de navigation) pour que le rafraîchissement retombe sur
+ * le bon onglet plutôt que de toujours revenir à "File d'attente".
+ */
+/**
+ * Barre du bas mobile personnalisable - 4 onglets "épinglés" toujours
+ * visibles (mémorisés sur cet appareil, pas de compte serveur pour
+ * cette préférence), le reste caché derrière le bouton "Plus" qui
+ * déplie la barre en grille (même style que la barre repliée, pas une
+ * liste séparée). Un appui sur une tuile dans la grille dépliée
+ * épingle/désépingle plutôt que de naviguer.
+ */
+var MOBILE_PINNED_KEY = 'dashboard_mobile_pinned_tabs_v1';
+var MOBILE_PINNED_DEFAULT = ['queue', 'caisse', 'rdv', 'clients'];
+
+function getMobilePinned() {
+  // Solides même si appelée avant que MOBILE_PINNED_KEY/DEFAULT (déclarées
+  // plus bas dans le script) ne soient assignées : c'est le cas du lien
+  // d'assistance super admin, qui appelle boot() immédiatement au chargement
+  // de la page plutôt qu'après un clic sur "Se connecter" (le temps que le
+  // script s'exécute jusqu'au bout) - sans ce filet, ça plantait avec
+  // "Cannot read properties of undefined (reading 'slice')", bloquant tout
+  // le reste du chargement du dashboard en mode assistance.
+  var key = (typeof MOBILE_PINNED_KEY !== 'undefined' && MOBILE_PINNED_KEY) || 'dashboard_mobile_pinned_tabs_v1';
+  var fallback = (typeof MOBILE_PINNED_DEFAULT !== 'undefined' && MOBILE_PINNED_DEFAULT) || ['queue', 'caisse', 'rdv', 'clients'];
+  try {
+    var saved = JSON.parse(localStorage.getItem(key) || 'null');
+    if (Array.isArray(saved) && saved.length) return saved;
+  } catch (e) {}
+  return fallback.slice();
+}
+
+function renderMobilePinned() {
+  var pinned = getMobilePinned();
+  document.querySelectorAll('#tabs button[data-t]').forEach(function (b) {
+    b.classList.toggle('mobile-pinned', pinned.indexOf(b.dataset.t) !== -1);
+  });
+}
+
+/**
+ * Épingle/désépingle un onglet dans la barre repliée. Épingler un 5e
+ * onglet retire automatiquement le plus anciennement épinglé (file
+ * simple) plutôt que de demander explicitement lequel remplacer - un
+ * seul appui suffit dans les deux sens.
+ */
+function toggleMobilePin(tabName) {
+  var pinned = getMobilePinned();
+  var idx = pinned.indexOf(tabName);
+  if (idx !== -1) {
+    pinned.splice(idx, 1);
+  } else {
+    pinned.push(tabName);
+    if (pinned.length > 4) pinned.shift();
+  }
+  localStorage.setItem(MOBILE_PINNED_KEY, JSON.stringify(pinned));
+  renderMobilePinned();
+  // Le panneau flottant est une reconstruction (clone) des vrais
+  // boutons de #tabs, pas les mêmes éléments - il faut le regénérer
+  // pour refléter le nouvel état épinglé pendant qu'il reste ouvert.
+  if (document.getElementById('mobile-expand-panel').classList.contains('on')) buildMobileExpandPanel();
+}
+
+/**
+ * Construit le contenu du panneau flottant "Plus" à partir des vrais
+ * boutons de #tabs (clonage du HTML, pas de duplication à la main) -
+ * jamais désynchronisé des icônes, du texte ou de l'état épinglé réel.
+ * Les tuiles d'action (Thème, Déconnexion) gardent leur onclick propre
+ * (préservé tel quel par le clonage HTML), les onglets de navigation
+ * sont gérés par la délégation de clic posée une seule fois plus bas.
+ */
+function buildMobileExpandPanel() {
+  var source = document.querySelectorAll('#tabs button[data-t], #tabs button.mobile-action');
+  document.getElementById('mobile-expand-panel').innerHTML = Array.prototype.map.call(source, function (b) { return b.outerHTML; }).join('');
+}
+
+function toggleMobileExpanded() {
+  var panel = document.getElementById('mobile-expand-panel');
+  var moreBtn = document.getElementById('mobile-more-btn');
+  var expanding = !panel.classList.contains('on');
+  if (expanding) buildMobileExpandPanel();
+  panel.classList.toggle('on', expanding);
+  moreBtn.classList.toggle('expanded-state', expanding);
+  // La bulle de l'assistant IA remonte au-dessus du panneau pendant
+  // qu'il est ouvert, pour ne jamais rester coincée dessous.
+  document.body.classList.toggle('mobile-more-open', expanding);
+}
+
+document.getElementById('mobile-expand-panel').addEventListener('click', function (e) {
+  var b = e.target.closest('button');
+  if (!b || !b.dataset.t) return; // les tuiles d'action gardent leur propre onclick (logout/toggleTheme)
+  toggleMobilePin(b.dataset.t);
+});
+
+function setActiveTab(tabName) {
+  if (VALID_TABS.indexOf(tabName) === -1) tabName = 'dashboard';
+
+  document.querySelectorAll('#tabs button').forEach(function (x) { x.classList.remove('on'); });
+  var btn = document.querySelector('#tabs button[data-t="' + tabName + '"]');
+  if (btn) btn.classList.add('on');
+  // Le bouton "Plus" n'a pas de data-t propre (il déplie la grille, ce
+  // n'est pas un onglet) - sur mobile, s'allumer lui-même quand
+  // l'onglet actif n'est pas épinglé évite que la barre du bas ne
+  // montre plus aucun onglet sélectionné.
+  var moreBtn = document.getElementById('mobile-more-btn');
+  if (moreBtn) moreBtn.classList.toggle('on', !!(btn && !btn.classList.contains('mobile-pinned')));
+  document.querySelectorAll('.tab-panel').forEach(function (p) { p.classList.remove('on'); });
+  document.getElementById('t-' + tabName).classList.add('on');
+
+  if (tabName !== 'rdv') stopCalendarNowRefresh();
+  if (tabName === 'settings') loadSettings();
+  if (tabName === 'clients') loadClients();
+  if (tabName === 'salons') loadChainTab();
+  if (tabName === 'marketing') loadMarketingTab();
+  if (tabName === 'caisse') loadCaisseTab();
+  if (tabName === 'rdv') loadRdvTab();
+  if (tabName === 'account') loadOwnerProfile();
+  if (tabName === 'dashboard') loadDashboardTab();
+
+  try { history.replaceState(null, '', location.pathname + location.search + '#' + tabName); } catch (e) {}
+}
+
 document.getElementById('tabs').addEventListener('click', function (e) {
   var b = e.target.closest('button');
   if (!b) return;
-  document.querySelectorAll('#tabs button').forEach(function (x) { x.classList.remove('on'); });
-  b.classList.add('on');
-  document.querySelectorAll('.tab-panel').forEach(function (p) { p.classList.remove('on'); });
-  document.getElementById('t-' + b.dataset.t).classList.add('on');
-  if (b.dataset.t !== 'rdv') stopTimelineAutoRefresh();
-  if (b.dataset.t === 'settings') loadSettings();
-  if (b.dataset.t === 'clients') loadClients();
-  if (b.dataset.t === 'salons') loadChainTab();
-  if (b.dataset.t === 'marketing') loadMarketingTab();
-  if (b.dataset.t === 'caisse') loadCaisseTab();
-  if (b.dataset.t === 'rdv') loadRdvTab();
-  if (b.dataset.t === 'account') loadOwnerProfile();
+  if (b.id === 'mobile-more-btn') { toggleMobileExpanded(); return; }
+  if (b.classList.contains('mobile-action')) return; // logout()/toggleTheme() déjà sur leur propre onclick
+  setActiveTab(b.dataset.t);
+  // Sécurité : si le panneau flottant était resté ouvert, le refermer
+  // aussi en cas de navigation directe depuis la barre repliée.
+  var panel = document.getElementById('mobile-expand-panel');
+  if (panel.classList.contains('on')) toggleMobileExpanded();
 });
+
+/* ============ Onglet Dashboard ============ */
+var WEEKDAY_LABELS_SHORT = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
+var dashLeaderMetric = 'revenue';
+var dashLeaderData = { by_revenue: [], by_speed: [], by_products: [] };
+var TROPHY_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0Z"/><path d="M7 5H4a3 3 0 0 0 3 5"/><path d="M17 5h3a3 3 0 0 1-3 5"/></svg>';
+
+function setDashLeaderMetric(metric) {
+  dashLeaderMetric = metric;
+  document.querySelectorAll('.dash-leader-tab').forEach(function (b) {
+    b.classList.toggle('on', b.dataset.metric === metric);
+  });
+  renderDashLeaderboard();
+}
+
+function renderDashLeaderboard() {
+  var key = dashLeaderMetric === 'revenue' ? 'by_revenue' : (dashLeaderMetric === 'speed' ? 'by_speed' : 'by_products');
+  var rows = dashLeaderData[key] || [];
+  var emptyMsg = dashLeaderMetric === 'speed'
+    ? 'Pas encore de coupe terminée aujourd\'hui'
+    : (dashLeaderMetric === 'products' ? 'Aucune vente de produit aujourd\'hui' : 'Aucune vente aujourd\'hui');
+
+  document.getElementById('dash-leader-list').innerHTML = rows.length === 0
+    ? '<div class="empty">' + emptyMsg + '</div>'
+    : rows.map(function (r, i) {
+        var avatarStyle = r.photo_url
+          ? 'background:url(&quot;' + esc(r.photo_url) + '&quot;) center/cover'
+          : 'background:' + stableColorForId(r.id);
+        var value = dashLeaderMetric === 'revenue' ? eur(r.revenue_cents)
+          : dashLeaderMetric === 'speed' ? r.avg_minutes + ' min'
+          : eur(r.product_revenue_cents);
+        return '<div class="dash-leader-row">' +
+          '<span class="dash-leader-rank"' + (i === 0 ? ' style="color:var(--orange)"' : '') + '>' + (i === 0 ? TROPHY_SVG : (i + 1)) + '</span>' +
+          '<span class="dash-leader-avatar" style="' + avatarStyle + '">' + (r.photo_url ? '' : esc(r.name.charAt(0).toUpperCase())) + '</span>' +
+          '<span class="dash-leader-name">' + esc(r.name) + '</span>' +
+          '<span class="dash-leader-value">' + value + '</span>' +
+        '</div>';
+      }).join('');
+}
+
+function loadDashboardTab() {
+  document.getElementById('dash-salon-name').textContent = currentSalonName || '—';
+  document.getElementById('dash-date').textContent = new Date().toLocaleDateString('fr-FR', {
+    weekday: 'long', day: 'numeric', month: 'long'
+  });
+
+  // File d'attente / occupation : à partir de `queue` et `barbers`, déjà
+  // chargés en mémoire pour l'onglet File d'attente - pas de nouvel
+  // appel réseau nécessaire pour cette partie.
+  var waitingCount = queue.filter(function (q) { return q.status === 'waiting'; }).length;
+  var activeCount = queue.filter(function (q) { return q.status === 'in_progress'; }).length;
+  var onDuty = barbers.filter(function (b) { return b.active; }).length;
+  var occupancy = onDuty > 0 ? Math.round((activeCount / onDuty) * 100) : 0;
+
+  document.getElementById('dash-kpi-barbers').textContent = onDuty;
+  document.getElementById('dash-pill-wait').textContent = waitingCount;
+  document.getElementById('dash-pill-occ').textContent = occupancy + ' %';
+  document.getElementById('dash-pill-active').textContent = activeCount;
+
+  document.getElementById('dash-catalog-list').innerHTML = [
+    { label: 'Prestations', count: services.length, tab: 'services' },
+    { label: 'Suppléments', count: extras.length, tab: 'extras' },
+    {
+      label: 'Produits', count: products.length, tab: 'products',
+      extra: (function () {
+        var tracked = products.filter(function (p) { return p.stock_enabled; });
+        if (!tracked.length) return '';
+        var total = tracked.reduce(function (a, p) { return a + (p.stock_quantity || 0); }, 0);
+        return ' · ' + total + ' en stock';
+      })()
+    }
+  ].map(function (c) {
+    return '<div class="dash-cat-row" onclick="setActiveTab(\'' + c.tab + '\')">' +
+      '<span>' + c.label + '</span><b>' + c.count + (c.extra || '') + '</b></div>';
+  }).join('');
+
+  var gaugeMax = 10; // au-delà de 10 en attente, la jauge reste pleine
+  var gaugeRatio = Math.max(0, Math.min(1, waitingCount / gaugeMax));
+  var circumference = 2 * Math.PI * 52;
+  document.getElementById('dash-gauge-fg').style.strokeDasharray =
+    (circumference * gaugeRatio) + ' ' + circumference;
+  document.getElementById('dash-gauge-num').textContent = waitingCount;
+  document.getElementById('dash-gauge-label').textContent = waitingCount > 1 ? 'en attente' : 'en attente';
+
+  api('/api/queue/stats/today').then(function (r) {
+    document.getElementById('dash-pill-rev').textContent = eur(r.revenue_cents);
+  }).catch(function () {});
+
+  api('/api/queue/stats/week').then(function (r) {
+    var maxRevenue = Math.max.apply(null, r.days.map(function (d) { return d.revenue_cents; }).concat([1]));
+    var totalWeek = r.days.reduce(function (a, d) { return a + d.revenue_cents; }, 0);
+    document.getElementById('dash-week-total').textContent = eur(totalWeek);
+    document.getElementById('dash-week-bars').innerHTML = r.days.map(function (d) {
+      var isToday = d.date === new Date().toISOString().slice(0, 10);
+      var h = Math.max(6, Math.round((d.revenue_cents / maxRevenue) * 62));
+      var label = WEEKDAY_LABELS_SHORT[new Date(d.date + 'T00:00:00').getDay()].charAt(0).toUpperCase();
+      return '<div class="dash-bar-col" title="' + eur(d.revenue_cents) + '">' +
+        '<div class="dash-bar' + (isToday ? ' today' : '') + '" style="height:' + h + 'px"></div>' +
+        '<div class="dash-bar-label">' + label + '</div></div>';
+    }).join('');
+
+    dashLeaderData = r.leaderboard || { by_revenue: [], by_speed: [], by_products: [] };
+    renderDashLeaderboard();
+  }).catch(function () {});
+
+  var todayStr = ymd(new Date());
+  loadSalonScheduleForTimeline().then(function () {
+    return api('/api/appointments?month=' + monthKey(new Date()));
+  }).then(function (r) {
+    var todayAppts = (r.items || []).filter(function (a) {
+      return a.scheduled_at.slice(0, 10) === todayStr && a.status !== 'cancelled';
+    });
+    todayAppts.forEach(function (a) { calAppointmentById[a.id] = a; });
+    dashTimelineCache = { dateStr: todayStr, appts: todayAppts };
+    document.getElementById('dash-timeline').innerHTML = renderDayTimelineHtml(todayStr, todayAppts);
+  }).catch(function () {
+    document.getElementById('dash-timeline').innerHTML = '<div class="empty">Impossible de charger le chrono du jour</div>';
+  });
+
+  api('/api/queue/history?per_page=1').then(function (r) {
+    document.getElementById('dash-kpi-clients').textContent = r.total || 0;
+  }).catch(function () {});
+
+  api('/api/appointments').then(function (r) {
+    var items = r.items || [];
+    document.getElementById('dash-kpi-rdv').textContent = items.length;
+    document.getElementById('dash-rdv-count-label').textContent = items.length;
+
+    document.getElementById('dash-rdv-list').innerHTML = items.length === 0
+      ? '<div class="empty">Aucun rendez-vous à venir</div>'
+      : items.slice(0, 5).map(function (a) {
+          var when = new Date(a.scheduled_at.replace(' ', 'T')).toLocaleString('fr-FR', {
+            day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
+          });
+          return '<div class="dash-rdv-row">' +
+            '<span class="dash-rdv-ic"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>' +
+            '<div style="min-width:0;flex:1">' +
+              '<div class="dash-rdv-name">' + esc(a.client_name) + ' · ' + esc(a.service_name || '') + '</div>' +
+              '<div class="dash-rdv-when">' + when + '</div>' +
+            '</div>' +
+          '</div>';
+        }).join('');
+
+    // Petit calendrier de la semaine : nombre de RDV par jour (7 derniers
+    // jours glissants, même fenêtre que le graphique de CA), à partir des
+    // mêmes RDV déjà récupérés ci-dessus plutôt qu'un nouvel appel.
+    var counts = {};
+    items.forEach(function (a) {
+      var d = a.scheduled_at.slice(0, 10);
+      counts[d] = (counts[d] || 0) + 1;
+    });
+    var todayStr = new Date().toISOString().slice(0, 10);
+    var cells = [];
+    for (var i = 0; i < 7; i++) {
+      var d = new Date();
+      d.setDate(d.getDate() + i);
+      var key = d.toISOString().slice(0, 10);
+      cells.push({ key: key, label: WEEKDAY_LABELS_SHORT[d.getDay()].slice(0, 3), count: counts[key] || 0, isToday: key === todayStr });
+    }
+    document.getElementById('dash-week-cal').innerHTML = cells.map(function (c) {
+      return '<div class="dash-week-day' + (c.isToday ? ' today' : '') + '">' +
+        '<div class="dash-week-day-label">' + c.label + '</div>' +
+        '<div class="dash-week-day-count">' + c.count + '</div>' +
+      '</div>';
+    }).join('');
+  }).catch(function () {});
+}
+
 
 /* ============ Chargement ============ */
 function boot() {
-  loadCurrentSalonName();
-  loadSalonSwitcher();
+  try {
+    renderMobilePinned();
+
+    // Restaure l'onglet actif depuis l'URL (#rdv, #caisse...) au lieu de
+    // toujours retomber sur "File d'attente" après un rafraîchissement.
+    // Le HTML statique affiche déjà "queue" par défaut, donc on ne fait
+    // rien de plus si aucun hash valide n'est présent.
+    var hashTab = (location.hash || '').replace('#', '');
+    if (VALID_TABS.indexOf(hashTab) !== -1 && hashTab !== 'dashboard') setActiveTab(hashTab);
+
+    loadCurrentSalonName();
+    loadSalonSwitcher();
+  } catch (err) {
+    // Une erreur ici (avant même le chargement des données) ne doit
+    // jamais laisser le dashboard bloqué sur "Chargement..." sans
+    // aucune indication visible - vécu une fois avec getMobilePinned()
+    // en mode assistance (lien direct, sans passer par le clic de
+    // connexion normal qui laisse le temps au script de finir de
+    // s'exécuter).
+    console.error('boot() (partie synchrone) a échoué :', err);
+    toast('Erreur au chargement : ' + err.message, true);
+  }
   // Devise et fuseau horaire du salon : utilisés respectivement par eur()
   // et nowSalonDatetimeString() partout dans le dashboard, chargés dès le
   // départ (pas seulement à l'ouverture de Réglages).
@@ -1719,7 +2632,13 @@ function boot() {
     .then(refreshQueue)
     .then(function () {
       setInterval(function () { renderQueue(); }, 1000);
+      setInterval(updateTimelineNowLines, 30000);
       subscribeQueue(refreshQueue);
+      loadDashboardTab();
+    })
+    .catch(function (err) {
+      console.error('boot() a échoué :', err);
+      toast('Erreur au chargement : ' + err.message, true);
     });
 }
 
@@ -1746,10 +2665,7 @@ function switchSalon(newSlug) {
   barberCapabilities = {}; barberLeaves = {};
   me = null;
 
-  document.querySelectorAll('#tabs button').forEach(function (x) { x.classList.remove('on'); });
-  document.querySelector('#tabs button[data-t="queue"]').classList.add('on');
-  document.querySelectorAll('.tab-panel').forEach(function (p) { p.classList.remove('on'); });
-  document.getElementById('t-queue').classList.add('on');
+  setActiveTab('queue');
 
   loadCurrentSalonName();
   loadCatalog().then(loadBarbers).then(refreshQueue).then(function () { toast('Salon changé'); });
@@ -2370,7 +3286,10 @@ function renderCatalog(table) {
         var photoStyle = x.image_url ? 'background:url(&quot;' + esc(x.image_url) + '&quot;) center/cover' : '';
         return '<div class="item' + (x.active ? '' : ' off') + '">' +
           '<div class="cat-photo" style="' + photoStyle + '" onclick="document.getElementById(\'cat-photo-input-' + x.id + '\').click()">' +
-            (x.image_url ? '' : '<span>+ photo</span>') +
+            (x.image_url
+              ? '<button type="button" class="cat-photo-remove" title="Supprimer la photo" onclick="event.stopPropagation();removeCatalogImage(\'' + table + '\',\'' + x.id + '\')">' +
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>'
+              : '<span>+ photo</span>') +
           '</div>' +
           '<input type="file" accept="image/*" id="cat-photo-input-' + x.id + '" style="display:none" onchange="uploadCatalogImage(\'' + table + '\',\'' + x.id + '\',this)">' +
           '<div class="item-main"><div class="item-name">' + esc(x.name) + '</div>' +
@@ -2409,6 +3328,16 @@ function uploadCatalogImage(table, id, input) {
     img.src = e.target.result;
   };
   reader.readAsDataURL(file);
+}
+
+function removeCatalogImage(table, id) {
+  showConfirm('Supprimer la photo de cet élément ?', { title: 'Supprimer la photo', confirmLabel: 'Supprimer' }).then(function (ok) {
+    if (!ok) return;
+    api('/api/catalog/' + table + '/' + id, { method: 'PUT', body: { image_url: '' } })
+      .then(loadCatalog)
+      .then(function () { toast('Photo supprimée'); })
+      .catch(function (e) { toast(e.message, true); });
+  });
 }
 
 var editingCat = null;
@@ -3103,8 +4032,10 @@ var STATUS_COLOR = {
 };
 
 /* ============ Marketing (fidélité + cadeaux) ============ */
+var loyaltyAccountsDataAll = [];
 var loyaltyAccountsData = [];
 var loyaltyPage = 1, loyaltyPerPage = 10;
+var giftCardsDataAll = [];
 var giftCardsData = [];
 var giftsPage = 1, giftsPerPage = 10;
 
@@ -3116,16 +4047,49 @@ function loadMarketingTab() {
   }).catch(function (e) { toast(e.message, true); });
 
   api('/api/owner/loyalty-accounts').then(function (r) {
+    loyaltyAccountsDataAll = r.items;
     loyaltyAccountsData = r.items;
     loyaltyPage = 1;
+    document.getElementById('loyalty-search').value = '';
     renderLoyaltyAccountsList();
   }).catch(function (e) { toast(e.message, true); });
 
   api('/api/owner/gift-cards').then(function (r) {
+    giftCardsDataAll = r.items;
     giftCardsData = r.items;
     giftsPage = 1;
+    document.getElementById('gift-search').value = '';
     renderGiftCardsList();
   }).catch(function (e) { toast(e.message, true); });
+}
+
+/**
+ * Filtre côté client (toutes les données sont déjà chargées) - pas
+ * besoin d'un aller-retour serveur pour une simple recherche texte sur
+ * une liste plafonnée à 300 éléments.
+ */
+function filterLoyaltyAccounts(query) {
+  query = query.trim().toLowerCase();
+  loyaltyAccountsData = !query ? loyaltyAccountsDataAll : loyaltyAccountsDataAll.filter(function (a) {
+    return (a.client_name || '').toLowerCase().indexOf(query) !== -1 ||
+      (a.recipient_email || '').toLowerCase().indexOf(query) !== -1 ||
+      (a.client_key || '').toLowerCase().indexOf(query) !== -1;
+  });
+  loyaltyPage = 1;
+  renderLoyaltyAccountsList();
+}
+
+function filterGiftCards(query) {
+  query = query.trim().toLowerCase();
+  giftCardsData = !query ? giftCardsDataAll : giftCardsDataAll.filter(function (g) {
+    return (g.recipient_name || '').toLowerCase().indexOf(query) !== -1 ||
+      (g.recipient_email || '').toLowerCase().indexOf(query) !== -1 ||
+      (g.recipient_phone || '').toLowerCase().indexOf(query) !== -1 ||
+      (g.code || '').toLowerCase().indexOf(query) !== -1 ||
+      (g.barber_name || '').toLowerCase().indexOf(query) !== -1;
+  });
+  giftsPage = 1;
+  renderGiftCardsList();
 }
 
 function renderPaginationControls(containerId, page, perPage, total, goFn) {
@@ -3157,11 +4121,17 @@ function renderLoyaltyAccountsList() {
   list.innerHTML = loyaltyAccountsData.length === 0
     ? '<div class="empty">Aucun client fidèle pour le moment</div>'
     : pageItems.map(function (a) {
+        var fmtDate = function (iso) { return iso ? new Date(iso).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : ''; };
+        var infoGrid = [
+          '<div class="f"><b>' + esc(a.recipient_email || a.client_key || '—') + '</b></div>',
+          '<div class="f"><b>' + a.points + '</b></div>',
+          '<div class="f">' + (a.rewards_available > 0 ? '<b>' + a.rewards_available + ' disponible' + (a.rewards_available > 1 ? 's' : '') + '</b>' : '') + '</div>',
+          '<div class="f"><b>' + fmtDate(a.activated_at) + '</b></div>',
+          '<div class="f"><b>' + fmtDate(a.updated_at) + '</b></div>'
+        ].join('');
         return '<div class="item">' +
           '<div class="item-main"><div class="item-name">' + esc(a.client_name) + '</div>' +
-          '<div class="item-meta">' + a.points + ' point' + (a.points > 1 ? 's' : '') +
-          (a.rewards_available > 0 ? ' · ' + a.rewards_available + ' récompense' + (a.rewards_available > 1 ? 's' : '') + ' disponible' + (a.rewards_available > 1 ? 's' : '') : '') +
-          '</div></div></div>';
+          '<div class="loyalty-info-grid">' + infoGrid + '</div></div></div>';
       }).join('');
 
   renderPaginationControls('loyalty-pagination', loyaltyPage, loyaltyPerPage, loyaltyAccountsData.length, 'goToLoyaltyPage');
@@ -3191,10 +4161,18 @@ function renderGiftCardsList() {
         var itemsList = g.items.map(function (it) { return (it.quantity > 1 ? it.quantity + ' × ' : '') + it.item_name; }).join(', ');
         var statusLabel = g.used_at ? 'Utilisé' : 'Non utilisé';
         var statusColor = g.used_at ? 'var(--grey)' : 'var(--green)';
+        var fmtDate = function (iso) { return new Date(iso).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }); };
+        var infoGrid = ['<div class="f"><b>' + esc(g.recipient_email) + '</b></div>',
+          '<div class="f"><b>' + esc(g.recipient_phone) + '</b></div>',
+          '<div class="f"><b>' + esc(g.code || '—') + '</b></div>',
+          '<div class="f"><b>' + esc(g.barber_name || 'Non désigné') + '</b></div>',
+          '<div class="f"><b>' + fmtDate(g.created_at) + '</b></div>',
+          '<div class="f">' + (g.used_at ? '<b>' + fmtDate(g.used_at) + '</b>' : '') + '</div>'
+        ].join('');
         return '<div class="item">' +
           '<div class="item-main"><div class="item-name">' + esc(g.recipient_name) + ' — ' + eur(g.amount_cents) + '</div>' +
           '<div class="item-meta">' + esc(itemsList) + '</div>' +
-          '<div class="item-meta">' + esc(g.recipient_email) + ' · ' + esc(g.recipient_phone) + ' · code ' + esc(g.code || '—') + '</div></div>' +
+          '<div class="gift-info-grid">' + infoGrid + '</div></div>' +
           '<div class="item-actions">' +
             (g.used_at ? '' : '<button class="btn btn-soft" onclick="resendGiftCode(\'' + g.id + '\')" style="font-size:13px;padding:6px 12px">Renvoyer le code</button>') +
             '<span style="color:' + statusColor + ';font-size:13px;font-weight:600;align-self:center">' + statusLabel + '</span>' +
@@ -3229,18 +4207,8 @@ function saveMarketingSettings() {
 
 /* ============ Caisse ============ */
 /* ============ Rendez-vous ============ */
-var DOT_COLORS = ['#3b82f6', '#f97316', '#10b981', '#a855f7', '#ec4899', '#eab308', '#14b8a6', '#ef4444'];
-
-// Couleur par défaut stable, dérivée de l'id du coiffeur (jamais de sa
-// position dans une liste triée) - ne change JAMAIS quand un autre
-// coiffeur est ajouté/supprimé/renommé, contrairement à un index de
-// tableau qui décale tout le monde. Utilisée uniquement tant que le
-// coiffeur n'a pas choisi sa propre couleur dans ses paramètres.
-function stableColorForId(id) {
-  var hash = 0;
-  for (var i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
-  return DOT_COLORS[hash % DOT_COLORS.length];
-}
+// DOT_COLORS et stableColorForId vivent désormais dans app.js (partagés
+// avec caisse.html pour les bulles de sélection de coiffeur).
 var calAnchor = new Date(); // date de reference pour la periode affichee
 var calViewMode = 'month'; // 'month' | 'week' | 'day'
 var calMonthCache = {}; // 'YYYY-MM' -> items[]
@@ -3288,70 +4256,105 @@ function loadRdvTab() {
 
   setCalView('month');
   resetRdvListToUpcoming();
-  loadTimeline();
-  startTimelineAutoRefresh();
+  // Charge les horaires du salon avant tout, pour que la timeline du
+  // jour (dès qu'un jour sera sélectionné) affiche la bonne plage dès
+  // le premier clic plutôt que d'attendre un second rendu.
+  loadSalonScheduleForTimeline();
+  startCalendarNowRefresh();
 }
 
-/* ---------- Planning du jour (timeline temps réel) ---------- */
-var timelineRefreshTimer = null;
-var timelineTickTimer = null;
-var timelineRange = { start: 9 * 60, end: 19 * 60 }; // en minutes depuis minuit
+/* ---------- Planning du jour, intégré au calendrier (comme la Caisse) ---------- */
+var salonScheduleByWeekday = null; // { [0-6]: {startMin, endMin} } - chargé une seule fois
+var calNowRefreshTimer = null;
 
 function minutesFromScheduledAt(appt) {
   var hm = appt.scheduled_at.slice(11, 16).split(':');
   return Number(hm[0]) * 60 + Number(hm[1]);
 }
 
-function loadTimeline() {
-  var todayStr = ymd(new Date());
-  var mKey = monthKey(new Date());
-  api('/api/appointments?month=' + mKey + '&all=1').then(function (r) {
-    var todays = r.items.filter(function (a) {
-      return a.scheduled_at.slice(0, 10) === todayStr && a.status !== 'cancelled' && a.barber_id;
-    });
-    renderTimeline(todays);
-  }).catch(function () { /* silencieux : la timeline n'est qu'un complément visuel */ });
+function timeStrToMinutes(t) {
+  var hm = t.slice(0, 5).split(':');
+  return Number(hm[0]) * 60 + Number(hm[1]);
 }
 
-function renderTimeline(appts) {
-  var card = document.getElementById('timeline-card');
-  if (!card) return;
+/**
+ * Charge une seule fois les horaires généraux du salon (Réglages >
+ * Calendrier), pour servir de vraie référence à la plage horaire du
+ * Planning du jour - jamais un minimum arbitraire qui ignorerait l'heure
+ * de fermeture réelle.
+ */
+function loadSalonScheduleForTimeline() {
+  if (salonScheduleByWeekday) return Promise.resolve(salonScheduleByWeekday);
+  return api('/api/salon-calendar/schedule').then(function (r) {
+    salonScheduleByWeekday = {};
+    (r.schedules || []).forEach(function (s) {
+      if (!s.active) return;
+      salonScheduleByWeekday[s.weekday] = { startMin: timeStrToMinutes(s.start_time), endMin: timeStrToMinutes(s.end_time) };
+    });
+    return salonScheduleByWeekday;
+  }).catch(function () { salonScheduleByWeekday = {}; return salonScheduleByWeekday; });
+}
 
-  if (appts.length === 0) {
-    document.getElementById('timeline-hours').innerHTML = '';
-    document.getElementById('timeline-rows').innerHTML = '<div class="timeline-empty">Aucun rendez-vous aujourd\'hui</div>';
-    return;
+/**
+ * Timeline "Planning du jour" par coiffeur pour une date donnée -
+ * affichée directement à l'intérieur du calendrier (panneau d'expansion
+ * Mois/Semaine, ou vue Jour), à la place de l'ancienne longue liste
+ * texte des RDV - même principe que l'Agenda de la caisse, bien plus
+ * ergonomique qu'une liste qui s'allonge indéfiniment.
+ */
+var timelineZoom = 1; // partagé entre l'onglet RDV et l'aperçu du Dashboard
+var dashTimelineCache = null; // {dateStr, appts} - pour re-rendre au zoom sans re-fetcher
+
+function renderDayTimelineHtml(dateStr, dayAppts) {
+  var weekday = new Date(dateStr + 'T00:00:00').getDay();
+  var salonDay = salonScheduleByWeekday && salonScheduleByWeekday[weekday];
+
+  // Même un jour totalement vide doit garder une ligne cliquable par
+  // coiffeur (pour ajouter un RDV directement) - on part donc toujours
+  // de la liste des coiffeurs bookables, pas seulement de ceux qui ont
+  // déjà un RDV ce jour-là.
+  var byBarber = {};
+  barbers.filter(isBookableForAdmin).forEach(function (b) {
+    byBarber[b.id] = { name: b.name, items: [] };
+  });
+  dayAppts.forEach(function (a) {
+    var key = a.barber_id || 'unassigned';
+    if (!byBarber[key]) byBarber[key] = { name: a.barber_name || 'Non assigné', items: [] };
+    byBarber[key].items.push(a);
+  });
+  var barberIds = Object.keys(byBarber).sort(function (x, y) { return byBarber[x].name.localeCompare(byBarber[y].name); });
+
+  if (barberIds.length === 0) {
+    return '<div class="timeline-empty">Aucun coiffeur disponible</div>';
   }
 
-  // Plage horaire = étendue des RDV du jour, arrondie à l'heure, avec un
-  // minimum de 8h d'amplitude pour que ça reste lisible même avec 1 seul RDV.
-  var starts = appts.map(minutesFromScheduledAt);
-  var ends = appts.map(function (a) { return minutesFromScheduledAt(a) + Math.max(a.duration_min || 30, 15); });
-  var rangeStart = Math.floor(Math.min.apply(null, starts) / 60) * 60;
-  var rangeEnd = Math.ceil(Math.max.apply(null, ends) / 60) * 60;
-  if (rangeEnd - rangeStart < 8 * 60) rangeEnd = rangeStart + 8 * 60;
-  timelineRange = { start: rangeStart, end: rangeEnd };
+  var starts = dayAppts.length ? dayAppts.map(minutesFromScheduledAt) : [salonDay ? salonDay.startMin : 9 * 60];
+  var ends = dayAppts.length
+    ? dayAppts.map(function (a) { return minutesFromScheduledAt(a) + Math.max(a.duration_min || 30, 15); })
+    : [salonDay ? salonDay.endMin : 19 * 60];
+  var apptMin = Math.min.apply(null, starts);
+  var apptMax = Math.max.apply(null, ends);
+
+  var baseStart = salonDay ? salonDay.startMin : Math.floor(apptMin / 60) * 60;
+  var baseEnd = salonDay ? salonDay.endMin : Math.ceil(apptMax / 60) * 60;
+
+  var rangeStart = Math.floor(Math.min(baseStart, apptMin) / 60) * 60;
+  var rangeEnd = Math.ceil(Math.max(baseEnd, apptMax) / 60) * 60;
+  if (rangeEnd - rangeStart < 4 * 60) rangeEnd = rangeStart + 4 * 60;
 
   var hourCount = (rangeEnd - rangeStart) / 60;
   var hoursHtml = '';
   for (var h = 0; h <= hourCount; h++) {
     var totalMin = rangeStart + h * 60;
-    hoursHtml += '<span>' + String(Math.floor(totalMin / 60)).padStart(2, '0') + ':00</span>';
+    var hourFrac = (h * 60) / (rangeEnd - rangeStart);
+    hoursHtml += '<span style="left: calc(22px + (100% - 22px) * ' + hourFrac + ')">' +
+      String(Math.floor(totalMin / 60)).padStart(2, '0') + ':00</span>';
   }
-  document.getElementById('timeline-hours').innerHTML = hoursHtml;
-  document.getElementById('timeline-hours').style.gridTemplateColumns = 'repeat(' + hourCount + ', 1fr)';
-
-  // Groupe par coiffeur, trié par nom pour un ordre stable.
-  var byBarber = {};
-  appts.forEach(function (a) {
-    if (!byBarber[a.barber_id]) byBarber[a.barber_id] = { name: a.barber_name || '?', items: [] };
-    byBarber[a.barber_id].items.push(a);
-  });
-  var barberIds = Object.keys(byBarber).sort(function (x, y) { return byBarber[x].name.localeCompare(byBarber[y].name); });
 
   var rowsHtml = barberIds.map(function (bid) {
     var b = byBarber[bid];
-    var color = rdvBarberColors[bid] || stableColorForId(bid);
+    var color = bid === 'unassigned' ? 'var(--grey)' : (rdvBarberColors[bid] || stableColorForId(bid));
+    var rowBarberArg = bid === 'unassigned' ? '' : bid;
     var blocksHtml = b.items.map(function (a) {
       var startMin = minutesFromScheduledAt(a);
       var dur = Math.max(a.duration_min || 30, 15);
@@ -3360,56 +4363,129 @@ function renderTimeline(appts) {
       var time = a.scheduled_at.slice(11, 16);
       return '<div class="timeline-block" style="left:' + leftPct + '%;width:' + widthPct + '%;background:' + color + '" ' +
         'title="' + esc(time + ' — ' + a.client_name + ' — ' + (a.service_name || '')) + '" ' +
-        'onclick="openClientDrawerForAppointment(\'' + a.id + '\')">' + esc(a.client_name) + '</div>';
+        'onclick="event.stopPropagation();openClientDrawerForAppointment(\'' + a.id + '\')">' + esc(a.client_name) + '</div>';
     }).join('');
     return '<div class="timeline-row">' +
-      '<div class="timeline-row-label"><span class="dot" style="background:' + color + '"></span>' + esc(b.name) + '</div>' +
-      '<div class="timeline-row-track">' + blocksHtml + '</div>' +
+      '<div class="timeline-row-label" title="' + esc(b.name) + '"><span class="dot" style="background:' + color + '"></span></div>' +
+      '<div class="timeline-row-track" onclick="openAdminAddAppointment(\'' + dateStr + '\',\'' + rowBarberArg + '\')">' + blocksHtml + '</div>' +
       '</div>';
   }).join('');
-  document.getElementById('timeline-rows').innerHTML = rowsHtml;
 
-  updateTimelineNowLine();
-}
-
-function updateTimelineNowLine() {
-  var inner = document.getElementById('timeline-inner');
-  if (!inner || !document.getElementById('timeline-rows').children.length) return;
-
-  var existing = document.getElementById('timeline-now-line');
-  var now = new Date();
-  var nowMin = now.getHours() * 60 + now.getMinutes();
-
-  if (nowMin < timelineRange.start || nowMin > timelineRange.end) {
-    if (existing) existing.remove();
-    return;
+  var nowLineHtml = '';
+  // On compare a l'heure du SALON (fuseau horaire configure), pas celle du
+  // navigateur qui affiche la page - sinon la ligne se decale des qu'on
+  // consulte le planning depuis un appareil regle sur un autre fuseau
+  // (session d'assistance, deplacement...), meme si l'heure du navigateur
+  // est correcte pour LUI.
+  var nowStr = nowSalonDatetimeString(); // "YYYY-MM-DD HH:MM:SS", heure du salon
+  if (dateStr === nowStr.slice(0, 10)) {
+    var nowMin = Number(nowStr.slice(11, 13)) * 60 + Number(nowStr.slice(14, 16));
+    if (nowMin >= rangeStart && nowMin <= rangeEnd) {
+      var leftFrac = (nowMin - rangeStart) / (rangeEnd - rangeStart);
+      nowLineHtml = '<div class="timeline-now-line" title="Maintenant — ' + nowStr.slice(11, 16) + '" ' +
+        'style="left: calc(22px + (100% - 22px) * ' + leftFrac + ')"></div>';
+    }
   }
 
-  var leftPct = ((nowMin - timelineRange.start) / (timelineRange.end - timelineRange.start)) * 100;
-  // 130px = largeur fixe de la colonne des noms, à décaler en plus du %.
-  var style = 'left: calc(130px + (100% - 130px) * ' + (leftPct / 100) + ')';
-  if (existing) {
-    existing.setAttribute('style', style);
-  } else {
-    var line = document.createElement('div');
-    line.id = 'timeline-now-line';
-    line.className = 'timeline-now-line';
-    line.setAttribute('style', style);
-    inner.appendChild(line);
+  // Repère de minutes en fond : une ligne fine tous les quarts d'heure.
+  // background-size en % du conteneur = 15 min exprimees en pourcentage
+  // de la plage totale affichee (rangeEnd - rangeStart).
+  var minuteStepPct = (15 / (rangeEnd - rangeStart)) * 100;
+  var minuteGridHtml = '<div class="timeline-minute-grid" style="background-size:' + minuteStepPct + '% 100%"></div>';
+
+  // Largeur ajustable au zoom : ~90px/heure a zoom 1 (comme le minimum
+  // fixe d'avant, mais qui suit desormais le nombre d'heures affichees
+  // au lieu d'une largeur fixe qui coupait les plages courtes ou
+  // ecrasait les plages longues).
+  var innerWidth = Math.round(hourCount * 90 * timelineZoom);
+  var zoomPct = Math.round(timelineZoom * 100);
+  var zoomCtrl = '<div class="timeline-zoom-ctrl"><div class="timeline-zoom-ctrl-inner">' +
+    '<button type="button" onclick="event.stopPropagation();adjustTimelineZoom(-1)" title="Dézoomer">−</button>' +
+    '<span>' + zoomPct + '%</span>' +
+    '<button type="button" onclick="event.stopPropagation();adjustTimelineZoom(1)" title="Zoomer">+</button>' +
+    '</div></div>';
+
+  return zoomCtrl + '<div class="timeline-scroll"><div class="timeline-inner" ' +
+    'data-date="' + dateStr + '" data-range-start="' + rangeStart + '" data-range-end="' + rangeEnd + '" ' +
+    'style="min-width:' + innerWidth + 'px">' +
+    '<div class="timeline-hours">' + hoursHtml + '</div>' +
+    minuteGridHtml + rowsHtml + nowLineHtml +
+    '</div></div>';
+}
+
+/**
+ * Déplace juste la ligne "maintenant" (position + info-bulle) sur
+ * toutes les frises actuellement affichées (agenda ET Dashboard),
+ * sans reconstruire le reste - une reconstruction complète perdait le
+ * défilement horizontal et le zoom en cours toutes les 30s, ce qui
+ * donnait une impression genante de rafraichissement constant pour
+ * un gain quasi invisible (la ligne n'avance que de quelques pixels).
+ */
+function updateTimelineNowLines() {
+  var nowStr = nowSalonDatetimeString();
+  var todayStr = nowStr.slice(0, 10);
+  var nowMin = Number(nowStr.slice(11, 13)) * 60 + Number(nowStr.slice(14, 16));
+  var title = 'Maintenant — ' + nowStr.slice(11, 16);
+
+  document.querySelectorAll('.timeline-inner[data-range-start]').forEach(function (inner) {
+    var rangeStart = Number(inner.dataset.rangeStart);
+    var rangeEnd = Number(inner.dataset.rangeEnd);
+    var visible = inner.dataset.date === todayStr && nowMin >= rangeStart && nowMin <= rangeEnd;
+    var line = inner.querySelector('.timeline-now-line');
+
+    if (!visible) {
+      if (line) line.remove();
+      return;
+    }
+    var leftCss = 'calc(22px + (100% - 22px) * ' + ((nowMin - rangeStart) / (rangeEnd - rangeStart)) + ')';
+    if (!line) {
+      line = document.createElement('div');
+      line.className = 'timeline-now-line';
+      inner.appendChild(line);
+    }
+    line.style.left = leftCss;
+    line.title = title;
+  });
+}
+
+/**
+ * +1 pour zoomer, -1 pour dézoomer (pas de 20%, borné entre 60% et
+ * 250%). Ré-affiche tous les plannings jour actuellement visibles avec
+ * les données déjà en mémoire, sans nouvel appel réseau.
+ */
+function adjustTimelineZoom(delta) {
+  timelineZoom = Math.max(0.6, Math.min(2.5, +(timelineZoom + delta * 0.2).toFixed(2)));
+
+  if (dashTimelineCache) {
+    var dashEl = document.getElementById('dash-timeline');
+    if (dashEl) dashEl.innerHTML = renderDayTimelineHtml(dashTimelineCache.dateStr, dashTimelineCache.appts);
+  }
+  if (caisseTimelineCache) {
+    var caisseEl = document.getElementById('caisse-timeline');
+    if (caisseEl) caisseEl.innerHTML = renderDayTimelineHtml(caisseTimelineCache.dateStr, caisseTimelineCache.appts);
+  }
+  if (typeof calViewMode !== 'undefined') {
+    if (calViewMode === 'day') renderDayView();
+    else if (calSelectedDate) {
+      if (calViewMode === 'month') renderMonthView();
+      else if (calViewMode === 'week') renderWeekView();
+    }
   }
 }
 
-function startTimelineAutoRefresh() {
-  stopTimelineAutoRefresh();
-  timelineTickTimer = setInterval(updateTimelineNowLine, 30000);
-  timelineRefreshTimer = setInterval(loadTimeline, 60000);
+/**
+ * Réaffiche la vue active toutes les 30s tant que l'onglet RDV est
+ * ouvert - fait avancer le trait "maintenant" et récupère les nouveaux
+ * RDV du jour sans action de l'utilisateur.
+ */
+function startCalendarNowRefresh() {
+  stopCalendarNowRefresh();
+  calNowRefreshTimer = setInterval(updateTimelineNowLines, 30000);
 }
 
-function stopTimelineAutoRefresh() {
-  if (timelineTickTimer) clearInterval(timelineTickTimer);
-  if (timelineRefreshTimer) clearInterval(timelineRefreshTimer);
-  timelineTickTimer = null;
-  timelineRefreshTimer = null;
+function stopCalendarNowRefresh() {
+  if (calNowRefreshTimer) clearInterval(calNowRefreshTimer);
+  calNowRefreshTimer = null;
 }
 
 function setCalView(mode) {
@@ -3418,7 +4494,7 @@ function setCalView(mode) {
     document.getElementById('cal-view-' + m).classList.toggle('on', m === mode);
   });
   document.getElementById('cal-weekdays').style.display = mode === 'day' ? 'none' : 'grid';
-  document.getElementById('cal-days').style.display = mode === 'day' ? 'none' : 'grid';
+  document.getElementById('cal-days').style.display = mode === 'day' ? 'none' : 'block';
   document.getElementById('cal-day-view').style.display = mode === 'day' ? 'block' : 'none';
   loadCalendarPeriod();
 }
@@ -3546,27 +4622,12 @@ function renderMonthView() {
  */
 function renderExpandPanel(dateStr, dayAppts) {
   var when = new Date(dateStr + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' });
-  var sorted = dayAppts.slice().sort(function (a, b) { return a.scheduled_at.localeCompare(b.scheduled_at); });
-
-  sorted.forEach(function (a) { calAppointmentById[a.id] = a; });
-
-  var rows = sorted.length === 0
-    ? '<div class="empty">Aucun rendez-vous ce jour-là</div>'
-    : sorted.map(function (a) {
-        var time = a.scheduled_at.slice(11, 16);
-        return '<div class="cal-expand-row" onclick="openClientDrawerForAppointment(\'' + a.id + '\')">' +
-          '<div class="cal-day-view-time">' + time + '</div>' +
-          '<div class="cal-day-view-dot" style="background:' + (rdvBarberColors[a.barber_id] || '#888') + '"></div>' +
-          '<div style="flex:1"><div class="cal-day-view-name">' + esc(a.client_name) + ' ' + sourceBadge(a) + '</div>' +
-          '<div class="cal-day-view-meta">' + esc(a.service_name) + (a.barber_name ? ' avec ' + esc(a.barber_name) : '') + '</div></div>' +
-          '</div>';
-      }).join('');
+  dayAppts.forEach(function (a) { calAppointmentById[a.id] = a; });
 
   return '<div class="cal-expand-panel">' +
     '<div class="cal-expand-head"><strong style="text-transform:capitalize">' + when + '</strong>' +
     '<button class="btn btn-soft" onclick="event.stopPropagation();selectCalendarDay(null)">Fermer</button></div>' +
-    '<button class="btn btn-primary" style="width:100%;margin-bottom:14px" onclick="event.stopPropagation();openAdminAddAppointment(\'' + dateStr + '\')">+ Ajouter un RDV</button>' +
-    rows +
+    renderDayTimelineHtml(dateStr, dayAppts) +
     '</div>';
 }
 
@@ -3574,11 +4635,11 @@ function renderExpandPanel(dateStr, dayAppts) {
  * Ajout manuel d'un RDV par l'admin (ex: client au téléphone) depuis le
  * panneau du jour - email optionnel, mais coiffeur toujours requis.
  */
-function openAdminAddAppointment(dateStr) {
+function openAdminAddAppointment(dateStr, preselectedBarberId) {
   var rdvBarbers = barbers.filter(isBookableForAdmin);
   var when = new Date(dateStr + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' });
 
-  var state = { barberId: null, serviceId: null, extraIds: [], time: null };
+  var state = { barberId: preselectedBarberId || null, serviceId: null, extraIds: [], time: null };
 
   var overlay = _buildModal(
     '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px">' +
@@ -3639,6 +4700,14 @@ function openAdminAddAppointment(dateStr) {
   var STEPS = ['barber', 'service', 'extras', 'datetime', 'contact'];
   attachClientAutocomplete(overlay, 'aa-name', 'aa-email', 'aa-phone', api);
 
+  // Clic sur la ligne d'un coiffeur précis dans le planning (au lieu du
+  // gros bouton générique) : on sait déjà qui, on saute directement à la
+  // prestation - exactement le principe déjà en place sur la Caisse.
+  if (preselectedBarberId) {
+    var preBtn = overlay.querySelector('#aa-step-barber .aa-card[data-id="' + preselectedBarberId + '"]');
+    if (preBtn) preBtn.classList.add('sel');
+  }
+
   window.aaGoStep = function (step) {
     STEPS.forEach(function (s) { overlay.querySelector('#aa-step-' + s).style.display = s === step ? 'block' : 'none'; });
     if (step === 'datetime') aaLoadSlots();
@@ -3647,6 +4716,8 @@ function openAdminAddAppointment(dateStr) {
       overlay.querySelector('#aa-contact-summary').textContent = when + ' à ' + state.time + ' — ' + (s ? s.name : '');
     }
   };
+
+  if (preselectedBarberId) aaGoStep('service');
 
   window.aaSelectBarber = function (el) {
     state.barberId = el.dataset.id;
@@ -3801,23 +4872,13 @@ function renderDayView() {
   document.getElementById('cal-month-label').textContent =
     calAnchor.toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
 
-  var dayAppts = applyCalBarberFilter(appointmentsForRange(calAnchor, calAnchor)).sort(function (a, b) { return a.scheduled_at.localeCompare(b.scheduled_at); });
+  var dateStr = ymd(calAnchor);
+  var dayAppts = applyCalBarberFilter(appointmentsForRange(calAnchor, calAnchor));
   dayAppts.forEach(function (a) { calAppointmentById[a.id] = a; });
   var view = document.getElementById('cal-day-view');
-  var addBtn = '<button class="btn btn-primary" style="width:100%;margin-bottom:14px" onclick="openAdminAddAppointment(\'' + ymd(calAnchor) + '\')">+ Ajouter un RDV</button>';
-  view.innerHTML = addBtn + (dayAppts.length === 0
-    ? '<div class="empty">Aucun rendez-vous ce jour-là</div>'
-    : '<div class="cal-day-view-list">' + dayAppts.map(function (a) {
-        var time = a.scheduled_at.slice(11, 16);
-        return '<div class="cal-day-view-appt" style="cursor:pointer" onclick="openClientDrawerForAppointment(\'' + a.id + '\')">' +
-          '<div class="cal-day-view-time">' + time + '</div>' +
-          '<div class="cal-day-view-dot" style="background:' + (rdvBarberColors[a.barber_id] || '#888') + '"></div>' +
-          '<div><div class="cal-day-view-name">' + esc(a.client_name) + ' ' + sourceBadge(a) + '</div>' +
-          '<div class="cal-day-view-meta">' + esc(a.service_name) + (a.barber_name ? ' avec ' + esc(a.barber_name) : '') + '</div></div>' +
-          '</div>';
-      }).join('') + '</div>');
+  view.innerHTML = renderDayTimelineHtml(dateStr, dayAppts);
 
-  calSelectedDate = ymd(calAnchor);
+  calSelectedDate = dateStr;
   document.getElementById('rdv-list-title').textContent = 'Le ' + calAnchor.toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' });
   document.getElementById('rdv-reset-btn').style.display = 'inline-block';
   renderRdvList();
@@ -4064,20 +5125,39 @@ function renderRdvList() {
         // ambigu, insensible au fuseau), l'heure directement depuis la
         // chaîne brute (comme partout ailleurs dans le calendrier).
         var dateOnly = new Date(a.scheduled_at.slice(0, 10) + 'T00:00:00');
-        var when = dateOnly.toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'short' }) +
-          ' à ' + a.scheduled_at.slice(11, 16);
+        var whenShort = dateOnly.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }) +
+          ' ' + a.scheduled_at.slice(11, 16);
         // Annulable : un vrai RDV en ligne, pas encore annulé, à venir -
         // même règle que le tiroir client (openClientDrawer).
         var cancelable = a.status !== 'cancelled' && a.source !== 'walkin' && a.scheduled_at > nowSalonDatetimeString();
+
+        var infoGrid = [
+          '<div class="f"><b>' + esc(a.client_name) + '</b></div>',
+          '<div class="f"><b>' + esc(a.service_name) + '</b></div>',
+          '<div class="f"><b>' + whenShort + ' ' + sourceBadge(a, true) + '</b></div>',
+          '<div class="f"><b>' + esc(a.barber_name || 'Premier disponible') + '</b></div>',
+          '<div class="f"><b>' + esc(a.email || '—') + '</b></div>',
+          '<div class="f"><b>' + esc(a.phone || '—') + '</b></div>',
+          '<div class="f"><b style="color:' + (statusColors[a.display_status] || 'var(--grey)') + '">' + (statusLabels[a.display_status] || a.display_status) + '</b></div>'
+        ].join('');
+
+        // Les boutons d'action sont toujours rendus (mêmes classes, même
+        // texte) pour que cette zone garde exactement la même largeur sur
+        // toutes les lignes — seulement rendus invisibles (visibility, pas
+        // display) quand le RDV n'est pas annulable. Sans ça, la grille
+        // n'aurait pas la même largeur disponible d'une ligne à l'autre et
+        // se désalignerait (colonne Statut en particulier).
+        var actionsHtml =
+          '<button class="btn btn-soft" style="padding:6px 10px;font-size:13px' + (cancelable ? '' : ';visibility:hidden;pointer-events:none') + '"' +
+          (cancelable ? ' onclick="openRescheduleAppointment(\'' + a.id + '\', calAppointmentById[\'' + a.id + '\'])"' : ' tabindex="-1"') + '>Déplacer</button>' +
+          '<button class="btn btn-ghost" style="color:var(--red);padding:6px 10px;font-size:13px' + (cancelable ? '' : ';visibility:hidden;pointer-events:none') + '"' +
+          (cancelable ? ' onclick="openCancelAppointmentsModal([\'' + a.id + '\'])"' : ' tabindex="-1"') + '>Annuler</button>';
+
         return '<div class="item">' +
           '<input type="checkbox" class="rdv-check" data-id="' + a.id + '" ' + (rdvSelectedIds[a.id] ? 'checked' : '') + ' onchange="toggleRdvSelect(\'' + a.id + '\', this.checked)" style="margin-right:12px;flex-shrink:0">' +
-          '<div class="item-main" onclick="openClientDrawerForAppointment(\'' + a.id + '\')" style="cursor:pointer"><div class="item-name">' + esc(a.client_name) + ' — ' + when + ' ' + sourceBadge(a) + '</div>' +
-          '<div class="item-meta">' + esc(a.service_name) + (a.barber_name ? ' avec ' + esc(a.barber_name) : ' · premier disponible') + '</div>' +
-          '<div class="item-meta">' + esc(a.email || '') + (a.phone ? ' · ' + esc(a.phone) : '') + '</div></div>' +
-          '<div class="item-actions" style="display:flex;align-items:center;gap:12px">' +
-          '<span style="color:' + (statusColors[a.display_status] || 'var(--grey)') + ';font-size:13px;font-weight:600">' + (statusLabels[a.display_status] || a.display_status) + '</span>' +
-          (cancelable ? '<button class="btn btn-soft" style="padding:6px 10px;font-size:13px" onclick="openRescheduleAppointment(\'' + a.id + '\', calAppointmentById[\'' + a.id + '\'])">Déplacer</button>' : '') +
-          (cancelable ? '<button class="btn btn-ghost" style="color:var(--red);padding:6px 10px;font-size:13px" onclick="openCancelAppointmentsModal([\'' + a.id + '\'])">Annuler</button>' : '') +
+          '<div class="item-main" onclick="openClientDrawerForAppointment(\'' + a.id + '\')" style="cursor:pointer">' +
+          '<div class="rdv-info-grid">' + infoGrid + '</div></div>' +
+          '<div class="item-actions" style="display:flex;align-items:center;gap:12px">' + actionsHtml +
           '</div>' +
           '</div>';
       }).join('');
@@ -4378,7 +5458,26 @@ function closingsGoToPage(p) {
   renderClosingsPage();
 }
 
+var caisseTimelineCache = null; // même principe que dashTimelineCache, pour le zoom sans re-fetch
+
+function loadCaisseTimeline() {
+  var todayStr = ymd(new Date());
+  loadSalonScheduleForTimeline().then(function () {
+    return api('/api/appointments?month=' + monthKey(new Date()));
+  }).then(function (r) {
+    var todayAppts = (r.items || []).filter(function (a) {
+      return a.scheduled_at.slice(0, 10) === todayStr && a.status !== 'cancelled';
+    });
+    todayAppts.forEach(function (a) { calAppointmentById[a.id] = a; });
+    caisseTimelineCache = { dateStr: todayStr, appts: todayAppts };
+    document.getElementById('caisse-timeline').innerHTML = renderDayTimelineHtml(todayStr, todayAppts);
+  }).catch(function () {
+    document.getElementById('caisse-timeline').innerHTML = '<div class="empty">Impossible de charger le planning du jour</div>';
+  });
+}
+
 function loadCaisseTab() {
+  loadCaisseTimeline();
   api('/api/owner/caisse/current-period').then(function (r) {
     document.getElementById('caisse-period-since').textContent = r.period_start
       ? 'Depuis la dernière clôture (' + new Date(r.period_start).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) + ').'
@@ -4509,6 +5608,48 @@ function renderClientsPagination() {
     '<button onclick="goToClientsPage(' + (clientsPage + 1) + ')"' + (clientsPage >= clientsTotalPages ? ' disabled' : '') + '>›</button>';
 }
 
+/* ============ Journal d'activité (Paramètres) ============ */
+var activityLogPage = 1;
+var activityLogTotalPages = 1;
+
+function loadActivityLog(page) {
+  activityLogPage = page || activityLogPage;
+  return api('/api/owner/activity-log?page=' + activityLogPage + '&per_page=25').then(function (r) {
+    activityLogPage = r.page;
+    activityLogTotalPages = r.total_pages;
+    renderActivityLog(r.items);
+    renderActivityLogPagination();
+  }).catch(function (e) { toast(e.message, true); });
+}
+
+function renderActivityLog(items) {
+  document.getElementById('activity-log-list').innerHTML = !items || items.length === 0
+    ? '<div class="empty">Aucune activité pour le moment</div>'
+    : items.map(function (a) {
+        var when = new Date(a.created_at).toLocaleString('fr-FR', {
+          day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+        });
+        return '<div class="item">' +
+          '<div class="item-main">' +
+            '<div class="item-name">' + esc(a.description) + '</div>' +
+            '<div class="item-meta">' + when + ' · ' + esc(a.actor) + (a.salon_name ? ' · ' + esc(a.salon_name) : '') + '</div>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+}
+
+function goToActivityLogPage(p) {
+  if (p < 1 || p > activityLogTotalPages) return;
+  loadActivityLog(p);
+}
+
+function renderActivityLogPagination() {
+  document.getElementById('activity-log-pagination').innerHTML =
+    '<button onclick="goToActivityLogPage(' + (activityLogPage - 1) + ')"' + (activityLogPage <= 1 ? ' disabled' : '') + '>‹</button>' +
+    '<span class="page-label">Page ' + activityLogPage + ' / ' + activityLogTotalPages + '</span>' +
+    '<button onclick="goToActivityLogPage(' + (activityLogPage + 1) + ')"' + (activityLogPage >= activityLogTotalPages ? ' disabled' : '') + '>›</button>';
+}
+
 document.getElementById('client-search').addEventListener('input', renderClients);
 
 function toggleClientSelect(id, checked) {
@@ -4634,6 +5775,7 @@ function renderClients() {
           (c.extra_names.length ? ' + ' + c.extra_names.join(', ') : '');
         var stuck = c.status === 'in_progress' &&
           (Date.now() - new Date(c.start_at || c.checkin_at).getTime()) > 90 * 60000;
+        var dur = durationBadge(c.start_at, c.end_at).replace(/^ · /, '');
 
         var actions = '';
         if (c.status === 'waiting' || c.status === 'in_progress') {
@@ -4642,19 +5784,25 @@ function renderClients() {
         }
         actions += '<button class="btn btn-ghost" onclick="deleteClient(\'' + c.id + '\')">Supprimer</button>';
 
-        return '<div class="item' + (stuck ? '' : '') + '">' +
+        var nameCell = '<b>' + esc(c.client_name) + '</b>' +
+          ' <span class="chip' + (c.status === 'in_progress' ? ' main' : '') + '" style="margin-left:4px;font-size:10.5px;color:' + (STATUS_COLOR[c.status] || 'var(--grey)') + '">' +
+          esc(STATUS_LABEL[c.status] || c.status) + '</span>' +
+          (stuck ? ' <span class="chip" style="background:var(--orange);color:#fff;font-size:10.5px">bloqué</span>' : '');
+
+        var infoGrid = [
+          '<div class="f">' + nameCell + '</div>',
+          '<div class="f"><b>' + esc(detail) + '</b></div>',
+          '<div class="f"><b>' + when + '</b></div>',
+          '<div class="f"><b>' + esc(c.email || '—') + '</b></div>',
+          '<div class="f">' + (c.total_price_cents ? '<b>' + eur(c.total_price_cents) + '</b>' : '') + '</div>',
+          '<div class="f">' + (dur ? '<b>' + dur + '</b>' : '') + '</div>'
+        ].join('');
+
+        return '<div class="item">' +
           '<input type="checkbox" class="client-check"' + (selectedClientIds[c.id] ? ' checked' : '') +
           ' onclick="event.stopPropagation()" onchange="toggleClientSelect(\'' + c.id + '\', this.checked)">' +
           '<div class="item-main" onclick="openClientDrawer(\'' + c.id + '\', \'history\')" style="cursor:pointer">' +
-            '<div class="item-name">' + esc(c.client_name) +
-              ' <span class="chip' + (c.status === 'in_progress' ? ' main' : '') + '" style="margin-left:6px;font-size:11px;color:' + (STATUS_COLOR[c.status] || 'var(--grey)') + '">' +
-              esc(STATUS_LABEL[c.status] || c.status) + '</span>' +
-              (stuck ? ' <span class="chip" style="background:var(--orange);color:#fff;font-size:11px">bloqué</span>' : '') +
-            '</div>' +
-            '<div class="item-meta">' + esc(detail) + ' · ' + when +
-              (c.email ? ' · ' + esc(c.email) : '') +
-              (c.total_price_cents ? ' · ' + eur(c.total_price_cents) : '') +
-              durationBadge(c.start_at, c.end_at) + '</div>' +
+            '<div class="client-info-grid">' + infoGrid + '</div>' +
           '</div>' +
           '<div class="item-actions" onclick="event.stopPropagation()">' + actions + '</div>' +
         '</div>';
@@ -4710,6 +5858,159 @@ function addManualClient() {
       return loadClients();
     }).catch(function (e) { errEl.textContent = e.message; errEl.style.display = 'block'; });
   };
+}
+
+/* ============ Import CSV de clients ============ */
+
+/**
+ * Ouvre le sélecteur de fichier, lit le CSV choisi et lance l'import
+ * (après confirmation). Volontairement souple sur le format : accepte
+ * ; ou , comme séparateur, avec ou sans ligne d'en-tête, en-têtes en
+ * français ou en anglais (Nom/Name, Email/Mail, Téléphone/Phone…) -
+ * accepte notamment tel quel le CSV généré par "Télécharger CSV" plus
+ * haut dans cet onglet.
+ */
+function importClientsCsv() {
+  var input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.csv,text/csv';
+  input.style.display = 'none';
+  document.body.appendChild(input);
+
+  input.onchange = function () {
+    var file = input.files && input.files[0];
+    document.body.removeChild(input);
+    if (!file) return;
+
+    var reader = new FileReader();
+    reader.onerror = function () { toast('Impossible de lire ce fichier', true); };
+    reader.onload = function (e) {
+      var clients;
+      try {
+        clients = parseClientsCsv(String(e.target.result));
+      } catch (err) {
+        toast('Fichier CSV illisible : ' + err.message, true);
+        return;
+      }
+      if (!clients.length) {
+        toast('Aucun client valide trouvé dans ce fichier (colonne "Nom" requise)', true);
+        return;
+      }
+      confirmImportClients(clients);
+    };
+    reader.readAsText(file, 'utf-8');
+  };
+
+  input.click();
+}
+
+var CSV_HEADER_ALIASES = {
+  name: ['nom', 'name', 'client', 'nomduclient', 'nomcomplet', 'fullname'],
+  email: ['email', 'e-mail', 'mail', 'courriel'],
+  phone: ['telephone', 'tel', 'phone', 'mobile', 'portable', 'gsm', 'numero', 'numerodetelephone']
+};
+
+// Enlève accents/espaces/casse pour comparer les en-têtes sans se soucier
+// des variantes ("Téléphone", "N° de téléphone", "TELEPHONE"…).
+function _normalizeCsvHeader(h) {
+  return String(h || '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().replace(/[^a-z]/g, '');
+}
+
+function _parseCsvLine(line, delim) {
+  var out = [], cur = '', inQuotes = false;
+  for (var i = 0; i < line.length; i++) {
+    var ch = line[i];
+    if (inQuotes) {
+      if (ch === '"') { if (line[i + 1] === '"') { cur += '"'; i++; } else inQuotes = false; }
+      else cur += ch;
+    } else if (ch === '"') inQuotes = true;
+    else if (ch === delim) { out.push(cur); cur = ''; }
+    else cur += ch;
+  }
+  out.push(cur);
+  return out.map(function (v) { return v.trim(); });
+}
+
+function parseClientsCsv(text) {
+  text = text.replace(/^\uFEFF/, ''); // BOM éventuel (Excel)
+  var lines = text.split(/\r\n|\r|\n/).filter(function (l) { return l.trim() !== ''; });
+  if (!lines.length) return [];
+
+  var sample = lines[0];
+  var delim = (sample.match(/;/g) || []).length >= (sample.match(/,/g) || []).length ? ';' : ',';
+  var rows = lines.map(function (l) { return _parseCsvLine(l, delim); });
+
+  // Repère les colonnes reconnues dans la 1re ligne ; si aucune ne
+  // correspond, on suppose qu'il n'y a pas d'en-tête et on retombe sur
+  // l'ordre par défaut nom;email;téléphone.
+  var colMap = {};
+  rows[0].forEach(function (h, i) {
+    var norm = _normalizeCsvHeader(h);
+    Object.keys(CSV_HEADER_ALIASES).forEach(function (field) {
+      if (!colMap[field] && CSV_HEADER_ALIASES[field].indexOf(norm) !== -1) colMap[field] = i;
+    });
+  });
+  var hasHeader = Object.keys(colMap).length > 0;
+  if (!hasHeader) colMap = { name: 0, email: 1, phone: 2 };
+  var dataRows = hasHeader ? rows.slice(1) : rows;
+
+  var out = [];
+  dataRows.forEach(function (row) {
+    var name = colMap.name !== undefined ? (row[colMap.name] || '').trim() : '';
+    if (!name) return; // ligne sans nom = ignorée
+    out.push({
+      name: name,
+      email: colMap.email !== undefined ? (row[colMap.email] || '').trim() : '',
+      phone: colMap.phone !== undefined ? (row[colMap.phone] || '').trim() : ''
+    });
+  });
+  return out;
+}
+
+function confirmImportClients(clients) {
+  var n = clients.length;
+  showConfirm(
+    n + ' client' + (n > 1 ? 's' : '') + ' trouvé' + (n > 1 ? 's' : '') + ' dans ce fichier. Les importer ?',
+    { title: 'Importer des clients', confirmLabel: 'Importer' }
+  ).then(function (ok) {
+    if (ok) runClientsImport(clients);
+  });
+}
+
+/**
+ * Import réel, en parallèle limité (4 à la fois) pour rester rapide sur
+ * de gros fichiers sans bombarder le serveur. Chaque client est ajouté
+ * via le même endpoint que "+ Ajouter un client" (historique 'Terminé').
+ * Les échecs individuels n'interrompent pas le reste de l'import.
+ */
+function runClientsImport(clients) {
+  var total = clients.length;
+  var idx = 0, okCount = 0, failCount = 0;
+  var CONCURRENCY = 4;
+
+  toast('Import de ' + total + ' client' + (total > 1 ? 's' : '') + ' en cours…');
+
+  function worker() {
+    if (idx >= total) return Promise.resolve();
+    var c = clients[idx++];
+    return api('/api/queue/manual-client', {
+      method: 'POST',
+      body: { client_name: c.name, email: c.email, phone: c.phone, source: 'csv_import' }
+    }).then(function () { okCount++; }, function () { failCount++; }).then(worker);
+  }
+
+  var workers = [];
+  for (var i = 0; i < Math.min(CONCURRENCY, total); i++) workers.push(worker());
+
+  Promise.all(workers).then(function () {
+    if (okCount > 0) return api('/api/queue/manual-client/import-log', { method: 'POST', body: { count: okCount } }).catch(function () {});
+  }).then(loadClients).then(function () {
+    var msg = okCount + ' client' + (okCount > 1 ? 's' : '') + ' importé' + (okCount > 1 ? 's' : '');
+    if (failCount) msg += ', ' + failCount + ' échec' + (failCount > 1 ? 's' : '');
+    toast(msg, failCount > 0 && okCount === 0);
+  });
 }
 
 function deleteSelectedClients() {
@@ -4894,6 +6195,100 @@ function removeGiftTileImage() {
   api('/api/settings', { method: 'PUT', body: { gift_tile_image_url: '' } })
     .then(loadCurrentSalonName)
     .then(function () { toast('Icône par défaut restaurée'); })
+    .catch(function (e) { toast(e.message, true); });
+}
+
+/**
+ * Recadre toujours l'image envoyée en 720x320 (ratio carte fidélité,
+ * "rectangle" horizontal) puis compresse en JPEG - garantit une image
+ * toujours légère côté compte client, peu importe la photo d'origine
+ * envoyée ici (même mécanisme que le tile cadeau du kiosk, en rectangle
+ * plutôt qu'en carré).
+ */
+function uploadLoyaltyCardImage(input) {
+  var file = input.files && input.files[0];
+  if (!file) return;
+
+  var TARGET_W = 720, TARGET_H = 320;
+  var reader = new FileReader();
+  reader.onload = function (e) {
+    var img = new Image();
+    img.onload = function () {
+      var canvas = document.createElement('canvas');
+      canvas.width = TARGET_W; canvas.height = TARGET_H;
+      var ctx = canvas.getContext('2d');
+      var targetRatio = TARGET_W / TARGET_H;
+      var srcRatio = img.width / img.height;
+      var sx, sy, sw, sh;
+      if (srcRatio > targetRatio) {
+        // Image source plus large que la cible : on rogne les côtés.
+        sh = img.height;
+        sw = sh * targetRatio;
+        sx = (img.width - sw) / 2; sy = 0;
+      } else {
+        // Image source plus haute que la cible : on rogne haut/bas.
+        sw = img.width;
+        sh = sw / targetRatio;
+        sx = 0; sy = (img.height - sh) / 2;
+      }
+      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, TARGET_W, TARGET_H);
+      var dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+
+      api('/api/settings', { method: 'PUT', body: { loyalty_card_image_url: dataUrl } })
+        .then(loadCurrentSalonName)
+        .then(function () { toast('Image mise à jour'); })
+        .catch(function (e) { toast(e.message, true); });
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeLoyaltyCardImage() {
+  api('/api/settings', { method: 'PUT', body: { loyalty_card_image_url: '' } })
+    .then(loadCurrentSalonName)
+    .then(function () { toast('Fond uni par défaut restauré'); })
+    .catch(function (e) { toast(e.message, true); });
+}
+
+/** Même recadrage 720x320 que la carte fidélité, pour la carte cadeau. */
+function uploadGiftCardImage(input) {
+  var file = input.files && input.files[0];
+  if (!file) return;
+
+  var TARGET_W = 720, TARGET_H = 320;
+  var reader = new FileReader();
+  reader.onload = function (e) {
+    var img = new Image();
+    img.onload = function () {
+      var canvas = document.createElement('canvas');
+      canvas.width = TARGET_W; canvas.height = TARGET_H;
+      var ctx = canvas.getContext('2d');
+      var targetRatio = TARGET_W / TARGET_H;
+      var srcRatio = img.width / img.height;
+      var sx, sy, sw, sh;
+      if (srcRatio > targetRatio) {
+        sh = img.height; sw = sh * targetRatio; sx = (img.width - sw) / 2; sy = 0;
+      } else {
+        sw = img.width; sh = sw / targetRatio; sx = 0; sy = (img.height - sh) / 2;
+      }
+      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, TARGET_W, TARGET_H);
+      var dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+
+      api('/api/settings', { method: 'PUT', body: { gift_card_image_url: dataUrl } })
+        .then(loadCurrentSalonName)
+        .then(function () { toast('Image mise à jour'); })
+        .catch(function (e) { toast(e.message, true); });
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeGiftCardImage() {
+  api('/api/settings', { method: 'PUT', body: { gift_card_image_url: '' } })
+    .then(loadCurrentSalonName)
+    .then(function () { toast('Dégradé par défaut restauré'); })
     .catch(function (e) { toast(e.message, true); });
 }
 
@@ -5115,10 +6510,53 @@ function loadSettings() {
     document.getElementById('set-from').value = s.smtp_from || '';
     document.getElementById('set-pass').value = '';
     document.getElementById('pass-state').textContent = r.smtp_pass_set ? '· déjà enregistré' : '';
+    document.getElementById('set-legal-address').value = s.legal_address || '';
+    document.getElementById('set-legal-phone').value = s.legal_phone || '';
+    document.getElementById('set-legal-email').value = s.legal_email || '';
+    document.getElementById('set-legal-website').value = s.legal_website || '';
+    document.getElementById('set-legal-siret').value = s.legal_siret || '';
+    document.getElementById('set-legal-vat').value = s.legal_vat_number || '';
+    document.getElementById('set-legal-form').value = s.legal_form || '';
+    document.getElementById('set-legal-capital').value = s.legal_share_capital || '';
+    document.getElementById('set-legal-rcs').value = s.legal_rcs_city || '';
+    document.getElementById('set-legal-naf').value = s.legal_naf_code || '';
+    document.getElementById('set-legal-register').value = s.legal_register_number || '';
+    document.getElementById('set-vat-service').value = s.vat_rate_service || '';
+    document.getElementById('set-vat-extra').value = s.vat_rate_extra || '';
+    document.getElementById('set-vat-product').value = s.vat_rate_product || '';
   }).catch(function (e) { toast(e.message, true); });
 
   loadSalonSchedule();
   loadSalonClosures();
+  loadActivityLog(1);
+}
+
+function saveLegalInfo() {
+  var siret = document.getElementById('set-legal-siret').value.replace(/\s/g, '').trim();
+  if (siret && !/^\d{14}$/.test(siret)) { toast('Le SIRET doit comporter exactement 14 chiffres', true); return; }
+  api('/api/settings', { method: 'PUT', body: {
+    legal_address: document.getElementById('set-legal-address').value,
+    legal_phone: document.getElementById('set-legal-phone').value,
+    legal_email: document.getElementById('set-legal-email').value,
+    legal_website: document.getElementById('set-legal-website').value,
+    legal_siret: siret,
+    legal_vat_number: document.getElementById('set-legal-vat').value,
+    legal_form: document.getElementById('set-legal-form').value,
+    legal_share_capital: document.getElementById('set-legal-capital').value,
+    legal_rcs_city: document.getElementById('set-legal-rcs').value,
+    legal_naf_code: document.getElementById('set-legal-naf').value,
+    legal_register_number: document.getElementById('set-legal-register').value
+  }}).then(function () { toast('Informations légales enregistrées'); })
+    .catch(function (e) { toast(e.message, true); });
+}
+
+function saveVatRates() {
+  api('/api/settings', { method: 'PUT', body: {
+    vat_rate_service: document.getElementById('set-vat-service').value,
+    vat_rate_extra: document.getElementById('set-vat-extra').value,
+    vat_rate_product: document.getElementById('set-vat-product').value
+  }}).then(function () { toast('Taux de TVA enregistrés'); })
+    .catch(function (e) { toast(e.message, true); });
 }
 
 function toggleSettingsAccordion(key) {

@@ -16,7 +16,55 @@
   .panel.on { display: block; }
   .back { background: none; border: none; padding: 0; font-family: inherit; font-size: 15px;
           color: var(--accent); font-weight: 500; cursor: pointer; margin-bottom: 18px; }
+  .gift-cancel-btn {
+    display: inline-flex; align-items: center; gap: 7px; background: rgba(255,59,48,.12);
+    color: var(--red); border: none; border-radius: 10px; padding: 9px 16px 9px 12px;
+    font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; margin-bottom: 18px;
+  }
+  .gift-cancel-btn:active { background: rgba(255,59,48,.22); }
+
+  .modal-backdrop {
+    display: none; position: fixed; inset: 0; z-index: 100;
+    background: rgba(0,0,0,.45); align-items: center; justify-content: center; padding: 20px;
+  }
+  .modal-backdrop.on { display: flex; }
+  .modal-box {
+    background: var(--card); border-radius: 20px; padding: 24px; max-width: 380px; width: 100%;
+    box-shadow: 0 20px 60px rgba(0,0,0,.3);
+  }
   .eyebrow { font-size: 15px; font-weight: 600; color: var(--grey); margin-bottom: 14px; }
+
+  /* Encart cadeau sur la page RDV - même esprit "vraie carte" que la
+     carte cadeau du compte client (dégradé par défaut, ou photo perso
+     avec dégradé sombre superposé pour garder le texte lisible). */
+  .gift-summary-box {
+    position: relative; overflow: hidden; border-radius: 18px; padding: 16px 18px; margin-bottom: 20px;
+    background: linear-gradient(135deg, #7c3aed, #db2777); color: #fff;
+  }
+  .gift-summary-box.has-bg { background-size: cover; background-position: center; }
+  .gift-summary-box.has-bg::before {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(135deg, rgba(0,0,0,.55), rgba(0,0,0,.25));
+  }
+  .gift-summary-box > * { position: relative; z-index: 1; }
+  .gift-summary-tag {
+    display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 700;
+    letter-spacing: .04em; text-transform: uppercase; color: rgba(255,255,255,.85); margin-bottom: 12px;
+  }
+  .gift-summary-barber { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .gift-summary-avatar {
+    width: 46px; height: 46px; border-radius: 50%; flex-shrink: 0; box-sizing: border-box;
+    display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 17px;
+    background-size: cover; background-position: center; border: 2px solid rgba(255,255,255,.5);
+  }
+  .gift-summary-label { font-size: 12px; color: rgba(255,255,255,.75); margin-bottom: 1px; }
+  .gift-summary-name { font-size: 16px; font-weight: 700; }
+  .gift-summary-items { display: flex; flex-wrap: wrap; gap: 8px; }
+  .gift-summary-chip {
+    display: flex; align-items: center; gap: 6px; background: rgba(255,255,255,.18); border-radius: 999px;
+    padding: 6px 13px; font-size: 13px; font-weight: 500;
+  }
+  .gift-summary-chip .chip-qty { font-weight: 700; }
 
   .svc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px,1fr)); gap: 10px; margin-bottom: 22px; }
   .svc-card {
@@ -67,10 +115,35 @@
 </head>
 <body>
 
+<div class="modal-backdrop" id="gift-cancel-modal-backdrop" onclick="if(event.target===this)closeGiftCancelModal()">
+  <div class="modal-box">
+    <div style="width:48px;height:48px;border-radius:50%;background:rgba(255,59,48,.12);display:flex;align-items:center;justify-content:center;margin-bottom:14px">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="var(--red)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-4.5-4.2-7-7.7-7-11a7 7 0 0 1 14 0c0 3.3-2.5 6.8-7 11Z"/><path d="M9.5 10.5l2 2 3-3.5"/></svg>
+    </div>
+    <h2 style="margin-bottom:10px">Annuler l'utilisation du cadeau ?</h2>
+    <p style="color:var(--grey);font-size:14.5px;margin-bottom:20px">Le cadeau reste intact et pourra être utilisé plus tard - vous recommencerez juste cette réservation depuis le début.</p>
+    <button class="go" style="background:var(--red)" onclick="confirmCancelGiftBooking()">Oui, annuler cette réservation</button>
+    <button class="go" style="background:var(--fill);color:var(--ink);margin-top:10px" onclick="closeGiftCancelModal()">Non, continuer</button>
+  </div>
+</div>
+
+
 <div class="wrap">
   <div class="rdv-header">
     <div class="mark" id="salon-mark">LE SALON</div>
     <h1>Prendre rendez-vous</h1>
+  </div>
+
+  <div class="gift-summary-box" id="gift-summary-box" style="display:none">
+    <div class="gift-summary-tag">🎁 Carte cadeau</div>
+    <div class="gift-summary-barber" id="gift-summary-barber-row">
+      <span class="gift-summary-avatar" id="gift-summary-avatar"></span>
+      <div>
+        <div class="gift-summary-label">Rendez-vous avec</div>
+        <div class="gift-summary-name" id="gift-summary-name"></div>
+      </div>
+    </div>
+    <div class="gift-summary-items" id="gift-summary-items"></div>
   </div>
 
   <section class="panel on" id="p-barber">
@@ -103,7 +176,11 @@
   </section>
 
   <section class="panel" id="p-datetime">
-    <button class="back" onclick="show('p-extras')">‹ Retour</button>
+    <button class="back" id="datetime-back-btn" onclick="show('p-extras')">‹ Retour</button>
+    <button class="gift-cancel-btn" id="datetime-cancel-btn" style="display:none" onclick="cancelGiftBooking()">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      Annuler l'utilisation du cadeau
+    </button>
     <div class="fld"><label for="rdv-date">Date</label><input id="rdv-date" type="date" onchange="loadSlots()"></div>
     <div class="eyebrow" style="margin-top:20px">Créneaux disponibles</div>
     <div id="half-toggle" class="half-toggle" style="display:none;margin-bottom:14px">
@@ -178,7 +255,31 @@ function api(path, opts) {
 function show(id) {
   document.querySelectorAll('.panel').forEach(function (p) { p.classList.remove('on'); });
   document.getElementById(id).classList.add('on');
+  renderGiftSummaryBox();
+  // Un cadeau fixe déjà la prestation et les suppléments - revenir en
+  // arrière depuis l'étape date/heure ne doit surtout pas permettre de
+  // rouvrir l'étape suppléments et d'en ajouter un en plus du cadeau.
+  // On isole donc le client : plus de retour possible, seulement un
+  // abandon explicite (double confirmation) qui repart de zéro.
+  document.getElementById('datetime-back-btn').style.display = activeGift ? 'none' : 'block';
+  document.getElementById('datetime-cancel-btn').style.display = activeGift ? 'inline-flex' : 'none';
   window.scrollTo(0, 0);
+}
+
+/**
+ * Abandonne l'utilisation du cadeau en cours (double confirmation :
+ * clic sur le bouton, puis validation de la boîte de dialogue) et
+ * repart entièrement de zéro, comme un nouveau client qui arrive.
+ */
+function cancelGiftBooking() {
+  document.getElementById('gift-cancel-modal-backdrop').classList.add('on');
+}
+function closeGiftCancelModal() {
+  document.getElementById('gift-cancel-modal-backdrop').classList.remove('on');
+}
+function confirmCancelGiftBooking() {
+  closeGiftCancelModal();
+  startNewBooking();
 }
 
 function iconForItem(name) {
@@ -193,11 +294,13 @@ function iconForItem(name) {
   if (n.indexOf('huile') !== -1 || n.indexOf('soin') !== -1) return '💧';
   if (n.indexOf('cire') !== -1 || n.indexOf('gel') !== -1) return '🧴';
   if (n.indexOf('zéro') !== -1 || n.indexOf('zero') !== -1) return '🪒';
+  if (n.indexOf('parfum') !== -1) return '🌸';
   if (n.indexOf('coupe') !== -1) return '✂️';
   return '✂️';
 }
 
 var services = [], extras = [], barbers = [];
+var giftCardImageUrl = '';
 var selBarber = null, selService = null, selExtras = [], selDate = null, selSlot = null;
 var activeGift = null;
 
@@ -214,6 +317,7 @@ function loadCatalog() {
     barbers = r[2].items.filter(function (b) { return b.accepts_appointments && hasBookableSchedule(b); });
     var salonName = r[3].salon_name;
     CURRENCY = r[3].currency || 'EUR';
+    giftCardImageUrl = r[3].gift_card_image_url || '';
     applyAccentColor(r[3].accent_color);
     document.title = 'Rendez-vous — ' + salonName;
     document.getElementById('salon-mark').textContent = salonName.toUpperCase();
@@ -253,7 +357,7 @@ function renderBarberGrid() {
 function selectBarber(el, id) {
   selBarber = id;
   document.querySelectorAll('#barber-grid .svc-card').forEach(function (c) { c.classList.remove('sel'); });
-  el.classList.add('sel');
+  if (el) el.classList.add('sel');
 
   if (activeGift) {
     // Prestation et suppléments déjà déterminés par le cadeau -
@@ -266,6 +370,50 @@ function selectBarber(el, id) {
     return;
   }
   show('p-service');
+}
+
+/**
+ * Rappelle, sur l'étape date/heure, le coiffeur retenu et le contenu du
+ * cadeau en cours d'utilisation - sans ça le client ne voit plus du
+ * tout ce qui a été offert une fois passé cet écran.
+ */
+function renderGiftSummaryBox() {
+  var box = document.getElementById('gift-summary-box');
+  if (!activeGift) { box.style.display = 'none'; return; }
+
+  if (giftCardImageUrl) {
+    box.classList.add('has-bg');
+    box.style.backgroundImage = 'url(\'' + giftCardImageUrl + '\')';
+  } else {
+    box.classList.remove('has-bg');
+    box.style.backgroundImage = '';
+  }
+
+  var barber = activeGift.designated_barber || barbers.find(function (b) { return b.id === selBarber; });
+  var barberRow = document.getElementById('gift-summary-barber-row');
+  if (barber) {
+    var avatarEl = document.getElementById('gift-summary-avatar');
+    if (barber.photo_url) {
+      avatarEl.setAttribute('style', 'background-image:url(\'' + barber.photo_url + '\')');
+      avatarEl.textContent = '';
+    } else {
+      avatarEl.setAttribute('style', 'background:' + stableColorForId(barber.id));
+      avatarEl.textContent = (barber.name || '?').trim().charAt(0).toUpperCase();
+    }
+    document.getElementById('gift-summary-name').textContent = barber.name;
+    barberRow.style.display = 'flex';
+  } else {
+    barberRow.style.display = 'none';
+  }
+
+  document.getElementById('gift-summary-items').innerHTML = activeGift.items.map(function (it) {
+    // Seuls les produits ont une quantité qui a du sens à afficher (on
+    // peut offrir 3 flacons de parfum) - une prestation ne se répète
+    // pas comme ça, "1x Coupe et barbe" n'apporte rien et alourdit.
+    var qty = (it.item_type === 'product' && it.quantity > 0) ? '<span class="chip-qty">' + it.quantity + '×</span> ' : '';
+    return '<span class="gift-summary-chip">' + qty + esc(it.item_name) + '</span>';
+  }).join('');
+  box.style.display = 'block';
 }
 
 /* ---------- Utiliser un cadeau ---------- */
@@ -283,6 +431,10 @@ function lookupGiftCode() {
 
   api('/api/sales/gift-cards/lookup?code=' + encodeURIComponent(code)).then(function (r) {
     var g = r.gift;
+    if (g.walk_in_only) {
+      errEl.textContent = 'Ce cadeau est utilisable uniquement en salon, sans rendez-vous — présentez-vous directement avec ce code.';
+      return;
+    }
     var serviceItem = g.items.find(function (it) { return it.item_type === 'service'; });
     if (!serviceItem || !serviceItem.item_id) {
       errEl.textContent = "Ce cadeau ne comprend pas de prestation réservable en ligne — présentez-vous directement au salon.";
@@ -293,6 +445,15 @@ function lookupGiftCode() {
     activeGift = g;
     selService = serviceItem.item_id;
     selExtras = extraItems.map(function (it) { return it.item_id; });
+
+    // Le coiffeur désigné (celui dont la bulle était sélectionnée à la
+    // vente en caisse) permet de sauter entièrement l'étape "choisissez
+    // le coiffeur" - le client passe directement au choix de la date,
+    // le cadeau étant déjà lié au bon coiffeur depuis l'achat.
+    if (g.designated_barber) {
+      selectBarber(null, g.designated_barber.id);
+      return;
+    }
 
     document.querySelectorAll('#barber-grid .svc-card').forEach(function (c) { c.classList.remove('sel'); });
     document.getElementById('barber-eyebrow').textContent = 'Cadeau de ' + g.recipient_name + ' — choisissez le coiffeur';
@@ -442,13 +603,13 @@ function submitAppointment() {
       client_name: name, email: email, phone: phone || null,
       service_id: selService, extras: selExtras,
       barber_id: selSlot.barberId, date: selDate, time: selSlot.time,
+      gift_id: activeGift ? activeGift.id : null,
       base_url: window.location.origin + window.location.pathname + (SALON_SLUG ? '?salon=' + SALON_SLUG : '')
     }
   }).then(function () {
     var s = services.find(function (x) { return x.id === selService; });
     var when = new Date(selDate + 'T' + selSlot.time).toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' }) + ' à ' + selSlot.time;
     document.getElementById('confirm-details').textContent = when + ' — ' + s.name + (activeGift ? ' (cadeau utilisé — présentez ce cadeau à votre coiffeur)' : '');
-    activeGift = null;
     show('p-confirmed');
   }).catch(function (e) {
     toast(e.message, true);

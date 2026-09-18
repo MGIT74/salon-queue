@@ -4,6 +4,7 @@ const { pool, getSettings } = require('../db');
 const { activeBarberCount } = require('../lib/queueMath');
 const requireAdmin = require('../middleware/auth');
 const { loginRateLimiter } = require('../middleware/rateLimiter');
+const { logActivity } = require('../lib/activityLog');
 
 const router = express.Router();
 
@@ -131,6 +132,7 @@ router.post('/', requireAdmin, wrap(async (req, res) => {
     throw err;
   }
   const [[item]] = await pool.query('SELECT * FROM barbers WHERE id = ?', [id]);
+  logActivity(req.salon.id, 'barber_create', 'Coiffeur "' + name + '" ajouté');
   res.json({ ok: true, item: stripSecrets(item) });
 }));
 
@@ -175,6 +177,10 @@ router.put('/:id', requireAdmin, wrap(async (req, res) => {
   }
   if (!sets.length) return res.json({ ok: true });
   params.push(req.params.id, req.salon.id);
+
+  const [[before]] = await pool.query('SELECT name FROM barbers WHERE id = ? AND salon_id = ?', [req.params.id, req.salon.id]);
+  const label = 'Coiffeur "' + (req.body.name || (before ? before.name : req.params.id)) + '"';
+
   try {
     await pool.query(`UPDATE barbers SET ${sets.join(', ')} WHERE id = ? AND salon_id = ?`, params);
   } catch (err) {
@@ -183,11 +189,18 @@ router.put('/:id', requireAdmin, wrap(async (req, res) => {
     }
     throw err;
   }
+  if (req.body.active !== undefined) {
+    logActivity(req.salon.id, req.body.active ? 'barber_restore' : 'barber_archive', label + (req.body.active ? ' réactivé' : ' archivé'));
+  } else {
+    logActivity(req.salon.id, 'barber_edit', label + ' modifié');
+  }
   res.json({ ok: true });
 }));
 
 router.delete('/:id', requireAdmin, wrap(async (req, res) => {
+  const [[before]] = await pool.query('SELECT name FROM barbers WHERE id = ? AND salon_id = ?', [req.params.id, req.salon.id]);
   await pool.query('UPDATE barbers SET active = 0 WHERE id = ? AND salon_id = ?', [req.params.id, req.salon.id]);
+  logActivity(req.salon.id, 'barber_archive', 'Coiffeur "' + (before ? before.name : req.params.id) + '" archivé');
   res.json({ ok: true, archived: true });
 }));
 
@@ -287,9 +300,24 @@ router.get('/:id/stats', requireAdmin, wrap(async (req, res) => {
     [req.params.id, req.salon.id, startSql, endSql]
   );
 
+  // Produits vendus attribués à CE coiffeur (vendeur de la ligne, ou à
+  // défaut le coiffeur de toute la vente) - séparé du CA prestations
+  // car non lié au temps passé, ne doit jamais fausser le calcul de
+  // revenu potentiel par minute libre ci-dessous.
+  const [[productRow]] = await pool.query(
+    `SELECT COUNT(*) AS product_count, COALESCE(SUM(si.unit_price_cents * si.quantity), 0) AS product_revenue_cents
+     FROM sale_items si JOIN sales s ON s.id = si.sale_id
+     WHERE s.salon_id = ? AND si.item_type = 'product'
+       AND COALESCE(si.barber_id, s.barber_id) = ?
+       AND s.created_at >= ? AND s.created_at < ?`,
+    [req.salon.id, req.params.id, startSql, endSql]
+  );
+
   const doneCount = Number(row.done_count);
   const revenueCents = Number(row.revenue_cents);
   const bookedMinutes = Number(row.booked_minutes);
+  const productCount = Number(productRow.product_count);
+  const productRevenueCents = Number(productRow.product_revenue_cents);
 
   // Calcul des créneaux disponibles/libres : nécessite les dates
   // locales de salon en jours calendaires précis (start_date/end_date,
@@ -361,7 +389,14 @@ router.get('/:id/stats', requireAdmin, wrap(async (req, res) => {
   }
 
   res.json(Object.assign(
-    { ok: true, done_count: doneCount, revenue_cents: revenueCents, booked_minutes: bookedMinutes },
+    {
+      ok: true, done_count: doneCount,
+      revenue_cents: revenueCents + productRevenueCents,
+      service_revenue_cents: revenueCents,
+      product_count: productCount,
+      product_revenue_cents: productRevenueCents,
+      booked_minutes: bookedMinutes
+    },
     availability ? { availability: availability } : {}
   ));
 }));

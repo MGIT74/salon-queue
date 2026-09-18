@@ -4,7 +4,9 @@
   "description": "File d'attente temps reel pour salon de coiffure",
   "main": "server.js",
   "engines": {
+   
     "node": ">=18"
+ 
   },
   "scripts": {
     "start": "node server.js",
@@ -18,8 +20,8 @@
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "mysql2": "^3.11.0",
-    "node-cron": "^3.0.3",
-    "nodemailer": "^6.9.14"
+    "node-cron": "^4.6.0",
+    "nodemailer": "^10.0.10"
   },
   "devDependencies": {
     "cypress": "^16.1.0"

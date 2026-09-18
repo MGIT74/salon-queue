@@ -39,6 +39,107 @@
   .card { background: var(--fill); border-radius: 18px; padding: 18px; margin-bottom: 16px; }
   .card .big { font-size: 28px; font-weight: 700; letter-spacing: -.02em; }
   .card .lbl { font-size: 13px; color: var(--grey); margin-top: 2px; }
+
+  /* Carte fidélité en mise en page "vraie carte" : logo à gauche,
+     points à droite (comme une carte de fidélité/membre physique). */
+  #loyalty-section .card { position: relative; overflow: hidden; }
+  #loyalty-section .card-top-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+  #loyalty-section .card-logo {
+    width: 44px; height: 44px; border-radius: 12px; background: var(--card); flex-shrink: 0;
+    background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center;
+  }
+  #loyalty-section .card-points-block { text-align: right; }
+  /* Même taille de texte et même espacement que la carte cadeau
+     (.gift-card .big / .lbl ci-dessous), pour que les deux cartes
+     paraissent de la même famille visuelle malgré des couleurs différentes. */
+  #loyalty-section .card { margin-bottom: 12px; }
+  #loyalty-section .card .big { font-size: 24px; }
+  #loyalty-section .card .lbl { font-size: 12.5px; }
+
+  /* Léger effet d'éclat qui balaie la carte une fois au chargement -
+     purement décoratif, s'arrête de lui-même (animation non bouclée). */
+  .card-shine {
+    position: absolute; top: 0; left: -60%; width: 40%; height: 100%;
+    background: linear-gradient(75deg, transparent, rgba(255,255,255,.35), transparent);
+    transform: skewX(-20deg); pointer-events: none; z-index: 2;
+  }
+  .card-shine.play { animation: card-shine-sweep 1.8s ease-in-out .3s 1; }
+  @keyframes card-shine-sweep {
+    0% { left: -60%; }
+    100% { left: 130%; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .card-shine { display: none; }
+  }
+
+  /* Carte fidélité avec image de fond personnalisée (Réglages > Marketing)
+     - dégradé sombre superposé pour garder le texte blanc lisible peu
+     importe les couleurs de la photo choisie. */
+  #loyalty-section .card.has-bg {
+    position: relative; background-size: cover; background-position: center;
+    color: #fff; overflow: hidden;
+  }
+  #loyalty-section .card.has-bg::before {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(135deg, rgba(0,0,0,.6), rgba(0,0,0,.25));
+  }
+  #loyalty-section .card.has-bg > * { position: relative; z-index: 1; }
+  #loyalty-section .card.has-bg .lbl { color: rgba(255,255,255,.85); }
+  #loyalty-section .card.has-bg .card-logo { background-color: rgba(255,255,255,.15); }
+
+  /* Cartes cadeaux (compte client) - même esprit "vraie carte" que la
+     fidélité (logo à gauche, montant à droite, effet d'éclat), mais
+     dégradé propre pour bien les distinguer visuellement. */
+  .gift-card {
+    position: relative; overflow: hidden; border-radius: 18px; padding: 18px; margin-bottom: 12px;
+    background: linear-gradient(135deg, #7c3aed, #db2777); color: #fff;
+  }
+  .gift-card .card-top-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+  .gift-card .card-logo {
+    width: 44px; height: 44px; border-radius: 12px; background: rgba(255,255,255,.18); flex-shrink: 0;
+    background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center;
+  }
+  .gift-card .card-points-block { text-align: right; }
+  .gift-card .big { font-size: 24px; font-weight: 700; letter-spacing: -.02em; }
+  .gift-card .lbl { font-size: 12.5px; color: rgba(255,255,255,.85); margin-top: 2px; }
+  .gift-card .gift-code {
+    margin-top: 14px; font-family: 'Courier New', monospace; font-size: 15px; font-weight: 700;
+    letter-spacing: .12em; background: rgba(255,255,255,.15); border-radius: 8px; padding: 8px 12px;
+    text-align: center; color: rgba(255,255,255,.85);
+  }
+  .gift-card .gift-use-btn {
+    display: block; width: 100%; margin-top: 10px; background: #fff; color: #7c3aed; border: none;
+    border-radius: 10px; padding: 11px; font-family: inherit; font-size: 14.5px; font-weight: 700; cursor: pointer;
+  }
+  .gift-card .gift-use-btn:active { transform: scale(.98); }
+  .gift-card .gift-walkin-note {
+    display: flex; align-items: center; justify-content: center; gap: 8px; text-align: center;
+    margin-top: 10px; background: rgba(255,255,255,.15); color: #fff;
+    border-radius: 10px; padding: 11px; font-size: 13px; font-weight: 600; line-height: 1.35;
+  }
+  .gift-card .gift-walkin-note svg { flex-shrink: 0; }
+  .gift-card.used {
+    background: var(--fill); color: var(--grey); filter: grayscale(1); opacity: .7;
+  }
+  .gift-card.used .lbl, .gift-card.used .gift-code { color: var(--grey); }
+  .gift-card.used .card-logo { background: var(--card); }
+  .gift-card .used-badge { font-size: 11.5px; margin-top: 8px; text-align: center; }
+  .gift-items { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
+  .gift-item-chip {
+    font-size: 11.5px; font-weight: 600; background: rgba(255,255,255,.18);
+    border-radius: 999px; padding: 4px 10px;
+  }
+  .gift-card.used .gift-item-chip { background: var(--card); }
+
+  /* Carte cadeau avec image de fond personnalisée (Réglages > Marketing)
+     - dégradé sombre superposé par-dessus la photo, même principe que la
+     carte de fidélité, pour garder le texte blanc toujours lisible. */
+  .gift-card.has-bg { background-size: cover; background-position: center; }
+  .gift-card.has-bg::before {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(135deg, rgba(0,0,0,.55), rgba(0,0,0,.25));
+  }
+  .gift-card.has-bg > * { position: relative; z-index: 1; }
   .gift-badge { display: inline-block; margin-top: 10px; background: var(--orange, #f97316);
                 color: #fff; font-size: 13px; font-weight: 600; padding: 5px 12px; border-radius: 999px; }
 
@@ -53,9 +154,13 @@
   .client-footer {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
     display: none; justify-content: space-around; align-items: center;
-    background: var(--card, #fff); box-shadow: 0 -6px 20px rgba(0,0,0,.1);
+    background: rgba(255,255,255,.75); backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border-top: 0.5px solid rgba(255,255,255,.4);
+    box-shadow: 0 -6px 20px rgba(0,0,0,.1);
     border-radius: 20px 20px 0 0; padding: 10px 8px calc(10px + env(safe-area-inset-bottom, 0px));
   }
+  [data-theme="dark"] .client-footer { background: rgba(28,28,30,.6); border-top-color: rgba(255,255,255,.08); }
   .client-footer.on { display: flex; }
   .client-footer.on ~ .toast, body:has(.client-footer.on) .toast { bottom: 100px; }
   .client-footer button {
@@ -66,6 +171,24 @@
   .client-footer button .ic { display: block; }
   .client-footer button.on { color: var(--blue); font-weight: 600; }
   body.has-footer .wrap { padding-bottom: 90px; }
+
+  /* Barre du bas remplacée par un simple bouton Annuler pendant les
+     étapes créneau/confirmation d'une réservation par cadeau - le
+     client doit être isolé de toute navigation (Accueil, Réserver,
+     Compte...) qui casserait le parcours en cours. */
+  .client-footer-gift-lock {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 50; display: none;
+    background: rgba(255,255,255,.75); backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border-top: 0.5px solid rgba(255,255,255,.4);
+    box-shadow: 0 -6px 20px rgba(0,0,0,.1);
+    border-radius: 20px 20px 0 0; padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+  [data-theme="dark"] .client-footer-gift-lock { background: rgba(28,28,30,.6); border-top-color: rgba(255,255,255,.08); }
+  .client-footer-gift-lock button {
+    display: block; width: 100%; background: none; border: none; font-family: inherit;
+    font-size: 15px; font-weight: 600; color: var(--red); cursor: pointer; padding: 8px;
+  }
 
   .modal-backdrop {
     display: none; position: fixed; inset: 0; z-index: 100;
@@ -114,6 +237,44 @@
 
   .back { background: none; border: none; padding: 0; font-family: inherit; font-size: 15px;
           color: var(--accent); font-weight: 500; cursor: pointer; margin-bottom: 18px; }
+  .gift-cancel-btn {
+    display: inline-flex; align-items: center; gap: 7px; background: rgba(255,59,48,.12);
+    color: var(--red); border: none; border-radius: 10px; padding: 9px 16px 9px 12px;
+    font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; margin-bottom: 18px;
+  }
+  .gift-cancel-btn:active { background: rgba(255,59,48,.22); }
+
+  /* Encart cadeau lors d'une réservation via un code (même esprit "vraie
+     carte" que la carte cadeau du compte - fond perso + dégradé sombre
+     superposé pour garder le texte lisible). */
+  .gift-summary-box {
+    position: relative; overflow: hidden; border-radius: 18px; padding: 16px 18px; margin-bottom: 20px;
+    background: linear-gradient(135deg, #7c3aed, #db2777); color: #fff;
+  }
+  .gift-summary-box.has-bg { background-size: cover; background-position: center; }
+  .gift-summary-box.has-bg::before {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(135deg, rgba(0,0,0,.55), rgba(0,0,0,.25));
+  }
+  .gift-summary-box > * { position: relative; z-index: 1; }
+  .gift-summary-tag {
+    display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 700;
+    letter-spacing: .04em; text-transform: uppercase; color: rgba(255,255,255,.85); margin-bottom: 12px;
+  }
+  .gift-summary-barber { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .gift-summary-avatar {
+    width: 46px; height: 46px; border-radius: 50%; flex-shrink: 0; box-sizing: border-box;
+    display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 17px;
+    background-size: cover; background-position: center; border: 2px solid rgba(255,255,255,.5);
+  }
+  .gift-summary-label { font-size: 12px; color: rgba(255,255,255,.75); margin-bottom: 1px; }
+  .gift-summary-name { font-size: 16px; font-weight: 700; }
+  .gift-summary-items { display: flex; flex-wrap: wrap; gap: 8px; }
+  .gift-summary-chip {
+    display: flex; align-items: center; gap: 6px; background: rgba(255,255,255,.18); border-radius: 999px;
+    padding: 6px 13px; font-size: 13px; font-weight: 500;
+  }
+  .gift-summary-chip .chip-qty { font-weight: 700; }
   .confirm-box { text-align: center; padding: 20px 0; }
   .confirm-box .check {
     width: 56px; height: 56px; border-radius: 50%; background: var(--green); margin: 0 auto 18px;
@@ -189,13 +350,24 @@
     <div id="loyalty-section">
       <div class="eyebrow">Fidélité</div>
       <div class="card">
-        <div class="big" id="loyalty-points">0</div>
-        <div class="lbl">points de fidélité</div>
+        <div class="card-shine"></div>
+        <div class="card-top-row">
+          <div class="card-logo" id="loyalty-card-logo"></div>
+          <div class="card-points-block">
+            <div class="big" id="loyalty-points">0</div>
+            <div class="lbl">points de fidélité</div>
+          </div>
+        </div>
         <div id="loyalty-gift"></div>
       </div>
     </div>
     <div id="loyalty-inactive-msg" class="msg" style="display:none">
       Votre carte de fidélité n'est pas encore activée — demandez à votre coiffeur de l'activer lors de votre prochain passage.
+    </div>
+
+    <div id="gift-cards-section" style="display:none">
+      <div class="eyebrow">Mes cadeaux</div>
+      <div id="gift-cards-list"></div>
     </div>
 
     <div class="eyebrow" id="upcoming-eyebrow" style="display:none">Vos prochains rendez-vous</div>
@@ -223,6 +395,17 @@
     <div class="msg" id="password-msg"></div>
   </section>
   <!-- Réservation intégrée -->
+  <div class="gift-summary-box" id="gift-summary-box" style="display:none">
+    <div class="gift-summary-tag">🎁 Carte cadeau</div>
+    <div class="gift-summary-barber" id="gift-summary-barber-row">
+      <span class="gift-summary-avatar" id="gift-summary-avatar"></span>
+      <div>
+        <div class="gift-summary-label">Rendez-vous avec</div>
+        <div class="gift-summary-name" id="gift-summary-name"></div>
+      </div>
+    </div>
+    <div class="gift-summary-items" id="gift-summary-items"></div>
+  </div>
   <section class="panel" id="p-book-barber">
     <div class="eyebrow" id="bk-barber-eyebrow">Choisissez votre coiffeur</div>
     <div class="svc-grid" id="bk-barber-grid"></div>
@@ -253,7 +436,11 @@
   </section>
 
   <section class="panel" id="p-book-datetime">
-    <button class="back" onclick="show('p-book-extras')">‹ Retour</button>
+    <button class="back" id="bk-datetime-back-btn" onclick="show('p-book-extras')">‹ Retour</button>
+    <button class="gift-cancel-btn" id="bk-datetime-cancel-btn" style="display:none" onclick="cancelBookGift()">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      Annuler l'utilisation du cadeau
+    </button>
     <div class="fld"><label for="bk-date">Date</label><input id="bk-date" type="date" onchange="loadBookSlots()"></div>
     <div class="eyebrow" style="margin-top:20px">Créneaux disponibles</div>
     <div id="bk-half-toggle" class="half-toggle" style="display:none;margin-bottom:14px">
@@ -300,6 +487,10 @@
   </button>
 </div>
 
+<div class="client-footer-gift-lock" id="client-footer-gift-lock">
+  <button onclick="cancelBookGift()">Annuler l'utilisation du cadeau</button>
+</div>
+
 <div class="modal-backdrop" id="cancel-modal-backdrop" onclick="if(event.target===this)closeCancelModal()">
   <div class="modal-box">
     <h2 style="margin-bottom:10px">Annuler ce rendez-vous ?</h2>
@@ -307,6 +498,19 @@
     <button class="go" style="background:var(--red)" id="cancel-modal-confirm-btn" onclick="confirmCancelUpcoming()">Oui, annuler mon rendez-vous</button>
     <button class="go" style="background:var(--fill);color:var(--ink);margin-top:10px" onclick="closeCancelModal()">Non, garder mon rendez-vous</button>
   </div>
+</div>
+
+<div class="modal-backdrop" id="gift-cancel-modal-backdrop" onclick="if(event.target===this)closeGiftCancelModal()">
+  <div class="modal-box">
+    <div style="width:48px;height:48px;border-radius:50%;background:rgba(255,59,48,.12);display:flex;align-items:center;justify-content:center;margin-bottom:14px">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="var(--red)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-4.5-4.2-7-7.7-7-11a7 7 0 0 1 14 0c0 3.3-2.5 6.8-7 11Z"/><path d="M9.5 10.5l2 2 3-3.5"/></svg>
+    </div>
+    <h2 style="margin-bottom:10px">Annuler l'utilisation du cadeau ?</h2>
+    <p style="color:var(--grey);font-size:14.5px;margin-bottom:20px">Le cadeau reste intact et pourra être utilisé plus tard - vous recommencerez juste cette réservation depuis le début.</p>
+    <button class="go" style="background:var(--red)" onclick="confirmCancelBookGift()">Oui, annuler cette réservation</button>
+    <button class="go" style="background:var(--fill);color:var(--ink);margin-top:10px" onclick="closeGiftCancelModal()">Non, continuer</button>
+  </div>
+
 </div>
 
 <script src="/app.js?v=5"></script>
@@ -343,6 +547,38 @@ function show(id) {
   document.querySelectorAll('.panel').forEach(function (p) { p.classList.remove('on'); });
   document.getElementById(id).classList.add('on');
   window.scrollTo(0, 0);
+  renderGiftSummaryBox();
+  var backBtn = document.getElementById('bk-datetime-back-btn');
+  var cancelBtn = document.getElementById('bk-datetime-cancel-btn');
+  if (backBtn && cancelBtn) {
+    backBtn.style.display = activeBookGift ? 'none' : 'block';
+    cancelBtn.style.display = activeBookGift ? 'inline-flex' : 'none';
+  }
+
+  // Une fois le cadeau engagé jusqu'au choix du créneau (ou la
+  // confirmation), le client ne doit plus pouvoir se balader vers
+  // Accueil/Réserver/Compte via la barre du bas - ça casserait le
+  // parcours en cours (cf. l'encart resté coincé signalé plus tôt). La
+  // barre normale est remplacée par un simple bouton Annuler, seule
+  // sortie possible tant que ce n'est pas fini.
+  var giftLocked = activeBookGift && ['p-book-datetime', 'p-book-confirm'].indexOf(id) !== -1;
+  document.getElementById('client-footer-gift-lock').style.display = giftLocked ? 'block' : 'none';
+  document.getElementById('client-footer').style.display = giftLocked ? 'none' : '';
+  if (giftLocked) document.body.classList.add('has-footer');
+
+  // L'effet d'éclat des cartes (fidélité + cadeaux) est une animation CSS
+  // - elle ne se déclenche jamais si l'élément est révélé APRÈS avoir été
+  // construit dans un panneau display:none (cas de tous les panneaux
+  // ici), donc on la (re)joue explicitement en JS à chaque fois que ce
+  // panneau devient réellement visible, plutôt que de compter sur le
+  // chargement de page.
+  if (id === 'p-home') {
+    document.querySelectorAll('.card-shine').forEach(function (shine) {
+      shine.classList.remove('play');
+      void shine.offsetWidth; // force le navigateur à "oublier" l'animation précédente
+      shine.classList.add('play');
+    });
+  }
 }
 
 function showFooter(activeId) {
@@ -539,6 +775,75 @@ function populateHome(d) {
   }
 
   renderVisitCard(d.upcoming_appointments || [], d.recent_visits || []);
+  renderGiftCards(d.gift_cards || []);
+}
+
+/**
+ * Affiche chaque carte cadeau reçue par le client, façon "carte de
+ * portefeuille" (logo du salon, montant, code) - même esprit que la
+ * carte de fidélité, dégradé distinct pour ne pas les confondre. Les
+ * cadeaux déjà utilisés restent visibles mais grisés, en dessous.
+ */
+function renderGiftCards(giftCards) {
+  var section = document.getElementById('gift-cards-section');
+  // Une carte déjà utilisée n'a plus d'utilité dans le compte du client -
+  // inutile de l'y laisser traîner, grisée, indéfiniment.
+  var sorted = giftCards.filter(function (g) { return !g.used; });
+  if (!sorted.length) { section.style.display = 'none'; return; }
+  section.style.display = 'block';
+
+  document.getElementById('gift-cards-list').innerHTML = sorted.map(function (g) {
+    var itemsHtml = (g.items && g.items.length)
+      ? '<div class="gift-items">' + g.items.map(function (it) {
+          var qty = (it.type === 'product' && it.quantity > 1) ? it.quantity + ' × ' : '';
+          return '<span class="gift-item-chip">' + qty + esc(it.name) + '</span>';
+        }).join('') + '</div>'
+      : '';
+    return '<div class="gift-card">' +
+      '<div class="card-shine"></div>' +
+      '<div class="card-top-row">' +
+        '<div class="card-logo" id="gift-card-logo-' + g.id + '">🎁</div>' +
+        '<div class="card-points-block">' +
+          '<div class="big">' + eur(g.amount_cents) + '</div>' +
+          '<div class="lbl">carte cadeau</div>' +
+        '</div>' +
+      '</div>' +
+      itemsHtml +
+      '<div class="gift-code">' + esc(g.code || '—') + '</div>' +
+      (g.pending
+        ? '<div class="gift-walkin-note"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>Un rendez-vous est déjà en attente avec ce cadeau</div>'
+        : '<button class="gift-use-btn" onclick="useGiftFromAccount(this, \'' + esc(g.code) + '\')">Utiliser ce cadeau</button>') +
+    '</div>';
+  }).join('');
+
+  // Logo du salon + image de fond personnalisée, si déjà connus (sinon
+  // appliqués plus tard dès que /api/settings/public répond - voir
+  // applyGiftCardDesign, appelée dans les deux sens pour ne pas dépendre
+  // de l'ordre d'arrivée des deux appels réseau).
+  applyGiftCardDesign();
+}
+var currentSalonLogoForCards = '';
+var currentGiftCardImageForCards = '';
+
+/**
+ * Applique le logo du salon et l'image de fond personnalisée (Réglages >
+ * Marketing) à toutes les cartes cadeaux NON utilisées déjà affichées -
+ * appelée aussi bien après le rendu de la liste (renderGiftCards) qu'après
+ * le chargement des réglages, quel que soit l'ordre d'arrivée des deux
+ * appels réseau concernés.
+ */
+function applyGiftCardDesign() {
+  document.querySelectorAll('.gift-card:not(.used)').forEach(function (card) {
+    if (currentGiftCardImageForCards) {
+      card.classList.add('has-bg');
+      card.style.backgroundImage = 'url("' + currentGiftCardImageForCards + '")';
+    }
+    var logo = card.querySelector('.card-logo');
+    if (logo && currentSalonLogoForCards) {
+      logo.style.backgroundImage = 'url("' + currentSalonLogoForCards + '")';
+      logo.textContent = '';
+    }
+  });
 }
 
 function loadProfile() {
@@ -583,6 +888,7 @@ function iconForItem(name) {
   if (n.indexOf('huile') !== -1 || n.indexOf('soin') !== -1) return '💧';
   if (n.indexOf('cire') !== -1 || n.indexOf('gel') !== -1) return '🧴';
   if (n.indexOf('zéro') !== -1 || n.indexOf('zero') !== -1) return '🪒';
+  if (n.indexOf('parfum') !== -1) return '🌸';
   if (n.indexOf('coupe') !== -1) return '✂️';
   return '✂️';
 }
@@ -647,7 +953,7 @@ function renderBookBarberGrid() {
 function selectBookBarber(el, id) {
   selBookBarber = id;
   document.querySelectorAll('#bk-barber-grid .svc-card').forEach(function (c) { c.classList.remove('sel'); });
-  el.classList.add('sel');
+  if (el) el.classList.add('sel');
 
   if (activeBookGift) {
     // Prestation et suppléments déjà déterminés par le cadeau - seuls
@@ -663,6 +969,41 @@ function selectBookBarber(el, id) {
 }
 
 /* ---------- Utiliser un cadeau (réservation) ---------- */
+/**
+ * Depuis le bouton "Utiliser ce cadeau" d'une carte du compte : plus
+ * besoin de copier/coller le code, on l'a déjà. Vérifie d'abord si ce
+ * cadeau est lié à un coiffeur "sans rendez-vous" (auquel cas il ne
+ * peut pas être réservé en ligne - le bouton se transforme alors en
+ * simple message, sans jamais quitter la page). Sinon, charge le
+ * catalogue si besoin (goBook) puis relance directement la même
+ * recherche que la saisie manuelle - le client atterrit directement sur
+ * le choix du coiffeur/créneau.
+ */
+function useGiftFromAccount(btn, code) {
+  btn.disabled = true;
+  btn.textContent = 'Vérification…';
+
+  apiForBooking('/api/sales/gift-cards/lookup?code=' + encodeURIComponent(code)).then(function (r) {
+    if (r.gift.walk_in_only) {
+      var note = document.createElement('div');
+      note.className = 'gift-walkin-note';
+      note.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-4.5-4.2-7-7.7-7-11a7 7 0 0 1 14 0c0 3.3-2.5 6.8-7 11Z"/><circle cx="12" cy="10" r="2.5"/></svg>' +
+        'Utilisable uniquement en salon, sans rendez-vous';
+      btn.replaceWith(note);
+      return;
+    }
+    goBook(function () {
+      document.getElementById('bk-gift-code-input').value = code;
+      document.getElementById('bk-gift-code-error').textContent = '';
+      lookupBookGiftCode();
+    });
+  }).catch(function (e) {
+    btn.disabled = false;
+    btn.textContent = 'Utiliser ce cadeau';
+    toast(e.message, true);
+  });
+}
+
 function openBookGiftCodeScreen() {
   document.getElementById('bk-gift-code-input').value = '';
   document.getElementById('bk-gift-code-error').textContent = '';
@@ -677,6 +1018,10 @@ function lookupBookGiftCode() {
 
   apiForBooking('/api/sales/gift-cards/lookup?code=' + encodeURIComponent(code)).then(function (r) {
     var g = r.gift;
+    if (g.walk_in_only) {
+      errEl.textContent = 'Ce cadeau est utilisable uniquement en salon, sans rendez-vous — présentez-vous directement avec ce code.';
+      return;
+    }
     var serviceItem = g.items.find(function (it) { return it.item_type === 'service'; });
     if (!serviceItem || !serviceItem.item_id) {
       errEl.textContent = "Ce cadeau ne comprend pas de prestation réservable en ligne — présentez-vous directement au salon.";
@@ -688,12 +1033,95 @@ function lookupBookGiftCode() {
     selBookService = serviceItem.item_id;
     selBookExtras = extraItems.map(function (it) { return it.item_id; });
 
+    // Le coiffeur désigné (celui dont la bulle était sélectionnée à la
+    // vente en caisse) permet de sauter entièrement l'étape "choisissez
+    // le coiffeur" - directement au choix du créneau, comme sur la page
+    // de réservation publique (rdv.html).
+    if (g.designated_barber) {
+      selectBookBarber(null, g.designated_barber.id);
+      return;
+    }
+
     document.querySelectorAll('#bk-barber-grid .svc-card').forEach(function (c) { c.classList.remove('sel'); });
     document.getElementById('bk-barber-eyebrow').textContent = 'Cadeau de ' + g.recipient_name + ' — choisissez le coiffeur';
     show('p-book-barber');
   }).catch(function (err) {
     errEl.textContent = err.message;
   });
+}
+
+/**
+ * Rappelle, tout au long de la réservation, le coiffeur retenu et le
+ * contenu du cadeau en cours d'utilisation - reprend le même fond
+ * personnalisé (Réglages > Marketing) que la carte cadeau du compte.
+ */
+var BOOKING_PANELS = ['p-book-barber', 'p-book-gift-code', 'p-book-service', 'p-book-extras', 'p-book-datetime', 'p-book-confirm', 'p-book-confirmed'];
+
+function renderGiftSummaryBox() {
+  var box = document.getElementById('gift-summary-box');
+  if (!box) return;
+  var currentPanel = document.querySelector('.panel.on');
+  var inBookingFlow = currentPanel && BOOKING_PANELS.indexOf(currentPanel.id) !== -1;
+  // Le cadeau reste actif en mémoire tant que la réservation n'est ni
+  // finalisée ni annulée - mais si le client quitte vers Accueil/Compte
+  // via la barre du bas sans faire ni l'un ni l'autre, cet encart (situé
+  // hors des panneaux pour rester visible tout au long de la
+  // réservation) ne doit surtout pas continuer à traîner ailleurs dans
+  // l'app.
+  if (!activeBookGift || !inBookingFlow) { box.style.display = 'none'; return; }
+
+  if (currentGiftCardImageForCards) {
+    box.classList.add('has-bg');
+    box.style.backgroundImage = 'url(\'' + currentGiftCardImageForCards + '\')';
+  } else {
+    box.classList.remove('has-bg');
+    box.style.backgroundImage = '';
+  }
+
+  var barber = activeBookGift.designated_barber || bookBarbers.find(function (b) { return b.id === selBookBarber; });
+  var barberRow = document.getElementById('gift-summary-barber-row');
+  if (barber) {
+    var avatarEl = document.getElementById('gift-summary-avatar');
+    if (barber.photo_url) {
+      avatarEl.setAttribute('style', 'background-image:url(\'' + barber.photo_url + '\')');
+      avatarEl.textContent = '';
+    } else {
+      avatarEl.setAttribute('style', 'background:' + stableColorForId(barber.id));
+      avatarEl.textContent = (barber.name || '?').trim().charAt(0).toUpperCase();
+    }
+    document.getElementById('gift-summary-name').textContent = barber.name;
+    barberRow.style.display = 'flex';
+  } else {
+    barberRow.style.display = 'none';
+  }
+
+  document.getElementById('gift-summary-items').innerHTML = activeBookGift.items.map(function (it) {
+    // Seuls les produits ont une quantité qui a du sens à afficher.
+    var qty = (it.item_type === 'product' && it.quantity > 0) ? '<span class="chip-qty">' + it.quantity + '×</span> ' : '';
+    return '<span class="gift-summary-chip">' + qty + esc(it.item_name) + '</span>';
+  }).join('');
+  box.style.display = 'block';
+}
+
+/**
+ * Abandonne l'utilisation du cadeau en cours (double confirmation) et
+ * repart de la toute première étape - un cadeau fixe déjà la
+ * prestation et les suppléments, revenir en arrière depuis l'étape
+ * date/heure ne doit surtout pas permettre d'en rajouter un.
+ */
+function cancelBookGift() {
+  document.getElementById('gift-cancel-modal-backdrop').classList.add('on');
+}
+function closeGiftCancelModal() {
+  document.getElementById('gift-cancel-modal-backdrop').classList.remove('on');
+}
+function confirmCancelBookGift() {
+  closeGiftCancelModal();
+  selBookBarber = null; selBookService = null; selBookExtras = []; selBookDate = null; selBookSlot = null; activeBookGift = null;
+  document.getElementById('bk-barber-eyebrow').textContent = 'Choisissez votre coiffeur';
+  document.getElementById('bk-date').value = '';
+  document.querySelectorAll('#bk-barber-grid .svc-card').forEach(function (c) { c.classList.remove('sel'); });
+  show('p-book-barber');
 }
 
 function renderBookServiceGrid() {
@@ -817,6 +1245,7 @@ function submitBookAppointment() {
         client_name: me.profile.name, email: me.profile.email, phone: me.profile.phone || null,
         service_id: selBookService, extras: selBookExtras, client_note: note || null,
         barber_id: selBookSlot.barberId, date: selBookDate, time: selBookSlot.time,
+        gift_id: activeBookGift ? activeBookGift.id : null,
         base_url: window.location.origin + '/rdv.html' + (bookSalonSlug ? '?salon=' + bookSalonSlug : '')
       }
     });
@@ -824,11 +1253,11 @@ function submitBookAppointment() {
     var s = bookServices.find(function (x) { return x.id === selBookService; });
     var when = new Date(selBookDate + 'T' + selBookSlot.time).toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' }) + ' à ' + selBookSlot.time;
     document.getElementById('bk-confirm-details').textContent = when + ' — ' + s.name + (activeBookGift ? ' (cadeau utilisé — présentez-le à votre coiffeur)' : '');
+    show('p-book-confirmed');
     selBookBarber = null; selBookService = null; selBookExtras = []; selBookDate = null; selBookSlot = null; activeBookGift = null;
     document.getElementById('bk-barber-eyebrow').textContent = 'Choisissez votre coiffeur';
     document.getElementById('bk-date').value = '';
     document.getElementById('bk-note').value = '';
-    show('p-book-confirmed');
     hideFooter();
   }).catch(function (e) {
     toast(e.message, true);
@@ -887,6 +1316,24 @@ function esc(s) {
         if (d.salon_name) document.getElementById('salon-mark').textContent = d.salon_name.toUpperCase();
         CURRENCY = d.currency || 'EUR';
         applyAccentColor(d.accent_color);
+        var loyaltyCard = document.querySelector('#loyalty-section .card');
+        if (loyaltyCard && d.loyalty_card_image_url) {
+          loyaltyCard.classList.add('has-bg');
+          loyaltyCard.style.backgroundImage = 'url("' + d.loyalty_card_image_url + '")';
+        }
+        var loyaltyLogo = document.getElementById('loyalty-card-logo');
+        if (loyaltyLogo && d.logo_url) {
+          loyaltyLogo.style.backgroundImage = 'url("' + d.logo_url + '")';
+        }
+        // Les cartes cadeaux (rendues séparément via /me, qui peut
+        // répondre avant ou après ce fetch-ci) réutilisent le même logo -
+        // on le mémorise, et on rafraîchit celles déjà affichées le cas
+        // échéant plutôt que de dépendre de l'ordre d'arrivée des deux appels.
+        currentSalonLogoForCards = d.logo_url || '';
+        currentGiftCardImageForCards = d.gift_card_image_url || '';
+        if (currentSalonLogoForCards || currentGiftCardImageForCards) {
+          applyGiftCardDesign();
+        }
       })
       .catch(function () {});
   }

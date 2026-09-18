@@ -42,19 +42,253 @@
   .topbar h1 { font-size: 22px; font-weight: 600; letter-spacing: -.03em; margin: 0; }
   .logout-btn { background: none; border: none; color: var(--grey); font-family: inherit; font-size: 14px; cursor: pointer; padding: 6px 0; }
 
+  /* --- Barre de bulles coiffeurs (sélection sans PIN) --- */
+  .barber-bubbles { display: flex; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; }
+  .barber-bubble {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    border: none; background: none; cursor: pointer; font-family: inherit; padding: 2px;
+  }
+  .barber-bubble .avatar {
+    width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    color: #fff; font-weight: 700; font-size: 16px; border: 3px solid transparent; box-sizing: border-box;
+    background-size: cover; background-position: center;
+  }
+  .barber-bubble.on .avatar {
+    border-color: var(--card);
+    box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--accent, var(--blue)), 0 0 14px 3px var(--accent, var(--blue));
+    transform: scale(1.08);
+    transition: transform .15s ease, box-shadow .15s ease;
+  }
+
+  /* --- Footer Timer / Agenda / Caisse (repris de "Mon poste") --- */
+  .caisse-footer {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
+    display: flex; justify-content: space-around; align-items: center;
+    background: rgba(255,255,255,.75); backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border-top: 0.5px solid rgba(255,255,255,.4);
+    box-shadow: 0 -6px 20px rgba(0,0,0,.1);
+    border-radius: 20px 20px 0 0; padding: 10px 8px calc(10px + env(safe-area-inset-bottom, 0px));
+  }
+  [data-theme="dark"] .caisse-footer { background: rgba(28,28,30,.6); border-top-color: rgba(255,255,255,.08); }
+  .caisse-footer button {
+    background: none; border: none; font-family: inherit; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    font-size: 11.5px; color: var(--grey); padding: 4px 18px; flex: 1;
+    transition: color .2s ease, transform .1s ease;
+  }
+  .caisse-footer button .ic { display: block; }
+  .caisse-footer button.on { color: var(--blue); font-weight: 600; }
+  .caisse-footer button:active { transform: scale(.92); }
+  body.has-caisse-footer #app-screen { padding-bottom: 84px; }
+  body.has-caisse-footer .toast { bottom: 100px; }
+  .caisse-tab-panel { display: none; position: relative; }
+  .caisse-tab-panel.on { display: block; animation: tab-fade-in .25s ease; }
+  @keyframes tab-fade-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .caisse-tab-panel.on, .item-btn, .ticket-line { animation: none; }
+  }
+  .tab-lock-overlay {
+    display: flex; position: absolute; inset: 0; z-index: 60; background: var(--bg);
+    flex-direction: column; align-items: center; justify-content: center; text-align: center;
+    padding: 40px 24px; gap: 12px;
+    opacity: 0; visibility: hidden; pointer-events: none; transition: opacity .25s ease, visibility 0s linear .25s;
+  }
+  .caisse-tab-panel.locked .tab-lock-overlay {
+    opacity: 1; visibility: visible; pointer-events: auto; transition: opacity .25s ease;
+  }
+  .tab-lock-overlay .ic { color: var(--grey); opacity: .6; }
+  .tab-lock-overlay .msg { font-size: 15px; font-weight: 600; max-width: 280px; }
+  .tab-lock-overlay .sub { font-size: 13px; color: var(--grey); max-width: 280px; }
+
+  /* --- Onglet Timer (repris de "Mon poste") --- */
+  .active-card {
+    background: var(--card); border-radius: 20px; padding: 26px 22px; text-align: center;
+    box-shadow: var(--shadow); margin-bottom: 22px;
+  }
+  .active-card .name { font-size: 22px; font-weight: 600; letter-spacing: -.02em; margin-bottom: 6px; }
+  .chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-bottom: 20px; }
+  .chip { font-size: 12.5px; font-weight: 500; padding: 5px 11px; border-radius: 999px; background: var(--fill); color: var(--ink); }
+  .chip.main { background: var(--blue-soft); color: var(--blue); font-weight: 600; }
+  .big-timer { font-size: 48px; font-weight: 600; letter-spacing: -.05em; font-variant-numeric: tabular-nums; color: var(--green); line-height: 1; margin-bottom: 4px; }
+  .big-timer.over { color: var(--red); }
+  .timer-sub { font-size: 13px; color: var(--grey); margin-bottom: 20px; }
+  .timer-sub.over { color: var(--red); font-weight: 500; }
+  .active-card .btn { width: 100%; margin-bottom: 8px; padding: 14px; font-size: 15px; }
+
+  #extras-picker { text-align: left; background: var(--fill); border-radius: 14px; padding: 14px; margin-bottom: 12px; }
+  .extra-opt { display: flex; align-items: center; gap: 10px; padding: 8px 2px; font-size: 14.5px; cursor: pointer; }
+  .extra-opt input { width: 18px; height: 18px; }
+  .extra-price { margin-left: auto; color: var(--grey); font-size: 13px; }
+  #extras-picker .btn { margin-top: 6px; }
+
+  .note-block { text-align: left; margin-bottom: 14px; }
+  .note-block label { display: block; font-size: 13px; font-weight: 600; color: var(--grey); margin-bottom: 6px; }
+  .note-block textarea {
+    width: 100%; padding: 12px 14px; border: none; border-radius: 12px; background: var(--fill);
+    color: var(--ink); font-family: inherit; font-size: 14.5px; resize: vertical; margin-bottom: 8px;
+  }
+
+  .section-label { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--grey); margin: 0 0 12px 2px; }
+  .next-item { margin-bottom: 10px; }
+  .next-card {
+    background: var(--card); border-radius: 16px; padding: 18px;
+    box-shadow: var(--shadow); display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;
+  }
+  .next-card.locked { opacity: .7; }
+  .next-card.prep-alert {
+    opacity: 1; box-shadow: 0 0 0 2px var(--orange, #f97316);
+    animation: prep-pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes prep-pulse {
+    0%, 100% { box-shadow: 0 0 0 2px var(--orange, #f97316); }
+    50% { box-shadow: 0 0 0 4px var(--orange, #f97316); }
+  }
+  .next-info { cursor: pointer; flex: 1; min-width: 140px; }
+  .next-info .name { font-size: 16px; font-weight: 600; letter-spacing: -.02em; }
+  .next-info .meta { font-size: 13px; color: var(--grey); margin-top: 2px; }
+  .next-btns { display: flex; gap: 8px; flex-shrink: 0; }
+  .next-card .btn { flex-shrink: 0; padding: 11px 16px; font-size: 13.5px; }
+  .btn-outline-red {
+    background: none; border: 1.5px solid var(--red); color: var(--red);
+    border-radius: 999px; font-family: inherit; font-weight: 600; cursor: pointer;
+  }
+
+  .next-detail {
+    background: var(--fill); border-radius: 16px; padding: 16px 18px; margin-top: 8px;
+    text-align: left;
+  }
+  .detail-row { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--sep); }
+  .detail-row:last-of-type { border-bottom: none; margin-bottom: 10px; }
+  .detail-label { font-size: 13px; color: var(--grey); }
+  .detail-value { font-size: 13.5px; font-weight: 500; text-align: right; word-break: break-word; }
+  .next-detail label { display: block; font-size: 12.5px; font-weight: 600; color: var(--grey); margin-bottom: 6px; }
+  .next-detail textarea {
+    width: 100%; padding: 11px 13px; border: none; border-radius: 10px; background: var(--card);
+    color: var(--ink); font-family: inherit; font-size: 14px; resize: vertical; margin-bottom: 8px;
+  }
+  .lock-note { font-size: 12px; color: var(--orange); margin-top: 4px; }
+  .lock-note.prep-alert-note { font-weight: 700; }
+
+  /* --- Onglet Agenda : calendrier (repris de "Mon poste") --- */
+  .cal-nav { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+  .cal-nav-row1 { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .cal-nav-row1 .cal-month-label { flex: 1; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cal-nav-row2 { display: flex; justify-content: center; }
+  .cal-month-label { font-size: 16px; font-weight: 600; letter-spacing: -.02em; text-transform: capitalize; }
+  .cal-view-switch { display: flex; background: var(--fill); border-radius: 10px; padding: 3px; gap: 2px; }
+  .cal-view-switch button {
+    border: none; background: none; color: var(--grey); font-family: inherit; font-size: 13px; font-weight: 600;
+    padding: 7px 14px; border-radius: 8px; cursor: pointer;
+  }
+  .cal-view-switch button.on { background: var(--blue); color: #fff; }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  .cal-week-row { margin-bottom: 4px; }
+  .cal-expand-panel { background: var(--fill); border-radius: 14px; padding: 16px 18px; margin: 6px 0 10px; }
+  .cal-expand-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; font-size: 14.5px; text-transform: capitalize; }
+  .cal-weekday { text-align: center; font-size: 12px; color: var(--grey); font-weight: 600; padding: 6px 0 10px; }
+  .cal-day {
+    min-height: 56px; border-radius: 10px; background: var(--fill); cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+    padding: 6px 2px;
+  }
+  .cal-day.empty { background: none; cursor: default; }
+  .cal-day.today { box-shadow: inset 0 0 0 2px var(--blue); }
+  .cal-day.selected { background: var(--blue); }
+  .cal-day.selected .cal-day-num { color: #fff; }
+  .cal-day-num { font-size: 13px; font-weight: 600; }
+  .cal-dots { display: flex; gap: 2px; }
+  .cal-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--blue); }
+
+  /* --- Planning du jour (timeline), utilisée dans l'Agenda --- */
+  .timeline-scroll { overflow-x: auto; }
+  .timeline-inner { position: relative; }
+  .timeline-hours { position: relative; height: 18px; margin-bottom: 6px; }
+  .timeline-hours span { position: absolute; top: 0; font-size: 12px; color: var(--grey); white-space: nowrap; transform: translateX(-1px); }
+  .timeline-row { display: flex; align-items: center; min-height: 54px; border-top: 1px solid var(--sep); }
+  .timeline-row:first-child { border-top: none; }
+  .timeline-row-label { width: 22px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; padding-right: 0; }
+  .timeline-row-label .dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .timeline-row-track { position: relative; flex: 1; height: 40px; }
+  .timeline-block {
+    position: absolute; top: 3px; bottom: 3px; border-radius: 8px; padding: 4px 10px;
+    font-size: 12.5px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis; cursor: pointer; display: flex; align-items: center;
+  }
+  .timeline-now-line {
+    position: absolute; top: 0; bottom: 0; width: 2px; background: var(--accent, var(--blue));
+    z-index: 5; cursor: help;
+  }
+  .timeline-now-line::before {
+    content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+    border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 7px solid var(--accent, var(--blue));
+  }
+  .timeline-now-line::after {
+    content: ''; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+    border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 7px solid var(--accent, var(--blue));
+  }
+  .timeline-empty { padding: 20px 0; text-align: center; color: var(--grey); font-size: 14px; }
+  .timeline-row-track { cursor: pointer; }
+  .timeline-row-track:hover { background: var(--fill); border-radius: 8px; }
+  .timeline-minute-grid {
+    position: absolute; left: 22px; right: 0; top: 0; bottom: 0; pointer-events: none; z-index: 0;
+    background-image: linear-gradient(to right, var(--sep) 1px, transparent 1px);
+    background-repeat: repeat-x; background-position: left top;
+  }
+  .timeline-zoom-ctrl { display: flex; align-items: center; justify-content: flex-end; gap: 6px; margin-bottom: 8px; }
+  .timeline-zoom-ctrl-inner { display: flex; align-items: center; gap: 6px; background: var(--fill); border-radius: 999px; padding: 4px 6px; }
+  .timeline-zoom-ctrl button {
+    width: 22px; height: 22px; border-radius: 50%; border: none; background: var(--card); color: var(--ink);
+    font-size: 14px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    font-family: inherit; line-height: 1;
+  }
+  .timeline-zoom-ctrl span { font-size: 11px; color: var(--grey); min-width: 32px; text-align: center; }
+
+  /* --- Formulaire "Ajouter un RDV" (repris de "Mon poste") --- */
+  .aa-step-title { font-size: 15px; font-weight: 600; margin-bottom: 12px; }
+  .aa-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px,1fr)); gap: 8px; margin-bottom: 6px; }
+  .aa-card {
+    border: none; background: var(--fill); color: var(--ink); border-radius: 14px;
+    padding: 14px 10px; cursor: pointer; font-family: inherit; text-align: center;
+    font-size: 13.5px; font-weight: 600; transition: background .15s ease;
+  }
+  .aa-card .aa-meta { display: block; font-size: 11.5px; font-weight: 400; color: var(--grey); margin-top: 3px; }
+  .aa-card.sel { background: var(--blue); color: #fff; }
+  .aa-card.sel .aa-meta { color: rgba(255,255,255,.8); }
+  .aa-chips { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 6px; }
+  .aa-chip {
+    border: none; background: var(--fill); color: var(--ink); border-radius: 999px;
+    padding: 9px 13px; cursor: pointer; font-family: inherit; font-size: 12.5px; font-weight: 500;
+  }
+  .aa-chip .aa-meta { color: var(--grey); margin-left: 4px; }
+  .aa-chip.sel { background: var(--blue); color: #fff; }
+  .aa-chip.sel .aa-meta { color: rgba(255,255,255,.75); }
+  .aa-slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px,1fr)); gap: 7px; margin-bottom: 6px; }
+  .aa-slot { border: none; background: var(--fill); color: var(--ink); border-radius: 10px; padding: 10px 4px; cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 600; }
+  .aa-slot.sel { background: var(--blue); color: #fff; }
+  .aa-back { background: none; border: none; padding: 0; font-family: inherit; font-size: 13.5px; color: var(--blue); font-weight: 500; cursor: pointer; margin-bottom: 14px; }
+  .half-toggle { display: flex; background: var(--fill); border-radius: 10px; padding: 3px; gap: 2px; }
+  .half-toggle button {
+    flex: 1; border: none; background: none; color: var(--grey); font-family: inherit; font-size: 13px;
+    font-weight: 600; padding: 7px 14px; border-radius: 8px; cursor: pointer;
+  }
+  .half-toggle button.sel { background: var(--blue); color: #fff; }
+
   .caisse-layout {
     display: grid; gap: 18px; align-items: start;
     grid-template-columns: 1fr 340px;
-    grid-template-areas: "grid ticket" "pending ticket" ". drawer";
+    grid-template-areas: "grid ticket" "pending ticket";
   }
   .caisse-grid-col { grid-area: grid; }
   .ticket-panel { grid-area: ticket; }
   .pending-section { grid-area: pending; }
-  .drawer-section { grid-area: drawer; }
   @media (max-width: 860px) {
     .caisse-layout {
       grid-template-columns: 1fr;
-      grid-template-areas: "grid" "ticket" "pending" "drawer";
+      grid-template-areas: "grid" "ticket" "pending";
     }
   }
 
@@ -62,13 +296,20 @@
   .cat-tabs button {
     flex: 1 0 auto; border: none; background: none; color: var(--ink); font-family: inherit;
     font-size: 14px; font-weight: 500; padding: 10px 16px; border-radius: 999px; cursor: pointer; white-space: nowrap;
+    transition: background .2s ease, box-shadow .2s ease, transform .1s ease;
   }
   .cat-tabs button.on { background: var(--card); font-weight: 600; box-shadow: var(--shadow); }
+  .cat-tabs button:active { transform: scale(.95); }
 
   .item-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
   .item-btn {
     background: var(--card); border: none; border-radius: 14px; padding: 16px 14px; box-shadow: var(--shadow);
     cursor: pointer; text-align: left; font-family: inherit; color: var(--ink); transition: transform .1s ease;
+    animation: item-fade-in .2s ease;
+  }
+  @keyframes item-fade-in {
+    from { opacity: 0; transform: scale(.94); }
+    to { opacity: 1; transform: scale(1); }
   }
   .item-btn:active { transform: scale(.96); }
   .item-btn .name { font-size: 14.5px; font-weight: 600; margin-bottom: 4px; }
@@ -90,6 +331,11 @@
   .ticket-panel h3 { font-size: 15px; margin: 0 0 12px; }
   .ticket-lines { flex: 1; overflow-y: auto; margin-bottom: 14px; min-height: 60px; }
   .ticket-line { display: flex; align-items: center; gap: 8px; padding: 9px 0; border-bottom: 1px solid var(--sep); }
+  .ticket-line.enter { animation: line-in .2s ease; }
+  @keyframes line-in {
+    from { opacity: 0; transform: translateX(-8px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
   .ticket-line:last-child { border-bottom: none; }
   .ticket-line .name { flex: 1; min-width: 0; font-size: 13.5px; }
   .ticket-line .qty-ctrl { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
@@ -99,6 +345,65 @@
   }
   .ticket-line .qty-val { font-size: 13px; min-width: 14px; text-align: center; }
   .ticket-line .line-price { font-size: 13.5px; font-weight: 600; flex-shrink: 0; min-width: 52px; text-align: right; }
+  .line-seller-avatar {
+    width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; background-size: cover; background-position: center;
+    border: none; padding: 0; cursor: pointer; font-family: inherit; flex-shrink: 0;
+  }
+  .line-seller-options { display: flex; flex-wrap: wrap; gap: 14px; justify-content: center; padding: 4px 0; }
+  .line-seller-opt {
+    display: flex; flex-direction: column; align-items: center; gap: 6px; width: 76px;
+    background: none; border: none; cursor: pointer; font-family: inherit; padding: 4px;
+  }
+  .line-seller-opt .dot {
+    width: 52px; height: 52px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 18px; font-weight: 700; color: #fff; background-size: cover; background-position: center;
+    border: 3px solid transparent; box-sizing: border-box;
+  }
+  .line-seller-opt .lbl { font-size: 12px; color: var(--ink); text-align: center; max-width: 76px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .line-seller-opt.sel .dot { border-color: var(--blue); box-shadow: 0 0 0 2px var(--card), 0 0 10px 2px var(--blue); }
+  .line-seller-opt.sel .lbl { font-weight: 700; }
+  .line-seller-opt.unassigned .dot { background: var(--fill); border: 1.5px dashed var(--grey); color: var(--grey); font-size: 22px; }
+
+  .history-btn {
+    background: var(--fill); border: none; width: 34px; height: 34px; border-radius: 50%;
+    color: var(--ink); cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+
+  /* --- Tiroir "Historique de caisse" (repris du tiroir client du dashboard) --- */
+  .history-drawer-backdrop {
+    display: flex; position: fixed; inset: 0; z-index: 300; background: rgba(0,0,0,0.4);
+    opacity: 0; pointer-events: none; transition: opacity .3s ease;
+  }
+  .history-drawer-backdrop.on { opacity: 1; pointer-events: auto; }
+  .history-drawer {
+    position: fixed; top: 0; right: 0; bottom: 0; width: min(420px, 92vw);
+    background: var(--card); box-shadow: -10px 0 40px rgba(0,0,0,0.3);
+    transform: translateX(100%); transition: transform .38s cubic-bezier(.32,.72,0,1);
+    z-index: 301; overflow-y: auto; padding: 24px;
+  }
+  .history-drawer-backdrop.on .history-drawer { transform: translateX(0); }
+  .history-drawer-head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 16px; }
+  .history-drawer-head h2 { font-size: 20px; margin: 0; letter-spacing: -.02em; }
+  .history-drawer .x { background: var(--fill); border: none; width: 32px; height: 32px; border-radius: 50%; color: var(--grey); font-size: 15px; cursor: pointer; flex-shrink: 0; }
+  .history-bubbles { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
+  .history-bubble {
+    display: flex; flex-direction: column; align-items: center; gap: 3px; border: none; background: none;
+    cursor: pointer; font-family: inherit; padding: 2px; width: 46px;
+  }
+  .history-bubble .avatar {
+    width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    color: #fff; font-weight: 700; font-size: 12px; background-size: cover; background-position: center;
+    border: 2px solid transparent; box-sizing: border-box;
+  }
+  .history-bubble.on .avatar { border-color: var(--card); box-shadow: 0 0 0 2px var(--blue), 0 0 8px 2px var(--blue); }
+  .history-bubble .lbl { font-size: 9.5px; color: var(--grey); max-width: 46px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .history-sale-card { background: var(--fill); border-radius: 14px; padding: 14px; margin-bottom: 10px; }
+  .history-sale-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+  .history-sale-head .amount { font-size: 16px; font-weight: 700; }
+  .history-sale-when { font-size: 12.5px; color: var(--grey); margin-bottom: 8px; }
+  .history-sale-items { font-size: 13px; color: var(--ink); margin-bottom: 10px; line-height: 1.5; }
+  .history-sale-items .li-barber { color: var(--grey); font-size: 11.5px; }
   .ticket-total { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-top: 2px solid var(--sep); margin-bottom: 14px; }
   .ticket-total .label { font-size: 14px; color: var(--grey); }
   .ticket-total .amount { font-size: 24px; font-weight: 600; letter-spacing: -.02em; }
@@ -122,16 +427,16 @@
 
   .drawer-btn {
     display: flex; align-items: center; justify-content: center; gap: 10px;
-    width: 100%; background: var(--card); border: none; border-radius: 18px;
-    padding: 18px; box-shadow: var(--shadow); color: var(--ink); font-family: inherit;
-    font-size: 14.5px; font-weight: 600; cursor: pointer;
+    width: 100%; background: var(--fill); border: none; border-radius: 12px;
+    padding: 12px; margin-top: 10px; color: var(--ink); font-family: inherit;
+    font-size: 13.5px; font-weight: 600; cursor: pointer;
   }
   .drawer-btn:active { transform: scale(.97); }
   .drawer-btn svg { flex-shrink: 0; opacity: .8; }
 
   .empty { background: var(--card); border-radius: 16px; padding: 30px 20px; text-align: center; color: var(--grey); font-size: 14px; box-shadow: var(--shadow); }
 
-  .pending-list { margin-bottom: 18px; }
+  .pending-list { margin-bottom: 18px; max-height: 340px; overflow-y: auto; padding-right: 10px; }
   .pending-card {
     display: flex; align-items: center; justify-content: space-between; gap: 12px;
     background: var(--card); border-radius: 14px; padding: 14px 16px; margin-bottom: 8px;
@@ -158,6 +463,11 @@
   .receipt-box .sub { text-align: center; font-size: 12px; color: #666; margin-bottom: 16px; }
   .receipt-box .rline { display: flex; justify-content: space-between; font-size: 13px; padding: 3px 0; }
   .receipt-box .rtotal { border-top: 1px dashed #999; margin-top: 8px; padding-top: 8px; font-weight: 700; font-size: 14px; }
+  .receipt-box .rsep { border-top: 1px dashed #999; margin: 6px 0; }
+  .receipt-box .rlegal-line { font-size: 10.5px; color: #444; line-height: 1.5; }
+  .receipt-box .rvathead { font-weight: 700; font-size: 11px; }
+  .receipt-box .rline span { flex: 1; text-align: right; }
+  .receipt-box .rline span:first-child { text-align: left; }
   .receipt-actions { display: flex; gap: 8px; margin-top: 18px; }
   .receipt-actions .btn { flex: 1; }
 
@@ -230,6 +540,48 @@
       <button class="logout-btn" onclick="logout()">Déconnexion</button>
     </div>
 
+    <div class="barber-bubbles" id="barber-bubbles"></div>
+
+    <div class="caisse-tab-panel" id="panel-timer">
+      <div class="tab-lock-overlay">
+        <svg class="ic" viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+        <div class="msg">Veuillez sélectionner votre profil</div>
+        <div class="sub">Touchez votre bulle en haut de l'écran pour utiliser le Timer.</div>
+      </div>
+      <div id="active-zone"></div>
+      <div class="section-label">À suivre</div>
+      <div id="next-zone"></div>
+    </div>
+
+    <div class="caisse-tab-panel" id="panel-agenda">
+      <div class="cal-nav">
+        <div class="cal-nav-row1">
+          <button class="btn btn-soft" onclick="calShiftPeriod(-1)">‹</button>
+          <div class="cal-month-label" id="cal-month-label"></div>
+          <button class="btn btn-soft" onclick="calShiftPeriod(1)">›</button>
+        </div>
+        <div class="cal-nav-row2">
+          <div class="cal-view-switch">
+            <button id="cal-view-month" class="on" onclick="setCalView('month')">Mois</button>
+            <button id="cal-view-week" onclick="setCalView('week')">Semaine</button>
+            <button id="cal-view-day" onclick="setCalView('day')">Jour</button>
+          </div>
+        </div>
+      </div>
+      <div class="cal-grid" id="cal-weekdays">
+        <div class="cal-weekday">Lun</div><div class="cal-weekday">Mar</div><div class="cal-weekday">Mer</div>
+        <div class="cal-weekday">Jeu</div><div class="cal-weekday">Ven</div><div class="cal-weekday">Sam</div><div class="cal-weekday">Dim</div>
+      </div>
+      <div id="cal-days"></div>
+      <div id="cal-day-view" style="display:none"></div>
+    </div>
+
+    <div class="caisse-tab-panel on" id="panel-caisse">
+    <div class="tab-lock-overlay">
+      <svg class="ic" viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+      <div class="msg">Veuillez sélectionner votre profil</div>
+      <div class="sub">Touchez votre bulle en haut de l'écran pour utiliser la Caisse.</div>
+    </div>
     <div class="caisse-layout">
       <div class="caisse-grid-col">
         <div class="cat-tabs" id="cat-tabs">
@@ -246,7 +598,12 @@
       </div>
 
       <div class="ticket-panel">
-        <h3>Ticket en cours</h3>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0">
+          <h3 style="margin-bottom:0">Ticket en cours</h3>
+          <button class="history-btn" title="Historique de caisse" onclick="openCaisseHistory()">
+            <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>
+          </button>
+        </div>
         <div class="ticket-lines" id="ticket-lines"><div class="empty">Aucun article sélectionné</div></div>
         <div class="ticket-total"><span class="label">Total</span><span class="amount" id="ticket-total">0,00 €</span></div>
 
@@ -278,15 +635,39 @@
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
           Vider le ticket
         </button>
-      </div>
-
-      <div class="drawer-section">
         <button class="drawer-btn" onclick="openCashDrawer()">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M2 11h20M9 15h6"/></svg>
           Ouvrir la caisse
         </button>
       </div>
     </div>
+    </div>
+  </div>
+</div>
+
+<div class="caisse-footer" id="caisse-footer" style="display:none">
+  <button id="nav-agenda" onclick="switchCaisseTab('agenda')">
+    <svg class="ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5.5" width="16" height="15" rx="2.5"/><path d="M4 9.5h16"/><path d="M8 3.5v3.5M16 3.5v3.5"/></svg>
+    Agenda
+  </button>
+  <button id="nav-timer" onclick="switchCaisseTab('timer')">
+    <svg class="ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>
+    Timer
+  </button>
+  <button id="nav-caisse" class="on" onclick="switchCaisseTab('caisse')">
+    <svg class="ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2.5"/><path d="M2 10h20"/><path d="M6 15h4"/></svg>
+    Caisse
+  </button>
+</div>
+
+<div class="history-drawer-backdrop" id="history-drawer-backdrop" onclick="if(event.target===this) closeCaisseHistory()">
+  <div class="history-drawer">
+    <div class="history-drawer-head">
+      <h2>Historique de caisse</h2>
+      <button class="x" onclick="closeCaisseHistory()">✕</button>
+    </div>
+    <div class="history-bubbles" id="history-bubbles"></div>
+    <div id="history-list"></div>
   </div>
 </div>
 
@@ -311,9 +692,17 @@
 mountThemeButton();
 
 var me = null;
+// Coiffeur "actif" (bulle sélectionnée) - distinct de `me` (celui dont
+// le PIN a ouvert la session). Toutes les actions de caisse (vente,
+// encaissements en attente) s'appliquent à ce coiffeur-là, pas
+// forcément à `me`. Changer de bulle ne redemande jamais de PIN - la
+// sécurité vient du fait qu'un PIN valide a déjà ouvert la tablette.
+var activeBarberId = null;
+var allBarbers = [];
 var catalog = { services: [], extras: [], products: [] };
 var ticket = []; // { item_type, item_id, item_name, unit_price_cents, quantity }
 var ticketQueueId = null; // coupe d'origine si le ticket vient d'un encaissement en attente
+var ticketDrafts = {}; // { [barberId]: { ticket, ticketQueueId, loyaltyDiscount, loyaltyRewardsAvailable } } - brouillon du ticket en cours de chaque coiffeur, gardé le temps de la session tablette (en mémoire, pas côté serveur)
 var loyaltyRewardsAvailable = 0; // récompenses dispo pour le client du ticket en cours
 var loyaltyDiscount = null; // { index, originalPrice, type } si une réduction fidélité est appliquée
 var marketingSettings = { loyalty_service_discount_pct: 50, loyalty_product_discount_pct: 20 };
@@ -333,6 +722,9 @@ function loadSalonName() {
     .then(function (d) {
       var name = d.salon_name || 'Le Salon';
       CURRENCY = d.currency || 'EUR';
+      rdvPrepAlertMin = Number(d.rdv_prep_alert_min) || 0;
+      legalInfo = d.legal || {};
+      vatRates = d.vat_rates || { service: 20, extra: 20, product: 20 };
       applyAccentColor(d.accent_color);
       document.title = name + ' — Caisse';
       var mark = document.getElementById('salon-mark');
@@ -343,11 +735,19 @@ function loadSalonName() {
     .catch(function () {});
 }
 loadSalonName();
+var legalInfo = {};
+var vatRates = { service: 20, extra: 20, product: 20 };
 
 function barberApi(path, opts) {
   opts = opts || {};
   var headers = { 'Content-Type': 'application/json' };
   if (me) { headers['X-Barber-Id'] = me.id; headers['X-Barber-Pin'] = me.pin; }
+  // opts.actingAs permet de cibler un coiffeur précis pour CET appel
+  // seulement (ex: ajouter un RDV pour le coiffeur d'une ligne de la
+  // timeline, même si une autre bulle - ou aucune - est sélectionnée
+  // globalement), sans toucher à activeBarberId.
+  var actingAs = (opts.actingAs !== undefined) ? opts.actingAs : activeBarberId;
+  if (actingAs) headers['X-Acting-As-Barber-Id'] = actingAs;
   if (SALON_SLUG) headers['X-Salon-Slug'] = SALON_SLUG;
   return fetch(path, {
     method: opts.method || 'GET',
@@ -414,23 +814,29 @@ function attemptLogin() {
 
 function logout() {
   me = null;
+  activeBarberId = null;
+  allBarbers = [];
   try { sessionStorage.removeItem('caisse-session'); } catch (e) {}
   pinBuffer = '';
   clearTimeout(inactivityTimer);
   document.getElementById('app-screen').style.display = 'none';
+  document.getElementById('caisse-footer').style.display = 'none';
+  document.body.classList.remove('has-caisse-footer');
   document.getElementById('login-screen').style.display = 'block';
   renderPinDots();
 }
 
-// Deconnexion automatique apres 15s d'inactivite - utilise exactement
-// le meme mecanisme que le bouton "Deconnexion" (pas de mode "flou en
-// arriere-plan" : ca garantit qu'un autre coiffeur peut toujours se
-// reconnecter normalement juste apres, sans aucun etat residuel).
+// Déconnexion automatique par inactivité - DÉSACTIVÉE pour l'instant à la
+// demande du client (2026-09), le reste du mécanisme de caisse (heure de
+// réouverture après clôture, caisse_locked_until) n'est pas concerné et
+// continue de fonctionner normalement. Remettre AUTO_LOGOUT_ENABLED à
+// true pour la réactiver sans avoir à toucher au reste du code.
+var AUTO_LOGOUT_ENABLED = false;
 var inactivityTimer = null;
 var INACTIVITY_LIMIT_MS = 15000;
 
 function resetInactivityTimer() {
-  if (!me) return;
+  if (!AUTO_LOGOUT_ENABLED || !me) return;
   clearTimeout(inactivityTimer);
   inactivityTimer = setTimeout(logout, INACTIVITY_LIMIT_MS);
 }
@@ -444,7 +850,13 @@ var pendingPaymentsInterval = null;
 function showApp() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app-screen').style.display = 'block';
+  document.getElementById('caisse-footer').style.display = 'flex';
+  document.body.classList.add('has-caisse-footer');
   document.getElementById('my-name').textContent = me.name;
+  activeBarberId = me.id;
+  updateTabLockState();
+  loadTicketDraft(activeBarberId);
+  loadBarberBubbles();
   loadCatalog();
   loadPendingPayments();
   loadMarketingSettings();
@@ -452,6 +864,1041 @@ function showApp() {
   clearInterval(pendingPaymentsInterval);
   pendingPaymentsInterval = setInterval(loadPendingPayments, 5000);
   resetInactivityTimer();
+}
+
+var CAISSE_TABS = ['timer', 'agenda', 'caisse'];
+
+function switchCaisseTab(tab) {
+  if (CAISSE_TABS.indexOf(tab) === -1) tab = 'caisse';
+  CAISSE_TABS.forEach(function (t) {
+    document.getElementById('panel-' + t).classList.toggle('on', t === tab);
+    document.getElementById('nav-' + t).classList.toggle('on', t === tab);
+  });
+  updateTabLockState();
+  if (tab === 'timer') startTimerAutoRefresh(); else stopTimerAutoRefresh();
+  if (tab === 'agenda') {
+    startAgendaAutoRefresh();
+    if (!calBooted) {
+      calBooted = true;
+      // Les horaires du salon peuvent arriver après le premier rendu
+      // (deux appels réseau distincts) - on relance un rendu une fois
+      // connus, pour ne jamais laisser l'ancien calcul "8h minimum"
+      // s'afficher même brièvement.
+      loadSalonScheduleForTimeline().then(function () {
+        if (calViewMode === 'day') renderCalDay();
+        else if (calViewMode === 'month') renderCalMonth();
+        else renderCalWeek();
+      });
+      loadAgendaPeriod();
+    }
+  } else {
+    stopAgendaAutoRefresh();
+  }
+}
+
+/**
+ * Bulles de tous les coiffeurs actifs, toujours affichées - cliquer sur
+ * une bulle change juste `activeBarberId` (aucun appel réseau, aucun
+ * PIN), puis recharge ce qui dépend du coiffeur actif (encaissements en
+ * attente pour l'instant ; Timer/Agenda s'y ajouteront).
+ */
+function loadBarberBubbles() {
+  var headers = {};
+  if (SALON_SLUG) headers['X-Salon-Slug'] = SALON_SLUG;
+  fetch('/api/barbers', { headers: headers })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      allBarbers = d.items || [];
+      renderBarberBubbles();
+    })
+    .catch(function () {});
+}
+
+function renderBarberBubbles() {
+  var box = document.getElementById('barber-bubbles');
+  box.innerHTML = allBarbers.map(function (b) {
+    var color = b.color || stableColorForId(b.id);
+    var initial = (b.name || '?').trim().charAt(0).toUpperCase();
+    var avatarStyle = b.photo_url
+      ? 'background-image:url(\'' + b.photo_url + '\')'
+      : 'background:' + color;
+    return '<button class="barber-bubble' + (b.id === activeBarberId ? ' on' : '') + '" onclick="selectActiveBarber(\'' + b.id + '\')" title="' + esc(b.name) + '">' +
+      '<span class="avatar" style="' + avatarStyle + '">' + (b.photo_url ? '' : esc(initial)) + '</span>' +
+      '</button>';
+  }).join('');
+  updateActiveBarberLabel();
+}
+
+function updateActiveBarberLabel() {
+  var el = document.getElementById('my-name');
+  if (!el) return;
+  if (!activeBarberId) { el.textContent = 'Tous'; return; }
+  var b = allBarbers.find(function (x) { return x.id === activeBarberId; });
+  el.textContent = b ? b.name : '—';
+}
+
+/**
+ * Range l'état du ticket en cours (lignes, coupe d'origine, réduction
+ * fidélité) dans le brouillon du coiffeur donné, pour le retrouver
+ * intact s'il revient plus tard sur sa bulle. En mémoire seulement -
+ * ne survit pas à un rechargement de page.
+ */
+function saveTicketDraft(barberId) {
+  if (!barberId) return;
+  ticketDrafts[barberId] = {
+    ticket: ticket,
+    ticketQueueId: ticketQueueId,
+    loyaltyDiscount: loyaltyDiscount,
+    loyaltyRewardsAvailable: loyaltyRewardsAvailable
+  };
+}
+
+/**
+ * Recharge le brouillon du coiffeur donné, ou repart sur un ticket vide
+ * s'il n'en a pas (ou plus aucune bulle sélectionnée).
+ */
+function loadTicketDraft(barberId) {
+  var draft = barberId ? ticketDrafts[barberId] : null;
+  ticket = draft ? draft.ticket : [];
+  ticketQueueId = draft ? draft.ticketQueueId : null;
+  loyaltyDiscount = draft ? draft.loyaltyDiscount : null;
+  loyaltyRewardsAvailable = draft ? draft.loyaltyRewardsAvailable : 0;
+}
+
+function selectActiveBarber(barberId) {
+  // Recliquer sur la bulle déjà active la désélectionne (mode "tout le
+  // monde", utile pour l'Agenda) - Timer/Caisse retombent alors sur le
+  // coiffeur authentifié (voir barberApi : en-tête omis si vide).
+  // Le ticket en cours appartient au coiffeur, pas à la tablette : on
+  // range son brouillon avant de partir, et on recharge celui du
+  // coiffeur qui arrive (ou un ticket vide s'il n'en a pas).
+  saveTicketDraft(activeBarberId);
+  activeBarberId = (barberId === activeBarberId) ? null : barberId;
+  loadTicketDraft(activeBarberId);
+  renderBarberBubbles();
+  updateTabLockState();
+  loadPendingPayments();
+  extrasPickerOpen = false;
+  nextDetailOpen = {};
+  renderActive(true);
+  renderNext();
+  renderTicket();
+  if (calBooted) {
+    if (calViewMode === 'day') renderCalDay();
+    else if (calViewMode === 'month') renderCalMonth();
+    else renderCalWeek();
+  }
+}
+
+/**
+ * Timer et Caisse exigent un coiffeur clairement identifié (aucun
+ * fallback silencieux sur "celui qui a ouvert la tablette ce matin") -
+ * sans bulle sélectionnée, on bloque ces deux onglets avec un message
+ * clair plutôt que de laisser agir au nom du mauvais coiffeur.
+ * L'Agenda n'est volontairement PAS concerné : aucune bulle sélectionnée
+ * y est un mode à part entière ("Tous les coiffeurs"), pas une erreur.
+ */
+function updateTabLockState() {
+  var locked = !activeBarberId;
+  document.getElementById('panel-timer').classList.toggle('locked', locked);
+  document.getElementById('panel-caisse').classList.toggle('locked', locked);
+}
+
+/* ---------- Onglet Timer (repris de "Mon poste", scopé au coiffeur actif) ---------- */
+var queue = [];
+var extrasPickerOpen = false;
+var nextDetailOpen = {}; // { [queueId]: true }
+var rdvPrepAlertMin = 0;
+var timerRefreshIntervalId = null;
+var timerRenderIntervalId = null;
+
+function startTimerAutoRefresh() {
+  stopTimerAutoRefresh();
+  refreshTimer();
+  timerRefreshIntervalId = setInterval(refreshTimer, 4000);
+  timerRenderIntervalId = setInterval(function () { renderActive(); }, 1000);
+}
+
+function stopTimerAutoRefresh() {
+  if (timerRefreshIntervalId) clearInterval(timerRefreshIntervalId);
+  if (timerRenderIntervalId) clearInterval(timerRenderIntervalId);
+  timerRefreshIntervalId = null;
+  timerRenderIntervalId = null;
+}
+
+function refreshTimer() {
+  if (!me) return;
+  return barberApi('/api/queue').then(function (r) {
+    queue = r.queue;
+    renderActive();
+    renderNext();
+  }).catch(function (e) { toast(e.message, true); });
+}
+
+function myActive() {
+  if (!activeBarberId) return null;
+  return queue.find(function (q) { return q.status === 'in_progress' && q.barber_id === activeBarberId; });
+}
+
+function cutTimerDisplay(cut) {
+  var elapsedSec = Math.max(Math.floor((Date.now() - new Date(cut.start_at).getTime()) / 1000), 0);
+  var remainSec = (cut.total_duration_min || 0) * 60 - elapsedSec;
+  if (remainSec >= 0) return { text: mmss(remainSec), over: false, label: 'Temps restant' };
+  return { text: '+' + formatMinutes(Math.ceil(Math.abs(remainSec) / 60)), over: true, label: 'En retard' };
+}
+
+function chipsHtml(q) {
+  return '<div class="chips"><span class="chip main">' + esc(q.service.name) + '</span>' +
+    q.extras.map(function (x) { return '<span class="chip">+ ' + esc(x.name) + '</span>'; }).join('') + '</div>';
+}
+
+function renderActive(force) {
+  var cur = myActive();
+  var zone = document.getElementById('active-zone');
+  if (!zone) return;
+  if (!cur) {
+    zone.innerHTML = '<div class="empty">Aucune coupe en cours</div>';
+    return;
+  }
+  var t = cutTimerDisplay(cur);
+
+  // Si l'utilisateur est en train d'interagir dans cette carte (panneau
+  // de suppléments ouvert, note en cours de frappe), on se contente de
+  // rafraîchir le minuteur sans reconstruire tout le HTML — sinon les
+  // cases cochées et le texte tapé seraient perdus à chaque tick.
+  var timerEl = document.getElementById('active-timer-value');
+  var subEl = document.getElementById('active-timer-sub');
+  var userIsEditing = !force && (extrasPickerOpen ||
+    (zone.contains(document.activeElement) && document.activeElement !== document.body));
+
+  if (userIsEditing && timerEl) {
+    timerEl.textContent = t.text;
+    timerEl.classList.toggle('over', t.over);
+    if (subEl) {
+      subEl.textContent = t.label + ' · prévu ' + formatMinutes(cur.total_duration_min) + ' · ' + eur(cur.total_price_cents);
+      subEl.classList.toggle('over', t.over);
+    }
+    return;
+  }
+
+  var extraIds = cur.extras.map(function (e) { return e.id; });
+  var extrasOptions = catalog.extras.map(function (e) {
+    return '<label class="extra-opt"><input type="checkbox" value="' + e.id + '"' +
+      (extraIds.indexOf(e.id) !== -1 ? ' checked' : '') + '> ' + esc(e.name) +
+      ' <span class="extra-price">+' + eur(e.price_cents) + '</span></label>';
+  }).join('');
+
+  zone.innerHTML =
+    '<div class="active-card">' +
+      '<div class="name">' + esc(cur.client_name) + '</div>' +
+      (cur.is_appointment
+        ? '<div class="hint" style="color:var(--blue);margin:-4px 0 6px">📅 Rendez-vous</div>'
+        : '') +
+      chipsHtml(cur) +
+      '<div class="big-timer' + (t.over ? ' over' : '') + '" id="active-timer-value">' + t.text + '</div>' +
+      '<div class="timer-sub' + (t.over ? ' over' : '') + '" id="active-timer-sub">' + t.label + ' · prévu ' + formatMinutes(cur.total_duration_min) + ' · ' + eur(cur.total_price_cents) + '</div>' +
+      (cur.gift_card
+        ? '<div class="hint" style="color:var(--green);margin:8px 0">🎁 Cadeau — supplément non modifiable, terminez la coupe telle quelle.</div>'
+        : '<button class="btn btn-soft" onclick="toggleExtrasPicker()">Ajouter un supplément</button>' +
+          '<div id="extras-picker" style="display:' + (extrasPickerOpen ? 'block' : 'none') + '">' + extrasOptions +
+            '<button class="btn btn-primary" onclick="saveExtras(\'' + cur.id + '\')">Valider</button>' +
+          '</div>') +
+      '<div class="note-block">' +
+        '<label for="client-note">Note sur ce client</label>' +
+        '<textarea id="client-note" rows="2" placeholder="Ex: préfère dégradé américain, allergie...">' + esc(cur.note || '') + '</textarea>' +
+        '<button class="btn btn-soft" onclick="saveNote(\'' + cur.id + '\')">Enregistrer la note</button>' +
+      '</div>' +
+      '<button class="btn btn-green" onclick="finishMine(\'' + cur.id + '\')">Terminer</button>' +
+    '</div>';
+}
+
+function toggleExtrasPicker() {
+  extrasPickerOpen = !extrasPickerOpen;
+  var el = document.getElementById('extras-picker');
+  if (el) el.style.display = extrasPickerOpen ? 'block' : 'none';
+}
+
+function hasNextWaitingForMe() {
+  return queue.some(function (q) {
+    return q.status === 'waiting' && (!q.barber_id || q.barber_id === activeBarberId);
+  });
+}
+
+function saveExtras(id) {
+  var ids = Array.prototype.map.call(
+    document.querySelectorAll('#extras-picker input[type="checkbox"]:checked'),
+    function (c) { return c.value; }
+  );
+
+  var cur = myActive();
+  var isAdding = cur && ids.length > cur.extras.length;
+  if (isAdding && hasNextWaitingForMe()) {
+    extrasPickerOpen = false;
+    if (document.activeElement) document.activeElement.blur();
+    renderActive(true);
+    toast('Un client attend déjà son tour — ajouter un supplément le retarderait.', true);
+    return;
+  }
+
+  barberApi('/api/queue/' + id, { method: 'PUT', body: { extras: ids } })
+    .then(function () {
+      extrasPickerOpen = false;
+      if (document.activeElement) document.activeElement.blur();
+      renderActive(true);
+      toast('Suppléments mis à jour');
+      return refreshTimer();
+    })
+    .catch(function (e) {
+      extrasPickerOpen = false;
+      if (document.activeElement) document.activeElement.blur();
+      renderActive(true);
+      toast(e.message, true);
+    });
+}
+
+function saveNote(id) {
+  var note = document.getElementById('client-note').value;
+  barberApi('/api/queue/' + id + '/note', { method: 'PUT', body: { note: note } })
+    .then(function () { toast('Note enregistrée'); })
+    .catch(function (e) { toast(e.message, true); });
+}
+
+function renderNext() {
+  var zone = document.getElementById('next-zone');
+  if (!zone) return;
+  if (myActive()) {
+    zone.innerHTML = '<div class="empty">Terminez la coupe en cours pour passer à la suivante</div>';
+    return;
+  }
+
+  var userIsEditing = zone.contains(document.activeElement) && document.activeElement !== document.body;
+  if (userIsEditing && zone.children.length) return;
+
+  var mine = queue.filter(function (q) {
+    return q.status === 'waiting' && (q.barber_id === activeBarberId || !q.barber_id);
+  }).sort(function (a, b) { return new Date(a.checkin_at) - new Date(b.checkin_at); });
+
+  if (mine.length === 0) {
+    zone.innerHTML = '<div class="empty">Personne en attente pour ce coiffeur pour le moment</div>';
+    return;
+  }
+
+  zone.innerHTML = mine.map(function (q, i) {
+    var isAppointmentNotYet = Boolean(q.is_appointment) && new Date(q.checkin_at) > new Date();
+    var locked = i > 0 || isAppointmentNotYet;
+    var detail = q.service.name + (q.extras.length ? ' + ' + q.extras.map(function (x) { return x.name; }).join(', ') : '');
+    var open = Boolean(nextDetailOpen[q.id]);
+    var minutesUntil = isAppointmentNotYet ? Math.round((new Date(q.checkin_at) - new Date()) / 60000) : null;
+    var prepAlert = isAppointmentNotYet && rdvPrepAlertMin > 0 && minutesUntil <= rdvPrepAlertMin;
+    var lockNote = isAppointmentNotYet
+      ? (prepAlert ? '⏰ Préparez-vous — RDV dans ' + Math.max(minutesUntil, 0) + ' min' : 'RDV à ' + new Date(q.checkin_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }))
+      : 'En attente de son tour';
+    var appointmentBadge = (q.is_appointment && !isAppointmentNotYet)
+      ? '<div class="meta" style="color:var(--blue)">📅 RDV ' + new Date(q.checkin_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) + '</div>'
+      : '';
+    return '<div class="next-item" data-id="' + q.id + '">' +
+      '<div class="next-card' + (locked ? ' locked' : '') + (prepAlert ? ' prep-alert' : '') + '">' +
+        '<div class="next-info" onclick="toggleNextDetail(\'' + q.id + '\')">' +
+          '<div class="name">' + esc(q.client_name) + '</div>' +
+          '<div class="meta">' + esc(detail) + '</div>' +
+          appointmentBadge +
+          (q.gift_card ? giftBadgeHtml(q.gift_card) : '') +
+          (locked ? '<div class="lock-note' + (prepAlert ? ' prep-alert-note' : '') + '">' + lockNote + '</div>' : '') +
+        '</div>' +
+        '<div class="next-btns">' +
+          (locked ? '' : '<button class="btn btn-primary" onclick="startMine(\'' + q.id + '\')">Commencer</button>') +
+          '<button class="btn btn-outline-red" onclick="cancelMine(\'' + q.id + '\')">Absent</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="next-detail" id="next-detail-' + q.id + '" style="display:' + (open ? 'block' : 'none') + '">' +
+        '<div class="detail-row"><span class="detail-label">Client</span><span class="detail-value">' + esc(q.client_name) + '</span></div>' +
+        (q.email ? '<div class="detail-row"><span class="detail-label">Email</span><span class="detail-value">' + esc(q.email) + '</span></div>' : '') +
+        (q.phone ? '<div class="detail-row"><span class="detail-label">Téléphone</span><span class="detail-value">' + esc(q.phone) + '</span></div>' : '') +
+        (q.gift_card ? giftDetailHtml(q.gift_card) : '') +
+        '<label>Note sur ce client</label>' +
+        '<textarea id="next-note-' + q.id + '" rows="2" placeholder="Ex: préfère dégradé américain, allergie...">' + esc(q.note || '') + '</textarea>' +
+        '<button class="btn btn-soft" onclick="saveNextNote(\'' + q.id + '\')">Enregistrer la note</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function giftBadgeHtml(gift) {
+  var productNames = gift.items
+    .filter(function (it) { return it.item_type === 'product'; })
+    .map(function (it) { return (it.quantity > 1 ? it.quantity + ' × ' : '') + it.item_name; })
+    .join(', ');
+  var label = productNames ? '🎁 Cadeau — à remettre : ' + esc(productNames) : '🎁 Cadeau';
+  return '<div class="meta" style="color:var(--green)">' + label + '</div>';
+}
+
+function giftDetailHtml(gift) {
+  var itemsList = gift.items.map(function (it) { return it.quantity + ' × ' + esc(it.item_name); }).join(', ');
+  return '<div class="detail-row" style="flex-direction:column;align-items:flex-start;gap:4px">' +
+    '<span class="detail-label" style="color:var(--green)">🎁 Cadeau (' + eur(gift.amount_cents) + ')</span>' +
+    '<span class="detail-value" style="font-weight:400">' + itemsList + '</span>' +
+    '</div>';
+}
+
+function toggleNextDetail(id) {
+  nextDetailOpen[id] = !nextDetailOpen[id];
+  var el = document.getElementById('next-detail-' + id);
+  if (el) el.style.display = nextDetailOpen[id] ? 'block' : 'none';
+}
+
+function saveNextNote(id) {
+  var note = document.getElementById('next-note-' + id).value;
+  barberApi('/api/queue/' + id + '/note', { method: 'PUT', body: { note: note } })
+    .then(function () { toast('Note enregistrée'); })
+    .catch(function (e) { toast(e.message, true); });
+}
+
+function cancelMine(id) {
+  var q = queue.find(function (x) { return x.id === id; });
+  var name = q ? q.client_name : 'ce client';
+  showConfirm('Marquer ' + name + ' comme absent ? Il sera retiré de la file.', { title: 'Client absent', danger: true, confirmLabel: 'Marquer absent' })
+    .then(function (ok) {
+      if (!ok) return;
+      barberApi('/api/queue/' + id + '/cancel', { method: 'POST', body: {} })
+        .then(refreshTimer)
+        .then(function () { toast('Client marqué absent'); })
+        .catch(function (e) { toast(e.message, true); });
+    });
+}
+
+function startMine(id) {
+  extrasPickerOpen = false;
+  barberApi('/api/queue/' + id + '/start', { method: 'POST', body: { barber_id: activeBarberId } })
+    .then(refreshTimer)
+    .catch(function (e) { toast(e.message, true); });
+}
+
+function finishMine(id) {
+  extrasPickerOpen = false;
+  var cur = queue.find(function (q) { return q.id === id; });
+  barberApi('/api/queue/' + id + '/finish', { method: 'POST', body: {} })
+    .then(function () {
+      if (cur && cur.gift_card) {
+        toast('Coupe terminée — ' + cur.client_name + ' a un cadeau à récupérer, direction la caisse');
+      } else {
+        toast('Coupe terminée — envoyez le client à la caisse');
+      }
+      return refreshTimer();
+    })
+    .catch(function (e) { toast(e.message, true); });
+}
+
+/* ---------- Onglet Agenda : calendrier (repris de "Mon poste") + Planning du jour ---------- */
+var calAnchor = new Date();
+var calViewMode = 'month';
+var calMonthCache = {};
+var calSelectedDate = null;
+var calBooted = false;
+var calApptById = {};
+var monthNames = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+
+function ymd(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function monthKey(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
+function addDays(d, n) { var r = new Date(d); r.setDate(r.getDate() + n); return r; }
+function startOfWeek(d) { var day = (d.getDay() + 6) % 7; return addDays(d, -day); }
+
+function setCalView(mode) {
+  calViewMode = mode;
+  ['month', 'week', 'day'].forEach(function (m) { document.getElementById('cal-view-' + m).classList.toggle('on', m === mode); });
+  document.getElementById('cal-weekdays').style.display = mode === 'day' ? 'none' : 'grid';
+  document.getElementById('cal-days').style.display = mode === 'day' ? 'none' : 'grid';
+  document.getElementById('cal-day-view').style.display = mode === 'day' ? 'block' : 'none';
+  loadAgendaPeriod();
+}
+
+function calShiftPeriod(delta) {
+  if (calViewMode === 'month') calAnchor = new Date(calAnchor.getFullYear(), calAnchor.getMonth() + delta, 1);
+  else if (calViewMode === 'week') calAnchor = addDays(calAnchor, delta * 7);
+  else calAnchor = addDays(calAnchor, delta);
+  loadAgendaPeriod();
+}
+
+function neededMonthKeys() {
+  if (calViewMode !== 'week') return [monthKey(calAnchor)];
+  var start = startOfWeek(calAnchor);
+  var end = addDays(start, 6);
+  var keys = [monthKey(start), monthKey(end)];
+  return keys.filter(function (k, i) { return keys.indexOf(k) === i; });
+}
+
+function loadAgendaPeriod() {
+  var keys = neededMonthKeys();
+  var toFetch = keys.filter(function (k) { return !calMonthCache[k]; });
+  Promise.all(toFetch.map(function (k) {
+    return barberApi('/api/appointments?month=' + k + '&all=1&caisse_view=1').then(function (r) { calMonthCache[k] = r.items; });
+  })).then(function () {
+    if (calViewMode === 'month') renderCalMonth();
+    else if (calViewMode === 'week') renderCalWeek();
+    else renderCalDay();
+  }).catch(function (e) { toast(e.message, true); });
+}
+
+function apptsForRange(startDate, endDate) {
+  var startStr = ymd(startDate), endStr = ymd(endDate);
+  var all = [];
+  neededMonthKeys().forEach(function (k) { all = all.concat(calMonthCache[k] || []); });
+  return all.filter(function (a) {
+    var d = a.scheduled_at.slice(0, 10);
+    return d >= startStr && d <= endStr && a.status !== 'cancelled';
+  });
+}
+
+/**
+ * Un petit point par coiffeur distinct ayant au moins un RDV ce jour-là
+ * (même couleur que sa bulle), plutôt qu'un simple point bleu générique -
+ * permet de voir en un coup d'œil qui a des créneaux sans ouvrir le jour.
+ */
+function calDayDotsHtml(dayAppts) {
+  var seen = {};
+  var dots = [];
+  dayAppts.forEach(function (a) {
+    var bid = a.barber_id || 'unassigned';
+    if (seen[bid]) return;
+    seen[bid] = true;
+    var color = bid === 'unassigned' ? 'var(--grey)' : stableColorForId(bid);
+    dots.push('<span class="cal-dot" style="background:' + color + '"></span>');
+  });
+  return dots.length ? '<div class="cal-dots">' + dots.join('') + '</div>' : '';
+}
+
+function renderCalMonth() {
+  document.getElementById('cal-month-label').textContent = monthNames[calAnchor.getMonth()] + ' ' + calAnchor.getFullYear();
+
+  var firstDay = new Date(calAnchor.getFullYear(), calAnchor.getMonth(), 1);
+  var daysInMonth = new Date(calAnchor.getFullYear(), calAnchor.getMonth() + 1, 0).getDate();
+  var startOffset = (firstDay.getDay() + 6) % 7;
+
+  var monthAppts = apptsForRange(firstDay, new Date(calAnchor.getFullYear(), calAnchor.getMonth(), daysInMonth));
+  var byDay = {};
+  monthAppts.forEach(function (a) {
+    var d = a.scheduled_at.slice(0, 10);
+    if (!byDay[d]) byDay[d] = [];
+    byDay[d].push(a);
+  });
+
+  var todayStr = ymd(new Date());
+  var dayCells = [];
+  for (var i = 0; i < startOffset; i++) dayCells.push(null);
+  for (var day = 1; day <= daysInMonth; day++) dayCells.push(day);
+  while (dayCells.length % 7 !== 0) dayCells.push(null);
+
+  var html = '';
+  for (var w = 0; w < dayCells.length; w += 7) {
+    var weekDays = dayCells.slice(w, w + 7);
+    var weekHtml = weekDays.map(function (d) {
+      if (d === null) return '<div class="cal-day empty"></div>';
+      var dateStr = calAnchor.getFullYear() + '-' + String(calAnchor.getMonth() + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+      var classes = 'cal-day' + (dateStr === todayStr ? ' today' : '') + (dateStr === calSelectedDate ? ' selected' : '');
+      return '<div class="' + classes + '" onclick="selectCalDay(\'' + dateStr + '\')">' +
+        '<div class="cal-day-num">' + d + '</div>' +
+        calDayDotsHtml(byDay[dateStr] || []) +
+        '</div>';
+    }).join('');
+
+    html += '<div class="cal-grid cal-week-row">' + weekHtml + '</div>';
+
+    var selectedInThisWeek = calSelectedDate && weekDays.some(function (d) {
+      if (d === null) return false;
+      var dateStr = calAnchor.getFullYear() + '-' + String(calAnchor.getMonth() + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+      return dateStr === calSelectedDate;
+    });
+    if (selectedInThisWeek) html += renderCalExpandPanel(calSelectedDate);
+  }
+  document.getElementById('cal-days').innerHTML = html;
+}
+
+function renderCalExpandPanel(dateStr) {
+  var when = new Date(dateStr + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' });
+  return '<div class="cal-expand-panel">' +
+    '<div class="cal-expand-head"><strong style="text-transform:capitalize">' + when + '</strong>' +
+    '<button class="btn btn-soft" onclick="event.stopPropagation();selectCalDay(null)">Fermer</button></div>' +
+    renderAgendaTimeline(dateStr) +
+    '</div>';
+}
+
+function renderCalWeek() {
+  var start = startOfWeek(calAnchor);
+  var end = addDays(start, 6);
+  document.getElementById('cal-month-label').textContent =
+    start.getDate() + ' ' + monthNames[start.getMonth()] + ' – ' + end.getDate() + ' ' + monthNames[end.getMonth()] + ' ' + end.getFullYear();
+
+  var weekAppts = apptsForRange(start, end);
+  var byDay = {};
+  weekAppts.forEach(function (a) {
+    var d = a.scheduled_at.slice(0, 10);
+    if (!byDay[d]) byDay[d] = [];
+    byDay[d].push(a);
+  });
+
+  var todayStr = ymd(new Date());
+  var cells = '';
+  for (var i = 0; i < 7; i++) {
+    var d = addDays(start, i);
+    var dateStr = ymd(d);
+    var classes = 'cal-day' + (dateStr === todayStr ? ' today' : '') + (dateStr === calSelectedDate ? ' selected' : '');
+    cells += '<div class="' + classes + '" onclick="selectCalDay(\'' + dateStr + '\')">' +
+      '<div class="cal-day-num">' + d.getDate() + '</div>' +
+      calDayDotsHtml(byDay[dateStr] || []) +
+      '</div>';
+  }
+
+  var html = '<div class="cal-grid cal-week-row">' + cells + '</div>';
+  if (calSelectedDate) html += renderCalExpandPanel(calSelectedDate);
+  document.getElementById('cal-days').innerHTML = html;
+}
+
+function renderCalDay() {
+  document.getElementById('cal-month-label').textContent =
+    calAnchor.toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+  document.getElementById('cal-day-view').innerHTML = renderAgendaTimeline(ymd(calAnchor));
+}
+
+function selectCalDay(dateStr) {
+  calSelectedDate = (!dateStr || dateStr === calSelectedDate) ? null : dateStr;
+  // calAnchor doit suivre la sélection, sinon passer ensuite en vue
+  // "Jour" affiche une date au hasard (celle où calAnchor était resté)
+  // au lieu du jour qu'on vient de choisir.
+  if (calSelectedDate) calAnchor = new Date(calSelectedDate + 'T00:00:00');
+  if (calViewMode === 'month') renderCalMonth();
+  else if (calViewMode === 'week') renderCalWeek();
+}
+
+/**
+ * Le "Planning du jour" (timeline par coiffeur, comme dans le dashboard),
+ * pour une date donnée - filtré au coiffeur actif si une bulle est
+ * sélectionnée, sinon tout le monde. Remplace la simple liste texte des
+ * RDV utilisée dans "Mon poste".
+ */
+var timelineZoom = 1;
+
+function renderAgendaTimeline(dateStr) {
+  var d = new Date(dateStr + 'T00:00:00');
+  var appts = apptsForRange(d, d);
+  if (activeBarberId) appts = appts.filter(function (a) { return a.barber_id === activeBarberId; });
+  appts.forEach(function (a) { calApptById[a.id] = a; });
+
+  if (appts.length === 0) {
+    var activeB = activeBarberId && allBarbers.find(function (b) { return b.id === activeBarberId; });
+    if (activeB && !activeB.accepts_appointments) {
+      return '<div class="timeline-empty">' + esc(activeB.name) + ' ne prend pas de RDV en ligne (sans-rdv uniquement)</div>';
+    }
+    var emptyMsg = '<div class="timeline-empty">' + (activeBarberId ? 'Aucun rendez-vous pour ce coiffeur ce jour-là' : 'Aucun rendez-vous ce jour-là') + '</div>';
+    // Bouton de raccourci seulement si on sait pour QUI ajouter (une
+    // bulle précise sélectionnée) - en mode "Tous", pas de coiffeur
+    // évident à qui l'attribuer.
+    if (activeBarberId) {
+      emptyMsg += '<button class="btn btn-primary" style="width:100%;margin-top:10px" onclick="openCaisseAddAppointment(\'' + dateStr + '\',\'' + activeBarberId + '\')">+ Ajouter un RDV</button>';
+    }
+    return emptyMsg;
+  }
+
+  function apptMinutes(a) {
+    var hm = a.scheduled_at.slice(11, 16).split(':');
+    return Number(hm[0]) * 60 + Number(hm[1]);
+  }
+
+  var starts = appts.map(apptMinutes);
+  var ends = appts.map(function (a) { return apptMinutes(a) + Math.max(a.duration_min || 30, 15); });
+  var apptMin = Math.min.apply(null, starts);
+  var apptMax = Math.max.apply(null, ends);
+
+  // Plage horaire = les heures d'ouverture réelles du salon ce jour-là,
+  // étendue uniquement si un RDV dépasse ces horaires - jamais un
+  // minimum arbitraire qui ignorerait l'heure de fermeture réelle.
+  var weekday = new Date(dateStr + 'T00:00:00').getDay();
+  var salonDay = salonScheduleByWeekday && salonScheduleByWeekday[weekday];
+  var baseStart = salonDay ? salonDay.startMin : Math.floor(apptMin / 60) * 60;
+  var baseEnd = salonDay ? salonDay.endMin : Math.ceil(apptMax / 60) * 60;
+
+  var rangeStart = Math.floor(Math.min(baseStart, apptMin) / 60) * 60;
+  var rangeEnd = Math.ceil(Math.max(baseEnd, apptMax) / 60) * 60;
+  // Filet minimal seulement si vraiment rien de mieux à afficher (aucun
+  // horaire salon configuré ce jour-là ET un unique RDV très court).
+  if (rangeEnd - rangeStart < 4 * 60) rangeEnd = rangeStart + 4 * 60;
+
+  var hourCount = (rangeEnd - rangeStart) / 60;
+  var hoursHtml = '';
+  for (var h = 0; h <= hourCount; h++) {
+    var totalMin = rangeStart + h * 60;
+    var hourFrac = (h * 60) / (rangeEnd - rangeStart);
+    hoursHtml += '<span style="left: calc(22px + (100% - 22px) * ' + hourFrac + ')">' +
+      String(Math.floor(totalMin / 60)).padStart(2, '0') + ':00</span>';
+  }
+
+  var byBarber = {};
+  appts.forEach(function (a) {
+    var key = a.barber_id || 'unassigned';
+    if (!byBarber[key]) byBarber[key] = { name: a.barber_name || 'Non assigné', items: [] };
+    byBarber[key].items.push(a);
+  });
+  var barberIds = Object.keys(byBarber).sort(function (x, y) { return byBarber[x].name.localeCompare(byBarber[y].name); });
+
+  var rowsHtml = barberIds.map(function (bid) {
+    var b = byBarber[bid];
+    var color = bid === 'unassigned' ? 'var(--grey)' : stableColorForId(bid);
+    var blocksHtml = b.items.map(function (a) {
+      var startMin = apptMinutes(a);
+      var dur = Math.max(a.duration_min || 30, 15);
+      var leftPct = ((startMin - rangeStart) / (rangeEnd - rangeStart)) * 100;
+      var widthPct = (dur / (rangeEnd - rangeStart)) * 100;
+      var time = a.scheduled_at.slice(11, 16);
+      return '<div class="timeline-block" style="left:' + leftPct + '%;width:' + widthPct + '%;background:' + color + '" ' +
+        'title="' + esc(time + ' — ' + a.client_name + ' — ' + (a.service_name || '')) + '" ' +
+        'onclick="event.stopPropagation();openAgendaClientDrawer(\'' + a.id + '\')">' + esc(a.client_name) + '</div>';
+    }).join('');
+    var trackClick = bid === 'unassigned' ? '' : ' onclick="openCaisseAddAppointment(\'' + dateStr + '\',\'' + bid + '\')" title="Cliquer pour ajouter un RDV"';
+    return '<div class="timeline-row">' +
+      '<div class="timeline-row-label" title="' + esc(b.name) + '"><span class="dot" style="background:' + color + '"></span></div>' +
+      '<div class="timeline-row-track"' + trackClick + '>' + blocksHtml + '</div>' +
+      '</div>';
+  }).join('');
+
+  // On compare a l'heure du SALON (fuseau horaire configure), pas celle du
+  // navigateur qui affiche la page.
+  var nowLineHtml = '';
+  var nowStr = nowSalonDatetimeString();
+  if (dateStr === nowStr.slice(0, 10)) {
+    var nowMin = Number(nowStr.slice(11, 13)) * 60 + Number(nowStr.slice(14, 16));
+    if (nowMin >= rangeStart && nowMin <= rangeEnd) {
+      var leftFrac = (nowMin - rangeStart) / (rangeEnd - rangeStart);
+      nowLineHtml = '<div class="timeline-now-line" title="Maintenant — ' + nowStr.slice(11, 16) + '" ' +
+        'style="left: calc(22px + (100% - 22px) * ' + leftFrac + ')"></div>';
+    }
+  }
+
+  var minuteStepPct = (15 / (rangeEnd - rangeStart)) * 100;
+  var minuteGridHtml = '<div class="timeline-minute-grid" style="background-size:' + minuteStepPct + '% 100%"></div>';
+
+  var innerWidth = Math.round(hourCount * 90 * timelineZoom);
+  var zoomPct = Math.round(timelineZoom * 100);
+  var zoomCtrl = '<div class="timeline-zoom-ctrl"><div class="timeline-zoom-ctrl-inner">' +
+    '<button type="button" onclick="event.stopPropagation();adjustAgendaZoom(-1)" title="Dézoomer">−</button>' +
+    '<span>' + zoomPct + '%</span>' +
+    '<button type="button" onclick="event.stopPropagation();adjustAgendaZoom(1)" title="Zoomer">+</button>' +
+    '</div></div>';
+
+  return zoomCtrl + '<div class="timeline-scroll"><div class="timeline-inner" ' +
+    'data-date="' + dateStr + '" data-range-start="' + rangeStart + '" data-range-end="' + rangeEnd + '" ' +
+    'style="min-width:' + innerWidth + 'px">' +
+    '<div class="timeline-hours">' + hoursHtml + '</div>' +
+    minuteGridHtml + rowsHtml + nowLineHtml +
+    '</div></div>';
+}
+
+/** Déplace juste la ligne "maintenant", sans reconstruire le reste. */
+function updateAgendaNowLines() {
+  var nowStr = nowSalonDatetimeString();
+  var todayStr = nowStr.slice(0, 10);
+  var nowMin = Number(nowStr.slice(11, 13)) * 60 + Number(nowStr.slice(14, 16));
+  var title = 'Maintenant — ' + nowStr.slice(11, 16);
+
+  document.querySelectorAll('.timeline-inner[data-range-start]').forEach(function (inner) {
+    var rangeStart = Number(inner.dataset.rangeStart);
+    var rangeEnd = Number(inner.dataset.rangeEnd);
+    var visible = inner.dataset.date === todayStr && nowMin >= rangeStart && nowMin <= rangeEnd;
+    var line = inner.querySelector('.timeline-now-line');
+
+    if (!visible) {
+      if (line) line.remove();
+      return;
+    }
+    var leftCss = 'calc(22px + (100% - 22px) * ' + ((nowMin - rangeStart) / (rangeEnd - rangeStart)) + ')';
+    if (!line) {
+      line = document.createElement('div');
+      line.className = 'timeline-now-line';
+      inner.appendChild(line);
+    }
+    line.style.left = leftCss;
+    line.title = title;
+  });
+}
+
+/** +1 pour zoomer, -1 pour dézoomer (pas de 20%, borné 60%-250%). */
+function adjustAgendaZoom(delta) {
+  timelineZoom = Math.max(0.6, Math.min(2.5, +(timelineZoom + delta * 0.2).toFixed(2)));
+  if (calViewMode === 'day') renderCalDay();
+  else if (calSelectedDate) { if (calViewMode === 'month') renderCalMonth(); else renderCalWeek(); }
+}
+
+
+
+function openAgendaClientDrawer(id) {
+  var a = calApptById[id];
+  if (!a) return;
+
+  var when = new Date(a.scheduled_at.replace(' ', 'T')).toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' }) +
+    ' à ' + a.scheduled_at.slice(11, 16);
+
+  var overlay = _buildModal(
+    '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px">' +
+    '<div class="modal-title" style="margin-bottom:0">' + esc(a.client_name) + '</div>' +
+    '<button id="acd-close-x" style="background:var(--fill);border:none;width:30px;height:30px;border-radius:50%;color:var(--grey);font-size:14px;cursor:pointer;flex-shrink:0;margin-left:10px">✕</button>' +
+    '</div>' +
+    '<div class="detail-row"><span class="detail-label">Quand</span><span class="detail-value" style="text-transform:capitalize">' + when + '</span></div>' +
+    '<div class="detail-row"><span class="detail-label">Coiffeur</span><span class="detail-value">' + esc(a.barber_name || 'Non assigné') + '</span></div>' +
+    '<div class="detail-row"><span class="detail-label">Prestation</span><span class="detail-value">' + esc(a.service_name) + '</span></div>' +
+    (a.email ? '<div class="detail-row"><span class="detail-label">Email</span><span class="detail-value">' + esc(a.email) + '</span></div>' : '') +
+    (a.phone ? '<div class="detail-row"><span class="detail-label">Téléphone</span><span class="detail-value">' + esc(a.phone) + '</span></div>' : '') +
+    (a.client_note ? '<div class="detail-row" style="flex-direction:column;align-items:flex-start;gap:2px"><span class="detail-label">📝 Note du client (RDV)</span><span class="detail-value" style="font-weight:400">' + esc(a.client_note) + '</span></div>' : '') +
+    '<div style="margin-top:14px">' +
+      '<label style="display:block;font-size:12.5px;font-weight:600;color:var(--grey);margin-bottom:6px">Note interne</label>' +
+      (a.promoted_queue_id
+        ? '<textarea id="acd-note" rows="2" style="width:100%;padding:11px 13px;border:none;border-radius:10px;background:var(--fill);color:var(--ink);font-family:inherit;font-size:14px;resize:vertical;margin-bottom:8px">' + esc(a.note || '') + '</textarea>' +
+          '<button class="btn btn-soft" id="acd-save-note-btn" style="width:100%">Enregistrer la note</button>'
+        : '<p class="hint" style="margin:0">Pas encore modifiable — ce RDV entrera dans la file le jour même.</p>') +
+    '</div>' +
+    (a.status !== 'cancelled'
+      ? '<button class="clear-ticket-btn" id="acd-cancel-btn" style="margin-top:14px">' +
+          '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M15 9l-6 6M9 9l6 6"/></svg>' +
+          'Annuler ce RDV' +
+        '</button>'
+      : '<p class="hint" style="margin-top:14px;color:var(--red)">Ce RDV est annulé.</p>')
+  );
+
+  overlay.querySelector('#acd-close-x').onclick = function () { _closeModal(overlay); };
+
+  var cancelBtn = overlay.querySelector('#acd-cancel-btn');
+  if (cancelBtn) {
+    cancelBtn.onclick = function () {
+      // Double confirmation pour une action irréversible et visible du
+      // client (email d'annulation envoyé) : une première confirmation
+      // simple, puis une seconde où il faut taper "ANNULER" en toutes
+      // lettres - protège d'un clic accidentel sur un écran partagé.
+      showConfirm('Annuler le RDV de ' + a.client_name + ' (' + when + ') ?', { title: 'Annuler ce RDV', danger: true, confirmLabel: 'Continuer' })
+        .then(function (ok) {
+          if (!ok) return;
+          return showPrompt('Tape ANNULER pour confirmer définitivement.', { title: 'Confirmation finale', requireExact: 'ANNULER', danger: true, confirmLabel: 'Annuler le RDV' });
+        })
+        .then(function (confirmed) {
+          if (!confirmed) return;
+          return barberApi('/api/appointments/' + a.id + '/admin-cancel', { method: 'POST', body: {}, actingAs: a.barber_id })
+            .then(function () {
+              a.status = 'cancelled';
+              _closeModal(overlay);
+              toast('RDV annulé');
+              Object.keys(calMonthCache).forEach(function (k) { delete calMonthCache[k]; });
+              loadAgendaPeriod();
+            });
+        })
+        .catch(function (e) { if (e) toast(e.message, true); });
+    };
+  }
+
+  var saveBtn = overlay.querySelector('#acd-save-note-btn');
+  if (saveBtn) {
+    saveBtn.onclick = function () {
+      var note = overlay.querySelector('#acd-note').value;
+      barberApi('/api/queue/' + a.promoted_queue_id + '/note', { method: 'PUT', body: { note: note }, actingAs: a.barber_id })
+        .then(function () { a.note = note; toast('Note enregistrée'); })
+        .catch(function (e) { toast(e.message, true); });
+    };
+  }
+}
+
+var agendaNowLineTimer = null;
+var salonScheduleByWeekday = null; // { [0-6]: {startMin, endMin} } - chargé une seule fois
+
+function timeStrToMinutes(t) {
+  var hm = t.slice(0, 5).split(':');
+  return Number(hm[0]) * 60 + Number(hm[1]);
+}
+
+/**
+ * Charge une seule fois les horaires généraux du salon (Réglages >
+ * Calendrier), pour servir de vraie référence à la plage horaire du
+ * Planning du jour - même correctif que celui appliqué au Planning du
+ * jour du dashboard (bug : la timeline pouvait s'afficher bien après la
+ * fermeture réelle du salon).
+ */
+function loadSalonScheduleForTimeline() {
+  if (salonScheduleByWeekday) return Promise.resolve(salonScheduleByWeekday);
+  return barberApi('/api/salon-calendar/schedule').then(function (r) {
+    salonScheduleByWeekday = {};
+    (r.schedules || []).forEach(function (s) {
+      if (!s.active) return;
+      salonScheduleByWeekday[s.weekday] = { startMin: timeStrToMinutes(s.start_time), endMin: timeStrToMinutes(s.end_time) };
+    });
+    return salonScheduleByWeekday;
+  }).catch(function () { salonScheduleByWeekday = {}; return salonScheduleByWeekday; });
+}
+
+/**
+ * Ajout rapide d'un RDV depuis l'Agenda de la caisse, pour un coiffeur
+ * précis (celui de la ligne cliquée, ou de la bulle active) - jamais
+ * d'étape "choisir le coiffeur", il est déjà connu. Repris du formulaire
+ * de "Mon poste", adapté à catalog.services/extras et à barberId
+ * explicite (au lieu de me.id).
+ */
+function openCaisseAddAppointment(dateStr, barberId) {
+  var barber = allBarbers.find(function (b) { return b.id === barberId; });
+  var when = new Date(dateStr + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' });
+  var state = { serviceId: null, extraIds: [], time: null };
+
+  var overlay = _buildModal(
+    '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px">' +
+    '<div class="modal-title" style="margin-bottom:0">Ajouter un RDV — ' + esc(barber ? barber.name : '') + ' — ' + when + '</div>' +
+    '<button id="pa-close-x" style="background:var(--fill);border:none;width:30px;height:30px;border-radius:50%;color:var(--grey);font-size:14px;cursor:pointer;flex-shrink:0;margin-left:10px">✕</button>' +
+    '</div>' +
+
+    '<div id="pa-step-service">' +
+      '<div class="aa-step-title">Prestation</div>' +
+      '<div class="aa-grid">' + catalog.services.map(function (s) {
+        return '<button class="aa-card" data-id="' + s.id + '" onclick="paSelectService(this)">' + esc(s.name) +
+          '<span class="aa-meta">' + formatMinutes(s.duration_min) + ' · ' + eur(s.price_cents) + '</span></button>';
+      }).join('') + '</div>' +
+    '</div>' +
+
+    '<div id="pa-step-extras" style="display:none">' +
+      '<button class="aa-back" onclick="paGoStep(\'service\')">‹ Retour</button>' +
+      '<div class="aa-step-title">Suppléments (optionnels)</div>' +
+      '<div class="aa-chips">' + catalog.extras.map(function (e) {
+        return '<button class="aa-chip" data-id="' + e.id + '" onclick="paToggleExtra(this)">' + esc(e.name) + '<span class="aa-meta">+' + formatMinutes(e.duration_min) + '</span></button>';
+      }).join('') + '</div>' +
+      '<button class="btn btn-primary" style="width:100%;margin-top:10px" onclick="paGoStep(\'datetime\')">Suivant</button>' +
+    '</div>' +
+
+    '<div id="pa-step-datetime" style="display:none">' +
+      '<button class="aa-back" onclick="paGoStep(\'extras\')">‹ Retour</button>' +
+      '<div class="aa-step-title">Créneau</div>' +
+      '<div id="pa-half-toggle" class="half-toggle" style="display:none;margin-bottom:8px">' +
+        '<button id="pa-half-morning" onclick="paShowHalf(\'morning\')">Matin</button>' +
+        '<button id="pa-half-afternoon" onclick="paShowHalf(\'afternoon\')">Après-midi</button>' +
+      '</div>' +
+      '<div class="aa-slots" id="pa-slots"><span class="hint" style="margin:0">Chargement…</span></div>' +
+    '</div>' +
+
+    '<div id="pa-step-contact" style="display:none">' +
+      '<button class="aa-back" onclick="paGoStep(\'datetime\')">‹ Retour</button>' +
+      '<div class="aa-step-title" id="pa-contact-summary"></div>' +
+      '<div class="fld" style="margin-bottom:10px"><label>Nom du client</label><input class="modal-input" id="pa-name" type="text"></div>' +
+      '<div class="fld" style="margin-bottom:10px"><label>Email (optionnel)</label><input class="modal-input" id="pa-email" type="email"></div>' +
+      '<div class="fld" style="margin-bottom:14px"><label>Téléphone (optionnel)</label><input class="modal-input" id="pa-phone" type="tel"></div>' +
+      '<div class="modal-error" id="pa-error" style="display:none"></div>' +
+      '<div class="modal-actions">' +
+      '<button class="btn btn-soft" id="pa-cancel-btn">Annuler</button>' +
+      '<button class="btn btn-primary" id="pa-save-btn">Ajouter le RDV</button>' +
+      '</div>' +
+    '</div>'
+  );
+
+  var STEPS = ['service', 'extras', 'datetime', 'contact'];
+  attachClientAutocomplete(overlay, 'pa-name', 'pa-email', 'pa-phone', barberApi);
+
+  window.paGoStep = function (step) {
+    STEPS.forEach(function (s) { overlay.querySelector('#pa-step-' + s).style.display = s === step ? 'block' : 'none'; });
+    if (step === 'datetime') paLoadSlots();
+    if (step === 'contact') {
+      var s = catalog.services.find(function (x) { return x.id === state.serviceId; });
+      overlay.querySelector('#pa-contact-summary').textContent = when + ' à ' + state.time + ' — ' + (s ? s.name : '');
+    }
+  };
+
+  window.paSelectService = function (el) {
+    state.serviceId = el.dataset.id;
+    overlay.querySelectorAll('#pa-step-service .aa-card').forEach(function (c) { c.classList.remove('sel'); });
+    el.classList.add('sel');
+    paGoStep('extras');
+  };
+
+  window.paToggleExtra = function (el) {
+    var id = el.dataset.id;
+    var i = state.extraIds.indexOf(id);
+    if (i === -1) state.extraIds.push(id); else state.extraIds.splice(i, 1);
+    el.classList.toggle('sel');
+  };
+
+  var slotsByHalf = { morning: [], afternoon: [] };
+  var currentHalf = 'afternoon';
+
+  function paRenderHalf() {
+    var slotsEl = overlay.querySelector('#pa-slots');
+    var list = slotsByHalf[currentHalf];
+    slotsEl.innerHTML = list.length
+      ? list.map(function (s) {
+          return '<button class="aa-slot" data-time="' + s.time + '" onclick="paSelectSlot(this)">' + s.time + '</button>';
+        }).join('')
+      : '<span class="hint" style="margin:0">Aucun créneau ' + (currentHalf === 'morning' ? 'le matin' : "l'après-midi") + '</span>';
+  }
+
+  window.paShowHalf = function (half) {
+    currentHalf = half;
+    overlay.querySelector('#pa-half-morning').classList.toggle('sel', half === 'morning');
+    overlay.querySelector('#pa-half-afternoon').classList.toggle('sel', half === 'afternoon');
+    paRenderHalf();
+  };
+
+  function paLoadSlots() {
+    var slotsEl = overlay.querySelector('#pa-slots');
+    var toggleEl = overlay.querySelector('#pa-half-toggle');
+    slotsEl.innerHTML = '<span class="hint" style="margin:0">Chargement…</span>';
+    toggleEl.style.display = 'none';
+    barberApi('/api/appointments/availability?date=' + dateStr + '&service_id=' + state.serviceId + '&barber_id=' + barberId + '&extras=' + state.extraIds.join(','), { actingAs: barberId })
+      .then(function (r) {
+        if (!r.slots.length) { slotsEl.innerHTML = '<span class="hint" style="margin:0">Aucun créneau disponible ce jour-là</span>'; return; }
+
+        slotsByHalf.morning = r.slots.filter(function (s) { return s.time < '12:00'; });
+        slotsByHalf.afternoon = r.slots.filter(function (s) { return s.time >= '12:00'; });
+
+        if (!slotsByHalf.morning.length) {
+          toggleEl.style.display = 'none';
+          currentHalf = 'afternoon';
+          paRenderHalf();
+        } else {
+          toggleEl.style.display = 'flex';
+          paShowHalf('morning');
+        }
+      })
+      .catch(function (e) { slotsEl.innerHTML = ''; toast(e.message, true); });
+  }
+
+  window.paSelectSlot = function (el) {
+    state.time = el.dataset.time;
+    overlay.querySelectorAll('#pa-slots .aa-slot').forEach(function (c) { c.classList.remove('sel'); });
+    el.classList.add('sel');
+    paGoStep('contact');
+  };
+
+  overlay.querySelector('#pa-close-x').onclick = function () { _closeModal(overlay); };
+  overlay.querySelector('#pa-cancel-btn').onclick = function () { _closeModal(overlay); };
+
+  overlay.querySelector('#pa-save-btn').onclick = function () {
+    var errEl = overlay.querySelector('#pa-error');
+    var name = overlay.querySelector('#pa-name').value.trim();
+    if (!name) { errEl.textContent = 'Le nom du client est requis'; errEl.style.display = 'block'; return; }
+
+    barberApi('/api/appointments/admin-create', {
+      method: 'POST',
+      actingAs: barberId,
+      body: {
+        client_name: name,
+        email: overlay.querySelector('#pa-email').value.trim(),
+        phone: overlay.querySelector('#pa-phone').value.trim(),
+        service_id: state.serviceId, extras: state.extraIds,
+        date: dateStr, time: state.time, barber_id: barberId,
+        base_url: window.location.origin + '/rdv.html'
+      }
+    }).then(function () {
+      _closeModal(overlay);
+      toast('RDV ajouté');
+      Object.keys(calMonthCache).forEach(function (k) { delete calMonthCache[k]; });
+      loadAgendaPeriod();
+    }).catch(function (e) { errEl.textContent = e.message; errEl.style.display = 'block'; });
+  };
+}
+
+function startAgendaAutoRefresh() {
+  stopAgendaAutoRefresh();
+  agendaNowLineTimer = setInterval(updateAgendaNowLines, 30000);
+}
+
+function stopAgendaAutoRefresh() {
+  if (agendaNowLineTimer) clearInterval(agendaNowLineTimer);
+  agendaNowLineTimer = null;
 }
 
 function loadInactivitySetting() {
@@ -645,10 +2092,20 @@ function useGiftCard(giftId, queueId) {
   var itemsList = items.map(function (it) {
     return it.quantity + ' × ' + it.item_name;
   }).join(', ');
-  var message = items.length
-    ? 'Ce cadeau (' + eur(gift.amount_cents) + ') comprend : ' + itemsList + '. ' +
-      'Pensez à remettre au client tout ce qui n\'est pas la coupe déjà effectuée (produits, suppléments...).'
-    : 'Confirmer l\'utilisation de ce cadeau ?';
+  var hasProduct = items.some(function (it) { return it.item_type === 'product'; });
+  var message;
+  if (!items.length) {
+    message = 'Confirmer l\'utilisation de ce cadeau ?';
+  } else if (hasProduct) {
+    // Un produit physique à remettre en plus de la coupe - le rappel
+    // n'a de sens QUE dans ce cas précis.
+    message = 'Ce cadeau (' + eur(gift.amount_cents) + ') comprend : ' + itemsList + '. ' +
+      'Pensez à remettre au client le(s) produit(s) inclus.';
+  } else {
+    // Rien que des prestations/suppléments (déjà effectués pendant la
+    // coupe) - aucun rappel à faire, un message simple suffit.
+    message = 'Ce cadeau (' + eur(gift.amount_cents) + ') comprend : ' + itemsList + '.';
+  }
 
   showConfirm(message, { title: 'Utiliser le cadeau' }).then(function (ok) {
     if (!ok) return;
@@ -699,6 +2156,7 @@ function iconForItem(name) {
   if (n.indexOf('huile') !== -1 || n.indexOf('soin') !== -1) return '💧';
   if (n.indexOf('cire') !== -1 || n.indexOf('gel') !== -1) return '🧴';
   if (n.indexOf('zéro') !== -1 || n.indexOf('zero') !== -1) return '🪒';
+  if (n.indexOf('parfum') !== -1) return '🌸';
   if (n.indexOf('coupe') !== -1) return '✂️';
   return currentCat === 'products' ? '🛍️' : '✂️';
 }
@@ -729,10 +2187,20 @@ function renderItemGrid() {
 /* ---------- Ticket ---------- */
 function addToTicket(itemType, itemId, itemName, unitPriceCents) {
   var existing = ticket.find(function (l) { return l.item_type === itemType && l.item_id === itemId; });
+  var newIndex = null;
   if (existing) { existing.quantity++; } else {
-    ticket.push({ item_type: itemType, item_id: itemId, item_name: itemName, unit_price_cents: unitPriceCents, quantity: 1 });
+    // Le "vendeur" par ligne n'a de sens que pour un produit (voir
+    // renderTicket) - par défaut le coiffeur actif au moment de
+    // l'ajout, modifiable ensuite ligne par ligne si un autre coiffeur
+    // a en réalité vendu ce produit précis.
+    var lineBarberId = itemType === 'product' ? activeBarberId : null;
+    ticket.push({ item_type: itemType, item_id: itemId, item_name: itemName, unit_price_cents: unitPriceCents, quantity: 1, barber_id: lineBarberId });
+    newIndex = ticket.length - 1;
   }
-  renderTicket();
+  // Seule une ligne VRAIMENT nouvelle rejoue l'animation d'entrée - un
+  // simple +1 de quantité sur une ligne déjà là ne doit jamais faire
+  // clignoter tout le ticket à chaque ajout.
+  renderTicket(newIndex);
 }
 
 function changeQty(index, delta) {
@@ -753,11 +2221,12 @@ function ticketTotal() {
   return ticket.reduce(function (a, l) { return a + l.unit_price_cents * l.quantity; }, 0);
 }
 
-function renderTicket() {
+function renderTicket(justAddedIndex) {
   document.getElementById('ticket-lines').innerHTML = ticket.length === 0
     ? '<div class="empty">Aucun article sélectionné</div>'
     : ticket.map(function (l, i) {
-        return '<div class="ticket-line">' +
+        return '<div class="ticket-line' + (i === justAddedIndex ? ' enter' : '') + '">' +
+          (l.item_type === 'product' ? lineSellerBubbleHtml(l, i) : '') +
           '<div class="name">' + esc(l.item_name) + '</div>' +
           '<div class="qty-ctrl">' +
             '<button onclick="changeQty(' + i + ',-1)">−</button>' +
@@ -775,6 +2244,57 @@ function renderTicket() {
   });
   updateGiftVisibility();
   updateLoyaltyVisibility();
+}
+
+/**
+ * Petite bulle "qui a vendu ce produit" sur chaque ligne produit du
+ * ticket - par défaut le coiffeur actif au moment de l'ajout, mais
+ * modifiable indépendamment (ex: un autre coiffeur a vendu ce parfum
+ * au client d'un collègue). Sans effet sur les prestations/suppléments,
+ * qui restent attribués à toute la vente.
+ */
+function lineSellerBubbleHtml(line, index) {
+  var seller = allBarbers.find(function (b) { return b.id === line.barber_id; });
+  var color = seller ? (seller.color || stableColorForId(seller.id)) : 'var(--fill)';
+  var initial = seller ? (seller.name || '?').trim().charAt(0).toUpperCase() : '?';
+  var avatarStyle = seller && seller.photo_url
+    ? 'background-image:url(\'' + seller.photo_url + '\')'
+    : 'background:' + color + ';color:' + (seller ? '#fff' : 'var(--grey)');
+  return '<button type="button" class="line-seller-avatar" style="' + avatarStyle + '" title="Qui a vendu ce produit ?" onclick="openLineSellerModal(' + index + ')">' +
+    (seller && seller.photo_url ? '' : esc(initial)) +
+  '</button>';
+}
+
+function openLineSellerModal(index) {
+  var line = ticket[index];
+  var options = '<button class="line-seller-opt unassigned' + (!line.barber_id ? ' sel' : '') + '" data-close-modal onclick="setLineSeller(' + index + ',null)">' +
+    '<span class="dot">–</span><span class="lbl">Non attribué</span></button>' +
+    allBarbers.map(function (b) {
+      var bColor = b.color || stableColorForId(b.id);
+      var bInitial = (b.name || '?').trim().charAt(0).toUpperCase();
+      var bStyle = b.photo_url ? 'background-image:url(\'' + b.photo_url + '\')' : 'background:' + bColor;
+      return '<button class="line-seller-opt' + (b.id === line.barber_id ? ' sel' : '') + '" data-close-modal onclick="setLineSeller(' + index + ',\'' + b.id + '\')">' +
+        '<span class="dot" style="' + bStyle + '">' + (b.photo_url ? '' : esc(bInitial)) + '</span><span class="lbl">' + esc(b.name) + '</span>' +
+        '</button>';
+    }).join('');
+
+  var overlay = _buildModal(
+    '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px">' +
+    '<div class="modal-title" style="margin-bottom:0">Qui a vendu "' + esc(line.item_name) + '" ?</div>' +
+    '<button id="lsm-close-x" style="background:var(--fill);border:none;width:30px;height:30px;border-radius:50%;color:var(--grey);font-size:14px;cursor:pointer;flex-shrink:0;margin-left:10px">✕</button>' +
+    '</div>' +
+    '<div class="line-seller-options">' + options + '</div>'
+  );
+  overlay.querySelector('#lsm-close-x').onclick = function () { _closeModal(overlay); };
+  overlay.addEventListener('click', function (e) { if (e.target === overlay) _closeModal(overlay); });
+  overlay.querySelectorAll('[data-close-modal]').forEach(function (btn) {
+    btn.addEventListener('click', function () { _closeModal(overlay); }, { once: true });
+  });
+}
+
+function setLineSeller(index, barberId) {
+  ticket[index].barber_id = barberId || null;
+  renderTicket();
 }
 
 /* ---------- Paiement ---------- */
@@ -840,11 +2360,34 @@ function updateGiftVisibility() {
   }
 }
 
+// Empêche tout second clic (double-tap, ou re-clic pendant que le
+// serveur traite déjà la vente) de déclencher une deuxième vente
+// complète avant que la première ait fini de répondre - sans ce verrou,
+// un simple temps de réponse un peu long (ex: envoi de l'email du code
+// cadeau) pouvait faire encaisser deux fois le même ticket.
+var paymentInFlight = false;
+
+function setPayButtonsLocked(locked) {
+  document.getElementById('pay-especes').disabled = locked || ticket.length === 0;
+  document.getElementById('pay-cb').disabled = locked || ticket.length === 0;
+}
+
 function pay(method) {
-  if (!ticket.length) return;
+  if (!ticket.length || paymentInFlight) return;
 
   var gift = null;
   if (document.getElementById('gift-checkbox').checked) {
+    // Le coiffeur actif (bulle sélectionnée) devient le coiffeur DÉSIGNÉ
+    // pour ce cadeau - le bénéficiaire n'aura plus à en choisir un lui-
+    // même au kiosk/à la réservation en ligne. Sans bulle sélectionnée,
+    // ce lien ne pourrait jamais se faire correctement (on retomberait
+    // sur "peu importe qui a ouvert la tablette ce matin-là", pas
+    // forcément le bon coiffeur) - on bloque donc ici plutôt que de
+    // laisser passer un cadeau mal attribué.
+    if (!activeBarberId) {
+      toast('Veuillez sélectionner votre profil (bulle coiffeur) avant de créer un cadeau', true);
+      return;
+    }
     var gName = document.getElementById('gift-name').value.trim();
     var gPhone = document.getElementById('gift-phone').value.trim();
     var gEmail = document.getElementById('gift-email').value.trim();
@@ -854,6 +2397,9 @@ function pay(method) {
     }
     gift = { recipient_name: gName, recipient_phone: gPhone, recipient_email: gEmail };
   }
+
+  paymentInFlight = true;
+  setPayButtonsLocked(true);
 
   var total = ticketTotal();
   var soldTicket = ticket.slice();
@@ -865,6 +2411,18 @@ function pay(method) {
     startTpePayment(saleCtx);
     return;
   }
+
+  // Espèces : même écran d'attente que la carte (sans les boutons
+  // Annuler/Réessayer) - l'encaissement peut prendre un instant (ex.
+  // envoi de l'email du code cadeau), sans retour visuel on pouvait
+  // croire que ça avait planté et recliquer.
+  var box = document.getElementById('tpe-box');
+  box.classList.remove('fail');
+  document.getElementById('tpe-spinner').style.display = 'block';
+  document.getElementById('tpe-amount').textContent = eur(saleCtx.total);
+  document.getElementById('tpe-msg').textContent = 'Encaissement en cours…';
+  document.getElementById('tpe-actions').style.display = 'none';
+  document.getElementById('tpe-overlay').classList.add('on');
 
   finalizeSale(saleCtx);
 }
@@ -904,15 +2462,24 @@ function showTpeFailure(message) {
   document.getElementById('tpe-amount').textContent = 'Échec du paiement';
   document.getElementById('tpe-msg').textContent = message;
   document.getElementById('tpe-actions').style.display = 'flex';
+  // L'utilisateur doit pouvoir choisir "Annuler" (retour au ticket) ou
+  // "Réessayer" - dans les deux cas ce n'est plus "en cours de
+  // traitement", donc on débloque les boutons de paiement.
+  paymentInFlight = false;
+  setPayButtonsLocked(false);
 }
 
 function cancelTpePayment() {
   tpePendingSaleCtx = null;
+  paymentInFlight = false;
+  setPayButtonsLocked(false);
   document.getElementById('tpe-overlay').classList.remove('on');
 }
 
 function retryTpePayment() {
   if (!tpePendingSaleCtx) return;
+  paymentInFlight = true;
+  setPayButtonsLocked(true);
   startTpePayment(tpePendingSaleCtx);
 }
 
@@ -923,9 +2490,18 @@ function finalizeSale(saleCtx) {
       payment_method: saleCtx.method, items: saleCtx.soldTicket, queue_id: saleCtx.linkedQueueId,
       gift: saleCtx.gift, loyalty_redeem: saleCtx.usedLoyalty
     }
-  }).then(function () {
+  }).then(function (r) {
     tpePendingSaleCtx = null;
-    showReceipt(saleCtx.soldTicket, saleCtx.total, saleCtx.method);
+    paymentInFlight = false;
+    document.getElementById('tpe-overlay').classList.remove('on');
+    showReceipt(saleCtx.soldTicket, saleCtx.total, saleCtx.method, { ticketNumber: r.sale && r.sale.ticket_number });
+    // Si un cadeau a été créé, on avertit toujours le coiffeur si l'email
+    // du code n'est pas parti (SMTP non configuré, panne...) - sans ça,
+    // le client repart sans son code et personne ne s'en aperçoit avant
+    // qu'il ne rappelle pour se plaindre.
+    if (r.gift && !r.gift.email_sent) {
+      toast('⚠️ Email du code cadeau NON envoyé - notez ce code pour le client : ' + r.gift.code, true);
+    }
     // Paiement en espèces : impression automatique du ticket, ce qui
     // déclenche aussi l'ouverture du tiroir-caisse si l'imprimante est
     // configurée pour ça (réglage côté pilote Windows). Pas fait pour la
@@ -944,19 +2520,119 @@ function finalizeSale(saleCtx) {
     document.getElementById('gift-email').value = '';
     renderTicket();
     loadPendingPayments();
-  }).catch(function (e) { toast(e.message, true); });
+  }).catch(function (e) {
+    // Échec (réseau, validation serveur...) - le ticket n'a PAS été
+    // vidé, donc le coiffeur peut corriger et refaire un essai : il faut
+    // impérativement débloquer les boutons, sinon la caisse reste
+    // bloquée jusqu'au rafraîchissement de la page.
+    paymentInFlight = false;
+    setPayButtonsLocked(false);
+    document.getElementById('tpe-overlay').classList.remove('on');
+    toast(e.message, true);
+  });
 }
 
 var PAYMENT_LABELS = { especes: 'Espèces', cb: 'Carte bancaire' };
 
-function showReceipt(lines, total, method) {
-  var when = new Date().toLocaleString('fr-FR');
-  var html = '<h2>' + esc(document.title.replace(' — Caisse', '')) + '</h2>' +
-    '<div class="sub">' + when + ' · ' + esc(me.name) + '</div>' +
-    lines.map(function (l) {
-      return '<div class="rline"><span>' + l.quantity + ' × ' + esc(l.item_name) + '</span><span>' + eur(l.unit_price_cents * l.quantity) + '</span></div>';
-    }).join('') +
-    '<div class="rline rtotal"><span>Total (' + esc(PAYMENT_LABELS[method] || method) + ')</span><span>' + eur(total) + '</span></div>' +
+/**
+ * Calcule le taux de TVA applicable à un article selon sa catégorie
+ * (prestation/supplément/produit) - jamais par article individuel,
+ * voir Réglages > TVA.
+ */
+function vatRateFor(itemType) {
+  if (itemType === 'service') return Number(vatRates.service) || 0;
+  if (itemType === 'extra') return Number(vatRates.extra) || 0;
+  return Number(vatRates.product) || 0;
+}
+
+function showReceipt(lines, total, method, opts) {
+  opts = opts || {};
+  var whenDate = opts.when ? new Date(opts.when) : new Date();
+  var when = whenDate.toLocaleDateString('fr-FR') + ' - ' + whenDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  var barberName = opts.barberName;
+  if (!barberName) {
+    var activeBarber = allBarbers.find(function (b) { return b.id === activeBarberId; });
+    barberName = activeBarber ? activeBarber.name : (me ? me.name : '');
+  }
+  var ticketNumber = opts.ticketNumber ? String(opts.ticketNumber).padStart(6, '0') : ('T' + whenDate.getTime());
+  var salonName = document.title.replace(' — Caisse', '');
+
+  // En-tête : identité du salon, comme l'exige la loi sur chaque ticket.
+  var headHtml = '<h2>' + esc(salonName) + '</h2>';
+  if (legalInfo.address) headHtml += '<div class="rlegal-line">' + esc(legalInfo.address).replace(/\n/g, '<br>') + '</div>';
+  if (legalInfo.phone) headHtml += '<div class="rlegal-line">Tel : ' + esc(legalInfo.phone) + '</div>';
+  if (legalInfo.email) headHtml += '<div class="rlegal-line">Mail : ' + esc(legalInfo.email) + '</div>';
+  if (legalInfo.website) headHtml += '<div class="rlegal-line">' + esc(legalInfo.website) + '</div>';
+
+  var metaHtml = '<div class="rsep"></div>' +
+    '<div class="rline"><span>Date</span><span>' + when + '</span></div>' +
+    '<div class="rline"><span>Ticket n°</span><span>' + esc(ticketNumber) + '</span></div>' +
+    (barberName ? '<div class="rline"><span>Coiffeur</span><span>' + esc(barberName) + '</span></div>' : '') +
+    '<div class="rsep"></div>';
+
+  var itemsHtml = lines.map(function (l) {
+    return '<div class="rline"><span>' + l.quantity + ' × ' + esc(l.item_name) + '</span><span>' + eur(l.unit_price_cents * l.quantity) + '</span></div>';
+  }).join('');
+
+  var articleCount = lines.reduce(function (n, l) { return n + l.quantity; }, 0);
+  var summaryHtml = '<div class="rsep"></div>' +
+    '<div class="rline"><span>Nombre d\'articles</span><span>' + articleCount + '</span></div>' +
+    '<div class="rline rtotal"><span>TOTAL TTC</span><span>' + eur(total) + '</span></div>';
+
+  // Détail TVA par taux (regroupe les articles dont le taux calculé est
+  // identique, même s'ils viennent de catégories différentes) - ou la
+  // mention d'exonération si le salon n'est pas assujetti à la TVA
+  // (pas de n° de TVA renseigné).
+  var vatHtml = '';
+  if (legalInfo.vat_number) {
+    var byRate = {};
+    lines.forEach(function (l) {
+      var rate = vatRateFor(l.item_type);
+      var ttc = l.unit_price_cents * l.quantity;
+      var ht = rate > 0 ? ttc / (1 + rate / 100) : ttc;
+      if (!byRate[rate]) byRate[rate] = { ht: 0, ttc: 0 };
+      byRate[rate].ht += ht;
+      byRate[rate].ttc += ttc;
+    });
+    var totalHt = 0;
+    var rateRows = Object.keys(byRate).sort(function (a, b) { return b - a; }).map(function (rate) {
+      var g = byRate[rate];
+      totalHt += g.ht;
+      return '<div class="rline"><span>(' + rate + '%)</span><span>' + eur(Math.round(g.ht)) + '</span><span>' + eur(Math.round(g.ttc - g.ht)) + '</span><span>' + eur(Math.round(g.ttc)) + '</span></div>';
+    }).join('');
+    vatHtml = '<div class="rsep"></div>' +
+      '<div class="rline rvathead"><span>Taux</span><span>HT</span><span>TVA</span><span>TTC</span></div>' +
+      rateRows +
+      '<div class="rline"><span>TOTAL HT</span><span></span><span></span><span>' + eur(Math.round(totalHt)) + '</span></div>';
+  } else {
+    vatHtml = '<div class="rsep"></div><div class="rlegal-line" style="text-align:center">TVA non applicable, art. 293 B du CGI</div>';
+  }
+
+  var paymentHtml = '<div class="rsep"></div>' +
+    '<div class="rline rtotal"><span>' + esc(PAYMENT_LABELS[method] || method) + '</span><span>' + eur(total) + '</span></div>';
+
+  // Mentions légales obligatoires en pied de ticket.
+  var footerParts = [];
+  if (legalInfo.siret) {
+    var siretLine = 'SIRET ' + esc(legalInfo.siret);
+    if (legalInfo.naf_code) siretLine += ' - NAF ' + esc(legalInfo.naf_code);
+    footerParts.push(siretLine);
+  }
+  if (legalInfo.vat_number) footerParts.push('TVA Intracom ' + esc(legalInfo.vat_number));
+  if (legalInfo.legal_form || legalInfo.share_capital) {
+    footerParts.push([legalInfo.legal_form, legalInfo.share_capital ? 'Capital ' + esc(legalInfo.share_capital) + ' €' : ''].filter(Boolean).map(esc).join(' - '));
+  }
+  if (legalInfo.rcs_city && legalInfo.siret) {
+    var siren = legalInfo.siret.slice(0, 9);
+    footerParts.push('RCS ' + esc(legalInfo.rcs_city) + ' ' + siren);
+  }
+  if (legalInfo.register_number) footerParts.push('Caisse ' + esc(legalInfo.register_number));
+  var footerHtml = footerParts.length
+    ? '<div class="rsep"></div><div class="rlegal-line" style="text-align:center">' + footerParts.join('<br>') + '</div>'
+    : '';
+
+  var html = headHtml + metaHtml + itemsHtml + summaryHtml + vatHtml + paymentHtml + footerHtml +
+    '<div class="rlegal-line" style="text-align:center;margin-top:10px">Merci de votre visite</div>' +
     '<div class="receipt-actions">' +
       '<button class="btn btn-soft" onclick="closeReceipt()">Fermer</button>' +
       '<button class="btn btn-primary" onclick="window.print()">Imprimer</button>' +
@@ -967,6 +2643,77 @@ function showReceipt(lines, total, method) {
 
 function closeReceipt() {
   document.getElementById('receipt-overlay').classList.remove('on');
+}
+
+/* ---------- Historique de caisse (tiroir latéral) ---------- */
+var historyFilterBarberId = null; // filtre local, distinct de activeBarberId
+var historySalesCache = [];
+
+function openCaisseHistory() {
+  historyFilterBarberId = null;
+  document.getElementById('history-drawer-backdrop').classList.add('on');
+  renderHistoryBubbles();
+  loadCaisseHistory();
+}
+
+function closeCaisseHistory() {
+  document.getElementById('history-drawer-backdrop').classList.remove('on');
+}
+
+function renderHistoryBubbles() {
+  document.getElementById('history-bubbles').innerHTML = allBarbers.map(function (b) {
+    var color = b.color || stableColorForId(b.id);
+    var initial = (b.name || '?').trim().charAt(0).toUpperCase();
+    var avatarStyle = b.photo_url ? 'background-image:url(\'' + b.photo_url + '\')' : 'background:' + color;
+    return '<button class="history-bubble' + (b.id === historyFilterBarberId ? ' on' : '') + '" onclick="selectHistoryFilter(\'' + b.id + '\')">' +
+      '<span class="avatar" style="' + avatarStyle + '">' + (b.photo_url ? '' : esc(initial)) + '</span>' +
+      '<span class="lbl">' + esc(b.name) + '</span>' +
+      '</button>';
+  }).join('');
+}
+
+function selectHistoryFilter(barberId) {
+  historyFilterBarberId = (barberId === historyFilterBarberId) ? null : barberId;
+  renderHistoryBubbles();
+  loadCaisseHistory();
+}
+
+function loadCaisseHistory() {
+  document.getElementById('history-list').innerHTML = '<p class="hint">Chargement…</p>';
+  var url = '/api/sales' + (historyFilterBarberId ? '?barber_id=' + historyFilterBarberId : '');
+  barberApi(url)
+    .then(function (r) {
+      historySalesCache = r.items;
+      renderHistoryList();
+    })
+    .catch(function (e) { document.getElementById('history-list').innerHTML = '<p class="hint">' + esc(e.message) + '</p>'; });
+}
+
+function renderHistoryList() {
+  var box = document.getElementById('history-list');
+  if (!historySalesCache.length) {
+    box.innerHTML = '<p class="hint" style="text-align:center;padding:20px 0">Aucune vente trouvée</p>';
+    return;
+  }
+  box.innerHTML = historySalesCache.map(function (s, i) {
+    var when = new Date(s.created_at).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+    var itemsHtml = s.items.map(function (it) {
+      var seller = it.barber_id ? allBarbers.find(function (b) { return b.id === it.barber_id; }) : null;
+      return '<div>' + it.quantity + ' × ' + esc(it.item_name) + (seller ? ' <span class="li-barber">(' + esc(seller.name) + ')</span>' : '') + '</div>';
+    }).join('');
+    return '<div class="history-sale-card">' +
+      '<div class="history-sale-head"><span>' + esc(s.barber_name || 'Non assigné') + ' · ' + esc(PAYMENT_LABELS[s.payment_method] || s.payment_method) + '</span>' +
+      '<span class="amount">' + eur(s.total_price_cents) + '</span></div>' +
+      '<div class="history-sale-when">' + when + '</div>' +
+      '<div class="history-sale-items">' + itemsHtml + '</div>' +
+      '<button class="btn btn-soft" style="width:100%" onclick="reprintSale(' + i + ')">Imprimer</button>' +
+    '</div>';
+  }).join('');
+}
+
+function reprintSale(index) {
+  var s = historySalesCache[index];
+  showReceipt(s.items, s.total_price_cents, s.payment_method, { when: s.created_at, barberName: s.barber_name || 'Non assigné', ticketNumber: s.ticket_number });
 }
 
 // Ouvre le tiroir-caisse sans passer par une vente (pour rendre la

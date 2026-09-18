@@ -50,7 +50,7 @@ async function checkAndNotifyAppointmentsForSalon(salonId) {
   if (!s.smtp_host) return;
 
   const threshold = Number(s.notify_before_min || 30);
-  const nowMs = new Date(nowParisDatetimeString().replace(' ', 'T') + 'Z').getTime();
+  const nowMs = new Date(nowParisDatetimeString(s.timezone).replace(' ', 'T') + 'Z').getTime();
 
   const [rows] = await pool.query(
     `SELECT a.id, a.client_name, a.email, a.scheduled_at, a.created_at, s.name AS service_name
@@ -67,7 +67,7 @@ async function checkAndNotifyAppointmentsForSalon(salonId) {
     if (minutesUntil > threshold || minutesUntil < threshold - MARGIN_MIN) continue;
 
     const [dateStr, timeStr] = scheduledAtStr.split(' ');
-    const apptUtcMs = parisLocalToUtcDate(dateStr, timeStr.slice(0, 5)).getTime();
+    const apptUtcMs = parisLocalToUtcDate(dateStr, timeStr.slice(0, 5), s.timezone).getTime();
     const createdMs = new Date(a.created_at).getTime();
     const leadMinAtBooking = (apptUtcMs - createdMs) / 60000;
 

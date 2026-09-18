@@ -17,10 +17,13 @@ function wrap(fn) {
 }
 
 router.post('/', wrap(async (req, res) => {
-  const { owner_name, salon_name, slug, email, password } = req.body;
+  const { owner_name, salon_name, slug, siret, email, password } = req.body;
 
-  if (!owner_name || !salon_name || !slug || !email || !password) {
+  if (!owner_name || !salon_name || !slug || !siret || !email || !password) {
     return res.status(400).json({ error: 'Tous les champs sont requis' });
+  }
+  if (!/^\d{14}$/.test(String(siret).replace(/\s/g, ''))) {
+    return res.status(400).json({ error: 'Le SIRET doit comporter exactement 14 chiffres' });
   }
   if (!/^[a-z0-9-]+$/.test(slug)) {
     return res.status(400).json({
@@ -81,6 +84,7 @@ router.post('/', wrap(async (req, res) => {
 
   const settingsRows = [
     [salonId, 'notify_before_min', '30'], [salonId, 'salon_name', salon_name],
+    [salonId, 'legal_siret', String(siret).replace(/\s/g, '')],
     [salonId, 'smtp_host', ''], [salonId, 'smtp_port', '587'],
     [salonId, 'smtp_user', ''], [salonId, 'smtp_pass', ''], [salonId, 'smtp_from', '']
   ];

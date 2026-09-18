@@ -45,6 +45,8 @@
       <input id="f-salon" type="text" placeholder="Le Salon" autocomplete="organization"></div>
     <div class="fld"><label for="f-slug">Identifiant (dans les liens de votre salon)</label>
       <input id="f-slug" type="text" placeholder="mon-salon" pattern="[a-z0-9-]+"></div>
+    <div class="fld"><label for="f-siret">Numéro SIRET</label>
+      <input id="f-siret" type="text" placeholder="14 chiffres" inputmode="numeric" maxlength="14"></div>
     <div class="fld"><label for="f-email">Email</label>
       <input id="f-email" type="email" placeholder="vous@exemple.com" autocomplete="email"></div>
     <div class="row2">
@@ -91,11 +93,13 @@ function doSignup() {
   var ownerName = document.getElementById('f-owner-name').value.trim();
   var salon = document.getElementById('f-salon').value.trim();
   var slug = document.getElementById('f-slug').value.trim();
+  var siret = document.getElementById('f-siret').value.replace(/\s/g, '').trim();
   var email = document.getElementById('f-email').value.trim();
   var pw = document.getElementById('f-pw').value;
   var pw2 = document.getElementById('f-pw2').value;
 
-  if (!ownerName || !salon || !slug || !email || !pw) { toast('Tous les champs sont requis', true); return; }
+  if (!ownerName || !salon || !slug || !siret || !email || !pw) { toast('Tous les champs sont requis', true); return; }
+  if (!/^\d{14}$/.test(siret)) { toast('Le SIRET doit comporter exactement 14 chiffres', true); return; }
   if (pw !== pw2) { toast('Les mots de passe ne correspondent pas', true); return; }
   if (pw.length < 6) { toast('Le mot de passe doit contenir au moins 6 caractères', true); return; }
 
@@ -105,7 +109,7 @@ function doSignup() {
   fetch('/api/signup', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ owner_name: ownerName, salon_name: salon, slug: slug, email: email, password: pw, base_url: window.location.origin })
+    body: JSON.stringify({ owner_name: ownerName, salon_name: salon, slug: slug, siret: siret, email: email, password: pw, base_url: window.location.origin })
   }).then(function (r) {
     return r.json().then(function (d) {
       if (!r.ok) throw new Error(d.error || 'Erreur');

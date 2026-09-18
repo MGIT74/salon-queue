@@ -361,6 +361,7 @@ function iconForItem(name) {
   if (n.indexOf('cire') !== -1 || n.indexOf('gel') !== -1) return '🧴';
   if (n.indexOf('zéro') !== -1 || n.indexOf('zero') !== -1) return '🪒';
   if (n.indexOf('barbe') !== -1) return '🧔';
+  if (n.indexOf('parfum') !== -1) return '🌸';
   if (n.indexOf('coupe') !== -1) return '✂️';
   return '✂️';
 }
@@ -612,6 +613,16 @@ function lookupGiftCode() {
       return;
     }
     activeGift = g;
+
+    // Le coiffeur désigné (celui dont la bulle était sélectionnée à la
+    // vente en caisse) permet de sauter entièrement l'étape "choisissez
+    // le coiffeur" - le client gagne du temps, et le cadeau est déjà lié
+    // au bon coiffeur depuis l'achat.
+    if (g.designated_barber) {
+      pickBarberAndGo(g.designated_barber.id);
+      return;
+    }
+
     document.getElementById('eyebrow-home').textContent = 'Cadeau de ' + g.recipient_name + ' — choisissez le coiffeur';
     show('p-home');
   }).catch(function (err) {

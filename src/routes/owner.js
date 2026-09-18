@@ -6,6 +6,7 @@ const requireAdminOrBarber = require('../middleware/barberAuth');
 const { hashPassword } = require('../lib/password');
 const { sendLoyaltyActivation, sendGiftConfirmation } = require('../lib/mailer');
 const { clientKey } = require('../lib/queueMath');
+const { logActivity } = require('../lib/activityLog');
 
 const router = express.Router();
 
@@ -76,6 +77,7 @@ router.post('/salons', requireAdmin, wrap(async (req, res) => {
   ];
   await pool.query('INSERT INTO settings (salon_id, `key`, value) VALUES ?', [settingsRows]);
 
+  logActivity(req.salon.id, 'salon_create', 'Salon "' + name + '" ajouté à l\'enseigne');
   res.json({ ok: true, item: { id, name, slug } });
 }));
 
@@ -92,6 +94,12 @@ router.put('/salons/:id', requireAdmin, wrap(async (req, res) => {
   if (!sets.length) return res.json({ ok: true });
   params.push(req.params.id);
   await pool.query(`UPDATE salons SET ${sets.join(', ')} WHERE id = ?`, params);
+  if (req.body.name !== undefined) {
+    logActivity(req.salon.id, 'salon_edit', 'Salon renommé "' + req.body.name + '"');
+  }
+  if (req.body.active !== undefined) {
+    logActivity(req.salon.id, req.body.active ? 'salon_restore' : 'salon_disable', 'Salon ' + (req.body.active ? 'réactivé' : 'désactivé'));
+  }
   res.json({ ok: true });
 }));
 
@@ -120,6 +128,7 @@ router.delete('/salons/:id', requireAdmin, wrap(async (req, res) => {
   }
 
   await pool.query('DELETE FROM salons WHERE id = ?', [req.params.id]);
+  logActivity(req.salon.id, 'salon_delete', 'Salon "' + salon.name + '" supprimé définitivement');
   res.json({ ok: true, deleted: true, name: salon.name });
 }));
 
@@ -193,7 +202,46 @@ router.get('/clients', requireAdmin, wrap(async (req, res) => {
   res.json({ ok: true, items });
 }));
 
-// Permet à un compte déjà connecté (même via l'ancien mot de passe partagé
+/**
+ * Journal d'activité (Paramètres > Journal d'activité) : même logique de
+ * filtre par salon que /clients ci-dessus, paginé (le journal peut vite
+ * devenir long sur une enseigne active).
+ */
+router.get('/activity-log', requireAdmin, wrap(async (req, res) => {
+  const salonFilter = req.query.salon; // absent ou 'all' => tous les salons
+
+  let salonIds;
+  if (!salonFilter || salonFilter === 'all') {
+    const [rows] = await pool.query('SELECT id FROM salons WHERE owner_id = ?', [req.ownerId]);
+    salonIds = rows.map((r) => r.id);
+  } else {
+    const [[owned]] = await pool.query(
+      'SELECT id FROM salons WHERE id = ? AND owner_id = ?', [salonFilter, req.ownerId]
+    );
+    if (!owned) return res.status(403).json({ error: "Ce salon n'appartient pas à votre enseigne" });
+    salonIds = [salonFilter];
+  }
+
+  if (salonIds.length === 0) return res.json({ ok: true, items: [], total: 0, page: 1, per_page: 25, total_pages: 1 });
+
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const perPage = Math.min(100, Math.max(1, Number(req.query.per_page) || 25));
+
+  const [[{ total }]] = await pool.query(
+    `SELECT COUNT(*) AS total FROM activity_log WHERE salon_id IN (?)`, [salonIds]
+  );
+  const [rows] = await pool.query(
+    `SELECT a.*, s.name AS salon_name
+     FROM activity_log a
+     JOIN salons s ON s.id = a.salon_id
+     WHERE a.salon_id IN (?)
+     ORDER BY a.created_at DESC LIMIT ? OFFSET ?`,
+    [salonIds, perPage, (page - 1) * perPage]
+  );
+
+  const items = rows.map((r) => Object.assign({}, r, { created_at: utcIso(r.created_at) }));
+  res.json({ ok: true, items, total, page, per_page: perPage, total_pages: Math.max(1, Math.ceil(total / perPage)) });
+}));
 // en clair) d'ajouter un email de récupération, pour pouvoir ensuite
 // utiliser "mot de passe oublié". Ne change pas le mot de passe lui-même.
 /**
@@ -213,6 +261,7 @@ router.put('/name', requireAdmin, wrap(async (req, res) => {
   if (name.length > 255) return res.status(400).json({ error: 'Nom trop long' });
 
   await pool.query('UPDATE owners SET name = ? WHERE id = ?', [name, req.ownerId]);
+  logActivity(req.salon.id, 'account_edit', 'Nom du compte modifié en "' + name + '"');
   res.json({ ok: true });
 }));
 
@@ -226,6 +275,7 @@ router.put('/email', requireAdmin, wrap(async (req, res) => {
   if (existing) return res.status(409).json({ error: 'Un autre compte utilise déjà cet email' });
 
   await pool.query('UPDATE owners SET email = ? WHERE id = ?', [email, req.ownerId]);
+  logActivity(req.salon.id, 'account_edit', 'Email du compte modifié en ' + email);
   res.json({ ok: true });
 }));
 
@@ -239,6 +289,7 @@ router.put('/password', requireAdmin, wrap(async (req, res) => {
   }
   const hash = await hashPassword(new_password);
   await pool.query('UPDATE owners SET password_hash = ? WHERE id = ?', [hash, req.ownerId]);
+  logActivity(req.salon.id, 'account_edit', 'Mot de passe du compte modifié');
   res.json({ ok: true });
 }));
 
@@ -281,6 +332,7 @@ router.put('/marketing-settings', requireAdmin, wrap(async (req, res) => {
   }
 
   await setOwnerSettings(req.ownerId, updates);
+  logActivity(req.salon.id, 'settings_edit', 'Réglages de fidélité modifiés');
   res.json({ ok: true });
 }));
 
@@ -290,7 +342,11 @@ router.put('/marketing-settings', requireAdmin, wrap(async (req, res) => {
  */
 router.get('/gift-cards', requireAdmin, wrap(async (req, res) => {
   const [rows] = await pool.query(
-    'SELECT * FROM gift_cards WHERE salon_id = ? ORDER BY created_at DESC LIMIT 300',
+    `SELECT g.*, b.name AS barber_name
+     FROM gift_cards g
+     LEFT JOIN sales s ON s.id = g.sale_id
+     LEFT JOIN barbers b ON b.id = s.barber_id
+     WHERE g.salon_id = ? ORDER BY g.created_at DESC LIMIT 300`,
     [req.salon.id]
   );
   res.json({
@@ -306,6 +362,7 @@ router.get('/gift-cards', requireAdmin, wrap(async (req, res) => {
         amount_cents: g.amount_cents,
         items,
         code: g.code,
+        barber_name: g.barber_name || null,
         used_at: g.used_at ? utcIso(g.used_at) : null,
         created_at: utcIso(g.created_at)
       };
@@ -349,7 +406,7 @@ router.post('/gift-cards/:id/resend', requireAdmin, wrap(async (req, res) => {
  */
 router.get('/loyalty-accounts', requireAdmin, wrap(async (req, res) => {
   const [rows] = await pool.query(
-    'SELECT client_name, client_key, points, rewards_available, activated_at, updated_at FROM loyalty_accounts ' +
+    'SELECT client_name, client_key, recipient_email, points, rewards_available, activated_at, updated_at FROM loyalty_accounts ' +
     'WHERE salon_id = ? AND activated_at IS NOT NULL ORDER BY updated_at DESC LIMIT 300',
     [req.salon.id]
   );
@@ -557,6 +614,7 @@ router.post('/caisse/close', requireAdmin, wrap(async (req, res) => {
     [id, req.salon.id, periodStart, total, sales.length, JSON.stringify(byMethod), zNumber]
   );
 
+  logActivity(req.salon.id, 'cash_closing', 'Clôture de caisse Z' + zNumber + ' (' + sales.length + ' vente' + (sales.length > 1 ? 's' : '') + ', ' + (total / 100).toFixed(2) + ' €)');
   res.json({ ok: true, id, z_number: zNumber, total_cents: total, sales_count: sales.length });
 }));
 

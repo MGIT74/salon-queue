@@ -4,7 +4,7 @@ const { pool, utcIso, getSettings } = require('../db');
 const requireAdmin = require('../middleware/auth');
 const requireAdminOrBarber = require('../middleware/barberAuth');
 const { clientKey } = require('../lib/queueMath');
-const { sendAppointmentConfirmation, sendAppointmentCancelledByAdmin, sendAppointmentRescheduled } = require('../lib/mailer');
+const { sendAppointmentConfirmation, sendAppointmentCancelledByAdmin, sendAppointmentRescheduled, sendGiftCodeRenewed } = require('../lib/mailer');
 
 const router = express.Router();
 
@@ -17,7 +17,51 @@ function wrap(fn) {
   };
 }
 
+// Même alphabet que generateGiftCode() dans sales.js (sans caractères
+// ambigus à l'oral/à l'écrit) - dupliqué ici plutôt que partagé pour
+// éviter un couplage entre ces deux fichiers pour 8 lignes de code.
+const GIFT_CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+function generateGiftCode() {
+  let code = '';
+  for (let i = 0; i < 8; i++) code += GIFT_CODE_CHARS[crypto.randomInt(GIFT_CODE_CHARS.length)];
+  return code;
+}
+
 const SLOT_STEP_MIN = 15;
+
+/**
+ * Libère un cadeau qui bloquait un rendez-vous désormais annulé, avec
+ * un NOUVEAU code (l'ancien, déjà transmis par email et potentiellement
+ * partagé, ne doit plus jamais pouvoir resservir). Ne fait rien si le
+ * cadeau a entre-temps été réellement consommé en salon (used_at) - ce
+ * cas ne devrait normalement pas se produire pour un RDV qu'on annule,
+ * mais mieux vaut ne rien casser si jamais.
+ */
+async function releaseGiftAfterCancellation(salonId, giftCardId) {
+  const [[gift]] = await pool.query(
+    'SELECT recipient_name, recipient_email, amount_cents, items_json, used_at FROM gift_cards WHERE id = ?',
+    [giftCardId]
+  );
+  if (!gift || gift.used_at) return;
+
+  const newCode = generateGiftCode();
+  await pool.query(
+    'UPDATE gift_cards SET code = ?, pending_appointment_id = NULL WHERE id = ?',
+    [newCode, giftCardId]
+  );
+  let items = [];
+  try { items = JSON.parse(gift.items_json || '[]'); } catch (e) { items = []; }
+  try {
+    await sendGiftCodeRenewed(salonId, gift.recipient_email, {
+      recipientName: gift.recipient_name,
+      amountEur: (gift.amount_cents / 100).toFixed(2) + ' €',
+      items,
+      code: newCode
+    });
+  } catch (err) {
+    console.error('[rdv] envoi du nouveau code cadeau échoué:', err.message);
+  }
+}
 
 /**
  * Heure "de salon" fiable, indépendante du fuseau horaire configuré sur
@@ -290,8 +334,10 @@ router.get('/', requireAdminOrBarber, wrap(async (req, res) => {
 
   // Un coiffeur connecté (PIN, pas admin) ne voit que SES propres RDV -
   // utilisé par 'Mon poste' pour son propre agenda, jamais l'admin
-  // complet du salon.
-  if (req.barberId) {
+  // complet du salon. L'Agenda de la caisse (vue multi-coiffeurs, filtre
+  // fait côté client par bulle sélectionnée) passe explicitement
+  // caisse_view=1 pour recevoir tout le monde, comme un admin.
+  if (req.barberId && req.query.caisse_view !== '1') {
     conditions.push('a.barber_id = ?');
     params.push(req.barberId);
   }
@@ -371,7 +417,7 @@ router.get('/', requireAdminOrBarber, wrap(async (req, res) => {
  * pour AUJOURD'HUI, promeut immédiatement en entrée de file.
  */
 router.post('/', wrap(async (req, res) => {
-  const { client_name, email, phone, service_id, barber_id, extras, date, time } = req.body;
+  const { client_name, email, phone, service_id, barber_id, extras, date, time, gift_id } = req.body;
   const clientNote = req.body.client_note ? String(req.body.client_note).slice(0, 500) : null;
   if (!client_name) return res.status(400).json({ error: 'Le nom est requis' });
   if (!email) return res.status(400).json({ error: "L'email est requis pour la confirmation" });
@@ -435,10 +481,26 @@ router.post('/', wrap(async (req, res) => {
   const cancelToken = crypto.randomBytes(24).toString('hex');
   const scheduledAt = date + ' ' + time + ':00';
 
+  // Un cadeau ne peut servir qu'a UN SEUL rendez-vous en attente a la
+  // fois - la mise a jour conditionnelle (WHERE ... IS NULL) est
+  // atomique, elle protege contre deux reservations lancees en meme
+  // temps avec le meme code (l'une des deux perd la course et se voit
+  // refusee proprement, plutot que les deux reussissent).
+  if (gift_id) {
+    const [giftLock] = await pool.query(
+      `UPDATE gift_cards SET pending_appointment_id = ?
+       WHERE id = ? AND salon_id = ? AND used_at IS NULL AND pending_appointment_id IS NULL`,
+      [id, gift_id, req.salon.id]
+    );
+    if (giftLock.affectedRows === 0) {
+      return res.status(409).json({ error: 'Ce cadeau n\'est plus disponible (déjà utilisé ou réservé pour un autre rendez-vous).' });
+    }
+  }
+
   await pool.query(
-    `INSERT INTO appointments (id, salon_id, barber_id, client_name, email, phone, service_id, scheduled_at, status, cancel_token, client_note)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?)`,
-    [id, req.salon.id, finalBarberId, client_name, email, phone || null, service_id, scheduledAt, cancelToken, clientNote]
+    `INSERT INTO appointments (id, salon_id, barber_id, client_name, email, phone, service_id, scheduled_at, status, cancel_token, client_note, gift_card_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?, ?)`,
+    [id, req.salon.id, finalBarberId, client_name, email, phone || null, service_id, scheduledAt, cancelToken, clientNote, gift_id || null]
   );
   if (extraIds.length) {
     await pool.query(
@@ -471,7 +533,8 @@ router.post('/', wrap(async (req, res) => {
       when,
       serviceName: service.name + (extraNames.length ? ' + ' + extraNames.join(', ') : ''),
       barberName: barber ? barber.name : null,
-      cancelUrl
+      cancelUrl,
+      giftNote: gift_id ? 'Ce rendez-vous est réglé avec votre carte cadeau - présentez-vous en salon, rien à payer sur place.' : null
     });
   } catch (err) {
     console.error('[rdv] envoi email de confirmation échoué:', err.message);
@@ -496,11 +559,11 @@ router.post('/', wrap(async (req, res) => {
  */
 router.post('/admin-create', requireAdminOrBarber, wrap(async (req, res) => {
   const { client_name, email, phone, service_id, extras, date, time } = req.body;
-  // Un coiffeur connecté (PIN) ne peut créer un RDV que pour LUI-MÊME
-  // - le coiffeur envoyé dans le corps de la requête est ignoré dans
-  // ce cas, on force sa propre identité pour éviter qu'il n'en crée un
-  // pour un collègue. L'admin garde le choix libre du coiffeur.
-  const barber_id = req.barberId || req.body.barber_id;
+  // Un coiffeur connecté (PIN) ne peut créer un RDV que pour le coiffeur
+  // actif (lui-même par défaut, ou celui désigné par bulle depuis la
+  // caisse partagée) - le coiffeur envoyé dans le corps de la requête
+  // est ignoré dans ce cas. L'admin garde le choix libre du coiffeur.
+  const barber_id = req.actingBarberId || req.body.barber_id;
   const clientNote = req.body.client_note ? String(req.body.client_note).slice(0, 500) : null;
   if (!client_name) return res.status(400).json({ error: 'Le nom est requis' });
   if (!barber_id) return res.status(400).json({ error: 'Le coiffeur est requis' });
@@ -597,7 +660,7 @@ router.post('/cancel', wrap(async (req, res) => {
   if (!token) return res.status(400).json({ error: 'Token requis' });
 
   const [[appt]] = await pool.query(
-    'SELECT id, salon_id, status, scheduled_at, promoted_queue_id FROM appointments WHERE cancel_token = ?', [token]
+    'SELECT id, salon_id, status, scheduled_at, promoted_queue_id, gift_card_id FROM appointments WHERE cancel_token = ?', [token]
   );
   if (!appt) return res.status(404).json({ error: 'Rendez-vous introuvable' });
   if (appt.status === 'cancelled') return res.status(409).json({ error: 'Ce rendez-vous est déjà annulé' });
@@ -621,6 +684,8 @@ router.post('/cancel', wrap(async (req, res) => {
       [appt.promoted_queue_id]
     );
   }
+  if (appt.gift_card_id) await releaseGiftAfterCancellation(appt.salon_id, appt.gift_card_id);
+
   res.json({ ok: true });
 }));
 
@@ -630,15 +695,23 @@ router.post('/cancel', wrap(async (req, res) => {
  * via token, aucun email envoyé puisqu'il vient d'annuler lui-même).
  * Ici un email d'excuses est envoyé au client s'il a une adresse.
  */
-router.post('/:id/admin-cancel', requireAdmin, wrap(async (req, res) => {
+router.post('/:id/admin-cancel', requireAdminOrBarber, wrap(async (req, res) => {
   const [[appt]] = await pool.query(
-    `SELECT a.id, a.status, a.scheduled_at, a.promoted_queue_id, a.client_name, a.email, s.name AS service_name
+    `SELECT a.id, a.status, a.scheduled_at, a.barber_id, a.promoted_queue_id, a.client_name, a.email, a.gift_card_id, a.salon_id, s.name AS service_name
      FROM appointments a JOIN services s ON s.id = a.service_id
      WHERE a.id = ? AND a.salon_id = ?`,
     [req.params.id, req.salon.id]
   );
   if (!appt) return res.status(404).json({ error: 'Rendez-vous introuvable' });
   if (appt.status === 'cancelled') return res.status(409).json({ error: 'Ce rendez-vous est déjà annulé' });
+
+  // Un coiffeur (session PIN, pas admin) ne peut annuler que le RDV du
+  // coiffeur actif (lui-même par défaut, ou celui désigné par bulle
+  // depuis la caisse partagée) - jamais celui d'un autre sans être passé
+  // par cette sélection explicite.
+  if (req.actingBarberId && appt.barber_id && appt.barber_id !== req.actingBarberId) {
+    return res.status(403).json({ error: "Ce n'est pas le RDV de ce coiffeur." });
+  }
 
   await pool.query('UPDATE appointments SET status = ? WHERE id = ?', ['cancelled', appt.id]);
   if (appt.promoted_queue_id) {
@@ -647,6 +720,7 @@ router.post('/:id/admin-cancel', requireAdmin, wrap(async (req, res) => {
       [appt.promoted_queue_id]
     );
   }
+  if (appt.gift_card_id) await releaseGiftAfterCancellation(appt.salon_id, appt.gift_card_id);
 
   if (appt.email) {
     try {
@@ -842,12 +916,16 @@ async function promoteTodayAppointments(salonId) {
  */
 router.delete('/:id', requireAdmin, wrap(async (req, res) => {
   const [[appt]] = await pool.query(
-    'SELECT id FROM appointments WHERE id = ? AND salon_id = ?',
+    'SELECT id, gift_card_id FROM appointments WHERE id = ? AND salon_id = ?',
     [req.params.id, req.salon.id]
   );
   if (!appt) return res.status(404).json({ error: 'Rendez-vous introuvable' });
 
   await pool.query('DELETE FROM appointments WHERE id = ?', [req.params.id]);
+  // Sans ça, un cadeau resterait verrouillé indéfiniment (plus aucun
+  // rendez-vous pour le libérer un jour) puisque la ligne qui le
+  // bloquait vient de disparaître.
+  if (appt.gift_card_id) await releaseGiftAfterCancellation(req.salon.id, appt.gift_card_id);
   res.json({ ok: true });
 }));
 

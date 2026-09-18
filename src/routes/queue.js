@@ -5,6 +5,7 @@ const { loadQueue, recompute, clientKey } = require('../lib/queueMath');
 const { promoteTodayAppointments, nowParisDatetimeString } = require('./appointments');
 const requireAdmin = require('../middleware/auth');
 const requireAdminOrBarber = require('../middleware/barberAuth');
+const { logActivity } = require('../lib/activityLog');
 
 const router = express.Router();
 
@@ -72,7 +73,7 @@ router.get('/', wrap(async (req, res) => {
  */
 router.get('/pending-payment', requireAdminOrBarber, wrap(async (req, res) => {
   let rows = await loadQueue(req.salon.id, ['done'], true);
-  if (req.barberId) rows = rows.filter((r) => r.barber_id === req.barberId);
+  if (req.actingBarberId) rows = rows.filter((r) => r.barber_id === req.actingBarberId);
   rows = await attachGiftInfo(rows, req.salon.id);
 
   // Fidélité : cumulée au niveau du SALON, pas de toute l'enseigne -
@@ -114,7 +115,7 @@ router.post('/:id/defer-payment', requireAdminOrBarber, wrap(async (req, res) =>
     [req.params.id, req.salon.id]
   );
   if (!row) return res.status(404).json({ error: 'Client introuvable' });
-  if (req.barberId && row.barber_id && row.barber_id !== req.barberId) {
+  if (req.actingBarberId && row.barber_id && row.barber_id !== req.actingBarberId) {
     return res.status(403).json({ error: "Ce n'est pas votre client." });
   }
   if (row.paid_at) return res.status(409).json({ error: 'Ce client a déjà été encaissé.' });
@@ -146,7 +147,25 @@ router.post('/manual-client', requireAdmin, wrap(async (req, res) => {
      VALUES (?, ?, ?, ?, ?, ?, 'done', NOW(), NOW(), NOW(), ?, ?)`,
     [id, req.salon.id, String(client_name).trim(), email || null, phone || null, service_id || null, totalPriceCents, totalDurationMin]
   );
+  // req.body.source === 'csv_import' : appelé en boucle par l'import CSV
+  // (voir /manual-client/import-log plus bas) - une ligne de journal par
+  // client noierait le journal, un seul résumé suffit pour tout le lot.
+  if (req.body.source !== 'csv_import') {
+    logActivity(req.salon.id, 'client_manual_add', 'Client "' + String(client_name).trim() + '" ajouté manuellement');
+  }
   res.json({ ok: true, id });
+}));
+
+/**
+ * Résumé unique après un import CSV (voir importClientsCsv côté
+ * dashboard) : évite une ligne de journal par client importé.
+ */
+router.post('/manual-client/import-log', requireAdmin, wrap(async (req, res) => {
+  const count = Number(req.body.count) || 0;
+  if (count > 0) {
+    logActivity(req.salon.id, 'client_csv_import', count + ' client' + (count > 1 ? 's' : '') + ' importé' + (count > 1 ? 's' : '') + ' depuis un fichier CSV');
+  }
+  res.json({ ok: true });
 }));
 
 // --- Public : check-in à la borne ---------------------------------------
@@ -251,16 +270,17 @@ router.post('/:id/start', requireAdminOrBarber, wrap(async (req, res) => {
   );
   if (!row) return res.status(404).json({ error: 'Client introuvable' });
 
-  // Un coiffeur connecté par PIN (pas admin) ne peut agir qu'en son propre
-  // nom, et seulement sur un client déjà assigné à lui ou non-assigné —
+  // Un coiffeur connecté par PIN (pas admin) ne peut agir qu'au nom du
+  // coiffeur actif (bulle sélectionnée - lui-même par défaut), et
+  // seulement sur un client déjà assigné à ce coiffeur ou non-assigné —
   // jamais démarrer le client de quelqu'un d'autre.
-  if (req.barberId) {
-    if (row.barber_id && row.barber_id !== req.barberId) {
+  if (req.actingBarberId) {
+    if (row.barber_id && row.barber_id !== req.actingBarberId) {
       return res.status(403).json({ error: 'Ce client attend un autre coiffeur.' });
     }
   }
 
-  const barberId = req.barberId || req.body.barber_id || row.barber_id || null;
+  const barberId = req.actingBarberId || req.body.barber_id || row.barber_id || null;
 
   if (barberId) {
     const [[busy]] = await pool.query(
@@ -313,13 +333,13 @@ router.post('/:id/start', requireAdminOrBarber, wrap(async (req, res) => {
 }));
 
 router.post('/:id/finish', requireAdminOrBarber, wrap(async (req, res) => {
-  if (req.barberId) {
+  if (req.actingBarberId) {
     const [[row]] = await pool.query(
       'SELECT barber_id FROM queue WHERE id = ? AND salon_id = ?',
       [req.params.id, req.salon.id]
     );
     if (!row) return res.status(404).json({ error: 'Client introuvable' });
-    if (row.barber_id !== req.barberId) {
+    if (row.barber_id !== req.actingBarberId) {
       return res.status(403).json({ error: "Ce n'est pas votre client en cours." });
     }
   }
@@ -332,13 +352,13 @@ router.post('/:id/finish', requireAdminOrBarber, wrap(async (req, res) => {
 }));
 
 router.post('/:id/cancel', requireAdminOrBarber, wrap(async (req, res) => {
-  if (req.barberId) {
+  if (req.actingBarberId) {
     const [[row]] = await pool.query(
       'SELECT barber_id FROM queue WHERE id = ? AND salon_id = ?',
       [req.params.id, req.salon.id]
     );
     if (!row) return res.status(404).json({ error: 'Client introuvable' });
-    if (row.barber_id && row.barber_id !== req.barberId) {
+    if (row.barber_id && row.barber_id !== req.actingBarberId) {
       return res.status(403).json({ error: "Ce n'est pas votre client." });
     }
   }
@@ -358,7 +378,7 @@ router.put('/:id', requireAdminOrBarber, wrap(async (req, res) => {
   );
   if (!existing) return res.status(404).json({ error: 'Client introuvable' });
 
-  if (req.barberId && existing.barber_id !== req.barberId) {
+  if (req.actingBarberId && existing.barber_id !== req.actingBarberId) {
     return res.status(403).json({ error: "Ce n'est pas votre client." });
   }
 
@@ -368,7 +388,7 @@ router.put('/:id', requireAdminOrBarber, wrap(async (req, res) => {
   // s'il y a déjà quelqu'un qui attend son tour derrière lui — ça le
   // retarderait sans qu'il le sache à l'avance. On ne bloque que
   // l'AJOUT (la liste s'agrandit), pas le retrait d'un supplément.
-  if (req.barberId && Array.isArray(extras) && existing.status === 'in_progress') {
+  if (req.actingBarberId && Array.isArray(extras) && existing.status === 'in_progress') {
     const [[{ n: currentExtrasCount }]] = await pool.query(
       'SELECT COUNT(*) AS n FROM queue_extras WHERE queue_id = ?', [req.params.id]
     );
@@ -376,7 +396,7 @@ router.put('/:id', requireAdminOrBarber, wrap(async (req, res) => {
       const [[nextWaiting]] = await pool.query(
         `SELECT id FROM queue WHERE salon_id = ? AND status = 'waiting'
          AND (barber_id IS NULL OR barber_id = ?) LIMIT 1`,
-        [req.salon.id, req.barberId]
+        [req.salon.id, req.actingBarberId]
       );
       if (nextWaiting) {
         return res.status(409).json({
@@ -459,6 +479,88 @@ router.get('/stats/today', requireAdmin, wrap(async (req, res) => {
   res.json({ ok: true, done: Number(row.done_count), revenue_cents: Number(row.revenue_cents) });
 }));
 
+/**
+ * Pour l'onglet Dashboard : CA + nombre de prestations terminées par
+ * jour sur les 7 derniers jours (pour le graphique en barres), et le
+ * coiffeur ayant généré le plus de CA aujourd'hui (pour la carte
+ * "profil"). Un seul appel plutôt que plusieurs, pour un chargement
+ * rapide de la page d'accueil.
+ */
+router.get('/stats/week', requireAdmin, wrap(async (req, res) => {
+  const [rows] = await pool.query(
+    `SELECT DATE(end_at) AS day, COUNT(*) AS done_count, COALESCE(SUM(total_price_cents), 0) AS revenue_cents
+     FROM queue
+     WHERE salon_id = ? AND status = 'done' AND end_at >= (CURDATE() - INTERVAL 6 DAY)
+     GROUP BY DATE(end_at)`,
+    [req.salon.id]
+  );
+  var byDay = {};
+  rows.forEach(function (r) {
+    var key = r.day instanceof Date ? r.day.toISOString().slice(0, 10) : String(r.day).slice(0, 10);
+    byDay[key] = { revenue_cents: Number(r.revenue_cents), done_count: Number(r.done_count) };
+  });
+  var days = [];
+  for (var i = 6; i >= 0; i--) {
+    var d = new Date();
+    d.setDate(d.getDate() - i);
+    var key = d.toISOString().slice(0, 10);
+    days.push(Object.assign({ date: key, revenue_cents: 0, done_count: 0 }, byDay[key] || {}));
+  }
+
+  const [byRevenue] = await pool.query(
+    `SELECT b.id, b.name, b.photo_url, COALESCE(SUM(q.total_price_cents), 0) AS revenue_cents, COUNT(*) AS done_count
+     FROM queue q JOIN barbers b ON b.id = q.barber_id
+     WHERE q.salon_id = ? AND q.status = 'done' AND q.end_at >= CURDATE()
+     GROUP BY b.id ORDER BY revenue_cents DESC LIMIT 3`,
+    [req.salon.id]
+  );
+
+  // Vitesse : duree REELLE (start_at -> end_at), pas la duree prevue au
+  // catalogue - c'est la vraie rapidite d'execution qui nous interesse
+  // ici. Plus la moyenne est basse, plus le coiffeur est rapide.
+  const [bySpeed] = await pool.query(
+    `SELECT b.id, b.name, b.photo_url, AVG(TIMESTAMPDIFF(MINUTE, q.start_at, q.end_at)) AS avg_minutes, COUNT(*) AS done_count
+     FROM queue q JOIN barbers b ON b.id = q.barber_id
+     WHERE q.salon_id = ? AND q.status = 'done' AND q.end_at >= CURDATE() AND q.start_at IS NOT NULL
+     GROUP BY b.id ORDER BY avg_minutes ASC LIMIT 3`,
+    [req.salon.id]
+  );
+
+  // Ventes de produits : attribuees a sale_items.barber_id (qui coiffeur a
+  // fait la vente au moment du ticket), avec repli sur sales.barber_id
+  // pour les tickets plus anciens d'avant l'ajout de cette colonne.
+  const [byProducts] = await pool.query(
+    `SELECT b.id, b.name, b.photo_url,
+            COALESCE(SUM(si.unit_price_cents * si.quantity), 0) AS product_revenue_cents,
+            COALESCE(SUM(si.quantity), 0) AS product_count
+     FROM sale_items si
+     JOIN sales s ON s.id = si.sale_id
+     JOIN barbers b ON b.id = COALESCE(si.barber_id, s.barber_id)
+     WHERE s.salon_id = ? AND si.item_type = 'product' AND s.created_at >= CURDATE()
+     GROUP BY b.id ORDER BY product_revenue_cents DESC LIMIT 3`,
+    [req.salon.id]
+  );
+
+  res.json({
+    ok: true,
+    days: days,
+    leaderboard: {
+      by_revenue: byRevenue.map((r) => ({
+        id: r.id, name: r.name, photo_url: r.photo_url,
+        revenue_cents: Number(r.revenue_cents), done_count: Number(r.done_count)
+      })),
+      by_speed: bySpeed.map((r) => ({
+        id: r.id, name: r.name, photo_url: r.photo_url,
+        avg_minutes: Math.round(Number(r.avg_minutes)), done_count: Number(r.done_count)
+      })),
+      by_products: byProducts.map((r) => ({
+        id: r.id, name: r.name, photo_url: r.photo_url,
+        product_revenue_cents: Number(r.product_revenue_cents), product_count: Number(r.product_count)
+      }))
+    }
+  });
+}));
+
 // --- Coiffeur : historique complet des clients (tous statuts) -----------
 router.get('/history', requireAdmin, wrap(async (req, res) => {
   const page = Math.max(1, parseInt(req.query.page, 10) || 1);
@@ -527,8 +629,10 @@ router.get('/history', requireAdmin, wrap(async (req, res) => {
 
 // --- Coiffeur : suppression définitive (nettoyage de données test) ------
 router.delete('/:id', requireAdmin, wrap(async (req, res) => {
+  const [[before]] = await pool.query('SELECT client_name FROM queue WHERE id = ? AND salon_id = ?', [req.params.id, req.salon.id]);
   await pool.query('DELETE FROM queue WHERE id = ? AND salon_id = ?', [req.params.id, req.salon.id]);
   await recompute(req.salon.id);
+  if (before) logActivity(req.salon.id, 'client_delete', 'Fiche client "' + before.client_name + '" supprimée définitivement');
   res.json({ ok: true, deleted: true });
 }));
 
@@ -541,7 +645,7 @@ router.put('/:id/note', requireAdminOrBarber, wrap(async (req, res) => {
     [req.params.id, req.salon.id]
   );
   if (!row) return res.status(404).json({ error: 'Client introuvable' });
-  if (req.barberId && row.barber_id && row.barber_id !== req.barberId) {
+  if (req.actingBarberId && row.barber_id && row.barber_id !== req.actingBarberId) {
     return res.status(403).json({ error: "Ce n'est pas votre client." });
   }
 
