@@ -2627,6 +2627,7 @@ function boot() {
     .then(refreshQueue)
     .then(function () {
       setInterval(function () { renderQueue(); }, 1000);
+      setInterval(updateTimelineNowLines, 30000);
       subscribeQueue(refreshQueue);
       loadDashboardTab();
     })
@@ -4399,10 +4400,47 @@ function renderDayTimelineHtml(dateStr, dayAppts) {
     '<button type="button" onclick="event.stopPropagation();adjustTimelineZoom(1)" title="Zoomer">+</button>' +
     '</div></div>';
 
-  return zoomCtrl + '<div class="timeline-scroll"><div class="timeline-inner" style="min-width:' + innerWidth + 'px">' +
+  return zoomCtrl + '<div class="timeline-scroll"><div class="timeline-inner" ' +
+    'data-date="' + dateStr + '" data-range-start="' + rangeStart + '" data-range-end="' + rangeEnd + '" ' +
+    'style="min-width:' + innerWidth + 'px">' +
     '<div class="timeline-hours">' + hoursHtml + '</div>' +
     minuteGridHtml + rowsHtml + nowLineHtml +
     '</div></div>';
+}
+
+/**
+ * Déplace juste la ligne "maintenant" (position + info-bulle) sur
+ * toutes les frises actuellement affichées (agenda ET Dashboard),
+ * sans reconstruire le reste - une reconstruction complète perdait le
+ * défilement horizontal et le zoom en cours toutes les 30s, ce qui
+ * donnait une impression genante de rafraichissement constant pour
+ * un gain quasi invisible (la ligne n'avance que de quelques pixels).
+ */
+function updateTimelineNowLines() {
+  var nowStr = nowSalonDatetimeString();
+  var todayStr = nowStr.slice(0, 10);
+  var nowMin = Number(nowStr.slice(11, 13)) * 60 + Number(nowStr.slice(14, 16));
+  var title = 'Maintenant — ' + nowStr.slice(11, 16);
+
+  document.querySelectorAll('.timeline-inner[data-range-start]').forEach(function (inner) {
+    var rangeStart = Number(inner.dataset.rangeStart);
+    var rangeEnd = Number(inner.dataset.rangeEnd);
+    var visible = inner.dataset.date === todayStr && nowMin >= rangeStart && nowMin <= rangeEnd;
+    var line = inner.querySelector('.timeline-now-line');
+
+    if (!visible) {
+      if (line) line.remove();
+      return;
+    }
+    var leftCss = 'calc(22px + (100% - 22px) * ' + ((nowMin - rangeStart) / (rangeEnd - rangeStart)) + ')';
+    if (!line) {
+      line = document.createElement('div');
+      line.className = 'timeline-now-line';
+      inner.appendChild(line);
+    }
+    line.style.left = leftCss;
+    line.title = title;
+  });
 }
 
 /**
@@ -4433,11 +4471,7 @@ function adjustTimelineZoom(delta) {
  */
 function startCalendarNowRefresh() {
   stopCalendarNowRefresh();
-  calNowRefreshTimer = setInterval(function () {
-    if (calViewMode === 'day') renderDayView();
-    else if (calViewMode === 'week') renderWeekView();
-    else renderMonthView();
-  }, 30000);
+  calNowRefreshTimer = setInterval(updateTimelineNowLines, 30000);
 }
 
 function stopCalendarNowRefresh() {
