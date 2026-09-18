@@ -479,6 +479,52 @@ router.get('/stats/today', requireAdmin, wrap(async (req, res) => {
   res.json({ ok: true, done: Number(row.done_count), revenue_cents: Number(row.revenue_cents) });
 }));
 
+/**
+ * Pour l'onglet Dashboard : CA + nombre de prestations terminées par
+ * jour sur les 7 derniers jours (pour le graphique en barres), et le
+ * coiffeur ayant généré le plus de CA aujourd'hui (pour la carte
+ * "profil"). Un seul appel plutôt que plusieurs, pour un chargement
+ * rapide de la page d'accueil.
+ */
+router.get('/stats/week', requireAdmin, wrap(async (req, res) => {
+  const [rows] = await pool.query(
+    `SELECT DATE(end_at) AS day, COUNT(*) AS done_count, COALESCE(SUM(total_price_cents), 0) AS revenue_cents
+     FROM queue
+     WHERE salon_id = ? AND status = 'done' AND end_at >= (CURDATE() - INTERVAL 6 DAY)
+     GROUP BY DATE(end_at)`,
+    [req.salon.id]
+  );
+  var byDay = {};
+  rows.forEach(function (r) {
+    var key = r.day instanceof Date ? r.day.toISOString().slice(0, 10) : String(r.day).slice(0, 10);
+    byDay[key] = { revenue_cents: Number(r.revenue_cents), done_count: Number(r.done_count) };
+  });
+  var days = [];
+  for (var i = 6; i >= 0; i--) {
+    var d = new Date();
+    d.setDate(d.getDate() - i);
+    var key = d.toISOString().slice(0, 10);
+    days.push(Object.assign({ date: key, revenue_cents: 0, done_count: 0 }, byDay[key] || {}));
+  }
+
+  const [[topBarber]] = await pool.query(
+    `SELECT b.id, b.name, b.photo_url, COALESCE(SUM(q.total_price_cents), 0) AS revenue_cents, COUNT(*) AS done_count
+     FROM queue q JOIN barbers b ON b.id = q.barber_id
+     WHERE q.salon_id = ? AND q.status = 'done' AND q.end_at >= CURDATE()
+     GROUP BY b.id ORDER BY revenue_cents DESC LIMIT 1`,
+    [req.salon.id]
+  );
+
+  res.json({
+    ok: true,
+    days: days,
+    top_barber_today: topBarber ? {
+      id: topBarber.id, name: topBarber.name, photo_url: topBarber.photo_url,
+      revenue_cents: Number(topBarber.revenue_cents), done_count: Number(topBarber.done_count)
+    } : null
+  });
+}));
+
 // --- Coiffeur : historique complet des clients (tous statuts) -----------
 router.get('/history', requireAdmin, wrap(async (req, res) => {
   const page = Math.max(1, parseInt(req.query.page, 10) || 1);
