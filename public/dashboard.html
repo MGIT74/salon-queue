@@ -741,8 +741,8 @@
     font-family: inherit; line-height: 1;
   }
   .timeline-zoom-ctrl span { font-size: 11px; color: var(--grey); min-width: 32px; text-align: center; }
-  #dash-timeline .timeline-zoom-ctrl { pointer-events: auto; }
-  #dash-timeline .timeline-now-line { pointer-events: auto; }
+  #dash-timeline .timeline-zoom-ctrl, #caisse-timeline .timeline-zoom-ctrl { pointer-events: auto; }
+  #dash-timeline .timeline-now-line, #caisse-timeline .timeline-now-line { pointer-events: auto; }
 
   /* Assistant "Ajouter un RDV" (admin) - parcours par étapes */
   .aa-step-title { font-size: 15px; font-weight: 600; margin-bottom: 12px; }
@@ -1326,6 +1326,11 @@
 
   <!-- ===== Onglet caisse ===== -->
   <div class="tab-panel" id="t-caisse">
+    <div class="card-box">
+      <h3>Planning du jour</h3>
+      <div id="caisse-timeline" style="pointer-events:none"><div class="empty">Chargement…</div></div>
+    </div>
+
     <div class="card-box">
       <h3>Période en cours</h3>
       <p class="hint" id="caisse-period-since">Depuis le début.</p>
@@ -4455,6 +4460,10 @@ function adjustTimelineZoom(delta) {
     var dashEl = document.getElementById('dash-timeline');
     if (dashEl) dashEl.innerHTML = renderDayTimelineHtml(dashTimelineCache.dateStr, dashTimelineCache.appts);
   }
+  if (caisseTimelineCache) {
+    var caisseEl = document.getElementById('caisse-timeline');
+    if (caisseEl) caisseEl.innerHTML = renderDayTimelineHtml(caisseTimelineCache.dateStr, caisseTimelineCache.appts);
+  }
   if (typeof calViewMode !== 'undefined') {
     if (calViewMode === 'day') renderDayView();
     else if (calSelectedDate) {
@@ -5449,7 +5458,26 @@ function closingsGoToPage(p) {
   renderClosingsPage();
 }
 
+var caisseTimelineCache = null; // même principe que dashTimelineCache, pour le zoom sans re-fetch
+
+function loadCaisseTimeline() {
+  var todayStr = ymd(new Date());
+  loadSalonScheduleForTimeline().then(function () {
+    return api('/api/appointments?month=' + monthKey(new Date()));
+  }).then(function (r) {
+    var todayAppts = (r.items || []).filter(function (a) {
+      return a.scheduled_at.slice(0, 10) === todayStr && a.status !== 'cancelled';
+    });
+    todayAppts.forEach(function (a) { calAppointmentById[a.id] = a; });
+    caisseTimelineCache = { dateStr: todayStr, appts: todayAppts };
+    document.getElementById('caisse-timeline').innerHTML = renderDayTimelineHtml(todayStr, todayAppts);
+  }).catch(function () {
+    document.getElementById('caisse-timeline').innerHTML = '<div class="empty">Impossible de charger le planning du jour</div>';
+  });
+}
+
 function loadCaisseTab() {
+  loadCaisseTimeline();
   api('/api/owner/caisse/current-period').then(function (r) {
     document.getElementById('caisse-period-since').textContent = r.period_start
       ? 'Depuis la dernière clôture (' + new Date(r.period_start).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) + ').'
