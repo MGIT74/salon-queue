@@ -507,21 +507,57 @@ router.get('/stats/week', requireAdmin, wrap(async (req, res) => {
     days.push(Object.assign({ date: key, revenue_cents: 0, done_count: 0 }, byDay[key] || {}));
   }
 
-  const [[topBarber]] = await pool.query(
+  const [byRevenue] = await pool.query(
     `SELECT b.id, b.name, b.photo_url, COALESCE(SUM(q.total_price_cents), 0) AS revenue_cents, COUNT(*) AS done_count
      FROM queue q JOIN barbers b ON b.id = q.barber_id
      WHERE q.salon_id = ? AND q.status = 'done' AND q.end_at >= CURDATE()
-     GROUP BY b.id ORDER BY revenue_cents DESC LIMIT 1`,
+     GROUP BY b.id ORDER BY revenue_cents DESC LIMIT 3`,
+    [req.salon.id]
+  );
+
+  // Vitesse : duree REELLE (start_at -> end_at), pas la duree prevue au
+  // catalogue - c'est la vraie rapidite d'execution qui nous interesse
+  // ici. Plus la moyenne est basse, plus le coiffeur est rapide.
+  const [bySpeed] = await pool.query(
+    `SELECT b.id, b.name, b.photo_url, AVG(TIMESTAMPDIFF(MINUTE, q.start_at, q.end_at)) AS avg_minutes, COUNT(*) AS done_count
+     FROM queue q JOIN barbers b ON b.id = q.barber_id
+     WHERE q.salon_id = ? AND q.status = 'done' AND q.end_at >= CURDATE() AND q.start_at IS NOT NULL
+     GROUP BY b.id ORDER BY avg_minutes ASC LIMIT 3`,
+    [req.salon.id]
+  );
+
+  // Ventes de produits : attribuees a sale_items.barber_id (qui coiffeur a
+  // fait la vente au moment du ticket), avec repli sur sales.barber_id
+  // pour les tickets plus anciens d'avant l'ajout de cette colonne.
+  const [byProducts] = await pool.query(
+    `SELECT b.id, b.name, b.photo_url,
+            COALESCE(SUM(si.unit_price_cents * si.quantity), 0) AS product_revenue_cents,
+            COALESCE(SUM(si.quantity), 0) AS product_count
+     FROM sale_items si
+     JOIN sales s ON s.id = si.sale_id
+     JOIN barbers b ON b.id = COALESCE(si.barber_id, s.barber_id)
+     WHERE s.salon_id = ? AND si.item_type = 'product' AND s.created_at >= CURDATE()
+     GROUP BY b.id ORDER BY product_revenue_cents DESC LIMIT 3`,
     [req.salon.id]
   );
 
   res.json({
     ok: true,
     days: days,
-    top_barber_today: topBarber ? {
-      id: topBarber.id, name: topBarber.name, photo_url: topBarber.photo_url,
-      revenue_cents: Number(topBarber.revenue_cents), done_count: Number(topBarber.done_count)
-    } : null
+    leaderboard: {
+      by_revenue: byRevenue.map((r) => ({
+        id: r.id, name: r.name, photo_url: r.photo_url,
+        revenue_cents: Number(r.revenue_cents), done_count: Number(r.done_count)
+      })),
+      by_speed: bySpeed.map((r) => ({
+        id: r.id, name: r.name, photo_url: r.photo_url,
+        avg_minutes: Math.round(Number(r.avg_minutes)), done_count: Number(r.done_count)
+      })),
+      by_products: byProducts.map((r) => ({
+        id: r.id, name: r.name, photo_url: r.photo_url,
+        product_revenue_cents: Number(r.product_revenue_cents), product_count: Number(r.product_count)
+      }))
+    }
   });
 }));
 

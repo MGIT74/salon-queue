@@ -87,6 +87,25 @@
     background: var(--fill); border-radius: 999px; padding: 6px 14px; font-size: 13px; font-weight: 700;
   }
 
+  .dash-leader-tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+  .dash-leader-tab {
+    flex: 1; padding: 6px 4px; border: none; border-radius: 8px; background: var(--fill); color: var(--grey);
+    font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit;
+  }
+  .dash-leader-tab.on { background: var(--blue); color: #fff; }
+  .dash-leader-row { display: flex; align-items: center; gap: 9px; padding: 7px 0; border-bottom: 1px solid var(--sep); }
+  .dash-leader-row:last-child { border-bottom: none; }
+  .dash-leader-rank {
+    width: 18px; text-align: center; font-size: 13px; font-weight: 700; color: var(--grey); flex-shrink: 0;
+  }
+  .dash-leader-avatar {
+    width: 28px; height: 28px; border-radius: 50%; background: var(--fill); background-size: cover;
+    background-position: center; display: flex; align-items: center; justify-content: center;
+    font-size: 11.5px; font-weight: 700; color: #fff; flex-shrink: 0;
+  }
+  .dash-leader-name { flex: 1; font-size: 12.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dash-leader-value { font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+
   .dash-big-num { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; margin-bottom: 4px; }
   .dash-bars { display: flex; align-items: flex-end; gap: 8px; height: 70px; flex: 1; }
   .dash-bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; height: 100%; justify-content: flex-end; }
@@ -1065,11 +1084,14 @@
     </div>
 
     <div class="dash-grid">
-      <div class="dash-card dash-card-profile">
-        <div class="dash-profile-photo" id="dash-profile-photo">—</div>
-        <div class="dash-profile-name" id="dash-profile-name">Aucune vente</div>
-        <div class="dash-profile-role">Coiffeur du jour</div>
-        <div class="dash-profile-badge" id="dash-profile-badge">0,00 €</div>
+      <div class="dash-card dash-card-leader">
+        <div class="dash-card-head"><h3>Classement du jour</h3></div>
+        <div class="dash-leader-tabs">
+          <button class="dash-leader-tab on" data-metric="revenue" onclick="setDashLeaderMetric('revenue')">CA</button>
+          <button class="dash-leader-tab" data-metric="speed" onclick="setDashLeaderMetric('speed')">Rapidité</button>
+          <button class="dash-leader-tab" data-metric="products" onclick="setDashLeaderMetric('products')">Produits</button>
+        </div>
+        <div id="dash-leader-list"></div>
       </div>
 
       <div class="dash-card">
@@ -2379,6 +2401,42 @@ document.getElementById('tabs').addEventListener('click', function (e) {
 
 /* ============ Onglet Dashboard ============ */
 var WEEKDAY_LABELS_SHORT = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
+var dashLeaderMetric = 'revenue';
+var dashLeaderData = { by_revenue: [], by_speed: [], by_products: [] };
+var TROPHY_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0Z"/><path d="M7 5H4a3 3 0 0 0 3 5"/><path d="M17 5h3a3 3 0 0 1-3 5"/></svg>';
+
+function setDashLeaderMetric(metric) {
+  dashLeaderMetric = metric;
+  document.querySelectorAll('.dash-leader-tab').forEach(function (b) {
+    b.classList.toggle('on', b.dataset.metric === metric);
+  });
+  renderDashLeaderboard();
+}
+
+function renderDashLeaderboard() {
+  var key = dashLeaderMetric === 'revenue' ? 'by_revenue' : (dashLeaderMetric === 'speed' ? 'by_speed' : 'by_products');
+  var rows = dashLeaderData[key] || [];
+  var emptyMsg = dashLeaderMetric === 'speed'
+    ? 'Pas encore de coupe terminée aujourd\'hui'
+    : (dashLeaderMetric === 'products' ? 'Aucune vente de produit aujourd\'hui' : 'Aucune vente aujourd\'hui');
+
+  document.getElementById('dash-leader-list').innerHTML = rows.length === 0
+    ? '<div class="empty">' + emptyMsg + '</div>'
+    : rows.map(function (r, i) {
+        var avatarStyle = r.photo_url
+          ? 'background:url(&quot;' + esc(r.photo_url) + '&quot;) center/cover'
+          : 'background:' + stableColorForId(r.id);
+        var value = dashLeaderMetric === 'revenue' ? eur(r.revenue_cents)
+          : dashLeaderMetric === 'speed' ? r.avg_minutes + ' min'
+          : eur(r.product_revenue_cents);
+        return '<div class="dash-leader-row">' +
+          '<span class="dash-leader-rank"' + (i === 0 ? ' style="color:var(--orange)"' : '') + '>' + (i === 0 ? TROPHY_SVG : (i + 1)) + '</span>' +
+          '<span class="dash-leader-avatar" style="' + avatarStyle + '">' + (r.photo_url ? '' : esc(r.name.charAt(0).toUpperCase())) + '</span>' +
+          '<span class="dash-leader-name">' + esc(r.name) + '</span>' +
+          '<span class="dash-leader-value">' + value + '</span>' +
+        '</div>';
+      }).join('');
+}
 
 function loadDashboardTab() {
   document.getElementById('dash-salon-name').textContent = currentSalonName || '—';
@@ -2402,10 +2460,18 @@ function loadDashboardTab() {
   document.getElementById('dash-catalog-list').innerHTML = [
     { label: 'Prestations', count: services.length, tab: 'services' },
     { label: 'Suppléments', count: extras.length, tab: 'extras' },
-    { label: 'Produits', count: products.length, tab: 'products' }
+    {
+      label: 'Produits', count: products.length, tab: 'products',
+      extra: (function () {
+        var tracked = products.filter(function (p) { return p.stock_enabled; });
+        if (!tracked.length) return '';
+        var total = tracked.reduce(function (a, p) { return a + (p.stock_quantity || 0); }, 0);
+        return ' · ' + total + ' en stock';
+      })()
+    }
   ].map(function (c) {
     return '<div class="dash-cat-row" onclick="setActiveTab(\'' + c.tab + '\')">' +
-      '<span>' + c.label + '</span><b>' + c.count + '</b></div>';
+      '<span>' + c.label + '</span><b>' + c.count + (c.extra || '') + '</b></div>';
   }).join('');
 
   var gaugeMax = 10; // au-delà de 10 en attente, la jauge reste pleine
@@ -2433,19 +2499,8 @@ function loadDashboardTab() {
         '<div class="dash-bar-label">' + label + '</div></div>';
     }).join('');
 
-    var top = r.top_barber_today;
-    if (top) {
-      var photoEl = document.getElementById('dash-profile-photo');
-      if (top.photo_url) {
-        photoEl.style.background = 'url(&quot;' + esc(top.photo_url) + '&quot;) center/cover';
-        photoEl.textContent = '';
-      } else {
-        photoEl.style.background = stableColorForId(top.id);
-        photoEl.textContent = top.name.charAt(0).toUpperCase();
-      }
-      document.getElementById('dash-profile-name').textContent = top.name;
-      document.getElementById('dash-profile-badge').textContent = eur(top.revenue_cents);
-    }
+    dashLeaderData = r.leaderboard || { by_revenue: [], by_speed: [], by_products: [] };
+    renderDashLeaderboard();
   }).catch(function () {});
 
   api('/api/queue/history?per_page=1').then(function (r) {
