@@ -1,0 +1,145 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Service de paiement Nepting / HiPay POS",
+    "version": "0.1.0",
+    "description": "Déclenche un paiement en LAN sur un terminal Android via l'API locale Nepting."
+  },
+  "servers": [
+    { "url": "http://localhost:3000", "description": "Serveur local" }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Vérifier que le service est opérationnel",
+        "responses": {
+          "200": {
+            "description": "Service démarré"
+          }
+        }
+      }
+    },
+    "/payments": {
+      "post": {
+        "summary": "Déclencher un paiement sur le TPE",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["amount", "transactionId"],
+                "properties": {
+                  "amount": {
+                    "type": "number",
+                    "example": 25.0,
+                    "description": "Montant en euros"
+                  },
+                  "transactionId": {
+                    "type": "string",
+                    "example": "SALE-2026-00001",
+                    "description": "Identifiant de transaction marchand (tag CF)"
+                  },
+                  "operation": {
+                    "type": "string",
+                    "enum": ["debit", "credit"],
+                    "default": "debit"
+                  },
+                  "customerReceipt": {
+                    "type": "boolean",
+                    "description": "Demander le retour du reçu client (tag CK)"
+                  },
+                  "terminalId": {
+                    "type": "string",
+                    "default": "default",
+                    "description": "Clé du TPE dans la configuration (config.terminals)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Paiement accepté",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/PaymentResult" }
+              }
+            }
+          },
+          "402": {
+            "description": "Paiement refusé ou échoué (traité par le TPE mais sans succès)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/PaymentResult" }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête invalide (montant ou transactionId manquant/incorrect)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResult" }
+              }
+            }
+          },
+          "500": {
+            "description": "Erreur de configuration ou erreur inconnue",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResult" }
+              }
+            }
+          },
+          "502": {
+            "description": "TPE injoignable ou trame malformée",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResult" }
+              }
+            }
+          },
+          "504": {
+            "description": "Timeout : aucune réponse du TPE",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResult" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "PaymentResult": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean" },
+          "status": { "type": "string", "enum": ["PAID", "FAILED"] },
+          "transactionId": { "type": "string", "nullable": true },
+          "extraData": { "type": "string", "nullable": true },
+          "amount": { "type": "number", "nullable": true },
+          "currency": { "type": "string", "nullable": true },
+          "operation": { "type": "string", "nullable": true },
+          "authorizationCode": { "type": "string", "nullable": true },
+          "paymentApplication": { "type": "string", "nullable": true },
+          "merchantContract": { "type": "string", "nullable": true },
+          "failureReasonCode": { "type": "string", "nullable": true },
+          "failureReason": { "type": "string", "nullable": true },
+          "receiptRaw": { "type": "string", "nullable": true },
+          "unknownTags": { "type": "array", "items": { "type": "string" } }
+        }
+      },
+      "ErrorResult": {
+        "type": "object",
+        "properties": {
+          "error": { "type": "string" },
+          "message": { "type": "string" }
+        }
+      }
+    }
+  }
+}
