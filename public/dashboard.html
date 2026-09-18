@@ -1130,6 +1130,11 @@
         <div class="dash-week-cal" id="dash-week-cal"></div>
       </div>
     </div>
+
+    <div class="dash-card" style="margin-bottom:16px">
+      <div class="dash-card-head"><h3>Chrono du jour</h3></div>
+      <div id="dash-timeline"><div class="empty">Chargement…</div></div>
+    </div>
   </div>
 
   <div class="tab-panel" id="t-queue">
@@ -2502,6 +2507,19 @@ function loadDashboardTab() {
     dashLeaderData = r.leaderboard || { by_revenue: [], by_speed: [], by_products: [] };
     renderDashLeaderboard();
   }).catch(function () {});
+
+  var todayStr = ymd(new Date());
+  loadSalonScheduleForTimeline().then(function () {
+    return api('/api/appointments?month=' + monthKey(new Date()));
+  }).then(function (r) {
+    var todayAppts = (r.items || []).filter(function (a) {
+      return a.scheduled_at.slice(0, 10) === todayStr && a.status !== 'cancelled';
+    });
+    todayAppts.forEach(function (a) { calAppointmentById[a.id] = a; });
+    document.getElementById('dash-timeline').innerHTML = renderDayTimelineHtml(todayStr, todayAppts);
+  }).catch(function () {
+    document.getElementById('dash-timeline').innerHTML = '<div class="empty">Impossible de charger le chrono du jour</div>';
+  });
 
   api('/api/queue/history?per_page=1').then(function (r) {
     document.getElementById('dash-kpi-clients').textContent = r.total || 0;
