@@ -205,12 +205,9 @@
 
   /* --- Planning du jour (timeline), utilisée dans l'Agenda --- */
   .timeline-scroll { overflow-x: auto; }
-  .timeline-inner { position: relative; min-width: 620px; }
-  .timeline-hours {
-    display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
-    padding-left: 110px; margin-bottom: 6px;
-  }
-  .timeline-hours span { font-size: 12px; color: var(--grey); }
+  .timeline-inner { position: relative; }
+  .timeline-hours { position: relative; height: 18px; margin-bottom: 6px; }
+  .timeline-hours span { position: absolute; top: 0; font-size: 12px; color: var(--grey); white-space: nowrap; transform: translateX(-1px); }
   .timeline-row { display: flex; align-items: center; min-height: 54px; border-top: 1px solid var(--sep); }
   .timeline-row:first-child { border-top: none; }
   .timeline-row-label { width: 22px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; padding-right: 0; }
@@ -223,7 +220,7 @@
   }
   .timeline-now-line {
     position: absolute; top: 0; bottom: 0; width: 2px; background: var(--accent, var(--blue));
-    pointer-events: none; z-index: 5;
+    z-index: 5; cursor: help;
   }
   .timeline-now-line::before {
     content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%);
@@ -236,6 +233,19 @@
   .timeline-empty { padding: 20px 0; text-align: center; color: var(--grey); font-size: 14px; }
   .timeline-row-track { cursor: pointer; }
   .timeline-row-track:hover { background: var(--fill); border-radius: 8px; }
+  .timeline-minute-grid {
+    position: absolute; left: 22px; right: 0; top: 0; bottom: 0; pointer-events: none; z-index: 0;
+    background-image: linear-gradient(to right, var(--sep) 1px, transparent 1px);
+    background-repeat: repeat-x; background-position: left top;
+  }
+  .timeline-zoom-ctrl { display: flex; align-items: center; justify-content: flex-end; gap: 6px; margin-bottom: 8px; }
+  .timeline-zoom-ctrl-inner { display: flex; align-items: center; gap: 6px; background: var(--fill); border-radius: 999px; padding: 4px 6px; }
+  .timeline-zoom-ctrl button {
+    width: 22px; height: 22px; border-radius: 50%; border: none; background: var(--card); color: var(--ink);
+    font-size: 14px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    font-family: inherit; line-height: 1;
+  }
+  .timeline-zoom-ctrl span { font-size: 11px; color: var(--grey); min-width: 32px; text-align: center; }
 
   /* --- Formulaire "Ajouter un RDV" (repris de "Mon poste") --- */
   .aa-step-title { font-size: 15px; font-weight: 600; margin-bottom: 12px; }
@@ -1464,6 +1474,8 @@ function selectCalDay(dateStr) {
  * sélectionnée, sinon tout le monde. Remplace la simple liste texte des
  * RDV utilisée dans "Mon poste".
  */
+var timelineZoom = 1;
+
 function renderAgendaTimeline(dateStr) {
   var d = new Date(dateStr + 'T00:00:00');
   var appts = apptsForRange(d, d);
@@ -1513,7 +1525,9 @@ function renderAgendaTimeline(dateStr) {
   var hoursHtml = '';
   for (var h = 0; h <= hourCount; h++) {
     var totalMin = rangeStart + h * 60;
-    hoursHtml += '<span>' + String(Math.floor(totalMin / 60)).padStart(2, '0') + ':00</span>';
+    var hourFrac = (h * 60) / (rangeEnd - rangeStart);
+    hoursHtml += '<span style="left: calc(22px + (100% - 22px) * ' + hourFrac + ')">' +
+      String(Math.floor(totalMin / 60)).padStart(2, '0') + ':00</span>';
   }
 
   var byBarber = {};
@@ -1544,21 +1558,74 @@ function renderAgendaTimeline(dateStr) {
       '</div>';
   }).join('');
 
+  // On compare a l'heure du SALON (fuseau horaire configure), pas celle du
+  // navigateur qui affiche la page.
   var nowLineHtml = '';
-  if (dateStr === ymd(new Date())) {
-    var now = new Date();
-    var nowMin = now.getHours() * 60 + now.getMinutes();
+  var nowStr = nowSalonDatetimeString();
+  if (dateStr === nowStr.slice(0, 10)) {
+    var nowMin = Number(nowStr.slice(11, 13)) * 60 + Number(nowStr.slice(14, 16));
     if (nowMin >= rangeStart && nowMin <= rangeEnd) {
       var leftFrac = (nowMin - rangeStart) / (rangeEnd - rangeStart);
-      nowLineHtml = '<div class="timeline-now-line" style="left: calc(110px + (100% - 110px) * ' + leftFrac + ')"></div>';
+      nowLineHtml = '<div class="timeline-now-line" title="Maintenant — ' + nowStr.slice(11, 16) + '" ' +
+        'style="left: calc(22px + (100% - 22px) * ' + leftFrac + ')"></div>';
     }
   }
 
-  return '<div class="timeline-scroll"><div class="timeline-inner">' +
-    '<div class="timeline-hours" style="grid-template-columns:repeat(' + hourCount + ',1fr)">' + hoursHtml + '</div>' +
-    rowsHtml + nowLineHtml +
+  var minuteStepPct = (15 / (rangeEnd - rangeStart)) * 100;
+  var minuteGridHtml = '<div class="timeline-minute-grid" style="background-size:' + minuteStepPct + '% 100%"></div>';
+
+  var innerWidth = Math.round(hourCount * 90 * timelineZoom);
+  var zoomPct = Math.round(timelineZoom * 100);
+  var zoomCtrl = '<div class="timeline-zoom-ctrl"><div class="timeline-zoom-ctrl-inner">' +
+    '<button type="button" onclick="event.stopPropagation();adjustAgendaZoom(-1)" title="Dézoomer">−</button>' +
+    '<span>' + zoomPct + '%</span>' +
+    '<button type="button" onclick="event.stopPropagation();adjustAgendaZoom(1)" title="Zoomer">+</button>' +
+    '</div></div>';
+
+  return zoomCtrl + '<div class="timeline-scroll"><div class="timeline-inner" ' +
+    'data-date="' + dateStr + '" data-range-start="' + rangeStart + '" data-range-end="' + rangeEnd + '" ' +
+    'style="min-width:' + innerWidth + 'px">' +
+    '<div class="timeline-hours">' + hoursHtml + '</div>' +
+    minuteGridHtml + rowsHtml + nowLineHtml +
     '</div></div>';
 }
+
+/** Déplace juste la ligne "maintenant", sans reconstruire le reste. */
+function updateAgendaNowLines() {
+  var nowStr = nowSalonDatetimeString();
+  var todayStr = nowStr.slice(0, 10);
+  var nowMin = Number(nowStr.slice(11, 13)) * 60 + Number(nowStr.slice(14, 16));
+  var title = 'Maintenant — ' + nowStr.slice(11, 16);
+
+  document.querySelectorAll('.timeline-inner[data-range-start]').forEach(function (inner) {
+    var rangeStart = Number(inner.dataset.rangeStart);
+    var rangeEnd = Number(inner.dataset.rangeEnd);
+    var visible = inner.dataset.date === todayStr && nowMin >= rangeStart && nowMin <= rangeEnd;
+    var line = inner.querySelector('.timeline-now-line');
+
+    if (!visible) {
+      if (line) line.remove();
+      return;
+    }
+    var leftCss = 'calc(22px + (100% - 22px) * ' + ((nowMin - rangeStart) / (rangeEnd - rangeStart)) + ')';
+    if (!line) {
+      line = document.createElement('div');
+      line.className = 'timeline-now-line';
+      inner.appendChild(line);
+    }
+    line.style.left = leftCss;
+    line.title = title;
+  });
+}
+
+/** +1 pour zoomer, -1 pour dézoomer (pas de 20%, borné 60%-250%). */
+function adjustAgendaZoom(delta) {
+  timelineZoom = Math.max(0.6, Math.min(2.5, +(timelineZoom + delta * 0.2).toFixed(2)));
+  if (calViewMode === 'day') renderCalDay();
+  else if (calSelectedDate) { if (calViewMode === 'month') renderCalMonth(); else renderCalWeek(); }
+}
+
+
 
 function openAgendaClientDrawer(id) {
   var a = calApptById[id];
@@ -1826,10 +1893,7 @@ function openCaisseAddAppointment(dateStr, barberId) {
 
 function startAgendaAutoRefresh() {
   stopAgendaAutoRefresh();
-  agendaNowLineTimer = setInterval(function () {
-    if (calViewMode === 'day') renderCalDay();
-    else if (calSelectedDate) { if (calViewMode === 'month') renderCalMonth(); else renderCalWeek(); }
-  }, 30000);
+  agendaNowLineTimer = setInterval(updateAgendaNowLines, 30000);
 }
 
 function stopAgendaAutoRefresh() {
