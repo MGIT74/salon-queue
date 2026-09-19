@@ -743,6 +743,7 @@
   .timeline-zoom-ctrl span { font-size: 11px; color: var(--grey); min-width: 32px; text-align: center; }
   #dash-timeline .timeline-zoom-ctrl { pointer-events: auto; }
   #dash-timeline .timeline-now-line { pointer-events: auto; }
+  #dash-timeline .timeline-row-track, #dash-timeline .timeline-block { pointer-events: none; cursor: default; }
 
   /* Assistant "Ajouter un RDV" (admin) - parcours par étapes */
   .aa-step-title { font-size: 15px; font-weight: 600; margin-bottom: 12px; }
@@ -1152,7 +1153,7 @@
 
     <div class="dash-card" style="margin-bottom:16px">
       <div class="dash-card-head"><h3>Planning du jour</h3></div>
-      <div id="dash-timeline" style="pointer-events:none"><div class="empty">Chargement…</div></div>
+      <div id="dash-timeline"><div class="empty">Chargement…</div></div>
     </div>
   </div>
 
