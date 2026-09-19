@@ -4630,12 +4630,13 @@ function renderExpandPanel(dateStr, dayAppts) {
 function openAdminAddAppointment(dateStr, preselectedBarberId) {
   var rdvBarbers = barbers.filter(isBookableForAdmin);
   var when = new Date(dateStr + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' });
+  var preBarber = preselectedBarberId && rdvBarbers.find(function (b) { return b.id === preselectedBarberId; });
 
   var state = { barberId: preselectedBarberId || null, serviceId: null, extraIds: [], time: null };
 
   var overlay = _buildModal(
     '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px">' +
-    '<div class="modal-title" style="margin-bottom:0">Ajouter un RDV — ' + when + '</div>' +
+    '<div class="modal-title" style="margin-bottom:0">Ajouter un RDV — ' + (preBarber ? esc(preBarber.name) + ' — ' : '') + when + '</div>' +
     '<button id="aa-close-x" style="background:var(--fill);border:none;width:30px;height:30px;border-radius:50%;color:var(--grey);font-size:14px;cursor:pointer;flex-shrink:0;margin-left:10px">✕</button>' +
     '</div>' +
 
