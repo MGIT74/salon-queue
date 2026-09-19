@@ -187,7 +187,7 @@
   .cal-view-switch button.on { background: var(--blue); color: #fff; }
   .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
   .cal-week-row { margin-bottom: 4px; }
-  .cal-expand-panel { background: var(--fill); border-radius: 14px; padding: 16px 18px; margin: 6px 0 10px; }
+  .cal-expand-panel { background: var(--fill); border-radius: 14px; padding: 16px 18px; margin: 6px 0 10px; min-width: 0; grid-column: 1 / -1; }
   .cal-expand-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; font-size: 14.5px; text-transform: capitalize; }
   .cal-weekday { text-align: center; font-size: 12px; color: var(--grey); font-weight: 600; padding: 6px 0 10px; }
   .cal-day {
@@ -204,7 +204,7 @@
   .cal-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--blue); }
 
   /* --- Planning du jour (timeline), utilisée dans l'Agenda --- */
-  .timeline-scroll { overflow-x: auto; }
+  .timeline-scroll { overflow-x: auto; width: 100%; max-width: 100%; }
   .timeline-inner { position: relative; }
   .timeline-hours { position: relative; height: 18px; margin-bottom: 6px; }
   .timeline-hours span { position: absolute; top: 0; font-size: 12px; color: var(--grey); white-space: nowrap; transform: translateX(-1px); }
