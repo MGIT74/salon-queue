@@ -1551,7 +1551,15 @@ function renderAgendaTimeline(dateStr) {
         'title="' + esc(time + ' — ' + a.client_name + ' — ' + (a.service_name || '')) + '" ' +
         'onclick="event.stopPropagation();openAgendaClientDrawer(\'' + a.id + '\')">' + esc(a.client_name) + '</div>';
     }).join('');
-    var trackClick = bid === 'unassigned' ? '' : ' onclick="openCaisseAddAppointment(\'' + dateStr + '\',\'' + bid + '\')" title="Cliquer pour ajouter un RDV"';
+    // Sans-rdv uniquement : la ligne reste visible (pour voir ses RDV
+    // deja enregistres) mais pas cliquable pour en ajouter un nouveau -
+    // juste un message, plutot que d'ouvrir un formulaire pour un
+    // coiffeur qui ne prend pas de RDV en ligne.
+    var rowBarber = bid !== 'unassigned' && allBarbers.find(function (x) { return x.id === bid; });
+    var trackClick = bid === 'unassigned' ? ''
+      : (rowBarber && rowBarber.accepts_appointments)
+        ? ' onclick="openCaisseAddAppointment(\'' + dateStr + '\',\'' + bid + '\')" title="Cliquer pour ajouter un RDV"'
+        : ' onclick="event.stopPropagation();toast(\'' + esc(b.name) + ' ne prend pas de RDV en ligne (sans-rdv uniquement)\', true)"';
     return '<div class="timeline-row">' +
       '<div class="timeline-row-label" title="' + esc(b.name) + '"><span class="dot" style="background:' + color + '"></span></div>' +
       '<div class="timeline-row-track"' + trackClick + '>' + blocksHtml + '</div>' +

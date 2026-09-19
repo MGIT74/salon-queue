@@ -4311,11 +4311,14 @@ function renderDayTimelineHtml(dateStr, dayAppts) {
   // déjà un RDV ce jour-là.
   var byBarber = {};
   barbers.filter(isBookableForAdmin).forEach(function (b) {
-    byBarber[b.id] = { name: b.name, items: [] };
+    byBarber[b.id] = { name: b.name, items: [], bookable: true };
   });
   dayAppts.forEach(function (a) {
     var key = a.barber_id || 'unassigned';
-    if (!byBarber[key]) byBarber[key] = { name: a.barber_name || 'Non assigné', items: [] };
+    // Un coiffeur peut avoir des RDV deja enregistres puis etre passe en
+    // "sans-rdv" depuis - sa ligne doit rester visible (pour voir ses
+    // RDV existants) mais pas cliquable pour en ajouter un nouveau.
+    if (!byBarber[key]) byBarber[key] = { name: a.barber_name || 'Non assigné', items: [], bookable: false };
     byBarber[key].items.push(a);
   });
   var barberIds = Object.keys(byBarber).sort(function (x, y) { return byBarber[x].name.localeCompare(byBarber[y].name); });
@@ -4350,7 +4353,6 @@ function renderDayTimelineHtml(dateStr, dayAppts) {
   var rowsHtml = barberIds.map(function (bid) {
     var b = byBarber[bid];
     var color = bid === 'unassigned' ? 'var(--grey)' : (rdvBarberColors[bid] || stableColorForId(bid));
-    var rowBarberArg = bid === 'unassigned' ? '' : bid;
     var blocksHtml = b.items.map(function (a) {
       var startMin = minutesFromScheduledAt(a);
       var dur = Math.max(a.duration_min || 30, 15);
@@ -4361,9 +4363,16 @@ function renderDayTimelineHtml(dateStr, dayAppts) {
         'title="' + esc(time + ' — ' + a.client_name + ' — ' + (a.service_name || '')) + '" ' +
         'onclick="event.stopPropagation();openClientDrawerForAppointment(\'' + a.id + '\')">' + esc(a.client_name) + '</div>';
     }).join('');
+    // Sans-rdv uniquement (ou pas de coiffeur assigné) : la ligne reste
+    // visible mais pas cliquable pour ajouter un RDV - juste un message,
+    // au lieu d'ouvrir un formulaire pour un coiffeur qui ne prend pas
+    // de RDV en ligne.
+    var trackClick = b.bookable
+      ? ' onclick="openAdminAddAppointment(\'' + dateStr + '\',\'' + bid + '\')"'
+      : (bid === 'unassigned' ? '' : ' onclick="event.stopPropagation();toast(\'' + esc(b.name) + ' ne prend pas de RDV en ligne (sans-rdv uniquement)\', true)"');
     return '<div class="timeline-row">' +
       '<div class="timeline-row-label" title="' + esc(b.name) + '"><span class="dot" style="background:' + color + '"></span></div>' +
-      '<div class="timeline-row-track" onclick="openAdminAddAppointment(\'' + dateStr + '\',\'' + rowBarberArg + '\')">' + blocksHtml + '</div>' +
+      '<div class="timeline-row-track"' + trackClick + '>' + blocksHtml + '</div>' +
       '</div>';
   }).join('');
 
