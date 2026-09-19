@@ -1559,7 +1559,7 @@ function renderAgendaTimeline(dateStr) {
     var trackClick = bid === 'unassigned' ? ''
       : (rowBarber && rowBarber.accepts_appointments)
         ? ' onclick="openCaisseAddAppointment(\'' + dateStr + '\',\'' + bid + '\')" title="Cliquer pour ajouter un RDV"'
-        : ' onclick="event.stopPropagation();toast(\'' + esc(b.name) + ' ne prend pas de RDV en ligne (sans-rdv uniquement)\', true)"';
+        : ' onclick="event.stopPropagation();notifySansRdvOnly(this)" data-barber-name="' + esc(b.name) + '"';
     return '<div class="timeline-row">' +
       '<div class="timeline-row-label" title="' + esc(b.name) + '"><span class="dot" style="background:' + color + '"></span></div>' +
       '<div class="timeline-row-track"' + trackClick + '>' + blocksHtml + '</div>' +
@@ -1596,6 +1596,11 @@ function renderAgendaTimeline(dateStr) {
     '<div class="timeline-hours">' + hoursHtml + '</div>' +
     minuteGridHtml + rowsHtml + nowLineHtml +
     '</div></div>';
+}
+
+/** Sur une ligne de coiffeur qui ne prend pas de RDV en ligne. */
+function notifySansRdvOnly(el) {
+  toast((el.dataset.barberName || 'Ce coiffeur') + ' ne prend pas de RDV en ligne (sans-rdv uniquement)', true);
 }
 
 /** Déplace juste la ligne "maintenant", sans reconstruire le reste. */
