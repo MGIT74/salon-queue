@@ -230,6 +230,34 @@ input[type="date"] { -webkit-appearance: none; appearance: none; }
   .auth-form-side { flex: 1 1 auto; padding: 34px 20px 40px; }
 }
 
+/* ============ Sélecteur d'indicatif téléphonique (drapeaux réels) ============ */
+/* Un <select> natif ne peut pas afficher d'image par option - les emoji
+   drapeaux à l'intérieur rendent souvent en noir et blanc/glyphes selon
+   le systeme. Menu personnalise avec de vraies icones (flagcdn.com). */
+.phone-cc-picker { position: relative; flex: 0 0 150px; }
+.phone-cc-btn {
+  width: 100%; height: 100%; display: flex; align-items: center; gap: 7px; cursor: pointer;
+  background: var(--fill); border: none; border-radius: 12px; padding: 0 10px 0 12px;
+  font-size: 14.5px; color: var(--ink); font-family: inherit; outline: 2px solid transparent; outline-offset: -2px;
+}
+.phone-cc-btn:focus-visible { outline-color: var(--blue); }
+.phone-cc-btn img { border-radius: 2px; flex-shrink: 0; display: block; }
+.phone-cc-btn .code { white-space: nowrap; }
+.phone-cc-btn .chev { margin-left: auto; color: var(--grey); flex-shrink: 0; }
+.phone-cc-list {
+  display: none; position: absolute; top: calc(100% + 6px); left: 0; z-index: 40;
+  background: var(--card); border-radius: 14px; box-shadow: var(--shadow-lg);
+  max-height: 260px; overflow-y: auto; width: 250px; padding: 6px;
+}
+.phone-cc-list.on { display: block; }
+.phone-cc-opt {
+  display: flex; align-items: center; gap: 9px; padding: 9px 10px; border-radius: 9px; cursor: pointer; font-size: 14px;
+}
+.phone-cc-opt:hover { background: var(--fill); }
+.phone-cc-opt img { border-radius: 2px; flex-shrink: 0; display: block; }
+.phone-cc-opt .code { color: var(--grey); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.phone-cc-opt .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 .toast {
   position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%) translateY(140%);
   opacity: 0;
