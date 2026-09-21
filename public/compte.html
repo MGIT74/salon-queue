@@ -18,7 +18,7 @@
 <link rel="stylesheet" href="/app.css?v=4">
 <style>
   html, body { min-height: 100%; }
-  .wrap { max-width: 480px; margin: 0 auto; padding: clamp(20px,3vw,40px) 18px 60px; }
+  .wrap { max-width: 480px; margin: 0 auto; padding: clamp(20px,3vw,40px) 18px 60px; display: none; }
   .rdv-header { text-align: center; margin-bottom: 28px; }
   .rdv-header .mark { font-size: 15px; font-weight: 600; color: var(--grey); margin-bottom: 6px; }
   .rdv-header h1 { font-size: 26px; font-weight: 600; letter-spacing: -.03em; margin: 0; }
@@ -575,7 +575,7 @@ function show(id) {
   document.getElementById(id).classList.add('on');
   var isAuthScreen = AUTH_PANEL_IDS.indexOf(id) !== -1;
   document.getElementById('auth-layout').style.display = isAuthScreen ? 'flex' : 'none';
-  document.querySelector('.wrap').style.display = isAuthScreen ? 'none' : '';
+  document.querySelector('.wrap').style.display = isAuthScreen ? 'none' : 'block';
   window.scrollTo(0, 0);
   renderGiftSummaryBox();
   var backBtn = document.getElementById('bk-datetime-back-btn');
@@ -1398,6 +1398,13 @@ function esc(s) {
   if (resetToken) { show('p-reset'); return; }
 
   if (localStorage.getItem('client_token')) { loadProfile(); return; }
+
+  // Visiteur non connecté, sans jeton ni lien de vérif/reset : le seul
+  // chemin qui n'appelait jamais show() explicitement - .wrap (l'appli
+  // connectée) restait donc visible par défaut sous le nouveau panneau
+  // de connexion, laissant apparaître l'ancien en-tête vide en bas de
+  // page.
+  show('p-login');
 })();
 </script>
 </body>
