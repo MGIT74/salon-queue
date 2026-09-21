@@ -345,13 +345,7 @@
         <div class="fld"><label for="su-email">Email</label><input id="su-email" type="email" placeholder="vous@exemple.fr"></div>
         <div class="fld"><label for="su-phone">Téléphone</label>
           <div style="display:flex;gap:8px">
-            <select id="su-phone-country" style="flex:0 0 96px">
-              <option value="+33">🇫🇷 +33</option>
-              <option value="+32">🇧🇪 +32</option>
-              <option value="+41">🇨🇭 +41</option>
-              <option value="+352">🇱🇺 +352</option>
-              <option value="+1">🇨🇦 +1</option>
-            </select>
+            <select id="su-phone-country" style="flex:0 0 96px"></select>
             <input id="su-phone" type="tel" style="flex:1;min-width:0" placeholder="6 12 34 56 78">
           </div>
         </div>
@@ -445,13 +439,7 @@
     <div class="fld"><label for="pf-email">Email</label><input id="pf-email" type="email"></div>
     <div class="fld"><label for="pf-phone">Téléphone</label>
       <div style="display:flex;gap:8px">
-        <select id="pf-phone-country" style="flex:0 0 96px">
-          <option value="+33">🇫🇷 +33</option>
-          <option value="+32">🇧🇪 +32</option>
-          <option value="+41">🇨🇭 +41</option>
-          <option value="+352">🇱🇺 +352</option>
-          <option value="+1">🇨🇦 +1</option>
-        </select>
+        <select id="pf-phone-country" style="flex:0 0 96px"></select>
         <input id="pf-phone" type="tel" style="flex:1;min-width:0" placeholder="6 12 34 56 78">
       </div>
     </div>
@@ -673,11 +661,109 @@ function hideFooter() {
 
 function goAccount() { show('p-account'); showFooter('nav-account'); }
 
+// Liste des indicatifs pays (drapeau + code), France en tête (public
+// principalement francophone), puis reste du monde par ordre
+// alphabetique de nom de pays. Generee en JS et partagee entre les
+// deux selecteurs (inscription + profil) plutot que dupliquee en HTML.
+var PHONE_COUNTRIES = [
+  ['+33', '🇫🇷', 'France'],
+  ['+32', '🇧🇪', 'Belgique'],
+  ['+41', '🇨🇭', 'Suisse'],
+  ['+352', '🇱🇺', 'Luxembourg'],
+  ['+1', '🇨🇦', 'Canada'],
+  ['+49', '🇩🇪', 'Allemagne'],
+  ['+213', '🇩🇿', 'Algérie'],
+  ['+61', '🇦🇺', 'Australie'],
+  ['+43', '🇦🇹', 'Autriche'],
+  ['+973', '🇧🇭', 'Bahreïn'],
+  ['+229', '🇧🇯', 'Bénin'],
+  ['+55', '🇧🇷', 'Brésil'],
+  ['+359', '🇧🇬', 'Bulgarie'],
+  ['+226', '🇧🇫', 'Burkina Faso'],
+  ['+237', '🇨🇲', 'Cameroun'],
+  ['+86', '🇨🇳', 'Chine'],
+  ['+357', '🇨🇾', 'Chypre'],
+  ['+57', '🇨🇴', 'Colombie'],
+  ['+242', '🇨🇬', 'Congo'],
+  ['+243', '🇨🇩', 'Congo (RDC)'],
+  ['+82', '🇰🇷', 'Corée du Sud'],
+  ['+225', '🇨🇮', "Côte d'Ivoire"],
+  ['+45', '🇩🇰', 'Danemark'],
+  ['+20', '🇪🇬', 'Égypte'],
+  ['+971', '🇦🇪', 'Émirats arabes unis'],
+  ['+34', '🇪🇸', 'Espagne'],
+  ['+372', '🇪🇪', 'Estonie'],
+  ['+1', '🇺🇸', 'États-Unis'],
+  ['+358', '🇫🇮', 'Finlande'],
+  ['+590', '🇬🇵', 'Guadeloupe'],
+  ['+594', '🇬🇫', 'Guyane'],
+  ['+30', '🇬🇷', 'Grèce'],
+  ['+509', '🇭🇹', 'Haïti'],
+  ['+36', '🇭🇺', 'Hongrie'],
+  ['+91', '🇮🇳', 'Inde'],
+  ['+62', '🇮🇩', 'Indonésie'],
+  ['+353', '🇮🇪', 'Irlande'],
+  ['+354', '🇮🇸', 'Islande'],
+  ['+972', '🇮🇱', 'Israël'],
+  ['+39', '🇮🇹', 'Italie'],
+  ['+81', '🇯🇵', 'Japon'],
+  ['+7', '🇰🇿', 'Kazakhstan'],
+  ['+965', '🇰🇼', 'Koweït'],
+  ['+371', '🇱🇻', 'Lettonie'],
+  ['+961', '🇱🇧', 'Liban'],
+  ['+370', '🇱🇹', 'Lituanie'],
+  ['+261', '🇲🇬', 'Madagascar'],
+  ['+223', '🇲🇱', 'Mali'],
+  ['+212', '🇲🇦', 'Maroc'],
+  ['+230', '🇲🇺', 'Maurice'],
+  ['+596', '🇲🇶', 'Martinique'],
+  ['+52', '🇲🇽', 'Mexique'],
+  ['+377', '🇲🇨', 'Monaco'],
+  ['+227', '🇳🇪', 'Niger'],
+  ['+47', '🇳🇴', 'Norvège'],
+  ['+64', '🇳🇿', 'Nouvelle-Zélande'],
+  ['+31', '🇳🇱', 'Pays-Bas'],
+  ['+51', '🇵🇪', 'Pérou'],
+  ['+63', '🇵🇭', 'Philippines'],
+  ['+48', '🇵🇱', 'Pologne'],
+  ['+351', '🇵🇹', 'Portugal'],
+  ['+974', '🇶🇦', 'Qatar'],
+  ['+262', '🇷🇪', 'Réunion'],
+  ['+44', '🇬🇧', 'Royaume-Uni'],
+  ['+40', '🇷🇴', 'Roumanie'],
+  ['+7', '🇷🇺', 'Russie'],
+  ['+221', '🇸🇳', 'Sénégal'],
+  ['+65', '🇸🇬', 'Singapour'],
+  ['+421', '🇸🇰', 'Slovaquie'],
+  ['+386', '🇸🇮', 'Slovénie'],
+  ['+46', '🇸🇪', 'Suède'],
+  ['+216', '🇹🇳', 'Tunisie'],
+  ['+90', '🇹🇷', 'Turquie'],
+  ['+380', '🇺🇦', 'Ukraine'],
+  ['+228', '🇹🇬', 'Togo'],
+  ['+420', '🇨🇿', 'Tchéquie']
+];
+
+function populatePhoneCountrySelects() {
+  var html = PHONE_COUNTRIES.map(function (p) {
+    return '<option value="' + p[0] + '">' + p[1] + ' ' + p[0] + '</option>';
+  }).join('');
+  ['su-phone-country', 'pf-phone-country'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) el.innerHTML = html;
+  });
+}
+populatePhoneCountrySelects();
+
 // Sépare un téléphone stocké (idéalement au format international,
 // mais peut être un ancien format local pour des comptes créés avant
 // l'ajout de l'indicatif) en {code, local}, pour préremplir les deux
 // champs correctement. Par défaut +33 si aucun indicatif connu détecté.
-var PHONE_COUNTRY_CODES = ['+352', '+33', '+32', '+41', '+1'];
+// Tries les indicatifs du plus long au plus court pour ne jamais
+// matcher un prefixe trop court par erreur (ex: +352 avant +33... même
+// si ici aucun de nos codes n'est strictement prefixe d'un autre).
+var PHONE_COUNTRY_CODES = Array.from(new Set(PHONE_COUNTRIES.map(function (p) { return p[0]; })))
+  .sort(function (a, b) { return b.length - a.length; });
 function splitPhoneCountry(phone) {
   phone = String(phone || '').trim();
   for (var i = 0; i < PHONE_COUNTRY_CODES.length; i++) {
