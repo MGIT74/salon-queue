@@ -26,7 +26,7 @@ const EDITABLE = [
   'email_tpl_rescheduled_subject', 'email_tpl_rescheduled_body',
   'email_tpl_turn_soon_subject', 'email_tpl_turn_soon_body',
   'email_tpl_closure_subject', 'email_tpl_closure_body',
-  'accent_color',
+  'accent_color', 'login_image_url',
   'caisse_inactivity_seconds', 'caisse_reopen_hour', 'currency',
   'rdv_slot_step_min', 'rdv_min_lead_min', 'rdv_max_advance_days',
   'rdv_buffer_min', 'rdv_cancel_deadline_min', 'rdv_prep_alert_min',
@@ -69,6 +69,14 @@ router.put('/', requireAdmin, wrap(async (req, res) => {
   // Un fuseau invalide planterait silencieusement tous les calculs
   // d'heure de salon (créneaux, clôtures, "en poste") - on vérifie que
   // c'est un identifiant IANA reconnu avant de l'accepter.
+  // Même précaution que pour les photos du catalogue (catalog.js) :
+  // cette valeur est ensuite injectée dans un style="background:url(...)"
+  // côté page de connexion - format strictement restreint.
+  const SAFE_IMAGE_URL = /^(data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=]+|https:\/\/[^\s"'<>]+)$/i;
+  if (patch.login_image_url && !SAFE_IMAGE_URL.test(patch.login_image_url)) {
+    return res.status(400).json({ error: "Format d'image invalide" });
+  }
+
   if (patch.timezone) {
     try { new Intl.DateTimeFormat('en-US', { timeZone: patch.timezone }); }
     catch (e) { return res.status(400).json({ error: 'Fuseau horaire invalide' }); }
@@ -198,6 +206,7 @@ router.get('/public', wrap(async (req, res) => {
     rdv_cancel_deadline_min: s.rdv_cancel_deadline_min ? Number(s.rdv_cancel_deadline_min) : 0,
     rdv_prep_alert_min: s.rdv_prep_alert_min ? Number(s.rdv_prep_alert_min) : 0,
     accent_color: s.accent_color || null,
+    login_image_url: s.login_image_url || null,
     timezone: s.timezone || 'Europe/Paris',
     legal: {
       address: s.legal_address || '',

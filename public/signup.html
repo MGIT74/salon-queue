@@ -31,41 +31,51 @@
 </head>
 <body>
 
-<div class="wrap">
-  <div class="head">
-    <div class="mark">LE SALON</div>
-    <h1>Créer votre salon</h1>
-    <p>Un compte, un mot de passe — vous gérez ensuite tout depuis votre dashboard.</p>
-  </div>
-
-  <div class="card-box" id="form-card">
-    <div class="fld"><label for="f-owner-name">Votre nom</label>
-      <input id="f-owner-name" type="text" placeholder="Prénom Nom" autocomplete="name"></div>
-    <div class="fld"><label for="f-salon">Nom du salon</label>
-      <input id="f-salon" type="text" placeholder="Le Salon" autocomplete="organization"></div>
-    <div class="fld"><label for="f-slug">Identifiant (dans les liens de votre salon)</label>
-      <input id="f-slug" type="text" placeholder="mon-salon" pattern="[a-z0-9-]+"></div>
-    <div class="fld"><label for="f-siret">Numéro SIRET</label>
-      <input id="f-siret" type="text" placeholder="14 chiffres" inputmode="numeric" maxlength="14"></div>
-    <div class="fld"><label for="f-email">Email</label>
-      <input id="f-email" type="email" placeholder="vous@exemple.com" autocomplete="email"></div>
-    <div class="row2">
-      <div class="fld"><label for="f-pw">Mot de passe</label>
-        <input id="f-pw" type="password" placeholder="6 caractères minimum" autocomplete="new-password"></div>
-      <div class="fld"><label for="f-pw2">Confirmer</label>
-        <input id="f-pw2" type="password" autocomplete="new-password"></div>
+<div class="auth-layout">
+  <div class="auth-visual">
+    <div class="auth-visual-overlay">
+      <div class="auth-visual-title">Lancez votre salon</div>
+      <p class="auth-visual-sub">Un compte, un mot de passe — gérez file d'attente, rendez-vous, caisse et catalogue depuis un seul endroit.</p>
     </div>
-    <button class="btn btn-primary" id="submit-btn" style="width:100%;padding:15px;font-size:16px" onclick="doSignup()">Créer mon salon</button>
   </div>
+  <div class="auth-form-side">
+    <div class="auth-form-card" style="max-width:440px">
+      <div class="auth-glow-icon">
+        <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor"><path d="M12 2l1.8 5.2L19 9l-5.2 1.8L12 16l-1.8-5.2L5 9l5.2-1.8L12 2z"/><path d="M19 14l.9 2.1L22 17l-2.1.9L19 20l-.9-2.1L16 17l2.1-.9L19 14z"/></svg>
+      </div>
+      <h1 class="auth-title">Créer votre salon</h1>
+      <p class="auth-sub">Vous gérez ensuite tout depuis votre dashboard</p>
 
-  <div class="card-box success" id="success-card" style="display:none">
-    <div class="check"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
-    <h2>Salon créé !</h2>
-    <p>Un email de confirmation vient de vous être envoyé. Cliquez sur le lien qu'il contient pour activer votre compte avant de vous connecter.</p>
-    <a class="btn btn-primary" id="dashboard-link" href="#">Aller à la connexion</a>
+      <div class="card-box" id="form-card" style="text-align:left">
+        <div class="fld"><label for="f-owner-name">Votre nom</label>
+          <input id="f-owner-name" type="text" placeholder="Prénom Nom" autocomplete="name"></div>
+        <div class="fld"><label for="f-salon">Nom du salon</label>
+          <input id="f-salon" type="text" placeholder="Le Salon" autocomplete="organization"></div>
+        <div class="fld"><label for="f-slug">Identifiant (dans les liens de votre salon)</label>
+          <input id="f-slug" type="text" placeholder="mon-salon" pattern="[a-z0-9-]+"></div>
+        <div class="fld"><label for="f-siret">Numéro SIRET</label>
+          <input id="f-siret" type="text" placeholder="14 chiffres" inputmode="numeric" maxlength="14"></div>
+        <div class="fld"><label for="f-email">Email</label>
+          <input id="f-email" type="email" placeholder="vous@exemple.com" autocomplete="email"></div>
+        <div class="row2">
+          <div class="fld"><label for="f-pw">Mot de passe</label>
+            <input id="f-pw" type="password" placeholder="6 caractères minimum" autocomplete="new-password"></div>
+          <div class="fld"><label for="f-pw2">Confirmer</label>
+            <input id="f-pw2" type="password" autocomplete="new-password"></div>
+        </div>
+        <button class="btn btn-primary" id="submit-btn" style="width:100%;padding:15px;font-size:16px" onclick="doSignup()">Créer mon salon</button>
+      </div>
+
+      <div class="card-box success" id="success-card" style="display:none">
+        <div class="check"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+        <h2>Salon créé !</h2>
+        <p>Un email de confirmation vient de vous être envoyé. Cliquez sur le lien qu'il contient pour activer votre compte avant de vous connecter.</p>
+        <a class="btn btn-primary" id="dashboard-link" href="#">Aller à la connexion</a>
+      </div>
+
+      <div class="login-link">Déjà un salon ? <a href="/dashboard.html">Se connecter</a></div>
+    </div>
   </div>
-
-  <div class="login-link">Déjà un salon ? <a href="/dashboard.html">Se connecter</a></div>
 </div>
 
 <script src="/app.js"></script>

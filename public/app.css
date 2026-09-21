@@ -2,7 +2,7 @@
   --bg: #f5f5f7; --card: #ffffff; --ink: #1d1d1f; --grey: #86868b;
   --sep: #d2d2d7; --fill: #f2f2f7; --fill-2: #e8e8ed;
   --blue: #0071e3; --blue-hover: #0058b9; --blue-soft: #e8f1fd;
-  --accent: #0071e3; --accent-hover: #0058b9;
+  --accent: #0071e3; --accent-hover: #0058b9; --accent-rgb: 0,113,227;
   --green: #34c759; --green-hover: #28a746;
   --red: #ff3b30; --orange: #ff9500;
   --shadow: 0 1px 3px rgba(0,0,0,0.05);
@@ -12,7 +12,7 @@
   --bg: #000000; --card: #1c1c1e; --ink: #f5f5f7; --grey: #98989d;
   --sep: #38383a; --fill: #2c2c2e; --fill-2: #3a3a3c;
   --blue: #0a84ff; --blue-hover: #409cff; --blue-soft: #0a2540;
-  --accent: #0a84ff; --accent-hover: #409cff;
+  --accent: #0a84ff; --accent-hover: #409cff; --accent-rgb: 10,132,255;
   --green: #30d158; --green-hover: #4ade7b;
   --red: #ff453a; --orange: #ff9f0a;
   --shadow: none;
@@ -176,6 +176,59 @@ button:active:not(:disabled), .switch:active {
    entièrement cliquable (le sélecteur de date natif s'ouvre toujours
    au tap), seule la petite icône calendrier disparaît visuellement. */
 input[type="date"] { -webkit-appearance: none; appearance: none; }
+
+/* ============ Page de connexion / création de compte ============ */
+/* Partagée par dashboard.html (gérants), compte.html (clients de chaque
+   salon) et signup.html (création d'enseigne) - le dégradé de droite
+   utilise --accent-rgb, déjà posé par applyAccentColor() avec la
+   couleur propre à chaque salon ; le panneau de gauche affiche l'image
+   uploadée dans Réglages (sinon un dégradé de secours). */
+.auth-layout { display: flex; min-height: 100vh; align-items: stretch; }
+.auth-visual {
+  flex: 1 1 44%; position: relative; min-width: 0; overflow: hidden;
+  background: linear-gradient(160deg, #1c1c1e 0%, #0a0a0c 100%);
+  background-size: cover; background-position: center;
+  display: flex; align-items: flex-end; padding: 44px;
+}
+.auth-visual::before {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(0,0,0,.05) 0%, rgba(0,0,0,.6) 100%);
+}
+.auth-visual-overlay { position: relative; z-index: 1; color: #fff; }
+.auth-visual-title { font-size: 26px; font-weight: 700; margin: 0 0 6px; letter-spacing: -.01em; }
+.auth-visual-sub { font-size: 15px; opacity: .8; margin: 0; }
+.auth-form-side {
+  flex: 1 1 56%; display: flex; align-items: center; justify-content: center;
+  padding: 40px 24px; position: relative; overflow: hidden; background: var(--bg);
+}
+.auth-form-side::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background:
+    radial-gradient(circle at 50% -10%, rgba(var(--accent-rgb), .30) 0%, rgba(var(--accent-rgb), 0) 55%),
+    radial-gradient(circle at 50% 15%, rgba(var(--accent-rgb), .16) 0%, rgba(var(--accent-rgb), 0) 45%);
+}
+.auth-form-card { width: 100%; max-width: 380px; text-align: center; position: relative; z-index: 1; }
+.auth-glow-icon {
+  width: 62px; height: 62px; border-radius: 50%; margin: 0 auto 20px;
+  background: radial-gradient(circle at 32% 28%, rgba(255,255,255,.9), rgba(var(--accent-rgb), 1) 60%);
+  box-shadow: 0 0 0 8px rgba(var(--accent-rgb), .14), 0 10px 30px rgba(var(--accent-rgb), .35);
+  display: flex; align-items: center; justify-content: center; color: #fff;
+}
+.auth-title { font-size: 25px; font-weight: 700; margin: 0 0 6px; letter-spacing: -.01em; }
+.auth-sub { color: var(--grey); margin: 0 0 26px; font-size: 14.5px; }
+.auth-form-card .fld { text-align: left; margin-bottom: 14px; }
+.auth-links { margin-top: 16px; font-size: 14px; }
+.auth-links a { color: var(--accent); text-decoration: none; font-weight: 500; }
+.auth-back-link {
+  position: absolute; top: 20px; left: 20px; z-index: 2; color: #fff; text-decoration: none;
+  font-size: 14px; font-weight: 500; opacity: .85; display: flex; align-items: center; gap: 6px;
+}
+@media (max-width: 780px) {
+  .auth-layout { flex-direction: column; }
+  .auth-visual { flex: 0 0 auto; min-height: 180px; padding: 20px 24px; }
+  .auth-visual-title { font-size: 21px; }
+  .auth-form-side { flex: 1 1 auto; padding: 34px 20px 40px; }
+}
 
 .toast {
   position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%) translateY(140%);

@@ -13,6 +13,7 @@
 </script>
 <style>
   html.auth-checking #p-login { display: none !important; }
+  html.auth-checking #auth-layout { display: none !important; }
 </style>
 <link rel="stylesheet" href="/app.css?v=4">
 <style>
@@ -284,62 +285,86 @@
 </head>
 <body>
 
+<div class="auth-layout" id="auth-layout">
+  <div class="auth-visual" id="auth-visual-panel">
+    <div class="auth-visual-overlay">
+      <div class="auth-visual-title" id="salon-mark">LE SALON</div>
+      <p class="auth-visual-sub">Mon compte</p>
+    </div>
+  </div>
+  <div class="auth-form-side">
+    <div class="auth-form-card">
+      <div class="auth-glow-icon">
+        <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor"><path d="M12 2l1.8 5.2L19 9l-5.2 1.8L12 16l-1.8-5.2L5 9l5.2-1.8L12 2z"/><path d="M19 14l.9 2.1L22 17l-2.1.9L19 20l-.9-2.1L16 17l2.1-.9L19 14z"/></svg>
+      </div>
+
+      <!-- Connexion -->
+      <section class="panel on" id="p-login">
+        <h1 class="auth-title">Bon retour</h1>
+        <p class="auth-sub">Connectez-vous pour gérer votre compte</p>
+        <div class="fld"><label for="li-email">Email</label><input id="li-email" type="email" placeholder="vous@exemple.fr"></div>
+        <div class="fld"><label for="li-pass">Mot de passe</label><input id="li-pass" type="password"></div>
+        <button class="go" onclick="doLogin()">Se connecter</button>
+        <div class="err" id="login-err"></div>
+        <div style="text-align:center;margin-top:16px;display:flex;justify-content:space-between">
+          <button class="link-btn" onclick="show('p-signup')">Créer un compte</button>
+          <button class="link-btn" onclick="show('p-forgot')">Mot de passe oublié ?</button>
+        </div>
+      </section>
+
+      <!-- Inscription -->
+      <section class="panel" id="p-signup">
+        <h1 class="auth-title">Créer un compte</h1>
+        <p class="auth-sub">Pour gérer vos rendez-vous, votre fidélité et vos cadeaux</p>
+        <div class="fld"><label for="su-name">Nom</label><input id="su-name" type="text" placeholder="Votre nom"></div>
+        <div class="fld"><label for="su-email">Email</label><input id="su-email" type="email" placeholder="vous@exemple.fr"></div>
+        <div class="fld"><label for="su-phone">Téléphone</label><input id="su-phone" type="tel"></div>
+        <div class="fld"><label for="su-pass">Mot de passe</label><input id="su-pass" type="password" placeholder="6 caractères minimum"></div>
+        <button class="go" onclick="doSignup()">Créer mon compte</button>
+        <div class="err" id="signup-err"></div>
+        <div style="text-align:center;margin-top:16px">
+          <button class="link-btn" onclick="show('p-login')">‹ J'ai déjà un compte</button>
+        </div>
+      </section>
+
+      <!-- Vérification email envoyée -->
+      <section class="panel" id="p-check-email">
+        <h1 class="auth-title">Vérifiez vos emails</h1>
+        <div class="msg" style="text-align:center;font-size:15px">
+          Un email de confirmation vient de vous être envoyé. Cliquez sur le lien qu'il contient pour activer votre compte, puis revenez vous connecter ici.
+        </div>
+        <button class="go" style="margin-top:18px" onclick="show('p-login')">Retour à la connexion</button>
+      </section>
+
+      <!-- Mot de passe oublié -->
+      <section class="panel" id="p-forgot">
+        <h1 class="auth-title">Mot de passe oublié</h1>
+        <p class="auth-sub">On vous envoie un lien pour le réinitialiser</p>
+        <div class="fld"><label for="fp-email">Email</label><input id="fp-email" type="email" placeholder="vous@exemple.fr"></div>
+        <button class="go" id="fp-send-btn" onclick="doForgot()">Envoyer le lien de réinitialisation</button>
+        <div class="msg" id="forgot-msg" style="font-size:14.5px;color:var(--ink);font-weight:500"></div>
+        <div class="err" id="forgot-err"></div>
+        <div style="text-align:center;margin-top:16px">
+          <button class="link-btn" onclick="show('p-login')">‹ Retour</button>
+        </div>
+      </section>
+
+      <!-- Nouveau mot de passe (depuis le lien email) -->
+      <section class="panel" id="p-reset">
+        <h1 class="auth-title">Nouveau mot de passe</h1>
+        <div class="fld"><label for="rp-pass">Nouveau mot de passe</label><input id="rp-pass" type="password" placeholder="6 caractères minimum"></div>
+        <button class="go" onclick="doResetPassword()">Valider</button>
+        <div class="err" id="reset-err"></div>
+      </section>
+    </div>
+  </div>
+</div>
+
 <div class="wrap">
   <div class="rdv-header">
-    <div class="mark" id="salon-mark">LE SALON</div>
+    <div class="mark" id="salon-mark-app">LE SALON</div>
     <h1>Mon compte</h1>
   </div>
-
-  <!-- Connexion -->
-  <section class="panel on" id="p-login">
-    <div class="fld"><label for="li-email">Email</label><input id="li-email" type="email" placeholder="vous@exemple.fr"></div>
-    <div class="fld"><label for="li-pass">Mot de passe</label><input id="li-pass" type="password"></div>
-    <button class="go" onclick="doLogin()">Se connecter</button>
-    <div class="err" id="login-err"></div>
-    <div style="text-align:center;margin-top:16px;display:flex;justify-content:space-between">
-      <button class="link-btn" onclick="show('p-signup')">Créer un compte</button>
-      <button class="link-btn" onclick="show('p-forgot')">Mot de passe oublié ?</button>
-    </div>
-  </section>
-
-  <!-- Inscription -->
-  <section class="panel" id="p-signup">
-    <div class="fld"><label for="su-name">Nom</label><input id="su-name" type="text" placeholder="Votre nom"></div>
-    <div class="fld"><label for="su-email">Email</label><input id="su-email" type="email" placeholder="vous@exemple.fr"></div>
-    <div class="fld"><label for="su-phone">Téléphone</label><input id="su-phone" type="tel"></div>
-    <div class="fld"><label for="su-pass">Mot de passe</label><input id="su-pass" type="password" placeholder="6 caractères minimum"></div>
-    <button class="go" onclick="doSignup()">Créer mon compte</button>
-    <div class="err" id="signup-err"></div>
-    <div style="text-align:center;margin-top:16px">
-      <button class="link-btn" onclick="show('p-login')">‹ J'ai déjà un compte</button>
-    </div>
-  </section>
-
-  <!-- Vérification email envoyée -->
-  <section class="panel" id="p-check-email">
-    <div class="msg" style="text-align:center;font-size:15px">
-      Un email de confirmation vient de vous être envoyé. Cliquez sur le lien qu'il contient pour activer votre compte, puis revenez vous connecter ici.
-    </div>
-    <button class="go" style="margin-top:18px" onclick="show('p-login')">Retour à la connexion</button>
-  </section>
-
-  <!-- Mot de passe oublié -->
-  <section class="panel" id="p-forgot">
-    <div class="fld"><label for="fp-email">Email</label><input id="fp-email" type="email" placeholder="vous@exemple.fr"></div>
-    <button class="go" id="fp-send-btn" onclick="doForgot()">Envoyer le lien de réinitialisation</button>
-    <div class="msg" id="forgot-msg" style="font-size:14.5px;color:var(--ink);font-weight:500"></div>
-    <div class="err" id="forgot-err"></div>
-    <div style="text-align:center;margin-top:16px">
-      <button class="link-btn" onclick="show('p-login')">‹ Retour</button>
-    </div>
-  </section>
-
-  <!-- Nouveau mot de passe (depuis le lien email) -->
-  <section class="panel" id="p-reset">
-    <div class="fld"><label for="rp-pass">Nouveau mot de passe</label><input id="rp-pass" type="password" placeholder="6 caractères minimum"></div>
-    <button class="go" onclick="doResetPassword()">Valider</button>
-    <div class="err" id="reset-err"></div>
-  </section>
 
   <!-- Accueil (connecté) : fidélité + dernière prestation -->
   <section class="panel" id="p-home">
@@ -543,9 +568,14 @@ function api(path, opts) {
   });
 }
 
+var AUTH_PANEL_IDS = ['p-login', 'p-signup', 'p-check-email', 'p-forgot', 'p-reset'];
+
 function show(id) {
   document.querySelectorAll('.panel').forEach(function (p) { p.classList.remove('on'); });
   document.getElementById(id).classList.add('on');
+  var isAuthScreen = AUTH_PANEL_IDS.indexOf(id) !== -1;
+  document.getElementById('auth-layout').style.display = isAuthScreen ? 'flex' : 'none';
+  document.querySelector('.wrap').style.display = isAuthScreen ? 'none' : '';
   window.scrollTo(0, 0);
   renderGiftSummaryBox();
   var backBtn = document.getElementById('bk-datetime-back-btn');
@@ -1313,9 +1343,16 @@ function esc(s) {
     fetch('/api/settings/public', { headers: { 'X-Salon-Slug': SALON_SLUG } })
       .then(function (r) { return r.json(); })
       .then(function (d) {
-        if (d.salon_name) document.getElementById('salon-mark').textContent = d.salon_name.toUpperCase();
+        if (d.salon_name) {
+          document.getElementById('salon-mark').textContent = d.salon_name.toUpperCase();
+          document.getElementById('salon-mark-app').textContent = d.salon_name.toUpperCase();
+        }
         CURRENCY = d.currency || 'EUR';
         applyAccentColor(d.accent_color);
+        if (d.login_image_url) {
+          var visualPanel = document.getElementById('auth-visual-panel');
+          if (visualPanel) visualPanel.style.backgroundImage = 'url("' + d.login_image_url + '")';
+        }
         var loyaltyCard = document.querySelector('#loyalty-section .card');
         if (loyaltyCard && d.loyalty_card_image_url) {
           loyaltyCard.classList.add('has-bg');

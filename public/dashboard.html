@@ -1012,17 +1012,33 @@
 </div>
 
 <!-- Connexion -->
-<div class="wrap login" id="login">
-  <h1>Dashboard</h1>
-  <p id="login-salon-name" style="font-weight:600;color:var(--blue)">Chargement…</p>
-  <p>Connectez-vous avec votre email (retrouve votre salon automatiquement)</p>
-  <div class="fld"><input id="login-email" type="email" placeholder="Email"
-       onkeydown="if(event.key==='Enter') doLogin()"></div>
-  <div class="fld"><input id="pw" type="password" placeholder="Mot de passe"
-       onkeydown="if(event.key==='Enter') doLogin()"></div>
-  <button class="btn btn-primary" style="width:100%;padding:15px;font-size:16px" onclick="doLogin()">Entrer</button>
-  <p style="margin-top:14px;font-size:14px"><a href="/forgot-password.html" style="color:var(--accent);text-decoration:none;font-weight:500">Mot de passe oublié ?</a></p>
-  <p style="margin-top:8px;font-size:14px;color:var(--grey)">Pas encore de salon ? <a href="/signup.html" style="color:var(--accent);text-decoration:none;font-weight:500">Créer mon salon</a></p>
+<div class="wrap" id="login" style="max-width:none;padding:0">
+  <div class="auth-layout">
+    <div class="auth-visual" id="auth-visual-panel">
+      <div class="auth-visual-overlay">
+        <div class="auth-visual-title" id="login-salon-name">Chargement…</div>
+        <p class="auth-visual-sub">Espace de gestion du salon</p>
+      </div>
+    </div>
+    <div class="auth-form-side">
+      <div class="auth-form-card">
+        <div class="auth-glow-icon">
+          <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor"><path d="M12 2l1.8 5.2L19 9l-5.2 1.8L12 16l-1.8-5.2L5 9l5.2-1.8L12 2z"/><path d="M19 14l.9 2.1L22 17l-2.1.9L19 20l-.9-2.1L16 17l2.1-.9L19 14z"/></svg>
+        </div>
+        <h1 class="auth-title">Dashboard</h1>
+        <p class="auth-sub">Connectez-vous avec votre email — retrouve votre salon automatiquement</p>
+        <div class="fld"><input id="login-email" type="email" placeholder="Email"
+             onkeydown="if(event.key==='Enter') doLogin()"></div>
+        <div class="fld"><input id="pw" type="password" placeholder="Mot de passe"
+             onkeydown="if(event.key==='Enter') doLogin()"></div>
+        <button class="btn btn-primary" style="width:100%;padding:15px;font-size:16px" onclick="doLogin()">Entrer</button>
+        <div class="auth-links">
+          <a href="/forgot-password.html">Mot de passe oublié ?</a>
+          <p style="margin-top:8px;color:var(--grey)">Pas encore de salon ? <a href="/signup.html">Créer mon salon</a></p>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- Application -->
@@ -1654,6 +1670,25 @@
     </div>
 
     <div class="card-box">
+      <h3>Page de connexion</h3>
+      <p class="hint">
+        Image affichée à côté du formulaire de connexion de vos clients (page « Mon compte » de chaque salon).
+        Le dégradé de fond utilise automatiquement la couleur d'accentuation ci-dessus. Sans image, un dégradé seul est affiché.
+      </p>
+      <div style="display:flex;align-items:center;gap:16px">
+        <div id="login-image-preview" onclick="document.getElementById('login-image-input').click()"
+             style="width:90px;height:120px;border-radius:14px;cursor:pointer;background:var(--fill);
+             display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;
+             color:var(--grey);font-size:12px;text-align:center;background-size:cover;background-position:center">Ajouter</div>
+        <input type="file" id="login-image-input" accept="image/*" style="display:none" onchange="uploadLoginImage(this)">
+        <div>
+          <div class="hint" style="margin:0 0 8px">Cliquez sur le cadre pour choisir une image (portrait de préférence).</div>
+          <button class="btn btn-ghost" style="padding:8px 14px;font-size:13px;display:none" id="login-image-remove-btn" onclick="removeLoginImage()">Retirer l'image</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card-box">
       <h3>Mot de passe</h3>
       <p class="hint">Ce mot de passe est partagé par tous les salons de votre enseigne.</p>
       <div class="grid2">
@@ -2027,6 +2062,7 @@ var currentSalonLogo = '';
 var currentGiftTileImage = '';
 var currentLoyaltyCardImage = '';
 var currentGiftCardImage = '';
+var currentLoginImage = '';
 
 function loadCurrentSalonName() {
   // Si l'URL ne precise pas de salon (lien universel, pas un lien
@@ -2079,6 +2115,24 @@ function loadCurrentSalonName() {
         if (accentInput) {
           accentInput.value = d.accent_color;
           document.getElementById('acc-accent-color-hex').textContent = d.accent_color;
+        }
+      }
+      currentLoginImage = d.login_image_url || '';
+      var visualPanel = document.getElementById('auth-visual-panel');
+      if (visualPanel && currentLoginImage) {
+        visualPanel.style.backgroundImage = 'url("' + currentLoginImage + '")';
+      }
+      var loginImgPreview = document.getElementById('login-image-preview');
+      if (loginImgPreview) {
+        var removeBtn = document.getElementById('login-image-remove-btn');
+        if (currentLoginImage) {
+          loginImgPreview.style.background = 'url("' + currentLoginImage + '") center/cover';
+          loginImgPreview.textContent = '';
+          if (removeBtn) removeBtn.style.display = 'inline-block';
+        } else {
+          loginImgPreview.style.background = 'var(--fill)';
+          loginImgPreview.textContent = 'Ajouter';
+          if (removeBtn) removeBtn.style.display = 'none';
         }
       }
       var giftPreview = document.getElementById('gift-tile-preview');
@@ -6128,6 +6182,57 @@ function uploadSalonLogo(input) {
     img.src = e.target.result;
   };
   reader.readAsDataURL(file);
+}
+
+function uploadLoginImage(input) {
+  var file = input.files && input.files[0];
+  if (!file) return;
+
+  var reader = new FileReader();
+  reader.onload = function (e) {
+    var img = new Image();
+    img.onload = function () {
+      // Portrait plutôt que carré : pensé pour le panneau de gauche,
+      // plus haut que large, de la page de connexion.
+      var w = 700, h = 900;
+      var canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      var ctx = canvas.getContext('2d');
+      var targetRatio = w / h;
+      var srcRatio = img.width / img.height;
+      var sx, sy, sw, sh;
+      if (srcRatio > targetRatio) {
+        sh = img.height; sw = sh * targetRatio; sx = (img.width - sw) / 2; sy = 0;
+      } else {
+        sw = img.width; sh = sw / targetRatio; sx = 0; sy = (img.height - sh) / 2;
+      }
+      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
+      var dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+
+      api('/api/settings', { method: 'PUT', body: { login_image_url: dataUrl } })
+        .then(function () {
+          document.getElementById('login-image-preview').style.background = 'url(&quot;' + dataUrl + '&quot;) center/cover';
+          document.getElementById('login-image-preview').textContent = '';
+          document.getElementById('login-image-remove-btn').style.display = 'inline-block';
+          toast('Image mise à jour');
+        })
+        .catch(function (e) { toast(e.message, true); });
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeLoginImage() {
+  api('/api/settings', { method: 'PUT', body: { login_image_url: '' } })
+    .then(function () {
+      var el = document.getElementById('login-image-preview');
+      el.style.background = 'var(--fill)';
+      el.textContent = 'Ajouter';
+      document.getElementById('login-image-remove-btn').style.display = 'none';
+      toast('Image retirée');
+    })
+    .catch(function (e) { toast(e.message, true); });
 }
 
 function saveAccentColor() {
