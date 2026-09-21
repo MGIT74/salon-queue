@@ -2060,7 +2060,7 @@ function renderPendingList() {
           ? '<button class="btn btn-primary" onclick="event.stopPropagation();useGiftCard(\'' + q.gift_card.id + '\',\'' + q.id + '\')">Utiliser le cadeau</button>'
           : '') +
         (isActive && !q.loyalty_member
-          ? '<button class="btn btn-ghost" onclick="event.stopPropagation();proposeLoyaltyActivation(\'' + q.id + '\')">Proposer la fidélité</button>'
+          ? '<button class="btn btn-ghost" onclick="event.stopPropagation();proposeLoyaltyActivation(\'' + q.id + '\')">Activer carte de fidélité</button>'
           : '') +
         (isActive ? '<button class="btn btn-ghost" onclick="event.stopPropagation();toggleDeferPayment(\'' + q.id + '\')">Mettre de côté</button>' : '') +
       '</div></div>';
