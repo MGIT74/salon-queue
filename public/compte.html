@@ -345,7 +345,7 @@
         <div class="fld"><label for="su-email">Email</label><input id="su-email" type="email" placeholder="vous@exemple.fr"></div>
         <div class="fld"><label for="su-phone">Téléphone</label>
           <div style="display:flex;gap:8px">
-            <select id="su-phone-country" style="flex:0 0 96px"></select>
+            <select id="su-phone-country" style="flex:0 0 150px"></select>
             <input id="su-phone" type="tel" style="flex:1;min-width:0" placeholder="6 12 34 56 78">
           </div>
         </div>
@@ -439,7 +439,7 @@
     <div class="fld"><label for="pf-email">Email</label><input id="pf-email" type="email"></div>
     <div class="fld"><label for="pf-phone">Téléphone</label>
       <div style="display:flex;gap:8px">
-        <select id="pf-phone-country" style="flex:0 0 96px"></select>
+        <select id="pf-phone-country" style="flex:0 0 150px"></select>
         <input id="pf-phone" type="tel" style="flex:1;min-width:0" placeholder="6 12 34 56 78">
       </div>
     </div>
@@ -746,7 +746,7 @@ var PHONE_COUNTRIES = [
 
 function populatePhoneCountrySelects() {
   var html = PHONE_COUNTRIES.map(function (p) {
-    return '<option value="' + p[0] + '">' + p[1] + ' ' + p[0] + '</option>';
+    return '<option value="' + p[0] + '">' + p[1] + ' ' + p[0] + ' ' + p[2] + '</option>';
   }).join('');
   ['su-phone-country', 'pf-phone-country'].forEach(function (id) {
     var el = document.getElementById(id);
