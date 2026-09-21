@@ -4181,10 +4181,37 @@ function renderLoyaltyAccountsList() {
         ].join('');
         return '<div class="item">' +
           '<div class="item-main"><div class="item-name">' + esc(a.client_name) + '</div>' +
-          '<div class="loyalty-info-grid">' + infoGrid + '</div></div></div>';
+          '<div class="loyalty-info-grid">' + infoGrid + '</div></div>' +
+          '<div class="item-actions">' +
+            '<button class="btn btn-soft" style="font-size:13px;padding:6px 12px" onclick="deactivateLoyaltyAccount(\'' + a.id + '\', \'' + esc(a.client_name).replace(/'/g, "\\'") + '\')">Désactiver</button>' +
+            '<button class="btn btn-ghost" style="font-size:13px;padding:6px 12px;color:var(--red)" onclick="deleteLoyaltyAccount(\'' + a.id + '\', \'' + esc(a.client_name).replace(/'/g, "\\'") + '\')">Supprimer</button>' +
+          '</div>' +
+          '</div>';
       }).join('');
 
   renderPaginationControls('loyalty-pagination', loyaltyPage, loyaltyPerPage, loyaltyAccountsData.length, 'goToLoyaltyPage');
+}
+
+function deactivateLoyaltyAccount(id, name) {
+  showConfirm('Désactiver la carte de fidélité de ' + name + ' ? Les points déjà cumulés sont conservés (réactivable plus tard).', { title: 'Désactiver la carte' })
+    .then(function (ok) {
+      if (!ok) return;
+      api('/api/owner/loyalty-accounts/' + id + '/deactivate', { method: 'POST' })
+        .then(loadMarketingTab)
+        .then(function () { toast('Carte désactivée'); })
+        .catch(function (e) { toast(e.message, true); });
+    });
+}
+
+function deleteLoyaltyAccount(id, name) {
+  showConfirm('Supprimer définitivement la carte de fidélité de ' + name + ' ? Les points cumulés seront perdus, cette action est irréversible.', { title: 'Supprimer la carte', danger: true, confirmLabel: 'Supprimer' })
+    .then(function (ok) {
+      if (!ok) return;
+      api('/api/owner/loyalty-accounts/' + id, { method: 'DELETE' })
+        .then(loadMarketingTab)
+        .then(function () { toast('Carte supprimée'); })
+        .catch(function (e) { toast(e.message, true); });
+    });
 }
 
 function changeGiftsPerPage(value) {
@@ -4209,8 +4236,8 @@ function renderGiftCardsList() {
     ? '<div class="empty">Aucun cadeau vendu pour le moment</div>'
     : pageItems.map(function (g) {
         var itemsList = g.items.map(function (it) { return (it.quantity > 1 ? it.quantity + ' × ' : '') + it.item_name; }).join(', ');
-        var statusLabel = g.used_at ? 'Utilisé' : 'Non utilisé';
-        var statusColor = g.used_at ? 'var(--grey)' : 'var(--green)';
+        var statusLabel = g.used_at ? 'Utilisé' : (g.voided_at ? 'Désactivé' : 'Non utilisé');
+        var statusColor = g.used_at ? 'var(--grey)' : (g.voided_at ? 'var(--orange)' : 'var(--green)');
         var fmtDate = function (iso) { return new Date(iso).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }); };
         var infoGrid = ['<div class="f"><b>' + esc(g.recipient_email) + '</b></div>',
           '<div class="f"><b>' + esc(g.recipient_phone) + '</b></div>',
@@ -4219,18 +4246,46 @@ function renderGiftCardsList() {
           '<div class="f"><b>' + fmtDate(g.created_at) + '</b></div>',
           '<div class="f">' + (g.used_at ? '<b>' + fmtDate(g.used_at) + '</b>' : '') + '</div>'
         ].join('');
+        var safeName = esc(g.recipient_name).replace(/'/g, "\\'");
         return '<div class="item">' +
           '<div class="item-main"><div class="item-name">' + esc(g.recipient_name) + ' — ' + eur(g.amount_cents) + '</div>' +
           '<div class="item-meta">' + esc(itemsList) + '</div>' +
           '<div class="gift-info-grid">' + infoGrid + '</div></div>' +
           '<div class="item-actions">' +
             (g.used_at ? '' : '<button class="btn btn-soft" onclick="resendGiftCode(\'' + g.id + '\')" style="font-size:13px;padding:6px 12px">Renvoyer le code</button>') +
+            (g.used_at ? '' : '<button class="btn btn-soft" onclick="toggleGiftCardVoid(\'' + g.id + '\', \'' + safeName + '\', ' + (g.voided_at ? 'true' : 'false') + ')" style="font-size:13px;padding:6px 12px">' + (g.voided_at ? 'Réactiver' : 'Désactiver') + '</button>') +
+            '<button class="btn btn-ghost" onclick="deleteGiftCard(\'' + g.id + '\', \'' + safeName + '\')" style="font-size:13px;padding:6px 12px;color:var(--red)">Supprimer</button>' +
             '<span style="color:' + statusColor + ';font-size:13px;font-weight:600;align-self:center">' + statusLabel + '</span>' +
           '</div>' +
           '</div>';
       }).join('');
 
   renderPaginationControls('gifts-pagination', giftsPage, giftsPerPage, giftCardsData.length, 'goToGiftsPage');
+}
+
+function toggleGiftCardVoid(id, name, currentlyVoided) {
+  var msg = currentlyVoided
+    ? 'Réactiver le bon cadeau de ' + name + ' ? Il redeviendra utilisable.'
+    : 'Désactiver le bon cadeau de ' + name + ' ? Il ne pourra plus être utilisé (sans le supprimer).';
+  showConfirm(msg, { title: currentlyVoided ? 'Réactiver le cadeau' : 'Désactiver le cadeau' })
+    .then(function (ok) {
+      if (!ok) return;
+      api('/api/owner/gift-cards/' + id + '/void', { method: 'POST' })
+        .then(loadMarketingTab)
+        .then(function () { toast(currentlyVoided ? 'Cadeau réactivé' : 'Cadeau désactivé'); })
+        .catch(function (e) { toast(e.message, true); });
+    });
+}
+
+function deleteGiftCard(id, name) {
+  showConfirm('Supprimer définitivement le bon cadeau de ' + name + ' ? Cette action est irréversible.', { title: 'Supprimer le cadeau', danger: true, confirmLabel: 'Supprimer' })
+    .then(function (ok) {
+      if (!ok) return;
+      api('/api/owner/gift-cards/' + id, { method: 'DELETE' })
+        .then(loadMarketingTab)
+        .then(function () { toast('Cadeau supprimé'); })
+        .catch(function (e) { toast(e.message, true); });
+    });
 }
 
 function resendGiftCode(giftId) {

@@ -489,7 +489,7 @@ router.post('/', wrap(async (req, res) => {
   if (gift_id) {
     const [giftLock] = await pool.query(
       `UPDATE gift_cards SET pending_appointment_id = ?
-       WHERE id = ? AND salon_id = ? AND used_at IS NULL AND pending_appointment_id IS NULL`,
+       WHERE id = ? AND salon_id = ? AND used_at IS NULL AND voided_at IS NULL AND pending_appointment_id IS NULL`,
       [id, gift_id, req.salon.id]
     );
     if (giftLock.affectedRows === 0) {

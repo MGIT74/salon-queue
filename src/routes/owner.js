@@ -364,10 +364,38 @@ router.get('/gift-cards', requireAdmin, wrap(async (req, res) => {
         code: g.code,
         barber_name: g.barber_name || null,
         used_at: g.used_at ? utcIso(g.used_at) : null,
+        voided_at: g.voided_at ? utcIso(g.voided_at) : null,
         created_at: utcIso(g.created_at)
       };
     })
   });
+}));
+
+/**
+ * Désactive/réactive un bon cadeau (bascule) : le rend inutilisable
+ * sans le supprimer, pour garder une trace (ex. cadeau annulé après
+ * remboursement) - distinct d'un bon déjà remis au client (used_at).
+ * Impossible sur un bon déjà utilisé (n'aurait pas de sens).
+ */
+router.post('/gift-cards/:id/void', requireAdmin, wrap(async (req, res) => {
+  const [[gift]] = await pool.query('SELECT * FROM gift_cards WHERE id = ? AND salon_id = ?', [req.params.id, req.salon.id]);
+  if (!gift) return res.status(404).json({ error: 'Cadeau introuvable' });
+  if (gift.used_at) return res.status(409).json({ error: 'Ce cadeau a déjà été utilisé, impossible de le désactiver' });
+
+  const nowVoided = !gift.voided_at;
+  await pool.query('UPDATE gift_cards SET voided_at = ? WHERE id = ?', [nowVoided ? new Date() : null, gift.id]);
+  logActivity(req.salon.id, nowVoided ? 'gift_card_void' : 'gift_card_restore',
+    'Bon cadeau ' + (gift.amount_cents / 100).toFixed(2) + ' € pour ' + gift.recipient_name + ' ' + (nowVoided ? 'désactivé' : 'réactivé'));
+  res.json({ ok: true, voided: nowVoided });
+}));
+
+/** Suppression définitive d'un bon cadeau (perd son historique). */
+router.delete('/gift-cards/:id', requireAdmin, wrap(async (req, res) => {
+  const [[gift]] = await pool.query('SELECT * FROM gift_cards WHERE id = ? AND salon_id = ?', [req.params.id, req.salon.id]);
+  if (!gift) return res.status(404).json({ error: 'Cadeau introuvable' });
+  await pool.query('DELETE FROM gift_cards WHERE id = ?', [gift.id]);
+  logActivity(req.salon.id, 'gift_card_delete', 'Bon cadeau ' + (gift.amount_cents / 100).toFixed(2) + ' € pour ' + gift.recipient_name + ' supprimé');
+  res.json({ ok: true });
 }));
 
 /**
@@ -406,7 +434,7 @@ router.post('/gift-cards/:id/resend', requireAdmin, wrap(async (req, res) => {
  */
 router.get('/loyalty-accounts', requireAdmin, wrap(async (req, res) => {
   const [rows] = await pool.query(
-    'SELECT client_name, client_key, recipient_email, points, rewards_available, activated_at, updated_at FROM loyalty_accounts ' +
+    'SELECT id, client_name, client_key, recipient_email, points, rewards_available, activated_at, updated_at FROM loyalty_accounts ' +
     'WHERE salon_id = ? AND activated_at IS NOT NULL ORDER BY updated_at DESC LIMIT 300',
     [req.salon.id]
   );
@@ -417,6 +445,31 @@ router.get('/loyalty-accounts', requireAdmin, wrap(async (req, res) => {
       updated_at: utcIso(r.updated_at)
     }))
   });
+}));
+
+/**
+ * Désactive une carte de fidélité (activated_at repassé à NULL) : le
+ * client n'accumule plus de points et la carte disparaît de cette
+ * liste, MAIS les points déjà cumulés restent en base - une future
+ * réactivation (bouton "Activer carte de fidélité" à la caisse)
+ * reprendra l'historique existant plutôt que de repartir de zéro.
+ * Différent d'une suppression définitive (route DELETE ci-dessous).
+ */
+router.post('/loyalty-accounts/:id/deactivate', requireAdmin, wrap(async (req, res) => {
+  const [[account]] = await pool.query('SELECT * FROM loyalty_accounts WHERE id = ? AND salon_id = ?', [req.params.id, req.salon.id]);
+  if (!account) return res.status(404).json({ error: 'Compte fidélité introuvable' });
+  await pool.query('UPDATE loyalty_accounts SET activated_at = NULL WHERE id = ?', [account.id]);
+  logActivity(req.salon.id, 'loyalty_deactivate', 'Carte de fidélité désactivée pour ' + account.client_name + ' (points conservés)');
+  res.json({ ok: true });
+}));
+
+/** Suppression définitive d'un compte fidélité (perd points et historique). */
+router.delete('/loyalty-accounts/:id', requireAdmin, wrap(async (req, res) => {
+  const [[account]] = await pool.query('SELECT * FROM loyalty_accounts WHERE id = ? AND salon_id = ?', [req.params.id, req.salon.id]);
+  if (!account) return res.status(404).json({ error: 'Compte fidélité introuvable' });
+  await pool.query('DELETE FROM loyalty_accounts WHERE id = ?', [account.id]);
+  logActivity(req.salon.id, 'loyalty_delete', 'Carte de fidélité supprimée pour ' + account.client_name + ' (' + account.points + ' points perdus)');
+  res.json({ ok: true });
 }));
 
 /**

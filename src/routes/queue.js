@@ -31,7 +31,7 @@ async function attachGiftInfo(rows, salonId) {
   // en premier — sans ce tri, l'ordre de retour SQL n'est pas garanti
   // et pouvait faire ressortir n'importe lequel au hasard.
   const [gifts] = await pool.query(
-    'SELECT * FROM gift_cards WHERE salon_id = ? AND used_at IS NULL ORDER BY created_at ASC', [salonId]
+    'SELECT * FROM gift_cards WHERE salon_id = ? AND used_at IS NULL AND voided_at IS NULL ORDER BY created_at ASC', [salonId]
   );
   if (!gifts.length) return rows;
   const giftByKey = {};
@@ -182,7 +182,7 @@ router.post('/checkin', wrap(async (req, res) => {
   const key = clientKey({ email, phone, client_name });
   if (key) {
     const [[unusedGift]] = await pool.query(
-      'SELECT id FROM gift_cards WHERE salon_id = ? AND used_at IS NULL AND ' +
+      'SELECT id FROM gift_cards WHERE salon_id = ? AND used_at IS NULL AND voided_at IS NULL AND ' +
       '(recipient_email = ? OR recipient_phone = ? OR recipient_name = ?) LIMIT 1',
       [req.salon.id, email || '', phone || '', client_name]
     );

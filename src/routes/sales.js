@@ -330,10 +330,14 @@ router.post('/gift-cards/:id/redeem', requireAdminOrBarber, wrap(async (req, res
   // clic, ou tentative d'utiliser le même cadeau sur deux clients
   // différents simultanément), une seule peut effectivement réussir.
   const [giftResult] = await pool.query(
-    'UPDATE gift_cards SET used_at = NOW(), used_queue_id = ? WHERE id = ? AND used_at IS NULL',
+    'UPDATE gift_cards SET used_at = NOW(), used_queue_id = ? WHERE id = ? AND used_at IS NULL AND voided_at IS NULL',
     [queue_id, req.params.id]
   );
   if (giftResult.affectedRows === 0) {
+    const [[giftNow]] = await pool.query('SELECT voided_at FROM gift_cards WHERE id = ?', [req.params.id]);
+    if (giftNow && giftNow.voided_at) {
+      return res.status(409).json({ error: 'Ce bon cadeau a été désactivé.' });
+    }
     return res.status(409).json({ error: 'Ce bon cadeau vient d\'être utilisé (probablement par un autre appareil).' });
   }
 

@@ -868,3 +868,11 @@ CREATE TABLE IF NOT EXISTS activity_log (
 SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'owners' AND column_name = 'phone');
 SET @sql := IF(@c = 0, "ALTER TABLE owners ADD COLUMN phone VARCHAR(30) NULL", 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Desactivation d'un bon cadeau (menu Marketing) : le rend inutilisable
+-- sans le supprimer, distinct de used_at (qui veut dire "deja remis au
+-- client"). Un bon desactive doit etre traite partout comme non
+-- utilisable, au meme titre qu'un bon deja utilise.
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'gift_cards' AND column_name = 'voided_at');
+SET @sql := IF(@c = 0, "ALTER TABLE gift_cards ADD COLUMN voided_at DATETIME NULL", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;

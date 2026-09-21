@@ -596,7 +596,7 @@ router.get('/salons/:id/client-gifts-loyalty', requireAutomationKey, wrap(async 
 
   const [gifts] = await pool.query(
     `SELECT recipient_name, amount_cents, created_at FROM gift_cards
-     WHERE salon_id = ? AND used_at IS NULL
+     WHERE salon_id = ? AND used_at IS NULL AND voided_at IS NULL
        AND (recipient_email = ? OR recipient_phone = ? OR recipient_name LIKE ?)
      ORDER BY created_at DESC`,
     [salonId, client, client, '%' + client + '%']
