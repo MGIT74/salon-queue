@@ -343,7 +343,18 @@
         <p class="auth-sub">Pour gérer vos rendez-vous, votre fidélité et vos cadeaux</p>
         <div class="fld"><label for="su-name">Nom</label><input id="su-name" type="text" placeholder="Votre nom"></div>
         <div class="fld"><label for="su-email">Email</label><input id="su-email" type="email" placeholder="vous@exemple.fr"></div>
-        <div class="fld"><label for="su-phone">Téléphone</label><input id="su-phone" type="tel"></div>
+        <div class="fld"><label for="su-phone">Téléphone</label>
+          <div style="display:flex;gap:8px">
+            <select id="su-phone-country" style="flex:0 0 96px">
+              <option value="+33">🇫🇷 +33</option>
+              <option value="+32">🇧🇪 +32</option>
+              <option value="+41">🇨🇭 +41</option>
+              <option value="+352">🇱🇺 +352</option>
+              <option value="+1">🇨🇦 +1</option>
+            </select>
+            <input id="su-phone" type="tel" style="flex:1;min-width:0" placeholder="6 12 34 56 78">
+          </div>
+        </div>
         <div class="fld"><label for="su-pass">Mot de passe</label><input id="su-pass" type="password" placeholder="6 caractères minimum"></div>
         <button class="go" onclick="doSignup()">Créer mon compte</button>
         <div class="err" id="signup-err"></div>
@@ -432,7 +443,18 @@
     <div class="eyebrow">Mes informations</div>
     <div class="fld"><label for="pf-name">Nom</label><input id="pf-name" type="text"></div>
     <div class="fld"><label for="pf-email">Email</label><input id="pf-email" type="email"></div>
-    <div class="fld"><label for="pf-phone">Téléphone</label><input id="pf-phone" type="tel"></div>
+    <div class="fld"><label for="pf-phone">Téléphone</label>
+      <div style="display:flex;gap:8px">
+        <select id="pf-phone-country" style="flex:0 0 96px">
+          <option value="+33">🇫🇷 +33</option>
+          <option value="+32">🇧🇪 +32</option>
+          <option value="+41">🇨🇭 +41</option>
+          <option value="+352">🇱🇺 +352</option>
+          <option value="+1">🇨🇦 +1</option>
+        </select>
+        <input id="pf-phone" type="tel" style="flex:1;min-width:0" placeholder="6 12 34 56 78">
+      </div>
+    </div>
     <button class="go" onclick="saveProfile()">Enregistrer</button>
     <div class="err" id="profile-err"></div>
     <div class="msg" id="profile-msg"></div>
@@ -651,14 +673,36 @@ function hideFooter() {
 
 function goAccount() { show('p-account'); showFooter('nav-account'); }
 
+// Sépare un téléphone stocké (idéalement au format international,
+// mais peut être un ancien format local pour des comptes créés avant
+// l'ajout de l'indicatif) en {code, local}, pour préremplir les deux
+// champs correctement. Par défaut +33 si aucun indicatif connu détecté.
+var PHONE_COUNTRY_CODES = ['+352', '+33', '+32', '+41', '+1'];
+function splitPhoneCountry(phone) {
+  phone = String(phone || '').trim();
+  for (var i = 0; i < PHONE_COUNTRY_CODES.length; i++) {
+    if (phone.indexOf(PHONE_COUNTRY_CODES[i]) === 0) {
+      return { code: PHONE_COUNTRY_CODES[i], local: phone.slice(PHONE_COUNTRY_CODES[i].length) };
+    }
+  }
+  return { code: '+33', local: phone };
+}
+function composePhone(countryCode, localRaw) {
+  var local = String(localRaw || '').trim();
+  if (!local) return '';
+  if (local.charAt(0) === '+') return local.replace(/[\s.-]/g, '');
+  return countryCode + local.replace(/[\s.-]/g, '').replace(/^0+/, '');
+}
+
 function doSignup() {
   var name = document.getElementById('su-name').value.trim();
   var email = document.getElementById('su-email').value.trim();
-  var phone = document.getElementById('su-phone').value.trim();
+  var phoneRaw = document.getElementById('su-phone').value.trim();
+  var phone = composePhone(document.getElementById('su-phone-country').value, phoneRaw);
   var password = document.getElementById('su-pass').value;
   var errEl = document.getElementById('signup-err');
   errEl.textContent = '';
-  if (!phone) { errEl.textContent = 'Le téléphone est requis'; return; }
+  if (!phoneRaw) { errEl.textContent = 'Le téléphone est requis'; return; }
   api('/api/client-auth/signup', { method: 'POST', body: { name: name, email: email, phone: phone, password: password, base_url: baseUrl() } })
     .then(function () { show('p-check-email'); })
     .catch(function (e) { errEl.textContent = e.message; });
@@ -818,7 +862,9 @@ function populateHome(d) {
   document.getElementById('home-hello').textContent = 'Bonjour ' + d.profile.name;
   document.getElementById('pf-name').value = d.profile.name;
   document.getElementById('pf-email').value = d.profile.email;
-  document.getElementById('pf-phone').value = d.profile.phone || '';
+  var phoneParts = splitPhoneCountry(d.profile.phone);
+  document.getElementById('pf-phone-country').value = phoneParts.code;
+  document.getElementById('pf-phone').value = phoneParts.local;
 
   document.getElementById('loyalty-section').style.display = d.loyalty_activated ? 'block' : 'none';
   document.getElementById('loyalty-inactive-msg').style.display = d.loyalty_activated ? 'none' : 'block';
@@ -1324,8 +1370,9 @@ function submitBookAppointment() {
 function saveProfile() {
   var errEl = document.getElementById('profile-err');
   document.getElementById('profile-msg').textContent = '';
-  var phone = document.getElementById('pf-phone').value.trim();
-  if (!phone) { errEl.textContent = 'Le téléphone est requis'; return; }
+  var phoneRaw = document.getElementById('pf-phone').value.trim();
+  if (!phoneRaw) { errEl.textContent = 'Le téléphone est requis'; return; }
+  var phone = composePhone(document.getElementById('pf-phone-country').value, phoneRaw);
   errEl.textContent = '';
   api('/api/client-auth/me', {
     method: 'PUT',
