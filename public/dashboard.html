@@ -4204,7 +4204,11 @@ function deactivateLoyaltyAccount(id, name) {
 }
 
 function deleteLoyaltyAccount(id, name) {
-  showConfirm('Supprimer définitivement la carte de fidélité de ' + name + ' ? Les points cumulés seront perdus, cette action est irréversible.', { title: 'Supprimer la carte', danger: true, confirmLabel: 'Supprimer' })
+  showConfirm('Supprimer définitivement la carte de fidélité de ' + name + ' ? Cette action est irréversible.', { title: 'Supprimer la carte', danger: true, confirmLabel: 'Continuer' })
+    .then(function (ok) {
+      if (!ok) return;
+      return showConfirm('Confirmez-vous vraiment la suppression ? Les points cumulés de ' + name + ' seront perdus définitivement.', { title: 'Dernière confirmation', danger: true, confirmLabel: 'Supprimer définitivement' });
+    })
     .then(function (ok) {
       if (!ok) return;
       api('/api/owner/loyalty-accounts/' + id, { method: 'DELETE' })
@@ -4278,7 +4282,11 @@ function toggleGiftCardVoid(id, name, currentlyVoided) {
 }
 
 function deleteGiftCard(id, name) {
-  showConfirm('Supprimer définitivement le bon cadeau de ' + name + ' ? Cette action est irréversible.', { title: 'Supprimer le cadeau', danger: true, confirmLabel: 'Supprimer' })
+  showConfirm('Supprimer définitivement le bon cadeau de ' + name + ' ? Cette action est irréversible.', { title: 'Supprimer le cadeau', danger: true, confirmLabel: 'Continuer' })
+    .then(function (ok) {
+      if (!ok) return;
+      return showConfirm('Confirmez-vous vraiment la suppression du bon cadeau de ' + name + ' ?', { title: 'Dernière confirmation', danger: true, confirmLabel: 'Supprimer définitivement' });
+    })
     .then(function (ok) {
       if (!ok) return;
       api('/api/owner/gift-cards/' + id, { method: 'DELETE' })
