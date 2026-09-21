@@ -294,7 +294,7 @@
   </div>
   <div class="auth-form-side">
     <div class="auth-form-card">
-      <div class="auth-glow-icon">
+      <div class="auth-glow-icon" id="auth-glow-icon">
         <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor"><path d="M12 2l1.8 5.2L19 9l-5.2 1.8L12 16l-1.8-5.2L5 9l5.2-1.8L12 2z"/><path d="M19 14l.9 2.1L22 17l-2.1.9L19 20l-.9-2.1L16 17l2.1-.9L19 14z"/></svg>
       </div>
 
@@ -1352,6 +1352,13 @@ function esc(s) {
         if (d.login_image_url) {
           var visualPanel = document.getElementById('auth-visual-panel');
           if (visualPanel) visualPanel.style.backgroundImage = 'url("' + d.login_image_url + '")';
+        }
+        if (d.logo_url) {
+          var glowIcon = document.getElementById('auth-glow-icon');
+          if (glowIcon) {
+            glowIcon.style.background = 'url("' + d.logo_url + '") center/cover';
+            glowIcon.innerHTML = '';
+          }
         }
         var loyaltyCard = document.querySelector('#loyalty-section .card');
         if (loyaltyCard && d.loyalty_card_image_url) {
