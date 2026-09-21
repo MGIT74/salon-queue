@@ -39,6 +39,158 @@ function esc(s) {
   return d.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
+/* ============ Sélecteur d'indicatif téléphonique (drapeaux réels) ============ */
+/* Partagé par compte.html (inscription/profil client) et signup.html
+   (création d'enseigne) - une seule liste/logique à maintenir. */
+var PHONE_COUNTRIES = [
+  ['+33', '🇫🇷', 'France', 'fr'],
+  ['+32', '🇧🇪', 'Belgique', 'be'],
+  ['+41', '🇨🇭', 'Suisse', 'ch'],
+  ['+352', '🇱🇺', 'Luxembourg', 'lu'],
+  ['+1', '🇨🇦', 'Canada', 'ca'],
+  ['+49', '🇩🇪', 'Allemagne', 'de'],
+  ['+213', '🇩🇿', 'Algérie', 'dz'],
+  ['+61', '🇦🇺', 'Australie', 'au'],
+  ['+43', '🇦🇹', 'Autriche', 'at'],
+  ['+973', '🇧🇭', 'Bahreïn', 'bh'],
+  ['+229', '🇧🇯', 'Bénin', 'bj'],
+  ['+55', '🇧🇷', 'Brésil', 'br'],
+  ['+359', '🇧🇬', 'Bulgarie', 'bg'],
+  ['+226', '🇧🇫', 'Burkina Faso', 'bf'],
+  ['+237', '🇨🇲', 'Cameroun', 'cm'],
+  ['+86', '🇨🇳', 'Chine', 'cn'],
+  ['+357', '🇨🇾', 'Chypre', 'cy'],
+  ['+57', '🇨🇴', 'Colombie', 'co'],
+  ['+242', '🇨🇬', 'Congo', 'cg'],
+  ['+243', '🇨🇩', 'Congo (RDC)', 'cd'],
+  ['+82', '🇰🇷', 'Corée du Sud', 'kr'],
+  ['+225', '🇨🇮', "Côte d'Ivoire", 'ci'],
+  ['+45', '🇩🇰', 'Danemark', 'dk'],
+  ['+20', '🇪🇬', 'Égypte', 'eg'],
+  ['+971', '🇦🇪', 'Émirats arabes unis', 'ae'],
+  ['+34', '🇪🇸', 'Espagne', 'es'],
+  ['+372', '🇪🇪', 'Estonie', 'ee'],
+  ['+1', '🇺🇸', 'États-Unis', 'us'],
+  ['+358', '🇫🇮', 'Finlande', 'fi'],
+  ['+590', '🇬🇵', 'Guadeloupe', 'gp'],
+  ['+594', '🇬🇫', 'Guyane', 'gf'],
+  ['+30', '🇬🇷', 'Grèce', 'gr'],
+  ['+509', '🇭🇹', 'Haïti', 'ht'],
+  ['+36', '🇭🇺', 'Hongrie', 'hu'],
+  ['+91', '🇮🇳', 'Inde', 'in'],
+  ['+62', '🇮🇩', 'Indonésie', 'id'],
+  ['+353', '🇮🇪', 'Irlande', 'ie'],
+  ['+354', '🇮🇸', 'Islande', 'is'],
+  ['+972', '🇮🇱', 'Israël', 'il'],
+  ['+39', '🇮🇹', 'Italie', 'it'],
+  ['+81', '🇯🇵', 'Japon', 'jp'],
+  ['+7', '🇰🇿', 'Kazakhstan', 'kz'],
+  ['+965', '🇰🇼', 'Koweït', 'kw'],
+  ['+371', '🇱🇻', 'Lettonie', 'lv'],
+  ['+961', '🇱🇧', 'Liban', 'lb'],
+  ['+370', '🇱🇹', 'Lituanie', 'lt'],
+  ['+261', '🇲🇬', 'Madagascar', 'mg'],
+  ['+223', '🇲🇱', 'Mali', 'ml'],
+  ['+212', '🇲🇦', 'Maroc', 'ma'],
+  ['+230', '🇲🇺', 'Maurice', 'mu'],
+  ['+596', '🇲🇶', 'Martinique', 'mq'],
+  ['+52', '🇲🇽', 'Mexique', 'mx'],
+  ['+377', '🇲🇨', 'Monaco', 'mc'],
+  ['+227', '🇳🇪', 'Niger', 'ne'],
+  ['+47', '🇳🇴', 'Norvège', 'no'],
+  ['+64', '🇳🇿', 'Nouvelle-Zélande', 'nz'],
+  ['+31', '🇳🇱', 'Pays-Bas', 'nl'],
+  ['+51', '🇵🇪', 'Pérou', 'pe'],
+  ['+63', '🇵🇭', 'Philippines', 'ph'],
+  ['+48', '🇵🇱', 'Pologne', 'pl'],
+  ['+351', '🇵🇹', 'Portugal', 'pt'],
+  ['+974', '🇶🇦', 'Qatar', 'qa'],
+  ['+262', '🇷🇪', 'Réunion', 're'],
+  ['+44', '🇬🇧', 'Royaume-Uni', 'gb'],
+  ['+40', '🇷🇴', 'Roumanie', 'ro'],
+  ['+7', '🇷🇺', 'Russie', 'ru'],
+  ['+221', '🇸🇳', 'Sénégal', 'sn'],
+  ['+65', '🇸🇬', 'Singapour', 'sg'],
+  ['+421', '🇸🇰', 'Slovaquie', 'sk'],
+  ['+386', '🇸🇮', 'Slovénie', 'si'],
+  ['+46', '🇸🇪', 'Suède', 'se'],
+  ['+216', '🇹🇳', 'Tunisie', 'tn'],
+  ['+90', '🇹🇷', 'Turquie', 'tr'],
+  ['+380', '🇺🇦', 'Ukraine', 'ua'],
+  ['+228', '🇹🇬', 'Togo', 'tg'],
+  ['+420', '🇨🇿', 'Tchéquie', 'cz']
+];
+
+function findPhoneCountryByCode(code) {
+  var found = PHONE_COUNTRIES.filter(function (p) { return p[0] === code; });
+  return found[0] || PHONE_COUNTRIES[0];
+}
+
+function flagUrl(iso) { return 'https://flagcdn.com/24x18/' + iso + '.png'; }
+
+function setPhoneCCDisplay(prefix, code, iso) {
+  var entry = iso
+    ? (PHONE_COUNTRIES.filter(function (p) { return p[0] === code && p[3] === iso; })[0] || findPhoneCountryByCode(code))
+    : findPhoneCountryByCode(code);
+  var countryEl = document.getElementById(prefix + '-phone-country');
+  if (!countryEl) return;
+  countryEl.value = entry[0];
+  countryEl.dataset.iso = entry[3];
+  document.getElementById(prefix + '-phone-cc-flag').src = flagUrl(entry[3]);
+  document.getElementById(prefix + '-phone-cc-label').textContent = entry[0];
+}
+
+function renderPhoneCCList(prefix) {
+  var listEl = document.getElementById(prefix + '-phone-cc-list');
+  listEl.innerHTML = PHONE_COUNTRIES.map(function (p) {
+    return '<div class="phone-cc-opt" onclick="event.stopPropagation();selectPhoneCC(\'' + prefix + '\',\'' + p[0] + '\',\'' + p[3] + '\')">' +
+      '<img src="' + flagUrl(p[3]) + '" width="20" height="15" alt="">' +
+      '<span class="code">' + p[0] + '</span><span class="name">' + esc(p[2]) + '</span></div>';
+  }).join('');
+}
+
+function selectPhoneCC(prefix, code, iso) {
+  setPhoneCCDisplay(prefix, code, iso);
+  document.getElementById(prefix + '-phone-cc-list').classList.remove('on');
+}
+
+function togglePhoneCC(prefix) {
+  var list = document.getElementById(prefix + '-phone-cc-list');
+  var isOpen = list.classList.contains('on');
+  document.querySelectorAll('.phone-cc-list').forEach(function (l) { l.classList.remove('on'); });
+  if (!isOpen) { renderPhoneCCList(prefix); list.classList.add('on'); }
+}
+
+document.addEventListener('click', function (e) {
+  if (!e.target.closest('.phone-cc-picker')) {
+    document.querySelectorAll('.phone-cc-list').forEach(function (l) { l.classList.remove('on'); });
+  }
+});
+
+// Sépare un téléphone stocké (idéalement au format international, mais
+// peut être un ancien format local pour des comptes créés avant l'ajout
+// de l'indicatif) en {code, local}, pour préremplir les deux champs
+// correctement. Par défaut +33 si aucun indicatif connu détecté. Trie
+// les indicatifs du plus long au plus court pour ne jamais matcher un
+// préfixe trop court par erreur.
+var PHONE_COUNTRY_CODES = Array.from(new Set(PHONE_COUNTRIES.map(function (p) { return p[0]; })))
+  .sort(function (a, b) { return b.length - a.length; });
+function splitPhoneCountry(phone) {
+  phone = String(phone || '').trim();
+  for (var i = 0; i < PHONE_COUNTRY_CODES.length; i++) {
+    if (phone.indexOf(PHONE_COUNTRY_CODES[i]) === 0) {
+      return { code: PHONE_COUNTRY_CODES[i], local: phone.slice(PHONE_COUNTRY_CODES[i].length) };
+    }
+  }
+  return { code: '+33', local: phone };
+}
+function composePhone(countryCode, localRaw) {
+  var local = String(localRaw || '').trim();
+  if (!local) return '';
+  if (local.charAt(0) === '+') return local.replace(/[\s.-]/g, '');
+  return countryCode + local.replace(/[\s.-]/g, '').replace(/^0+/, '');
+}
+
 /**
  * Heure "de salon" actuelle (Europe/Paris) sous forme de texte
  * "YYYY-MM-DD HH:MM:SS", pour comparer directement (par chaîne) à

@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS owners (
   id CHAR(36) PRIMARY KEY,
   name VARCHAR(255) NULL,
   email VARCHAR(255) UNIQUE NULL,
+  phone VARCHAR(30) NULL,
   password_hash VARCHAR(255) NULL,
   admin_password VARCHAR(255) NULL,
   reset_token VARCHAR(64) NULL,
@@ -861,3 +862,9 @@ CREATE TABLE IF NOT EXISTS activity_log (
   FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE,
   INDEX idx_activity_log_salon_created (salon_id, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Telephone du gerant, saisi a la creation du salon (avec indicatif
+-- pays, format international) - utile pour une future integration SMS.
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'owners' AND column_name = 'phone');
+SET @sql := IF(@c = 0, "ALTER TABLE owners ADD COLUMN phone VARCHAR(30) NULL", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
