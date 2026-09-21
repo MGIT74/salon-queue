@@ -16,6 +16,22 @@ function wrap(fn) {
   };
 }
 
+/**
+ * Vérification en direct (avant même de soumettre le formulaire) : le
+ * champ Identifiant se remplit automatiquement depuis le nom du salon,
+ * mais deux enseignes peuvent porter le même nom (ex. "Le Salon") - ce
+ * point n'est utile QUE pour prévenir plus tôt, la vraie verification
+ * (autoritaire) reste celle faite a l'inscription elle-meme.
+ */
+router.get('/check-slug', wrap(async (req, res) => {
+  const slug = String(req.query.slug || '').trim().toLowerCase();
+  if (!slug || !/^[a-z0-9-]+$/.test(slug)) {
+    return res.json({ ok: true, available: false, reason: 'invalid' });
+  }
+  const [[existing]] = await pool.query('SELECT id FROM salons WHERE slug = ?', [slug]);
+  res.json({ ok: true, available: !existing });
+}));
+
 router.post('/', wrap(async (req, res) => {
   const { owner_name, salon_name, slug, siret, email, phone, password } = req.body;
 

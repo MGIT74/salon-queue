@@ -75,7 +75,9 @@
           <div class="fld"><label for="f-salon">Nom du salon</label>
             <input id="f-salon" type="text" placeholder="Le Salon" autocomplete="organization"></div>
           <div class="fld"><label for="f-slug">Identifiant (dans les liens de votre salon)</label>
-            <input id="f-slug" type="text" placeholder="mon-salon" pattern="[a-z0-9-]+"></div>
+            <input id="f-slug" type="text" placeholder="mon-salon" pattern="[a-z0-9-]+">
+            <div id="slug-status" style="font-size:12.5px;margin-top:6px;min-height:16px"></div>
+          </div>
           <div class="fld"><label for="f-siret">Numéro SIRET</label>
             <input id="f-siret" type="text" placeholder="14 chiffres" inputmode="numeric" maxlength="14"></div>
           <div class="row2">
@@ -133,11 +135,46 @@ function slugifyLive(v) {
 document.getElementById('f-salon').addEventListener('input', function () {
   var slugField = document.getElementById('f-slug');
   if (!slugField.dataset.touched) slugField.value = slugifyLive(this.value);
+  scheduleSlugCheck();
 });
 document.getElementById('f-slug').addEventListener('input', function () {
   this.dataset.touched = '1';
   this.value = slugifyLive(this.value);
+  scheduleSlugCheck();
 });
+
+var slugCheckTimer = null;
+var slugAvailable = null; // null = pas encore verifie, true/false = connu
+
+function scheduleSlugCheck() {
+  var statusEl = document.getElementById('slug-status');
+  var slug = document.getElementById('f-slug').value.trim();
+  slugAvailable = null;
+  clearTimeout(slugCheckTimer);
+  if (!slug) { statusEl.textContent = ''; return; }
+  statusEl.textContent = 'Vérification…';
+  statusEl.style.color = 'var(--grey)';
+  // Anti-rebond : on attend que la personne arrete de taper avant
+  // d'interroger le serveur, plutot qu'un appel a chaque frappe.
+  slugCheckTimer = setTimeout(function () {
+    fetch('/api/signup/check-slug?slug=' + encodeURIComponent(slug))
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        // La valeur a change entre-temps (l'appel precedent repond en
+        // retard) - on ignore ce resultat perime.
+        if (document.getElementById('f-slug').value.trim() !== slug) return;
+        slugAvailable = d.available;
+        if (d.available) {
+          statusEl.textContent = '✓ Disponible';
+          statusEl.style.color = 'var(--green)';
+        } else {
+          statusEl.textContent = '✗ Déjà pris, essayez un autre identifiant';
+          statusEl.style.color = 'var(--red)';
+        }
+      })
+      .catch(function () { statusEl.textContent = ''; });
+  }, 450);
+}
 
 function doSignup() {
   var ownerName = document.getElementById('f-owner-name').value.trim();
@@ -152,6 +189,7 @@ function doSignup() {
 
   if (!ownerName || !email || !phoneRaw) { toast('Merci de remplir votre nom, email et téléphone', true); goSignupStep(1); return; }
   if (!salon || !slug || !siret || !pw) { toast('Tous les champs sont requis', true); return; }
+  if (slugAvailable === false) { toast('Cet identifiant est déjà utilisé, merci d\'en choisir un autre', true); return; }
   if (!/^\d{14}$/.test(siret)) { toast('Le SIRET doit comporter exactement 14 chiffres', true); return; }
   if (pw !== pw2) { toast('Les mots de passe ne correspondent pas', true); return; }
   if (pw.length < 6) { toast('Le mot de passe doit contenir au moins 6 caractères', true); return; }
