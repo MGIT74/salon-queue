@@ -2117,8 +2117,12 @@ function loadCurrentSalonName() {
       }
       currentLoginImage = d.login_image_url || '';
       var visualPanel = document.getElementById('auth-visual-panel');
-      if (visualPanel && currentLoginImage) {
-        visualPanel.style.backgroundImage = 'url("' + currentLoginImage + '")';
+      // Sans salon precis dans l'URL (ecran de connexion generique), on
+      // utilise l'image de la plateforme (Super Admin > Parametres) au
+      // lieu de celle du salon par defaut, qui n'a pas de sens ici.
+      var imageToShow = SALON_SLUG ? currentLoginImage : (d.platform_login_image_url || '');
+      if (visualPanel && imageToShow) {
+        visualPanel.style.backgroundImage = 'url("' + imageToShow + '")';
       }
       var loginImgPreview = document.getElementById('login-image-preview');
       if (loginImgPreview) {

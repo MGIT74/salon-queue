@@ -328,6 +328,27 @@ router.put('/smtp', requireSuperAdmin, wrap(async (req, res) => {
   res.json({ ok: true, smtp_from: patch.smtp_from });
 }));
 
+/**
+ * Image affichée à côté du formulaire de connexion "générique"
+ * (dashboard.html sans ?salon=, avant toute résolution d'enseigne) -
+ * distincte de l'image propre à chaque salon, qui reste dans les
+ * Réglages de chaque enseigne (dashboard.html > Compte).
+ */
+router.get('/login-image', requireSuperAdmin, wrap(async (req, res) => {
+  const s = await getPlatformSettings();
+  res.json({ ok: true, login_image_url: s.login_image_url || null });
+}));
+
+router.put('/login-image', requireSuperAdmin, wrap(async (req, res) => {
+  const SAFE_IMAGE_URL = /^(data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=]+|https:\/\/[^\s"'<>]+)$/i;
+  const url = req.body.login_image_url;
+  if (url && !SAFE_IMAGE_URL.test(url)) {
+    return res.status(400).json({ error: "Format d'image invalide" });
+  }
+  await setPlatformSettings({ login_image_url: url || '' });
+  res.json({ ok: true });
+}));
+
 router.post('/test-email', requireSuperAdmin, wrap(async (req, res) => {
   const to = req.body.to;
   if (!to) return res.status(400).json({ error: 'Adresse de destination requise' });

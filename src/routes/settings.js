@@ -1,5 +1,5 @@
 const express = require('express');
-const { pool, getSettings, setSettings, getCaisseLockedUntil } = require('../db');
+const { pool, getSettings, setSettings, getCaisseLockedUntil, getPlatformSettings } = require('../db');
 const { sendTest, invalidateTransport, sendAppointmentConfirmation, sendAppointmentReminder, sendAppointmentCancelledByAdmin, sendAppointmentRescheduled, sendTurnSoon, sendSalonClosureNotice } = require('../lib/mailer');
 const requireAdmin = require('../middleware/auth');
 
@@ -188,9 +188,14 @@ router.post('/email-templates/test', requireAdmin, wrap(async (req, res) => {
 router.get('/public', wrap(async (req, res) => {
   const s = await getSettings(req.salon.id);
   const caisseLockedUntil = await getCaisseLockedUntil(req.salon.id, s);
+  // Utilisée par l'écran de connexion "générique" (aucun salon précis
+  // dans l'URL) - distincte de login_image_url ci-dessous, propre à
+  // CE salon (utilisée elle sur la page de connexion CLIENT du salon).
+  const platform = await getPlatformSettings();
 
   res.json({
     ok: true,
+    platform_login_image_url: platform.login_image_url || null,
     salon_name: s.salon_name || 'Le Salon',
     logo_url: s.logo_url || null,
     gift_tile_image_url: s.gift_tile_image_url || null,
