@@ -910,6 +910,7 @@ function loadBarberBubbles() {
     .then(function (d) {
       allBarbers = d.items || [];
       renderBarberBubbles();
+      updateTabLockState();
     })
     .catch(function () {});
 }
@@ -1002,6 +1003,12 @@ function updateTabLockState() {
   var locked = !activeBarberId;
   document.getElementById('panel-timer').classList.toggle('locked', locked);
   document.getElementById('panel-caisse').classList.toggle('locked', locked);
+
+  var activeBarber = activeBarberId && allBarbers.find(function (b) { return b.id === activeBarberId; });
+  var timerBtn = document.getElementById('nav-timer');
+  var timerHidden = Boolean(activeBarber && activeBarber.timer_enabled === 0);
+  timerBtn.style.display = timerHidden ? 'none' : '';
+  if (timerHidden && timerBtn.classList.contains('on')) switchCaisseTab('agenda');
 }
 
 /* ---------- Onglet Timer (repris de "Mon poste", scopé au coiffeur actif) ---------- */

@@ -3549,6 +3549,12 @@ function renderBarberDetail(b) {
 
 function renderScheduleTab(b) {
   var currentColor = b.color || stableColorForId(b.id);
+  var timerToggle = '<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;background:var(--fill);border-radius:12px;padding:12px 14px">' +
+    '<div class="switch' + (b.timer_enabled === 0 ? '' : ' on') + '" onclick="toggleBarberTimer(\'' + b.id + '\', this)"></div>' +
+    '<div><div style="font-weight:600;font-size:14px">Timer / file d\'attente en temps réel</div>' +
+    '<div class="hint" style="margin:2px 0 0">Si désactivé : l\'onglet Timer disparaît pour ce coiffeur dans Caisse et Poste, et la réservation en ligne repasse sur un calcul classique (horaires + durée des prestations, sans tenir compte d\'un éventuel retard réel). La file d\'attente (check-in sans-rdv) reste utilisable normalement.</div></div>' +
+    '</div>';
+
   var colorPicker = '<div style="margin-bottom:20px">' +
     '<label class="hint" style="display:block;margin-bottom:8px">Couleur dans l\'agenda</label>' +
     '<div style="display:flex;align-items:center;gap:10px">' +
@@ -3586,7 +3592,7 @@ function renderScheduleTab(b) {
       '</div>' +
       '</div>';
   }).join('');
-  return colorPicker + days + '<button class="btn btn-primary" style="margin-top:16px" onclick="saveSchedule(\'' + b.id + '\')">Enregistrer les horaires</button>';
+  return timerToggle + colorPicker + days + '<button class="btn btn-primary" style="margin-top:16px" onclick="saveSchedule(\'' + b.id + '\')">Enregistrer les horaires</button>';
 }
 
 function setBarberColor(id, color) {
@@ -3974,6 +3980,18 @@ function setBarberPin(id, name) {
 function toggleDay(el) {
   el.classList.toggle('on');
   el.closest('.day-row').classList.toggle('off', !el.classList.contains('on'));
+}
+
+function toggleBarberTimer(id, el) {
+  var enabling = !el.classList.contains('on');
+  el.classList.toggle('on');
+  api('/api/barbers/' + id, { method: 'PUT', body: { timer_enabled: enabling } })
+    .then(function () {
+      var b = barbers.find(function (x) { return x.id === id; });
+      if (b) b.timer_enabled = enabling ? 1 : 0;
+      toast(enabling ? 'Timer activé' : 'Timer désactivé');
+    })
+    .catch(function (e) { toast(e.message, true); el.classList.toggle('on'); });
 }
 
 function saveSchedule(id) {

@@ -149,6 +149,7 @@ router.put('/:id', requireAdmin, wrap(async (req, res) => {
     sets.push('pin_code = ?'); params.push(req.body.pin_code || null);
   }
   if (req.body.photo_url !== undefined) { sets.push('photo_url = ?'); params.push(req.body.photo_url || null); }
+  if (req.body.timer_enabled !== undefined) { sets.push('timer_enabled = ?'); params.push(req.body.timer_enabled ? 1 : 0); }
   if (req.body.color !== undefined) {
     if (req.body.color && !/^#[0-9a-fA-F]{6}$/.test(req.body.color)) {
       return res.status(400).json({ error: 'Couleur invalide (format #RRGGBB attendu)' });
@@ -191,6 +192,8 @@ router.put('/:id', requireAdmin, wrap(async (req, res) => {
   }
   if (req.body.active !== undefined) {
     logActivity(req.salon.id, req.body.active ? 'barber_restore' : 'barber_archive', label + (req.body.active ? ' réactivé' : ' archivé'));
+  } else if (req.body.timer_enabled !== undefined) {
+    logActivity(req.salon.id, 'barber_edit', label + ' — Timer ' + (req.body.timer_enabled ? 'activé' : 'désactivé'));
   } else {
     logActivity(req.salon.id, 'barber_edit', label + ' modifié');
   }
@@ -214,7 +217,7 @@ router.post('/login', loginRateLimiter('barber-pin-login'), wrap(async (req, res
   if (!pin) return res.status(400).json({ error: 'Code PIN requis' });
 
   const [[barber]] = await pool.query(
-    'SELECT id, name, accepts_appointments FROM barbers WHERE salon_id = ? AND pin_code = ? AND active = 1 LIMIT 1',
+    'SELECT id, name, accepts_appointments, timer_enabled FROM barbers WHERE salon_id = ? AND pin_code = ? AND active = 1 LIMIT 1',
     [req.salon.id, pin]
   );
   if (!barber) return res.status(401).json({ error: 'Code PIN incorrect' });

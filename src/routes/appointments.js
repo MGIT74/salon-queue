@@ -252,8 +252,17 @@ async function computeSlotsForBarber(barberId, dateStr, durationMin, rdvSettings
   let nowMin = isToday ? paris.minutes : -1;
 
   if (isToday) {
-    const busyMin = await getBarberBusyMinutesToday(barberId);
-    nowMin = paris.minutes + busyMin + leadMin;
+    // Coiffeur sans chrono/file d'attente en temps reel (timer_enabled=0,
+    // ex. loueur de fauteuil independant) : on ne consulte PAS son
+    // eventuel retard reel, la reservation reste un calcul classique
+    // horaires + duree uniquement.
+    const [[barberRow]] = await pool.query('SELECT timer_enabled FROM barbers WHERE id = ?', [barberId]);
+    if (!barberRow || barberRow.timer_enabled) {
+      const busyMin = await getBarberBusyMinutesToday(barberId);
+      nowMin = paris.minutes + busyMin + leadMin;
+    } else {
+      nowMin = paris.minutes + leadMin;
+    }
   }
 
   const slots = [];

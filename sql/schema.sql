@@ -883,3 +883,13 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 SET @c := (SELECT COLUMN_TYPE FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'platform_settings' AND column_name = 'value');
 SET @sql := IF(@c <> 'longtext', 'ALTER TABLE platform_settings MODIFY COLUMN value LONGTEXT', 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Certains coiffeurs (ex. loueurs de fauteuil independants) ne veulent
+-- pas suivre le systeme de chrono/file d'attente en temps reel :
+-- timer_enabled=0 masque l'onglet Timer pour eux dans Caisse/Poste ET
+-- fait retomber la prise de RDV en ligne sur un calcul classique
+-- (horaires + duree des prestations), sans tenir compte d'un eventuel
+-- retard reel (getBarberBusyMinutesToday n'est alors plus consulte).
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'barbers' AND column_name = 'timer_enabled');
+SET @sql := IF(@c = 0, "ALTER TABLE barbers ADD COLUMN timer_enabled TINYINT(1) NOT NULL DEFAULT 1", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
