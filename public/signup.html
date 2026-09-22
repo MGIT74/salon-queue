@@ -32,7 +32,7 @@
 <body>
 
 <div class="auth-layout">
-  <div class="auth-visual">
+  <div class="auth-visual" id="auth-visual-panel">
     <div class="auth-visual-overlay">
       <div class="auth-visual-title">Lancez votre salon</div>
       <p class="auth-visual-sub">Un compte, un mot de passe — gérez file d'attente, rendez-vous, caisse et catalogue depuis un seul endroit.</p>
@@ -108,6 +108,11 @@
 <script src="/app.js"></script>
 <script>
 mountThemeButton();
+fetch('/api/settings/public').then(function (r) { return r.json(); }).then(function (d) {
+  if (d.platform_login_image_url) {
+    document.getElementById('auth-visual-panel').style.backgroundImage = 'url("' + d.platform_login_image_url + '")';
+  }
+}).catch(function () {});
 addPasswordToggle('f-pw');
 addPasswordToggle('f-pw2');
 setPhoneCCDisplay('f', '+33', 'fr');
