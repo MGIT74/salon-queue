@@ -178,7 +178,7 @@ CREATE TABLE IF NOT EXISTS settings (
 -- (réinitialisation de mot de passe...), distinct du SMTP par salon.
 CREATE TABLE IF NOT EXISTS platform_settings (
   `key` VARCHAR(100) PRIMARY KEY,
-  value TEXT,
+  value LONGTEXT,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -875,4 +875,11 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 -- utilisable, au meme titre qu'un bon deja utilise.
 SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'gift_cards' AND column_name = 'voided_at');
 SET @sql := IF(@c = 0, "ALTER TABLE gift_cards ADD COLUMN voided_at DATETIME NULL", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- platform_settings.value etait en TEXT (65 Ko max) - trop petit pour
+-- l'image de connexion generique (base64), qui a besoin de la meme
+-- capacite que settings.value (deja en LONGTEXT).
+SET @c := (SELECT COLUMN_TYPE FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'platform_settings' AND column_name = 'value');
+SET @sql := IF(@c <> 'longtext', 'ALTER TABLE platform_settings MODIFY COLUMN value LONGTEXT', 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
