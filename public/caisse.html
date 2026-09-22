@@ -1004,12 +1004,6 @@ function updateTabLockState() {
   var locked = !activeBarberId;
   document.getElementById('panel-timer').classList.toggle('locked', locked);
   document.getElementById('panel-caisse').classList.toggle('locked', locked);
-
-  var activeBarber = activeBarberId && allBarbers.find(function (b) { return b.id === activeBarberId; });
-  var timerBtn = document.getElementById('nav-timer');
-  var timerHidden = Boolean(activeBarber && activeBarber.timer_enabled === 0);
-  timerBtn.style.display = timerHidden ? 'none' : '';
-  if (timerHidden && timerBtn.classList.contains('on')) switchCaisseTab('agenda');
 }
 
 /* ---------- Onglet Timer (repris de "Mon poste", scopé au coiffeur actif) ---------- */
@@ -1197,6 +1191,7 @@ function saveNote(id) {
 function renderNext() {
   var zone = document.getElementById('next-zone');
   if (!zone) return;
+  var activeBarber = activeBarberId && allBarbers.find(function (b) { return b.id === activeBarberId; });
   if (myActive()) {
     zone.innerHTML = '<div class="empty">Terminez la coupe en cours pour passer à la suivante</div>';
     return;
@@ -1237,7 +1232,11 @@ function renderNext() {
           (locked ? '<div class="lock-note' + (prepAlert ? ' prep-alert-note' : '') + '">' + lockNote + '</div>' : '') +
         '</div>' +
         '<div class="next-btns">' +
-          (locked ? '' : '<button class="btn btn-primary" onclick="startMine(\'' + q.id + '\')">Commencer</button>') +
+          (locked ? '' : (
+            (activeBarber && activeBarber.timer_enabled === 0)
+              ? '<button class="btn btn-primary" onclick="quickFinishMine(\'' + q.id + '\')">Je prends</button>'
+              : '<button class="btn btn-primary" onclick="startMine(\'' + q.id + '\')">Commencer</button>'
+          )) +
           '<button class="btn btn-outline-red" onclick="cancelMine(\'' + q.id + '\')">Absent</button>' +
         '</div>' +
       '</div>' +
@@ -1295,6 +1294,16 @@ function cancelMine(id) {
         .then(function () { toast('Client marqué absent'); })
         .catch(function (e) { toast(e.message, true); });
     });
+}
+
+function quickFinishMine(id) {
+  var q = queue.find(function (x) { return x.id === id; });
+  barberApi('/api/queue/' + id + '/quick-finish', { method: 'POST', body: { barber_id: activeBarberId } })
+    .then(function () {
+      toast((q ? q.client_name + ' — ' : '') + 'ajouté à l\'encaissement');
+      return refreshTimer();
+    })
+    .catch(function (e) { toast(e.message, true); });
 }
 
 function startMine(id) {

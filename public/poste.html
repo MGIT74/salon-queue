@@ -410,10 +410,10 @@ function showApp() {
   // reste que Déconnexion, et son seul écran (le suivi de la file en
   // cours) reste affiché sans bascule inutile.
   var showTabs = me.acceptsAppointments;
-  document.getElementById('nav-home').style.display = (showTabs && me.timerEnabled) ? 'flex' : 'none';
+  document.getElementById('nav-home').style.display = showTabs ? 'flex' : 'none';
   document.getElementById('nav-agenda').style.display = showTabs ? 'flex' : 'none';
 
-  if (showTabs && !me.timerEnabled) gotoAgenda(); else gotoHome();
+  gotoHome();
   boot();
 }
 
@@ -660,7 +660,11 @@ function renderNext() {
           (locked ? '<div class="lock-note' + (prepAlert ? ' prep-alert-note' : '') + '">' + lockNote + '</div>' : '') +
         '</div>' +
         '<div class="next-btns">' +
-          (locked ? '' : '<button class="btn btn-primary" onclick="startMine(\'' + q.id + '\')">Commencer</button>') +
+          (locked ? '' : (
+            me.timerEnabled === false
+              ? '<button class="btn btn-primary" onclick="quickFinishMine(\'' + q.id + '\')">Je prends</button>'
+              : '<button class="btn btn-primary" onclick="startMine(\'' + q.id + '\')">Commencer</button>'
+          )) +
           '<button class="btn btn-outline-red" onclick="cancelMine(\'' + q.id + '\')">Absent</button>' +
         '</div>' +
       '</div>' +
@@ -728,6 +732,16 @@ function cancelMine(id) {
         .then(function () { toast('Client marqué absent'); })
         .catch(function (e) { toast(e.message, true); });
     });
+}
+
+function quickFinishMine(id) {
+  var q = queue.find(function (x) { return x.id === id; });
+  barberApi('/api/queue/' + id + '/quick-finish', { method: 'POST', body: { barber_id: me.id } })
+    .then(function () {
+      toast((q ? q.client_name + ' — ' : '') + 'ajouté à l\'encaissement');
+      return refresh();
+    })
+    .catch(function (e) { toast(e.message, true); });
 }
 
 function startMine(id) {

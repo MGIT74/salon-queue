@@ -332,6 +332,57 @@ router.post('/:id/start', requireAdminOrBarber, wrap(async (req, res) => {
   res.json({ ok: true });
 }));
 
+/**
+ * Pour un coiffeur avec le Timer désactivé : passe directement de
+ * "en attente" à "terminé" (prêt à encaisser), sans passer par "en
+ * cours" - pas de start_at pose, donc pas de duree "reelle" suivie
+ * pour ce client (le classement 'Rapidite' du Dashboard exclut deja
+ * les lignes sans start_at, donc aucune fausse duree quasi-nulle n'y
+ * apparait). Meme respect de l'ordre d'arrivee que /start.
+ */
+router.post('/:id/quick-finish', requireAdminOrBarber, wrap(async (req, res) => {
+  const [[row]] = await pool.query(
+    'SELECT id, barber_id, checkin_at FROM queue WHERE id = ? AND salon_id = ?',
+    [req.params.id, req.salon.id]
+  );
+  if (!row) return res.status(404).json({ error: 'Client introuvable' });
+
+  if (req.actingBarberId) {
+    if (row.barber_id && row.barber_id !== req.actingBarberId) {
+      return res.status(403).json({ error: 'Ce client attend un autre coiffeur.' });
+    }
+  }
+  const barberId = req.actingBarberId || req.body.barber_id || row.barber_id || null;
+
+  if (barberId && !(req.body.force_transfer && !req.barberId)) {
+    const [[earlier]] = await pool.query(
+      `SELECT client_name FROM queue
+       WHERE salon_id = ? AND status = 'waiting' AND id != ? AND checkin_at < ?
+       AND (barber_id IS NULL OR barber_id = ?)
+       ORDER BY checkin_at ASC LIMIT 1`,
+      [req.salon.id, req.params.id, row.checkin_at, barberId]
+    );
+    if (earlier) {
+      return res.status(409).json({
+        error: earlier.client_name + ' est arrivé avant et doit être pris en premier.'
+      });
+    }
+  }
+
+  await pool.query(
+    "UPDATE queue SET status = 'done', end_at = NOW(), barber_id = COALESCE(?, barber_id) WHERE id = ? AND salon_id = ?",
+    [barberId, req.params.id, req.salon.id]
+  );
+  if (barberId) {
+    await pool.query(
+      'UPDATE appointments SET barber_id = COALESCE(barber_id, ?) WHERE promoted_queue_id = ?',
+      [barberId, req.params.id]
+    );
+  }
+  await recompute(req.salon.id);
+  res.json({ ok: true });
+}));
+
 router.post('/:id/finish', requireAdminOrBarber, wrap(async (req, res) => {
   if (req.actingBarberId) {
     const [[row]] = await pool.query(
