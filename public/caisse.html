@@ -584,6 +584,7 @@
     </div>
     <div class="caisse-layout">
       <div class="caisse-grid-col">
+        <div id="caisse-no-timer-active" style="display:none"></div>
         <div class="cat-tabs" id="cat-tabs">
           <button class="on" data-cat="services">Prestations</button>
           <button data-cat="extras">Suppléments</button>
@@ -1042,6 +1043,28 @@ function refreshTimer() {
   }).catch(function (e) { toast(e.message, true); });
 }
 
+/**
+ * Sans Timer, le bouton "Terminer" (qui vit normalement dans cet
+ * onglet) devient inaccessible pour ce coiffeur - sans repli, plus
+ * aucun moyen de faire passer un client de "en cours" à "pret a
+ * encaisser". Ce mini-panneau, affiche directement dans Caisse,
+ * reprend juste cette action, sans l'affichage du chrono.
+ */
+function updateCaisseNoTimerCard(cur) {
+  var box = document.getElementById('caisse-no-timer-active');
+  if (!box) return;
+  var activeBarber = activeBarberId && allBarbers.find(function (b) { return b.id === activeBarberId; });
+  var show = Boolean(activeBarber && activeBarber.timer_enabled === 0 && cur);
+  box.style.display = show ? 'block' : 'none';
+  if (!show) return;
+  box.innerHTML =
+    '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--fill);border-radius:12px;padding:12px 14px;margin-bottom:14px">' +
+      '<div><div style="font-weight:600;font-size:14px">' + esc(cur.client_name) + ' — prestation en cours</div>' +
+      '<div class="hint" style="margin:2px 0 0">' + esc(cur.service.name) + '</div></div>' +
+      '<button class="btn btn-green" style="flex-shrink:0" onclick="finishMine(\'' + cur.id + '\')">Terminer</button>' +
+    '</div>';
+}
+
 function myActive() {
   if (!activeBarberId) return null;
   return queue.find(function (q) { return q.status === 'in_progress' && q.barber_id === activeBarberId; });
@@ -1061,6 +1084,7 @@ function chipsHtml(q) {
 
 function renderActive(force) {
   var cur = myActive();
+  updateCaisseNoTimerCard(cur);
   var zone = document.getElementById('active-zone');
   if (!zone) return;
   if (!cur) {

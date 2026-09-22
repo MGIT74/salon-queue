@@ -232,6 +232,7 @@
     </div>
 
     <div id="p-agenda" style="display:none">
+      <div id="poste-no-timer-active" style="display:none"></div>
       <div class="cal-nav">
         <div class="cal-nav-row1">
           <button class="btn btn-soft" onclick="calShiftPeriod(-1)">‹</button>
@@ -458,6 +459,27 @@ function refresh() {
   }).catch(function (e) { toast(e.message, true); });
 }
 
+/**
+ * Sans Timer, l'ecran qui contient normalement le bouton "Terminer"
+ * (#p-home) n'est plus affiche pour ce coiffeur - sans repli, plus
+ * aucun moyen de faire passer un client de "en cours" a "termine".
+ * Ce mini-panneau, affiche en haut de l'Agenda (le seul autre ecran
+ * disponible ici), reprend juste cette action.
+ */
+function updatePosteNoTimerCard(cur) {
+  var box = document.getElementById('poste-no-timer-active');
+  if (!box) return;
+  var show = Boolean(!me.timerEnabled && cur);
+  box.style.display = show ? 'block' : 'none';
+  if (!show) return;
+  box.innerHTML =
+    '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--fill);border-radius:12px;padding:12px 14px;margin-bottom:14px">' +
+      '<div><div style="font-weight:600;font-size:14px">' + esc(cur.client_name) + ' — prestation en cours</div>' +
+      '<div class="hint" style="margin:2px 0 0">' + esc(cur.service.name) + '</div></div>' +
+      '<button class="btn btn-green" style="flex-shrink:0" onclick="finishMine(\'' + cur.id + '\')">Terminer</button>' +
+    '</div>';
+}
+
 function myActive() {
   if (!me) return null;
   return queue.find(function (q) { return q.status === 'in_progress' && q.barber_id === me.id; });
@@ -479,6 +501,7 @@ var extrasPickerOpen = false;
 
 function renderActive(force) {
   var cur = myActive();
+  updatePosteNoTimerCard(cur);
   var zone = document.getElementById('active-zone');
   if (!cur) {
     zone.innerHTML = '<div class="empty">Aucune coupe en cours</div>';
