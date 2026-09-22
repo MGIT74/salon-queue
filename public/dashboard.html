@@ -2179,6 +2179,7 @@ loadCurrentSalonName();
 function doLogin() {
   var email = document.getElementById('login-email').value.trim();
   var pw = document.getElementById('pw').value;
+  if (!pw && !email) { toast('Merci de renseigner votre email et votre mot de passe', true); return; }
   if (!pw) { toast('Merci de renseigner votre mot de passe', true); return; }
 
   if (email) {
