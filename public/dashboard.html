@@ -575,11 +575,14 @@
   }
 
   .rdv-info-grid {
-    display: grid; grid-template-columns: 150px 170px 100px 110px 170px 100px 80px; gap: 4px 12px;
+    display: grid; grid-template-columns: 200px 170px 115px 140px 185px 120px; gap: 4px 12px;
     margin-top: 8px;
   }
   .rdv-info-grid .f { font-size: 12.5px; color: var(--grey); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .rdv-info-grid .f b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+  /* Le chip de statut vit dans la cellule Nom (comme dans Clients) -
+     pas de colonne dédiée, la ligne reste compacte. */
+  .rdv-info-grid .f .chip { font-size: 10.5px; padding: 3px 9px; margin-left: 6px; vertical-align: 2px; }
   .rdv-info-head { margin-top: 0; padding-bottom: 6px; border-bottom: 1px solid var(--sep); }
   .rdv-info-head .f { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; font-weight: 600; }
   @media (max-width: 900px) {
@@ -598,9 +601,8 @@
       display: grid; width: 100%;
       grid-template-columns: 1fr auto;
       grid-template-areas:
-        "nom    statut"
+        "nom    date"
         "presta presta"
-        "date   date"
         "coif   coif"
         "email  tel";
       gap: 5px 10px;
@@ -610,6 +612,10 @@
     }
     .rdv-info-grid .f:nth-child(1) { grid-area: nom; font-size: 15.5px; }
     .rdv-info-grid .f:nth-child(1) b { font-weight: 700; }
+    .rdv-info-grid .f:nth-child(1) .chip {
+      display: inline-block; padding: 3px 10px; border-radius: 999px;
+      background: var(--fill); font-size: 11.5px; margin-left: 8px; vertical-align: 2px;
+    }
     .rdv-info-grid .f:nth-child(2) { grid-area: presta; }
     .rdv-info-grid .f:nth-child(3) { grid-area: date; color: var(--grey); font-size: 12px; }
     .rdv-info-grid .f:nth-child(4) { grid-area: coif; }
@@ -620,13 +626,6 @@
     .rdv-info-grid .f:nth-child(6) {
       grid-area: tel; font-size: 11.5px; color: var(--grey); text-align: right;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    }
-    .rdv-info-grid .f:nth-child(7) {
-      grid-area: statut; text-align: right; flex-shrink: 0;
-    }
-    .rdv-info-grid .f:nth-child(7) b {
-      display: inline-block; padding: 3px 10px; border-radius: 999px;
-      background: var(--fill); font-size: 11.5px;
     }
     #rdv-list .item-actions {
       width: 100%; justify-content: flex-end; margin: 4px 0 0;
@@ -1552,7 +1551,7 @@
         <input type="checkbox" class="rdv-check" style="margin-right:12px;flex-shrink:0;visibility:hidden" tabindex="-1" disabled>
         <div class="rdv-info-grid rdv-info-head" style="margin-top:0">
           <div class="f">Nom</div><div class="f">Prestation</div><div class="f">Date</div>
-          <div class="f">Coiffeur</div><div class="f">Email</div><div class="f">Téléphone</div><div class="f">Statut</div>
+          <div class="f">Coiffeur</div><div class="f">Email</div><div class="f">Téléphone</div>
         </div>
         <div class="item-actions" style="display:flex;align-items:center;gap:12px;visibility:hidden">
           <button class="btn btn-soft" style="padding:6px 10px;font-size:13px" tabindex="-1">Déplacer</button>
@@ -5276,14 +5275,18 @@ function renderRdvList() {
         // même règle que le tiroir client (openClientDrawer).
         var cancelable = a.status !== 'cancelled' && a.source !== 'walkin' && a.scheduled_at > nowSalonDatetimeString();
 
+        // Chip de statut collé au nom (même présentation que la liste
+        // Clients) - la grille n'a plus de colonne Statut dédiée, la
+        // ligne reste compacte et alignée sur l'en-tête.
+        var statusChip = '<span class="chip" style="color:' + (statusColors[a.display_status] || 'var(--grey)') + '">' + (statusLabels[a.display_status] || a.display_status) + '</span>';
+
         var infoGrid = [
-          '<div class="f"><b>' + esc(a.client_name) + '</b></div>',
+          '<div class="f"><b>' + esc(a.client_name) + '</b>' + statusChip + '</div>',
           '<div class="f"><b>' + esc(a.service_name) + '</b></div>',
-          '<div class="f"><b>' + whenShort + ' ' + sourceBadge(a, true) + '</b></div>',
-          '<div class="f"><b>' + esc(a.barber_name || 'Premier disponible') + '</b></div>',
-          '<div class="f"><b>' + esc(a.email || '—') + '</b></div>',
-          '<div class="f"><b>' + esc(a.phone || '—') + '</b></div>',
-          '<div class="f"><span class="chip" style="color:' + (statusColors[a.display_status] || 'var(--grey)') + '">' + (statusLabels[a.display_status] || a.display_status) + '</span></div>'
+          '<div class="f"><b>' + whenShort + '</b> ' + sourceBadge(a, true) + '</div>',
+          '<div class="f">' + esc(a.barber_name || 'Premier disponible') + '</div>',
+          '<div class="f">' + esc(a.email || '—') + '</div>',
+          '<div class="f">' + esc(a.phone || '—') + '</div>'
         ].join('');
 
         // Les boutons d'action sont toujours rendus (mêmes classes, même
