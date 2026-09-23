@@ -4,6 +4,7 @@ const { pool, utcIso, getSettings } = require('../db');
 const { loadQueue, recompute, clientKey } = require('../lib/queueMath');
 const { promoteTodayAppointments, nowParisDatetimeString } = require('./appointments');
 const requireAdmin = require('../middleware/auth');
+const { verifyOwnerPassword } = require('../middleware/auth');
 const requireAdminOrBarber = require('../middleware/barberAuth');
 const { logActivity } = require('../lib/activityLog');
 const { wrap } = require('../lib/wrap');
@@ -68,6 +69,24 @@ router.get('/', wrap(async (req, res) => {
     if (a.status !== b.status) return a.status === 'in_progress' ? -1 : 1;
     return (a.position || 0) - (b.position || 0);
   });
+
+  // Cette route n'exige pas d'authentification (le kiosque et l'écran
+  // d'affichage en salle l'utilisent sans mot de passe) - mais renvoyait
+  // jusqu'ici l'email et le téléphone de CHAQUE client de la file à
+  // QUICONQUE l'appelle, authentifié ou non (aucune de ces deux pages
+  // n'affiche ces champs, ils ne servaient donc qu'à fuiter). Ne les
+  // inclut désormais que si l'appelant est un admin authentifié
+  // (dashboard.html envoie toujours ce mot de passe) - sans bloquer la
+  // requête dans le cas contraire, juste sans ces deux champs.
+  const given = req.get('X-Admin-Password') || '';
+  const isAdmin = given && await verifyOwnerPassword(req.salon, given);
+  if (!isAdmin) {
+    rows = rows.map((r) => {
+      const { email, phone, ...rest } = r;
+      return rest;
+    });
+  }
+
   res.json({ ok: true, queue: rows });
 }));
 

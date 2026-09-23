@@ -99,3 +99,10 @@ module.exports = async function requireAdmin(req, res, next) {
     res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 };
+
+// Vérification "douce" du mot de passe admin, sans bloquer la requête
+// si elle échoue - utilisée pour inclure ou non des informations
+// sensibles (email/téléphone client) selon que l'appelant est
+// authentifié ou non, sur une route par ailleurs publique (kiosque,
+// écran d'affichage en salle).
+module.exports.verifyOwnerPassword = verifyOwnerPassword;
