@@ -1211,7 +1211,12 @@ function renderNext() {
 
   zone.innerHTML = mine.map(function (q, i) {
     var isAppointmentNotYet = Boolean(q.is_appointment) && new Date(q.checkin_at) > new Date();
-    var locked = i > 0 || isAppointmentNotYet;
+    // Sans Timer, pas de suivi de temps reel a proprement parler - on
+    // ne verrouille plus sur l'heure du RDV (le coiffeur peut "prendre"
+    // un client en avance), mais l'ordre (un seul bouton actif a la
+    // fois) reste respecte comme pour tout le monde.
+    var noTimerBarber = Boolean(activeBarber && activeBarber.timer_enabled === 0);
+    var locked = i > 0 || (isAppointmentNotYet && !noTimerBarber);
     var detail = q.service.name + (q.extras.length ? ' + ' + q.extras.map(function (x) { return x.name; }).join(', ') : '');
     var open = Boolean(nextDetailOpen[q.id]);
     var minutesUntil = isAppointmentNotYet ? Math.round((new Date(q.checkin_at) - new Date()) / 60000) : null;
@@ -1229,7 +1234,7 @@ function renderNext() {
           '<div class="meta">' + esc(detail) + '</div>' +
           appointmentBadge +
           (q.gift_card ? giftBadgeHtml(q.gift_card) : '') +
-          (locked ? '<div class="lock-note' + (prepAlert ? ' prep-alert-note' : '') + '">' + lockNote + '</div>' : '') +
+          ((locked || isAppointmentNotYet) ? '<div class="lock-note' + (prepAlert ? ' prep-alert-note' : '') + '">' + lockNote + '</div>' : '') +
         '</div>' +
         '<div class="next-btns">' +
           (locked ? '' : (
