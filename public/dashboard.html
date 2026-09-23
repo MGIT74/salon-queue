@@ -3552,7 +3552,7 @@ function renderScheduleTab(b) {
   var timerToggle = '<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;background:var(--fill);border-radius:12px;padding:12px 14px">' +
     '<div class="switch' + (b.timer_enabled === 0 ? '' : ' on') + '" onclick="toggleBarberTimer(\'' + b.id + '\', this)"></div>' +
     '<div><div style="font-weight:600;font-size:14px">Timer / file d\'attente en temps réel</div>' +
-    '<div class="hint" style="margin:2px 0 0">Si désactivé : l\'onglet Timer disparaît pour ce coiffeur dans Caisse et Poste, et la réservation en ligne repasse sur un calcul classique (horaires + durée des prestations, sans tenir compte d\'un éventuel retard réel). La file d\'attente (check-in sans-rdv) reste utilisable normalement.</div></div>' +
+    '<div class="hint" style="margin:2px 0 0">Si désactivé : l\'onglet Timer reste visible (le coiffeur voit toujours ses prochains clients), mais le bouton "Commencer" devient "Je prends" — le client passe directement à l\'encaissement, sans suivi de chrono ni retard pris en compte. La réservation en ligne repasse sur un calcul classique (horaires + durée des prestations). La file d\'attente (check-in sans-rdv) reste utilisable normalement.</div></div>' +
     '</div>';
 
   var colorPicker = '<div style="margin-bottom:20px">' +
