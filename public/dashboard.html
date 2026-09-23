@@ -3065,7 +3065,7 @@ function renderDrawerMarketing(r) {
 
   if (r.gifts && r.gifts.length) {
     r.gifts.forEach(function (g) {
-      var itemsList = g.items.map(function (it) { return (it.quantity > 1 ? it.quantity + ' × ' : '') + it.item_name; }).join(', ');
+      var itemsList = g.items.map(function (it) { return it.quantity + ' × ' + it.item_name; }).join(', ');
       var label = g.used_at ? '🎁 Cadeau utilisé' : '🎁 Cadeau disponible';
       var color = g.used_at ? 'var(--grey)' : 'var(--green)';
       parts.push(
@@ -4260,7 +4260,7 @@ function renderGiftCardsList() {
   list.innerHTML = giftCardsData.length === 0
     ? '<div class="empty">Aucun cadeau vendu pour le moment</div>'
     : pageItems.map(function (g) {
-        var itemsList = g.items.map(function (it) { return (it.quantity > 1 ? it.quantity + ' × ' : '') + it.item_name; }).join(', ');
+        var itemsList = g.items.map(function (it) { return it.quantity + ' × ' + it.item_name; }).join(', ');
         var statusLabel = g.used_at ? 'Utilisé' : (g.voided_at ? 'Désactivé' : 'Non utilisé');
         var statusColor = g.used_at ? 'var(--grey)' : (g.voided_at ? 'var(--orange)' : 'var(--green)');
         var fmtDate = function (iso) { return new Date(iso).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }); };
@@ -5514,7 +5514,7 @@ function renderSalesDetailPage() {
     'caisse-sales-detail', 'sales-detail-pagination', 'salesDetailGoToPage',
     function (s) {
       var when = new Date(s.created_at).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
-      var itemsList = s.items.map(function (it) { return (it.quantity > 1 ? it.quantity + ' × ' : '') + it.item_name; }).join(', ');
+      var itemsList = s.items.map(function (it) { return it.quantity + ' × ' + it.item_name; }).join(', ');
       var methodLabel2 = { especes: 'Espèces', cb: 'CB', autre: 'Autre' }[s.payment_method] || s.payment_method;
       return '<div class="item"><div class="item-main">' +
         '<div class="item-name">' + esc(s.barber_name || 'Non assigné') + ' — ' + eur(s.total_price_cents) + '</div>' +
