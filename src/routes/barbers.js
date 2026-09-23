@@ -5,23 +5,23 @@ const { activeBarberCount } = require('../lib/queueMath');
 const requireAdmin = require('../middleware/auth');
 const { loginRateLimiter } = require('../middleware/rateLimiter');
 const { logActivity } = require('../lib/activityLog');
+const { wrap } = require('../lib/wrap');
 
 const router = express.Router();
-
-function wrap(fn) {
-  return function (req, res) {
-    fn(req, res).catch((err) => {
-      console.error(err);
-      res.status(500).json({ error: err.message });
-    });
-  };
-}
 
 function stripSecrets(b) {
   var out = Object.assign({}, b);
   out.has_pin = Boolean(out.pin_code);
   delete out.pin_code;
   return out;
+}
+
+// Comme pour les images du catalogue (catalog.js) : la photo du coiffeur
+// est injectée dans un style="background:url(...)" sans échappement
+// complet côté front - on restreint ici strictement le format accepté.
+const SAFE_PHOTO_URL = /^(data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=]+|https:\/\/[^\s"'<>]+)$/i;
+function isSafePhotoUrl(url) {
+  return typeof url === 'string' && SAFE_PHOTO_URL.test(url);
 }
 
 router.get('/', wrap(async (req, res) => {
@@ -107,6 +107,9 @@ router.post('/', requireAdmin, wrap(async (req, res) => {
   if (pin_code && !/^\d{4,8}$/.test(pin_code)) {
     return res.status(400).json({ error: 'Le code PIN doit contenir entre 4 et 8 chiffres' });
   }
+  if (photo_url && !isSafePhotoUrl(photo_url)) {
+    return res.status(400).json({ error: "Format d'image invalide" });
+  }
   // Équipe figée dès la création : plus de "masqué en attendant qu'on
   // choisisse" - il faut savoir tout de suite si ce coiffeur rejoint
   // l'équipe Sans RDV (visible kiosk) ou RDV en ligne (visible rdv.html),
@@ -148,7 +151,12 @@ router.put('/:id', requireAdmin, wrap(async (req, res) => {
     }
     sets.push('pin_code = ?'); params.push(req.body.pin_code || null);
   }
-  if (req.body.photo_url !== undefined) { sets.push('photo_url = ?'); params.push(req.body.photo_url || null); }
+  if (req.body.photo_url !== undefined) {
+    if (req.body.photo_url && !isSafePhotoUrl(req.body.photo_url)) {
+      return res.status(400).json({ error: "Format d'image invalide" });
+    }
+    sets.push('photo_url = ?'); params.push(req.body.photo_url || null);
+  }
   if (req.body.timer_enabled !== undefined) { sets.push('timer_enabled = ?'); params.push(req.body.timer_enabled ? 1 : 0); }
   if (req.body.color !== undefined) {
     if (req.body.color && !/^#[0-9a-fA-F]{6}$/.test(req.body.color)) {

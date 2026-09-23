@@ -3,17 +3,9 @@ const { pool, getSettings } = require('../db');
 const requireAutomationKey = require('../middleware/automationAuth');
 const { computeSlotsForBarber, nowInParis } = require('./appointments');
 const { sendCustomClientEmail } = require('../lib/mailer');
+const { wrap } = require('../lib/wrap');
 
 const router = express.Router();
-
-function wrap(fn) {
-  return function (req, res) {
-    fn(req, res).catch((err) => {
-      console.error(err);
-      res.status(500).json({ error: err.message });
-    });
-  };
-}
 
 /**
  * Liste tous les salons actifs - nécessaire pour qu'un workflow

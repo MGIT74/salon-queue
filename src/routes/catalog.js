@@ -2,6 +2,7 @@ const express = require('express');
 const { pool } = require('../db');
 const requireAdmin = require('../middleware/auth');
 const { logActivity } = require('../lib/activityLog');
+const { wrap } = require('../lib/wrap');
 
 const router = express.Router();
 
@@ -20,15 +21,6 @@ const SAFE_IMAGE_URL = /^(data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=]
 
 function isSafeImageUrl(url) {
   return typeof url === 'string' && SAFE_IMAGE_URL.test(url);
-}
-
-function wrap(fn) {
-  return function (req, res) {
-    fn(req, res).catch((err) => {
-      console.error(err);
-      res.status(500).json({ error: err.message });
-    });
-  };
 }
 
 function slugify(str) {

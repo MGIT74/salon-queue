@@ -4,19 +4,11 @@ const { pool, getSettings } = require('../db');
 const { hashPassword, verifyPassword } = require('../lib/password');
 const { sendClientVerificationEmail, sendClientPasswordReset } = require('../lib/mailer');
 const { clientKey } = require('../lib/queueMath');
-const { loginRateLimiter } = require('../middleware/rateLimiter');
+const { loginRateLimiter, signupRateLimiter } = require('../middleware/rateLimiter');
 const { nowParisDatetimeString } = require('./appointments');
+const { wrap } = require('../lib/wrap');
 
 const router = express.Router();
-
-function wrap(fn) {
-  return function (req, res) {
-    fn(req, res).catch((err) => {
-      console.error(err);
-      res.status(500).json({ error: err.message });
-    });
-  };
-}
 
 // base_url contient déjà ?salon=xxx si l'espace client est ouvert pour
 // un salon précis - ne jamais recoller un second '?' par-dessus (même
@@ -44,7 +36,7 @@ async function requireClient(req, res, next) {
   next();
 }
 
-router.post('/signup', wrap(async (req, res) => {
+router.post('/signup', signupRateLimiter('client-signup'), wrap(async (req, res) => {
   const { name, email, phone, password } = req.body;
   if (!name || !email || !password) return res.status(400).json({ error: 'Nom, email et mot de passe requis' });
   if (!phone) return res.status(400).json({ error: 'Le téléphone est requis' });
@@ -92,7 +84,7 @@ router.post('/verify-email', wrap(async (req, res) => {
   res.json({ ok: true });
 }));
 
-router.post('/resend-verification', wrap(async (req, res) => {
+router.post('/resend-verification', signupRateLimiter('client-resend'), wrap(async (req, res) => {
   const email = String(req.body.email || '').trim();
   const genericMsg = "Si un compte existe avec cet email et n'est pas encore confirmé, un nouveau lien vient d'être envoyé.";
   if (!email) return res.json({ ok: true, message: genericMsg });
@@ -142,7 +134,7 @@ router.post('/logout', requireClient, wrap(async (req, res) => {
   res.json({ ok: true });
 }));
 
-router.post('/forgot-password', wrap(async (req, res) => {
+router.post('/forgot-password', signupRateLimiter('client-forgot'), wrap(async (req, res) => {
   const email = String(req.body.email || '').trim();
   const genericMsg = "Si un compte existe avec cet email, un lien de réinitialisation vient d'être envoyé.";
   if (!email) return res.json({ ok: true, message: genericMsg });

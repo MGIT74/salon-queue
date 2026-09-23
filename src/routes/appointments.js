@@ -5,17 +5,9 @@ const requireAdmin = require('../middleware/auth');
 const requireAdminOrBarber = require('../middleware/barberAuth');
 const { clientKey } = require('../lib/queueMath');
 const { sendAppointmentConfirmation, sendAppointmentCancelledByAdmin, sendAppointmentRescheduled, sendGiftCodeRenewed } = require('../lib/mailer');
+const { wrap } = require('../lib/wrap');
 
 const router = express.Router();
-
-function wrap(fn) {
-  return function (req, res) {
-    fn(req, res).catch((err) => {
-      console.error(err);
-      res.status(500).json({ error: err.message });
-    });
-  };
-}
 
 // Même alphabet que generateGiftCode() dans sales.js (sans caractères
 // ambigus à l'oral/à l'écrit) - dupliqué ici plutôt que partagé pour

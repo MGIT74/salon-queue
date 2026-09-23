@@ -2,17 +2,9 @@ const express = require('express');
 const { pool, getSettings, setSettings, getCaisseLockedUntil, getPlatformSettings } = require('../db');
 const { sendTest, invalidateTransport, sendAppointmentConfirmation, sendAppointmentReminder, sendAppointmentCancelledByAdmin, sendAppointmentRescheduled, sendTurnSoon, sendSalonClosureNotice } = require('../lib/mailer');
 const requireAdmin = require('../middleware/auth');
+const { wrap } = require('../lib/wrap');
 
 const router = express.Router();
-
-function wrap(fn) {
-  return function (req, res) {
-    fn(req, res).catch((err) => {
-      console.error(err);
-      res.status(500).json({ error: err.message });
-    });
-  };
-}
 
 const EDITABLE = [
   'salon_name', 'notify_before_min', 'logo_url', 'gift_tile_image_url', 'loyalty_card_image_url', 'gift_card_image_url', 'timezone',
@@ -133,7 +125,9 @@ router.post('/smtp/test', requireAdmin, wrap(async (req, res) => {
     await sendTest(req.salon.id, to);
     res.json({ ok: true, sent: true });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    // Message utilisateur utile ici (échec SMTP configuré par l'admin,
+    // ex: "authentification refusée") - pas un détail interne.
+    res.status(400).json({ error: 'Envoi du test impossible : ' + err.message });
   }
 }));
 

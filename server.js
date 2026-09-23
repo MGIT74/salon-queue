@@ -40,6 +40,32 @@ const { loginRateLimiter } = require('./src/middleware/rateLimiter');
 const app = express();
 const PORT = Number((process.env.PORT || '3000').toString().replace(/[\r\n]+$/, '').trim());
 
+// En-têtes de sécurité de base, appliqués à toutes les réponses :
+// - X-Frame-Options / frame-ancestors : empêche l'embed du dashboard
+//   dans un iframe tiers (clickjacking, qui pourrait faire valider un
+//   encaissement en superposant un bouton invisible).
+// - X-Content-Type-Options : interdit le "sniffing" MIME par le
+//   navigateur (un fichier uploadé ne peut pas être réinterprété en JS).
+// - Referrer-Policy : ne divulgue jamais l'URL complète (qui peut
+//   contenir ?salon=... ou d'anciens paramètres sensibles) vers des
+//   sites tiers (polices, images externes...).
+// - CSP : blocage par défaut des scripts/frames/objets externes. Le
+//   front n'utilise que des scripts inline et des data:/self, la
+//   directive reste donc souple sur les styles/img mais stricte sur
+//   les scripts et les connexions.
+function securityHeaders(req, res, next) {
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'same-origin');
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; " +
+    "img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+  );
+  next();
+}
+app.use(securityHeaders);
+
 // Nécessaire derrière un reverse proxy (nginx) pour que req.ip reflète
 // la vraie IP du client (via X-Forwarded-For) plutôt que celle du
 // proxy - indispensable pour que le limiteur de tentatives de

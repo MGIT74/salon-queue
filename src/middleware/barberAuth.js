@@ -1,12 +1,21 @@
 const { pool } = require('../db');
-const { verifyPassword } = require('../lib/password');
+const { verifyPassword, timingSafeStringEqual } = require('../lib/password');
 const { validateToken } = require('../lib/impersonation');
+const { isBlocked, recordFailure, recordSuccess } = require('./rateLimiter');
 
 // Autorise soit le mot de passe admin du salon courant (contrôle total),
 // soit une authentification coiffeur par code PIN — limitée à son propre
 // périmètre, utilisée depuis "Mon poste" sur le téléphone du coiffeur.
 // resolveSalon doit s'exécuter avant ce middleware pour poser req.salon.
 // Pose req.barberId quand c'est une session coiffeur (pas admin).
+//
+// Rate limiting : le PIN est court (4-8 chiffres) et se vérifie sur
+// chaque appel d'API de cette famille de routes — sans compteur, un
+// script pouvait deviner un PIN en boucle sur n'importe quelle route
+// GET (seul POST /api/barbers/login était protégé). Même mécanisme que
+// auth.js : compteur par salon + IP, blocage temporaire au-delà du
+// seuil. Une authentification réussie (PIN ou mot de passe) remet le
+// compteur à zéro.
 module.exports = async function requireAdminOrBarber(req, res, next) {
   if (!req.salon) {
     return res.status(500).json({ error: 'Salon non résolu (resolveSalon manquant en amont)' });
@@ -17,13 +26,32 @@ module.exports = async function requireAdminOrBarber(req, res, next) {
     return next();
   }
 
-  const given = req.get('X-Admin-Password') || req.query.pw || '';
+  const ip = req.ip || (req.connection && req.connection.remoteAddress) || 'unknown';
+  const rlKey = 'barber-or-admin:' + req.salon.owner_id + ':' + ip;
+  const retryAfterSec = isBlocked(rlKey);
+  if (retryAfterSec) {
+    res.set('Retry-After', String(retryAfterSec));
+    return res.status(429).json({
+      error: 'Trop de tentatives, réessayez dans ' + Math.ceil(retryAfterSec / 60) + ' min.'
+    });
+  }
+
+  // Plus de fallback ?pw= dans l'URL (fuite dans les logs serveur,
+  // l'historique navigateur et l'en-tête Referer) - en-tête dédié
+  // uniquement, comme sur les routes requireAdmin depuis longtemps.
+  const given = req.get('X-Admin-Password') || '';
 
   if (req.salon.owner_password_hash) {
-    if (await verifyPassword(given, req.salon.owner_password_hash)) return next();
+    if (await verifyPassword(given, req.salon.owner_password_hash)) {
+      recordSuccess(rlKey);
+      return next();
+    }
   } else {
     const adminPw = (req.salon.owner_admin_password || '').replace(/[\r\n]+$/, '').trim();
-    if (adminPw && given === adminPw) return next();
+    if (adminPw && timingSafeStringEqual(given, adminPw)) {
+      recordSuccess(rlKey);
+      return next();
+    }
   }
 
   const barberId = req.get('X-Barber-Id');
@@ -35,6 +63,7 @@ module.exports = async function requireAdminOrBarber(req, res, next) {
         [barberId, req.salon.id, barberPin]
       );
       if (barber) {
+        recordSuccess(rlKey);
         req.barberId = barber.id;
         // Sélecteur par bulle (caisse partagée) : une fois qu'UN coiffeur
         // s'est authentifié par son propre code PIN (ci-dessus), la
@@ -65,5 +94,8 @@ module.exports = async function requireAdminOrBarber(req, res, next) {
     }
   }
 
+  // Ni mot de passe admin, ni couple id/PIN coiffeur valide : échec
+  // d'authentification, comptabilisé pour le blocage progressif.
+  recordFailure(rlKey);
   return res.status(401).json({ error: 'Authentification requise' });
 };

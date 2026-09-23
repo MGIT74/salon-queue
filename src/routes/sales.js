@@ -5,17 +5,9 @@ const { clientKey, earnLoyaltyPoint } = require('../lib/queueMath');
 const { sendGiftConfirmation } = require('../lib/mailer');
 const requireAdmin = require('../middleware/auth');
 const requireAdminOrBarber = require('../middleware/barberAuth');
+const { wrap } = require('../lib/wrap');
 
 const router = express.Router();
-
-function wrap(fn) {
-  return function (req, res) {
-    fn(req, res).catch((err) => {
-      console.error(err);
-      res.status(500).json({ error: err.message });
-    });
-  };
-}
 
 const PAYMENT_METHODS = ['especes', 'cb', 'autre'];
 

@@ -1,20 +1,12 @@
 const express = require('express');
 const { pool } = require('../db');
 const requireAdmin = require('../middleware/auth');
+const { wrap } = require('../lib/wrap');
 
 const router = express.Router();
 
 const DEFAULT_FREE_CREDITS_PER_MONTH = 10;
 const N8N_CHAT_WEBHOOK_URL = process.env.N8N_CHAT_WEBHOOK_URL;
-
-function wrap(fn) {
-  return function (req, res) {
-    fn(req, res).catch((err) => {
-      console.error(err);
-      res.status(500).json({ error: err.message });
-    });
-  };
-}
 
 function currentMonthStr() {
   return new Date().toISOString().slice(0, 7); // 'YYYY-MM'

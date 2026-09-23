@@ -3,17 +3,9 @@ const crypto = require('crypto');
 const { getSettings } = require('../db');
 const requireAdminOrBarber = require('../middleware/barberAuth');
 const { chargeCard } = require('../lib/tpeNepting');
+const { wrap } = require('../lib/wrap');
 
 const router = express.Router();
-
-function wrap(fn) {
-  return function (req, res) {
-    fn(req, res).catch((err) => {
-      console.error(err);
-      res.status(500).json({ error: err.message });
-    });
-  };
-}
 
 /**
  * Déclenche un paiement carte sur le TPE configuré pour ce salon.

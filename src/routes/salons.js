@@ -5,17 +5,9 @@ const { sendTestEmail, sendVerificationEmail, invalidateTransport } = require('.
 const { hashPassword } = require('../lib/password');
 const { createToken } = require('../lib/impersonation');
 const { isBlocked, recordFailure, recordSuccess } = require('../middleware/rateLimiter');
+const { wrap } = require('../lib/wrap');
 
 const router = express.Router();
-
-function wrap(fn) {
-  return function (req, res) {
-    fn(req, res).catch((err) => {
-      console.error(err);
-      res.status(500).json({ error: err.message });
-    });
-  };
-}
 
 function timingSafeStringEqual(a, b) {
   const bufA = Buffer.from(String(a));
@@ -125,21 +117,27 @@ router.post('/salons', requireSuperAdmin, wrap(async (req, res) => {
     verifyToken = crypto.randomBytes(32).toString('hex');
     const verifyExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
     await pool.query(
-      `INSERT INTO owners (id, name, email, admin_password, password_hash, verify_token, verify_token_expires)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [ownerId, ownerName, email, admin_password, passwordHash, verifyToken, verifyExpires]
+      `INSERT INTO owners (id, name, email, password_hash, verify_token, verify_token_expires)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [ownerId, ownerName, email, passwordHash, verifyToken, verifyExpires]
     );
   } else {
+    // Pas d'email : seule une empreinte du mot de passe partagé est
+    // conservée (scrypt), la valeur en clair n'est jamais stockée. La
+    // connexion se fait par comparaison au hash (voir verifyOwnerPassword
+    // dans middleware/auth.js, qui accepte aussi les comptes legacy le
+    // temps de leur migration paresseuse).
+    const passwordHash = await hashPassword(admin_password);
     await pool.query(
-      'INSERT INTO owners (id, name, admin_password) VALUES (?, ?, ?)',
-      [ownerId, ownerName, admin_password]
+      'INSERT INTO owners (id, name, password_hash) VALUES (?, ?, ?)',
+      [ownerId, ownerName, passwordHash]
     );
   }
 
   const id = crypto.randomUUID();
   await pool.query(
     'INSERT INTO salons (id, owner_id, name, slug, admin_password) VALUES (?, ?, ?, ?, ?)',
-    [id, ownerId, name, slug, admin_password]
+    [id, ownerId, name, slug, '']
   );
 
   // Catalogue de départ, comme pour le tout premier salon — sinon la
@@ -202,7 +200,13 @@ router.put('/salons/:id', requireSuperAdmin, wrap(async (req, res) => {
   if (req.body.admin_password) {
     const [[salon]] = await pool.query('SELECT owner_id FROM salons WHERE id = ?', [req.params.id]);
     if (!salon) return res.status(404).json({ error: 'Salon introuvable' });
-    await pool.query('UPDATE owners SET admin_password = ? WHERE id = ?', [req.body.admin_password, salon.owner_id]);
+    // Empreinte scrypt uniquement - la valeur en clair n'est jamais
+    // persistée (l'ancienne colonne admin_password est purgée au passage).
+    const passwordHash = await hashPassword(req.body.admin_password);
+    await pool.query(
+      'UPDATE owners SET password_hash = ?, admin_password = NULL WHERE id = ?',
+      [passwordHash, salon.owner_id]
+    );
   }
 
   res.json({ ok: true });
@@ -264,16 +268,17 @@ router.put('/owners/:id', requireSuperAdmin, wrap(async (req, res) => {
   res.json({ ok: true });
 }));
 
-// Réinitialise le mot de passe d'une enseigne (super admin). Efface aussi
-// le hash existant si l'enseigne s'était inscrite par email — sinon
-// l'ancien mot de passe hashé resterait prioritaire et le nouveau mot de
-// passe en clair n'aurait aucun effet.
+// Réinitialise le mot de passe d'une enseigne (super admin). Stocké
+// exclusivement sous forme de hash scrypt (l'ancien stockage en clair
+// est purgé) - la vérification à la connexion passe toujours par le hash
+// en priorité (verifyOwnerPassword dans middleware/auth.js).
 router.put('/owners/:id/password', requireSuperAdmin, wrap(async (req, res) => {
   const { admin_password } = req.body;
   if (!admin_password) return res.status(400).json({ error: 'Mot de passe requis' });
+  const passwordHash = await hashPassword(admin_password);
   await pool.query(
-    'UPDATE owners SET admin_password = ?, password_hash = NULL WHERE id = ?',
-    [admin_password, req.params.id]
+    'UPDATE owners SET password_hash = ?, admin_password = NULL WHERE id = ?',
+    [passwordHash, req.params.id]
   );
   res.json({ ok: true });
 }));
@@ -356,7 +361,9 @@ router.post('/test-email', requireSuperAdmin, wrap(async (req, res) => {
     await sendTestEmail(to);
     res.json({ ok: true, sent: true });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    // Message utilisateur utile ici (échec SMTP configuré par le super
+    // admin, ex: "authentification refusée") - pas un détail interne.
+    res.status(400).json({ error: 'Envoi du test impossible : ' + err.message });
   }
 }));
 

@@ -37,7 +37,7 @@ module.exports = async function resolveSalon(req, res, next) {
     req.ownerId = salon.owner_id;
     next();
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
+    console.error('[resolveSalon]', err);
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 };

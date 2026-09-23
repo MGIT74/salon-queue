@@ -45,6 +45,36 @@ function recordSuccess(key) {
 }
 
 /**
+ * Limiteur simple par IP pour les endpoints d'INSCRIPTION (création de
+ * comptes) et l'envoi d'emails publics : bloque avant traitement dès que
+ * la limite d'appels par fenêtre est atteinte. Différent du limiteur de
+ * login : ici on compte chaque appel (pas seulement les échecs), car le
+ * risque est le flooding massif (spam de comptes, abus du SMTP plateforme
+ * pour harceler des tiers) plutôt que la devinette d'un secret.
+ */
+function signupRateLimiter(name, opts) {
+  const { max, windowMs, blockMs } = Object.assign({ max: 5, windowMs: 60 * 60 * 1000, blockMs: 60 * 60 * 1000 }, opts);
+  return function (req, res, next) {
+    const ip = req.ip || (req.connection && req.connection.remoteAddress) || 'unknown';
+    const key = name + ':' + ip;
+
+    const retryAfterSec = isBlocked(key);
+    if (retryAfterSec) {
+      res.set('Retry-After', String(retryAfterSec));
+      return res.status(429).json({
+        error: 'Trop de demandes, réessayez dans ' + Math.ceil(retryAfterSec / 60) + ' min.'
+      });
+    }
+
+    // Comptabilise chaque appel dans la fenêtre (via recordFailure qui
+    // incrémente le compteur, la sémantique "échec" s'applique ici au
+    // simple volume, indépendamment du code de statut de la réponse).
+    recordFailure(key, { max, windowMs, blockMs });
+    next();
+  };
+}
+
+/**
  * Middleware Express pour une route de login dédiée (POST /login) :
  * bloque avant traitement si déjà au-delà du seuil, et observe le
  * code de statut de la réponse pour compter échecs/succès
@@ -87,4 +117,4 @@ setInterval(() => {
   }
 }, 10 * 60 * 1000).unref();
 
-module.exports = { loginRateLimiter, isBlocked, recordFailure, recordSuccess };
+module.exports = { loginRateLimiter, signupRateLimiter, isBlocked, recordFailure, recordSuccess };

@@ -19,4 +19,18 @@ async function verifyPassword(password, stored) {
   return crypto.timingSafeEqual(derived, storedBuf);
 }
 
-module.exports = { hashPassword, verifyPassword };
+// Comparaison en temps constant de deux chaînes (anti-oracle de timing).
+// Longueurs différentes : une comparaison est quand même effectuée (contre
+// bufA elle-même) pour ne pas révéler la longueur via une sortie anticipée
+// mesurable au timing.
+function timingSafeStringEqual(a, b) {
+  const bufA = Buffer.from(String(a));
+  const bufB = Buffer.from(String(b));
+  if (bufA.length !== bufB.length) {
+    crypto.timingSafeEqual(bufA, bufA);
+    return false;
+  }
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
+module.exports = { hashPassword, verifyPassword, timingSafeStringEqual };

@@ -3,18 +3,10 @@ const crypto = require('crypto');
 const { pool } = require('../db');
 const { hashPassword, verifyPassword } = require('../lib/password');
 const { sendPasswordReset, sendVerificationEmail } = require('../lib/platformMailer');
-const { loginRateLimiter } = require('../middleware/rateLimiter');
+const { loginRateLimiter, signupRateLimiter } = require('../middleware/rateLimiter');
+const { wrap } = require('../lib/wrap');
 
 const router = express.Router();
-
-function wrap(fn) {
-  return function (req, res) {
-    fn(req, res).catch((err) => {
-      console.error(err);
-      res.status(500).json({ error: err.message });
-    });
-  };
-}
 
 /**
  * Vérification en direct (avant même de soumettre le formulaire) : le
@@ -23,7 +15,7 @@ function wrap(fn) {
  * point n'est utile QUE pour prévenir plus tôt, la vraie verification
  * (autoritaire) reste celle faite a l'inscription elle-meme.
  */
-router.get('/check-slug', wrap(async (req, res) => {
+router.get('/check-slug', signupRateLimiter('signup-check-slug', { max: 30 }), wrap(async (req, res) => {
   const slug = String(req.query.slug || '').trim().toLowerCase();
   if (!slug || !/^[a-z0-9-]+$/.test(slug)) {
     return res.json({ ok: true, available: false, reason: 'invalid' });
@@ -32,7 +24,11 @@ router.get('/check-slug', wrap(async (req, res) => {
   res.json({ ok: true, available: !existing });
 }));
 
-router.post('/', wrap(async (req, res) => {
+// Création de compte : fortement limitée par IP (5/h) - c'est une route
+// publique qui déclenche l'envoi d'un email par la plateforme SMTP, un
+// flooding automatisé polluerait la boîte d'envoi et harcèlerait des
+// tiers (email de vérification non sollicité).
+router.post('/', signupRateLimiter('signup'), wrap(async (req, res) => {
   const { owner_name, salon_name, slug, siret, email, phone, password } = req.body;
 
   if (!owner_name || !salon_name || !slug || !siret || !email || !phone || !password) {
@@ -65,9 +61,9 @@ router.post('/', wrap(async (req, res) => {
 
   const ownerId = crypto.randomUUID();
   await pool.query(
-    `INSERT INTO owners (id, name, email, phone, password_hash, admin_password, verify_token, verify_token_expires)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [ownerId, owner_name, email, phone, passwordHash, '', verifyToken, verifyExpires]
+    `INSERT INTO owners (id, name, email, phone, password_hash, verify_token, verify_token_expires)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [ownerId, owner_name, email, phone, passwordHash, verifyToken, verifyExpires]
   );
 
   const salonId = crypto.randomUUID();
@@ -124,7 +120,7 @@ router.post('/', wrap(async (req, res) => {
  * échecs (email introuvable, SMTP plateforme non configuré...) sont
  * seulement journalisés côté serveur, jamais renvoyés tels quels.
  */
-router.post('/forgot-password', wrap(async (req, res) => {
+router.post('/forgot-password', signupRateLimiter('signup-forgot'), wrap(async (req, res) => {
   const email = String(req.body.email || '').trim();
   const genericMsg = "Si un compte existe avec cet email, un lien de réinitialisation vient d'être envoyé.";
 
@@ -195,7 +191,7 @@ router.post('/verify-email', wrap(async (req, res) => {
  * Renvoi de l'email de confirmation (lien perdu ou expiré). Réponse
  * générique dans tous les cas, comme pour le mot de passe oublié.
  */
-router.post('/resend-verification', wrap(async (req, res) => {
+router.post('/resend-verification', signupRateLimiter('signup-resend'), wrap(async (req, res) => {
   const email = String(req.body.email || '').trim();
   const genericMsg = "Si un compte existe avec cet email et n'est pas encore confirmé, un nouveau lien vient d'être envoyé.";
   if (!email) return res.json({ ok: true, message: genericMsg });
