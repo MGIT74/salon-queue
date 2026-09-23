@@ -34,20 +34,35 @@ async function attachGiftInfo(rows, salonId) {
     'SELECT * FROM gift_cards WHERE salon_id = ? AND used_at IS NULL AND voided_at IS NULL ORDER BY created_at ASC', [salonId]
   );
   if (!gifts.length) return rows;
+  const giftById = {};
   const giftByKey = {};
   gifts.forEach((g) => {
+    giftById[g.id] = g;
     const key = clientKey({ email: g.recipient_email, phone: g.recipient_phone, client_name: g.recipient_name });
     // Ne jamais écraser un cadeau déjà trouvé pour cette clé : le
     // premier de la boucle (donc le plus ancien, grâce au tri) reste.
     if (key && !giftByKey[key]) giftByKey[key] = g;
   });
+  const toGiftPayload = (gift, explicit) => {
+    let items = [];
+    try { items = JSON.parse(gift.items_json || '[]'); } catch (e) { items = []; }
+    return { id: gift.id, amount_cents: gift.amount_cents, items, explicit: explicit };
+  };
   return rows.map((r) => {
+    // Lien EXPLICITE (le client a lui-même indiqué vouloir utiliser CE
+    // cadeau en le réservant avec son code) - prioritaire : cette venue
+    // EST la venue prévue pour le récupérer.
+    if (r.gift_card_id && giftById[r.gift_card_id]) {
+      return Object.assign({}, r, { gift_card: toGiftPayload(giftById[r.gift_card_id], true) });
+    }
+    // Sinon, simple rapprochement par identité : ce client a AUSSI un
+    // cadeau non réclamé qui traîne, mais rien n'indique qu'il vient
+    // pour ça aujourd'hui - à traiter comme un rappel informatif, pas
+    // comme l'objet de cette visite.
     const key = clientKey(r);
     const gift = key ? giftByKey[key] : null;
     if (!gift) return r;
-    let items = [];
-    try { items = JSON.parse(gift.items_json || '[]'); } catch (e) { items = []; }
-    return Object.assign({}, r, { gift_card: { id: gift.id, amount_cents: gift.amount_cents, items } });
+    return Object.assign({}, r, { gift_card: toGiftPayload(gift, false) });
   });
 }
 

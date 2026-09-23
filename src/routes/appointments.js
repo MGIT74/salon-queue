@@ -884,9 +884,9 @@ async function promoteAppointment(appt, extraIds) {
   );
 
   await pool.query(
-    `INSERT INTO queue (id, salon_id, client_name, email, phone, service_id, barber_id, status, checkin_at, is_appointment)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 'waiting', ?, 1)`,
-    [queueId, appt.salon_id, appt.client_name, appt.email, appt.phone || null, appt.service_id, appt.barber_id, checkinUtc]
+    `INSERT INTO queue (id, salon_id, client_name, email, phone, service_id, barber_id, status, checkin_at, is_appointment, gift_card_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 'waiting', ?, 1, ?)`,
+    [queueId, appt.salon_id, appt.client_name, appt.email, appt.phone || null, appt.service_id, appt.barber_id, checkinUtc, appt.gift_card_id || null]
   );
   if (extraIds && extraIds.length) {
     await pool.query(

@@ -893,3 +893,15 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'barbers' AND column_name = 'timer_enabled');
 SET @sql := IF(@c = 0, "ALTER TABLE barbers ADD COLUMN timer_enabled TINYINT(1) NOT NULL DEFAULT 1", 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Lien EXPLICITE vers un cadeau que le client a lui-meme indique vouloir
+-- utiliser des la reservation (code cadeau saisi) - deja porte par
+-- appointments.gift_card_id, mais perdu lors de la promotion vers la
+-- file (queue) faute de colonne equivalente ici. Sans cette colonne,
+-- impossible de distinguer "ce client vient PRECISEMENT pour ce cadeau"
+-- d'un simple rapprochement automatique par identite (client qui a
+-- juste un AUTRE cadeau non reclame qui traine, sans rapport avec sa
+-- venue du jour) - les deux cas etaient traites pareil a tort.
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'queue' AND column_name = 'gift_card_id');
+SET @sql := IF(@c = 0, "ALTER TABLE queue ADD COLUMN gift_card_id CHAR(36) NULL", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;

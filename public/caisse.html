@@ -1263,14 +1263,19 @@ function giftBadgeHtml(gift) {
     .filter(function (it) { return it.item_type === 'product'; })
     .map(function (it) { return it.quantity + ' × ' + it.item_name; })
     .join(', ');
-  var label = productNames ? '🎁 Cadeau — à remettre : ' + esc(productNames) : '🎁 Cadeau';
-  return '<div class="meta" style="color:var(--green)">' + label + '</div>';
+  var label = gift.explicit
+    ? (productNames ? '🎁 Cadeau — à remettre : ' + esc(productNames) : '🎁 Cadeau')
+    : 'ℹ️ Rappel : cadeau non réclamé en attente' + (productNames ? ' (' + esc(productNames) + ')' : '') + ' — sans rapport avec cette venue';
+  return '<div class="meta" style="color:' + (gift.explicit ? 'var(--green)' : 'var(--grey)') + '">' + label + '</div>';
 }
 
 function giftDetailHtml(gift) {
   var itemsList = gift.items.map(function (it) { return it.quantity + ' × ' + esc(it.item_name); }).join(', ');
+  var title = gift.explicit
+    ? '🎁 Cadeau (' + eur(gift.amount_cents) + ')'
+    : 'ℹ️ Cadeau non réclamé (sans rapport avec cette venue) — ' + eur(gift.amount_cents);
   return '<div class="detail-row" style="flex-direction:column;align-items:flex-start;gap:4px">' +
-    '<span class="detail-label" style="color:var(--green)">🎁 Cadeau (' + eur(gift.amount_cents) + ')</span>' +
+    '<span class="detail-label" style="color:' + (gift.explicit ? 'var(--green)' : 'var(--grey)') + '">' + title + '</span>' +
     '<span class="detail-value" style="font-weight:400">' + itemsList + '</span>' +
     '</div>';
 }
@@ -2087,21 +2092,25 @@ function renderPendingList() {
       var giftItemsList = (q.gift_card.items || []).map(function (it) {
         return it.quantity + ' × ' + it.item_name;
       }).join(', ');
-      giftNote = '<div class="lock-note" style="color:var(--green)">🎁 Cadeau disponible</div>' +
-        (giftItemsList ? '<div class="meta" style="color:var(--green)">' + esc(giftItemsList) + '</div>' : '');
+      giftNote = q.gift_card.explicit
+        ? '<div class="lock-note" style="color:var(--green)">🎁 Cadeau disponible</div>' +
+          (giftItemsList ? '<div class="meta" style="color:var(--green)">' + esc(giftItemsList) + '</div>' : '')
+        : '<div class="lock-note" style="color:var(--grey)">ℹ️ Rappel : cadeau non réclamé en attente (sans rapport avec cette venue)</div>' +
+          (giftItemsList ? '<div class="meta" style="color:var(--grey)">' + esc(giftItemsList) + '</div>' : '');
     }
     var loyaltyNote = q.loyalty_rewards_available
       ? '<div class="lock-note" style="color:var(--blue)">⭐ Fidélité disponible</div>'
       : '';
-    var displayAmount = q.gift_card ? q.gift_card.amount_cents : q.total_price_cents;
+    var explicitGift = Boolean(q.gift_card && q.gift_card.explicit);
+    var displayAmount = explicitGift ? q.gift_card.amount_cents : q.total_price_cents;
     return '<div class="pending-card' + (isActive ? '' : ' locked') + '"' +
-      (isActive && !q.gift_card ? ' onclick="usePendingForTicket(\'' + q.id + '\')"' : '') + '>' +
+      (isActive && !explicitGift ? ' onclick="usePendingForTicket(\'' + q.id + '\')"' : '') + '>' +
       '<div><div class="name">' + esc(q.client_name) + '</div>' +
       '<div class="meta">' + esc(detail) + '</div>' +
       (isActive ? giftNote + loyaltyNote : '<div class="lock-note">En attente de son tour</div>') + '</div>' +
       '<div class="pending-actions">' +
         '<span class="amount">' + eur(displayAmount) + '</span>' +
-        (isActive && q.gift_card
+        (isActive && explicitGift
           ? '<button class="btn btn-primary" onclick="event.stopPropagation();useGiftCard(\'' + q.gift_card.id + '\',\'' + q.id + '\')">Utiliser le cadeau</button>'
           : '') +
         (isActive && !q.loyalty_member

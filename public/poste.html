@@ -692,8 +692,10 @@ function giftBadgeHtml(gift) {
     .filter(function (it) { return it.item_type === 'product'; })
     .map(function (it) { return it.quantity + ' × ' + it.item_name; })
     .join(', ');
-  var label = productNames ? '🎁 Cadeau — à remettre : ' + esc(productNames) : '🎁 Cadeau';
-  return '<div class="meta" style="color:var(--green)">' + label + '</div>';
+  var label = gift.explicit
+    ? (productNames ? '🎁 Cadeau — à remettre : ' + esc(productNames) : '🎁 Cadeau')
+    : 'ℹ️ Rappel : cadeau non réclamé en attente' + (productNames ? ' (' + esc(productNames) + ')' : '') + ' — sans rapport avec cette venue';
+  return '<div class="meta" style="color:' + (gift.explicit ? 'var(--green)' : 'var(--grey)') + '">' + label + '</div>';
 }
 
 /**
@@ -703,8 +705,11 @@ function giftBadgeHtml(gift) {
  */
 function giftDetailHtml(gift) {
   var itemsList = gift.items.map(function (it) { return it.quantity + ' × ' + esc(it.item_name); }).join(', ');
+  var title = gift.explicit
+    ? '🎁 Cadeau (' + eur(gift.amount_cents) + ')'
+    : 'ℹ️ Cadeau non réclamé (sans rapport avec cette venue) — ' + eur(gift.amount_cents);
   return '<div class="detail-row" style="flex-direction:column;align-items:flex-start;gap:4px">' +
-    '<span class="detail-label" style="color:var(--green)">🎁 Cadeau (' + eur(gift.amount_cents) + ')</span>' +
+    '<span class="detail-label" style="color:' + (gift.explicit ? 'var(--green)' : 'var(--grey)') + '">' + title + '</span>' +
     '<span class="detail-value" style="font-weight:400">' + itemsList + '</span>' +
     '</div>';
 }
