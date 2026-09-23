@@ -218,7 +218,7 @@ router.get('/salons/:id/barbers-status', requireAutomationKey, wrap(async (req, 
   if (!salon) return res.status(404).json({ error: 'Salon introuvable ou inactif' });
 
   const [barbers] = await pool.query(
-    'SELECT id, name, active, accepts_appointments FROM barbers WHERE salon_id = ? ORDER BY sort_order, name',
+    'SELECT id, name, active, accepts_appointments, timer_enabled FROM barbers WHERE salon_id = ? ORDER BY sort_order, name',
     [salonId]
   );
 
@@ -260,6 +260,11 @@ router.get('/salons/:id/barbers-status', requireAutomationKey, wrap(async (req, 
       name: b.name,
       active: Boolean(b.active),
       accepts_appointments: Boolean(b.accepts_appointments),
+      // Coiffeur sans chrono/file d'attente en temps reel (ex. loueur
+      // de fauteuil independant) : pas de suivi de retard, la
+      // reservation en ligne se base uniquement sur horaires + duree
+      // des prestations pour lui.
+      timer_enabled: Boolean(b.timer_enabled),
       on_leave_today: onLeave,
       working_today: Boolean(todaySchedule),
       today_hours: todaySchedule ? todaySchedule.start_time.slice(0, 5) + '-' + todaySchedule.end_time.slice(0, 5) : null,
