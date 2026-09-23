@@ -13,9 +13,14 @@ const { isBlocked, recordFailure, recordSuccess } = require('./rateLimiter');
 // chaque appel d'API de cette famille de routes — sans compteur, un
 // script pouvait deviner un PIN en boucle sur n'importe quelle route
 // GET (seul POST /api/barbers/login était protégé). Même mécanisme que
-// auth.js : compteur par salon + IP, blocage temporaire au-delà du
-// seuil. Une authentification réussie (PIN ou mot de passe) remet le
-// compteur à zéro.
+// auth.js, mais avec DEUX compteurs distincts par IP :
+// - "pin:{salon}:{ip}"    : échecs de code PIN, compteur PAR SALON —
+//   c'est le PIN qui est propre à chaque salon, donc un blocage ne
+//   doit jamais gêner un autre salon de la même enseigne ;
+// - "admin:{owner}:{ip}"  : échecs de mot de passe admin, compteur par
+//   ENSEIGNE (le mot de passe est partagé par tous les salons).
+// Un échec PIN ne nourrit que le compteur PIN du salon concerné, et
+// réciproquement pour le mot de passe : les deux risques sont isolés.
 module.exports = async function requireAdminOrBarber(req, res, next) {
   if (!req.salon) {
     return res.status(500).json({ error: 'Salon non résolu (resolveSalon manquant en amont)' });
@@ -27,12 +32,20 @@ module.exports = async function requireAdminOrBarber(req, res, next) {
   }
 
   const ip = req.ip || (req.connection && req.connection.remoteAddress) || 'unknown';
-  const rlKey = 'barber-or-admin:' + req.salon.owner_id + ':' + ip;
-  const retryAfterSec = isBlocked(rlKey);
-  if (retryAfterSec) {
-    res.set('Retry-After', String(retryAfterSec));
+  const pinRlKey = 'pin:' + req.salon.id + ':' + ip;
+  const adminRlKey = 'admin:' + req.salon.owner_id + ':' + ip;
+
+  // Le mot de passe admin donne le contrôle total sur toute l'enseigne :
+  // si son compteur est bloqué (tentatives répétées du mauvais mot de
+  // passe), on refuse tout de suite, même si un PIN valide est fourni.
+  // En revanche un blocage du compteur PIN n'empêche PAS une connexion
+  // admin par mot de passe (le PIN est un secret plus faible, son
+  // compteur ne doit pas pouvoir bloquer le propriétaire).
+  const adminBlockedFor = isBlocked(adminRlKey);
+  if (adminBlockedFor) {
+    res.set('Retry-After', String(adminBlockedFor));
     return res.status(429).json({
-      error: 'Trop de tentatives, réessayez dans ' + Math.ceil(retryAfterSec / 60) + ' min.'
+      error: 'Trop de tentatives, réessayez dans ' + Math.ceil(adminBlockedFor / 60) + ' min.'
     });
   }
 
@@ -43,13 +56,15 @@ module.exports = async function requireAdminOrBarber(req, res, next) {
 
   if (req.salon.owner_password_hash) {
     if (await verifyPassword(given, req.salon.owner_password_hash)) {
-      recordSuccess(rlKey);
+      recordSuccess(adminRlKey);
+      recordSuccess(pinRlKey);
       return next();
     }
   } else {
     const adminPw = (req.salon.owner_admin_password || '').replace(/[\r\n]+$/, '').trim();
     if (adminPw && timingSafeStringEqual(given, adminPw)) {
-      recordSuccess(rlKey);
+      recordSuccess(adminRlKey);
+      recordSuccess(pinRlKey);
       return next();
     }
   }
@@ -57,13 +72,22 @@ module.exports = async function requireAdminOrBarber(req, res, next) {
   const barberId = req.get('X-Barber-Id');
   const barberPin = req.get('X-Barber-Pin');
   if (barberId && barberPin) {
+    // Tentative PIN : bloquée uniquement si le compteur PIN de CE salon
+    // est lui-même au-delà du seuil (pas le compteur admin).
+    const pinBlockedFor = isBlocked(pinRlKey);
+    if (pinBlockedFor) {
+      res.set('Retry-After', String(pinBlockedFor));
+      return res.status(429).json({
+        error: 'Trop de tentatives, réessayez dans ' + Math.ceil(pinBlockedFor / 60) + ' min.'
+      });
+    }
     try {
       const [[barber]] = await pool.query(
         'SELECT id FROM barbers WHERE id = ? AND salon_id = ? AND pin_code = ? AND active = 1 LIMIT 1',
         [barberId, req.salon.id, barberPin]
       );
       if (barber) {
-        recordSuccess(rlKey);
+        recordSuccess(pinRlKey);
         req.barberId = barber.id;
         // Sélecteur par bulle (caisse partagée) : une fois qu'UN coiffeur
         // s'est authentifié par son propre code PIN (ci-dessus), la
@@ -94,8 +118,14 @@ module.exports = async function requireAdminOrBarber(req, res, next) {
     }
   }
 
-  // Ni mot de passe admin, ni couple id/PIN coiffeur valide : échec
-  // d'authentification, comptabilisé pour le blocage progressif.
-  recordFailure(rlKey);
+  // Ni mot de passe admin, ni couple id/PIN coiffeur valide. On nourrit
+  // le compteur du secret effectivement testé : un PIN fourni ne compte
+  // que pour le salon concerné (le blocage reste local à ce salon), un
+  // échec "mot de passe admin" seul compte pour l'enseigne.
+  if (barberId && barberPin) {
+    recordFailure(pinRlKey);
+  } else {
+    recordFailure(adminRlKey);
+  }
   return res.status(401).json({ error: 'Authentification requise' });
 };
