@@ -506,9 +506,9 @@ router.post('/loyalty-accounts/activate', requireAdminOrBarber, wrap(async (req,
   } else {
     try {
       await pool.query(
-        `INSERT INTO loyalty_accounts (id, salon_id, client_key, client_name, recipient_email, activated_at)
-         VALUES (UUID(), ?, ?, ?, ?, NOW())`,
-        [req.salon.id, key, clientName, email]
+        `INSERT INTO loyalty_accounts (id, owner_id, salon_id, client_key, client_name, recipient_email, activated_at)
+         VALUES (UUID(), ?, ?, ?, ?, ?, NOW())`,
+        [req.ownerId, req.salon.id, key, clientName, email]
       );
     } catch (err) {
       // Deux activations envoyées au même instant (double clic) peuvent
