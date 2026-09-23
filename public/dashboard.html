@@ -498,6 +498,25 @@
           display: flex; align-items: center; gap: 14px; box-shadow: var(--shadow); flex-wrap: wrap; transition: background .25s ease; }
   .item.off { opacity: .5; }
   #rdv-list .item, #clients-list .item { flex-wrap: nowrap; overflow-x: auto; }
+
+  /* ============ Liste "tableau" (RDV, Clients) - inspire d'un CRM :
+     un seul conteneur borde plutot que des cartes empilees, lignes
+     separees par un trait fin, survol en surbrillance. ============ */
+  .list-table-box {
+    border: 1px solid var(--sep); border-radius: 14px; overflow: hidden; background: var(--card);
+  }
+  .list-table-box .item {
+    background: none; border-radius: 0; box-shadow: none; margin-bottom: 0;
+    padding: 13px 18px; border-bottom: 1px solid var(--sep);
+  }
+  .list-table-box .item:last-child { border-bottom: none; }
+  .list-table-box .item:not(#rdv-list-head):hover { background: var(--fill); }
+  .list-table-box #rdv-list-head, .list-table-box > .item:first-child {
+    background: var(--fill); padding-top: 11px; padding-bottom: 11px;
+  }
+  .status-dot {
+    display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; flex-shrink: 0;
+  }
   #caisse-sales-detail .item, #caisse-closings-list .item {
     border-bottom: 1px solid var(--sep); border-radius: 0; box-shadow: none; background: none; padding: 14px 4px;
   }
@@ -1547,20 +1566,22 @@
         <input type="checkbox" id="rdv-select-all" onchange="toggleSelectAllRdv(this.checked)">
         Tout sélectionner
       </label>
-      <div class="item" id="rdv-list-head" style="border-radius:0;box-shadow:none;background:none;padding:0 4px;margin-bottom:0;flex-wrap:nowrap">
-        <input type="checkbox" class="rdv-check" style="margin-right:12px;flex-shrink:0;visibility:hidden" tabindex="-1" disabled>
-        <div class="item-main">
-          <div class="rdv-info-grid rdv-info-head" style="margin-top:0">
-            <div class="f">Nom</div><div class="f">Prestation</div><div class="f">Date</div>
-            <div class="f">Coiffeur</div><div class="f">Email</div><div class="f">Téléphone</div>
+      <div class="list-table-box">
+        <div class="item" id="rdv-list-head" style="border-radius:0;box-shadow:none;background:none;margin-bottom:0;flex-wrap:nowrap">
+          <input type="checkbox" class="rdv-check" style="margin-right:12px;flex-shrink:0;visibility:hidden" tabindex="-1" disabled>
+          <div class="item-main">
+            <div class="rdv-info-grid rdv-info-head" style="margin-top:0">
+              <div class="f">Nom</div><div class="f">Prestation</div><div class="f">Date</div>
+              <div class="f">Coiffeur</div><div class="f">Email</div><div class="f">Téléphone</div>
+            </div>
+          </div>
+          <div class="item-actions" style="display:flex;align-items:center;gap:12px;visibility:hidden">
+            <button class="btn btn-soft" style="padding:6px 10px;font-size:13px" tabindex="-1">Déplacer</button>
+            <button class="btn btn-ghost" style="padding:6px 10px;font-size:13px" tabindex="-1">Annuler</button>
           </div>
         </div>
-        <div class="item-actions" style="display:flex;align-items:center;gap:12px;visibility:hidden">
-          <button class="btn btn-soft" style="padding:6px 10px;font-size:13px" tabindex="-1">Déplacer</button>
-          <button class="btn btn-ghost" style="padding:6px 10px;font-size:13px" tabindex="-1">Annuler</button>
-        </div>
+        <div id="rdv-list"></div>
       </div>
-      <div id="rdv-list"></div>
       <div class="clients-pagination" id="rdv-pagination"></div>
     </div>
   </div>
@@ -1615,14 +1636,21 @@
       <input type="checkbox" id="clients-select-all" onchange="toggleSelectAllClients(this.checked)">
       Tout sélectionner
     </label>
-    <div class="item" style="background:none;box-shadow:none;border-radius:0;padding:0 18px;margin-bottom:0;flex-wrap:nowrap">
-      <input type="checkbox" class="client-check" style="visibility:hidden" tabindex="-1" disabled>
-      <div class="client-info-grid client-info-head" style="margin-top:0">
-        <div class="f">Nom</div><div class="f">Prestation</div><div class="f">Date</div>
-        <div class="f">Email</div><div class="f">Prix</div><div class="f">Durée</div>
+    <div class="list-table-box">
+      <div class="item" style="background:none;box-shadow:none;border-radius:0;margin-bottom:0;flex-wrap:nowrap">
+        <input type="checkbox" class="client-check" style="visibility:hidden" tabindex="-1" disabled>
+        <div class="item-main">
+          <div class="client-info-grid client-info-head" style="margin-top:0">
+            <div class="f">Nom</div><div class="f">Prestation</div><div class="f">Date</div>
+            <div class="f">Email</div><div class="f">Prix</div><div class="f">Durée</div>
+          </div>
+        </div>
+        <div class="item-actions" style="visibility:hidden">
+          <button class="btn btn-ghost" tabindex="-1">Supprimer</button>
+        </div>
       </div>
+      <div id="clients-list"></div>
     </div>
-    <div id="clients-list"></div>
     <div class="clients-pagination" id="clients-pagination"></div>
   </div>
 
@@ -5280,7 +5308,9 @@ function renderRdvList() {
         // Chip de statut collé au nom (même présentation que la liste
         // Clients) - la grille n'a plus de colonne Statut dédiée, la
         // ligne reste compacte et alignée sur l'en-tête.
-        var statusChip = '<span class="chip" style="color:' + (statusColors[a.display_status] || 'var(--grey)') + '">' + (statusLabels[a.display_status] || a.display_status) + '</span>';
+        var statusChip = '<span style="color:' + (statusColors[a.display_status] || 'var(--grey)') + ';font-size:12.5px;font-weight:500;margin-left:8px">' +
+          '<span class="status-dot" style="background:' + (statusColors[a.display_status] || 'var(--grey)') + '"></span>' +
+          (statusLabels[a.display_status] || a.display_status) + '</span>';
 
         var infoGrid = [
           '<div class="f"><b>' + esc(a.client_name) + '</b>' + statusChip + '</div>',
@@ -5916,7 +5946,8 @@ function renderClients() {
         actions += '<button class="btn btn-ghost" onclick="deleteClient(\'' + c.id + '\')">Supprimer</button>';
 
         var nameCell = '<b>' + esc(c.client_name) + '</b>' +
-          ' <span class="chip' + (c.status === 'in_progress' ? ' main' : '') + '" style="margin-left:4px;font-size:10.5px;color:' + (STATUS_COLOR[c.status] || 'var(--grey)') + '">' +
+          ' <span style="margin-left:6px;font-size:12.5px;font-weight:500;color:' + (STATUS_COLOR[c.status] || 'var(--grey)') + '">' +
+          '<span class="status-dot" style="background:' + (STATUS_COLOR[c.status] || 'var(--grey)') + '"></span>' +
           esc(STATUS_LABEL[c.status] || c.status) + '</span>' +
           (stuck ? ' <span class="chip" style="background:var(--orange);color:#fff;font-size:10.5px">bloqué</span>' : '');
 
