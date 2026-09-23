@@ -5283,7 +5283,7 @@ function renderRdvList() {
           '<div class="f"><b>' + esc(a.barber_name || 'Premier disponible') + '</b></div>',
           '<div class="f"><b>' + esc(a.email || '—') + '</b></div>',
           '<div class="f"><b>' + esc(a.phone || '—') + '</b></div>',
-          '<div class="f"><b style="color:' + (statusColors[a.display_status] || 'var(--grey)') + '">' + (statusLabels[a.display_status] || a.display_status) + '</b></div>'
+          '<div class="f"><span class="chip" style="color:' + (statusColors[a.display_status] || 'var(--grey)') + '">' + (statusLabels[a.display_status] || a.display_status) + '</span></div>'
         ].join('');
 
         // Les boutons d'action sont toujours rendus (mêmes classes, même
