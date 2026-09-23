@@ -1,4 +1,5 @@
 const mysql = require('mysql2/promise');
+const { encryptSecret, decryptSecret } = require('./lib/secretBox');
 
 // xCloud a tendance à réécrire le .env avec des fins de ligne Windows (\r\n)
 // et laisse parfois un \r collé à la fin des valeurs — ce qui casse la
@@ -116,11 +117,17 @@ function parisLocalToUtcDate(dateStr, timeStr, tz) {
   return new Date(guess.getTime() - offsetMs);
 }
 
-// Lecture / écriture de la table settings (clé -> valeur), par salon
+// Lecture / écriture de la table settings (clé -> valeur), par salon.
+// Les secrets (smtp_pass) sont déchiffrés à la lecture et chiffrés à
+// l'écriture - en base, la valeur n'est jamais un mot de passe en clair
+// (voir lib/secretBox.js ; les valeurs legacy antérieures au chiffrement
+// restent lisibles et seront re-chiffrées à leur prochaine réécriture).
+const SECRET_SETTING_KEYS = new Set(['smtp_pass']);
+
 async function getSettings(salonId) {
   const [rows] = await pool.query('SELECT `key`, value FROM settings WHERE salon_id = ?', [salonId]);
   const out = {};
-  rows.forEach((r) => { out[r.key] = r.value; });
+  rows.forEach((r) => { out[r.key] = SECRET_SETTING_KEYS.has(r.key) ? decryptSecret(r.value) : r.value; });
   return out;
 }
 
@@ -129,7 +136,12 @@ async function setSettings(salonId, obj) {
   if (!entries.length) return;
   const placeholders = entries.map(() => '(?, ?, ?, NOW())').join(', ');
   const params = [];
-  entries.forEach(([k, v]) => { params.push(salonId, k, v == null ? '' : String(v)); });
+  entries.forEach(([k, v]) => {
+    const str = v == null ? '' : String(v);
+    // '' signifie "champ laissé vide = conserver l'ancien" côté réglages :
+    // ne jamais écraser le secret existant par une valeur vide chiffrée.
+    params.push(salonId, k, SECRET_SETTING_KEYS.has(k) && str !== '' ? encryptSecret(str) : str);
+  });
   await pool.query(
     `INSERT INTO settings (salon_id, \`key\`, value, updated_at) VALUES ${placeholders}
      ON DUPLICATE KEY UPDATE value = VALUES(value), updated_at = VALUES(updated_at)`,
@@ -161,11 +173,12 @@ async function setOwnerSettings(ownerId, obj) {
 }
 
 // Réglages globaux de la plateforme (pas liés à un salon), ex: SMTP
-// utilisé pour les emails de la plateforme elle-même.
+// utilisé pour les emails de la plateforme elle-même. smtp_pass y est
+// stocké chiffré, comme dans les réglages par salon ci-dessus.
 async function getPlatformSettings() {
   const [rows] = await pool.query('SELECT `key`, value FROM platform_settings');
   const out = {};
-  rows.forEach((r) => { out[r.key] = r.value; });
+  rows.forEach((r) => { out[r.key] = r.key === 'smtp_pass' ? decryptSecret(r.value) : r.value; });
   return out;
 }
 
@@ -174,7 +187,10 @@ async function setPlatformSettings(obj) {
   if (!entries.length) return;
   const placeholders = entries.map(() => '(?, ?, NOW())').join(', ');
   const params = [];
-  entries.forEach(([k, v]) => { params.push(k, v == null ? '' : String(v)); });
+  entries.forEach(([k, v]) => {
+    const str = v == null ? '' : String(v);
+    params.push(k, k === 'smtp_pass' && str !== '' ? encryptSecret(str) : str);
+  });
   await pool.query(
     `INSERT INTO platform_settings (\`key\`, value, updated_at) VALUES ${placeholders}
      ON DUPLICATE KEY UPDATE value = VALUES(value), updated_at = VALUES(updated_at)`,

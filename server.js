@@ -35,6 +35,7 @@ const tpeRoutes = require('./src/routes/tpe');
 const requireAdmin = require('./src/middleware/auth');
 const resolveSalon = require('./src/middleware/resolveSalon');
 const { startNotifyJob } = require('./src/cron/notify');
+const { startPurgeJob } = require('./src/cron/purge');
 const { loginRateLimiter } = require('./src/middleware/rateLimiter');
 
 const app = express();
@@ -122,4 +123,5 @@ app.get('/', (req, res) => res.redirect('/dashboard.html'));
 app.listen(PORT, () => {
   console.log('Serveur démarré sur le port ' + PORT);
   startNotifyJob();
+  startPurgeJob();
 });
