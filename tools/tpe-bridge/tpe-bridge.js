@@ -217,9 +217,11 @@ const path = require('path');
  * dialogue : on écrit un fichier temporaire et on le soumet à `lp`.
  * Deux modes :
  *  - "escpos"  (défaut) : l'imprimante est une thermique 58/80 mm ;
- *    on lui envoie du texte brut + commande de découpe. `lp -o raw`
- *    est requis (file "raw" activée par défaut sur la plupart des
- *    pilotes thermiques).
+ *    le texte est transcodé en CP850 (jeu de caractères ESC/POS
+ *    européen, avec le signe €) et précédé de la commande ESC t 11 qui
+ *    sélectionne la table CP850 dans l'imprimante. `lp -o raw` est
+ *    requis (file "raw" activée par défaut sur la plupart des pilotes
+ *    thermiques).
  *  - "text" : imprimante classique (A4...) - lp rendra le texte
  *    proprement avec ses filtres standards.
  * printer : nom CUPS (ex. "EPSON_TM-T20III"). Vide = imprimante par
@@ -227,10 +229,53 @@ const path = require('path');
  * Le retour contient l'identifiant de job CUPS (ex. "EPSON-123") pour
  * tracer l'impression.
  */
+
+// Table CP850 (Europe de l'Ouest) : jeu de caractères standard des
+// imprimantes thermiques ESC/POS. L'UTF-8 envoyé tel quel s'imprime en
+// hiéroglyphes (€ -> "Ré‡", è -> "‡") car l'imprimante attend du CP850.
+const UTF8_TO_CP850 = {
+  '€': '\x80', 'à': '\x85', 'è': '\x8A', 'é': '\x82', 'ê': '\x88',
+  'ë': '\x89', 'ï': '\x8B', 'î': '\x8C', 'ô': '\x93', 'ö': '\x94',
+  'ù': '\x97', 'û': '\x96', 'ü': '\x81', 'ç': '\x87', 'Ç': '\x80',
+  'À': '\xB7', 'È': '\xD4', 'É': '\x90', 'Ê': '\xD2', 'Ë': '\xD3',
+  'Î': '\xD7', 'Ï': '\xD8', 'Ô': '\xE2', 'Ö': '\x99', 'Ù': '\xEB',
+  'Û': '\xEA', 'Ü': '\x9A', '°': '\xF8', '±': '\xF1', '£': '\x9C',
+  '§': '\xA7', '×': '\x9D', '÷': '\xF6', '«': '\xAE', '»': '\xAF',
+  'α': '\xE0', 'ß': '\xE1', 'Γ': '\xE2', 'π': '\xE3', 'Σ': '\xE4',
+  'σ': '\xE5', 'µ': '\xE6', 'τ': '\xE7', 'Φ': '\xE8', 'Θ': '\xE9',
+  'Ω': '\xEA', 'δ': '\xEB', '∞': '\xEC', 'φ': '\xED', 'ε': '\xEE',
+  '∩': '\xEF', '≡': '\xF0', '≥': '\xF2', '≤': '\xF3', '⌠': '\xF4',
+  '⌡': '\xF5', '≈': '\xF7', '√': '\xFB', 'ⁿ': '\xFC', '²': '\xFD'
+};
+
+/** Transcode une chaîne UTF-8 vers une chaîne CP850 (octets 1:1). */
+function toCp850(text) {
+  let out = '';
+  for (const ch of text) {
+    if (UTF8_TO_CP850[ch] !== undefined) out += UTF8_TO_CP850[ch];
+    else if (ch.charCodeAt(0) < 128) out += ch;   // ASCII : identique
+    else out += '?';                               // caractère hors CP850
+  }
+  return out;
+}
+
 function printTicket(text, printer, mode) {
   return new Promise((resolve, reject) => {
-    const tmpFile = path.join(os.tmpdir(), 'ticket-' + Date.now() + '.txt');
-    fs.writeFile(tmpFile, text, 'utf8', (err) => {
+    // En mode escpos : transcodage CP850 + sélection de la table de
+    // caractères ESC t 11 (CP850) en tête de flux, puis découpe
+    // automatique (GS V 66 0) en pied.
+    const content = mode === 'escpos'
+      ? Buffer.concat([
+          Buffer.from('\x1B\x40', 'ascii'),                 // ESC @ : reset
+          Buffer.from('\x1B\x74\x11', 'ascii'),             // ESC t 11 -> table CP850
+          Buffer.from(toCp850(text), 'binary'),
+          Buffer.from('\n\n\n', 'ascii'),
+          Buffer.from('\x1D\x56\x42\x00', 'ascii')          // GS V 66 0 : découpe
+        ])
+      : Buffer.from(text, 'utf8');
+
+    const tmpFile = path.join(os.tmpdir(), 'ticket-' + Date.now() + '.bin');
+    fs.writeFile(tmpFile, content, (err) => {
       if (err) return reject(new Error('Écriture du ticket impossible : ' + err.message));
 
       const args = [];
