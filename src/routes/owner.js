@@ -618,10 +618,16 @@ router.get('/caisse/current-period', requireAdmin, wrap(async (req, res) => {
 
 /**
  * Cloture la periode ouverte actuelle - fige les chiffres dans
- * cash_closings. Admin uniquement (jamais accessible depuis la caisse
- * elle-meme, authentifiee par PIN coiffeur).
+ * cash_closings. Accessible a l'admin ET aux coiffeurs connectes par
+ * PIN (une seule caisse partagee par tout le salon - n'importe quel
+ * coiffeur en service peut la cloturer, pas seulement l'admin).
  */
-router.post('/caisse/close', requireAdmin, wrap(async (req, res) => {
+router.post('/caisse/close', requireAdminOrBarber, wrap(async (req, res) => {
+  const startingCashCents = Math.round(Number(req.body.starting_cash_cents));
+  if (!Number.isFinite(startingCashCents) || startingCashCents < 0) {
+    return res.status(400).json({ error: 'Le fond de caisse doit être renseigné (montant en euros, 0 ou plus).' });
+  }
+
   const [[lastClosing]] = await pool.query(
     'SELECT period_end FROM cash_closings WHERE salon_id = ? ORDER BY period_end DESC LIMIT 1',
     [req.salon.id]
@@ -654,19 +660,33 @@ router.post('/caisse/close', requireAdmin, wrap(async (req, res) => {
   const zNumber = maxZ + 1;
 
   await pool.query(
-    `INSERT INTO cash_closings (id, salon_id, period_start, period_end, total_cents, sales_count, breakdown_json, z_number)
-     VALUES (?, ?, ?, NOW(), ?, ?, ?, ?)`,
-    [id, req.salon.id, periodStart, total, sales.length, JSON.stringify(byMethod), zNumber]
+    `INSERT INTO cash_closings (id, salon_id, period_start, period_end, total_cents, sales_count, breakdown_json, z_number, starting_cash_cents)
+     VALUES (?, ?, ?, NOW(), ?, ?, ?, ?, ?)`,
+    [id, req.salon.id, periodStart, total, sales.length, JSON.stringify(byMethod), zNumber, startingCashCents]
   );
 
-  logActivity(req.salon.id, 'cash_closing', 'Clôture de caisse Z' + zNumber + ' (' + sales.length + ' vente' + (sales.length > 1 ? 's' : '') + ', ' + (total / 100).toFixed(2) + ' €)');
+  const actorLabel = req.barberId ? 'coiffeur' : 'admin';
+  logActivity(req.salon.id, 'cash_closing', 'Clôture de caisse Z' + zNumber + ' (' + sales.length + ' vente' + (sales.length > 1 ? 's' : '') + ', ' + (total / 100).toFixed(2) + ' €, ' + actorLabel + ')');
   res.json({ ok: true, id, z_number: zNumber, total_cents: total, sales_count: sales.length });
+}));
+
+/**
+ * Fond de caisse suggere pour la prochaine cloture : celui de la
+ * derniere cloture (il reste physiquement dans le tiroir, donc reste
+ * le meme sauf si quelqu'un le corrige manuellement).
+ */
+router.get('/caisse/suggested-float', requireAdminOrBarber, wrap(async (req, res) => {
+  const [[lastClosing]] = await pool.query(
+    'SELECT starting_cash_cents FROM cash_closings WHERE salon_id = ? ORDER BY period_end DESC LIMIT 1',
+    [req.salon.id]
+  );
+  res.json({ ok: true, starting_cash_cents: lastClosing ? lastClosing.starting_cash_cents : 0 });
 }));
 
 /**
  * Historique des clotures precedentes.
  */
-router.get('/caisse/closings', requireAdmin, wrap(async (req, res) => {
+router.get('/caisse/closings', requireAdminOrBarber, wrap(async (req, res) => {
   const conditions = ['salon_id = ?'];
   const params = [req.salon.id];
   if (req.query.date_from) { conditions.push('period_end >= ?'); params.push(req.query.date_from + ' 00:00:00'); }
@@ -700,7 +720,7 @@ router.get('/caisse/closings', requireAdmin, wrap(async (req, res) => {
  * incluse) - exigé par la réglementation française sur les logiciels de
  * caisse pour permettre la réconciliation lors d'un contrôle fiscal.
  */
-router.get('/caisse/closings/:id', requireAdmin, wrap(async (req, res) => {
+router.get('/caisse/closings/:id', requireAdminOrBarber, wrap(async (req, res) => {
   const [[row]] = await pool.query(
     'SELECT * FROM cash_closings WHERE id = ? AND salon_id = ?',
     [req.params.id, req.salon.id]
@@ -724,6 +744,7 @@ router.get('/caisse/closings/:id', requireAdmin, wrap(async (req, res) => {
     total_cents: row.total_cents,
     sales_count: row.sales_count,
     breakdown,
+    starting_cash_cents: row.starting_cash_cents,
     grand_total_cents: Number(grandTotal)
   });
 }));

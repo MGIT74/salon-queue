@@ -498,6 +498,33 @@
     }
     .receipt-actions { display: none; }
   }
+
+  /* --- Ticket Z (clôture de caisse imprimable) - identique a dashboard.html --- */
+  .z-overlay {
+    display: none; position: fixed; inset: 0; z-index: 400; background: rgba(0,0,0,.5);
+    align-items: center; justify-content: center; padding: 20px;
+  }
+  .z-overlay.on { display: flex; }
+  .z-box { background: #fff; color: #111; border-radius: 14px; padding: 26px; max-width: 360px; width: 100%; font-family: 'Courier New', monospace; }
+  .z-box h2 { font-size: 16px; text-align: center; margin: 0 0 2px; }
+  .z-box .z-num { text-align: center; font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+  .z-box .sub { text-align: center; font-size: 12px; color: #666; margin-bottom: 16px; }
+  .z-box .zline { display: flex; justify-content: space-between; font-size: 13px; padding: 3px 0; }
+  .z-box .zline.total { border-top: 1px dashed #999; margin-top: 8px; padding-top: 8px; font-weight: 700; font-size: 14px; }
+  .z-box .zline.grand { font-weight: 700; margin-top: 4px; }
+  .z-box .zsection-label { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: #888; margin: 14px 0 4px; }
+  .z-actions { display: flex; gap: 8px; margin-top: 18px; }
+  .z-actions .btn { flex: 1; }
+  @media print {
+    @page { size: 80mm auto; margin: 0; }
+    body * { visibility: hidden; }
+    .z-box, .z-box * { visibility: visible; }
+    .z-box {
+      position: fixed; top: 0; left: 0; width: 80mm; max-width: none;
+      box-shadow: none; border-radius: 0; padding: 4mm; font-size: 12px;
+    }
+    .z-actions { display: none; }
+  }
 </style>
 </head>
 <body>
@@ -640,10 +667,18 @@
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M2 11h20M9 15h6"/></svg>
           Ouvrir la caisse
         </button>
+        <button class="drawer-btn" onclick="startCaisseClosing()" style="margin-top:8px">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg>
+          Clôturer la caisse (ticket Z)
+        </button>
       </div>
     </div>
     </div>
   </div>
+</div>
+
+<div class="z-overlay" id="z-overlay">
+  <div class="z-box" id="z-box"></div>
 </div>
 
 <div class="caisse-footer" id="caisse-footer" style="display:none">
@@ -1981,6 +2016,86 @@ function loadMarketingSettings() {
   barberApi('/api/owner/marketing-settings').then(function (r) {
     marketingSettings = r.settings;
   }).catch(function () {});
+}
+
+function startCaisseClosing() {
+  Promise.all([
+    barberApi('/api/owner/caisse/current-period'),
+    barberApi('/api/owner/caisse/suggested-float')
+  ]).then(function (results) {
+    var r = results[0];
+    var suggestedFloat = results[1].starting_cash_cents;
+    if (r.sales_count === 0) { toast('Aucune vente à clôturer sur cette période', true); return; }
+
+    var floatInput = window.prompt(
+      'Fond de caisse actuellement dans le tiroir (en euros) — cet argent reste en caisse, il ne fait pas partie des ventes :',
+      (suggestedFloat / 100).toFixed(2)
+    );
+    if (floatInput === null) return;
+    var floatCents = Math.round(parseFloat(floatInput.replace(',', '.')) * 100);
+    if (!Number.isFinite(floatCents) || floatCents < 0) { toast('Montant du fond de caisse invalide', true); return; }
+
+    showConfirm(
+      'Clôturer la caisse pour ' + eur(r.total_cents) + ' (' + r.sales_count + ' vente' + (r.sales_count > 1 ? 's' : '') + ') ? Fond de caisse : ' + eur(floatCents) + '.',
+      { title: '1/2 — Confirmer la clôture' }
+    ).then(function (ok1) {
+      if (!ok1) return;
+      showConfirm(
+        'Cette action est définitive et ne peut pas être annulée. Confirmez une seconde fois pour valider.',
+        { title: '2/2 — Dernière confirmation', danger: true, confirmLabel: 'Clôturer définitivement' }
+      ).then(function (ok2) {
+        if (!ok2) return;
+        barberApi('/api/owner/caisse/close', { method: 'POST', body: { starting_cash_cents: floatCents } })
+          .then(function (r2) { printZTicket(r2.id); })
+          .catch(function (e) { toast(e.message, true); });
+      });
+    });
+  }).catch(function (e) { toast(e.message, true); });
+}
+
+var ZTICKET_METHOD_LABELS = { especes: 'Espèces', cb: 'Carte bancaire', autre: 'Autre' };
+
+function printZTicket(id) {
+  barberApi('/api/owner/caisse/closings/' + id).then(function (r) {
+    var salonName = (document.getElementById('salon-name-tag') && document.getElementById('salon-name-tag').textContent) || 'Salon';
+    var periodEndTxt = new Date(r.period_end).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' });
+    var periodStartTxt = r.period_start
+      ? new Date(r.period_start).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })
+      : 'Mise en service';
+
+    var breakdownHtml = Object.keys(r.breakdown).map(function (m) {
+      return '<div class="zline"><span>' + esc(ZTICKET_METHOD_LABELS[m] || m) + '</span><span>' + eur(r.breakdown[m]) + '</span></div>';
+    }).join('');
+
+    var cashSalesCents = r.breakdown.especes || 0;
+    var expectedInDrawer = (r.starting_cash_cents || 0) + cashSalesCents;
+
+    var html =
+      '<h2>' + esc(salonName) + '</h2>' +
+      '<div class="z-num">CLÔTURE Z' + String(r.z_number).padStart(3, '0') + '</div>' +
+      '<div class="sub">Du ' + esc(periodStartTxt) + '<br>au ' + esc(periodEndTxt) + '</div>' +
+      '<div class="zsection-label">Détail par mode de paiement</div>' +
+      (breakdownHtml || '<div class="zline"><span>Aucun détail</span></div>') +
+      '<div class="zline total"><span>Total (' + r.sales_count + ' vente' + (r.sales_count > 1 ? 's' : '') + ')</span><span>' + eur(r.total_cents) + '</span></div>' +
+      '<div class="zsection-label">Fond de caisse</div>' +
+      '<div class="zline"><span>Fond de caisse (reste en caisse)</span><span>' + eur(r.starting_cash_cents || 0) + '</span></div>' +
+      '<div class="zline"><span>+ Ventes en espèces</span><span>' + eur(cashSalesCents) + '</span></div>' +
+      '<div class="zline total"><span>= Espèces attendues dans le tiroir</span><span>' + eur(expectedInDrawer) + '</span></div>' +
+      '<div class="zsection-label">Cumul depuis la mise en service</div>' +
+      '<div class="zline grand"><span>Grand total perpétuel</span><span>' + eur(r.grand_total_cents) + '</span></div>' +
+      '<div class="z-actions">' +
+        '<button class="btn btn-soft" onclick="closeZTicket()">Fermer</button>' +
+        '<button class="btn btn-primary" onclick="window.print()">Imprimer</button>' +
+      '</div>';
+
+    document.getElementById('z-box').innerHTML = html;
+    document.getElementById('z-overlay').classList.add('on');
+    loadPendingPayments();
+  }).catch(function (e) { toast(e.message, true); });
+}
+
+function closeZTicket() {
+  document.getElementById('z-overlay').classList.remove('on');
 }
 
 function forceOpenCaisse() {

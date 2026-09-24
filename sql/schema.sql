@@ -905,3 +905,12 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'queue' AND column_name = 'gift_card_id');
 SET @sql := IF(@c = 0, "ALTER TABLE queue ADD COLUMN gift_card_id CHAR(36) NULL", 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Fond de caisse (argent liquide de depart dans le tiroir, sert a
+-- rendre la monnaie) declare a chaque cloture - ne fait PAS partie du
+-- chiffre d'affaires et reste physiquement dans le tiroir apres la
+-- cloture (seules les ventes du jour sont retirees/comptees a part).
+-- Un seul fond de caisse pour tout le salon (pas par coiffeur).
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'cash_closings' AND column_name = 'starting_cash_cents');
+SET @sql := IF(@c = 0, "ALTER TABLE cash_closings ADD COLUMN starting_cash_cents INT NOT NULL DEFAULT 0", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;

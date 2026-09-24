@@ -5608,6 +5608,9 @@ function printZTicket(id) {
       return '<div class="zline"><span>' + esc(ZTICKET_METHOD_LABELS[m] || m) + '</span><span>' + eur(r.breakdown[m]) + '</span></div>';
     }).join('');
 
+    var cashSalesCents = r.breakdown.especes || 0;
+    var expectedInDrawer = (r.starting_cash_cents || 0) + cashSalesCents;
+
     var html =
       '<h2>' + esc(salonName) + '</h2>' +
       '<div class="z-num">CLÔTURE Z' + String(r.z_number).padStart(3, '0') + '</div>' +
@@ -5615,6 +5618,10 @@ function printZTicket(id) {
       '<div class="zsection-label">Détail par mode de paiement</div>' +
       (breakdownHtml || '<div class="zline"><span>Aucun détail</span></div>') +
       '<div class="zline total"><span>Total (' + r.sales_count + ' vente' + (r.sales_count > 1 ? 's' : '') + ')</span><span>' + eur(r.total_cents) + '</span></div>' +
+      '<div class="zsection-label">Fond de caisse</div>' +
+      '<div class="zline"><span>Fond de caisse (reste en caisse)</span><span>' + eur(r.starting_cash_cents || 0) + '</span></div>' +
+      '<div class="zline"><span>+ Ventes en espèces</span><span>' + eur(cashSalesCents) + '</span></div>' +
+      '<div class="zline total"><span>= Espèces attendues dans le tiroir</span><span>' + eur(expectedInDrawer) + '</span></div>' +
       '<div class="zsection-label">Cumul depuis la mise en service</div>' +
       '<div class="zline grand"><span>Grand total perpétuel</span><span>' + eur(r.grand_total_cents) + '</span></div>' +
       '<div class="z-actions">' +
@@ -5691,12 +5698,30 @@ function loadCaisseTab() {
 }
 
 // Double validation demandée explicitement, pour eviter une cloture
-// par erreur (action definitive, ne peut pas etre annulee).
+// par erreur (action definitive, ne peut pas etre annulee). Le fond de
+// caisse (argent liquide de depart, hors chiffre d'affaires) doit etre
+// renseigne avant de cloturer - pre-rempli avec celui de la derniere
+// cloture, puisqu'il reste physiquement dans le tiroir d'une fois sur
+// l'autre.
 function startCaisseClosing() {
-  api('/api/owner/caisse/current-period').then(function (r) {
+  Promise.all([
+    api('/api/owner/caisse/current-period'),
+    api('/api/owner/caisse/suggested-float')
+  ]).then(function (results) {
+    var r = results[0];
+    var suggestedFloat = results[1].starting_cash_cents;
     if (r.sales_count === 0) { toast('Aucune vente à clôturer sur cette période', true); return; }
+
+    var floatInput = window.prompt(
+      'Fond de caisse actuellement dans le tiroir (en euros) — cet argent reste en caisse, il ne fait pas partie des ventes :',
+      (suggestedFloat / 100).toFixed(2)
+    );
+    if (floatInput === null) return;
+    var floatCents = Math.round(parseFloat(floatInput.replace(',', '.')) * 100);
+    if (!Number.isFinite(floatCents) || floatCents < 0) { toast('Montant du fond de caisse invalide', true); return; }
+
     showConfirm(
-      'Clôturer la caisse pour ' + eur(r.total_cents) + ' (' + r.sales_count + ' vente' + (r.sales_count > 1 ? 's' : '') + ') ?',
+      'Clôturer la caisse pour ' + eur(r.total_cents) + ' (' + r.sales_count + ' vente' + (r.sales_count > 1 ? 's' : '') + ') ? Fond de caisse : ' + eur(floatCents) + '.',
       { title: '1/2 — Confirmer la clôture' }
     ).then(function (ok1) {
       if (!ok1) return;
@@ -5705,7 +5730,7 @@ function startCaisseClosing() {
         { title: '2/2 — Dernière confirmation', danger: true, confirmLabel: 'Clôturer définitivement' }
       ).then(function (ok2) {
         if (!ok2) return;
-        api('/api/owner/caisse/close', { method: 'POST', body: {} })
+        api('/api/owner/caisse/close', { method: 'POST', body: { starting_cash_cents: floatCents } })
           .then(function () { toast('Caisse clôturée'); loadCaisseTab(); })
           .catch(function (e) { toast(e.message, true); });
       });
