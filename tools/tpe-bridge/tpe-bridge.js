@@ -261,18 +261,28 @@ function toCp850(text) {
 
 function printTicket(text, printer, mode) {
   return new Promise((resolve, reject) => {
-    // En mode escpos : transcodage CP850 + sélection de la table de
-    // caractères ESC t 11 (CP850) en tête de flux, puis découpe
-    // automatique (GS V 66 0) en pied.
-    const content = mode === 'escpos'
-      ? Buffer.concat([
-          Buffer.from('\x1B\x40', 'ascii'),                 // ESC @ : reset
-          Buffer.from('\x1B\x74\x11', 'ascii'),             // ESC t 11 -> table CP850
-          Buffer.from(toCp850(text), 'binary'),
-          Buffer.from('\n\n\n', 'ascii'),
-          Buffer.from('\x1D\x56\x42\x00', 'ascii')          // GS V 66 0 : découpe
-        ])
-      : Buffer.from(text, 'utf8');
+    let content, useRaw;
+    if (mode === 'drawer') {
+      // Commande ESC/POS brute (ouverture de tiroir) : les octets du
+      // texte sont déjà la commande complète (ESC p...) - aucun
+      // transcodage, aucune découpe, rien à ajouter. Envoi raw obligatoire.
+      content = Buffer.from(text, 'binary');
+      useRaw = true;
+    } else if (mode === 'escpos') {
+      // Transcodage CP850 + sélection de la table de caractères ESC t 11
+      // (CP850) en tête de flux, puis découpe automatique (GS V 66 0) en pied.
+      content = Buffer.concat([
+        Buffer.from('\x1B\x40', 'ascii'),                 // ESC @ : reset
+        Buffer.from('\x1B\x74\x11', 'ascii'),             // ESC t 11 -> table CP850
+        Buffer.from(toCp850(text), 'binary'),
+        Buffer.from('\n\n\n', 'ascii'),
+        Buffer.from('\x1D\x56\x42\x00', 'ascii')          // GS V 66 0 : découpe
+      ]);
+      useRaw = true;
+    } else {
+      content = Buffer.from(text, 'utf8');
+      useRaw = false;
+    }
 
     const tmpFile = path.join(os.tmpdir(), 'ticket-' + Date.now() + '.bin');
     fs.writeFile(tmpFile, content, (err) => {
@@ -280,8 +290,8 @@ function printTicket(text, printer, mode) {
 
       const args = [];
       if (printer) args.push('-d', printer);
-      if (mode === 'escpos') args.push('-o', 'raw');
-      args.push('-t', 'Ticket-caisse');
+      if (useRaw) args.push('-o', 'raw');
+      args.push('-t', mode === 'drawer' ? 'Ouverture-tiroir' : 'Ticket-caisse');
       args.push(tmpFile);
 
       execFile('lp', args, { timeout: 15000 }, (err2, stdout, stderr) => {

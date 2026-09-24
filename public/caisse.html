@@ -3344,19 +3344,30 @@ function reprintSale(index) {
 }
 
 // Ouvre le tiroir-caisse sans passer par une vente (pour rendre la
-// monnaie, déposer/retirer de l'argent, etc). Techniquement, on ne peut
-// pas envoyer l'ordre d'ouverture directement à l'imprimante depuis une
-// page web - on déclenche donc une impression minimale, qui ouvre le
-// tiroir si l'imprimante est configurée pour ça (réglage du pilote), au
-// prix d'un tout petit bout de papier qui avance.
+// monnaie, déposer/retirer de l'argent, etc). Avec le pont d'impression,
+// on lui envoie la commande ESC/POS dédiée (ESC p : impulsion 12 V sur
+// la broche tiroir de l'imprimante) — silencieux, sans dialogue ni
+// papier. Sans pont, repli historique : impression d'un mini-bout de
+// papier via le dialogue, qui ouvre le tiroir si le pilote l'y est
+// configuré.
 function openCashDrawer() {
   toast('Ouverture du tiroir…');
-  document.getElementById('receipt-box').innerHTML = '<div style="height:1mm"></div>';
-  document.getElementById('receipt-overlay').classList.add('on');
-  setTimeout(function () {
-    window.print();
-    setTimeout(closeReceipt, 300);
-  }, 50);
+  if (!tpeBridgeUrl) {
+    document.getElementById('receipt-box').innerHTML = '<div style="height:1mm"></div>';
+    document.getElementById('receipt-overlay').classList.add('on');
+    setTimeout(function () {
+      window.print();
+      setTimeout(closeReceipt, 300);
+    }, 50);
+    return;
+  }
+  // ESC p 0 25 250 : impulsion broche 2, 25 ms on / 250 ms off (standard ESC/POS)
+  barberApi('/api/tpe/print', {
+    method: 'POST',
+    body: { text: '\x1B\x70\x00\x19\xFA', mode: 'drawer' }
+  })
+    .then(function (d) { if (d.ok) toast('Tiroir ouvert'); })
+    .catch(function (e) { toast('Tiroir impossible : ' + e.message, true); });
 }
 </script>
 </body>

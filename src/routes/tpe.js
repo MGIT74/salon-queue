@@ -107,7 +107,10 @@ router.post('/charge', requireAdminOrBarber, wrap(async (req, res) => {
  */
 router.post('/print', requireAdminOrBarber, wrap(async (req, res) => {
   const text = typeof req.body.text === 'string' ? req.body.text : '';
-  const mode = req.body.mode === 'text' ? 'text' : 'escpos';
+  // 'escpos' : ticket avec transcodage CP850 + découpe | 'drawer' :
+  // commande ESC/POS brute d'ouverture de tiroir | 'text' : imprimante
+  // classique via filtres CUPS.
+  const mode = ['escpos', 'drawer', 'text'].includes(req.body.mode) ? req.body.mode : 'escpos';
   if (!text.trim()) return res.status(400).json({ error: 'Ticket vide' });
   if (text.length > 50_000) return res.status(400).json({ error: 'Ticket trop long' });
 
