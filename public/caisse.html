@@ -699,7 +699,8 @@
       </button>
 
       <h3 style="margin:28px 0 4px">Historique des clôtures</h3>
-      <div id="cloture-history-list"></div>
+      <p class="hint" style="margin:0 0 10px">7 derniers jours. L'historique complet reste consultable depuis le Dashboard admin (menu Caisse).</p>
+      <div id="cloture-history-list" style="max-height:340px;overflow-y:auto"></div>
     </div>
     </div>
   </div>
@@ -2306,10 +2307,12 @@ function loadClotureTab() {
       '</div>';
   }).catch(function (e) { toast(e.message, true); });
 
-  barberApi('/api/owner/caisse/closings').then(function (r) {
+  var sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  var dateFrom = sevenDaysAgo.toISOString().slice(0, 10);
+  barberApi('/api/owner/caisse/closings?date_from=' + dateFrom).then(function (r) {
     var list = document.getElementById('cloture-history-list');
     if (!r.items.length) {
-      list.innerHTML = '<p class="hint">Aucune clôture pour l\'instant.</p>';
+      list.innerHTML = '<p class="hint">Aucune clôture sur les 7 derniers jours.</p>';
       return;
     }
     list.innerHTML = r.items.map(function (c) {
