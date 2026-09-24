@@ -2053,10 +2053,10 @@ function startCaisseClosing() {
     var suggestedFloat = results[1].starting_cash_cents;
     if (r.sales_count === 0) { toast('Aucune vente à clôturer sur cette période', true); return; }
 
-    var floatInput = window.prompt(
-      'Fond de caisse actuellement dans le tiroir (en euros) — cet argent reste en caisse, il ne fait pas partie des ventes :',
-      (suggestedFloat / 100).toFixed(2)
-    );
+    showPrompt(
+      'Fond de caisse actuellement dans le tiroir (en euros) — cet argent reste en caisse, il ne fait pas partie des ventes.',
+      { title: 'Fond de caisse', defaultValue: (suggestedFloat / 100).toFixed(2), confirmLabel: 'Continuer' }
+    ).then(function (floatInput) {
     if (floatInput === null) return;
     var floatCents = Math.round(parseFloat(floatInput.replace(',', '.')) * 100);
     if (!Number.isFinite(floatCents) || floatCents < 0) { toast('Montant du fond de caisse invalide', true); return; }
@@ -2075,6 +2075,7 @@ function startCaisseClosing() {
           .then(function (r2) { printZTicket(r2.id); loadClotureTab(); })
           .catch(function (e) { toast(e.message, true); });
       });
+    });
     });
   }).catch(function (e) { toast(e.message, true); });
 }
@@ -2153,14 +2154,15 @@ function loadClotureTab() {
 }
 
 function forceOpenCaisse() {
-  var pw = window.prompt('Mot de passe admin :');
-  if (!pw) return;
-  var headers = { 'Content-Type': 'application/json', 'X-Admin-Password': pw };
-  if (SALON_SLUG) headers['X-Salon-Slug'] = SALON_SLUG;
-  fetch('/api/settings/caisse/force-open', { method: 'POST', headers: headers })
-    .then(function (r) { return r.json().then(function (d) { if (!r.ok) throw new Error(d.error || 'Erreur'); return d; }); })
-    .then(function () { window.location.reload(); })
-    .catch(function (e) { window.alert(e.message); });
+  showPrompt('Mot de passe administrateur du salon :', { title: 'Forcer l\'ouverture', confirmLabel: 'Ouvrir' }).then(function (pw) {
+    if (!pw) return;
+    var headers = { 'Content-Type': 'application/json', 'X-Admin-Password': pw };
+    if (SALON_SLUG) headers['X-Salon-Slug'] = SALON_SLUG;
+    fetch('/api/settings/caisse/force-open', { method: 'POST', headers: headers })
+      .then(function (r) { return r.json().then(function (d) { if (!r.ok) throw new Error(d.error || 'Erreur'); return d; }); })
+      .then(function () { window.location.reload(); })
+      .catch(function (e) { toast(e.message, true); });
+  });
 }
 
 (function autoLogin() {

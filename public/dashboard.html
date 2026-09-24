@@ -5712,10 +5712,10 @@ function startCaisseClosing() {
     var suggestedFloat = results[1].starting_cash_cents;
     if (r.sales_count === 0) { toast('Aucune vente à clôturer sur cette période', true); return; }
 
-    var floatInput = window.prompt(
-      'Fond de caisse actuellement dans le tiroir (en euros) — cet argent reste en caisse, il ne fait pas partie des ventes :',
-      (suggestedFloat / 100).toFixed(2)
-    );
+    showPrompt(
+      'Fond de caisse actuellement dans le tiroir (en euros) — cet argent reste en caisse, il ne fait pas partie des ventes.',
+      { title: 'Fond de caisse', defaultValue: (suggestedFloat / 100).toFixed(2), confirmLabel: 'Continuer' }
+    ).then(function (floatInput) {
     if (floatInput === null) return;
     var floatCents = Math.round(parseFloat(floatInput.replace(',', '.')) * 100);
     if (!Number.isFinite(floatCents) || floatCents < 0) { toast('Montant du fond de caisse invalide', true); return; }
@@ -5734,6 +5734,7 @@ function startCaisseClosing() {
           .then(function () { toast('Caisse clôturée'); loadCaisseTab(); })
           .catch(function (e) { toast(e.message, true); });
       });
+    });
     });
   }).catch(function (e) { toast(e.message, true); });
 }
