@@ -945,3 +945,12 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'cash_closings' AND column_name = 'recount_confirmed_by');
 SET @sql := IF(@c = 0, "ALTER TABLE cash_closings ADD COLUMN recount_confirmed_by VARCHAR(120) NULL", 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Empeche deux clotures simultanees (course tres improbable mais
+-- possible - deux coiffeurs qui cliquent Cloturer en meme temps)
+-- d'obtenir le meme numero Z, ce qui serait un probleme de conformite
+-- (numerotation sequentielle exigee par la reglementation francaise
+-- sur les logiciels de caisse). Trouve lors d'un audit de securite.
+SET @c := (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'cash_closings' AND index_name = 'uniq_salon_z');
+SET @sql := IF(@c = 0, "ALTER TABLE cash_closings ADD UNIQUE KEY uniq_salon_z (salon_id, z_number)", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;

@@ -679,17 +679,32 @@ router.post('/caisse/close', requireAdminOrBarber, wrap(async (req, res) => {
   });
 
   const id = crypto.randomUUID();
-  const [[{ maxZ }]] = await pool.query(
-    'SELECT COALESCE(MAX(z_number), 0) AS maxZ FROM cash_closings WHERE salon_id = ?',
-    [req.salon.id]
-  );
-  const zNumber = maxZ + 1;
 
-  await pool.query(
-    `INSERT INTO cash_closings (id, salon_id, period_start, period_end, total_cents, sales_count, breakdown_json, z_number, starting_cash_cents, by_barber_json, by_item_json)
-     VALUES (?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?)`,
-    [id, req.salon.id, periodStart, total, sales.length, JSON.stringify(byMethod), zNumber, startingCashCents, JSON.stringify(byBarber), JSON.stringify(byItem)]
-  );
+  // Numerotation sequentielle exigee legalement - en cas de collision
+  // (deux clotures lancees en meme temps, course tres improbable mais
+  // possible), reessaie avec le numero suivant plutot que d'echouer,
+  // grace a la contrainte d'unicite (salon_id, z_number) qui detecte
+  // le conflit de facon fiable (contrairement a un simple SELECT MAX
+  // avant l'ecriture, sujet a la meme course).
+  let zNumber;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const [[{ maxZ }]] = await pool.query(
+      'SELECT COALESCE(MAX(z_number), 0) AS maxZ FROM cash_closings WHERE salon_id = ?',
+      [req.salon.id]
+    );
+    zNumber = maxZ + 1;
+    try {
+      await pool.query(
+        `INSERT INTO cash_closings (id, salon_id, period_start, period_end, total_cents, sales_count, breakdown_json, z_number, starting_cash_cents, by_barber_json, by_item_json)
+         VALUES (?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?)`,
+        [id, req.salon.id, periodStart, total, sales.length, JSON.stringify(byMethod), zNumber, startingCashCents, JSON.stringify(byBarber), JSON.stringify(byItem)]
+      );
+      break;
+    } catch (err) {
+      if (err.code === 'ER_DUP_ENTRY' && attempt < 4) continue;
+      throw err;
+    }
+  }
 
   let actorLabel = req.barberId ? 'coiffeur' : 'admin';
   if (req.body.closed_by_barber_id) {
