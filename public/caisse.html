@@ -697,6 +697,24 @@
   <div class="z-box" id="z-box"></div>
 </div>
 
+<div class="z-overlay" id="cloture-pin-overlay">
+  <div style="text-align:center;background:var(--card);border-radius:20px;padding:32px 28px;max-width:340px;width:100%">
+    <h1 style="margin-bottom:6px">Clôture</h1>
+    <p class="hint" style="margin-bottom:20px">Code PIN du coiffeur qui clôture</p>
+    <div class="pin-dots" id="cloture-pin-dots">
+      <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
+    </div>
+    <div class="keypad" id="cloture-keypad">
+      <button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button>
+      <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button>
+      <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button>
+      <button class="empty"></button><button data-k="0">0</button><button class="del" data-k="del">⌫</button>
+    </div>
+    <div class="login-error" id="cloture-pin-error"></div>
+    <button class="btn btn-ghost" style="margin-top:18px;font-size:13px" onclick="closeCloturePinModal()">Annuler</button>
+  </div>
+</div>
+
 <div class="caisse-footer" id="caisse-footer" style="display:none">
   <button id="nav-agenda" onclick="switchCaisseTab('agenda')">
     <svg class="ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5.5" width="16" height="15" rx="2.5"/><path d="M4 9.5h16"/><path d="M8 3.5v3.5M16 3.5v3.5"/></svg>
@@ -938,20 +956,65 @@ function switchCaisseTab(tab) {
   doSwitchCaisseTab(tab);
 }
 
+var cloturePinBuffer = '';
+
+function renderCloturePinDots() {
+  var dots = document.querySelectorAll('#cloture-pin-dots .pin-dot');
+  dots.forEach(function (d, i) { d.classList.toggle('filled', i < cloturePinBuffer.length); });
+}
+
+function closeCloturePinModal() {
+  document.getElementById('cloture-pin-overlay').classList.remove('on');
+  cloturePinBuffer = '';
+  renderCloturePinDots();
+  document.getElementById('cloture-pin-error').textContent = '';
+}
+
+document.getElementById('cloture-keypad').addEventListener('click', function (e) {
+  var btn = e.target.closest('button');
+  if (!btn || btn.classList.contains('empty')) return;
+  var k = btn.dataset.k;
+  document.getElementById('cloture-pin-error').textContent = '';
+
+  if (k === 'del') {
+    cloturePinBuffer = cloturePinBuffer.slice(0, -1);
+    renderCloturePinDots();
+    return;
+  }
+  if (cloturePinBuffer.length >= 4) return;
+  cloturePinBuffer += k;
+  renderCloturePinDots();
+  if (cloturePinBuffer.length === 4) attemptClotureVerification();
+});
+
+function attemptClotureVerification() {
+  var headers = { 'Content-Type': 'application/json' };
+  if (SALON_SLUG) headers['X-Salon-Slug'] = SALON_SLUG;
+  fetch('/api/barbers/login', {
+    method: 'POST',
+    headers: headers,
+    body: JSON.stringify({ pin: cloturePinBuffer, source: 'cloture' })
+  }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
+    .then(function (res) {
+      if (!res.ok) {
+        document.getElementById('cloture-pin-error').textContent = res.data.error || 'Code incorrect';
+        cloturePinBuffer = '';
+        renderCloturePinDots();
+        return;
+      }
+      clotureVerifiedBarber = res.data.barber;
+      closeCloturePinModal();
+      doSwitchCaisseTab('cloture');
+    })
+    .catch(function () {
+      document.getElementById('cloture-pin-error').textContent = 'Connexion impossible';
+      cloturePinBuffer = '';
+      renderCloturePinDots();
+    });
+}
+
 function verifyClotureAccess() {
-  showPrompt('Code PIN du coiffeur qui clôture la caisse :', { title: 'Accès à la Clôture', confirmLabel: 'Valider', inputMode: 'numeric' }).then(function (pin) {
-    if (!pin) return;
-    var headers = { 'Content-Type': 'application/json' };
-    if (SALON_SLUG) headers['X-Salon-Slug'] = SALON_SLUG;
-    fetch('/api/barbers/login', { method: 'POST', headers: headers, body: JSON.stringify({ pin: pin, source: 'cloture' }) })
-      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
-      .then(function (res) {
-        if (!res.ok) { toast(res.data.error || 'Code incorrect', true); return; }
-        clotureVerifiedBarber = res.data.barber;
-        doSwitchCaisseTab('cloture');
-      })
-      .catch(function (e) { toast(e.message, true); });
-  });
+  document.getElementById('cloture-pin-overlay').classList.add('on');
 }
 
 function doSwitchCaisseTab(tab) {
