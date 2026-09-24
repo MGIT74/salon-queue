@@ -580,7 +580,7 @@ router.get('/client-marketing', requireAdmin, wrap(async (req, res) => {
  * ou depuis le debut si jamais cloture) - total, nombre de ventes,
  * detail par mode de paiement, detail par coiffeur.
  */
-router.get('/caisse/current-period', requireAdmin, wrap(async (req, res) => {
+router.get('/caisse/current-period', requireAdminOrBarber, wrap(async (req, res) => {
   const [[lastClosing]] = await pool.query(
     'SELECT period_end FROM cash_closings WHERE salon_id = ? ORDER BY period_end DESC LIMIT 1',
     [req.salon.id]
