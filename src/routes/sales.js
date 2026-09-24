@@ -169,8 +169,8 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
   );
 
   await pool.query(
-    'INSERT INTO sales (id, salon_id, barber_id, payment_method, total_price_cents, ticket_number) VALUES (?, ?, ?, ?, ?, ?)',
-    [saleId, req.salon.id, barberId, payment_method, total, ticketNumber]
+    'INSERT INTO sales (id, salon_id, barber_id, payment_method, total_price_cents, ticket_number, queue_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [saleId, req.salon.id, barberId, payment_method, total, ticketNumber, queue_id || null]
   );
   await pool.query(
     'INSERT INTO sale_items (id, sale_id, item_type, item_id, item_name, unit_price_cents, quantity, barber_id) VALUES ?',

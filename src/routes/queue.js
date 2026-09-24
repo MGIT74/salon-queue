@@ -707,9 +707,39 @@ router.get('/history', requireAdmin, wrap(async (req, res) => {
 // --- Coiffeur : suppression définitive (nettoyage de données test) ------
 router.delete('/:id', requireAdmin, wrap(async (req, res) => {
   const [[before]] = await pool.query('SELECT client_name FROM queue WHERE id = ? AND salon_id = ?', [req.params.id, req.salon.id]);
+
+  // La vente correspondante (si le client a ete encaisse) doit
+  // disparaitre en meme temps - sinon le Dashboard (CA calcule depuis
+  // queue) et la Caisse/les tickets Z (CA calcule depuis sales)
+  // divergent silencieusement. Mais si cette vente appartient DEJA a
+  // une cloture passee (ticket Z deja imprime, figE), on refuse : les
+  // chiffres d'une periode cloturee ne doivent plus jamais changer
+  // retroactivement (conformite legale des logiciels de caisse).
+  const [[sale]] = await pool.query(
+    'SELECT id, total_price_cents, created_at FROM sales WHERE queue_id = ? AND salon_id = ?',
+    [req.params.id, req.salon.id]
+  );
+  if (sale) {
+    const [[closedPeriod]] = await pool.query(
+      'SELECT id FROM cash_closings WHERE salon_id = ? AND period_end > ? LIMIT 1',
+      [req.salon.id, sale.created_at]
+    );
+    if (closedPeriod) {
+      return res.status(409).json({
+        error: 'Impossible de supprimer : la vente correspondante appartient déjà à une clôture de caisse passée (ticket Z imprimé). Les chiffres d\'une période clôturée ne peuvent plus être modifiés.'
+      });
+    }
+  }
+
   await pool.query('DELETE FROM queue WHERE id = ? AND salon_id = ?', [req.params.id, req.salon.id]);
+  if (sale) {
+    await pool.query('DELETE FROM sales WHERE id = ? AND salon_id = ?', [sale.id, req.salon.id]);
+  }
   await recompute(req.salon.id);
-  if (before) logActivity(req.salon.id, 'client_delete', 'Fiche client "' + before.client_name + '" supprimée définitivement');
+  if (before) {
+    logActivity(req.salon.id, 'client_delete', 'Fiche client "' + before.client_name + '" supprimée définitivement' +
+      (sale ? ' (vente associée de ' + (sale.total_price_cents / 100).toFixed(2) + ' € également annulée)' : ''));
+  }
   res.json({ ok: true, deleted: true });
 }));
 

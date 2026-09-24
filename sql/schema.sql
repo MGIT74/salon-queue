@@ -1003,3 +1003,13 @@ CREATE TABLE IF NOT EXISTS tpe_charge_jobs (
   INDEX idx_tpe_charge_salon (salon_id, status),
   FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Lien entre une vente et la fiche de visite (queue) dont elle vient,
+-- pour pouvoir annuler la vente si la fiche est supprimee (sinon le
+-- Dashboard - qui calcule son CA depuis queue - et la Caisse/les
+-- tickets Z - qui le calculent depuis sales - divergent silencieusement
+-- des qu'une fiche deja payee est supprimee). NULL pour une vente
+-- directe sans fiche de visite (produit vendu seul, etc.).
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'sales' AND column_name = 'queue_id');
+SET @sql := IF(@c = 0, "ALTER TABLE sales ADD COLUMN queue_id CHAR(36) NULL", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
