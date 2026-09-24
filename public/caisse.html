@@ -1078,7 +1078,9 @@ function renderBarberBubbles() {
     var avatarStyle = b.photo_url
       ? 'background-image:url(\'' + b.photo_url + '\')'
       : 'background:' + color;
-    return '<button class="barber-bubble' + (b.id === activeBarberId ? ' on' : '') + '" onclick="selectActiveBarber(\'' + b.id + '\')" title="' + esc(b.name) + '">' +
+    var onclick = clotureVerifiedBarber ? '' : ' onclick="selectActiveBarber(\'' + b.id + '\')"';
+    var cursorStyle = clotureVerifiedBarber ? ' style="cursor:default"' : '';
+    return '<button class="barber-bubble' + (b.id === activeBarberId ? ' on' : '') + '"' + onclick + cursorStyle + ' title="' + esc(b.name) + '">' +
       '<span class="avatar" style="' + avatarStyle + '">' + (b.photo_url ? '' : esc(initial)) + '</span>' +
       '</button>';
   }).join('');
