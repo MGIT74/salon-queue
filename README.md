@@ -15,8 +15,11 @@ Cette version utilise **MySQL/MariaDB** comme base de données — pas de dépen
 | `/display.html` | Salle d'attente, sur TV ou écran | Qui est au fauteuil, qui attend, avec chronos en direct |
 | `/dashboard.html` | Coiffeurs, sur tablette ou mobile | Commencer / terminer les coupes, gérer le catalogue et les réglages |
 
-Le dashboard contient cinq onglets : **File d'attente**, **Prestations**,
-**Suppléments**, **Coiffeurs** (avec horaires hebdomadaires) et **Réglages** (SMTP).
+Le dashboard contient plusieurs onglets : **File d'attente**, **Prestations**,
+**Suppléments**, **Produits**, **Marketing** (fidélité + cadeaux), **Caisse**,
+**Rendez-vous**, **Coiffeurs** (horaires, congés, tarifs par coiffeur),
+**Clients**, **Mes salons**, **Compte** et **Réglages** (général, fuseau,
+calendrier, SMTP, notifications).
 
 ## Comment le timing est calculé
 
@@ -70,6 +73,84 @@ npm start
 ```
 
 Le serveur expose `/healthz` pour les sondes de disponibilité.
+
+## Compte fictif pour les tests UI/UX — authentification
+
+Après avoir configuré une **base de test** dans `.env`, créez le compte de
+démonstration avec :
+
+```bash
+npm run seed:uiux-auth
+```
+
+Cette commande peut être rejouée : elle crée ou réactive uniquement le salon
+fictif `Atelier Nova`, sans supprimer les autres salons ni leurs données.
+
+| Champ | Valeur |
+|---|---|
+| Email | `demo@atelier-nova.test` |
+| Mot de passe | `UIUX2026!` |
+| Salon | Atelier Nova |
+
+Pour remplir le salon avec des données réalistes (coiffeurs, catalogue, file
+d'attente, rendez-vous, caisse, carte cadeau et fidélité), utilisez plutôt :
+
+```bash
+npm run seed:uiux
+```
+
+Le compte client de démonstration est `lea.dupont@demo.test` avec le mot de
+passe `Client2026!`. Ouvrez ensuite `http://localhost:3000/dashboard.html`,
+saisissez l’email et le mot de passe administrateur ci-dessus : le salon est
+retrouvé automatiquement. N’exécutez aucune de ces commandes sur la base de
+production.
+
+## Tests E2E avec Cypress
+
+Les scénarios Cypress utilisent exclusivement le salon fictif `Atelier Nova`.
+Avant chaque test, les données de démonstration sont réinitialisées avec
+`npm run seed:uiux` : les tests sont donc reproductibles et ne doivent pas être
+lancés contre une base de production.
+
+Installez les dépendances, démarrez l’application dans un terminal, puis lancez
+les tests dans un second terminal :
+
+```bash
+npm install
+npm start
+npm run test:e2e
+```
+
+Pour le mode interactif :
+
+```bash
+npm run test:e2e:open
+```
+
+La suite couvre les parcours administrateur, dashboard, borne, écran public,
+caisse (PIN et encaissement), rendez-vous, espace client, gestion des coiffeurs,
+réglages salon/SMTP, fidélité et marketing. Elle utilise Chrome par défaut.
+L’application doit être déjà en cours d’exécution sur `http://localhost:3000`.
+Pour une autre adresse, utilisez
+`CYPRESS_BASE_URL=https://mon-environnement.test npm run test:e2e`.
+
+Pour ouvrir Cypress dans son interface graphique :
+
+```bash
+npm run test:e2e:open
+```
+
+Pour lancer les tests en mode navigateur spécifique :
+
+```bash
+npx cypress open --browser chrome
+```
+
+Pour une exécution headless complète :
+
+```bash
+npm run test:e2e
+```
 
 ## Sécurité — à connaître avant la mise en production
 

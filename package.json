@@ -4,11 +4,17 @@
   "description": "File d'attente temps reel pour salon de coiffure",
   "main": "server.js",
   "engines": {
+   
     "node": ">=18"
+ 
   },
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "seed:uiux-auth": "node scripts/seed-uiux-auth.js",
+    "seed:uiux": "npm run seed:uiux-auth && node scripts/seed-uiux-demo.js",
+    "test:e2e": "cypress run --browser chrome",
+    "test:e2e:open": "cypress open"
   },
   "dependencies": {
     "dotenv": "^16.4.5",
@@ -16,5 +22,8 @@
     "mysql2": "^3.11.0",
     "node-cron": "^4.6.0",
     "nodemailer": "^10.0.10"
+  },
+  "devDependencies": {
+    "cypress": "^16.1.0"
   }
 }
