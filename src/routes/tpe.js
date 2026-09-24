@@ -57,12 +57,53 @@ router.post('/charge', requireAdminOrBarber, wrap(async (req, res) => {
 
   const merchantTxId = crypto.randomBytes(8).toString('hex');
 
-  // Deux protocoles supportés selon la configuration du terminal :
-  // - "nepting" (défaut)  : trames TLV "Protocole Caisse" (API locale
-  //   Nepting, cf. lib/tpeNepting.js)
-  // - "concert"           : Concert version 3 IP — le protocole historique
-  //   annoncé "PROTOCOL: ConcertV3 IP" sur les tickets de config
-  //   (Crédit Agricole / Nepting, PAX A920Pro, Ingenico...).
+  // Le pont local est configuré (tpe_bridge_url) : le serveur ne peut
+  // pas joindre l'IP locale du TPE (l'app est en ligne). On délègue au
+  // pont du salon : dépôt de la demande, le pont la réclame par polling,
+  // parle au TPE en TCP local et rapporte le résultat ; cette route
+  // attend la réponse (long polling jusqu'à 110 s, sous le timeout de
+  // la caisse) puis renvoie le résultat au navigateur. Même contrat de
+  // réponse que le chemin direct ci-dessous.
+  if (s.tpe_bridge_url) {
+    const [[bridgeKey]] = await pool.query(
+      'SELECT key_preview FROM bridge_keys WHERE salon_id = ?',
+      [req.salon.id]
+    );
+    if (!bridgeKey) {
+      return res.status(400).json({ error: 'Pont configuré mais clé non générée (Réglages > Terminal de paiement > Générer la clé du pont)' });
+    }
+    const jobId = crypto.randomUUID();
+    await pool.query(
+      'INSERT INTO tpe_charge_jobs (id, salon_id, amount_cents) VALUES (?, ?, ?)',
+      [jobId, req.salon.id, amountCents]
+    );
+
+    const deadline = Date.now() + 110_000;
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 1500));
+      const [[job]] = await pool.query(
+        'SELECT status, result_json FROM tpe_charge_jobs WHERE id = ?',
+        [jobId]
+      );
+      if (!job || job.status === 'pending') continue;
+      if (job.status === 'done' && job.result_json) {
+        const result = JSON.parse(job.result_json);
+        return res.json({
+          ok: true,
+          success: result.success,
+          auth_number: result.authNumber || null,
+          failure_code: result.failureCode || result.resultCode || null,
+          failure_reason: result.failureReason || null,
+          merchant_tx_id: merchantTxId
+        });
+      }
+      return res.status(502).json({ error: 'Paiement impossible : ' + (job.result_json || 'le pont n\'a pas pu joindre le terminal') });
+    }
+    return res.status(504).json({ error: 'Le terminal de paiement n\'a pas répondu à temps (pont hors ligne ?)' });
+  }
+
+  // Pas de pont : le serveur essaie de joindre directement le TPE (ne
+  // fonctionne que si le serveur EST sur le réseau du salon).
   try {
     let result;
     if (s.tpe_protocol === 'concert') {
@@ -131,6 +172,27 @@ router.get('/bridge/poll', requireBridgeKey, wrap(async (req, res) => {
     [req.salon.id]
   );
   res.json({ ok: true, jobs });
+}));
+
+/** Le pont réclame les demandes de paiement CB en attente. */
+router.get('/bridge/charge-poll', requireBridgeKey, wrap(async (req, res) => {
+  const [jobs] = await pool.query(
+    "SELECT id, amount_cents FROM tpe_charge_jobs WHERE salon_id = ? AND status = 'pending' AND created_at > (NOW() - INTERVAL 2 MINUTE) ORDER BY created_at LIMIT 5",
+    [req.salon.id]
+  );
+  res.json({ ok: true, jobs });
+}));
+
+/** Le pont rapporte le résultat d'une demande de paiement CB. */
+router.post('/bridge/charge-ack', requireBridgeKey, wrap(async (req, res) => {
+  const { job_id, result, error } = req.body;
+  if (!job_id) return res.status(400).json({ error: 'job_id requis' });
+  const status = result ? 'done' : 'failed';
+  await pool.query(
+    "UPDATE tpe_charge_jobs SET status = ?, result_json = ?, updated_at = NOW() WHERE id = ? AND salon_id = ? AND status = 'pending'",
+    [status, result ? JSON.stringify(result) : (error ? String(error).slice(0, 500) : null), job_id, req.salon.id]
+  );
+  res.json({ ok: true });
 }));
 
 /** Le pont signale le résultat d'impression d'un ticket. */

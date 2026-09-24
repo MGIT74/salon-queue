@@ -986,3 +986,20 @@ CREATE TABLE IF NOT EXISTS bridge_keys (
   UNIQUE KEY uniq_salon_bridge (salon_id),
   FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Demandes de paiement CB déléguées au pont local : la caisse (HTTPS)
+-- dépose la demande ici, le pont du salon la récupère par polling,
+-- parle au TPE en TCP local (Concert v3) et rapporte le résultat.
+-- pending -> done/failed ; les demandes jamais réclamées expirent
+-- (purge au-delà de 10 min, la caisse a déjà timeouté de son côté).
+CREATE TABLE IF NOT EXISTS tpe_charge_jobs (
+  id CHAR(36) PRIMARY KEY,
+  salon_id CHAR(36) NOT NULL,
+  amount_cents INT NOT NULL,
+  status VARCHAR(10) NOT NULL DEFAULT 'pending',
+  result_json TEXT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NULL,
+  INDEX idx_tpe_charge_salon (salon_id, status),
+  FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -2904,26 +2904,13 @@ function startTpePayment(saleCtx) {
   document.getElementById('tpe-actions').style.display = 'none';
   document.getElementById('tpe-overlay').classList.add('on');
 
-  // Deux chemins possibles vers le terminal :
-  // - pont local configuré : la requête part du navigateur de la caisse
-  //   vers le petit serveur du salon (même réseau que le TPE) - c'est le
-  //   seul chemin qui fonctionne quand l'app est hébergée en ligne ;
-  // - sinon : l'API serveur historique (utile si le serveur est lui-même
-  //   sur le réseau du salon, ou en attendant la mise en place du pont).
-  var bridgeCall = tpeBridgeUrl
-    ? fetch(tpeBridgeUrl.replace(/\/$/, '') + '/charge', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount_cents: saleCtx.total })
-      }).then(function (r) {
-        return r.json().then(function (data) {
-          if (!r.ok) throw new Error(data.error || 'Erreur ' + r.status);
-          return data;
-        });
-      })
-    : barberApi('/api/tpe/charge', { method: 'POST', body: { amount_cents: saleCtx.total } });
-
-  bridgeCall
+  // Paiement carte : TOUJOURS via l'API serveur (https, autorisé).
+  // Si un pont est configuré (tpe_bridge_url), le serveur délègue au
+  // pont du salon (polling, comme pour l'impression) : le pont parle
+  // au TPE en TCP local et rapporte le résultat. Sans pont, le serveur
+  // essaie de joindre le TPE directement (ne fonctionne que si le
+  // serveur est sur le réseau du salon).
+  barberApi('/api/tpe/charge', { method: 'POST', body: { amount_cents: saleCtx.total } })
     .then(function (r) {
       if (r.success) {
         document.getElementById('tpe-overlay').classList.remove('on');

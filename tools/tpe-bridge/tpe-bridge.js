@@ -450,11 +450,13 @@ function main() {
 const POLL_INTERVAL_MS = 3000;
 
 /**
- * Récupère les tickets en attente sur l'app et les imprime. Le pont est
- * le CLIENT HTTPS : plus aucun appel navigateur -> réseau local (que
- * Chrome interdit) - tout passe par le serveur en https, autorisé.
+ * Récupère les tickets en attente sur l'app et les imprime, puis les
+ * demandes de paiement CB et les traite. Le pont est le CLIENT HTTPS :
+ * plus aucun appel navigateur -> réseau local (que Chrome interdit) -
+ * tout passe par le serveur en https, autorisé.
  */
 async function pollOnce(opts) {
+  /* --- 1. Tickets à imprimer --- */
   let jobs;
   try {
     const res = await fetch(
@@ -482,6 +484,50 @@ async function pollOnce(opts) {
       console.error('[!] Échec impression :', err.message);
       await ackJob(opts, job.id, false, err.message);
     }
+  }
+
+  /* --- 2. Demandes de paiement CB (si un TPE est configuré) --- */
+  if (!opts.tpe) return;
+  let chargeJobs;
+  try {
+    const res = await fetch(
+      opts.server.replace(/\/$/, '') + '/api/tpe/bridge/charge-poll?salon=' + encodeURIComponent(opts.salon),
+      { headers: { 'X-Bridge-Key': opts.key, 'X-Salon-Slug': opts.salon } }
+    );
+    if (!res.ok) return;
+    const data = await res.json();
+    chargeJobs = data.jobs || [];
+  } catch (err) {
+    return; // déjà loggé côté tickets
+  }
+
+  for (const job of chargeJobs) {
+    console.log(`[${new Date().toLocaleTimeString()}] Paiement CB ${(job.amount_cents / 100).toFixed(2)} € -> TPE ${opts.tpe}:${opts.port}`);
+    try {
+      const result = await concertCharge(opts.tpe, opts.port, opts.pos, job.amount_cents, 120000);
+      console.log(`[<] Résultat CB : ${result.success ? 'ACCEPTÉ' : 'REFUSÉ (' + (result.failureReason || result.resultCode) + ')'}`);
+      await ackChargeJob(opts, job.id, result, null);
+    } catch (err) {
+      console.error('[!] Échec CB :', err.message);
+      await ackChargeJob(opts, job.id, null, err.message);
+    }
+  }
+}
+
+/** Rapporte le résultat d'un paiement CB au serveur. */
+async function ackChargeJob(opts, jobId, result, error) {
+  try {
+    await fetch(opts.server.replace(/\/$/, '') + '/api/tpe/bridge/charge-ack', {
+      method: 'POST',
+      headers: {
+        'X-Bridge-Key': opts.key,
+        'X-Salon-Slug': opts.salon,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ job_id: jobId, result, error })
+    });
+  } catch (err) {
+    console.error('[ack CB] impossible :', err.message);
   }
 }
 
