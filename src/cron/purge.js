@@ -32,12 +32,20 @@ async function purgeExpiredTokens() {
   const [ownerReset] = await pool.query(
     'UPDATE owners SET reset_token = NULL, reset_token_expires = NULL WHERE reset_token IS NOT NULL AND reset_token_expires IS NOT NULL AND reset_token_expires <= NOW()'
   );
+  // Tickets imprimés depuis plus de 7 jours (tracés une semaine pour
+  // dépannage, puis supprimés - la table ne doit pas grossir indéfiniment).
+  const [printJobs] = await pool.query(
+    'DELETE FROM print_jobs WHERE status IN (\'done\', \'failed\') AND created_at <= (NOW() - INTERVAL 7 DAY)'
+  );
 
   const n = sessions.affectedRows + impersonation.affectedRows +
     clientVerify.changedRows + clientReset.changedRows +
     ownerVerify.changedRows + ownerReset.changedRows;
   if (n > 0) {
     console.log('[purge] jetons expirés nettoyés :', n);
+  }
+  if (printJobs.affectedRows > 0) {
+    console.log('[purge] tickets imprimés supprimés :', printJobs.affectedRows);
   }
 }
 

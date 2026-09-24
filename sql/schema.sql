@@ -954,3 +954,35 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 SET @c := (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'cash_closings' AND index_name = 'uniq_salon_z');
 SET @sql := IF(@c = 0, "ALTER TABLE cash_closings ADD UNIQUE KEY uniq_salon_z (salon_id, z_number)", 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- File d'attente d'impression pour le pont local (tools/tpe-bridge) :
+-- la caisse (navigateur) dépose ici les tickets à imprimer, et le pont
+-- installé dans le salon les récupère en interrogeant le serveur
+-- (HTTPS -> HTTPS, aucun appel navigateur vers le réseau local, ce que
+-- Chrome interdit). Une ligne = un ticket ; pending -> done/failed
+-- selon le résultat rapporté par le pont.
+CREATE TABLE IF NOT EXISTS print_jobs (
+  id CHAR(36) PRIMARY KEY,
+  salon_id CHAR(36) NOT NULL,
+  text LONGTEXT NOT NULL,
+  mode VARCHAR(10) NOT NULL DEFAULT 'escpos',
+  status VARCHAR(10) NOT NULL DEFAULT 'pending',
+  error TEXT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  printed_at DATETIME NULL,
+  INDEX idx_print_jobs_salon (salon_id, status),
+  FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Clé du pont d'impression par salon (hashée, même modèle que api_keys) :
+-- permet au pont installé dans le salon de récupérer UNIQUEMENT les
+-- tickets de son salon, sans jamais transmettre la clé en clair en base.
+CREATE TABLE IF NOT EXISTS bridge_keys (
+  id CHAR(36) PRIMARY KEY,
+  salon_id CHAR(36) NOT NULL,
+  key_hash CHAR(64) NOT NULL,
+  key_preview VARCHAR(16) NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_salon_bridge (salon_id),
+  FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

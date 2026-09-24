@@ -42,7 +42,7 @@ const net = require('net');
 /* ---------- Lecture des arguments ---------- */
 
 function parseArgs(argv) {
-  const opts = { tpe: null, port: 8888, listen: 7788, pos: '2', printer: '' };
+  const opts = { tpe: null, port: 8888, listen: 7788, pos: '2', printer: '', server: null, salon: null, key: null };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     const next = () => argv[++i];
@@ -51,7 +51,16 @@ function parseArgs(argv) {
     else if (a === '--listen') opts.listen = parseInt(next(), 10);
     else if (a === '--pos') opts.pos = String(next()).slice(0, 1);
     else if (a === '--printer') opts.printer = String(next());
+    else if (a === '--server') opts.server = String(next());
+    else if (a === '--salon') opts.salon = String(next());
+    else if (a === '--key') opts.key = String(next());
     else if (a === '--help' || a === '-h') { printHelp(); process.exit(0); }
+  }
+  if (!opts.tpe && !opts.server) {
+    console.error("[!] Donnez au moins --tpe <ip du TPE> ou --server <url de l'app>. Exemples :");
+    console.error('      node tpe-bridge.js --tpe 192.168.1.125 --pos 2');
+    console.error('      node tpe-bridge.js --server https://mon-app.com --salon mon-salon --key CLE --printer EPSON');
+    process.exit(1);
   }
   return opts;
 }
@@ -60,14 +69,27 @@ function printHelp() {
   console.log(`
 Pont local caisse <-> TPE + impression silencieuse
 
-  node tpe-bridge.js --tpe <ip du TPE> [options]
+DEUX MODES (cumulables) :
 
-  --tpe <ip>         IP du terminal (facultatif si impression seule)
-  --port <n>         Port Concert du TPE (defaut : 8888)
-  --listen <n>       Port HTTP de ce pont (defaut : 7788)
-  --pos <n>          Numero de caisse (defaut : 2)
-  --printer <nom>    Imprimante CUPS pour les tickets (defaut : imprimante
-                     par defaut du systeme). Liste : lpstat -p | grep imprimante
+1. SERVEUR (recommande pour l'impression) - le pont interroge lui-meme
+   l'app en HTTPS et imprime les tickets deposés par la caisse :
+
+   node tpe-bridge.js --server https://mon-app.com --salon mon-salon --key CLE
+
+     --server <url>   URL de l'app (celle du navigateur, sans /caisse)
+     --salon <slug>   Identifiant du salon (celui de l'URL ?salon=...)
+     --key <cle>      Cle du pont (Dashboard > Reglages > Terminal de paiement)
+     --printer <nom>  Imprimante CUPS (defaut : imprimante par defaut)
+
+2. SERVEUR HTTP LOCAL (paiement TPE) - la caisse ou l'app peuvent lui
+   deleguer l'envoi Concert au TPE sur le reseau local :
+
+   node tpe-bridge.js --tpe 192.168.1.125 [--port 8888] [--listen 7788] [--pos 2]
+
+     --tpe <ip>         IP du terminal (voir ticket de config)
+     --port <n>         Port Concert du TPE (defaut : 8888)
+     --listen <n>       Port HTTP de ce pont (defaut : 7788)
+     --pos <n>          Numero de caisse (defaut : 2)
 `);
 }
 
@@ -253,6 +275,23 @@ function sendJson(res, status, obj) {
 function main() {
   const opts = parseArgs(process.argv.slice(2));
 
+  // Mode SERVEUR : le pont interroge l'app en HTTPS et imprime les
+  // tickets déposés par la caisse. Aucun port local requis.
+  if (opts.server) {
+    console.log('=== Pont d\'impression (mode serveur) ===');
+    console.log(`App           : ${opts.server}`);
+    console.log(`Salon         : ${opts.salon}`);
+    console.log(`Imprimante    : ${opts.printer || 'imprimante par défaut du système'}`);
+    const { execFile } = require('child_process');
+    execFile('lpstat', ['-a'], (err, stdout) => {
+      if (err || !stdout.trim()) console.log('Imprimantes   : (aucune détectée)');
+      else console.log('Imprimantes   : ' + stdout.trim().split('\n').join(' | '));
+    });
+    startServerPolling(opts);
+    return;
+  }
+
+  // Mode HTTP LOCAL (paiement TPE) - inchangé.
   const server = http.createServer((req, res) => {
     if (req.method === 'OPTIONS') {
       res.writeHead(204, CORS_HEADERS);
@@ -349,6 +388,74 @@ function main() {
     console.error('[!] Erreur serveur :', err.message);
     process.exit(1);
   });
+}
+
+/* ---------- Mode SERVEUR : polling de l'app en HTTPS ---------- */
+
+const POLL_INTERVAL_MS = 3000;
+
+/**
+ * Récupère les tickets en attente sur l'app et les imprime. Le pont est
+ * le CLIENT HTTPS : plus aucun appel navigateur -> réseau local (que
+ * Chrome interdit) - tout passe par le serveur en https, autorisé.
+ */
+async function pollOnce(opts) {
+  let jobs;
+  try {
+    const res = await fetch(
+      opts.server.replace(/\/$/, '') + '/api/tpe/bridge/poll?salon=' + encodeURIComponent(opts.salon),
+      { headers: { 'X-Bridge-Key': opts.key, 'X-Salon-Slug': opts.salon } }
+    );
+    if (!res.ok) {
+      const detail = await res.json().catch(() => ({}));
+      throw new Error('HTTP ' + res.status + (detail.error ? ' - ' + detail.error : ''));
+    }
+    const data = await res.json();
+    jobs = data.jobs || [];
+  } catch (err) {
+    console.error('[poll] serveur injoignable :', err.message);
+    return;
+  }
+
+  for (const job of jobs) {
+    console.log(`[${new Date().toLocaleTimeString()}] Ticket ${job.id.slice(0, 8)} (${job.mode}) — impression...`);
+    try {
+      const out = await printTicket(job.text, opts.printer, job.mode);
+      console.log('[<] Imprimé :', out.jobId || '(job CUPS sans id)');
+      await ackJob(opts, job.id, true, null);
+    } catch (err) {
+      console.error('[!] Échec impression :', err.message);
+      await ackJob(opts, job.id, false, err.message);
+    }
+  }
+}
+
+async function ackJob(opts, jobId, ok, error) {
+  try {
+    await fetch(opts.server.replace(/\/$/, '') + '/api/tpe/bridge/ack', {
+      method: 'POST',
+      headers: {
+        'X-Bridge-Key': opts.key,
+        'X-Salon-Slug': opts.salon,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ job_id: jobId, ok, error })
+    });
+  } catch (err) {
+    // Pas grave : le job restera 'pending' et sera re-soumis au prochain
+    // poll (impression en double possible en cas de crash entre les deux
+    // appels, scénario extrêmement rare et préférable à un ticket perdu).
+    console.error('[ack] impossible :', err.message);
+  }
+}
+
+function startServerPolling(opts) {
+  console.log(`Mode serveur : polling ${opts.server} (salon "${opts.salon}") toutes les ${POLL_INTERVAL_MS / 1000} s`);
+  const loop = async () => {
+    try { await pollOnce(opts); } catch (err) { console.error('[poll]', err.message); }
+    setTimeout(loop, POLL_INTERVAL_MS);
+  };
+  loop();
 }
 
 main();

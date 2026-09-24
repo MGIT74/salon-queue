@@ -3120,26 +3120,21 @@ function showReceipt(lines, total, method, opts) {
   document.getElementById('receipt-box').innerHTML = html;
   document.getElementById('receipt-overlay').classList.add('on');
 
-  // Impression silencieuse via le pont local : si configuré, le ticket
-  // (version texte 32 colonnes) part directement à l'imprimante du
-  // salon, sans aucune boîte de dialogue. En cas d'échec, on affiche
-  // une note discrète — le bouton "Imprimer" (dialogue navigateur)
-  // reste toujours disponible en repli.
+  // Impression silencieuse : le ticket (version texte 32 colonnes) est
+  // déposé sur le SERVEUR (https, toujours autorisé). Le pont installé
+  // dans le salon le récupère par polling et l'imprime via CUPS — sans
+  // aucune boîte de dialogue. (Un envoi direct navigateur -> pont local
+  // était bloqué par Chrome : page https vers http du LAN.)
   if (tpeBridgeUrl) {
     var ticketText = buildReceiptText(lines, total, method, {
       whenDate: whenDate, ticketNumber: ticketNumber, barberName: barberName, salonName: salonName
     });
-    fetch(tpeBridgeUrl.replace(/\/$/, '') + '/print', {
+    barberApi('/api/tpe/print', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: ticketText })
+      body: { text: ticketText, mode: tpeBridgeUrl.includes('escpos=off') ? 'text' : 'escpos' }
     })
-      .then(function (r) { return r.json(); })
-      .then(function (d) {
-        if (d.ok) toast('Ticket envoyé à l\'imprimante');
-        else toast('Impression directe impossible : ' + (d.error || 'erreur') + ' — utilisez le bouton Imprimer', true);
-      })
-      .catch(function () { toast('Pont d\'impression injoignable — utilisez le bouton Imprimer', true); });
+      .then(function (d) { if (d.ok) toast('Ticket envoyé à l\'imprimante'); })
+      .catch(function () { toast('File d\'impression indisponible — utilisez le bouton Imprimer', true); });
   }
 }
 
