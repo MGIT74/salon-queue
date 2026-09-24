@@ -320,6 +320,8 @@
   .item-btn:active { transform: scale(.96); }
   .item-btn .name { font-size: 14.5px; font-weight: 600; margin-bottom: 4px; }
   .item-btn .price { font-size: 13px; color: var(--grey); }
+  .item-btn .stock, .item-btn .overlay .stock { font-size: 11px; color: var(--grey); margin-top: 2px; }
+  .item-btn .stock.low, .item-btn .overlay .stock.low { color: var(--red); font-weight: 600; }
   .item-btn .icon { font-size: 24px; margin-bottom: 6px; display: block; }
   .item-btn.has-photo { padding: 0; overflow: hidden; position: relative; min-height: 96px; }
   .item-btn.has-photo .photo-bg { position: absolute; inset: 0; background-size: cover; background-position: center; }
@@ -2629,18 +2631,25 @@ function renderItemGrid() {
     ? '<div class="empty">Rien à afficher ici</div>'
     : items.map(function (it) {
         var onclickAttr = 'addToTicket(\'' + typeSingular + '\',\'' + it.id + '\',\'' + esc(it.name).replace(/'/g, "\\'") + '\',' + it.price_cents + ')';
+        var stockHtml = '';
+        if (typeSingular === 'product' && it.stock_enabled) {
+          var low = it.stock_quantity <= 0;
+          stockHtml = '<div class="stock' + (low ? ' low' : '') + '">' + (low ? 'Rupture' : it.stock_quantity + ' en stock') + '</div>';
+        }
         if (it.image_url) {
           return '<button class="item-btn has-photo" onclick="' + onclickAttr + '">' +
             '<span class="photo-bg" style="background-image:url(&quot;' + esc(it.image_url) + '&quot;)"></span>' +
             '<span class="overlay">' +
               '<span class="name">' + esc(it.name) + '</span>' +
               '<span class="price">' + eur(it.price_cents) + '</span>' +
+              stockHtml +
             '</span></button>';
         }
         return '<button class="item-btn" onclick="' + onclickAttr + '">' +
           '<span class="icon">' + iconForItem(it.name) + '</span>' +
           '<div class="name">' + esc(it.name) + '</div>' +
           '<div class="price">' + eur(it.price_cents) + '</div>' +
+          stockHtml +
           '</button>';
       }).join('');
 }
