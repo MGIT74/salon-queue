@@ -1996,6 +1996,14 @@
         Historique des actions sensibles effectuées sur ce compte : catalogue, coiffeurs, salons, clients,
         clôtures de caisse, réglages… Utile pour retrouver qui a fait quoi, et quand.
       </p>
+      <div class="fld" style="margin:0 0 14px;max-width:160px"><label for="activity-log-per-page">Par page</label>
+        <select id="activity-log-per-page" onchange="changeActivityLogPerPage(this.value)">
+          <option value="10">10</option>
+          <option value="20">20</option>
+          <option value="50" selected>50</option>
+          <option value="100">100</option>
+        </select>
+      </div>
       <div id="activity-log-list"></div>
       <div class="clients-pagination" id="activity-log-pagination"></div>
       </div>
@@ -5859,15 +5867,21 @@ function renderClientsPagination() {
 /* ============ Journal d'activité (Paramètres) ============ */
 var activityLogPage = 1;
 var activityLogTotalPages = 1;
+var activityLogPerPage = 50;
 
 function loadActivityLog(page) {
   activityLogPage = page || activityLogPage;
-  return api('/api/owner/activity-log?page=' + activityLogPage + '&per_page=25').then(function (r) {
+  return api('/api/owner/activity-log?page=' + activityLogPage + '&per_page=' + activityLogPerPage).then(function (r) {
     activityLogPage = r.page;
     activityLogTotalPages = r.total_pages;
     renderActivityLog(r.items);
     renderActivityLogPagination();
   }).catch(function (e) { toast(e.message, true); });
+}
+
+function changeActivityLogPerPage(v) {
+  activityLogPerPage = Number(v) || 50;
+  loadActivityLog(1);
 }
 
 function renderActivityLog(items) {
