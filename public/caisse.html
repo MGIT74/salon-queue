@@ -672,12 +672,8 @@
     </div>
 
     <div class="caisse-tab-panel" id="panel-cloture">
-    <div class="tab-lock-overlay">
-      <svg class="ic" viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
-      <div class="msg">Veuillez sélectionner votre profil</div>
-      <div class="sub">Touchez votre bulle en haut de l'écran pour accéder à la clôture.</div>
-    </div>
     <div style="max-width:520px;margin:0 auto;padding:18px 4px">
+      <div id="cloture-verified-as" class="hint" style="margin-bottom:14px"></div>
       <h3 style="margin-bottom:4px">Période en cours</h3>
       <p class="hint" style="margin:0 0 18px">Depuis la dernière clôture (ou la mise en service).</p>
       <div id="cloture-current-period" style="background:var(--fill);border-radius:14px;padding:16px 18px;margin-bottom:20px">
@@ -928,8 +924,38 @@ function showApp() {
 
 var CAISSE_TABS = ['timer', 'agenda', 'caisse', 'cloture'];
 
+// Coiffeur verifie par PIN specifiquement pour cloturer - distinct de
+// `me` (celui qui a ouvert la tablette ce matin) et de `activeBarberId`
+// (simple bulle selectionnee, changeable sans aucune verification) :
+// sur un appareil partage entre plusieurs coiffeurs, ni l'un ni
+// l'autre ne garantit fiablement QUI est reellement en train de
+// cloturer la caisse la, maintenant.
+var clotureVerifiedBarber = null;
+
 function switchCaisseTab(tab) {
   if (CAISSE_TABS.indexOf(tab) === -1) tab = 'caisse';
+  if (tab === 'cloture' && !clotureVerifiedBarber) { verifyClotureAccess(); return; }
+  doSwitchCaisseTab(tab);
+}
+
+function verifyClotureAccess() {
+  showPrompt('Code PIN du coiffeur qui clôture la caisse :', { title: 'Accès à la Clôture', confirmLabel: 'Valider', inputMode: 'numeric' }).then(function (pin) {
+    if (!pin) return;
+    var headers = { 'Content-Type': 'application/json' };
+    if (SALON_SLUG) headers['X-Salon-Slug'] = SALON_SLUG;
+    fetch('/api/barbers/login', { method: 'POST', headers: headers, body: JSON.stringify({ pin: pin, source: 'cloture' }) })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
+      .then(function (res) {
+        if (!res.ok) { toast(res.data.error || 'Code incorrect', true); return; }
+        clotureVerifiedBarber = res.data.barber;
+        doSwitchCaisseTab('cloture');
+      })
+      .catch(function (e) { toast(e.message, true); });
+  });
+}
+
+function doSwitchCaisseTab(tab) {
+  if (tab !== 'cloture') clotureVerifiedBarber = null;
   CAISSE_TABS.forEach(function (t) {
     document.getElementById('panel-' + t).classList.toggle('on', t === tab);
     document.getElementById('nav-' + t).classList.toggle('on', t === tab);
@@ -1064,7 +1090,6 @@ function updateTabLockState() {
   var locked = !activeBarberId;
   document.getElementById('panel-timer').classList.toggle('locked', locked);
   document.getElementById('panel-caisse').classList.toggle('locked', locked);
-  document.getElementById('panel-cloture').classList.toggle('locked', locked);
 }
 
 /* ---------- Onglet Timer (repris de "Mon poste", scopé au coiffeur actif) ---------- */
@@ -2071,7 +2096,7 @@ function startCaisseClosing() {
         { title: '2/2 — Dernière confirmation', danger: true, confirmLabel: 'Clôturer définitivement' }
       ).then(function (ok2) {
         if (!ok2) return;
-        barberApi('/api/owner/caisse/close', { method: 'POST', body: { starting_cash_cents: floatCents } })
+        barberApi('/api/owner/caisse/close', { method: 'POST', body: { starting_cash_cents: floatCents, closed_by_barber_id: clotureVerifiedBarber ? clotureVerifiedBarber.id : null } })
           .then(function (r2) { printZTicket(r2.id); loadClotureTab(); })
           .catch(function (e) { toast(e.message, true); });
       });
@@ -2126,6 +2151,10 @@ function closeZTicket() {
 }
 
 function loadClotureTab() {
+  document.getElementById('cloture-verified-as').textContent = clotureVerifiedBarber
+    ? 'Connecté pour la clôture en tant que : ' + clotureVerifiedBarber.name
+    : '';
+
   barberApi('/api/owner/caisse/current-period').then(function (r) {
     document.getElementById('cloture-current-period').innerHTML =
       '<div style="display:flex;justify-content:space-between;font-size:14px">' +

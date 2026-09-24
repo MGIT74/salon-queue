@@ -665,7 +665,14 @@ router.post('/caisse/close', requireAdminOrBarber, wrap(async (req, res) => {
     [id, req.salon.id, periodStart, total, sales.length, JSON.stringify(byMethod), zNumber, startingCashCents]
   );
 
-  const actorLabel = req.barberId ? 'coiffeur' : 'admin';
+  let actorLabel = req.barberId ? 'coiffeur' : 'admin';
+  if (req.body.closed_by_barber_id) {
+    const [[verifiedBarber]] = await pool.query(
+      'SELECT name FROM barbers WHERE id = ? AND salon_id = ?',
+      [req.body.closed_by_barber_id, req.salon.id]
+    );
+    if (verifiedBarber) actorLabel = verifiedBarber.name;
+  }
   logActivity(req.salon.id, 'cash_closing', 'Clôture de caisse Z' + zNumber + ' (' + sales.length + ' vente' + (sales.length > 1 ? 's' : '') + ', ' + (total / 100).toFixed(2) + ' €, ' + actorLabel + ')');
   res.json({ ok: true, id, z_number: zNumber, total_cents: total, sales_count: sales.length });
 }));

@@ -230,7 +230,7 @@ router.post('/login', loginRateLimiter('barber-pin-login'), wrap(async (req, res
   );
   if (!barber) return res.status(401).json({ error: 'Code PIN incorrect' });
 
-  var sourceLabel = req.body.source === 'poste' ? 'au Poste' : req.body.source === 'caisse' ? 'à la Caisse' : '';
+  var sourceLabel = req.body.source === 'poste' ? 'au Poste' : req.body.source === 'caisse' ? 'à la Caisse' : req.body.source === 'cloture' ? 'pour vérification (Clôture)' : '';
   logActivity(req.salon.id, 'barber_login', 'Connexion' + (sourceLabel ? ' ' + sourceLabel : '') + ' de "' + barber.name + '" (code PIN)');
   res.json({ ok: true, barber });
 }));

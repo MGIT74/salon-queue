@@ -477,8 +477,9 @@ function showPrompt(message, opts) {
       (opts.title ? '<div class="modal-title">' + esc(opts.title) + '</div>' : '') +
       (message ? '<div class="modal-message">' + esc(message) + '</div>' : '') +
       '<div class="modal-error" id="modal-prompt-error" style="display:none"></div>' +
-      '<input class="modal-input" id="modal-prompt-input" type="text" value="' +
-      esc(opts.defaultValue || '') + '" placeholder="' + esc(opts.placeholder || '') + '">' +
+      '<input class="modal-input" id="modal-prompt-input" type="' + esc(opts.inputType || 'text') + '"' +
+      (opts.inputMode ? ' inputmode="' + esc(opts.inputMode) + '"' : '') +
+      ' value="' + esc(opts.defaultValue || '') + '" placeholder="' + esc(opts.placeholder || '') + '">' +
       '<div class="modal-actions">' +
       '<button class="btn btn-soft" id="modal-cancel-btn">Annuler</button>' +
       '<button class="btn ' + (opts.danger ? 'modal-danger-btn' : 'btn-primary') + '" id="modal-confirm-btn">' +
