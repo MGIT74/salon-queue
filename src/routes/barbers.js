@@ -230,6 +230,7 @@ router.post('/login', loginRateLimiter('barber-pin-login'), wrap(async (req, res
   );
   if (!barber) return res.status(401).json({ error: 'Code PIN incorrect' });
 
+  logActivity(req.salon.id, 'barber_login', 'Connexion de "' + barber.name + '" (code PIN)');
   res.json({ ok: true, barber });
 }));
 
