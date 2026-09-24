@@ -636,8 +636,12 @@ router.post('/caisse/close', requireAdminOrBarber, wrap(async (req, res) => {
 
   const [sales] = await pool.query(
     periodStart
-      ? 'SELECT payment_method, total_price_cents FROM sales WHERE salon_id = ? AND created_at > ?'
-      : 'SELECT payment_method, total_price_cents FROM sales WHERE salon_id = ?',
+      ? `SELECT s.payment_method, s.total_price_cents, s.barber_id, b.name AS barber_name
+         FROM sales s LEFT JOIN barbers b ON b.id = s.barber_id
+         WHERE s.salon_id = ? AND s.created_at > ?`
+      : `SELECT s.payment_method, s.total_price_cents, s.barber_id, b.name AS barber_name
+         FROM sales s LEFT JOIN barbers b ON b.id = s.barber_id
+         WHERE s.salon_id = ?`,
     periodStart ? [req.salon.id, periodStart] : [req.salon.id]
   );
 
@@ -646,10 +650,32 @@ router.post('/caisse/close', requireAdminOrBarber, wrap(async (req, res) => {
   }
 
   const byMethod = {};
+  const byBarber = {};
   let total = 0;
   sales.forEach((s) => {
     total += s.total_price_cents;
     byMethod[s.payment_method] = (byMethod[s.payment_method] || 0) + s.total_price_cents;
+    const barberKey = s.barber_id || '_none';
+    if (!byBarber[barberKey]) byBarber[barberKey] = { name: s.barber_name || 'Non attribué', count: 0, total_cents: 0 };
+    byBarber[barberKey].count += 1;
+    byBarber[barberKey].total_cents += s.total_price_cents;
+  });
+
+  const [saleItems] = await pool.query(
+    periodStart
+      ? `SELECT si.item_name, si.quantity, si.unit_price_cents
+         FROM sale_items si JOIN sales s ON s.id = si.sale_id
+         WHERE s.salon_id = ? AND s.created_at > ?`
+      : `SELECT si.item_name, si.quantity, si.unit_price_cents
+         FROM sale_items si JOIN sales s ON s.id = si.sale_id
+         WHERE s.salon_id = ?`,
+    periodStart ? [req.salon.id, periodStart] : [req.salon.id]
+  );
+  const byItem = {};
+  saleItems.forEach((it) => {
+    if (!byItem[it.item_name]) byItem[it.item_name] = { quantity: 0, total_cents: 0 };
+    byItem[it.item_name].quantity += it.quantity;
+    byItem[it.item_name].total_cents += it.quantity * it.unit_price_cents;
   });
 
   const id = crypto.randomUUID();
@@ -660,9 +686,9 @@ router.post('/caisse/close', requireAdminOrBarber, wrap(async (req, res) => {
   const zNumber = maxZ + 1;
 
   await pool.query(
-    `INSERT INTO cash_closings (id, salon_id, period_start, period_end, total_cents, sales_count, breakdown_json, z_number, starting_cash_cents)
-     VALUES (?, ?, ?, NOW(), ?, ?, ?, ?, ?)`,
-    [id, req.salon.id, periodStart, total, sales.length, JSON.stringify(byMethod), zNumber, startingCashCents]
+    `INSERT INTO cash_closings (id, salon_id, period_start, period_end, total_cents, sales_count, breakdown_json, z_number, starting_cash_cents, by_barber_json, by_item_json)
+     VALUES (?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?)`,
+    [id, req.salon.id, periodStart, total, sales.length, JSON.stringify(byMethod), zNumber, startingCashCents, JSON.stringify(byBarber), JSON.stringify(byItem)]
   );
 
   let actorLabel = req.barberId ? 'coiffeur' : 'admin';
@@ -741,6 +767,10 @@ router.get('/caisse/closings/:id', requireAdminOrBarber, wrap(async (req, res) =
 
   let breakdown = {};
   try { breakdown = JSON.parse(row.breakdown_json || '{}'); } catch (e) { breakdown = {}; }
+  let byBarber = {};
+  try { byBarber = JSON.parse(row.by_barber_json || '{}'); } catch (e) { byBarber = {}; }
+  let byItem = {};
+  try { byItem = JSON.parse(row.by_item_json || '{}'); } catch (e) { byItem = {}; }
 
   res.json({
     ok: true,
@@ -751,6 +781,8 @@ router.get('/caisse/closings/:id', requireAdminOrBarber, wrap(async (req, res) =
     total_cents: row.total_cents,
     sales_count: row.sales_count,
     breakdown,
+    by_barber: byBarber,
+    by_item: byItem,
     starting_cash_cents: row.starting_cash_cents,
     grand_total_cents: Number(grandTotal)
   });

@@ -5609,6 +5609,19 @@ function printZTicket(id) {
       return '<div class="zline"><span>' + esc(ZTICKET_METHOD_LABELS[m] || m) + '</span><span>' + eur(r.breakdown[m]) + '</span></div>';
     }).join('');
 
+    var barberRows = Object.keys(r.by_barber || {}).map(function (k) { return r.by_barber[k]; })
+      .sort(function (a, b) { return b.total_cents - a.total_cents; });
+    var byBarberHtml = barberRows.map(function (b) {
+      return '<div class="zline"><span>' + esc(b.name) + ' (' + b.count + ')</span><span>' + eur(b.total_cents) + '</span></div>';
+    }).join('');
+
+    var itemRows = Object.keys(r.by_item || {}).map(function (name) {
+      return Object.assign({ name: name }, r.by_item[name]);
+    }).sort(function (a, b) { return b.total_cents - a.total_cents; });
+    var byItemHtml = itemRows.map(function (it) {
+      return '<div class="zline"><span>' + it.quantity + ' × ' + esc(it.name) + '</span><span>' + eur(it.total_cents) + '</span></div>';
+    }).join('');
+
     var cashSalesCents = r.breakdown.especes || 0;
     var expectedInDrawer = (r.starting_cash_cents || 0) + cashSalesCents;
 
@@ -5619,6 +5632,8 @@ function printZTicket(id) {
       '<div class="zsection-label">Détail par mode de paiement</div>' +
       (breakdownHtml || '<div class="zline"><span>Aucun détail</span></div>') +
       '<div class="zline total"><span>Total (' + r.sales_count + ' vente' + (r.sales_count > 1 ? 's' : '') + ')</span><span>' + eur(r.total_cents) + '</span></div>' +
+      (byBarberHtml ? '<div class="zsection-label">Détail par coiffeur</div>' + byBarberHtml : '') +
+      (byItemHtml ? '<div class="zsection-label">Détail par prestation / produit</div>' + byItemHtml : '') +
       '<div class="zsection-label">Fond de caisse</div>' +
       '<div class="zline"><span>Fond de caisse (reste en caisse)</span><span>' + eur(r.starting_cash_cents || 0) + '</span></div>' +
       '<div class="zline"><span>+ Ventes en espèces</span><span>' + eur(cashSalesCents) + '</span></div>' +

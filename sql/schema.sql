@@ -914,3 +914,15 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'cash_closings' AND column_name = 'starting_cash_cents');
 SET @sql := IF(@c = 0, "ALTER TABLE cash_closings ADD COLUMN starting_cash_cents INT NOT NULL DEFAULT 0", 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Detail supplementaire du ticket Z : chiffre d'affaires par coiffeur
+-- et par prestation/produit vendu (demande explicitement, sur le
+-- modele d'un ticket Z d'un vrai logiciel de caisse professionnel) -
+-- fige au moment de la cloture, comme le reste du ticket.
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'cash_closings' AND column_name = 'by_barber_json');
+SET @sql := IF(@c = 0, "ALTER TABLE cash_closings ADD COLUMN by_barber_json TEXT NULL", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'cash_closings' AND column_name = 'by_item_json');
+SET @sql := IF(@c = 0, "ALTER TABLE cash_closings ADD COLUMN by_item_json TEXT NULL", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
