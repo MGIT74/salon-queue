@@ -236,7 +236,12 @@ function printTicket(text, printer, mode) {
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type'
+  'Access-Control-Allow-Headers': 'Content-Type',
+  // Chrome (Private Network Access) : une page HTTPS qui appelle un
+  // serveur du réseau local envoie d'abord une requête OPTIONS avec
+  // "Access-Control-Request-Private-Network: true" - sans la réponse
+  // ci-dessous, le navigateur bloque silencieusement l'appel.
+  'Access-Control-Allow-Private-Network': 'true'
 };
 
 function sendJson(res, status, obj) {
