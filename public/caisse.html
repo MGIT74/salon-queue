@@ -501,7 +501,8 @@
 
   /* --- Ticket Z (clôture de caisse imprimable) - identique a dashboard.html --- */
   .z-overlay {
-    display: none; position: fixed; inset: 0; z-index: 400; background: rgba(0,0,0,.5);
+    display: none; position: fixed; inset: 0; z-index: 400; background: rgba(0,0,0,.42);
+    backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
     align-items: center; justify-content: center; padding: 20px;
   }
   .z-overlay.on { display: flex; }
