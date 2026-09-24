@@ -3186,6 +3186,13 @@ function printReceiptSilent() {
  */
 function buildReceiptText(lines, total, method, o) {
   var COLS = 32;
+  // Le symbole € n'existe pas dans CP850 et les imprimantes jet d'encre
+  // (contrairement aux thermiques) ignorent souvent les commandes de
+  // table de caractères : il s'imprime "Ç". On l'écarte à la source —
+  // le montant est affiché avec le code devise lisible "EUR".
+  function money(cents) {
+    return (cents / 100).toFixed(2).replace('.', ',') + ' EUR';
+  }
   function pad(txt, len) { return String(txt == null ? '' : txt).slice(0, COLS); }
   function center(t) { t = String(t); var sp = Math.max(0, Math.floor((COLS - t.length) / 2)); return ' '.repeat(sp) + t; }
   function twoCols(a, b) {
@@ -3210,13 +3217,13 @@ function buildReceiptText(lines, total, method, o) {
 
   lines.forEach(function (l) {
     out.push(l.quantity + ' x ' + l.item_name);
-    out.push(twoCols('  ' + eur(l.unit_price_cents * l.quantity), ''));
+    out.push(twoCols('  ' + money(l.unit_price_cents * l.quantity), ''));
   });
 
   var articleCount = lines.reduce(function (n, l) { return n + l.quantity; }, 0);
   out.push(sep());
   out.push(twoCols('Articles', String(articleCount)));
-  out.push(twoCols('TOTAL TTC', eur(o.total != null ? o.total : total)));
+  out.push(twoCols('TOTAL TTC', money(o.total != null ? o.total : total)));
 
   if (legalInfo.vat_number) {
     var byRate = {};
@@ -3233,15 +3240,15 @@ function buildReceiptText(lines, total, method, o) {
     Object.keys(byRate).sort(function (a, b) { return b - a; }).forEach(function (rate) {
       var g = byRate[rate];
       totalHt += g.ht;
-      out.push(twoCols(rate + '%', eur(Math.round(g.ttc - g.ht)) + '/' + eur(Math.round(g.ttc))));
+      out.push(twoCols(rate + '%', money(Math.round(g.ttc - g.ht)) + '/' + money(Math.round(g.ttc))));
     });
-    out.push(twoCols('TOTAL HT', eur(Math.round(totalHt))));
+    out.push(twoCols('TOTAL HT', money(Math.round(totalHt))));
   } else {
     out.push(center('TVA non applicable, art. 293 B du CGI'));
   }
 
   out.push(sep());
-  out.push(twoCols(PAYMENT_LABELS[method] || method, eur(o.total != null ? o.total : total)));
+  out.push(twoCols(PAYMENT_LABELS[method] || method, money(o.total != null ? o.total : total)));
 
   if (legalInfo.siret) {
     var siretLine = 'SIRET ' + legalInfo.siret;
