@@ -100,6 +100,12 @@
   .caisse-tab-panel.locked .tab-lock-overlay {
     opacity: 1; visibility: visible; pointer-events: auto; transition: opacity .25s ease;
   }
+  .caisse-tab-panel.day-closed .tab-closed-overlay {
+    opacity: 1; visibility: visible; pointer-events: auto; transition: opacity .25s ease;
+  }
+  .caisse-tab-panel.day-closed .tab-lock-overlay:not(.tab-closed-overlay) {
+    opacity: 0 !important; visibility: hidden !important; pointer-events: none !important;
+  }
   .tab-lock-overlay .ic { color: var(--grey); opacity: .6; }
   .tab-lock-overlay .msg { font-size: 15px; font-weight: 600; max-width: 280px; }
   .tab-lock-overlay .sub { font-size: 13px; color: var(--grey); max-width: 280px; }
@@ -605,6 +611,11 @@
     </div>
 
     <div class="caisse-tab-panel on" id="panel-caisse">
+    <div class="tab-lock-overlay tab-closed-overlay">
+      <svg class="ic" viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+      <div class="msg">Caisse fermée</div>
+      <div class="sub" id="caisse-closed-reopen-text">La caisse a été clôturée pour la journée.</div>
+    </div>
     <div class="tab-lock-overlay">
       <svg class="ic" viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
       <div class="msg">Veuillez sélectionner votre profil</div>
@@ -954,6 +965,7 @@ function showApp() {
   document.getElementById('my-name').textContent = me.name;
   activeBarberId = me.id;
   updateTabLockState();
+  refreshCaisseLockState();
   loadTicketDraft(activeBarberId);
   loadBarberBubbles();
   loadCatalog();
@@ -1052,6 +1064,7 @@ function doSwitchCaisseTab(tab) {
   updateTabLockState();
   if (tab === 'timer') startTimerAutoRefresh(); else stopTimerAutoRefresh();
   if (tab === 'cloture') loadClotureTab();
+  if (tab === 'caisse') refreshCaisseLockState();
   if (tab === 'agenda') {
     startAgendaAutoRefresh();
     if (!calBooted) {
@@ -1180,6 +1193,27 @@ function selectActiveBarber(barberId) {
  * L'Agenda n'est volontairement PAS concerné : aucune bulle sélectionnée
  * y est un mode à part entière ("Tous les coiffeurs"), pas une erreur.
  */
+function refreshCaisseLockState() {
+  var headers = {};
+  if (SALON_SLUG) headers['X-Salon-Slug'] = SALON_SLUG;
+  fetch('/api/settings/public', { headers: headers })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      var panel = document.getElementById('panel-caisse');
+      if (d.caisse_locked_until) {
+        var when = new Date(d.caisse_locked_until).toLocaleString('fr-FR', {
+          weekday: 'long', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
+        });
+        document.getElementById('caisse-closed-reopen-text').textContent = 'Réouverture prévue le ' + when + '.';
+        panel.classList.add('day-closed');
+      } else {
+        panel.classList.remove('day-closed');
+      }
+    })
+    .catch(function () {});
+}
+setInterval(refreshCaisseLockState, 30000);
+
 function updateTabLockState() {
   var locked = !activeBarberId;
   document.getElementById('panel-timer').classList.toggle('locked', locked);
