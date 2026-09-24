@@ -833,6 +833,7 @@ function loadSalonName() {
       rdvPrepAlertMin = Number(d.rdv_prep_alert_min) || 0;
       legalInfo = d.legal || {};
       vatRates = d.vat_rates || { service: 20, extra: 20, product: 20 };
+      tpeBridgeUrl = d.tpe_bridge_url || null;
       applyAccentColor(d.accent_color);
       document.title = name + ' — Caisse';
       var mark = document.getElementById('salon-mark');
@@ -845,6 +846,11 @@ function loadSalonName() {
 loadSalonName();
 var legalInfo = {};
 var vatRates = { service: 20, extra: 20, product: 20 };
+// URL du pont local (réglages TPE du dashboard) : quand elle est définie,
+// les paiements carte sont envoyés au petit serveur du salon (même réseau
+// que le TPE) au lieu de l'API en ligne - le serveur cloud ne peut pas
+// joindre une IP locale du type 192.168.1.x.
+var tpeBridgeUrl = null;
 
 function barberApi(path, opts) {
   opts = opts || {};
@@ -2898,13 +2904,32 @@ function startTpePayment(saleCtx) {
   document.getElementById('tpe-actions').style.display = 'none';
   document.getElementById('tpe-overlay').classList.add('on');
 
-  barberApi('/api/tpe/charge', { method: 'POST', body: { amount_cents: saleCtx.total } })
+  // Deux chemins possibles vers le terminal :
+  // - pont local configuré : la requête part du navigateur de la caisse
+  //   vers le petit serveur du salon (même réseau que le TPE) - c'est le
+  //   seul chemin qui fonctionne quand l'app est hébergée en ligne ;
+  // - sinon : l'API serveur historique (utile si le serveur est lui-même
+  //   sur le réseau du salon, ou en attendant la mise en place du pont).
+  var bridgeCall = tpeBridgeUrl
+    ? fetch(tpeBridgeUrl.replace(/\/$/, '') + '/charge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount_cents: saleCtx.total })
+      }).then(function (r) {
+        return r.json().then(function (data) {
+          if (!r.ok) throw new Error(data.error || 'Erreur ' + r.status);
+          return data;
+        });
+      })
+    : barberApi('/api/tpe/charge', { method: 'POST', body: { amount_cents: saleCtx.total } });
+
+  bridgeCall
     .then(function (r) {
       if (r.success) {
         document.getElementById('tpe-overlay').classList.remove('on');
         finalizeSale(saleCtx);
       } else {
-        showTpeFailure('Paiement refusé par le terminal.');
+        showTpeFailure(r.failure_reason ? 'Paiement refusé : ' + r.failure_reason : 'Paiement refusé par le terminal.');
       }
     })
     .catch(function (e) { showTpeFailure(e.message); });

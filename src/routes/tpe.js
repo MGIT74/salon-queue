@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const { getSettings } = require('../db');
 const requireAdminOrBarber = require('../middleware/barberAuth');
 const { chargeCard } = require('../lib/tpeNepting');
+const { concertCharge } = require('../lib/tpeConcert');
 const { wrap } = require('../lib/wrap');
 
 const router = express.Router();
@@ -30,21 +31,39 @@ router.post('/charge', requireAdminOrBarber, wrap(async (req, res) => {
 
   const merchantTxId = crypto.randomBytes(8).toString('hex');
 
+  // Deux protocoles supportés selon la configuration du terminal :
+  // - "nepting" (défaut)  : trames TLV "Protocole Caisse" (API locale
+  //   Nepting, cf. lib/tpeNepting.js)
+  // - "concert"           : Concert version 3 IP — le protocole historique
+  //   annoncé "PROTOCOL: ConcertV3 IP" sur les tickets de config
+  //   (Crédit Agricole / Nepting, PAX A920Pro, Ingenico...).
   try {
-    const result = await chargeCard({
-      host: s.tpe_ip,
-      port: Number(s.tpe_port) || 20002,
-      replyMode: s.tpe_reply_mode === 'callback' ? 'callback' : 'same',
-      callbackPort: Number(s.tpe_callback_port) || 20006,
-      cashRegisterId: s.tpe_cash_register_id,
-      cashRegisterNumber: s.tpe_cash_register_number || '01'
-    }, { amountCents, merchantTxId });
+    let result;
+    if (s.tpe_protocol === 'concert') {
+      result = await concertCharge({
+        host: s.tpe_ip,
+        port: Number(s.tpe_port) || 8888,
+        posNumber: String(s.tpe_cash_register_number || '1').slice(0, 1),
+        transactionType: 'debit',
+        private: merchantTxId.slice(0, 10)
+      }, { amountCents, timeoutMs: 120000 });
+    } else {
+      result = await chargeCard({
+        host: s.tpe_ip,
+        port: Number(s.tpe_port) || 20002,
+        replyMode: s.tpe_reply_mode === 'callback' ? 'callback' : 'same',
+        callbackPort: Number(s.tpe_callback_port) || 20006,
+        cashRegisterId: s.tpe_cash_register_id,
+        cashRegisterNumber: s.tpe_cash_register_number || '01'
+      }, { amountCents, merchantTxId });
+    }
 
     res.json({
       ok: true,
       success: result.success,
-      auth_number: result.authNumber,
-      failure_code: result.failureCode,
+      auth_number: result.authNumber || null,
+      failure_code: result.failureCode || result.resultCode || null,
+      failure_reason: result.failureReason || null,
       merchant_tx_id: merchantTxId
     });
   } catch (err) {
