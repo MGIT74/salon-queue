@@ -926,3 +926,22 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'cash_closings' AND column_name = 'by_item_json');
 SET @sql := IF(@c = 0, "ALTER TABLE cash_closings ADD COLUMN by_item_json TEXT NULL", 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Recomptage du fond de caisse le lendemain matin, par le premier
+-- coiffeur qui se connecte (n'importe lequel) - confirme que l'argent
+-- reellement dans le tiroir correspond au fond de caisse declare a la
+-- cloture precedente, avant que la journee ne commence (sinon un
+-- manque se mélangerait avec les ventes du jour, impossible a repérer
+-- ensuite). Ne s'affiche qu'une seule fois par cloture (des que
+-- confirme par quelqu'un, plus personne ne revoit le popup).
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'cash_closings' AND column_name = 'recount_confirmed_at');
+SET @sql := IF(@c = 0, "ALTER TABLE cash_closings ADD COLUMN recount_confirmed_at DATETIME NULL", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'cash_closings' AND column_name = 'recount_actual_cents');
+SET @sql := IF(@c = 0, "ALTER TABLE cash_closings ADD COLUMN recount_actual_cents INT NULL", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'cash_closings' AND column_name = 'recount_confirmed_by');
+SET @sql := IF(@c = 0, "ALTER TABLE cash_closings ADD COLUMN recount_confirmed_by VARCHAR(120) NULL", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;

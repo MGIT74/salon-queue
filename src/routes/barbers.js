@@ -232,7 +232,17 @@ router.post('/login', loginRateLimiter('barber-pin-login'), wrap(async (req, res
 
   var sourceLabel = req.body.source === 'poste' ? 'au Poste' : req.body.source === 'caisse' ? 'à la Caisse' : req.body.source === 'cloture' ? 'pour vérification (Clôture)' : '';
   logActivity(req.salon.id, 'barber_login', 'Connexion' + (sourceLabel ? ' ' + sourceLabel : '') + ' de "' + barber.name + '" (code PIN)');
-  res.json({ ok: true, barber });
+
+  let pendingRecount = null;
+  if (req.body.source === 'caisse') {
+    const [[lastClosing]] = await pool.query(
+      'SELECT id, starting_cash_cents FROM cash_closings WHERE salon_id = ? AND recount_confirmed_at IS NULL ORDER BY period_end DESC LIMIT 1',
+      [req.salon.id]
+    );
+    if (lastClosing) pendingRecount = { closing_id: lastClosing.id, expected_cents: lastClosing.starting_cash_cents };
+  }
+
+  res.json({ ok: true, barber, pending_recount: pendingRecount });
 }));
 
 /**

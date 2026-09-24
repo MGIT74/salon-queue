@@ -717,6 +717,49 @@ router.get('/caisse/suggested-float', requireAdminOrBarber, wrap(async (req, res
 }));
 
 /**
+ * Confirme le recomptage du fond de caisse le lendemain matin (premier
+ * coiffeur connecte) - avec ou sans ecart constate. Journalise dans
+ * tous les cas (conforme ou ecart), avec le montant precis si un ecart
+ * est signale.
+ */
+router.post('/caisse/confirm-recount', requireAdminOrBarber, wrap(async (req, res) => {
+  const closingId = String(req.body.closing_id || '');
+  const actualCents = Math.round(Number(req.body.actual_cents));
+  if (!closingId || !Number.isFinite(actualCents) || actualCents < 0) {
+    return res.status(400).json({ error: 'Montant recompté invalide.' });
+  }
+
+  const [[closing]] = await pool.query(
+    'SELECT z_number, starting_cash_cents, recount_confirmed_at FROM cash_closings WHERE id = ? AND salon_id = ?',
+    [closingId, req.salon.id]
+  );
+  if (!closing) return res.status(404).json({ error: 'Clôture introuvable.' });
+  if (closing.recount_confirmed_at) return res.status(400).json({ error: 'Ce recomptage a déjà été confirmé.' });
+
+  let actorName = 'Admin';
+  if (req.barberId) {
+    const [[b]] = await pool.query('SELECT name FROM barbers WHERE id = ? AND salon_id = ?', [req.barberId, req.salon.id]);
+    if (b) actorName = b.name;
+  }
+
+  await pool.query(
+    'UPDATE cash_closings SET recount_confirmed_at = NOW(), recount_actual_cents = ?, recount_confirmed_by = ? WHERE id = ?',
+    [actualCents, actorName, closingId]
+  );
+
+  const diffCents = actualCents - closing.starting_cash_cents;
+  const zLabel = 'Z' + String(closing.z_number).padStart(3, '0');
+  if (diffCents === 0) {
+    logActivity(req.salon.id, 'cash_recount', 'Fond de caisse recompté par ' + actorName + ' (' + zLabel + ') — conforme : ' + (actualCents / 100).toFixed(2) + ' €');
+  } else {
+    const sign = diffCents > 0 ? '+' : '';
+    logActivity(req.salon.id, 'cash_recount', 'Fond de caisse recompté par ' + actorName + ' (' + zLabel + ') — ÉCART constaté : ' + (actualCents / 100).toFixed(2) + ' € trouvés au lieu de ' + (closing.starting_cash_cents / 100).toFixed(2) + ' € attendus (' + sign + (diffCents / 100).toFixed(2) + ' €)');
+  }
+
+  res.json({ ok: true, diff_cents: diffCents });
+}));
+
+/**
  * Historique des clotures precedentes.
  */
 router.get('/caisse/closings', requireAdminOrBarber, wrap(async (req, res) => {

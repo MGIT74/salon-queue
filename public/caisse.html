@@ -698,6 +698,29 @@
   <div class="z-box" id="z-box"></div>
 </div>
 
+<div class="z-overlay" id="recount-overlay">
+  <div style="text-align:center;background:var(--card);border-radius:20px;padding:32px 28px;max-width:360px;width:100%">
+    <h2 style="margin-bottom:6px">Recomptage du fond de caisse</h2>
+    <p class="hint" style="margin-bottom:20px">Fond de caisse d'hier : <b id="recount-expected" style="color:var(--ink)"></b> — à recompter avant de commencer.</p>
+
+    <div id="recount-step-1">
+      <button class="btn btn-primary" style="width:100%;padding:14px;font-size:15px" onclick="startRecountStep2()">
+        Ouvrir la caisse pour compter
+      </button>
+    </div>
+
+    <div id="recount-step-2" style="display:none">
+      <p class="hint" style="margin-bottom:14px">Une fois compté et le tiroir refermé :</p>
+      <button class="btn btn-primary" style="width:100%;padding:14px;font-size:15px;margin-bottom:10px" onclick="confirmRecountMatch()">Le compte est bon</button>
+      <button class="btn btn-ghost" style="width:100%;padding:10px;font-size:13.5px" onclick="showRecountMismatchInput()">Il y a un écart</button>
+      <div id="recount-mismatch-box" style="display:none;margin-top:14px">
+        <input class="modal-input" id="recount-actual-input" type="number" step="0.01" inputmode="decimal" placeholder="Montant réellement trouvé (€)" style="width:100%;box-sizing:border-box">
+        <button class="btn btn-primary" style="width:100%;padding:12px;margin-top:10px" onclick="confirmRecountMismatch()">Valider avec cet écart</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="z-overlay" id="cloture-pin-overlay">
   <div style="text-align:center;background:var(--card);border-radius:20px;padding:32px 28px;max-width:340px;width:100%">
     <h1 style="margin-bottom:6px">Clôture</h1>
@@ -879,6 +902,7 @@ function attemptLogin() {
       me = { id: res.data.barber.id, name: res.data.barber.name, pin: pinBuffer };
       try { sessionStorage.setItem('caisse-session', JSON.stringify(me)); } catch (e) {}
       showApp();
+      checkPendingRecount(res.data.pending_recount);
     })
     .catch(function () {
       document.getElementById('login-error').textContent = 'Connexion impossible';
@@ -2265,6 +2289,50 @@ function loadClotureTab() {
         '</div></div>';
     }).join('');
   }).catch(function (e) { toast(e.message, true); });
+}
+
+var pendingRecountClosingId = null;
+var pendingRecountExpectedCents = 0;
+
+function checkPendingRecount(pr) {
+  if (!pr) return;
+  pendingRecountClosingId = pr.closing_id;
+  pendingRecountExpectedCents = pr.expected_cents;
+  document.getElementById('recount-expected').textContent = eur(pr.expected_cents);
+  document.getElementById('recount-step-1').style.display = 'block';
+  document.getElementById('recount-step-2').style.display = 'none';
+  document.getElementById('recount-mismatch-box').style.display = 'none';
+  document.getElementById('recount-actual-input').value = '';
+  document.getElementById('recount-overlay').classList.add('on');
+}
+
+function startRecountStep2() {
+  openCashDrawer();
+  document.getElementById('recount-step-1').style.display = 'none';
+  document.getElementById('recount-step-2').style.display = 'block';
+}
+
+function showRecountMismatchInput() {
+  document.getElementById('recount-mismatch-box').style.display = 'block';
+}
+
+function confirmRecountMatch() {
+  submitRecount(pendingRecountExpectedCents);
+}
+
+function confirmRecountMismatch() {
+  var val = parseFloat((document.getElementById('recount-actual-input').value || '').replace(',', '.'));
+  if (!Number.isFinite(val) || val < 0) { toast('Montant invalide', true); return; }
+  submitRecount(Math.round(val * 100));
+}
+
+function submitRecount(actualCents) {
+  barberApi('/api/owner/caisse/confirm-recount', { method: 'POST', body: { closing_id: pendingRecountClosingId, actual_cents: actualCents } })
+    .then(function () {
+      document.getElementById('recount-overlay').classList.remove('on');
+      toast('Fond de caisse vérifié');
+    })
+    .catch(function (e) { toast(e.message, true); });
 }
 
 function forceOpenCaisse() {
