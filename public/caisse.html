@@ -3119,7 +3119,7 @@ function showReceipt(lines, total, method, opts) {
     '<div class="rlegal-line" style="text-align:center;margin-top:10px">Merci de votre visite</div>' +
     '<div class="receipt-actions">' +
       '<button class="btn btn-soft" onclick="closeReceipt()">Fermer</button>' +
-      '<button class="btn btn-primary" onclick="window.print()">Imprimer</button>' +
+      '<button class="btn btn-primary" id="receipt-print-btn" onclick="printReceiptSilent()">Imprimer</button>' +
     '</div>';
   document.getElementById('receipt-box').innerHTML = html;
   document.getElementById('receipt-overlay').classList.add('on');
@@ -3129,17 +3129,55 @@ function showReceipt(lines, total, method, opts) {
   // dans le salon le récupère par polling et l'imprime via CUPS — sans
   // aucune boîte de dialogue. (Un envoi direct navigateur -> pont local
   // était bloqué par Chrome : page https vers http du LAN.)
+  // L'envoi automatique se fait dès l'affichage du reçu ; le bouton
+  // "Imprimer" ci-dessus rejoue le même envoi (copie demandée par le
+  // client) — même chemin silencieux, aucun dialogue. En cas d'échec,
+  // l'aperçu reste à l'écran et le bouton bascule sur window.print()
+  // (dialogue navigateur, repli universel).
   if (tpeBridgeUrl) {
-    var ticketText = buildReceiptText(lines, total, method, {
+    var receiptCtx = {
+      lines: lines, total: total, method: method,
       whenDate: whenDate, ticketNumber: ticketNumber, barberName: barberName, salonName: salonName
-    });
-    barberApi('/api/tpe/print', {
-      method: 'POST',
-      body: { text: ticketText, mode: tpeBridgeUrl.includes('escpos=off') ? 'text' : 'escpos' }
-    })
-      .then(function (d) { if (d.ok) toast('Ticket envoyé à l\'imprimante'); })
-      .catch(function () { toast('File d\'impression indisponible — utilisez le bouton Imprimer', true); });
+    };
+    currentReceiptCtx = receiptCtx;
+    sendReceiptToPrinter(receiptCtx)
+      .then(function (sent) {
+        if (sent) setTimeout(closeReceipt, 1200);
+        // échec : le reçu reste affiché, le bouton Imprimer fera window.print()
+      });
   }
+}
+
+// Contexte du reçu actuellement affiché, pour que le bouton "Imprimer"
+// puisse ré-envoyer le même ticket au pont (copie client).
+var currentReceiptCtx = null;
+
+/**
+ * Envoie (ou ré-envoie) le ticket au pont d'impression. Renvoie true si
+ * l'envoi a été accepté par le serveur, false sinon (ou si pas de pont).
+ * Utilisé à la fois pour l'impression automatique après paiement et pour
+ * le bouton "Imprimer" de l'aperçu (copie à la demande).
+ */
+function sendReceiptToPrinter(ctx) {
+  if (!tpeBridgeUrl) return Promise.resolve(false);
+  var ticketText = buildReceiptText(ctx.lines, ctx.total, ctx.method, {
+    whenDate: ctx.whenDate, ticketNumber: ctx.ticketNumber,
+    barberName: ctx.barberName, salonName: ctx.salonName
+  });
+  return barberApi('/api/tpe/print', {
+    method: 'POST',
+    body: { text: ticketText, mode: tpeBridgeUrl.includes('escpos=off') ? 'text' : 'escpos' }
+  })
+    .then(function (d) {
+      if (!d.ok) return false;
+      toast('Ticket envoyé à l\'imprimante');
+      return true;
+    })
+    .catch(function () {
+      toast('File d\'impression indisponible — le dialogue va s\'ouvrir', true);
+      window.print();
+      return false;
+    });
 }
 
 /**
