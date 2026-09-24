@@ -1013,3 +1013,10 @@ CREATE TABLE IF NOT EXISTS tpe_charge_jobs (
 SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'sales' AND column_name = 'queue_id');
 SET @sql := IF(@c = 0, "ALTER TABLE sales ADD COLUMN queue_id CHAR(36) NULL", 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Ventilation TVA par taux (CA TTC/HT/TVA pour chaque taux applique),
+-- demandee suite a un test de cloture ou l'utilisateur a remarque son
+-- absence par rapport a un vrai ticket Z de logiciel de caisse.
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'cash_closings' AND column_name = 'vat_json');
+SET @sql := IF(@c = 0, "ALTER TABLE cash_closings ADD COLUMN vat_json TEXT NULL", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;

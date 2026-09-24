@@ -663,15 +663,37 @@ router.post('/caisse/close', requireAdminOrBarber, wrap(async (req, res) => {
 
   const [saleItems] = await pool.query(
     periodStart
-      ? `SELECT si.item_name, si.quantity, si.unit_price_cents
+      ? `SELECT si.item_name, si.item_type, si.quantity, si.unit_price_cents
          FROM sale_items si JOIN sales s ON s.id = si.sale_id
          WHERE s.salon_id = ? AND s.created_at > ?`
-      : `SELECT si.item_name, si.quantity, si.unit_price_cents
+      : `SELECT si.item_name, si.item_type, si.quantity, si.unit_price_cents
          FROM sale_items si JOIN sales s ON s.id = si.sale_id
          WHERE s.salon_id = ?`,
     periodStart ? [req.salon.id, periodStart] : [req.salon.id]
   );
   const byItem = {};
+  const vatRateFor = (itemType) => {
+    const raw = itemType === 'service' ? req.salon.vat_rate_service
+      : itemType === 'extra' ? req.salon.vat_rate_extra
+      : req.salon.vat_rate_product;
+    return (raw !== undefined && raw !== null && raw !== '') ? Number(raw) : 20;
+  };
+  // Ventilation TVA par taux (comme sur un vrai ticket Z de logiciel de
+  // caisse) : CA TTC, HT et TVA pour chaque taux applique, plus le
+  // total TVA - demande explicitement suite a un test de cloture.
+  const byVatRate = {};
+  saleItems.forEach((it) => {
+    const rate = vatRateFor(it.item_type);
+    const ttc = it.quantity * it.unit_price_cents;
+    if (!byVatRate[rate]) byVatRate[rate] = { ttc_cents: 0 };
+    byVatRate[rate].ttc_cents += ttc;
+  });
+  Object.keys(byVatRate).forEach((rate) => {
+    const ttc = byVatRate[rate].ttc_cents;
+    const ht = Math.round(ttc / (1 + Number(rate) / 100));
+    byVatRate[rate].ht_cents = ht;
+    byVatRate[rate].vat_cents = ttc - ht;
+  });
   saleItems.forEach((it) => {
     if (!byItem[it.item_name]) byItem[it.item_name] = { quantity: 0, total_cents: 0 };
     byItem[it.item_name].quantity += it.quantity;
@@ -695,9 +717,9 @@ router.post('/caisse/close', requireAdminOrBarber, wrap(async (req, res) => {
     zNumber = maxZ + 1;
     try {
       await pool.query(
-        `INSERT INTO cash_closings (id, salon_id, period_start, period_end, total_cents, sales_count, breakdown_json, z_number, starting_cash_cents, by_barber_json, by_item_json)
-         VALUES (?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?)`,
-        [id, req.salon.id, periodStart, total, sales.length, JSON.stringify(byMethod), zNumber, startingCashCents, JSON.stringify(byBarber), JSON.stringify(byItem)]
+        `INSERT INTO cash_closings (id, salon_id, period_start, period_end, total_cents, sales_count, breakdown_json, z_number, starting_cash_cents, by_barber_json, by_item_json, vat_json)
+         VALUES (?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [id, req.salon.id, periodStart, total, sales.length, JSON.stringify(byMethod), zNumber, startingCashCents, JSON.stringify(byBarber), JSON.stringify(byItem), JSON.stringify(byVatRate)]
       );
       break;
     } catch (err) {
@@ -829,6 +851,8 @@ router.get('/caisse/closings/:id', requireAdminOrBarber, wrap(async (req, res) =
   try { byBarber = JSON.parse(row.by_barber_json || '{}'); } catch (e) { byBarber = {}; }
   let byItem = {};
   try { byItem = JSON.parse(row.by_item_json || '{}'); } catch (e) { byItem = {}; }
+  let byVat = {};
+  try { byVat = JSON.parse(row.vat_json || '{}'); } catch (e) { byVat = {}; }
 
   res.json({
     ok: true,
@@ -841,6 +865,7 @@ router.get('/caisse/closings/:id', requireAdminOrBarber, wrap(async (req, res) =
     breakdown,
     by_barber: byBarber,
     by_item: byItem,
+    by_vat: byVat,
     starting_cash_cents: row.starting_cash_cents,
     grand_total_cents: Number(grandTotal)
   });
