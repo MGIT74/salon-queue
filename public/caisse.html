@@ -3119,6 +3119,109 @@ function showReceipt(lines, total, method, opts) {
     '</div>';
   document.getElementById('receipt-box').innerHTML = html;
   document.getElementById('receipt-overlay').classList.add('on');
+
+  // Impression silencieuse via le pont local : si configuré, le ticket
+  // (version texte 32 colonnes) part directement à l'imprimante du
+  // salon, sans aucune boîte de dialogue. En cas d'échec, on affiche
+  // une note discrète — le bouton "Imprimer" (dialogue navigateur)
+  // reste toujours disponible en repli.
+  if (tpeBridgeUrl) {
+    var ticketText = buildReceiptText(lines, total, method, {
+      whenDate: whenDate, ticketNumber: ticketNumber, barberName: barberName, salonName: salonName
+    });
+    fetch(tpeBridgeUrl.replace(/\/$/, '') + '/print', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: ticketText })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d.ok) toast('Ticket envoyé à l\'imprimante');
+        else toast('Impression directe impossible : ' + (d.error || 'erreur') + ' — utilisez le bouton Imprimer', true);
+      })
+      .catch(function () { toast('Pont d\'impression injoignable — utilisez le bouton Imprimer', true); });
+  }
+}
+
+/**
+ * Version TEXTE du ticket pour l'impression silencieuse (thermique
+ * 32/48 colonnes via lp, sans dialogue). Même contenu que le rendu
+ * HTML : en-tête légal, articles, TVA, total, mode de paiement, pied
+ * légal. `cols` s'adapte à la largeur du rouleau (32 par défaut).
+ */
+function buildReceiptText(lines, total, method, o) {
+  var COLS = 32;
+  function pad(txt, len) { return String(txt == null ? '' : txt).slice(0, COLS); }
+  function center(t) { t = String(t); var sp = Math.max(0, Math.floor((COLS - t.length) / 2)); return ' '.repeat(sp) + t; }
+  function twoCols(a, b) {
+    a = String(a); b = String(b);
+    var space = COLS - a.length - b.length;
+    if (space < 1) { return (a + ' ' + b).slice(0, COLS); }
+    return a + ' '.repeat(space) + b;
+  }
+  function sep() { return '-'.repeat(COLS); }
+
+  var out = [];
+  if (o.salonName) out.push(center(o.salonName));
+  if (legalInfo.address) String(legalInfo.address).split('\n').forEach(function (l) { out.push(center(l)); });
+  if (legalInfo.phone) out.push(center('Tel : ' + legalInfo.phone));
+  if (legalInfo.email) out.push(center('Mail : ' + legalInfo.email));
+  if (legalInfo.website) out.push(center(legalInfo.website));
+  out.push(sep());
+  out.push(twoCols('Date', o.whenDate.toLocaleDateString('fr-FR') + ' ' + o.whenDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })));
+  out.push(twoCols('Ticket n°', o.ticketNumber || ''));
+  if (o.barberName) out.push(twoCols('Coiffeur', o.barberName));
+  out.push(sep());
+
+  lines.forEach(function (l) {
+    out.push(l.quantity + ' x ' + l.item_name);
+    out.push(twoCols('  ' + eur(l.unit_price_cents * l.quantity), ''));
+  });
+
+  var articleCount = lines.reduce(function (n, l) { return n + l.quantity; }, 0);
+  out.push(sep());
+  out.push(twoCols('Articles', String(articleCount)));
+  out.push(twoCols('TOTAL TTC', eur(o.total != null ? o.total : total)));
+
+  if (legalInfo.vat_number) {
+    var byRate = {};
+    lines.forEach(function (l) {
+      var rate = vatRateFor(l.item_type);
+      var ttc = l.unit_price_cents * l.quantity;
+      var ht = rate > 0 ? ttc / (1 + rate / 100) : ttc;
+      if (!byRate[rate]) byRate[rate] = { ht: 0, ttc: 0 };
+      byRate[rate].ht += ht; byRate[rate].ttc += ttc;
+    });
+    var totalHt = 0;
+    out.push(sep());
+    out.push(twoCols('Taux', 'HT       TTC'));
+    Object.keys(byRate).sort(function (a, b) { return b - a; }).forEach(function (rate) {
+      var g = byRate[rate];
+      totalHt += g.ht;
+      out.push(twoCols(rate + '%', eur(Math.round(g.ttc - g.ht)) + '/' + eur(Math.round(g.ttc))));
+    });
+    out.push(twoCols('TOTAL HT', eur(Math.round(totalHt))));
+  } else {
+    out.push(center('TVA non applicable, art. 293 B du CGI'));
+  }
+
+  out.push(sep());
+  out.push(twoCols(PAYMENT_LABELS[method] || method, eur(o.total != null ? o.total : total)));
+
+  if (legalInfo.siret) {
+    var siretLine = 'SIRET ' + legalInfo.siret;
+    if (legalInfo.naf_code) siretLine += ' NAF ' + legalInfo.naf_code;
+    out.push(center(siretLine));
+  }
+  if (legalInfo.vat_number) out.push(center('TVA Intracom ' + legalInfo.vat_number));
+  if (legalInfo.rcs_city && legalInfo.siret) out.push(center('RCS ' + legalInfo.rcs_city + ' ' + legalInfo.siret.slice(0, 9)));
+  if (legalInfo.register_number) out.push(center('Caisse ' + legalInfo.register_number));
+
+  out.push('');
+  out.push(center('Merci de votre visite'));
+  out.push('');
+  out.push('');
+  return out.join('\n');
 }
 
 function closeReceipt() {

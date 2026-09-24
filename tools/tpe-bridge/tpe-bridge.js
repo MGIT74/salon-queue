@@ -42,7 +42,7 @@ const net = require('net');
 /* ---------- Lecture des arguments ---------- */
 
 function parseArgs(argv) {
-  const opts = { tpe: null, port: 8888, listen: 7788, pos: '2' };
+  const opts = { tpe: null, port: 8888, listen: 7788, pos: '2', printer: '' };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     const next = () => argv[++i];
@@ -50,26 +50,24 @@ function parseArgs(argv) {
     else if (a === '--port') opts.port = parseInt(next(), 10);
     else if (a === '--listen') opts.listen = parseInt(next(), 10);
     else if (a === '--pos') opts.pos = String(next()).slice(0, 1);
+    else if (a === '--printer') opts.printer = String(next());
     else if (a === '--help' || a === '-h') { printHelp(); process.exit(0); }
-  }
-  if (!opts.tpe) {
-    console.error('[!] Adresse IP du TPE manquante. Exemple :');
-    console.error('    node tpe-bridge.js --tpe 192.168.1.125 --pos 2');
-    process.exit(1);
   }
   return opts;
 }
 
 function printHelp() {
   console.log(`
-Pont local caisse <-> TPE (Concert v3 IP)
+Pont local caisse <-> TPE + impression silencieuse
 
   node tpe-bridge.js --tpe <ip du TPE> [options]
 
-  --tpe <ip>      IP du terminal (obligatoire, voir ticket de config)
-  --port <n>      Port Concert du TPE (defaut : 8888)
-  --listen <n>    Port HTTP de ce pont (defaut : 7788)
-  --pos <n>       Numero de caisse (defaut : 2)
+  --tpe <ip>         IP du terminal (facultatif si impression seule)
+  --port <n>         Port Concert du TPE (defaut : 8888)
+  --listen <n>       Port HTTP de ce pont (defaut : 7788)
+  --pos <n>          Numero de caisse (defaut : 2)
+  --printer <nom>    Imprimante CUPS pour les tickets (defaut : imprimante
+                     par defaut du systeme). Liste : lpstat -p | grep imprimante
 `);
 }
 
@@ -185,6 +183,54 @@ function concertCharge(host, port, pos, amountCents, timeoutMs) {
   });
 }
 
+/* ---------- Impression silencieuse ---------- */
+
+const { execFile } = require('child_process');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+
+/**
+ * Imprime du texte brut via CUPS (macOS/Linux) SANS aucune boîte de
+ * dialogue : on écrit un fichier temporaire et on le soumet à `lp`.
+ * Deux modes :
+ *  - "escpos"  (défaut) : l'imprimante est une thermique 58/80 mm ;
+ *    on lui envoie du texte brut + commande de découpe. `lp -o raw`
+ *    est requis (file "raw" activée par défaut sur la plupart des
+ *    pilotes thermiques).
+ *  - "text" : imprimante classique (A4...) - lp rendra le texte
+ *    proprement avec ses filtres standards.
+ * printer : nom CUPS (ex. "EPSON_TM-T20III"). Vide = imprimante par
+ * défaut du système.
+ * Le retour contient l'identifiant de job CUPS (ex. "EPSON-123") pour
+ * tracer l'impression.
+ */
+function printTicket(text, printer, mode) {
+  return new Promise((resolve, reject) => {
+    const tmpFile = path.join(os.tmpdir(), 'ticket-' + Date.now() + '.txt');
+    fs.writeFile(tmpFile, text, 'utf8', (err) => {
+      if (err) return reject(new Error('Écriture du ticket impossible : ' + err.message));
+
+      const args = [];
+      if (printer) args.push('-d', printer);
+      if (mode === 'escpos') args.push('-o', 'raw');
+      args.push('-t', 'Ticket-caisse');
+      args.push(tmpFile);
+
+      execFile('lp', args, { timeout: 15000 }, (err2, stdout, stderr) => {
+        // Le fichier temporaire est soumis : on le supprime quoi qu'il arrive
+        fs.unlink(tmpFile, () => {});
+        if (err2) {
+          const msg = (stderr || err2.message || '').trim();
+          reject(new Error('Impression refusée par le système : ' + msg));
+        } else {
+          resolve({ jobId: (stdout || '').trim() });
+        }
+      });
+    });
+  });
+}
+
 /* ---------- Serveur HTTP ---------- */
 
 const CORS_HEADERS = {
@@ -210,6 +256,38 @@ function main() {
 
     if (req.method === 'GET' && req.url.split('?')[0] === '/health') {
       return sendJson(res, 200, { ok: true, tpe: opts.tpe, pos: opts.pos });
+    }
+
+    // Impression silencieuse d'un ticket (texte brut). La caisse génère
+    // le texte du ticket et le pousse ici ; le pont le soumet à lp
+    // (CUPS) sans aucune boîte de dialogue.
+    // Body : { text: "...", mode: "escpos"|"text" (défaut escpos), printer: "NOM" }
+    if (req.method === 'POST' && req.url.split('?')[0] === '/print') {
+      let body = '';
+      req.on('data', (c) => { body += c; if (body.length > 100_000) req.destroy(); });
+      req.on('end', async () => {
+        let payload;
+        try {
+          payload = JSON.parse(body);
+        } catch (e) {
+          return sendJson(res, 400, { error: 'Requête invalide' });
+        }
+        const text = typeof payload.text === 'string' ? payload.text : '';
+        if (!text.trim()) return sendJson(res, 400, { error: 'Ticket vide' });
+        const mode = payload.mode === 'text' ? 'text' : 'escpos';
+        const printer = typeof payload.printer === 'string' && payload.printer.trim() ? payload.printer.trim() : opts.printer || '';
+
+        console.log(`[${new Date().toLocaleTimeString()}] Impression (${mode}${printer ? ', ' + printer : ', défaut'}) — ${text.length} caractères`);
+        try {
+          const out = await printTicket(text, printer, mode);
+          console.log('[<] Impression soumise :', out.jobId || '(job CUPS sans id)');
+          sendJson(res, 200, Object.assign({ ok: true }, out));
+        } catch (err) {
+          console.error('[!] Échec impression :', err.message);
+          sendJson(res, 502, { error: err.message });
+        }
+      });
+      return;
     }
 
     if (req.method === 'POST' && req.url.split('?')[0] === '/charge') {
@@ -243,15 +321,23 @@ function main() {
   });
 
   server.listen(opts.listen, () => {
-    console.log('=== Pont TPE Concert v3 ===');
-    console.log(`TPE cible     : ${opts.tpe}:${opts.port} (n° caisse ${opts.pos})`);
+    console.log('=== Pont TPE Concert v3 + impression ===');
+    console.log(`TPE cible     : ${opts.tpe ? opts.tpe + ':' + opts.port + ' (n° caisse ' + opts.pos + ')' : '(impression seule - pas de TPE configuré)'}`);
+    console.log(`Imprimante    : ${opts.printer || 'imprimante par défaut du système'}`);
     console.log(`Pont en écoute: http://0.0.0.0:${opts.listen}`);
     console.log(`Santé         : http://localhost:${opts.listen}/health`);
     console.log('');
     console.log('Dans la caisse (Dashboard > Réglages > Terminal de paiement), renseignez :');
     console.log(`  Pont local : http://<ip-de-cet-ordinateur>:${opts.listen}`);
     console.log('');
-    console.log('En attente de paiements... (Ctrl+C pour arrêter)');
+    console.log('Imprimantes disponibles (lpstat -a) :');
+    const { execFile } = require('child_process');
+    execFile('lpstat', ['-a'], (err, stdout) => {
+      if (err || !stdout.trim()) console.log('  (aucune imprimante détectée)');
+      else stdout.trim().split('\n').forEach((l) => console.log('  ' + l));
+    });
+    console.log('');
+    console.log('En attente de paiements et impressions... (Ctrl+C pour arrêter)');
   });
 
   server.on('error', (err) => {
