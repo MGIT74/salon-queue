@@ -2,6 +2,7 @@ const express = require('express');
 const { pool, getSettings, setSettings, getCaisseLockedUntil, getPlatformSettings } = require('../db');
 const { sendTest, invalidateTransport, sendAppointmentConfirmation, sendAppointmentReminder, sendAppointmentCancelledByAdmin, sendAppointmentRescheduled, sendTurnSoon, sendSalonClosureNotice } = require('../lib/mailer');
 const requireAdmin = require('../middleware/auth');
+const { logActivity } = require('../lib/activityLog');
 const { wrap } = require('../lib/wrap');
 
 const router = express.Router();
@@ -36,6 +37,7 @@ const EDITABLE = [
 // configurée. Se réactive normalement à la prochaine clôture.
 router.post('/caisse/force-open', requireAdmin, wrap(async (req, res) => {
   await setSettings(req.salon.id, { caisse_force_reopen_at: new Date().toISOString() });
+  logActivity(req.salon.id, 'caisse_force_open', 'Caisse déverrouillée manuellement (mot de passe admin)');
   res.json({ ok: true });
 }));
 
