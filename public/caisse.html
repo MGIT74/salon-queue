@@ -1004,6 +1004,7 @@ function attemptClotureVerification() {
         return;
       }
       clotureVerifiedBarber = res.data.barber;
+      renderBarberBubbles();
       closeCloturePinModal();
       doSwitchCaisseTab('cloture');
     })
@@ -1019,7 +1020,7 @@ function verifyClotureAccess() {
 }
 
 function doSwitchCaisseTab(tab) {
-  if (tab !== 'cloture') clotureVerifiedBarber = null;
+  if (tab !== 'cloture') { clotureVerifiedBarber = null; renderBarberBubbles(); }
   CAISSE_TABS.forEach(function (t) {
     document.getElementById('panel-' + t).classList.toggle('on', t === tab);
     document.getElementById('nav-' + t).classList.toggle('on', t === tab);
@@ -1068,7 +1069,10 @@ function loadBarberBubbles() {
 
 function renderBarberBubbles() {
   var box = document.getElementById('barber-bubbles');
-  box.innerHTML = allBarbers.map(function (b) {
+  var list = clotureVerifiedBarber
+    ? allBarbers.filter(function (b) { return b.id === clotureVerifiedBarber.id; })
+    : allBarbers;
+  box.innerHTML = list.map(function (b) {
     var color = b.color || stableColorForId(b.id);
     var initial = (b.name || '?').trim().charAt(0).toUpperCase();
     var avatarStyle = b.photo_url
