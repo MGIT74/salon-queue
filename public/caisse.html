@@ -3189,9 +3189,11 @@ function buildReceiptText(lines, total, method, o) {
   // Le symbole € n'existe pas dans CP850 et les imprimantes jet d'encre
   // (contrairement aux thermiques) ignorent souvent les commandes de
   // table de caractères : il s'imprime "Ç". On l'écarte à la source —
-  // le montant est affiché avec le code devise lisible "EUR".
+  // le montant est affiché avec le code devise (EUR, CHF, USD...) tel
+  // que configuré pour le salon, robuste sur tout type d'imprimante.
+  var currencyCode = (CURRENCY || 'EUR');
   function money(cents) {
-    return (cents / 100).toFixed(2).replace('.', ',') + ' EUR';
+    return (cents / 100).toFixed(2).replace('.', ',') + ' ' + currencyCode;
   }
   function pad(txt, len) { return String(txt == null ? '' : txt).slice(0, COLS); }
   function center(t) { t = String(t); var sp = Math.max(0, Math.floor((COLS - t.length) / 2)); return ' '.repeat(sp) + t; }
