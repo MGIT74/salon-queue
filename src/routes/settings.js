@@ -35,7 +35,34 @@ const EDITABLE = [
 // Force la réouverture immédiate de la caisse (annule le verrouillage
 // jusqu'au lendemain habituel), sans attendre l'heure de réouverture
 // configurée. Se réactive normalement à la prochaine clôture.
-router.post('/caisse/force-open', requireAdmin, wrap(async (req, res) => {
+const { verifyOwnerPassword } = require('../middleware/auth');
+const { isBlocked, recordFailure, recordSuccess } = require('../middleware/rateLimiter');
+
+/**
+ * "Forcer l'ouverture" (caisse.html) verifie le mot de passe admin,
+ * mais avec sa PROPRE cle de blocage - jamais celle de requireAdmin
+ * (utilisee par le Dashboard a CHAQUE appel, puisque le mot de passe y
+ * est renvoye sur chaque requete). Sans cette separation, des essais
+ * rates ici (ex. un coiffeur qui devine) finiraient par bloquer
+ * l'admin lui-meme sur le Dashboard, depuis le meme reseau/IP du
+ * salon - bug reellement constate.
+ */
+router.post('/caisse/force-open', wrap(async (req, res) => {
+  const ip = req.ip || (req.connection && req.connection.remoteAddress) || 'unknown';
+  const rlKey = 'admin-forceopen:' + req.ownerId + ':' + ip;
+  const retryAfterSec = isBlocked(rlKey);
+  if (retryAfterSec) {
+    res.set('Retry-After', String(retryAfterSec));
+    return res.status(429).json({ error: 'Trop de tentatives, réessayez dans ' + Math.ceil(retryAfterSec / 60) + ' min.' });
+  }
+  const given = req.get('X-Admin-Password') || '';
+  const ok = await verifyOwnerPassword(req.salon, given);
+  if (!ok) {
+    recordFailure(rlKey);
+    return res.status(401).json({ error: 'Mot de passe incorrect' });
+  }
+  recordSuccess(rlKey);
+
   await setSettings(req.salon.id, { caisse_force_reopen_at: new Date().toISOString() });
   logActivity(req.salon.id, 'caisse_force_open', 'Caisse déverrouillée manuellement (mot de passe admin)');
   res.json({ ok: true });
