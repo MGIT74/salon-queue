@@ -100,7 +100,11 @@ $btnOk.Add_Click({
         printer = $tbPrinter.Text.Trim()
         tpeIp   = $tbTpeIp.Text.Trim()
     }
-    $cfg | ConvertTo-Json | Set-Content -Path $configFile -Encoding UTF8
+    $json = $cfg | ConvertTo-Json
+    # Set-Content -Encoding UTF8 ajoute un BOM invisible en tete de fichier
+    # sous Windows PowerShell 5.1, ce qui fait echouer JSON.parse() cote
+    # Node.js (tpe-bridge-win.js) - on ecrit donc nous-memes en UTF8 SANS BOM.
+    [System.IO.File]::WriteAllText($configFile, $json, [System.Text.UTF8Encoding]::new($false))
     $form.Tag = "ok"
     $form.Close()
 })

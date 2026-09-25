@@ -35,7 +35,14 @@ const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
 
 function loadConfig() {
   try {
-    return JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
+    let raw = fs.readFileSync(CONFIG_FILE, 'utf8');
+    // Tolere un BOM UTF-8 en tete de fichier (present si le fichier a ete
+    // ecrit par "Set-Content -Encoding UTF8" sous Windows PowerShell 5.1,
+    // qui l'ajoute silencieusement) - sinon JSON.parse echoue et on
+    // retombe a tort sur l'assistant de premiere configuration alors que
+    // la config existe deja et est valide.
+    if (raw.charCodeAt(0) === 0xFEFF) raw = raw.slice(1);
+    return JSON.parse(raw);
   } catch (e) {
     return null;
   }
