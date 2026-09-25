@@ -37,7 +37,7 @@ if ([string]::IsNullOrWhiteSpace($autoShare) -and $existingCfg) { $autoShare = $
 
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "TPE Bridge - Configuration"
-$form.Size = New-Object System.Drawing.Size(480, 460)
+$form.Size = [System.Drawing.Size]::new(480, 460)
 $form.StartPosition = "CenterScreen"
 $form.FormBorderStyle = "FixedDialog"
 $form.MaximizeBox = $false
@@ -45,23 +45,23 @@ $form.MinimizeBox = $false
 
 $title = New-Object System.Windows.Forms.Label
 $title.Text = "Configurer la caisse de ce salon"
-$title.Font = New-Object System.Drawing.Font("Segoe UI", 12, [System.Drawing.FontStyle]::Bold)
-$title.Location = New-Object System.Drawing.Point(20, 15)
-$title.Size = New-Object System.Drawing.Size(430, 26)
+$title.Font = [System.Drawing.Font]::new("Segoe UI", 12, [System.Drawing.FontStyle]::Bold)
+$title.Location = [System.Drawing.Point]::new(20, 15)
+$title.Size = [System.Drawing.Size]::new(430, 26)
 $form.Controls.Add($title)
 
 function Add-Field($labelText, $y, $defaultValue) {
     $label = New-Object System.Windows.Forms.Label
     $label.Text = $labelText
-    $label.Location = New-Object System.Drawing.Point(20, $y)
-    $label.Size = New-Object System.Drawing.Size(430, 18)
+    $label.Location = [System.Drawing.Point]::new(20, $y)
+    $label.Size = [System.Drawing.Size]::new(430, 18)
     $form.Controls.Add($label)
 
     $textbox = New-Object System.Windows.Forms.TextBox
-    $textbox.Location = New-Object System.Drawing.Point(20, $y + 20)
-    $textbox.Size = New-Object System.Drawing.Size(420, 24)
+    $textbox.Location = [System.Drawing.Point]::new(20, $y + 20)
+    $textbox.Size = [System.Drawing.Size]::new(420, 24)
     $textbox.Text = $defaultValue
-    $textbox.Font = New-Object System.Drawing.Font("Segoe UI", 10)
+    $textbox.Font = [System.Drawing.Font]::new("Segoe UI", 10)
     $form.Controls.Add($textbox)
     return $textbox
 }
@@ -77,16 +77,16 @@ $tbPrinter = Add-Field "Nom de partage de l'imprimante" 205 $autoShare
 $tbTpeIp = Add-Field "IP du TPE (facultatif, laisser vide si pas encore configure)" 255 $defaultTpeIp
 
 $lblStatus = New-Object System.Windows.Forms.Label
-$lblStatus.Location = New-Object System.Drawing.Point(20, 300)
-$lblStatus.Size = New-Object System.Drawing.Size(430, 20)
+$lblStatus.Location = [System.Drawing.Point]::new(20, 300)
+$lblStatus.Size = [System.Drawing.Size]::new(430, 20)
 $lblStatus.ForeColor = [System.Drawing.Color]::Firebrick
 $form.Controls.Add($lblStatus)
 
 $btnOk = New-Object System.Windows.Forms.Button
 $btnOk.Text = "Valider et demarrer"
-$btnOk.Location = New-Object System.Drawing.Point(20, 330)
-$btnOk.Size = New-Object System.Drawing.Size(200, 36)
-$btnOk.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
+$btnOk.Location = [System.Drawing.Point]::new(20, 330)
+$btnOk.Size = [System.Drawing.Size]::new(200, 36)
+$btnOk.Font = [System.Drawing.Font]::new("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
 $btnOk.Add_Click({
     if ([string]::IsNullOrWhiteSpace($tbSalon.Text) -or [string]::IsNullOrWhiteSpace($tbKey.Text)) {
         $lblStatus.Text = "L'identifiant du salon et la cle du pont sont obligatoires."
@@ -109,15 +109,15 @@ $form.AcceptButton = $btnOk
 
 $btnCancel = New-Object System.Windows.Forms.Button
 $btnCancel.Text = "Annuler"
-$btnCancel.Location = New-Object System.Drawing.Point(230, 330)
-$btnCancel.Size = New-Object System.Drawing.Size(120, 36)
+$btnCancel.Location = [System.Drawing.Point]::new(230, 330)
+$btnCancel.Size = [System.Drawing.Size]::new(120, 36)
 $btnCancel.Add_Click({ $form.Tag = "cancel"; $form.Close() })
 $form.Controls.Add($btnCancel)
 
 $lblNote = New-Object System.Windows.Forms.Label
 $lblNote.Text = "La cle et l'identifiant du salon se trouvent dans le Dashboard,`nsous Reglages > Terminal de paiement > Generer la cle du pont."
-$lblNote.Location = New-Object System.Drawing.Point(20, 375)
-$lblNote.Size = New-Object System.Drawing.Size(430, 40)
+$lblNote.Location = [System.Drawing.Point]::new(20, 375)
+$lblNote.Size = [System.Drawing.Size]::new(430, 40)
 $lblNote.ForeColor = [System.Drawing.Color]::Gray
 $form.Controls.Add($lblNote)
 
