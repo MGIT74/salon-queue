@@ -135,8 +135,16 @@ router.get('/bridge/poll', requireBridgeKey, wrap(async (req, res) => {
   res.json({ ok: true, jobs });
 }));
 
-/** Le pont réclame les demandes de paiement CB en attente. */
+/**
+ * Le pont réclame les demandes de paiement CB en attente. Le pont
+ * (tpe-bridge.js) n'appelle JAMAIS cette route s'il n'a pas d'IP de TPE
+ * configurée localement (voir pollOnce : "if (!opts.tpe) return;") - un
+ * appel ici est donc la preuve que le TPE est effectivement réglé côté
+ * pont, ce que le serveur ne peut pas savoir autrement depuis qu'on ne
+ * stocke plus cette IP côté dashboard.
+ */
 router.get('/bridge/charge-poll', requireBridgeKey, wrap(async (req, res) => {
+  pool.query('UPDATE bridge_keys SET last_charge_poll_at = NOW() WHERE salon_id = ?', [req.salon.id]).catch(() => {});
   const [jobs] = await pool.query(
     "SELECT id, amount_cents FROM tpe_charge_jobs WHERE salon_id = ? AND status = 'pending' AND created_at > (NOW() - INTERVAL 2 MINUTE) ORDER BY created_at LIMIT 5",
     [req.salon.id]
@@ -200,12 +208,21 @@ router.post('/bridge-key', requireAdminOrBarber, wrap(async (req, res) => {
  */
 router.get('/bridge-status', requireAdminOrBarber, wrap(async (req, res) => {
   const [[row]] = await pool.query(
-    'SELECT last_seen_at FROM bridge_keys WHERE salon_id = ?',
+    'SELECT last_seen_at, last_charge_poll_at FROM bridge_keys WHERE salon_id = ?',
     [req.salon.id]
   );
   const lastSeenAt = row && row.last_seen_at ? new Date(row.last_seen_at) : null;
+  const lastTpeAt = row && row.last_charge_poll_at ? new Date(row.last_charge_poll_at) : null;
   const online = Boolean(lastSeenAt && (Date.now() - lastSeenAt.getTime()) < 10_000);
-  res.json({ ok: true, configured: Boolean(row), online, last_seen_at: lastSeenAt ? lastSeenAt.toISOString() : null });
+  const tpeOnline = Boolean(lastTpeAt && (Date.now() - lastTpeAt.getTime()) < 10_000);
+  res.json({
+    ok: true,
+    configured: Boolean(row),
+    online,
+    last_seen_at: lastSeenAt ? lastSeenAt.toISOString() : null,
+    tpe_online: tpeOnline,
+    tpe_last_seen_at: lastTpeAt ? lastTpeAt.toISOString() : null
+  });
 }));
 
 module.exports = router;

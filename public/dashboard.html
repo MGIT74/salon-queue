@@ -7055,16 +7055,24 @@ function pollBridgeStatus() {
     if (!r.configured) {
       label.textContent = 'Pont jamais connecté — installez-le sur un ordinateur du salon.';
       label.style.color = 'var(--grey)';
+      dotTpe.classList.add('is-offline');
       return;
     }
-    if (r.online) {
-      dotPrinter.classList.add('is-online');
-      dotTpe.classList.add('is-online');
+    // Imprimante : suit le statut général du pont (il interroge les
+    // tickets à chaque cycle, qu'un TPE soit configuré ou non).
+    dotPrinter.classList.add(r.online ? 'is-online' : 'is-offline');
+    // TPE : signal séparé (le pont ne réclame les paiements CB que s'il a
+    // une IP de TPE réglée localement) - rouge tant qu'il n'a jamais été
+    // vu, même si le pont lui-même est bien connecté.
+    dotTpe.classList.add(r.tpe_online ? 'is-online' : 'is-offline');
+
+    if (r.online && r.tpe_online) {
       label.textContent = 'Pont connecté';
       label.style.color = 'var(--green)';
+    } else if (r.online && !r.tpe_online) {
+      label.textContent = 'Pont connecté — TPE pas encore configuré ou pas connecté';
+      label.style.color = 'var(--red)';
     } else {
-      dotPrinter.classList.add('is-offline');
-      dotTpe.classList.add('is-offline');
       var when = r.last_seen_at
         ? 'dernier signal ' + new Date(r.last_seen_at).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
         : 'jamais connecté récemment';
