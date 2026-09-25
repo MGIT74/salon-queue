@@ -73,10 +73,10 @@ REM --- 4. Tache planifiee au demarrage de Windows (au login, sans UAC)
 echo [..] Creation du demarrage automatique...
 schtasks /Create /F /TN "TPE-Bridge" /TR "\"C:\Program Files\nodejs\node.exe\" \"%BRIDGE_DIR%\tpe-bridge-win.js\"" /SC ONLOGON /RL HIGHEST /F >nul 2>&1
 if %errorLevel% equ 0 (
-    echo [OK] Demarrage automatique configure (tache "TPE-Bridge").
+    echo [OK] Demarrage automatique configure - tache "TPE-Bridge".
 ) else (
     echo [!] Tache planifiee non creee - le pont devra etre lance a la main
-    echo     (double-clic sur %BRIDGE_DIR%\tpe-bridge-win.js ou raccourci bureau).
+    echo     double-clic sur %BRIDGE_DIR%\tpe-bridge-win.js ou raccourci bureau.
 )
 
 REM --- 5. Premier lancement (assistant de configuration)
