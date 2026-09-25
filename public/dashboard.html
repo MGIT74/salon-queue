@@ -1484,16 +1484,21 @@
           <div class="fld"><label>Clé (copiez-la maintenant — elle ne sera plus affichée)</label>
             <input id="bridge-key-value" type="text" readonly onclick="this.select()" style="font-family:monospace;font-size:12px">
           </div>
-          <div class="fld" style="margin-top:8px"><label>Commande à lancer sur l'ordinateur du salon (Node.js requis)</label>
+          <div class="fld" style="margin-top:8px"><label>Commande à lancer sur Mac/Linux, ou sous Windows en ligne de commande (Node.js requis)</label>
             <input id="bridge-cmd-value" type="text" readonly onclick="this.select()" style="font-family:monospace;font-size:11.5px">
           </div>
           <button class="btn btn-soft" style="margin-top:8px" onclick="copyBridgeSetup()">📋 Copier la commande</button>
-          <button class="btn btn-primary" style="margin-top:8px" onclick="downloadBridgeConfig()">⬇️ Télécharger config.json (à déposer sur l'ordi du salon)</button>
+          <p class="hint" style="margin-top:4px;margin-bottom:8px">
+            À utiliser sur Mac ou Linux (seule méthode disponible sur ces systèmes), ou sous
+            Windows si vous préférez le terminal à l'installeur graphique ci-dessous.
+          </p>
+          <button class="btn btn-primary" style="margin-top:8px" onclick="downloadBridgeConfig()">⬇️ Télécharger config.json (Windows uniquement — à déposer sur l'ordi du salon)</button>
           <p class="hint" style="margin-top:8px">
-            Le plus simple pour un client non technique : télécharger ce fichier, le déposer dans
-            <code>%APPDATA%\TPE-Bridge\config.json</code> sur l'ordinateur du salon (créer le dossier
-            <code>TPE-Bridge</code> s'il n'existe pas), puis double-cliquer sur <code>tpe-bridge-win.js</code> —
-            aucune question à taper.
+            Cette méthode ne fonctionne que sous Windows (avec l'installeur graphique
+            <code>TPE-Bridge-Installeur.bat</code> ou <code>tpe-bridge-win.js</code>) : télécharger
+            ce fichier, le déposer dans <code>%APPDATA%\TPE-Bridge\config.json</code> sur
+            l'ordinateur du salon (créer le dossier <code>TPE-Bridge</code> s'il n'existe pas), puis
+            double-cliquer sur <code>tpe-bridge-win.js</code> — aucune question à taper.
           </p>
         </div>
       </div>
