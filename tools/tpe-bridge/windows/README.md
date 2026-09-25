@@ -10,21 +10,32 @@ manipulation quotidienne.
    - `install.bat`
    - `tpe-bridge-win.js`
    - `tpe-bridge.js`
+   - `config-wizard.ps1`
 2. **Clic droit sur `install.bat`** → **"Exécuter en tant qu'administrateur"**
 3. L'installeur :
    - installe Node.js si absent (automatique)
    - copie le pont dans `C:\TPE-Bridge`
    - ouvre le pare-feu pour le TPE/l'impression
    - programme le **démarrage automatique** à chaque boot de Windows
-4. **Répondre aux 3 questions** de l'assistant :
-   - Adresse de l'app : `https://rdv.handsgraphic.com`
+4. Une **petite fenêtre** (pas un terminal) s'ouvre pour les 5 derniers
+   réglages — copier/coller normal (Ctrl+V ou clic droit fonctionnent,
+   contrairement à un terminal classique) :
+   - Adresse de l'app : déjà pré-remplie (`https://rdv.handsgraphic.com`)
    - Identifiant du salon : celui de l'URL `?salon=...` (ex. `oyonnax`)
    - Clé du pont : depuis le Dashboard → Réglages → Terminal de paiement →
-     **"Générer la clé du pont"** (copier la clé qui s'affiche)
-   - IP du TPE : facultatif à ce stade (Entree si pas encore de TPE)
+     **"Générer la clé du pont"** (copier le tout premier champ affiché,
+     pas la ligne de commande en dessous)
+   - Nom de partage de l'imprimante : déjà pré-rempli si le partage
+     automatique a réussi
+   - IP du TPE : facultatif à ce stade
+5. Cliquer sur **"Valider et démarrer"** — le pont se lance immédiatement.
 
 C'est fini. Le pont tourne en arrière-plan, tout de suite et à chaque
 démarrage du PC.
+
+*Pour reconfigurer plus tard (changer de clé, d'imprimante...) : double-
+cliquer directement sur `C:\TPE-Bridge\config-wizard.ps1`, qui rouvre la
+même fenêtre pré-remplie avec les valeurs actuelles.*
 
 ## Configuration de l'imprimante (automatique)
 
@@ -34,22 +45,22 @@ méthode fiable et sans dépendance : **partager l'imprimante**, puis lui
 copier directement le ticket — ça envoie les données telles quelles au
 spouleur, sans jamais ouvrir de dialogue.
 
-**Depuis la dernière version, l'assistant de configuration (`install.bat`
-puis premier lancement) partage automatiquement l'imprimante par défaut
-de Windows** (via PowerShell `Set-Printer`) — rien à faire dans la
-plupart des cas, il suffit de valider la question "Nom de partage de
-l'imprimante" avec Entrée.
+**Le formulaire de configuration partage automatiquement l'imprimante par
+défaut de Windows** (via PowerShell `Set-Printer`) dès son ouverture — le
+champ "Nom de partage de l'imprimante" est déjà rempli dans la plupart
+des cas, il n'y a rien à faire.
 
-Si le partage automatique échoue (message `[!]` dans la console — le
-plus souvent : script pas lancé en administrateur, ou aucune imprimante
-par défaut définie), le partager à la main :
+Si le partage automatique échoue (le champ reste vide à l'ouverture du
+formulaire — le plus souvent : pas lancé en administrateur, ou aucune
+imprimante par défaut définie), le partager à la main :
 
 1. **Paramètres Windows** → **Bluetooth et appareils** → **Imprimantes et
    scanners** → cliquer sur l'imprimante du ticket → **Propriétés de
    l'imprimante** → onglet **Partage** → cocher **"Partager cette
    imprimante"** → noter le **nom de partage**.
-2. Renseigner ce nom de partage à la question de l'assistant (ou dans
-   `%APPDATA%\TPE-Bridge\config.json`, champ `printer`).
+2. Renseigner ce nom de partage dans le formulaire (champ "Nom de partage
+   de l'imprimante"), ou directement dans
+   `%APPDATA%\TPE-Bridge\config.json`, champ `printer`.
 3. Tester : `copy /b n'importe_quel_fichier.txt \\localhost\NomDuPartage`
    dans une invite de commandes — si une page sort de l'imprimante, c'est
    bon.

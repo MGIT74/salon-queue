@@ -36,6 +36,7 @@ if %errorLevel% neq 0 (
 set BRIDGE_DIR=C:\TPE-Bridge
 set LAUNCHER=%~dp0tpe-bridge-win.js
 set CORE=%~dp0tpe-bridge.js
+set WIZARD=%~dp0config-wizard.ps1
 
 REM --- 1. Node.js ---
 where node >nul 2>nul
@@ -61,6 +62,7 @@ echo [..] Installation des fichiers dans %BRIDGE_DIR%...
 if not exist "%BRIDGE_DIR%" mkdir "%BRIDGE_DIR%"
 copy /Y "%LAUNCHER%" "%BRIDGE_DIR%\tpe-bridge-win.js" >nul
 copy /Y "%CORE%" "%BRIDGE_DIR%\tpe-bridge.js" >nul
+copy /Y "%WIZARD%" "%BRIDGE_DIR%\config-wizard.ps1" >nul
 echo [OK] Fichiers installes.
 
 REM --- 3. Pare-feu : autoriser le pont en reseau local (TPE, impression)
@@ -79,14 +81,25 @@ if %errorLevel% equ 0 (
     echo     double-clic sur %BRIDGE_DIR%\tpe-bridge-win.js ou raccourci bureau.
 )
 
-REM --- 5. Premier lancement (assistant de configuration)
+REM --- 5. Configuration (formulaire graphique - pas de terminal a manipuler)
 echo.
 echo ============================================================
-echo    Derniere etape : configuration (3 questions)
+echo    Derniere etape : une fenetre de configuration va s'ouvrir
 echo ============================================================
 echo.
 cd /d "%BRIDGE_DIR%"
-"C:\Program Files\nodejs\node.exe" tpe-bridge-win.js
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%BRIDGE_DIR%\config-wizard.ps1"
+if not exist "%APPDATA%\TPE-Bridge\config.json" (
+    echo.
+    echo [!] Configuration annulee ou non terminee.
+    echo     Relancez ce programme pour reessayer, ou double-cliquez sur
+    echo     %BRIDGE_DIR%\config-wizard.ps1 pour ouvrir juste le formulaire.
+    pause
+    exit /b 1
+)
+echo [OK] Configuration enregistree.
+echo.
+start "" "C:\Program Files\nodejs\node.exe" "%BRIDGE_DIR%\tpe-bridge-win.js"
 
 echo.
 echo ============================================================
