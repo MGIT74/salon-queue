@@ -1,0 +1,154 @@
+@echo off
+REM ============================================================
+REM  TPE Bridge - Installeur Windows TOUT-EN-UN (mini-PC des salons)
+REM
+REM  Fichier UNIQUE et autonome : aucun autre fichier necessaire a cote.
+REM  Il contient ses propres fichiers embarques (encodes) et les
+REM  extrait lui-meme lors de l'installation.
+REM
+REM  Utilisation : clic droit sur ce fichier -^> "Executer en tant
+REM  qu'administrateur". C'est tout.
+REM
+REM  Ce que fait ce script :
+REM   1. Verifie/installe Node.js (silencieux, via winget)
+REM   2. Arrete une eventuelle instance du pont deja en cours
+REM   3. Extrait ses fichiers embarques dans C:\TPE-Bridge
+REM   4. Cree une regle de pare-feu entrante (TPE / impression locale)
+REM   5. Cree une tache planifiee : le pont demarre tout seul au boot,
+REM      tourne en arriere-plan, redemarre en cas de crash
+REM   6. Lance l'assistant de configuration (fenetre graphique,
+REM      pas de terminal a manipuler)
+REM ============================================================
+
+setlocal enabledelayedexpansion
+
+echo.
+echo ============================================================
+echo    TPE Bridge - Installation pour le salon
+echo ============================================================
+echo.
+
+REM --- Verifier les droits administrateur ---
+net session >nul 2>&1
+if %errorLevel% neq 0 (
+    echo [!] Ce script doit etre lance en tant qu'administrateur.
+    echo     Clic droit sur ce fichier -^> "Executer en tant qu'administrateur"
+    pause
+    exit /b 1
+)
+
+set BRIDGE_DIR=C:\TPE-Bridge
+set TMP_DIR=%TEMP%\tpe-bridge-install
+
+if not exist "%TMP_DIR%" mkdir "%TMP_DIR%" >nul 2>&1
+
+REM --- 1. Node.js ---
+where node >nul 2>nul
+if %errorLevel% equ 0 (
+    echo [OK] Node.js deja installe :
+    node --version
+) else (
+    echo [..] Installation de Node.js...
+    winget install OpenJS.NodeJS.LTS --silent --accept-package-agreements --accept-source-agreements
+    if %errorLevel% neq 0 (
+        echo [!] winget a echoue. Installez Node.js manuellement depuis
+        echo     https://nodejs.org puis relancez ce script.
+        pause
+        exit /b 1
+    )
+    echo [OK] Node.js installe.
+    set "PATH=%PATH%;C:\Program Files\nodejs"
+)
+
+REM --- 2. Arreter toute instance du pont deja en cours (evite les fichiers
+REM        verrouilles lors de l'extraction ci-dessous)
+echo [..] Arret d'une eventuelle instance du pont deja en cours...
+powershell.exe -NoProfile -Command "Get-CimInstance Win32_Process -Filter \"Name='node.exe'\" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*tpe-bridge-win.js*' -or $_.CommandLine -like '*tpe-bridge.js*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }" >nul 2>&1
+timeout /t 1 /nobreak >nul
+
+REM --- 3. Extraire les fichiers embarques dans %BRIDGE_DIR% ---
+echo [..] Installation des fichiers dans %BRIDGE_DIR%...
+if not exist "%BRIDGE_DIR%" mkdir "%BRIDGE_DIR%"
+call :extract_payload TPE_BRIDGE_CORE "%BRIDGE_DIR%\tpe-bridge.js"
+call :extract_payload TPE_BRIDGE_WIN "%BRIDGE_DIR%\tpe-bridge-win.js"
+call :extract_payload CONFIG_WIZARD "%BRIDGE_DIR%\config-wizard.ps1"
+call :extract_payload CONFIGURER_BAT "%BRIDGE_DIR%\Configurer.bat"
+if not exist "%BRIDGE_DIR%\tpe-bridge.js" (
+    echo [!] Echec de l'extraction des fichiers. Contactez le support.
+    pause
+    exit /b 1
+)
+echo [OK] Fichiers installes.
+
+REM --- 4. Pare-feu : autoriser le pont en reseau local (TPE, impression)
+echo [..] Configuration du pare-feu...
+netsh advfirewall firewall delete rule name="TPE Bridge" >nul 2>&1
+netsh advfirewall firewall add rule name="TPE Bridge" dir=in action=allow program="C:\Program Files\nodejs\node.exe" enable=yes profile=any >nul 2>&1
+echo [OK] Pare-feu configure.
+
+REM --- 5. Tache planifiee au demarrage de Windows (au login, sans UAC)
+echo [..] Creation du demarrage automatique...
+schtasks /Create /F /TN "TPE-Bridge" /TR "\"C:\Program Files\nodejs\node.exe\" \"%BRIDGE_DIR%\tpe-bridge-win.js\"" /SC ONLOGON /RL HIGHEST /F >nul 2>&1
+if %errorLevel% equ 0 (
+    echo [OK] Demarrage automatique configure - tache "TPE-Bridge".
+) else (
+    echo [!] Tache planifiee non creee - le pont devra etre lance a la main
+    echo     double-clic sur %BRIDGE_DIR%\tpe-bridge-win.js ou raccourci bureau.
+)
+
+REM --- 6. Configuration (formulaire graphique - pas de terminal a manipuler)
+echo.
+echo ============================================================
+echo    Derniere etape : une fenetre de configuration va s'ouvrir
+echo ============================================================
+echo.
+cd /d "%BRIDGE_DIR%"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%BRIDGE_DIR%\config-wizard.ps1"
+if not exist "%APPDATA%\TPE-Bridge\config.json" (
+    echo.
+    echo [!] Configuration annulee ou non terminee.
+    echo     Relancez ce programme pour reessayer, ou double-cliquez sur
+    echo     %BRIDGE_DIR%\config-wizard.ps1 pour ouvrir juste le formulaire.
+    pause
+    exit /b 1
+)
+echo [OK] Configuration enregistree.
+echo.
+start "" "C:\Program Files\nodejs\node.exe" "%BRIDGE_DIR%\tpe-bridge-win.js"
+
+echo.
+echo ============================================================
+echo    Installation terminee !
+echo    Le pont demarrera automatiquement a chaque demarrage.
+echo    Ce fichier peut etre ferme.
+echo ============================================================
+rd /s /q "%TMP_DIR%" >nul 2>&1
+pause
+exit /b 0
+
+REM ============================================================
+REM  Sous-routine : extrait un bloc de donnees embarque plus bas
+REM  dans ce meme fichier (entre :NOM_BEGIN et :NOM_END) vers un
+REM  fichier temporaire .b64, puis le decode avec certutil.
+REM  %1 = nom du marqueur   %2 = fichier de destination final
+REM ============================================================
+:extract_payload
+setlocal enabledelayedexpansion
+set "B64FILE=%TMP_DIR%\%~1.b64"
+if exist "%B64FILE%" del /f /q "%B64FILE%" >nul 2>&1
+set "CAPTURE=0"
+for /f "usebackq delims=" %%L in ("%~f0") do (
+    if "!CAPTURE!"=="1" (
+        if "%%L"==":%~1_END" (
+            set "CAPTURE=0"
+        ) else (
+            >>"%B64FILE%" echo(%%L
+        )
+    ) else (
+        if "%%L"==":%~1_BEGIN" set "CAPTURE=1"
+    )
+)
+certutil -decode -f "%B64FILE%" "%~2" >nul
+endlocal
+exit /b
+
