@@ -1,6 +1,6 @@
 const express = require('express');
 const crypto = require('crypto');
-const { getSettings, pool } = require('../db');
+const { pool } = require('../db');
 const requireAdminOrBarber = require('../middleware/barberAuth');
 const { wrap } = require('../lib/wrap');
 
@@ -49,9 +49,15 @@ router.post('/charge', requireAdminOrBarber, wrap(async (req, res) => {
     return res.status(400).json({ error: 'Montant invalide' });
   }
 
-  const s = await getSettings(req.salon.id);
-  if (!s.tpe_bridge_url) {
-    return res.status(400).json({ error: 'Aucun pont local configuré (Réglages > Terminal de paiement)' });
+  // Le pont est actif dès qu'une clé a été générée pour ce salon - aucun
+  // interrupteur séparé à cocher : générer la clé (Réglages > Terminal de
+  // paiement) suffit à tout activer (impression silencieuse + paiement CB).
+  const [[bridgeKey]] = await pool.query(
+    'SELECT key_preview FROM bridge_keys WHERE salon_id = ?',
+    [req.salon.id]
+  );
+  if (!bridgeKey) {
+    return res.status(400).json({ error: 'Aucun pont local configuré (Réglages > Terminal de paiement > Générer la clé du pont)' });
   }
 
   const merchantTxId = crypto.randomBytes(8).toString('hex');
@@ -62,13 +68,6 @@ router.post('/charge', requireAdminOrBarber, wrap(async (req, res) => {
   // parle au TPE en TCP local et rapporte le résultat ; cette route
   // attend la réponse (long polling jusqu'à 110 s, sous le timeout de
   // la caisse) puis renvoie le résultat au navigateur.
-  const [[bridgeKey]] = await pool.query(
-    'SELECT key_preview FROM bridge_keys WHERE salon_id = ?',
-    [req.salon.id]
-  );
-  if (!bridgeKey) {
-    return res.status(400).json({ error: 'Pont configuré mais clé non générée (Réglages > Terminal de paiement > Générer la clé du pont)' });
-  }
   const jobId = crypto.randomUUID();
   await pool.query(
     'INSERT INTO tpe_charge_jobs (id, salon_id, amount_cents) VALUES (?, ?, ?)',

@@ -11,7 +11,7 @@ const EDITABLE = [
   'salon_name', 'notify_before_min', 'logo_url', 'gift_tile_image_url', 'loyalty_card_image_url', 'gift_card_image_url', 'timezone',
   'smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_from',
   'printer_connection_type', 'printer_ip', 'printer_model',
-  'tpe_bridge_url', 'tpe_print_mode',
+  'tpe_print_mode',
   'email_tpl_confirmation_subject', 'email_tpl_confirmation_body',
   'email_tpl_reminder_subject', 'email_tpl_reminder_body',
   'email_tpl_cancelled_subject', 'email_tpl_cancelled_body',
@@ -214,6 +214,9 @@ router.get('/public', wrap(async (req, res) => {
   // dans l'URL) - distincte de login_image_url ci-dessous, propre à
   // CE salon (utilisée elle sur la page de connexion CLIENT du salon).
   const platform = await getPlatformSettings();
+  // Le pont est actif dès qu'une clé a été générée - aucun interrupteur
+  // séparé à cocher (voir /api/tpe/charge, même logique).
+  const [[bridgeKey]] = await pool.query('SELECT 1 FROM bridge_keys WHERE salon_id = ?', [req.salon.id]);
 
   res.json({
     ok: true,
@@ -254,10 +257,10 @@ router.get('/public', wrap(async (req, res) => {
       product: s.vat_rate_product !== undefined && s.vat_rate_product !== '' ? Number(s.vat_rate_product) : 20
     },
     // TPE : la caisse a besoin de savoir si elle doit passer par le pont
-    // local (tpe_bridge_url) au lieu de l'API serveur - l'IP du terminal
-    // n'est joignable que depuis le réseau du salon, jamais depuis le
-    // serveur cloud.
-    tpe_bridge_url: s.tpe_bridge_url || null,
+    // local au lieu de l'API serveur directe - l'IP du terminal n'est
+    // joignable que depuis le réseau du salon, jamais depuis le serveur
+    // cloud. Actif dès qu'une clé de pont existe, pas un réglage à part.
+    tpe_bridge_url: bridgeKey ? '1' : null,
     tpe_print_mode: s.tpe_print_mode === 'text' ? 'text' : 'escpos',
     caisse_locked_until: caisseLockedUntil
   });
