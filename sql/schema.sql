@@ -982,6 +982,7 @@ CREATE TABLE IF NOT EXISTS bridge_keys (
   salon_id CHAR(36) NOT NULL,
   key_hash CHAR(64) NOT NULL,
   key_preview VARCHAR(16) NOT NULL,
+  last_seen_at DATETIME NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY uniq_salon_bridge (salon_id),
   FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE

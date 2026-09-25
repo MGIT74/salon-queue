@@ -25,6 +25,10 @@ async function requireBridgeKey(req, res, next) {
     if (!salon) return res.status(404).json({ error: 'Salon du pont introuvable ou inactif' });
     req.salon = salon;
     req.ownerId = salon.owner_id;
+    // Signal de vie : chaque appel authentifié du pont (poll, charge-poll,
+    // ack...) met à jour ce timestamp, ce qui permet au dashboard d'afficher
+    // un vrai statut "connecté / hors ligne" plutôt qu'une simple case cochée.
+    pool.query('UPDATE bridge_keys SET last_seen_at = NOW() WHERE salon_id = ?', [row.salon_id]).catch(() => {});
     return next();
   } catch (err) {
     console.error('[bridgeKey]', err);
@@ -185,6 +189,23 @@ router.post('/bridge-key', requireAdminOrBarber, wrap(async (req, res) => {
     [id, req.salon.id, hash, preview]
   );
   res.json({ ok: true, key: plainKey });
+}));
+
+/**
+ * Statut de connexion du pont, pour l'affichage dans le dashboard (icônes
+ * "TPE" / "Imprimante" avec pastille verte/rouge). "En ligne" = a donné
+ * signe de vie (n'importe quel appel authentifié) il y a moins de 10 s -
+ * le pont interroge le serveur toutes les 3 s, donc 10 s laisse une marge
+ * confortable sans faire clignoter le statut pour une latence réseau normale.
+ */
+router.get('/bridge-status', requireAdminOrBarber, wrap(async (req, res) => {
+  const [[row]] = await pool.query(
+    'SELECT last_seen_at FROM bridge_keys WHERE salon_id = ?',
+    [req.salon.id]
+  );
+  const lastSeenAt = row && row.last_seen_at ? new Date(row.last_seen_at) : null;
+  const online = Boolean(lastSeenAt && (Date.now() - lastSeenAt.getTime()) < 10_000);
+  res.json({ ok: true, configured: Boolean(row), online, last_seen_at: lastSeenAt ? lastSeenAt.toISOString() : null });
 }));
 
 module.exports = router;

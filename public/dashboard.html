@@ -656,6 +656,15 @@
               margin-bottom: 14px; transition: background .25s ease; }
   .card-box h3 { font-size: 17px; font-weight: 600; letter-spacing: -.02em; margin: 0 0 4px; }
   .card-box .hint { font-size: 13.5px; color: var(--grey); margin: 0 0 18px; line-height: 1.5; }
+
+  .bridge-device { display: flex; align-items: center; gap: 9px; font-size: 13.5px; font-weight: 500; color: var(--ink); }
+  .bridge-device-icon { position: relative; display: inline-flex; color: var(--grey); }
+  .bridge-device-dot {
+    position: absolute; right: -2px; bottom: -2px; width: 9px; height: 9px; border-radius: 50%;
+    background: var(--sep); border: 2px solid var(--fill); transition: background .2s ease;
+  }
+  .bridge-device-dot.is-online { background: var(--green); }
+  .bridge-device-dot.is-offline { background: var(--red); }
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
   .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
   @media (max-width: 700px) { .grid4 { grid-template-columns: 1fr 1fr; } }
@@ -1460,7 +1469,26 @@
 
       <!-- Impression silencieuse + paiement CB via le pont local : methode recommandee -->
       <div class="card-box" style="background:var(--fill);box-shadow:none;margin-bottom:14px">
-        <h3 style="font-size:15px">🖨️ Pont local (impression + paiement CB, recommandé)</h3>
+        <h3 style="font-size:15px;margin-bottom:14px">Pont local (impression + paiement CB, recommandé)</h3>
+
+        <div style="display:flex;gap:28px;margin-bottom:16px">
+          <div class="bridge-device">
+            <span class="bridge-device-icon">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+              <span class="bridge-device-dot" id="bridge-dot-printer"></span>
+            </span>
+            <span>Imprimante</span>
+          </div>
+          <div class="bridge-device">
+            <span class="bridge-device-icon">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+              <span class="bridge-device-dot" id="bridge-dot-tpe"></span>
+            </span>
+            <span>Terminal de paiement</span>
+          </div>
+        </div>
+        <p class="hint" id="bridge-status-label" style="margin:-6px 0 14px;font-weight:500"></p>
+
         <p class="hint" style="margin-bottom:10px">
           Installez le pont sur un ordinateur du salon (même réseau que le TPE, allumé pendant les
           horaires). La caisse dépose les tickets et les demandes de paiement sur l'app, le pont
@@ -5730,6 +5758,9 @@ function loadCaisseTab() {
     document.getElementById('caisse-reopen-hour').value = r.settings.caisse_reopen_hour || '00:00';
     document.getElementById('set-tpe-bridge-enabled').checked = Boolean(r.settings.tpe_bridge_url);
     document.getElementById('set-tpe-print-mode').value = r.settings.tpe_print_mode === 'text' ? 'text' : 'escpos';
+    if (window.__bridgeStatusInterval) clearInterval(window.__bridgeStatusInterval);
+    pollBridgeStatus();
+    window.__bridgeStatusInterval = setInterval(pollBridgeStatus, 5000);
 
     EMAIL_TPL_TYPES.forEach(function (type) {
       var key = type.replace(/-/g, '_');
@@ -7005,6 +7036,42 @@ function openAddSalonClosure() {
       errEl.textContent = e.message; errEl.style.display = 'block';
     });
   };
+}
+
+/**
+ * Interroge le statut réel du pont (dernier signal de vie reçu) et met à
+ * jour les pastilles Imprimante/TPE + le message. Les deux icônes
+ * partagent le même signal (un seul processus pont gère les deux) - ce
+ * n'est pas un test indépendant de l'imprimante ou du TPE eux-mêmes.
+ */
+function pollBridgeStatus() {
+  var dotPrinter = document.getElementById('bridge-dot-printer');
+  var dotTpe = document.getElementById('bridge-dot-tpe');
+  var label = document.getElementById('bridge-status-label');
+  if (!dotPrinter || !dotTpe || !label) return;
+  api('/api/tpe/bridge-status').then(function (r) {
+    dotPrinter.classList.remove('is-online', 'is-offline');
+    dotTpe.classList.remove('is-online', 'is-offline');
+    if (!r.configured) {
+      label.textContent = 'Pont jamais connecté — installez-le sur un ordinateur du salon.';
+      label.style.color = 'var(--grey)';
+      return;
+    }
+    if (r.online) {
+      dotPrinter.classList.add('is-online');
+      dotTpe.classList.add('is-online');
+      label.textContent = 'Pont connecté';
+      label.style.color = 'var(--green)';
+    } else {
+      dotPrinter.classList.add('is-offline');
+      dotTpe.classList.add('is-offline');
+      var when = r.last_seen_at
+        ? 'dernier signal ' + new Date(r.last_seen_at).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+        : 'jamais connecté récemment';
+      label.textContent = 'Pont hors ligne — ' + when;
+      label.style.color = 'var(--red)';
+    }
+  }).catch(function () {});
 }
 
 function saveDeviceSettings() {
