@@ -2,8 +2,6 @@ const express = require('express');
 const crypto = require('crypto');
 const { getSettings, pool } = require('../db');
 const requireAdminOrBarber = require('../middleware/barberAuth');
-const { chargeCard } = require('../lib/tpeNepting');
-const { concertCharge } = require('../lib/tpeConcert');
 const { wrap } = require('../lib/wrap');
 
 const router = express.Router();
@@ -48,101 +46,53 @@ router.post('/charge', requireAdminOrBarber, wrap(async (req, res) => {
   }
 
   const s = await getSettings(req.salon.id);
-  // L'IP du TPE et l'identifiant de caisse ne servent qu'au chemin direct
-  // serveur -> TPE (ci-dessous) : quand un pont local est configuré, le
-  // pont utilise sa PROPRE configuration locale (config.json sur
-  // l'ordinateur du salon) et ces champs ne sont jamais lus - inutile de
-  // forcer leur saisie dans ce cas.
   if (!s.tpe_bridge_url) {
-    if (!s.tpe_ip) {
-      return res.status(400).json({ error: 'Aucun terminal de paiement configuré (Réglages > Terminal de paiement)' });
-    }
-    if (!s.tpe_cash_register_id) {
-      return res.status(400).json({ error: 'Identifiant de caisse manquant (Réglages > Terminal de paiement)' });
-    }
+    return res.status(400).json({ error: 'Aucun pont local configuré (Réglages > Terminal de paiement)' });
   }
 
   const merchantTxId = crypto.randomBytes(8).toString('hex');
 
-  // Le pont local est configuré (tpe_bridge_url) : le serveur ne peut
-  // pas joindre l'IP locale du TPE (l'app est en ligne). On délègue au
-  // pont du salon : dépôt de la demande, le pont la réclame par polling,
+  // Le serveur (hébergé sur un VPS, jamais sur le réseau du salon) ne
+  // peut pas joindre l'IP locale du TPE : on délègue systématiquement au
+  // pont du salon - dépôt de la demande, le pont la réclame par polling,
   // parle au TPE en TCP local et rapporte le résultat ; cette route
   // attend la réponse (long polling jusqu'à 110 s, sous le timeout de
-  // la caisse) puis renvoie le résultat au navigateur. Même contrat de
-  // réponse que le chemin direct ci-dessous.
-  if (s.tpe_bridge_url) {
-    const [[bridgeKey]] = await pool.query(
-      'SELECT key_preview FROM bridge_keys WHERE salon_id = ?',
-      [req.salon.id]
-    );
-    if (!bridgeKey) {
-      return res.status(400).json({ error: 'Pont configuré mais clé non générée (Réglages > Terminal de paiement > Générer la clé du pont)' });
-    }
-    const jobId = crypto.randomUUID();
-    await pool.query(
-      'INSERT INTO tpe_charge_jobs (id, salon_id, amount_cents) VALUES (?, ?, ?)',
-      [jobId, req.salon.id, amountCents]
-    );
-
-    const deadline = Date.now() + 110_000;
-    while (Date.now() < deadline) {
-      await new Promise((r) => setTimeout(r, 1500));
-      const [[job]] = await pool.query(
-        'SELECT status, result_json FROM tpe_charge_jobs WHERE id = ?',
-        [jobId]
-      );
-      if (!job || job.status === 'pending') continue;
-      if (job.status === 'done' && job.result_json) {
-        const result = JSON.parse(job.result_json);
-        return res.json({
-          ok: true,
-          success: result.success,
-          auth_number: result.authNumber || null,
-          failure_code: result.failureCode || result.resultCode || null,
-          failure_reason: result.failureReason || null,
-          merchant_tx_id: merchantTxId
-        });
-      }
-      return res.status(502).json({ error: 'Paiement impossible : ' + (job.result_json || 'le pont n\'a pas pu joindre le terminal') });
-    }
-    return res.status(504).json({ error: 'Le terminal de paiement n\'a pas répondu à temps (pont hors ligne ?)' });
+  // la caisse) puis renvoie le résultat au navigateur.
+  const [[bridgeKey]] = await pool.query(
+    'SELECT key_preview FROM bridge_keys WHERE salon_id = ?',
+    [req.salon.id]
+  );
+  if (!bridgeKey) {
+    return res.status(400).json({ error: 'Pont configuré mais clé non générée (Réglages > Terminal de paiement > Générer la clé du pont)' });
   }
+  const jobId = crypto.randomUUID();
+  await pool.query(
+    'INSERT INTO tpe_charge_jobs (id, salon_id, amount_cents) VALUES (?, ?, ?)',
+    [jobId, req.salon.id, amountCents]
+  );
 
-  // Pas de pont : le serveur essaie de joindre directement le TPE (ne
-  // fonctionne que si le serveur EST sur le réseau du salon).
-  try {
-    let result;
-    if (s.tpe_protocol === 'concert') {
-      result = await concertCharge({
-        host: s.tpe_ip,
-        port: Number(s.tpe_port) || 8888,
-        posNumber: String(s.tpe_cash_register_number || '1').slice(0, 1),
-        transactionType: 'debit',
-        private: merchantTxId.slice(0, 10)
-      }, { amountCents, timeoutMs: 120000 });
-    } else {
-      result = await chargeCard({
-        host: s.tpe_ip,
-        port: Number(s.tpe_port) || 20002,
-        replyMode: s.tpe_reply_mode === 'callback' ? 'callback' : 'same',
-        callbackPort: Number(s.tpe_callback_port) || 20006,
-        cashRegisterId: s.tpe_cash_register_id,
-        cashRegisterNumber: s.tpe_cash_register_number || '01'
-      }, { amountCents, merchantTxId });
+  const deadline = Date.now() + 110_000;
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 1500));
+    const [[job]] = await pool.query(
+      'SELECT status, result_json FROM tpe_charge_jobs WHERE id = ?',
+      [jobId]
+    );
+    if (!job || job.status === 'pending') continue;
+    if (job.status === 'done' && job.result_json) {
+      const result = JSON.parse(job.result_json);
+      return res.json({
+        ok: true,
+        success: result.success,
+        auth_number: result.authNumber || null,
+        failure_code: result.failureCode || result.resultCode || null,
+        failure_reason: result.failureReason || null,
+        merchant_tx_id: merchantTxId
+      });
     }
-
-    res.json({
-      ok: true,
-      success: result.success,
-      auth_number: result.authNumber || null,
-      failure_code: result.failureCode || result.resultCode || null,
-      failure_reason: result.failureReason || null,
-      merchant_tx_id: merchantTxId
-    });
-  } catch (err) {
-    res.status(502).json({ error: `Impossible de joindre le terminal de paiement : ${err.message}` });
+    return res.status(502).json({ error: 'Paiement impossible : ' + (job.result_json || 'le pont n\'a pas pu joindre le terminal') });
   }
+  return res.status(504).json({ error: 'Le terminal de paiement n\'a pas répondu à temps (pont hors ligne ?)' });
 }));
 
 /**

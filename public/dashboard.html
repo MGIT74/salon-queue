@@ -1469,7 +1469,7 @@
           l'ordinateur du salon au moment de l'installation, pas ici.
         </p>
         <label class="fld" style="flex-direction:row;align-items:center;gap:8px;display:flex;margin-bottom:10px">
-          <input type="checkbox" id="set-tpe-bridge-enabled" onchange="updateBridgeModeVisibility()" style="width:auto">
+          <input type="checkbox" id="set-tpe-bridge-enabled" style="width:auto">
           <span>Utiliser le pont local pour les paiements CB</span>
         </label>
         <div class="fld" style="margin-bottom:10px;max-width:280px">
@@ -1492,47 +1492,6 @@
             À utiliser sur Mac ou Linux (seule méthode disponible sur ces systèmes), ou sous
             Windows si vous préférez le terminal à l'installeur graphique ci-dessous.
           </p>
-        </div>
-      </div>
-
-      <!-- Connexion directe serveur -> TPE : uniquement pertinent SANS pont local (cas rare) -->
-      <div id="tpe-direct-fields" style="display:none">
-        <p class="hint" style="font-size:12.5px;margin-top:0">
-          Ce qui suit ne sert que si vous n'utilisez <strong>pas</strong> de pont local (connexion
-          directe entre le serveur et le TPE — ne fonctionne que si le serveur est physiquement sur
-          le réseau du salon, cas rare).
-        </p>
-        <div class="grid2">
-          <div class="fld"><label for="set-tpe-ip">Adresse IP du TPE</label>
-            <input id="set-tpe-ip" type="text" placeholder="Ex: 192.168.1.125"></div>
-          <div class="fld"><label for="set-tpe-protocol">Protocole du terminal</label>
-            <select id="set-tpe-protocol">
-              <option value="nepting">Nepting TLV (port 20002)</option>
-              <option value="concert">Concert v3 IP (port 8888)</option>
-            </select>
-          </div>
-        </div>
-        <div class="grid2">
-          <div class="fld"><label for="set-tpe-port">Port d'écoute TPE</label>
-            <input id="set-tpe-port" type="number" placeholder="20002"></div>
-          <div class="fld"><label for="set-tpe-cash-register-number">Numéro de caisse</label>
-            <input id="set-tpe-cash-register-number" type="text" placeholder="Ex: 01 (voir ticket de config)"></div>
-        </div>
-        <div class="grid2">
-          <div class="fld"><label for="set-tpe-cash-register-id">Identifiant de caisse</label>
-            <input id="set-tpe-cash-register-id" type="text" placeholder="Fourni par le prestataire monétique"></div>
-          <div class="fld"><label for="set-tpe-reply-mode">Mode de réponse</label>
-            <select id="set-tpe-reply-mode" onchange="updateTpeCallbackVisibility()">
-              <option value="same">Sur la même connexion</option>
-              <option value="callback">Le TPE rappelle la caisse</option>
-            </select>
-          </div>
-        </div>
-        <div class="grid2">
-          <div class="fld" id="tpe-callback-port-fld" style="display:none">
-            <label for="set-tpe-callback-port">Port d'écoute caisse</label>
-            <input id="set-tpe-callback-port" type="number" placeholder="20006">
-          </div>
         </div>
       </div>
 
@@ -5769,17 +5728,8 @@ function loadCaisseTab() {
   api('/api/settings').then(function (r) {
     document.getElementById('caisse-inactivity').value = r.settings.caisse_inactivity_seconds || 15;
     document.getElementById('caisse-reopen-hour').value = r.settings.caisse_reopen_hour || '00:00';
-    document.getElementById('set-tpe-ip').value = r.settings.tpe_ip || '';
-    document.getElementById('set-tpe-port').value = r.settings.tpe_port || '20002';
-    document.getElementById('set-tpe-cash-register-id').value = r.settings.tpe_cash_register_id || '';
-    document.getElementById('set-tpe-cash-register-number').value = r.settings.tpe_cash_register_number || '01';
-    document.getElementById('set-tpe-reply-mode').value = r.settings.tpe_reply_mode || 'same';
-    document.getElementById('set-tpe-callback-port').value = r.settings.tpe_callback_port || '20006';
-    document.getElementById('set-tpe-protocol').value = r.settings.tpe_protocol || 'nepting';
     document.getElementById('set-tpe-bridge-enabled').checked = Boolean(r.settings.tpe_bridge_url);
     document.getElementById('set-tpe-print-mode').value = r.settings.tpe_print_mode === 'text' ? 'text' : 'escpos';
-    updateBridgeModeVisibility();
-    updateTpeCallbackVisibility();
 
     EMAIL_TPL_TYPES.forEach(function (type) {
       var key = type.replace(/-/g, '_');
@@ -7057,28 +7007,8 @@ function openAddSalonClosure() {
   };
 }
 
-function updateTpeCallbackVisibility() {
-  var mode = document.getElementById('set-tpe-reply-mode').value;
-  document.getElementById('tpe-callback-port-fld').style.display = mode === 'callback' ? 'block' : 'none';
-}
-
-// Le bloc "connexion directe serveur -> TPE" ne sert que quand aucun pont
-// local n'est utilisé (le pont a sa propre config locale, indépendante de
-// ces champs) - on le masque pour ne pas embrouiller le cas courant.
-function updateBridgeModeVisibility() {
-  var usesBridge = document.getElementById('set-tpe-bridge-enabled').checked;
-  document.getElementById('tpe-direct-fields').style.display = usesBridge ? 'none' : 'block';
-}
-
 function saveDeviceSettings() {
   api('/api/settings', { method: 'PUT', body: {
-    tpe_ip: document.getElementById('set-tpe-ip').value.trim(),
-    tpe_port: document.getElementById('set-tpe-port').value || '20002',
-    tpe_cash_register_id: document.getElementById('set-tpe-cash-register-id').value.trim(),
-    tpe_cash_register_number: document.getElementById('set-tpe-cash-register-number').value.trim() || '01',
-    tpe_reply_mode: document.getElementById('set-tpe-reply-mode').value,
-    tpe_callback_port: document.getElementById('set-tpe-callback-port').value || '20006',
-    tpe_protocol: document.getElementById('set-tpe-protocol').value,
     tpe_bridge_url: document.getElementById('set-tpe-bridge-enabled').checked ? '1' : '',
     tpe_print_mode: document.getElementById('set-tpe-print-mode').value
   }}).then(function () { toast('Terminal enregistré'); })
