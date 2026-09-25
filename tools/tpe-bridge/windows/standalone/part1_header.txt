@@ -73,6 +73,7 @@ call :extract_payload TPE_BRIDGE_CORE "%BRIDGE_DIR%\tpe-bridge.js"
 call :extract_payload TPE_BRIDGE_WIN "%BRIDGE_DIR%\tpe-bridge-win.js"
 call :extract_payload CONFIG_WIZARD "%BRIDGE_DIR%\config-wizard.ps1"
 call :extract_payload CONFIGURER_BAT "%BRIDGE_DIR%\Configurer.bat"
+call :extract_payload RUN_HIDDEN_VBS "%BRIDGE_DIR%\run-hidden.vbs"
 if not exist "%BRIDGE_DIR%\tpe-bridge.js" (
     echo [!] Echec de l'extraction des fichiers. Contactez le support.
     pause
@@ -88,7 +89,7 @@ echo [OK] Pare-feu configure.
 
 REM --- 5. Tache planifiee au demarrage de Windows (au login, sans UAC)
 echo [..] Creation du demarrage automatique...
-schtasks /Create /F /TN "TPE-Bridge" /TR "\"C:\Program Files\nodejs\node.exe\" \"%BRIDGE_DIR%\tpe-bridge-win.js\"" /SC ONLOGON /RL HIGHEST /F >nul 2>&1
+schtasks /Create /F /TN "TPE-Bridge" /TR "wscript.exe \"%BRIDGE_DIR%\run-hidden.vbs\"" /SC ONLOGON /RL HIGHEST /F >nul 2>&1
 if %errorLevel% equ 0 (
     echo [OK] Demarrage automatique configure - tache "TPE-Bridge".
 ) else (
@@ -114,13 +115,14 @@ if not exist "%APPDATA%\TPE-Bridge\config.json" (
 )
 echo [OK] Configuration enregistree.
 echo.
-start "" "C:\Program Files\nodejs\node.exe" "%BRIDGE_DIR%\tpe-bridge-win.js"
+wscript.exe "%BRIDGE_DIR%\run-hidden.vbs"
 
 echo.
 echo ============================================================
 echo    Installation terminee !
-echo    Le pont demarrera automatiquement a chaque demarrage.
-echo    Ce fichier peut etre ferme.
+echo    Le pont tourne maintenant en arriere-plan, sans fenetre
+echo    visible - c'est normal, il n'y a rien d'autre a faire.
+echo    Il demarrera aussi automatiquement a chaque demarrage.
 echo ============================================================
 rd /s /q "%TMP_DIR%" >nul 2>&1
 pause

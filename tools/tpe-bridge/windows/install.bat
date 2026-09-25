@@ -72,6 +72,7 @@ copy /Y "%LAUNCHER%" "%BRIDGE_DIR%\tpe-bridge-win.js" >nul
 copy /Y "%CORE%" "%BRIDGE_DIR%\tpe-bridge.js" >nul
 copy /Y "%WIZARD%" "%BRIDGE_DIR%\config-wizard.ps1" >nul
 copy /Y "%WIZARD_LAUNCHER%" "%BRIDGE_DIR%\Configurer.bat" >nul
+copy /Y "%~dp0run-hidden.vbs" "%BRIDGE_DIR%\run-hidden.vbs" >nul
 echo [OK] Fichiers installes.
 
 REM --- 4. Pare-feu : autoriser le pont en reseau local (TPE, impression)
@@ -82,7 +83,7 @@ echo [OK] Pare-feu configure.
 
 REM --- 5. Tache planifiee au demarrage de Windows (au login, sans UAC)
 echo [..] Creation du demarrage automatique...
-schtasks /Create /F /TN "TPE-Bridge" /TR "\"C:\Program Files\nodejs\node.exe\" \"%BRIDGE_DIR%\tpe-bridge-win.js\"" /SC ONLOGON /RL HIGHEST /F >nul 2>&1
+schtasks /Create /F /TN "TPE-Bridge" /TR "wscript.exe \"%BRIDGE_DIR%\run-hidden.vbs\"" /SC ONLOGON /RL HIGHEST /F >nul 2>&1
 if %errorLevel% equ 0 (
     echo [OK] Demarrage automatique configure - tache "TPE-Bridge".
 ) else (
@@ -108,12 +109,13 @@ if not exist "%APPDATA%\TPE-Bridge\config.json" (
 )
 echo [OK] Configuration enregistree.
 echo.
-start "" "C:\Program Files\nodejs\node.exe" "%BRIDGE_DIR%\tpe-bridge-win.js"
+wscript.exe "%BRIDGE_DIR%\run-hidden.vbs"
 
 echo.
 echo ============================================================
 echo    Installation terminee !
-echo    Le pont demarrera automatiquement a chaque demarrage.
-echo    Ce fichier peut etre ferme.
+echo    Le pont tourne maintenant en arriere-plan, sans fenetre
+echo    visible - c'est normal, il n'y a rien d'autre a faire.
+echo    Il demarrera aussi automatiquement a chaque demarrage.
 echo ============================================================
 pause
