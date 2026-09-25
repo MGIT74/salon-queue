@@ -34,7 +34,7 @@ C'est fini. Le pont tourne en arrière-plan, tout de suite et à chaque
 démarrage du PC.
 
 *Pour reconfigurer plus tard (changer de clé, d'imprimante...) : double-
-cliquer directement sur `C:\TPE-Bridge\config-wizard.ps1`, qui rouvre la
+cliquer directement sur `C:\TPE-Bridge\Configurer.bat`, qui rouvre la
 même fenêtre pré-remplie avec les valeurs actuelles.*
 
 ## Configuration de l'imprimante (automatique)

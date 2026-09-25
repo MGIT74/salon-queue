@@ -37,6 +37,7 @@ set BRIDGE_DIR=C:\TPE-Bridge
 set LAUNCHER=%~dp0tpe-bridge-win.js
 set CORE=%~dp0tpe-bridge.js
 set WIZARD=%~dp0config-wizard.ps1
+set WIZARD_LAUNCHER=%~dp0Configurer.bat
 
 REM --- 1. Node.js ---
 where node >nul 2>nul
@@ -63,6 +64,7 @@ if not exist "%BRIDGE_DIR%" mkdir "%BRIDGE_DIR%"
 copy /Y "%LAUNCHER%" "%BRIDGE_DIR%\tpe-bridge-win.js" >nul
 copy /Y "%CORE%" "%BRIDGE_DIR%\tpe-bridge.js" >nul
 copy /Y "%WIZARD%" "%BRIDGE_DIR%\config-wizard.ps1" >nul
+copy /Y "%WIZARD_LAUNCHER%" "%BRIDGE_DIR%\Configurer.bat" >nul
 echo [OK] Fichiers installes.
 
 REM --- 3. Pare-feu : autoriser le pont en reseau local (TPE, impression)
