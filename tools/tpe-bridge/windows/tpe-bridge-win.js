@@ -25,7 +25,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { spawn, execSync } = require('child_process');
+const { spawn, execFileSync } = require('child_process');
 const os = require('os');
 
 const CONFIG_DIR = path.join(process.env.APPDATA || os.homedir(), 'TPE-Bridge');
@@ -75,7 +75,7 @@ function autoShareDefaultPrinter() {
       '  Set-Printer -Name $p.Name -Shared $true -ShareName $share -ErrorAction Stop; ' +
       '  Write-Output ($p.Name + "|" + $share) ' +
       '}';
-    const out = execSync('powershell.exe -NoProfile -Command "' + script.replace(/"/g, '\\"') + '"', { encoding: 'utf8', timeout: 10000 }).trim();
+    const out = execFileSync('powershell.exe', ['-NoProfile', '-Command', script], { encoding: 'utf8', timeout: 10000 }).trim();
     if (!out) return null;
     const [printerName, shareName] = out.split('|');
     return { printerName, shareName };
