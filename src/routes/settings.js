@@ -12,7 +12,7 @@ const EDITABLE = [
   'smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_from',
   'printer_connection_type', 'printer_ip', 'printer_model',
   'tpe_ip', 'tpe_port', 'tpe_cash_register_id', 'tpe_cash_register_number',
-  'tpe_reply_mode', 'tpe_callback_port', 'tpe_protocol', 'tpe_bridge_url',
+  'tpe_reply_mode', 'tpe_callback_port', 'tpe_protocol', 'tpe_bridge_url', 'tpe_print_mode',
   'email_tpl_confirmation_subject', 'email_tpl_confirmation_body',
   'email_tpl_reminder_subject', 'email_tpl_reminder_body',
   'email_tpl_cancelled_subject', 'email_tpl_cancelled_body',
@@ -259,6 +259,7 @@ router.get('/public', wrap(async (req, res) => {
     // n'est joignable que depuis le réseau du salon, jamais depuis le
     // serveur cloud.
     tpe_bridge_url: s.tpe_bridge_url || null,
+    tpe_print_mode: s.tpe_print_mode === 'text' ? 'text' : 'escpos',
     caisse_locked_until: caisseLockedUntil
   });
 }));

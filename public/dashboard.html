@@ -1453,45 +1453,32 @@
       </h3>
       <div class="accordion-body" id="devices-body" style="display:none">
       <p class="hint">
-        Connexion avec ton terminal de paiement (ex: Nepting) — une fois ces informations enregistrées, le montant du
-        ticket est envoyé automatiquement au TPE au moment de payer par carte, sans avoir à le retaper. Renseigné par
-        le prestataire qui gère ton terminal. Le TPE et la caisse doivent être sur le même réseau local.
-      </p>
-      <div class="grid2">
-        <div class="fld"><label for="set-tpe-ip">Adresse IP du TPE</label>
-          <input id="set-tpe-ip" type="text" placeholder="Ex: 192.168.1.125"></div>
-        <div class="fld"><label for="set-tpe-protocol">Protocole du terminal</label>
-          <select id="set-tpe-protocol">
-            <option value="nepting">Nepting TLV (port 20002)</option>
-            <option value="concert">Concert v3 IP (port 8888)</option>
-          </select>
-        </div>
-      </div>
-      <div class="grid2">
-        <div class="fld"><label for="set-tpe-port">Port d'écoute TPE</label>
-          <input id="set-tpe-port" type="number" placeholder="20002"></div>
-        <div class="fld"><label for="set-tpe-cash-register-number">Numéro de caisse</label>
-          <input id="set-tpe-cash-register-number" type="text" placeholder="Ex: 01 (voir ticket de config)"></div>
-      </div>
-      <div class="grid2">
-        <div class="fld"><label for="set-tpe-cash-register-id">Identifiant de caisse</label>
-          <input id="set-tpe-cash-register-id" type="text" placeholder="Fourni par le prestataire monétique"></div>
-        <div class="fld"><label for="set-tpe-bridge-url">Pont local (facultatif — paiement CB direct)</label>
-          <input id="set-tpe-bridge-url" type="text" placeholder="http://192.168.1.10:7788"></div>
-      </div>
-      <p class="hint" style="margin:-6px 0 14px;font-size:12.5px">
-        Pont local : si la caisse est hébergée en ligne, le serveur ne peut pas joindre l'IP locale du
-        terminal (ex. 192.168.1.125). Lancez le petit pont <b>tools/tpe-bridge</b> sur un ordinateur du
-        salon (même réseau que le TPE) et renseignez ici son adresse — la caisse lui délègue l'envoi.
+        Connexion avec ton terminal de paiement (ex: Nepting) — une fois le pont installé sur un
+        ordinateur du salon, le montant du ticket est envoyé automatiquement au TPE au moment de
+        payer par carte, sans avoir à le retaper.
       </p>
 
-      <!-- Impression silencieuse : clé du pont + commande à copier -->
+      <!-- Impression silencieuse + paiement CB via le pont local : methode recommandee -->
       <div class="card-box" style="background:var(--fill);box-shadow:none;margin-bottom:14px">
-        <h3 style="font-size:15px">🖨️ Impression directe (sans boîte de dialogue)</h3>
+        <h3 style="font-size:15px">🖨️ Pont local (impression + paiement CB, recommandé)</h3>
         <p class="hint" style="margin-bottom:10px">
-          Installez le pont sur un ordinateur du salon (allumé pendant les horaires). La caisse dépose
-          le ticket sur l'app, le pont le récupère automatiquement et l'imprime — sans aucun clic ni dialogue.
+          Installez le pont sur un ordinateur du salon (même réseau que le TPE, allumé pendant les
+          horaires). La caisse dépose les tickets et les demandes de paiement sur l'app, le pont
+          les récupère automatiquement, imprime et parle au TPE en local — sans aucun clic ni
+          dialogue. L'adresse IP du TPE et son numéro de caisse se règlent directement sur
+          l'ordinateur du salon au moment de l'installation, pas ici.
         </p>
+        <label class="fld" style="flex-direction:row;align-items:center;gap:8px;display:flex;margin-bottom:10px">
+          <input type="checkbox" id="set-tpe-bridge-enabled" onchange="updateBridgeModeVisibility()" style="width:auto">
+          <span>Utiliser le pont local pour les paiements CB</span>
+        </label>
+        <div class="fld" style="margin-bottom:10px;max-width:280px">
+          <label for="set-tpe-print-mode">Mode d'impression</label>
+          <select id="set-tpe-print-mode">
+            <option value="escpos">ESC/POS (découpe automatique, standard)</option>
+            <option value="text">Texte simple (imprimante non ESC/POS)</option>
+          </select>
+        </div>
         <button class="btn btn-soft" onclick="generateBridgeKey(this)">Générer / régénérer la clé du pont</button>
         <div id="bridge-key-result" style="display:none;margin-top:12px">
           <div class="fld"><label>Clé (copiez-la maintenant — elle ne sera plus affichée)</label>
@@ -1510,18 +1497,48 @@
           </p>
         </div>
       </div>
-      <div class="grid2">
-        <div class="fld"><label for="set-tpe-reply-mode">Mode de réponse</label>
-          <select id="set-tpe-reply-mode" onchange="updateTpeCallbackVisibility()">
-            <option value="same">Sur la même connexion</option>
-            <option value="callback">Le TPE rappelle la caisse</option>
-          </select>
+
+      <!-- Connexion directe serveur -> TPE : uniquement pertinent SANS pont local (cas rare) -->
+      <div id="tpe-direct-fields" style="display:none">
+        <p class="hint" style="font-size:12.5px;margin-top:0">
+          Ce qui suit ne sert que si vous n'utilisez <strong>pas</strong> de pont local (connexion
+          directe entre le serveur et le TPE — ne fonctionne que si le serveur est physiquement sur
+          le réseau du salon, cas rare).
+        </p>
+        <div class="grid2">
+          <div class="fld"><label for="set-tpe-ip">Adresse IP du TPE</label>
+            <input id="set-tpe-ip" type="text" placeholder="Ex: 192.168.1.125"></div>
+          <div class="fld"><label for="set-tpe-protocol">Protocole du terminal</label>
+            <select id="set-tpe-protocol">
+              <option value="nepting">Nepting TLV (port 20002)</option>
+              <option value="concert">Concert v3 IP (port 8888)</option>
+            </select>
+          </div>
         </div>
-        <div class="fld" id="tpe-callback-port-fld" style="display:none">
-          <label for="set-tpe-callback-port">Port d'écoute caisse</label>
-          <input id="set-tpe-callback-port" type="number" placeholder="20006">
+        <div class="grid2">
+          <div class="fld"><label for="set-tpe-port">Port d'écoute TPE</label>
+            <input id="set-tpe-port" type="number" placeholder="20002"></div>
+          <div class="fld"><label for="set-tpe-cash-register-number">Numéro de caisse</label>
+            <input id="set-tpe-cash-register-number" type="text" placeholder="Ex: 01 (voir ticket de config)"></div>
+        </div>
+        <div class="grid2">
+          <div class="fld"><label for="set-tpe-cash-register-id">Identifiant de caisse</label>
+            <input id="set-tpe-cash-register-id" type="text" placeholder="Fourni par le prestataire monétique"></div>
+          <div class="fld"><label for="set-tpe-reply-mode">Mode de réponse</label>
+            <select id="set-tpe-reply-mode" onchange="updateTpeCallbackVisibility()">
+              <option value="same">Sur la même connexion</option>
+              <option value="callback">Le TPE rappelle la caisse</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid2">
+          <div class="fld" id="tpe-callback-port-fld" style="display:none">
+            <label for="set-tpe-callback-port">Port d'écoute caisse</label>
+            <input id="set-tpe-callback-port" type="number" placeholder="20006">
+          </div>
         </div>
       </div>
+
       <button class="btn btn-primary" onclick="saveDeviceSettings()">Enregistrer</button>
       </div>
     </div>
@@ -5762,7 +5779,9 @@ function loadCaisseTab() {
     document.getElementById('set-tpe-reply-mode').value = r.settings.tpe_reply_mode || 'same';
     document.getElementById('set-tpe-callback-port').value = r.settings.tpe_callback_port || '20006';
     document.getElementById('set-tpe-protocol').value = r.settings.tpe_protocol || 'nepting';
-    document.getElementById('set-tpe-bridge-url').value = r.settings.tpe_bridge_url || '';
+    document.getElementById('set-tpe-bridge-enabled').checked = Boolean(r.settings.tpe_bridge_url);
+    document.getElementById('set-tpe-print-mode').value = r.settings.tpe_print_mode === 'text' ? 'text' : 'escpos';
+    updateBridgeModeVisibility();
     updateTpeCallbackVisibility();
 
     EMAIL_TPL_TYPES.forEach(function (type) {
@@ -7046,6 +7065,14 @@ function updateTpeCallbackVisibility() {
   document.getElementById('tpe-callback-port-fld').style.display = mode === 'callback' ? 'block' : 'none';
 }
 
+// Le bloc "connexion directe serveur -> TPE" ne sert que quand aucun pont
+// local n'est utilisé (le pont a sa propre config locale, indépendante de
+// ces champs) - on le masque pour ne pas embrouiller le cas courant.
+function updateBridgeModeVisibility() {
+  var usesBridge = document.getElementById('set-tpe-bridge-enabled').checked;
+  document.getElementById('tpe-direct-fields').style.display = usesBridge ? 'none' : 'block';
+}
+
 function saveDeviceSettings() {
   api('/api/settings', { method: 'PUT', body: {
     tpe_ip: document.getElementById('set-tpe-ip').value.trim(),
@@ -7055,7 +7082,8 @@ function saveDeviceSettings() {
     tpe_reply_mode: document.getElementById('set-tpe-reply-mode').value,
     tpe_callback_port: document.getElementById('set-tpe-callback-port').value || '20006',
     tpe_protocol: document.getElementById('set-tpe-protocol').value,
-    tpe_bridge_url: document.getElementById('set-tpe-bridge-url').value.trim()
+    tpe_bridge_url: document.getElementById('set-tpe-bridge-enabled').checked ? '1' : '',
+    tpe_print_mode: document.getElementById('set-tpe-print-mode').value
   }}).then(function () { toast('Terminal enregistré'); })
     .catch(function (e) { toast(e.message, true); });
 }

@@ -48,11 +48,18 @@ router.post('/charge', requireAdminOrBarber, wrap(async (req, res) => {
   }
 
   const s = await getSettings(req.salon.id);
-  if (!s.tpe_ip) {
-    return res.status(400).json({ error: 'Aucun terminal de paiement configuré (Réglages > Terminal de paiement)' });
-  }
-  if (!s.tpe_cash_register_id) {
-    return res.status(400).json({ error: 'Identifiant de caisse manquant (Réglages > Terminal de paiement)' });
+  // L'IP du TPE et l'identifiant de caisse ne servent qu'au chemin direct
+  // serveur -> TPE (ci-dessous) : quand un pont local est configuré, le
+  // pont utilise sa PROPRE configuration locale (config.json sur
+  // l'ordinateur du salon) et ces champs ne sont jamais lus - inutile de
+  // forcer leur saisie dans ce cas.
+  if (!s.tpe_bridge_url) {
+    if (!s.tpe_ip) {
+      return res.status(400).json({ error: 'Aucun terminal de paiement configuré (Réglages > Terminal de paiement)' });
+    }
+    if (!s.tpe_cash_register_id) {
+      return res.status(400).json({ error: 'Identifiant de caisse manquant (Réglages > Terminal de paiement)' });
+    }
   }
 
   const merchantTxId = crypto.randomBytes(8).toString('hex');

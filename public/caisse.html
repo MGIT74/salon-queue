@@ -838,6 +838,7 @@ function loadSalonName() {
       legalInfo = d.legal || {};
       vatRates = d.vat_rates || { service: 20, extra: 20, product: 20 };
       tpeBridgeUrl = d.tpe_bridge_url || null;
+      tpePrintMode = d.tpe_print_mode === 'text' ? 'text' : 'escpos';
       applyAccentColor(d.accent_color);
       document.title = name + ' — Caisse';
       var mark = document.getElementById('salon-mark');
@@ -855,6 +856,7 @@ var vatRates = { service: 20, extra: 20, product: 20 };
 // que le TPE) au lieu de l'API en ligne - le serveur cloud ne peut pas
 // joindre une IP locale du type 192.168.1.x.
 var tpeBridgeUrl = null;
+var tpePrintMode = 'escpos';
 
 function barberApi(path, opts) {
   opts = opts || {};
@@ -3167,7 +3169,7 @@ function printReceiptSilent() {
   });
   barberApi('/api/tpe/print', {
     method: 'POST',
-    body: { text: ticketText, mode: tpeBridgeUrl.includes('escpos=off') ? 'text' : 'escpos' }
+    body: { text: ticketText, mode: tpePrintMode }
   })
     .then(function (d) {
       if (btn) { btn.disabled = false; }
