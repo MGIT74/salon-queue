@@ -26,6 +26,27 @@ manipulation quotidienne.
 C'est fini. Le pont tourne en arrière-plan, tout de suite et à chaque
 démarrage du PC.
 
+## Configuration de l'imprimante (une seule fois)
+
+Windows n'a pas d'équivalent direct à CUPS/`lp` (utilisé sur macOS/Linux)
+pour envoyer des octets bruts à une imprimante sans aucune fenêtre. La
+méthode fiable et sans dépendance : **partager l'imprimante**, puis lui
+copier directement le ticket — ça envoie les données telles quelles au
+spouleur, sans jamais ouvrir de dialogue.
+
+1. **Paramètres Windows** → **Bluetooth et appareils** → **Imprimantes et
+   scanners** → cliquer sur l'imprimante du ticket → **Propriétés de
+   l'imprimante** → onglet **Partage** → cocher **"Partager cette
+   imprimante"** → noter le **nom de partage** (souvent identique au nom
+   de l'imprimante, ex. `EPSON_TM-T20III`).
+2. Dans l'assistant TPE Bridge (ou `%APPDATA%\TPE-Bridge\config.json`),
+   renseigner ce nom de partage comme **imprimante** — inutile si le nom
+   de partage est identique au nom de l'imprimante par défaut de Windows
+   (le pont le détecte automatiquement dans ce cas).
+3. Tester : `copy /b n'importe_quel_fichier.txt \\localhost\NomDuPartage`
+   dans une invite de commandes — si une page sort de l'imprimante, c'est
+   bon.
+
 ## Quotidien : rien à faire
 
 Le pont démarre avec Windows, se relance tout seul s'il plante, et
@@ -56,6 +77,7 @@ node tpe-bridge-win.js > pont.log 2>&1
 | Problème | Solution |
 |---|---|
 | Tickets ne sortent pas | Vérifier que l'imprimante est bien installée dans Windows et définie par défaut. Tester : `echo test > \\localhost\NOM` ou une page test Windows |
+| "partage introuvable ou non partagé" dans les logs | L'imprimante n'est pas partagée (voir section "Configuration de l'imprimante" ci-dessus), ou le nom de partage renseigné ne correspond pas exactement |
 | "Clé du pont invalide" dans les logs | Régénérer la clé dans le dashboard et relancer l'assistant (supprimer `%APPDATA%\TPE-Bridge\config.json` puis relancer le pont) |
 | Changer la configuration | Supprimer `%APPDATA%\TPE-Bridge\config.json` → l'assistant se relance au prochain démarrage |
 | Pont ne démarre pas au boot | Vérifier la tâche : `schtasks /Query /TN "TPE-Bridge"` |
@@ -73,8 +95,11 @@ rmdir /S /Q "%APPDATA%\TPE-Bridge"
 - `tpe-bridge-win.js` = lanceur : assistant premier lancement, stockage
   de la config dans `%APPDATA%\TPE-Bridge\config.json`, relance
   automatique du pont en cas de crash.
-- `tpe-bridge.js` = le pont lui-même (identique à la version macOS/Linux,
-  même code, mêmes arguments).
+- `tpe-bridge.js` = le pont lui-même (même fichier que la version macOS/
+  Linux ; seule la méthode d'envoi à l'imprimante diffère en interne
+  selon le système - RAW via CUPS/`lp` sur macOS/Linux, copie vers un
+  partage réseau local sur Windows - le reste du comportement, le
+  protocole TPE et la logique de polling sont strictement identiques).
 - La tâche planifiée tourne au **login** (pas au boot système) pour que
   l'imprimante réseau soit déjà disponible.
 - Le fichier de config contient la clé du pont : il n'est lisible que

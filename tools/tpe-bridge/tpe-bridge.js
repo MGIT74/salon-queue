@@ -288,6 +288,10 @@ function printTicket(text, printer, mode) {
     fs.writeFile(tmpFile, content, (err) => {
       if (err) return reject(new Error('Écriture du ticket impossible : ' + err.message));
 
+      if (process.platform === 'win32') {
+        return printTicketWindows(tmpFile, printer, useRaw, resolve, reject);
+      }
+
       const args = [];
       if (printer) args.push('-d', printer);
       if (useRaw) args.push('-o', 'raw');
@@ -306,6 +310,76 @@ function printTicket(text, printer, mode) {
       });
     });
   });
+}
+
+/**
+ * Impression silencieuse sur Windows : CUPS/lp n'existe pas, donc pas
+ * d'équivalent direct à "lp -o raw". La méthode fiable et sans aucune
+ * dépendance pour envoyer des octets bruts (ESC/POS) à une imprimante
+ * Windows, sans jamais ouvrir de boîte de dialogue, est de PARTAGER
+ * l'imprimante (une seule fois, voir windows/README.md) puis de copier
+ * le fichier directement vers ce partage : `copy /b fichier \\localhost\Partage`
+ * envoie les octets tels quels au spouleur, sans passage par le pilote
+ * qui reformaterait le texte (ce que fait justement `-o raw` sous CUPS).
+ * `printer` doit être le NOM DE PARTAGE (pas le nom d'imprimante Windows
+ * s'ils diffèrent) - à défaut, on utilise le nom d'imprimante par défaut
+ * du système comme partage (fonctionne si son partage porte le même nom).
+ */
+function printTicketWindows(tmpFile, printer, useRaw, resolve, reject) {
+  const finish = (err, jobLabel) => {
+    fs.unlink(tmpFile, () => {});
+    if (err) reject(err);
+    else resolve({ jobId: jobLabel });
+  };
+
+  const sendToShare = (shareName) => {
+    const target = '\\\\localhost\\' + shareName;
+    execFile('cmd.exe', ['/c', 'copy', '/b', tmpFile, target], { timeout: 15000 }, (err, stdout, stderr) => {
+      if (err) {
+        finish(new Error(
+          'Impression refusée par Windows (partage "' + shareName + '" introuvable ou non partagé) : ' +
+          (stderr || err.message || '').trim() +
+          ' — l\'imprimante doit être partagée (voir windows/README.md, section Impression).'
+        ));
+      } else {
+        finish(null, 'copy -> \\\\localhost\\' + shareName);
+      }
+    });
+  };
+
+  if (printer) return sendToShare(printer);
+
+  // Pas de nom fourni : on retrouve l'imprimante par défaut de Windows
+  // via PowerShell, et on tente son propre nom comme nom de partage
+  // (cas le plus courant si l'utilisateur a suivi le README).
+  execFile('powershell.exe', [
+    '-NoProfile', '-Command',
+    "(Get-CimInstance -ClassName Win32_Printer | Where-Object { $_.Default -eq $true }).Name"
+  ], { timeout: 8000 }, (err, stdout) => {
+    const name = (stdout || '').trim();
+    if (err || !name) {
+      return finish(new Error(
+        'Aucune imprimante par défaut détectée sur Windows et aucun --printer fourni. ' +
+        'Précisez le nom de partage de l\'imprimante (windows/README.md).'
+      ));
+    }
+    sendToShare(name);
+  });
+}
+
+/**
+ * Liste les imprimantes connues du système, pour affichage informatif
+ * au demarrage (jamais utilise pour imprimer) - lpstat sous macOS/
+ * Linux, PowerShell Get-Printer sous Windows (lpstat n'existe pas).
+ */
+function listPrinters(callback) {
+  if (process.platform === 'win32') {
+    execFile('powershell.exe', [
+      '-NoProfile', '-Command', 'Get-CimInstance -ClassName Win32_Printer | Select-Object -ExpandProperty Name'
+    ], (err, stdout) => callback(err, stdout));
+  } else {
+    execFile('lpstat', ['-a'], (err, stdout) => callback(err, stdout));
+  }
 }
 
 /* ---------- Serveur HTTP ---------- */
@@ -337,8 +411,7 @@ function main() {
     console.log(`App           : ${opts.server}`);
     console.log(`Salon         : ${opts.salon}`);
     console.log(`Imprimante    : ${opts.printer || 'imprimante par défaut du système'}`);
-    const { execFile } = require('child_process');
-    execFile('lpstat', ['-a'], (err, stdout) => {
+    listPrinters((err, stdout) => {
       if (err || !stdout.trim()) console.log('Imprimantes   : (aucune détectée)');
       else console.log('Imprimantes   : ' + stdout.trim().split('\n').join(' | '));
     });
@@ -429,9 +502,8 @@ function main() {
     console.log('Dans la caisse (Dashboard > Réglages > Terminal de paiement), renseignez :');
     console.log(`  Pont local : http://<ip-de-cet-ordinateur>:${opts.listen}`);
     console.log('');
-    console.log('Imprimantes disponibles (lpstat -a) :');
-    const { execFile } = require('child_process');
-    execFile('lpstat', ['-a'], (err, stdout) => {
+    console.log('Imprimantes disponibles :');
+    listPrinters((err, stdout) => {
       if (err || !stdout.trim()) console.log('  (aucune imprimante détectée)');
       else stdout.trim().split('\n').forEach((l) => console.log('  ' + l));
     });
