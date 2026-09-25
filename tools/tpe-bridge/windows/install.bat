@@ -58,7 +58,14 @@ if %errorLevel% equ 0 (
     set "PATH=%PATH%;C:\Program Files\nodejs"
 )
 
-REM --- 2. Copier les fichiers ---
+REM --- 2. Arreter toute instance du pont deja en cours (evite les fichiers
+REM        verrouilles lors de la copie ci-dessous - plus besoin de fermer
+REM        des fenetres a la main)
+echo [..] Arret d'une eventuelle instance du pont deja en cours...
+powershell.exe -NoProfile -Command "Get-CimInstance Win32_Process -Filter \"Name='node.exe'\" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*tpe-bridge-win.js*' -or $_.CommandLine -like '*tpe-bridge.js*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }" >nul 2>&1
+timeout /t 1 /nobreak >nul
+
+REM --- 3. Copier les fichiers ---
 echo [..] Installation des fichiers dans %BRIDGE_DIR%...
 if not exist "%BRIDGE_DIR%" mkdir "%BRIDGE_DIR%"
 copy /Y "%LAUNCHER%" "%BRIDGE_DIR%\tpe-bridge-win.js" >nul
@@ -67,13 +74,13 @@ copy /Y "%WIZARD%" "%BRIDGE_DIR%\config-wizard.ps1" >nul
 copy /Y "%WIZARD_LAUNCHER%" "%BRIDGE_DIR%\Configurer.bat" >nul
 echo [OK] Fichiers installes.
 
-REM --- 3. Pare-feu : autoriser le pont en reseau local (TPE, impression)
+REM --- 4. Pare-feu : autoriser le pont en reseau local (TPE, impression)
 echo [..] Configuration du pare-feu...
 netsh advfirewall firewall delete rule name="TPE Bridge" >nul 2>&1
 netsh advfirewall firewall add rule name="TPE Bridge" dir=in action=allow program="C:\Program Files\nodejs\node.exe" enable=yes profile=any >nul 2>&1
 echo [OK] Pare-feu configure.
 
-REM --- 4. Tache planifiee au demarrage de Windows (au login, sans UAC)
+REM --- 5. Tache planifiee au demarrage de Windows (au login, sans UAC)
 echo [..] Creation du demarrage automatique...
 schtasks /Create /F /TN "TPE-Bridge" /TR "\"C:\Program Files\nodejs\node.exe\" \"%BRIDGE_DIR%\tpe-bridge-win.js\"" /SC ONLOGON /RL HIGHEST /F >nul 2>&1
 if %errorLevel% equ 0 (
@@ -83,7 +90,7 @@ if %errorLevel% equ 0 (
     echo     double-clic sur %BRIDGE_DIR%\tpe-bridge-win.js ou raccourci bureau.
 )
 
-REM --- 5. Configuration (formulaire graphique - pas de terminal a manipuler)
+REM --- 6. Configuration (formulaire graphique - pas de terminal a manipuler)
 echo.
 echo ============================================================
 echo    Derniere etape : une fenetre de configuration va s'ouvrir
