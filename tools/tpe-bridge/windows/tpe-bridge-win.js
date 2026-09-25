@@ -55,6 +55,35 @@ function ask(rl, question, def) {
   });
 }
 
+/**
+ * Partage automatiquement l'imprimante par défaut de Windows via
+ * PowerShell (Set-Printer -Shared), pour éviter la manipulation
+ * manuelle (Propriétés de l'imprimante > Partage > cocher la case,
+ * parfois difficile à trouver). Retourne le nom de partage utilisé, ou
+ * null si ça échoue (imprimante introuvable, droits insuffisants...) -
+ * dans ce cas l'utilisateur peut toujours partager manuellement
+ * (voir windows/README.md) et saisir le nom de partage à la question
+ * suivante.
+ */
+function autoShareDefaultPrinter() {
+  try {
+    const script =
+      '$p = Get-CimInstance -ClassName Win32_Printer | Where-Object { $_.Default -eq $true } | Select-Object -First 1; ' +
+      'if ($p) { ' +
+      '  $share = ($p.Name -replace "[^a-zA-Z0-9_-]", "_"); ' +
+      '  if ($share.Length -eq 0) { $share = "TicketPrinter" }; ' +
+      '  Set-Printer -Name $p.Name -Shared $true -ShareName $share -ErrorAction Stop; ' +
+      '  Write-Output ($p.Name + "|" + $share) ' +
+      '}';
+    const out = execSync('powershell.exe -NoProfile -Command "' + script.replace(/"/g, '\\"') + '"', { encoding: 'utf8', timeout: 10000 }).trim();
+    if (!out) return null;
+    const [printerName, shareName] = out.split('|');
+    return { printerName, shareName };
+  } catch (e) {
+    return null;
+  }
+}
+
 /** Assistant de premier lancement : pose les 4 questions et sauvegarde. */
 async function firstRunWizard() {
   console.log('');
@@ -71,13 +100,27 @@ async function firstRunWizard() {
   console.log(' paiement, bouton "Generer la cle du pont".)');
   console.log('');
 
+  console.log('[..] Partage de l\'imprimante par defaut (impression silencieuse)...');
+  const shared = autoShareDefaultPrinter();
+  let defaultPrinterAnswer = '';
+  if (shared) {
+    console.log('[OK] "' + shared.printerName + '" partagee sous le nom "' + shared.shareName + '".');
+    defaultPrinterAnswer = shared.shareName;
+  } else {
+    console.log('[!] Partage automatique impossible (aucune imprimante par defaut, ou droits');
+    console.log('    insuffisants - relancez en tant qu\'administrateur). Vous pouvez partager');
+    console.log('    l\'imprimante manuellement (voir windows/README.md) et indiquer son nom');
+    console.log('    de partage a la question suivante, ou reessayer plus tard.');
+  }
+  console.log('');
+
   const readline = require('readline');
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 
   const server = await ask(rl, 'Adresse de votre application (ex: https://rdv.handsgraphic.com)', 'https://rdv.handsgraphic.com');
   const salon = await ask(rl, 'Identifiant du salon (celui dans l\'URL ?salon=...)', '');
   const key = await ask(rl, 'Cle du pont', '');
-  const printer = await ask(rl, 'Nom de l\'imprimante (Entree = imprimante par defaut)', '');
+  const printer = await ask(rl, 'Nom de partage de l\'imprimante', defaultPrinterAnswer);
   const tpeIp = await ask(rl, 'IP du TPE (Entree si aucun TPE pour le moment)', '');
   rl.close();
 

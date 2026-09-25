@@ -26,7 +26,7 @@ manipulation quotidienne.
 C'est fini. Le pont tourne en arrière-plan, tout de suite et à chaque
 démarrage du PC.
 
-## Configuration de l'imprimante (une seule fois)
+## Configuration de l'imprimante (automatique)
 
 Windows n'a pas d'équivalent direct à CUPS/`lp` (utilisé sur macOS/Linux)
 pour envoyer des octets bruts à une imprimante sans aucune fenêtre. La
@@ -34,15 +34,22 @@ méthode fiable et sans dépendance : **partager l'imprimante**, puis lui
 copier directement le ticket — ça envoie les données telles quelles au
 spouleur, sans jamais ouvrir de dialogue.
 
+**Depuis la dernière version, l'assistant de configuration (`install.bat`
+puis premier lancement) partage automatiquement l'imprimante par défaut
+de Windows** (via PowerShell `Set-Printer`) — rien à faire dans la
+plupart des cas, il suffit de valider la question "Nom de partage de
+l'imprimante" avec Entrée.
+
+Si le partage automatique échoue (message `[!]` dans la console — le
+plus souvent : script pas lancé en administrateur, ou aucune imprimante
+par défaut définie), le partager à la main :
+
 1. **Paramètres Windows** → **Bluetooth et appareils** → **Imprimantes et
    scanners** → cliquer sur l'imprimante du ticket → **Propriétés de
    l'imprimante** → onglet **Partage** → cocher **"Partager cette
-   imprimante"** → noter le **nom de partage** (souvent identique au nom
-   de l'imprimante, ex. `EPSON_TM-T20III`).
-2. Dans l'assistant TPE Bridge (ou `%APPDATA%\TPE-Bridge\config.json`),
-   renseigner ce nom de partage comme **imprimante** — inutile si le nom
-   de partage est identique au nom de l'imprimante par défaut de Windows
-   (le pont le détecte automatiquement dans ce cas).
+   imprimante"** → noter le **nom de partage**.
+2. Renseigner ce nom de partage à la question de l'assistant (ou dans
+   `%APPDATA%\TPE-Bridge\config.json`, champ `printer`).
 3. Tester : `copy /b n'importe_quel_fichier.txt \\localhost\NomDuPartage`
    dans une invite de commandes — si une page sort de l'imprimante, c'est
    bon.
