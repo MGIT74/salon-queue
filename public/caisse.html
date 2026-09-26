@@ -2296,8 +2296,6 @@ function printZTicket(id) {
       '<div class="zline"><span>Fond de caisse (reste en caisse)</span><span>' + eur(r.starting_cash_cents || 0) + '</span></div>' +
       '<div class="zline"><span>+ Ventes en espèces</span><span>' + eur(cashSalesCents) + '</span></div>' +
       '<div class="zline total"><span>= Espèces attendues dans le tiroir</span><span>' + eur(expectedInDrawer) + '</span></div>' +
-      '<div class="zsection-label">Cumul depuis la mise en service</div>' +
-      '<div class="zline grand"><span>Grand total perpétuel</span><span>' + eur(r.grand_total_cents) + '</span></div>' +
       '<div class="z-actions">' +
         '<button class="btn btn-soft" onclick="closeZTicket()">Fermer</button>' +
         '<button class="btn btn-primary" onclick="window.print()">Imprimer</button>' +
