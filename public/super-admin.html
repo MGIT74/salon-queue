@@ -829,7 +829,7 @@ function generateApiKey() {
           '<div class="modal-title">Clé générée</div>' +
           '<div class="modal-message" style="margin-bottom:14px">Copiez-la maintenant — elle ne sera plus jamais affichée après avoir fermé cette fenêtre.</div>' +
           '<div style="display:flex;gap:8px;align-items:center;margin-bottom:16px">' +
-            '<input type="text" readonly value="' + esc(r.key) + '" id="new-api-key-value" style="flex:1;padding:12px 14px;border:none;border-radius:12px;background:var(--fill);color:var(--ink);font-family:monospace;font-size:13px">' +
+            '<input type="text" readonly value="' + esc(r.key) + '" id="new-api-key-value" style="flex:1;padding:12px 14px;border:1px solid var(--sep);border-radius:12px;background:var(--card);color:var(--ink);font-family:monospace;font-size:13px">' +
             '<button class="btn btn-soft" onclick="navigator.clipboard.writeText(\'' + r.key + '\');toast(\'Copiée\')">Copier</button>' +
           '</div>' +
           '<div class="modal-actions"><button class="btn btn-primary" id="new-api-key-close-btn">J\'ai bien copié la clé</button></div>'

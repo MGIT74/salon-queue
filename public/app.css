@@ -149,10 +149,10 @@ button:active:not(:disabled), .switch:active {
   color: var(--grey); margin-bottom: 7px; letter-spacing: -.01em;
 }
 .fld input, .fld select, .fld textarea {
-  width: 100%; padding: 14px 15px; border: none; border-radius: 12px;
-  background: var(--fill); color: var(--ink); font-family: inherit; font-size: 16px;
+  width: 100%; padding: 14px 15px; border: 1px solid var(--sep); border-radius: 12px;
+  background: var(--card); color: var(--ink); font-family: inherit; font-size: 16px;
   outline: 2px solid transparent; outline-offset: -2px;
-  transition: outline-color .15s ease, background .25s ease;
+  transition: outline-color .15s ease, background .25s ease, border-color .15s ease;
 }
 .fld input:focus, .fld select:focus, .fld textarea:focus { outline-color: var(--blue); }
 

@@ -974,13 +974,8 @@
 
 .clients-toolbar { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
 .clients-toolbar .fld label { font-size: 12px; color: var(--grey); display: block; margin-bottom: 4px; }
-.clients-toolbar .fld input[type="date"] {
-  padding: 9px 12px; border: none; border-radius: 10px; background: var(--fill);
-  color: var(--ink); font-family: inherit; font-size: 13.5px;
-}
-.clients-toolbar .fld select {
-  padding: 9px 12px; border: none; border-radius: 10px; background: var(--fill);
-  color: var(--ink); font-family: inherit; font-size: 13.5px;
+.clients-toolbar .fld input[type="date"], .clients-toolbar .fld select {
+  padding: 9px 12px; border-radius: 10px; font-size: 13.5px;
 }
 .clients-export-bar {
   display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;
@@ -1561,7 +1556,7 @@
       <div class="admin-head" style="margin-bottom:14px">
         <h3 id="rdv-list-title" style="margin:0">À venir</h3>
         <input id="rdv-search" type="text" placeholder="Rechercher un nom…" oninput="onRdvFilterChange()"
-               style="max-width:220px;padding:11px 16px;border:none;border-radius:999px;background:var(--fill);color:var(--ink);font-family:inherit;font-size:14px;outline:none">
+               style="max-width:220px;padding:11px 16px;border:1px solid var(--sep);border-radius:999px;background:var(--card);color:var(--ink);font-family:inherit;font-size:14px;outline:none">
         <button class="btn btn-soft" id="rdv-reset-btn" onclick="resetRdvListToUpcoming()" style="display:none">Voir tous les à venir</button>
       </div>
       <div class="grid4" style="margin-bottom:16px">
@@ -1643,7 +1638,7 @@
     <div class="admin-head">
       <h2>Clients</h2>
       <input id="client-search" type="text" placeholder="Rechercher un nom…"
-             style="max-width:260px;padding:11px 16px;border:none;border-radius:999px;background:var(--fill);color:var(--ink);font-family:inherit;font-size:14px;outline:none">
+             style="max-width:260px;padding:11px 16px;border:1px solid var(--sep);border-radius:999px;background:var(--card);color:var(--ink);font-family:inherit;font-size:14px;outline:none">
     </div>
 
     <div class="clients-toolbar">
