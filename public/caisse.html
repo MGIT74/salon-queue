@@ -2285,6 +2285,7 @@ function printZTicket(id) {
       '<h2>' + esc(salonName) + '</h2>' +
       '<div class="z-num">CLÔTURE Z' + String(r.z_number).padStart(3, '0') + '</div>' +
       '<div class="sub">Du ' + esc(periodStartTxt) + '<br>au ' + esc(periodEndTxt) + '</div>' +
+      (r.closed_by ? '<div class="sub">Clôturé par : ' + esc(r.closed_by) + '</div>' : '') +
       '<div class="zsection-label">Détail par mode de paiement</div>' +
       (breakdownHtml || '<div class="zline"><span>Aucun détail</span></div>') +
       '<div class="zline total"><span>Total (' + r.sales_count + ' vente' + (r.sales_count > 1 ? 's' : '') + ')</span><span>' + eur(r.total_cents) + '</span></div>' +

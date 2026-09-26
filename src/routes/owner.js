@@ -736,6 +736,7 @@ router.post('/caisse/close', requireAdminOrBarber, wrap(async (req, res) => {
     );
     if (verifiedBarber) actorLabel = verifiedBarber.name;
   }
+  await pool.query('UPDATE cash_closings SET closed_by = ? WHERE id = ?', [actorLabel, id]);
   logActivity(req.salon.id, 'cash_closing', 'Clôture de caisse Z' + zNumber + ' (' + sales.length + ' vente' + (sales.length > 1 ? 's' : '') + ', ' + (total / 100).toFixed(2) + ' €, ' + actorLabel + ')');
   res.json({ ok: true, id, z_number: zNumber, total_cents: total, sales_count: sales.length });
 }));
@@ -821,6 +822,7 @@ router.get('/caisse/closings', requireAdminOrBarber, wrap(async (req, res) => {
         period_end: utcIso(r.period_end),
         total_cents: r.total_cents,
         sales_count: r.sales_count,
+        closed_by: r.closed_by || null,
         breakdown
       };
     })
@@ -862,6 +864,7 @@ router.get('/caisse/closings/:id', requireAdminOrBarber, wrap(async (req, res) =
     period_end: utcIso(row.period_end),
     total_cents: row.total_cents,
     sales_count: row.sales_count,
+    closed_by: row.closed_by || null,
     breakdown,
     by_barber: byBarber,
     by_item: byItem,
