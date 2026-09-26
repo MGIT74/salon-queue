@@ -126,8 +126,6 @@ function findPhoneCountryByCode(code) {
   return found[0] || PHONE_COUNTRIES[0];
 }
 
-function flagUrl(iso) { return 'https://flagcdn.com/24x18/' + iso + '.png'; }
-
 function setPhoneCCDisplay(prefix, code, iso) {
   var entry = iso
     ? (PHONE_COUNTRIES.filter(function (p) { return p[0] === code && p[3] === iso; })[0] || findPhoneCountryByCode(code))
@@ -136,7 +134,7 @@ function setPhoneCCDisplay(prefix, code, iso) {
   if (!countryEl) return;
   countryEl.value = entry[0];
   countryEl.dataset.iso = entry[3];
-  document.getElementById(prefix + '-phone-cc-flag').src = flagUrl(entry[3]);
+  document.getElementById(prefix + '-phone-cc-flag').textContent = entry[1];
   document.getElementById(prefix + '-phone-cc-label').textContent = entry[0];
 }
 
@@ -144,7 +142,7 @@ function renderPhoneCCList(prefix) {
   var listEl = document.getElementById(prefix + '-phone-cc-list');
   listEl.innerHTML = PHONE_COUNTRIES.map(function (p) {
     return '<div class="phone-cc-opt" onclick="event.stopPropagation();selectPhoneCC(\'' + prefix + '\',\'' + p[0] + '\',\'' + p[3] + '\')">' +
-      '<img src="' + flagUrl(p[3]) + '" width="20" height="15" alt="">' +
+      '<span class="flag-emoji">' + p[1] + '</span>' +
       '<span class="code">' + p[0] + '</span><span class="name">' + esc(p[2]) + '</span></div>';
   }).join('');
 }
