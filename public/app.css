@@ -217,6 +217,10 @@ input[type="date"] { -webkit-appearance: none; appearance: none; }
 .auth-title { font-size: 25px; font-weight: 700; margin: 0 0 6px; letter-spacing: -.01em; }
 .auth-sub { color: var(--grey); margin: 0 0 26px; font-size: 14.5px; }
 .auth-form-card .fld { text-align: left; margin-bottom: 14px; }
+.auth-form-card .fld input {
+  background: var(--card); border: 1px solid var(--sep);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+}
 .auth-links { margin-top: 16px; font-size: 14px; }
 .auth-links a { color: var(--accent); text-decoration: none; font-weight: 500; }
 .auth-back-link {
