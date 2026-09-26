@@ -223,8 +223,11 @@ router.get('/public', wrap(async (req, res) => {
   // contourner la reconfirmation obligatoire du matin - voir autoLogin()
   // dans caisse.html, qui force une vraie reconnexion (code PIN) tant
   // que ce signal est actif, au lieu de restaurer la session d'hier.
-  const [[pendingRecountRow]] = await pool.query(
-    'SELECT 1 FROM cash_closings WHERE salon_id = ? AND recount_confirmed_at IS NULL LIMIT 1',
+  // Ne regarde QUE la clôture la plus récente (même logique que
+  // /api/barbers/login) - une ancienne clôture de test jamais confirmée
+  // ne doit pas bloquer indéfiniment une fois la dernière confirmée.
+  const [[lastClosingRow]] = await pool.query(
+    'SELECT recount_confirmed_at FROM cash_closings WHERE salon_id = ? ORDER BY period_end DESC LIMIT 1',
     [req.salon.id]
   );
 
@@ -272,7 +275,7 @@ router.get('/public', wrap(async (req, res) => {
     // cloud. Actif dès qu'une clé de pont existe, pas un réglage à part.
     tpe_bridge_url: bridgeKey ? '1' : null,
     tpe_print_mode: s.tpe_print_mode === 'text' ? 'text' : 'escpos',
-    pending_recount: Boolean(pendingRecountRow),
+    pending_recount: Boolean(lastClosingRow && !lastClosingRow.recount_confirmed_at),
     caisse_locked_until: caisseLockedUntil
   });
 }));
