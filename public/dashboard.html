@@ -504,6 +504,7 @@
      separees par un trait fin, survol en surbrillance. ============ */
   .list-table-box {
     border: 1px solid var(--sep); border-radius: 14px; overflow: hidden; background: var(--card);
+    box-shadow: var(--shadow);
   }
   .list-table-box .item {
     background: none; border-radius: 0; box-shadow: none; margin-bottom: 0;
@@ -512,8 +513,14 @@
   .list-table-box .item:last-child { border-bottom: none; }
   .list-table-box .item:not(#rdv-list-head):hover { background: var(--fill); }
   .list-table-box #rdv-list-head, .list-table-box > .item:first-child {
-    background: var(--fill); padding-top: 11px; padding-bottom: 11px;
+    background: var(--fill-2); padding-top: 11px; padding-bottom: 11px;
   }
+  /* Zebrage tres leger : aide a suivre une ligne sur des tableaux longs,
+     sans concurrencer le survol (fill) ni la carte blanche (card). Ne
+     vise que les lignes de donnees (nichees dans un conteneur enfant
+     comme #clients-list / #rdv-list), jamais la ligne d'en-tete qui est
+     elle un enfant direct de .list-table-box. */
+  .list-table-box > div > .item:nth-child(even) { background: rgba(0,0,0,0.012); }
   .status-dot {
     display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; flex-shrink: 0;
   }
