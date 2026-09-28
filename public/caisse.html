@@ -3243,6 +3243,41 @@ function buildReceiptText(lines, total, method, o) {
   }
   function sep() { return '-'.repeat(COLS); }
 
+  // Découpe un texte en lignes de mots entiers (largeur différente pour la
+  // 1re ligne et les suivantes) ; un mot plus long qu'une ligne est coupé.
+  function wrapWords(text, firstWidth, nextWidth) {
+    var lines = [], cur = '', width = firstWidth;
+    String(text).split(/\s+/).filter(Boolean).forEach(function (word) {
+      while (true) {
+        var candidate = cur ? cur + ' ' + word : word;
+        if (candidate.length <= width) { cur = candidate; break; }
+        if (cur) { lines.push(cur); cur = ''; width = nextWidth; continue; }
+        lines.push(word.slice(0, width));       // mot seul trop long : on le coupe
+        word = word.slice(width);
+        width = nextWidth;
+        if (!word) break;
+      }
+    });
+    if (cur) lines.push(cur);
+    return lines.length ? lines : [''];
+  }
+
+  // Ligne d'article avec le prix TOUJOURS à droite, sur la même ligne que le
+  // nom quand ça tient : "1 x Coupe et barbe        28,00 EUR". Nom trop long :
+  // il passe sur plusieurs lignes (suite décalée de 2 espaces) et le prix se
+  // place à droite de la dernière ; s'il n'y a plus de place à côté, il a sa
+  // propre ligne, alignée à droite. Le prix n'est jamais tronqué.
+  function itemLines(name, price) {
+    var lines = wrapWords(name, COLS, COLS - 2).map(function (t, i) { return (i ? '  ' : '') + t; });
+    var last = lines[lines.length - 1];
+    if (last.length + 1 + price.length <= COLS) {
+      lines[lines.length - 1] = last + ' '.repeat(COLS - last.length - price.length) + price;
+    } else {
+      lines.push(' '.repeat(Math.max(0, COLS - price.length)) + price);
+    }
+    return lines;
+  }
+
   var out = [];
   if (o.salonName) out.push(center(o.salonName));
   if (legalInfo.address) String(legalInfo.address).split('\n').forEach(function (l) { out.push(center(l)); });
@@ -3256,8 +3291,8 @@ function buildReceiptText(lines, total, method, o) {
   out.push(sep());
 
   lines.forEach(function (l) {
-    out.push(l.quantity + ' x ' + l.item_name);
-    out.push(twoCols('  ' + money(l.unit_price_cents * l.quantity), ''));
+    itemLines(l.quantity + ' x ' + l.item_name, money(l.unit_price_cents * l.quantity))
+      .forEach(function (t) { out.push(t); });
   });
 
   var articleCount = lines.reduce(function (n, l) { return n + l.quantity; }, 0);
