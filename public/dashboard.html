@@ -624,8 +624,12 @@
     background: none; padding: 14px 4px; margin-bottom: 0;
   }
   #loyalty-accounts-list .item:last-child, #gift-cards-list .item:last-child { border-bottom: none; }
+  /* Colonnes PROPORTIONNELLES (fr), pas en pixels fixes - meme correctif
+     que .client-info-grid : au lieu de deborder par-dessus les boutons
+     d'action des que la largeur reelle manque, le texte se tronque
+     (ellipsis deja en place) quelle que soit la largeur disponible. */
   .gift-info-grid {
-    display: grid; grid-template-columns: 210px 130px 120px 130px 110px 110px; gap: 4px 12px;
+    display: grid; grid-template-columns: 210fr 130fr 120fr 130fr 110fr 110fr; gap: 4px 12px;
     margin-top: 8px;
   }
   .gift-info-grid .f { font-size: 12.5px; color: var(--grey); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -633,18 +637,54 @@
   .gift-info-head { margin-top: 0; padding-bottom: 6px; border-bottom: 1px solid var(--sep); }
   .gift-info-head .f { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; font-weight: 600; }
   .loyalty-info-grid {
-    display: grid; grid-template-columns: 220px 90px 130px 120px 130px; gap: 4px 12px;
+    display: grid; grid-template-columns: 220fr 90fr 130fr 120fr 130fr; gap: 4px 12px;
     margin-top: 8px;
   }
   .loyalty-info-grid .f { font-size: 12.5px; color: var(--grey); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .loyalty-info-grid .f b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
   .loyalty-info-head { margin-top: 0; padding-bottom: 6px; border-bottom: 1px solid var(--sep); }
   .loyalty-info-head .f { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; font-weight: 600; }
-  @media (max-width: 900px) {
-    .loyalty-info-grid { grid-template-columns: 1fr 1fr; }
-  }
-  @media (max-width: 900px) {
-    .gift-info-grid { grid-template-columns: 1fr 1fr; }
+
+  /* En dessous de ce seuil (meme que Clients/Rendez-vous), les colonnes
+     meme proportionnelles deviennent trop etroites pour rester lisibles -
+     bascule en carte : email (le champ le plus important) en pleine
+     largeur en premier, puis le reste en petit en dessous. Les boutons
+     d'action passent sur leur propre ligne, alignes a droite. */
+  @container mainpane (max-width: 760px) {
+    .loyalty-info-head, .gift-info-head { display: none; }
+    #loyalty-accounts-list .item, #gift-cards-list .item {
+      align-items: flex-start; flex-wrap: wrap; padding: 14px 4px;
+    }
+    .loyalty-info-grid {
+      display: grid; width: 100%;
+      grid-template-columns: 1fr auto;
+      grid-template-areas: "email points" "recomp recomp" "activele derniere";
+      gap: 5px 10px;
+    }
+    .loyalty-info-grid .f { white-space: normal; overflow: visible; text-overflow: clip; }
+    .loyalty-info-grid .f:nth-child(1) { grid-area: email; font-size: 14.5px; }
+    .loyalty-info-grid .f:nth-child(2) { grid-area: points; text-align: right; font-size: 14.5px; }
+    .loyalty-info-grid .f:nth-child(3) { grid-area: recomp; }
+    .loyalty-info-grid .f:nth-child(4) { grid-area: activele; color: var(--grey); font-size: 12px; }
+    .loyalty-info-grid .f:nth-child(5) { grid-area: derniere; color: var(--grey); font-size: 12px; text-align: right; }
+
+    .gift-info-grid {
+      display: grid; width: 100%;
+      grid-template-columns: 1fr 1fr;
+      grid-template-areas: "email tel" "code coif" "achete utilise";
+      gap: 5px 10px;
+    }
+    .gift-info-grid .f { white-space: normal; overflow: visible; text-overflow: clip; }
+    .gift-info-grid .f:nth-child(1) { grid-area: email; font-size: 14.5px; }
+    .gift-info-grid .f:nth-child(2) { grid-area: tel; text-align: right; }
+    .gift-info-grid .f:nth-child(3) { grid-area: code; }
+    .gift-info-grid .f:nth-child(4) { grid-area: coif; text-align: right; }
+    .gift-info-grid .f:nth-child(5) { grid-area: achete; color: var(--grey); font-size: 12px; }
+    .gift-info-grid .f:nth-child(6) { grid-area: utilise; color: var(--grey); font-size: 12px; text-align: right; }
+
+    #loyalty-accounts-list .item-actions, #gift-cards-list .item-actions {
+      width: 100%; justify-content: flex-end; margin-top: 8px;
+    }
   }
 
   .client-info-grid {
