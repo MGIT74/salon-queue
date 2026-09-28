@@ -602,6 +602,7 @@
   .cat-photo-remove svg { width: 10px; height: 10px; }
   .item-name { font-size: 16px; font-weight: 600; letter-spacing: -.015em; }
   .item-meta { font-size: 13px; color: var(--grey); margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .item-email { font-size: 13.5px; font-weight: 600; color: var(--ink); margin-top: 6px; }
   .item-actions { display: flex; gap: 6px; flex-wrap: wrap; }
   /* Largeur reservee CONSTANTE (independante du nombre reel de boutons
      affiches sur chaque ligne) pour que .item-main - donc la grille de
@@ -638,7 +639,7 @@
      d'action des que la largeur reelle manque, le texte se tronque
      (ellipsis deja en place) quelle que soit la largeur disponible. */
   .gift-info-grid {
-    display: grid; grid-template-columns: 210fr 130fr 120fr 130fr 110fr 110fr; gap: 4px 12px;
+    display: grid; grid-template-columns: 130fr 120fr 130fr 110fr 110fr; gap: 4px 12px;
     margin-top: 8px;
   }
   .gift-info-grid .f { font-size: 12.5px; color: var(--grey); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -688,16 +689,15 @@
     .gift-info-grid {
       display: grid; width: 100%;
       grid-template-columns: 1fr 1fr;
-      grid-template-areas: "email tel" "code coif" "achete utilise";
+      grid-template-areas: "tel code" "coif achete" "utilise utilise";
       gap: 5px 10px;
     }
     .gift-info-grid .f { white-space: normal; overflow: visible; text-overflow: clip; }
-    .gift-info-grid .f:nth-child(1) { grid-area: email; font-size: 14.5px; }
-    .gift-info-grid .f:nth-child(2) { grid-area: tel; text-align: right; }
-    .gift-info-grid .f:nth-child(3) { grid-area: code; }
-    .gift-info-grid .f:nth-child(4) { grid-area: coif; text-align: right; }
-    .gift-info-grid .f:nth-child(5) { grid-area: achete; color: var(--grey); font-size: 12px; }
-    .gift-info-grid .f:nth-child(6) { grid-area: utilise; color: var(--grey); font-size: 12px; text-align: right; }
+    .gift-info-grid .f:nth-child(1) { grid-area: tel; }
+    .gift-info-grid .f:nth-child(2) { grid-area: code; text-align: right; }
+    .gift-info-grid .f:nth-child(3) { grid-area: coif; }
+    .gift-info-grid .f:nth-child(4) { grid-area: achete; color: var(--grey); font-size: 12px; text-align: right; }
+    .gift-info-grid .f:nth-child(5) { grid-area: utilise; color: var(--grey); font-size: 12px; }
 
     #loyalty-accounts-list .item-actions, #gift-cards-list .item-actions {
       width: 100%; justify-content: flex-end; margin-top: 8px;
@@ -1531,7 +1531,7 @@
       <div class="item" id="gift-list-head" style="background:none;box-shadow:none;border-radius:0;border-bottom:1px solid var(--sep);margin-bottom:0;padding:0 4px 6px">
         <div class="item-main">
           <div class="gift-info-grid gift-info-head">
-            <div class="f">Email</div><div class="f">Téléphone</div><div class="f">Code</div>
+            <div class="f">Téléphone</div><div class="f">Code</div>
             <div class="f">Coiffeur</div><div class="f">Acheté le</div><div class="f">Utilisé le</div>
           </div>
         </div>
@@ -4524,8 +4524,7 @@ function renderGiftCardsList() {
         var statusLabel = g.used_at ? 'Utilisé' : (g.voided_at ? 'Désactivé' : 'Non utilisé');
         var statusColor = g.used_at ? 'var(--grey)' : (g.voided_at ? 'var(--orange)' : 'var(--green)');
         var fmtDate = function (iso) { return new Date(iso).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }); };
-        var infoGrid = ['<div class="f"><b>' + esc(g.recipient_email) + '</b></div>',
-          '<div class="f"><b>' + esc(g.recipient_phone) + '</b></div>',
+        var infoGrid = ['<div class="f"><b>' + esc(g.recipient_phone) + '</b></div>',
           '<div class="f"><b>' + esc(g.code || '—') + '</b></div>',
           '<div class="f"><b>' + esc(g.barber_name || 'Non désigné') + '</b></div>',
           '<div class="f"><b>' + fmtDate(g.created_at) + '</b></div>',
@@ -4534,6 +4533,7 @@ function renderGiftCardsList() {
         var safeName = esc(g.recipient_name).replace(/'/g, "\\'");
         return '<div class="item">' +
           '<div class="item-main"><div class="item-name">' + esc(g.recipient_name) + ' — ' + eur(g.amount_cents) + '</div>' +
+          '<div class="item-email">' + esc(g.recipient_email) + '</div>' +
           '<div class="item-meta">' + esc(itemsList) + '</div>' +
           '<div class="gift-info-grid">' + infoGrid + '</div></div>' +
           '<div class="item-actions">' +
