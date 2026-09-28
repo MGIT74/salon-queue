@@ -96,6 +96,25 @@ const ADMIN = { 'Content-Type':'application/json','X-Salon-Slug':'test','X-Admin
   check('on peut la rouvrir', /Connexion TPE/.test(modalText()));
   d.getElementById('conn-close-btn').click(); await sleep(400);
 
+  console.log('\n[V] L\'icone n\'apparait que sur l\'onglet Caisse');
+  const shown = () => gear.style.display !== 'none';
+  check('onglet Caisse (defaut) : visible', shown());
+  for (const tab of ['agenda', 'timer', 'cloture']) {
+    w.doSwitchCaisseTab(tab); await sleep(200);
+    check('onglet ' + tab + ' : masquee', !shown());
+  }
+  w.doSwitchCaisseTab('caisse'); await sleep(200);
+  check('retour sur Caisse : de nouveau visible', shown());
+  w.doSwitchCaisseTab('agenda'); await sleep(200);
+  w.switchCaisseTab('caisse'); await sleep(200);
+  check('via le menu du bas (switchCaisseTab) : visible sur Caisse', shown());
+  w.doSwitchCaisseTab('timer'); await sleep(200);
+  const meBackup = w.me; w.logout(); await sleep(150);
+  w.me = meBackup; w.showApp(); await sleep(300);
+  check('un autre coiffeur se connecte alors que l\'onglet Timer est affiche : icone masquee', !shown());
+  w.doSwitchCaisseTab('caisse'); await sleep(200);
+  check('puis sur Caisse : visible', shown());
+
   console.log('\n[U7] Deconnexion du coiffeur : plus de suivi');
   w.logout(); await sleep(300);
   const c0 = statusCalls; await sleep(3500);

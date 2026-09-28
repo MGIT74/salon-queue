@@ -975,6 +975,17 @@ function setConnPollInterval(ms) {
 }
 function stopConnPolling() { clearInterval(connPollTimer); connPollTimer = null; }
 
+// L'icone n'a de sens que sur l'onglet Caisse (c'est la que l'impression et le
+// paiement carte servent). On lit l'onglet REELLEMENT affiche plutot qu'un
+// parametre : au moment de la connexion d'un coiffeur, l'onglet visible peut
+// etre un autre que Caisse (celui du coiffeur precedent).
+function updateConnBtnVisibility() {
+  var btn = document.getElementById('conn-btn');
+  var panel = document.getElementById('panel-caisse');
+  if (!btn || !panel) return;
+  btn.style.display = panel.classList.contains('on') ? '' : 'none';
+}
+
 function pollConnection() {
   return barberApi('/api/tpe/bridge-status').then(function (r) {
     connStatus = r;
@@ -1096,6 +1107,7 @@ function showApp() {
   loadCatalog();
   loadPendingPayments();
   restoreChargedSale();
+  updateConnBtnVisibility();
   pollConnection();
   setConnPollInterval(15000);
   loadMarketingSettings();
@@ -1189,6 +1201,7 @@ function doSwitchCaisseTab(tab) {
     document.getElementById('panel-' + t).classList.toggle('on', t === tab);
     document.getElementById('nav-' + t).classList.toggle('on', t === tab);
   });
+  updateConnBtnVisibility();
   updateTabLockState();
   if (tab === 'timer') startTimerAutoRefresh(); else stopTimerAutoRefresh();
   if (tab === 'cloture') loadClotureTab();
