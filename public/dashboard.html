@@ -40,7 +40,7 @@
 </style>
 <link rel="stylesheet" href="/app.css?v=5">
 <style>
-  .wrap { max-width: none; margin: 0; padding: clamp(20px,2.2vw,36px); }
+  .wrap { max-width: none; margin: 0; padding: clamp(16px,1.8vw,28px); }
 
   #impersonate-banner {
     display: none; position: fixed; top: 0; left: 0; right: 0; z-index: 999;
@@ -51,7 +51,7 @@
     background: rgba(0,0,0,0.15); color: inherit; border: none; padding: 6px 16px;
     border-radius: 999px; font-family: inherit; font-weight: 700; font-size: 13px; cursor: pointer;
   }
-  body.impersonating .wrap { padding-top: calc(clamp(20px,2.2vw,36px) + 46px); }
+  body.impersonating .wrap { padding-top: calc(clamp(16px,1.8vw,28px) + 46px); }
   h1 { font-size: clamp(28px,3.2vw,40px); font-weight: 600; letter-spacing: -.035em; margin: 0 0 20px; }
 
   /* Connexion */
@@ -204,7 +204,7 @@
   }
 
   /* Disposition en sidebar (comme les applications modernes) */
-  .app-shell { display: flex; align-items: flex-start; gap: 26px; }
+  .app-shell { display: flex; align-items: flex-start; gap: 16px; }
   .sidebar {
     width: var(--sidebar-w, 240px); flex-shrink: 0; background: var(--card); border-radius: 20px;
     padding: 18px 12px; box-shadow: var(--shadow);
@@ -222,7 +222,7 @@
        les règles CSS, ce qui casse position:sticky de façon peu
        fiable selon les navigateurs. position:fixed s'ancre à la
        fenêtre et n'a pas ce problème. */
-    position: fixed; top: 20px; left: clamp(20px,2.2vw,36px); z-index: 40;
+    position: fixed; top: 20px; left: clamp(16px,1.8vw,28px); z-index: 40;
     max-height: calc(100vh - 40px); overflow-y: auto;
   }
   .sidebar-brand { padding: 4px 10px 16px; margin-bottom: 12px; border-bottom: 1px solid var(--sep); }
@@ -234,7 +234,7 @@
     min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
   .main-content {
-    flex: 1; min-width: 0; margin-left: calc(var(--sidebar-w, 240px) + 26px);
+    flex: 1; min-width: 0; margin-left: calc(var(--sidebar-w, 240px) + 16px);
     transition: margin-left .2s ease;
     container-type: inline-size; container-name: mainpane;
   }
