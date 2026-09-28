@@ -648,7 +648,14 @@
   }
 
   .client-info-grid {
-    display: grid; grid-template-columns: 220px 180px 110px 190px 90px 90px; gap: 4px 12px;
+    /* Colonnes PROPORTIONNELLES (fr), pas en pixels fixes : au lieu de
+       deborder par-dessus le bouton Supprimer des que la largeur reelle
+       manque (deja constate deux fois, y compris barre laterale repliee),
+       elles se compriment gracieusement - le texte se tronque (ellipsis
+       deja pose sur .f plus bas) au lieu de chevaucher quoi que ce soit.
+       Memes proportions que les anciennes valeurs en px (220 180 110 190
+       90 90). Meme principe deja utilise par .rdv-info-grid. */
+    display: grid; grid-template-columns: 220fr 180fr 110fr 190fr 90fr 90fr; gap: 4px 12px;
     margin-top: 8px;
   }
   .client-info-grid .f { font-size: 12.5px; color: var(--grey); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
