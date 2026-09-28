@@ -614,8 +614,50 @@
   .client-info-grid .f b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
   .client-info-head { margin-top: 0; }
   .client-info-head .f { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; font-weight: 600; }
-  @media (max-width: 900px) {
-    .client-info-grid { grid-template-columns: 1fr 1fr; }
+  @container mainpane (max-width: 760px) {
+    /* Les colonnes de cette grille sont en PIXELS FIXES (220+180+110+190+90+90
+       = 880px de colonnes, sans compter la case à cocher et le bouton
+       Supprimer) : en dessous de leur besoin réel, .item-main (qui a
+       min-width:0 pour pouvoir se comprimer) rétrécit mais la grille, elle,
+       ne rétrécit jamais - elle déborde alors PAR-DESSUS le bouton Supprimer
+       au lieu de simplement défiler (constaté avec une capture d'écran,
+       tablette en paysage avec barre latérale). On passe plutôt à une carte,
+       sur le même principe que la liste des rendez-vous : nom (+ statut) et
+       prix sur la même ligne en haut, prestation en pleine largeur, date et
+       durée cote à cote, email en petit en bas - plus aucune colonne à
+       largeur fixe à cette taille. */
+    #clients-list-head, .client-info-head { display: none; }
+    #clients-list .item {
+      align-items: flex-start; flex-wrap: wrap; overflow-x: visible;
+      padding: 14px 4px;
+    }
+    .client-info-grid {
+      display: grid; width: 100%;
+      grid-template-columns: 1fr auto;
+      grid-template-areas:
+        "nom    prix"
+        "presta presta"
+        "date   duree"
+        "email  email";
+      gap: 5px 10px;
+    }
+    .client-info-grid .f {
+      white-space: normal; overflow: visible; text-overflow: clip;
+    }
+    .client-info-grid .f:nth-child(1) { grid-area: nom; font-size: 15.5px; }
+    .client-info-grid .f:nth-child(1) b { font-weight: 700; }
+    .client-info-grid .f:nth-child(2) { grid-area: presta; }
+    .client-info-grid .f:nth-child(3) { grid-area: date; color: var(--grey); font-size: 12px; }
+    .client-info-grid .f:nth-child(4) {
+      grid-area: email; font-size: 11.5px; color: var(--grey);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .client-info-grid .f:nth-child(5) { grid-area: prix; text-align: right; font-size: 15.5px; }
+    .client-info-grid .f:nth-child(6) { grid-area: duree; color: var(--grey); font-size: 12px; text-align: right; }
+    #clients-list .item-actions {
+      width: 100%; justify-content: flex-end; margin: 4px 0 0;
+      padding-left: 30px; box-sizing: border-box;
+    }
   }
 
   .rdv-info-grid {
@@ -1690,7 +1732,7 @@
       Tout sélectionner
     </label>
     <div class="list-table-box">
-      <div class="item" style="background:none;box-shadow:none;border-radius:0;margin-bottom:0;flex-wrap:nowrap">
+      <div class="item" id="clients-list-head" style="background:none;box-shadow:none;border-radius:0;margin-bottom:0;flex-wrap:nowrap">
         <input type="checkbox" class="client-check" style="visibility:hidden" tabindex="-1" disabled>
         <div class="item-main">
           <div class="client-info-grid client-info-head" style="margin-top:0">
