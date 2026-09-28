@@ -31,6 +31,26 @@ const os = require('os');
 const CONFIG_DIR = path.join(process.env.APPDATA || os.homedir(), 'TPE-Bridge');
 const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
 
+/* ---------- Journal (%APPDATA%\TPE-Bridge\bridge.log) ----------
+ * Le pont tourne sans fenetre : sans journal, impossible de savoir pourquoi il
+ * ne demarre pas ou s'arrete. On garde ici ce que le pont affiche, plus les
+ * demarrages/arrets. Le fichier est limite (~500 Ko, un seul .old conserve) et
+ * un probleme d'ecriture ne doit JAMAIS empecher le pont de tourner. */
+const LOG_FILE = path.join(CONFIG_DIR, 'bridge.log');
+let logWrites = 0;
+function logText(text) {
+  try {
+    fs.mkdirSync(CONFIG_DIR, { recursive: true });
+    if (logWrites++ % 200 === 0) {
+      try { if (fs.statSync(LOG_FILE).size > 500000) fs.renameSync(LOG_FILE, LOG_FILE + '.old'); } catch (e) { /* pas encore de fichier */ }
+    }
+    fs.appendFileSync(LOG_FILE, text);
+  } catch (e) { /* jamais bloquant */ }
+}
+function logLine(msg) {
+  logText('[' + new Date().toLocaleString('fr-FR') + '] ' + msg + '\n');
+}
+
 /* ---------- Configuration ---------- */
 
 function loadConfig() {
@@ -160,19 +180,42 @@ function startBridge(cfg) {
   // Relance automatique : si le process meurt (crash, MAJ réseau...),
   // on le relance après 5 s, indéfiniment.
   const child = spawn(process.execPath, [path.join(__dirname, 'bridge-core.js'), ...args], {
-    stdio: 'inherit',
-    windowsHide: false
+    stdio: ['ignore', 'pipe', 'pipe'],
+    windowsHide: true
+  });
+  logLine('coeur du pont demarre (pid ' + child.pid + ')');
+
+  // Ce que le pont affiche va a la console (si elle est visible) ET au journal.
+  child.stdout.on('data', (d) => { try { process.stdout.write(d); } catch (e) { /* console absente */ } logText(d.toString()); });
+  child.stderr.on('data', (d) => { try { process.stderr.write(d); } catch (e) { /* console absente */ } logText(d.toString()); });
+
+  // 'error' (lancement impossible) et 'exit' peuvent l'un comme l'autre
+  // survenir seuls : dans les deux cas on relance, une seule fois.
+  let restartScheduled = false;
+  const restart = () => {
+    if (restartScheduled) return;
+    restartScheduled = true;
+    setTimeout(() => startBridge(cfg), 5000);
+  };
+
+  child.on('error', (err) => {
+    logLine('impossible de lancer le coeur du pont : ' + err.message + ' - nouvel essai dans 5 s');
+    restart();
   });
 
   child.on('exit', (code) => {
+    logLine('pont arrete (code ' + code + ') - relance dans 5 s');
     console.log(`[i] Pont arrêté (code ${code}) — relance dans 5 s... (Ctrl+C deux fois pour quitter)`);
-    setTimeout(() => startBridge(cfg), 5000);
+    restart();
   });
 }
 
 /* ---------- Main ---------- */
 
 async function main() {
+  let who = '?';
+  try { who = os.userInfo().username; } catch (e) { /* rare */ }
+  logLine('lanceur Windows demarre (pid ' + process.pid + ', utilisateur ' + who + ')');
   let cfg = loadConfig();
   if (!cfg) {
     cfg = await firstRunWizard();
@@ -206,5 +249,6 @@ async function main() {
 
 main().catch((err) => {
   console.error('[!] Erreur fatale :', err.message);
+  logLine('ERREUR FATALE : ' + (err && err.stack ? err.stack : err));
   process.exit(1);
 });

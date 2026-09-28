@@ -100,6 +100,18 @@ node tpe-bridge-win.js > pont.log 2>&1
 | Changer la configuration | Supprimer `%APPDATA%\TPE-Bridge\config.json` → l'assistant se relance au prochain démarrage |
 | Pont ne démarre pas au boot | Vérifier que `TPE-Bridge.vbs` existe dans `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup` (à coller dans la barre d'adresse de l'Explorateur). Sinon relancer l'installeur. Pour démarrer le pont tout de suite : double-clic sur `C:\TPE-Bridge\run-hidden.vbs` |
 
+## Journaux (pour comprendre un problème de démarrage)
+
+Le pont tourne sans fenêtre : deux fichiers gardent sa trace, dans
+`%APPDATA%\TPE-Bridge` (à coller dans la barre d'adresse de l'Explorateur) :
+
+| Fichier | Contenu |
+|---|---|
+| `launch.log` | Une ligne à CHAQUE exécution du lanceur : « lanceur execute », puis « pont lance » ou « le pont tourne deja ». Si Windows ne lance pas le lanceur à l'ouverture de session, il n'y a **aucune ligne** à cette heure-là. |
+| `bridge.log` | Démarrages et arrêts du pont, et tout ce qu'il affiche (erreurs d'impression, serveur injoignable...). Limité à ~500 Ko. |
+
+Le lanceur ne démarre **jamais un deuxième pont** si un tourne déjà.
+
 ## Désinstallation
 
 ```bat
