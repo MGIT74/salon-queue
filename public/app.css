@@ -271,7 +271,10 @@ input[type="date"] { -webkit-appearance: none; appearance: none; }
   background: var(--ink); color: var(--bg);
   padding: 14px 20px; border-radius: 16px; font-size: 15px; font-weight: 500;
   line-height: 1.4; text-align: left;
-  z-index: 90; transition: transform .3s cubic-bezier(.3,1.3,.5,1), opacity .25s ease; pointer-events: none;
+  /* Au-dessus de toutes les modales/overlays (dont la popup de recomptage,
+     z-index 400, qui floute ce qu'elle recouvre) - sinon un message d'erreur
+     affiche pendant une popup est cache derriere et illisible. */
+  z-index: 10000; transition: transform .3s cubic-bezier(.3,1.3,.5,1), opacity .25s ease; pointer-events: none;
   max-width: 90vw;
 }
 .toast.on { transform: translateX(-50%) translateY(0); opacity: 1; }

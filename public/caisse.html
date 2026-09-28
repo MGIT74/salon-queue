@@ -2394,13 +2394,18 @@ function confirmRecountMismatch() {
   submitRecount(Math.round(val * 100));
 }
 
+var recountSubmitting = false;
 function submitRecount(actualCents) {
+  if (recountSubmitting) return;   // évite un double envoi (double clic / double tap)
+  recountSubmitting = true;
   barberApi('/api/owner/caisse/confirm-recount', { method: 'POST', body: { closing_id: pendingRecountClosingId, actual_cents: actualCents } })
     .then(function () {
       document.getElementById('recount-overlay').classList.remove('on');
+      pendingRecountClosingId = null;
       toast('Fond de caisse vérifié');
     })
-    .catch(function (e) { toast(e.message, true); });
+    .catch(function (e) { toast(e.message, true); })
+    .then(function () { recountSubmitting = false; });
 }
 
 function forceOpenCaisse() {

@@ -772,7 +772,9 @@ router.post('/caisse/confirm-recount', requireAdminOrBarber, wrap(async (req, re
     [closingId, req.salon.id]
   );
   if (!closing) return res.status(404).json({ error: 'Clôture introuvable.' });
-  if (closing.recount_confirmed_at) return res.status(400).json({ error: 'Ce recomptage a déjà été confirmé.' });
+  // Déjà confirmé (double clic, double envoi) : succès sans rien modifier,
+  // plutôt qu'une erreur qui laisserait croire que la validation a échoué.
+  if (closing.recount_confirmed_at) return res.json({ ok: true, already_confirmed: true });
 
   let actorName = 'Admin';
   if (req.barberId) {

@@ -98,12 +98,12 @@ node tpe-bridge-win.js > pont.log 2>&1
 | "partage introuvable ou non partagé" dans les logs | L'imprimante n'est pas partagée (voir section "Configuration de l'imprimante" ci-dessus), ou le nom de partage renseigné ne correspond pas exactement |
 | "Clé du pont invalide" dans les logs | Régénérer la clé dans le dashboard et relancer l'assistant (supprimer `%APPDATA%\TPE-Bridge\config.json` puis relancer le pont) |
 | Changer la configuration | Supprimer `%APPDATA%\TPE-Bridge\config.json` → l'assistant se relance au prochain démarrage |
-| Pont ne démarre pas au boot | Vérifier la tâche : `schtasks /Query /TN "TPE-Bridge"` |
+| Pont ne démarre pas au boot | Vérifier que `TPE-Bridge.vbs` existe dans `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup` (à coller dans la barre d'adresse de l'Explorateur). Sinon relancer l'installeur. Pour démarrer le pont tout de suite : double-clic sur `C:\TPE-Bridge\run-hidden.vbs` |
 
 ## Désinstallation
 
 ```bat
-schtasks /Delete /TN "TPE-Bridge" /F
+del "%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\TPE-Bridge.vbs"
 rmdir /S /Q C:\TPE-Bridge
 rmdir /S /Q "%APPDATA%\TPE-Bridge"
 ```

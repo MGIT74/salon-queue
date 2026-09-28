@@ -81,14 +81,21 @@ netsh advfirewall firewall delete rule name="TPE Bridge" >nul 2>&1
 netsh advfirewall firewall add rule name="TPE Bridge" dir=in action=allow program="C:\Program Files\nodejs\node.exe" enable=yes profile=any >nul 2>&1
 echo [OK] Pare-feu configure.
 
-REM --- 5. Tache planifiee au demarrage de Windows (au login, sans UAC)
+REM --- 5. Demarrage automatique : le lanceur invisible est depose dans le
+REM        dossier Demarrage de l'utilisateur, donc lance a chaque ouverture
+REM        de session Windows. (L'ancienne methode - tache planifiee - ne
+REM        fonctionnait jamais : la commande schtasks etait rejetee car une
+REM        option y figurait deux fois, et l'erreur etait masquee.)
 echo [..] Creation du demarrage automatique...
-schtasks /Create /F /TN "TPE-Bridge" /TR "wscript.exe \"%BRIDGE_DIR%\run-hidden.vbs\"" /SC ONLOGON /RL HIGHEST /F >nul 2>&1
-if %errorLevel% equ 0 (
-    echo [OK] Demarrage automatique configure - tache "TPE-Bridge".
+schtasks /Delete /TN "TPE-Bridge" /F >nul 2>&1
+set "STARTUP_DIR=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup"
+if not exist "%STARTUP_DIR%" mkdir "%STARTUP_DIR%" >nul 2>&1
+copy /Y "%BRIDGE_DIR%\run-hidden.vbs" "%STARTUP_DIR%\TPE-Bridge.vbs" >nul 2>&1
+if exist "%STARTUP_DIR%\TPE-Bridge.vbs" (
+    echo [OK] Demarrage automatique configure.
 ) else (
-    echo [!] Tache planifiee non creee - le pont devra etre lance a la main
-    echo     double-clic sur %BRIDGE_DIR%\tpe-bridge-win.js ou raccourci bureau.
+    echo [!] Demarrage automatique non configure - le pont devra etre relance a la main
+    echo     apres chaque redemarrage : double-clic sur %BRIDGE_DIR%\run-hidden.vbs
 )
 
 REM --- 6. Configuration (formulaire graphique - pas de terminal a manipuler)

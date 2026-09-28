@@ -235,11 +235,14 @@ router.post('/login', loginRateLimiter('barber-pin-login'), wrap(async (req, res
 
   let pendingRecount = null;
   if (req.body.source === 'caisse') {
+    // Uniquement la clôture la PLUS RÉCENTE : une ancienne clôture (test,
+    // avant la mise en place du recomptage) restée non confirmée ne doit
+    // pas refaire surgir la popup à chaque connexion.
     const [[lastClosing]] = await pool.query(
-      'SELECT id, starting_cash_cents FROM cash_closings WHERE salon_id = ? AND recount_confirmed_at IS NULL ORDER BY period_end DESC LIMIT 1',
+      'SELECT id, starting_cash_cents, recount_confirmed_at FROM cash_closings WHERE salon_id = ? ORDER BY period_end DESC LIMIT 1',
       [req.salon.id]
     );
-    if (lastClosing) pendingRecount = { closing_id: lastClosing.id, expected_cents: lastClosing.starting_cash_cents };
+    if (lastClosing && !lastClosing.recount_confirmed_at) pendingRecount = { closing_id: lastClosing.id, expected_cents: lastClosing.starting_cash_cents };
   }
 
   res.json({ ok: true, barber, pending_recount: pendingRecount });
