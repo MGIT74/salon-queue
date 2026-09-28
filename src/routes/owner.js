@@ -8,6 +8,7 @@ const { sendLoyaltyActivation, sendGiftConfirmation } = require('../lib/mailer')
 const { clientKey } = require('../lib/queueMath');
 const { logActivity } = require('../lib/activityLog');
 const { wrap } = require('../lib/wrap');
+const { getPendingRecount } = require('../lib/pendingRecount');
 
 const router = express.Router();
 
@@ -752,6 +753,16 @@ router.get('/caisse/suggested-float', requireAdminOrBarber, wrap(async (req, res
     [req.salon.id]
   );
   res.json({ ok: true, starting_cash_cents: lastClosing ? lastClosing.starting_cash_cents : 0 });
+}));
+
+/**
+ * Recomptage du fond de caisse encore à confirmer (ou null). Appelée par la
+ * caisse quand la page est rafraîchie : la session du coiffeur est alors
+ * restaurée sans repasser par le code PIN, et la popup doit quand même se
+ * réafficher tant que le recomptage n'est pas confirmé.
+ */
+router.get('/caisse/pending-recount', requireAdminOrBarber, wrap(async (req, res) => {
+  res.json({ ok: true, pending_recount: await getPendingRecount(req.salon.id) });
 }));
 
 /**

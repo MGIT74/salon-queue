@@ -2,6 +2,7 @@ const express = require('express');
 const crypto = require('crypto');
 const { pool, getSettings } = require('../db');
 const { activeBarberCount } = require('../lib/queueMath');
+const { getPendingRecount } = require('../lib/pendingRecount');
 const requireAdmin = require('../middleware/auth');
 const { loginRateLimiter } = require('../middleware/rateLimiter');
 const { logActivity } = require('../lib/activityLog');
@@ -233,17 +234,9 @@ router.post('/login', loginRateLimiter('barber-pin-login'), wrap(async (req, res
   var sourceLabel = req.body.source === 'poste' ? 'au Poste' : req.body.source === 'caisse' ? 'à la Caisse' : req.body.source === 'cloture' ? 'pour vérification (Clôture)' : '';
   logActivity(req.salon.id, 'barber_login', 'Connexion' + (sourceLabel ? ' ' + sourceLabel : '') + ' de "' + barber.name + '" (code PIN)');
 
-  let pendingRecount = null;
-  if (req.body.source === 'caisse') {
-    // Uniquement la clôture la PLUS RÉCENTE : une ancienne clôture (test,
-    // avant la mise en place du recomptage) restée non confirmée ne doit
-    // pas refaire surgir la popup à chaque connexion.
-    const [[lastClosing]] = await pool.query(
-      'SELECT id, starting_cash_cents, recount_confirmed_at FROM cash_closings WHERE salon_id = ? ORDER BY period_end DESC LIMIT 1',
-      [req.salon.id]
-    );
-    if (lastClosing && !lastClosing.recount_confirmed_at) pendingRecount = { closing_id: lastClosing.id, expected_cents: lastClosing.starting_cash_cents };
-  }
+  // Recomptage du fond de caisse en attente (uniquement la clôture la plus
+  // récente, règle partagée avec /api/owner/caisse/pending-recount).
+  const pendingRecount = req.body.source === 'caisse' ? await getPendingRecount(req.salon.id) : null;
 
   res.json({ ok: true, barber, pending_recount: pendingRecount });
 }));

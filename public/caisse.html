@@ -2440,18 +2440,18 @@ function forceOpenCaisse() {
 
       var saved = null;
       try { saved = JSON.parse(sessionStorage.getItem('caisse-session') || 'null'); } catch (e) {}
-      if (saved && saved.id && saved.pin && !d.pending_recount) {
+      if (saved && saved.id && saved.pin) {
         me = saved;
         showApp();
-      } else if (saved && d.pending_recount) {
-        // Une session existait (tablette jamais éteinte pendant la nuit)
-        // mais un recomptage du fond de caisse est en attente : on efface
-        // cette session et on force une vraie reconnexion par code PIN,
-        // seul chemin qui déclenche la popup de recomptage (voir
-        // attemptLogin -> checkPendingRecount). Sans ça, la restauration
-        // silencieuse de session contournerait la reconfirmation du matin.
-        try { sessionStorage.removeItem('caisse-session'); } catch (e) {}
-        document.documentElement.classList.remove('auth-checking');
+        // Rafraîchissement de la page : la session est restaurée sans repasser
+        // par le code PIN (donc sans passer par attemptLogin, qui est le
+        // chemin normal d'affichage de la popup de recomptage). On vérifie
+        // donc ici si le recomptage du fond de caisse est encore à confirmer,
+        // pour réafficher la popup - qui bloque la caisse tant que ce n'est
+        // pas validé, et ne peut plus être contournée par un simple F5.
+        barberApi('/api/owner/caisse/pending-recount')
+          .then(function (r) { checkPendingRecount(r.pending_recount); })
+          .catch(function () {});
       } else {
         document.documentElement.classList.remove('auth-checking');
       }
