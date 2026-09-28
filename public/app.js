@@ -10,6 +10,21 @@ function initTheme() {
   }
 }
 
+/**
+ * Barre laterale du dashboard repliee en rail d'icones (desktop/tablette
+ * uniquement - masque en mode telephone, bandeau du bas). Memorise sur cet
+ * appareil ; applique avant le premier affichage par le script anti-flash
+ * en tete de dashboard.html (meme principe que le mode sombre), pour ne
+ * jamais voir la barre large une fraction de seconde avant de se replier.
+ */
+function toggleSidebarCollapsed() {
+  var html = document.documentElement;
+  var collapsed = html.getAttribute('data-sidebar-collapsed') === '1';
+  if (collapsed) html.removeAttribute('data-sidebar-collapsed');
+  else html.setAttribute('data-sidebar-collapsed', '1');
+  try { localStorage.setItem('sidebar-collapsed', collapsed ? '0' : '1'); } catch (e) {}
+}
+
 function toggleTheme() {
   var el = document.documentElement;
   var next = el.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
