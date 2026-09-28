@@ -7,8 +7,8 @@ REM  "Executer en tant qu'administrateur") :
 REM   1. Verifie/installe Node.js (silencieux, via winget)
 REM   2. Copie les fichiers du pont dans C:\TPE-Bridge
 REM   3. Cree une regle de pare-feu entrante (TPE / impression locale)
-REM   4. Cree une tache planifiee : le pont demarre tout seul au boot,
-REM      tourne en arriere-plan, redemarre en cas de crash
+REM   4. Depose un lanceur dans le dossier Demarrage de Windows : le pont
+REM      demarre tout seul, sans fenetre, a chaque ouverture de session
 REM   5. Lance l'assistant de premiere configuration
 REM
 REM  Fichiers requis a cote de ce script :
