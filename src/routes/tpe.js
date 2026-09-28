@@ -269,8 +269,10 @@ router.get('/bridge-status', requireAdminOrBarber, wrap(async (req, res) => {
     configured: Boolean(row),
     // Début de la clé + date de création : permet d'afficher qu'une clé
     // existe déjà (la clé complète, elle, n'est visible qu'à sa génération).
-    key_preview: row ? row.key_preview : null,
-    key_created_at: createdAt ? createdAt.toISOString() : null,
+    // Le début de la clé n'est utile qu'à l'administrateur (écran Réglages) :
+    // la caisse, utilisée avec un simple code PIN de coiffeur, ne le reçoit pas.
+    key_preview: (!req.barberId && row) ? row.key_preview : null,
+    key_created_at: (!req.barberId && createdAt) ? createdAt.toISOString() : null,
     online,
     last_seen_at: lastSeenAt ? lastSeenAt.toISOString() : null,
     tpe_online: tpeOnline,

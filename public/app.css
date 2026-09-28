@@ -348,3 +348,41 @@ input[type="date"] { -webkit-appearance: none; appearance: none; }
 .autocomplete-item:hover { background: var(--fill); }
 .autocomplete-item .ac-name { font-size: 14px; font-weight: 600; }
 .autocomplete-item .ac-meta { font-size: 12px; color: var(--grey); margin-top: 1px; }
+
+/* ============ Connexion TPE / imprimante (pastilles, guide, bouton reglages) ============
+   Partage par la caisse (fenetre "Connexion TPE / imprimante") et le dashboard. */
+.bridge-device { display: flex; align-items: center; gap: 9px; font-size: 13.5px; font-weight: 500; color: var(--ink); }
+.bridge-device-icon { position: relative; display: inline-flex; color: var(--grey); }
+.bridge-device-dot {
+  position: absolute; right: -2px; bottom: -2px; width: 9px; height: 9px; border-radius: 50%;
+  background: var(--sep); border: 2px solid var(--fill); transition: background .2s ease;
+}
+.bridge-device-dot.is-online { background: var(--green); }
+.bridge-device-dot.is-offline { background: var(--red); }
+
+.bridge-guide-steps { list-style: none; margin: 0 0 14px; padding: 0; counter-reset: step; }
+.bridge-guide-steps li { counter-increment: step; display: flex; gap: 12px; align-items: flex-start;
+                         font-size: 14.5px; line-height: 1.5; color: var(--ink); padding: 11px 0; }
+.bridge-guide-steps li + li { border-top: 1px solid var(--sep); }
+.bridge-guide-steps li::before { content: counter(step); flex: 0 0 26px; height: 26px; border-radius: 50%;
+                                 background: var(--blue-soft); color: var(--blue); font-weight: 700; font-size: 13px;
+                                 display: flex; align-items: center; justify-content: center; }
+.bridge-guide-never { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--grey);
+                      margin: 0 0 16px; cursor: pointer; }
+
+.conn-rows { display: flex; gap: 26px; flex-wrap: wrap; margin: 4px 0 14px; }
+.conn-hint { font-size: 12.5px; color: var(--grey); line-height: 1.5; margin: 0 0 16px; }
+
+/* Bouton reglages (caisse), a gauche du bouton de theme : meme taille, meme style. */
+.conn-btn {
+  position: fixed; top: 18px; right: 70px; z-index: 60;
+  width: 42px; height: 42px; border-radius: 50%; border: none;
+  background: var(--fill); color: var(--grey); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.conn-btn:hover { color: var(--ink); }
+.conn-btn svg { width: 20px; height: 20px; }
+.conn-dot { position: absolute; top: 2px; right: 2px; width: 11px; height: 11px; border-radius: 50%;
+            border: 2px solid var(--bg); display: none; }
+.conn-dot.is-online { display: block; background: var(--green); }
+.conn-dot.is-offline { display: block; background: var(--red); }

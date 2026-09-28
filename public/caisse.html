@@ -29,7 +29,7 @@
 <style>
   html.auth-checking #login-screen { display: none; }
 </style>
-<link rel="stylesheet" href="/app.css?v=4">
+<link rel="stylesheet" href="/app.css?v=5">
 <style>
   html, body { min-height: 100%; }
   .wrap { max-width: 1100px; margin: 0 auto; padding: 20px 18px 40px; }
@@ -585,6 +585,10 @@
   </div>
 
   <div id="app-screen" style="display:none">
+    <button class="conn-btn" id="conn-btn" onclick="openConnectionPopup()" aria-label="Connexion TPE et imprimante" title="Connexion TPE / imprimante">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      <span class="conn-dot" id="conn-dot"></span>
+    </button>
     <div class="topbar">
       <div>
         <div id="salon-name-tag" style="font-size:12px;font-weight:600;color:var(--grey);letter-spacing:.04em;text-transform:uppercase;margin-bottom:2px"></div>
@@ -819,7 +823,7 @@
   </div>
 </div>
 
-<script src="/app.js?v=5"></script>
+<script src="/app.js?v=6"></script>
 <script>
 mountThemeButton();
 
@@ -957,7 +961,93 @@ function attemptLogin() {
     });
 }
 
+/* ---------- Connexion TPE / imprimante (bouton reglages en haut a droite) ----------
+ * Etat lu toutes les 15 s (3 s tant que la fenetre est ouverte) : la pastille du
+ * bouton dit d'un coup d'oeil si l'impression et le paiement carte fonctionnent.
+ * Cote caisse on parle de "connexion", jamais de "pont". */
+var connStatus = null;      // derniere reponse de /api/tpe/bridge-status
+var connPopup = null;       // { overlay } tant que la fenetre est ouverte
+var connPollTimer = null;
+
+function setConnPollInterval(ms) {
+  clearInterval(connPollTimer);
+  connPollTimer = setInterval(pollConnection, ms);
+}
+function stopConnPolling() { clearInterval(connPollTimer); connPollTimer = null; }
+
+function pollConnection() {
+  return barberApi('/api/tpe/bridge-status').then(function (r) {
+    connStatus = r;
+    window.__bridgeOnline = Boolean(r.online);
+    renderConnectionDot();
+    renderConnectionPopup();
+  }).catch(function () { /* silencieux : on garde le dernier etat connu */ });
+}
+
+function renderConnectionDot() {
+  var dot = document.getElementById('conn-dot');
+  if (!dot) return;
+  dot.className = 'conn-dot';
+  if (connStatus && connStatus.configured) dot.classList.add(connStatus.online ? 'is-online' : 'is-offline');
+}
+
+function connectionSummary(r) {
+  if (!r) return { text: 'Vérification en cours…', tone: 'grey' };
+  if (!r.configured) return { text: 'La connexion n\'est pas encore installée sur cet ordinateur. Demandez à l\'administrateur du salon.', tone: 'grey' };
+  if (!r.online) return { text: 'Non connecté', tone: 'red' };
+  if (!r.tpe_online) return { text: 'Imprimante connectée — terminal de paiement pas encore configuré ou éteint', tone: 'red' };
+  return { text: 'Tout est connecté', tone: 'green' };
+}
+
+function renderConnectionPopup() {
+  if (!connPopup) return;
+  var o = connPopup.overlay;
+  var r = connStatus;
+  var s = connectionSummary(r);
+  var text = o.querySelector('#conn-text');
+  text.textContent = s.text;
+  text.style.color = s.tone === 'green' ? 'var(--green)' : s.tone === 'red' ? 'var(--red)' : 'var(--grey)';
+  var cfg = Boolean(r && r.configured);
+  o.querySelector('#conn-dot-printer').className = 'bridge-device-dot' + (cfg ? (r.online ? ' is-online' : ' is-offline') : '');
+  o.querySelector('#conn-dot-tpe').className = 'bridge-device-dot' + (cfg ? (r.tpe_online ? ' is-online' : ' is-offline') : '');
+  var canConnect = cfg && !r.online;
+  o.querySelector('#conn-connect-btn').style.display = canConnect ? 'block' : 'none';
+  o.querySelector('#conn-hint').style.display = canConnect ? 'block' : 'none';
+}
+
+function openConnectionPopup() {
+  if (connPopup) return;
+  var overlay = _buildModal(
+    '<div class="modal-title">Connexion TPE / imprimante</div>' +
+    '<div class="conn-rows">' +
+      '<div class="bridge-device"><span class="bridge-device-icon">' + BRIDGE_ICON_PRINTER + '<span class="bridge-device-dot" id="conn-dot-printer"></span></span><span>Imprimante</span></div>' +
+      '<div class="bridge-device"><span class="bridge-device-icon">' + BRIDGE_ICON_CARD + '<span class="bridge-device-dot" id="conn-dot-tpe"></span></span><span>Terminal de paiement</span></div>' +
+    '</div>' +
+    '<p class="modal-message" id="conn-text" style="margin:0 0 14px;font-weight:500"></p>' +
+    '<button class="btn btn-primary" id="conn-connect-btn" style="width:100%;margin-bottom:10px">Connecter</button>' +
+    '<p class="conn-hint" id="conn-hint">Ce bouton fonctionne uniquement depuis l\'ordinateur relié à l\'imprimante et au TPE (pas depuis une tablette ou un téléphone).</p>' +
+    '<div class="modal-actions"><button class="btn btn-soft" id="conn-close-btn">Fermer</button></div>'
+  );
+  connPopup = { overlay: overlay };
+  overlay.querySelector('#conn-close-btn').onclick = closeConnectionPopup;
+  overlay.querySelector('#conn-connect-btn').onclick = function () { startBridgeFlow(); };
+  overlay.addEventListener('click', function (e) { if (e.target === overlay) closeConnectionPopup(); });
+  setConnPollInterval(3000);       // suivi rapproche pendant que la fenetre est ouverte
+  renderConnectionPopup();
+  pollConnection();
+}
+
+function closeConnectionPopup() {
+  if (!connPopup) return;
+  _closeModal(connPopup.overlay);
+  connPopup = null;
+  setConnPollInterval(15000);
+}
+
 function logout() {
+  stopConnPolling();
+  if (connPopup) closeConnectionPopup();
+  connStatus = null;
   me = null;
   activeBarberId = null;
   allBarbers = [];
@@ -1006,6 +1096,8 @@ function showApp() {
   loadCatalog();
   loadPendingPayments();
   restoreChargedSale();
+  pollConnection();
+  setConnPollInterval(15000);
   loadMarketingSettings();
   loadInactivitySetting();
   clearInterval(pendingPaymentsInterval);

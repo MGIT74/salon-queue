@@ -587,3 +587,67 @@ function stableColorForId(id) {
   for (var i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
   return DOT_COLORS[hash % DOT_COLORS.length];
 }
+
+
+/* ---------- Connexion TPE / imprimante (programme de connexion local) ----------
+ * Partage par la caisse et le dashboard. Une page web ne peut PAS lancer un
+ * programme : on ouvre un lien tpebridge://start que Windows sait traiter
+ * (declare par l'installeur) et qui lance run-hidden.vbs. La fenetre
+ * d'autorisation qui suit est celle du NAVIGATEUR - impossible a restyler ou
+ * renommer depuis une page web : on affiche donc d'abord notre propre guide.
+ * Cote utilisateur on parle de "connexion", jamais de "pont". */
+var BRIDGE_ICON_PRINTER = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>';
+var BRIDGE_ICON_CARD = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>';
+var BRIDGE_GUIDE_KEY = 'bridge-start-guide-hidden';
+
+function startBridgeFlow() {
+  var hidden = false;
+  try { hidden = localStorage.getItem(BRIDGE_GUIDE_KEY) === '1'; } catch (e) { /* stockage indisponible */ }
+  if (hidden) { launchBridgeLink(); return; }
+
+  var overlay = _buildModal(
+    '<div class="modal-title">Connecter le TPE et l\'imprimante</div>' +
+    '<p class="modal-message" style="margin-bottom:8px">Votre navigateur va afficher une petite fenêtre pour demander l\'autorisation. C\'est normal et sans danger.</p>' +
+    '<ol class="bridge-guide-steps">' +
+      '<li><span><b>Cochez</b> « Toujours autoriser… » pour ne plus avoir à le refaire.</span></li>' +
+      '<li><span>Cliquez sur <b>« Ouvrir Microsoft Windows Based Script Host »</b>. C\'est le nom que Windows donne au programme de connexion.</span></li>' +
+    '</ol>' +
+    '<label class="bridge-guide-never"><input type="checkbox" id="bridge-guide-never"> Ne plus afficher ce guide</label>' +
+    '<div class="modal-actions">' +
+      '<button class="btn btn-soft" id="bridge-guide-cancel">Annuler</button>' +
+      '<button class="btn btn-primary" id="bridge-guide-go">Continuer</button>' +
+    '</div>'
+  );
+  overlay.querySelector('#bridge-guide-cancel').onclick = function () { _closeModal(overlay); };
+  overlay.querySelector('#bridge-guide-go').onclick = function () {
+    if (overlay.querySelector('#bridge-guide-never').checked) {
+      try { localStorage.setItem(BRIDGE_GUIDE_KEY, '1'); } catch (e) { /* tant pis */ }
+    }
+    _closeModal(overlay);
+    launchBridgeLink();
+  };
+}
+
+function launchBridgeLink() {
+  // Lien clique par programme, dans le geste de l'utilisateur (le clic sur
+  // "Continuer") : le navigateur affiche alors sa demande d'autorisation.
+  var a = document.createElement('a');
+  a.href = 'tpebridge://start';
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  onBridgeStartClick();
+}
+
+function onBridgeStartClick() {
+  toast('Connexion demandée - quelques secondes...');
+  // Le navigateur ne dit pas si Windows a reussi (ni si la fenetre a ete
+  // validee) : on juge sur le statut reel (window.__bridgeOnline, tenu a jour
+  // par la page), en laissant le temps de repondre.
+  setTimeout(function () {
+    if (!window.__bridgeOnline) {
+      toast('Toujours pas connecté. Vérifiez que vous avez bien cliqué sur « Ouvrir » dans la fenêtre du navigateur, et que vous êtes sur l\'ordinateur relié à l\'imprimante et au TPE.', true);
+    }
+  }, 45000);
+}

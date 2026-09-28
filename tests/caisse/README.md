@@ -39,5 +39,6 @@ node tests/caisse/05-ecran-caisse.js                 # carte debitee mais vente 
 node tests/caisse/06-paiement-cb-bout-en-bout.js     # paiement carte avec un faux pont : accepte, refuse, panne, silence, expiration
 node tests/caisse/07-cadeau-limite-et-ecran-incertain.js  # limite de tentatives cadeau + confirmation avant de relancer un paiement incertain
 node tests/caisse/08-heure-de-reouverture.js         # heure de reouverture : fuseaux et changements d'heure
-node tests/caisse/09-guide-demarrage-pont.js       # guide "Demarrer le pont" : affichage, lien tpebridge://start, memorisation
+node tests/caisse/09-guide-demarrage-pont.js       # guide "Connecter le TPE et l'imprimante" : affichage, lien tpebridge://start, memorisation
+node tests/caisse/10-connexion-caisse.js            # icone reglages de la caisse : pastille, fenetre, etats, suivi en direct, droits
 ```

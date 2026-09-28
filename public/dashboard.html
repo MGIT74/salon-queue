@@ -33,7 +33,7 @@
 <style>
   html.auth-checking #login { display: none; }
 </style>
-<link rel="stylesheet" href="/app.css?v=4">
+<link rel="stylesheet" href="/app.css?v=5">
 <style>
   .wrap { max-width: none; margin: 0; padding: clamp(20px,2.2vw,36px); }
 
@@ -678,24 +678,6 @@
               margin-bottom: 14px; transition: background .25s ease; }
   .card-box h3 { font-size: 17px; font-weight: 600; letter-spacing: -.02em; margin: 0 0 4px; }
   .card-box .hint { font-size: 13.5px; color: var(--grey); margin: 0 0 18px; line-height: 1.5; }
-
-  .bridge-device { display: flex; align-items: center; gap: 9px; font-size: 13.5px; font-weight: 500; color: var(--ink); }
-  .bridge-device-icon { position: relative; display: inline-flex; color: var(--grey); }
-  .bridge-device-dot {
-    position: absolute; right: -2px; bottom: -2px; width: 9px; height: 9px; border-radius: 50%;
-    background: var(--sep); border: 2px solid var(--fill); transition: background .2s ease;
-  }
-  .bridge-device-dot.is-online { background: var(--green); }
-  .bridge-device-dot.is-offline { background: var(--red); }
-  .bridge-guide-steps { list-style: none; margin: 0 0 14px; padding: 0; counter-reset: step; }
-  .bridge-guide-steps li { counter-increment: step; display: flex; gap: 12px; align-items: flex-start;
-                           font-size: 14.5px; line-height: 1.5; color: var(--ink); padding: 11px 0; }
-  .bridge-guide-steps li + li { border-top: 1px solid var(--sep); }
-  .bridge-guide-steps li::before { content: counter(step); flex: 0 0 26px; height: 26px; border-radius: 50%;
-                                   background: var(--blue-soft); color: var(--blue); font-weight: 700; font-size: 13px;
-                                   display: flex; align-items: center; justify-content: center; }
-  .bridge-guide-never { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--grey);
-                        margin: 0 0 16px; cursor: pointer; }
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
   .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
   @media (max-width: 700px) { .grid4 { grid-template-columns: 1fr 1fr; } }
@@ -1515,7 +1497,7 @@
         </div>
         <p class="hint" id="bridge-status-label" style="margin:-6px 0 14px;font-weight:500"></p>
         <div id="bridge-start-box" style="display:none;margin:-4px 0 14px">
-          <button class="btn btn-soft" id="bridge-start-btn" onclick="startBridgeFlow()">Démarrer le pont sur cet ordinateur</button>
+          <button class="btn btn-soft" id="bridge-start-btn" onclick="startBridgeFlow()">Connecter</button>
           <p class="hint" style="margin:6px 0 0;font-size:12.5px">
             Ne fonctionne que depuis l'ordinateur du salon où le pont est installé (pas depuis une tablette ou un téléphone).
           </p>
@@ -2147,7 +2129,7 @@
   </div>
 </div>
 
-<script src="/app.js?v=5"></script>
+<script src="/app.js?v=6"></script>
 <script>
 mountThemeButton();
 
@@ -7076,65 +7058,6 @@ function renderBridgeStartButton(r) {
   if (!box) return;
   window.__bridgeOnline = Boolean(r && r.online);
   box.style.display = (r && r.configured && !r.online) ? 'block' : 'none';
-}
-
-var BRIDGE_GUIDE_KEY = 'bridge-start-guide-hidden';
-
-/**
- * Clic sur "Démarrer le pont". La fenêtre d'autorisation qui suit est celle du
- * NAVIGATEUR (Chrome/Edge) : une page web ne peut ni la restyler ni la
- * renommer. On affiche donc d'abord notre propre guide, qui dit exactement
- * quoi cocher et quoi cliquer - sauf si l'utilisateur l'a masqué.
- */
-function startBridgeFlow() {
-  var hidden = false;
-  try { hidden = localStorage.getItem(BRIDGE_GUIDE_KEY) === '1'; } catch (e) { /* stockage indisponible */ }
-  if (hidden) { launchBridgeLink(); return; }
-
-  var overlay = _buildModal(
-    '<div class="modal-title">Démarrer le pont</div>' +
-    '<p class="modal-message" style="margin-bottom:8px">Votre navigateur va afficher une petite fenêtre pour demander l\'autorisation. C\'est normal et sans danger.</p>' +
-    '<ol class="bridge-guide-steps">' +
-      '<li><span><b>Cochez</b> « Toujours autoriser… » pour ne plus avoir à le refaire.</span></li>' +
-      '<li><span>Cliquez sur <b>« Ouvrir Microsoft Windows Based Script Host »</b>. C\'est le nom que Windows donne au lanceur du pont.</span></li>' +
-    '</ol>' +
-    '<label class="bridge-guide-never"><input type="checkbox" id="bridge-guide-never"> Ne plus afficher ce guide</label>' +
-    '<div class="modal-actions">' +
-      '<button class="btn btn-soft" id="bridge-guide-cancel">Annuler</button>' +
-      '<button class="btn btn-primary" id="bridge-guide-go">Continuer</button>' +
-    '</div>'
-  );
-  overlay.querySelector('#bridge-guide-cancel').onclick = function () { _closeModal(overlay); };
-  overlay.querySelector('#bridge-guide-go').onclick = function () {
-    if (overlay.querySelector('#bridge-guide-never').checked) {
-      try { localStorage.setItem(BRIDGE_GUIDE_KEY, '1'); } catch (e) { /* tant pis */ }
-    }
-    _closeModal(overlay);
-    launchBridgeLink();
-  };
-}
-
-function launchBridgeLink() {
-  // Lien cliqué par programme, dans le geste de l'utilisateur (le clic sur
-  // "Continuer") : le navigateur affiche alors sa demande d'autorisation.
-  var a = document.createElement('a');
-  a.href = 'tpebridge://start';
-  a.style.display = 'none';
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  onBridgeStartClick();
-}
-
-function onBridgeStartClick() {
-  toast('Demande envoyée - le pont devrait passer au vert dans quelques secondes');
-  // Le navigateur ne dit pas si Windows a réussi (ni si la fenêtre a été
-  // validée) : on juge sur le statut réel, en laissant le temps de répondre.
-  setTimeout(function () {
-    if (!window.__bridgeOnline) {
-      toast('Le pont ne répond toujours pas. Vérifiez que vous avez bien cliqué sur « Ouvrir » dans la fenêtre du navigateur, et que vous êtes sur l\'ordinateur du salon.', true);
-    }
-  }, 45000);
 }
 
 /**
