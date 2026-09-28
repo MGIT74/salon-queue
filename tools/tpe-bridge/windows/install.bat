@@ -92,6 +92,13 @@ schtasks /Delete /TN "TPE-Bridge" /F >nul 2>&1
 set "STARTUP_DIR=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup"
 if not exist "%STARTUP_DIR%" mkdir "%STARTUP_DIR%" >nul 2>&1
 copy /Y "%BRIDGE_DIR%\run-hidden.vbs" "%STARTUP_DIR%\TPE-Bridge.vbs" >nul 2>&1
+REM Lien tpebridge://start (utilise par le bouton "Demarrer le pont" du
+REM dashboard) : declare a Windows dans la ruche de l'utilisateur, sans droits
+REM supplementaires. La commande ne recoit AUCUN argument venant du lien, donc
+REM une page web ne peut rien faire d'autre que demander de lancer le pont.
+reg add "HKCU\Software\Classes\tpebridge" /ve /t REG_SZ /d "URL:TPE Bridge" /f >nul 2>&1
+reg add "HKCU\Software\Classes\tpebridge" /v "URL Protocol" /t REG_SZ /d "" /f >nul 2>&1
+reg add "HKCU\Software\Classes\tpebridge\shell\open\command" /ve /t REG_SZ /d "wscript.exe \"%BRIDGE_DIR%\run-hidden.vbs\"" /f >nul 2>&1
 if exist "%STARTUP_DIR%\TPE-Bridge.vbs" (
     echo [OK] Demarrage automatique configure.
 ) else (

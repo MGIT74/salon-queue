@@ -1505,6 +1505,14 @@
           </div>
         </div>
         <p class="hint" id="bridge-status-label" style="margin:-6px 0 14px;font-weight:500"></p>
+        <div id="bridge-start-box" style="display:none;margin:-4px 0 14px">
+          <a class="btn btn-soft" id="bridge-start-btn" href="tpebridge://start" onclick="onBridgeStartClick()"
+             style="display:inline-block;text-decoration:none">Démarrer le pont sur cet ordinateur</a>
+          <p class="hint" style="margin:6px 0 0;font-size:12.5px">
+            Ne fonctionne que depuis l'ordinateur du salon où le pont est installé (pas depuis une tablette ou un téléphone).
+            Au premier clic, votre navigateur demande l'autorisation : choisissez « Toujours autoriser ».
+          </p>
+        </div>
 
         <div class="fld" style="margin-bottom:10px;max-width:280px">
           <label for="set-tpe-print-mode">Mode d'impression</label>
@@ -7050,6 +7058,30 @@ function openAddSalonClosure() {
  * n'est pas un test indépendant de l'imprimante ou du TPE eux-mêmes.
  */
 /**
+ * Affiche le bouton "Démarrer le pont sur cet ordinateur" seulement quand un
+ * pont est configuré ET hors ligne. Le bouton est un lien tpebridge://start :
+ * Windows le relie (déclaré par l'installeur) au lanceur TPE-Bridge.vbs - une
+ * page web ne peut pas lancer de programme elle-même, seulement demander à
+ * Windows d'ouvrir un lien qu'il connaît, avec l'accord de l'utilisateur.
+ */
+function renderBridgeStartButton(r) {
+  var box = document.getElementById('bridge-start-box');
+  if (!box) return;
+  window.__bridgeOnline = Boolean(r && r.online);
+  box.style.display = (r && r.configured && !r.online) ? 'block' : 'none';
+}
+
+function onBridgeStartClick() {
+  toast('Demande envoyée - le pont devrait passer au vert dans quelques secondes');
+  // Le navigateur ne dit pas si Windows a réussi : on juge sur le statut réel.
+  setTimeout(function () {
+    if (!window.__bridgeOnline) {
+      toast('Le pont ne répond toujours pas. Ce bouton ne marche que depuis l\'ordinateur du salon où le pont est installé (et après la mise à jour de l\'installeur).', true);
+    }
+  }, 30000);
+}
+
+/**
  * Indique clairement si une clé de pont existe déjà (début de la clé + date),
  * pour ne pas se demander s'il faut en générer une. La clé complète n'est
  * jamais réaffichée : seule la génération la montre, une seule fois.
@@ -7079,6 +7111,7 @@ function pollBridgeStatus() {
   if (!dotPrinter || !dotTpe || !label) return;
   api('/api/tpe/bridge-status').then(function (r) {
     renderBridgeKeyInfo(r);
+    renderBridgeStartButton(r);
     dotPrinter.classList.remove('is-online', 'is-offline');
     dotTpe.classList.remove('is-online', 'is-offline');
     if (!r.configured) {

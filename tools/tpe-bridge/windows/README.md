@@ -104,6 +104,7 @@ node tpe-bridge-win.js > pont.log 2>&1
 
 ```bat
 del "%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\TPE-Bridge.vbs"
+reg delete "HKCU\Software\Classes\tpebridge" /f
 rmdir /S /Q C:\TPE-Bridge
 rmdir /S /Q "%APPDATA%\TPE-Bridge"
 ```
