@@ -659,7 +659,15 @@
      bascule en carte : email (le champ le plus important) en pleine
      largeur en premier, puis le reste en petit en dessous. Les boutons
      d'action passent sur leur propre ligne, alignes a droite. */
-  @container mainpane (max-width: 760px) {
+  /* Seuil plus genereux que Clients/Rendez-vous (760px) : ces deux listes
+     ont BEAUCOUP plus a caser en largeur - jusqu'a 4 boutons/etiquette
+     reserves (voir .item-actions min-width plus haut) en plus de 5-6
+     colonnes de donnees. Le mode tableau y reste cramponne bien plus
+     longtemps ; on bascule donc en carte (infos empilees en pleine
+     largeur, actions sur leur propre ligne en dessous) des que le
+     conteneur reel devient inferieur a 1000px - ce qui couvre le cas
+     signale (tablette repliee, ~885px). */
+  @container mainpane (max-width: 1000px) {
     #loyalty-list-head, #gift-list-head { display: none; }
     #loyalty-accounts-list .item, #gift-cards-list .item {
       align-items: flex-start; flex-wrap: wrap; padding: 14px 4px;
