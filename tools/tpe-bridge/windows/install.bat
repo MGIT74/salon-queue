@@ -9,6 +9,7 @@ REM   2. Copie les fichiers du pont dans C:\TPE-Bridge
 REM   3. Cree une regle de pare-feu entrante (TPE / impression locale)
 REM   4. Depose un lanceur dans le dossier Demarrage de Windows : le pont
 REM      demarre tout seul, sans fenetre, a chaque ouverture de session
+REM      (et se relance seul apres 5 s s'il s'arrete - voir startBridge)
 REM   5. Lance l'assistant de premiere configuration
 REM
 REM  Fichiers requis a cote de ce script :

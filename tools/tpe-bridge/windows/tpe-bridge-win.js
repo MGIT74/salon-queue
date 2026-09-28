@@ -186,17 +186,19 @@ async function main() {
   console.log('');
 
   // Le cœur du pont est dans bridge-core.js (même dossier) : c'est le
-  // tpe-bridge.js standard renommé. S'il est absent, on l'extrait depuis
-  // le fichier pont embarqué (tpe-bridge.js) fourni par l'installateur.
+  // tpe-bridge.js standard renommé. On le RECOPIE À CHAQUE DÉMARRAGE depuis
+  // tpe-bridge.js (fourni par l'installateur) : avant, il n'était créé que
+  // s'il manquait, donc une mise à jour de tpe-bridge.js (ex: correctif
+  // d'encodage des tickets) n'était jamais appliquée - le pont continuait à
+  // faire tourner l'ancienne copie indéfiniment.
   const corePath = path.join(__dirname, 'bridge-core.js');
+  const src = path.join(__dirname, 'tpe-bridge.js');
+  if (fs.existsSync(src)) {
+    try { fs.copyFileSync(src, corePath); } catch (e) { /* on garde la copie existante */ }
+  }
   if (!fs.existsSync(corePath)) {
-    const src = path.join(__dirname, 'tpe-bridge.js');
-    if (fs.existsSync(src)) {
-      fs.copyFileSync(src, corePath);
-    } else {
-      console.error('[!] bridge-core.js introuvable — réinstallez TPE Bridge.');
-      process.exit(1);
-    }
+    console.error('[!] bridge-core.js introuvable — réinstallez TPE Bridge.');
+    process.exit(1);
   }
 
   startBridge(cfg);
