@@ -1,6 +1,6 @@
 const express = require('express');
 const crypto = require('crypto');
-const { pool } = require('../db');
+const { pool, utcIso } = require('../db');
 const requireAdminOrBarber = require('../middleware/barberAuth');
 const { wrap } = require('../lib/wrap');
 
@@ -207,16 +207,25 @@ router.post('/bridge-key', requireAdminOrBarber, wrap(async (req, res) => {
  */
 router.get('/bridge-status', requireAdminOrBarber, wrap(async (req, res) => {
   const [[row]] = await pool.query(
-    'SELECT last_seen_at, last_charge_poll_at FROM bridge_keys WHERE salon_id = ?',
+    'SELECT key_preview, created_at, last_seen_at, last_charge_poll_at FROM bridge_keys WHERE salon_id = ?',
     [req.salon.id]
   );
-  const lastSeenAt = row && row.last_seen_at ? new Date(row.last_seen_at) : null;
-  const lastTpeAt = row && row.last_charge_poll_at ? new Date(row.last_charge_poll_at) : null;
+  // MySQL renvoie les dates en UTC sans fuseau ("2026-09-26 15:39:12") :
+  // utcIso() les tague explicitement, sinon new Date() les lirait dans le
+  // fuseau du serveur Node et décalerait le statut de 1-2 h selon la config.
+  const toDate = (v) => (v ? new Date(utcIso(String(v))) : null);
+  const lastSeenAt = row ? toDate(row.last_seen_at) : null;
+  const lastTpeAt = row ? toDate(row.last_charge_poll_at) : null;
+  const createdAt = row ? toDate(row.created_at) : null;
   const online = Boolean(lastSeenAt && (Date.now() - lastSeenAt.getTime()) < 10_000);
   const tpeOnline = Boolean(lastTpeAt && (Date.now() - lastTpeAt.getTime()) < 10_000);
   res.json({
     ok: true,
     configured: Boolean(row),
+    // Début de la clé + date de création : permet d'afficher qu'une clé
+    // existe déjà (la clé complète, elle, n'est visible qu'à sa génération).
+    key_preview: row ? row.key_preview : null,
+    key_created_at: createdAt ? createdAt.toISOString() : null,
     online,
     last_seen_at: lastSeenAt ? lastSeenAt.toISOString() : null,
     tpe_online: tpeOnline,

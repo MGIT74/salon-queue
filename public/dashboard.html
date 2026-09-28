@@ -1513,7 +1513,8 @@
             <option value="text">Texte simple (imprimante non ESC/POS)</option>
           </select>
         </div>
-        <button class="btn btn-soft" onclick="generateBridgeKey(this)">Générer / régénérer la clé du pont</button>
+        <p class="hint" id="bridge-key-info" style="margin:0 0 10px"></p>
+        <button class="btn btn-soft" id="bridge-key-btn" onclick="generateBridgeKey(this)">Générer la clé du pont</button>
         <div id="bridge-key-result" style="display:none;margin-top:12px">
           <div class="fld"><label>Clé (copiez-la maintenant — elle ne sera plus affichée)</label>
             <input id="bridge-key-value" type="text" readonly onclick="this.select()" style="font-family:monospace;font-size:12px">
@@ -7048,12 +7049,36 @@ function openAddSalonClosure() {
  * partagent le même signal (un seul processus pont gère les deux) - ce
  * n'est pas un test indépendant de l'imprimante ou du TPE eux-mêmes.
  */
+/**
+ * Indique clairement si une clé de pont existe déjà (début de la clé + date),
+ * pour ne pas se demander s'il faut en générer une. La clé complète n'est
+ * jamais réaffichée : seule la génération la montre, une seule fois.
+ */
+function renderBridgeKeyInfo(r) {
+  var info = document.getElementById('bridge-key-info');
+  var btn = document.getElementById('bridge-key-btn');
+  if (!info || !btn) return;
+  if (r.key_preview) {
+    var when = r.key_created_at
+      ? ' · créée le ' + new Date(r.key_created_at).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+      : '';
+    info.innerHTML = '<span style="color:var(--green);font-weight:600">✓ Clé déjà générée :</span> ' +
+      '<code>' + esc(r.key_preview) + '</code>' + esc(when) + '<br>' +
+      'En régénérer une invalide celle-ci : le pont installé s\'arrêtera tant qu\'il n\'est pas reconfiguré.';
+    btn.textContent = 'Régénérer la clé du pont';
+  } else {
+    info.textContent = 'Aucune clé générée pour le moment.';
+    btn.textContent = 'Générer la clé du pont';
+  }
+}
+
 function pollBridgeStatus() {
   var dotPrinter = document.getElementById('bridge-dot-printer');
   var dotTpe = document.getElementById('bridge-dot-tpe');
   var label = document.getElementById('bridge-status-label');
   if (!dotPrinter || !dotTpe || !label) return;
   api('/api/tpe/bridge-status').then(function (r) {
+    renderBridgeKeyInfo(r);
     dotPrinter.classList.remove('is-online', 'is-offline');
     dotTpe.classList.remove('is-online', 'is-offline');
     if (!r.configured) {
@@ -7110,6 +7135,7 @@ function generateBridgeKey(btn) {
         'node tpe-bridge.js --server ' + server + ' --salon ' + slug + ' --key ' + r.key;
       document.getElementById('bridge-key-result').style.display = 'block';
       toast('Clé générée — copiez la commande pour le salon');
+      pollBridgeStatus();
     })
     .catch(function (e) {
       btn.disabled = false;
