@@ -35,7 +35,13 @@ async function purgeExpiredTokens() {
   // Tickets imprimés depuis plus de 7 jours (tracés une semaine pour
   // dépannage, puis supprimés - la table ne doit pas grossir indéfiniment).
   const [printJobs] = await pool.query(
-    'DELETE FROM print_jobs WHERE status IN (\'done\', \'failed\') AND created_at <= (NOW() - INTERVAL 7 DAY)'
+    'DELETE FROM print_jobs WHERE status IN (\'done\', \'failed\', \'expired\') AND created_at <= (NOW() - INTERVAL 7 DAY)'
+  );
+  // Demandes de paiement CB terminées (ou expirées) depuis plus de 7 jours :
+  // cette table n'était jamais nettoyée. Les demandes 'processing' sont
+  // gardées (paiement dont le résultat n'a jamais été confirmé - trace utile).
+  await pool.query(
+    'DELETE FROM tpe_charge_jobs WHERE status IN (\'done\', \'failed\', \'expired\') AND created_at <= (NOW() - INTERVAL 7 DAY)'
   );
 
   const n = sessions.affectedRows + impersonation.affectedRows +

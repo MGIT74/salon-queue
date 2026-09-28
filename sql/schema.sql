@@ -1022,3 +1022,30 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'cash_closings' AND column_name = 'vat_json');
 SET @sql := IF(@c = 0, "ALTER TABLE cash_closings ADD COLUMN vat_json TEXT NULL", 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- ============================================================
+-- Fiabilisation de l'encaissement (audit de la caisse)
+-- ============================================================
+
+-- Identifiant de tentative d'encaissement fourni par la caisse : rejouer la
+-- meme demande (reseau coupe, double envoi, nouvel essai apres une carte
+-- debitee) renvoie la vente deja creee au lieu d'en creer une seconde.
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'sales' AND column_name = 'client_request_id');
+SET @sql := IF(@c = 0, 'ALTER TABLE sales ADD COLUMN client_request_id VARCHAR(64) NULL', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @c := (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'sales' AND index_name = 'uniq_salon_request');
+SET @sql := IF(@c = 0, 'ALTER TABLE sales ADD UNIQUE KEY uniq_salon_request (salon_id, client_request_id)', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Numero de ticket unique par salon (numerotation sequentielle exigee).
+-- Filet de securite en plus du verrou applicatif (lib/cashLock.js). Ajoute
+-- seulement s'il n'existe AUCUN doublon aujourd'hui - sinon la commande
+-- echouerait ; dans ce cas la requete ci-dessous liste les doublons a
+-- corriger a la main avant de relancer cette migration :
+--   SELECT salon_id, ticket_number, COUNT(*) FROM sales
+--   WHERE ticket_number IS NOT NULL GROUP BY salon_id, ticket_number HAVING COUNT(*) > 1;
+SET @dups := (SELECT COUNT(*) FROM (SELECT 1 FROM sales WHERE ticket_number IS NOT NULL GROUP BY salon_id, ticket_number HAVING COUNT(*) > 1) d);
+SET @c := (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'sales' AND index_name = 'uniq_salon_ticket');
+SET @sql := IF(@c = 0 AND @dups = 0, 'ALTER TABLE sales ADD UNIQUE KEY uniq_salon_ticket (salon_id, ticket_number)', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;

@@ -9,6 +9,7 @@ const { clientKey } = require('../lib/queueMath');
 const { logActivity } = require('../lib/activityLog');
 const { wrap } = require('../lib/wrap');
 const { getPendingRecount } = require('../lib/pendingRecount');
+const { withCashLock, HttpError } = require('../lib/cashLock');
 
 const router = express.Router();
 
@@ -629,106 +630,7 @@ router.post('/caisse/close', requireAdminOrBarber, wrap(async (req, res) => {
     return res.status(400).json({ error: 'Le fond de caisse doit être renseigné (montant en euros, 0 ou plus).' });
   }
 
-  const [[lastClosing]] = await pool.query(
-    'SELECT period_end FROM cash_closings WHERE salon_id = ? ORDER BY period_end DESC LIMIT 1',
-    [req.salon.id]
-  );
-  const periodStart = lastClosing ? lastClosing.period_end : null;
-
-  const [sales] = await pool.query(
-    periodStart
-      ? `SELECT s.payment_method, s.total_price_cents, s.barber_id, b.name AS barber_name
-         FROM sales s LEFT JOIN barbers b ON b.id = s.barber_id
-         WHERE s.salon_id = ? AND s.created_at > ?`
-      : `SELECT s.payment_method, s.total_price_cents, s.barber_id, b.name AS barber_name
-         FROM sales s LEFT JOIN barbers b ON b.id = s.barber_id
-         WHERE s.salon_id = ?`,
-    periodStart ? [req.salon.id, periodStart] : [req.salon.id]
-  );
-
-  if (sales.length === 0) {
-    return res.status(400).json({ error: 'Aucune vente à clôturer sur cette période.' });
-  }
-
-  const byMethod = {};
-  const byBarber = {};
-  let total = 0;
-  sales.forEach((s) => {
-    total += s.total_price_cents;
-    byMethod[s.payment_method] = (byMethod[s.payment_method] || 0) + s.total_price_cents;
-    const barberKey = s.barber_id || '_none';
-    if (!byBarber[barberKey]) byBarber[barberKey] = { name: s.barber_name || 'Non attribué', count: 0, total_cents: 0 };
-    byBarber[barberKey].count += 1;
-    byBarber[barberKey].total_cents += s.total_price_cents;
-  });
-
-  const [saleItems] = await pool.query(
-    periodStart
-      ? `SELECT si.item_name, si.item_type, si.quantity, si.unit_price_cents
-         FROM sale_items si JOIN sales s ON s.id = si.sale_id
-         WHERE s.salon_id = ? AND s.created_at > ?`
-      : `SELECT si.item_name, si.item_type, si.quantity, si.unit_price_cents
-         FROM sale_items si JOIN sales s ON s.id = si.sale_id
-         WHERE s.salon_id = ?`,
-    periodStart ? [req.salon.id, periodStart] : [req.salon.id]
-  );
-  const byItem = {};
-  const vatRateFor = (itemType) => {
-    const raw = itemType === 'service' ? req.salon.vat_rate_service
-      : itemType === 'extra' ? req.salon.vat_rate_extra
-      : req.salon.vat_rate_product;
-    return (raw !== undefined && raw !== null && raw !== '') ? Number(raw) : 20;
-  };
-  // Ventilation TVA par taux (comme sur un vrai ticket Z de logiciel de
-  // caisse) : CA TTC, HT et TVA pour chaque taux applique, plus le
-  // total TVA - demande explicitement suite a un test de cloture.
-  const byVatRate = {};
-  saleItems.forEach((it) => {
-    const rate = vatRateFor(it.item_type);
-    const ttc = it.quantity * it.unit_price_cents;
-    if (!byVatRate[rate]) byVatRate[rate] = { ttc_cents: 0 };
-    byVatRate[rate].ttc_cents += ttc;
-  });
-  Object.keys(byVatRate).forEach((rate) => {
-    const ttc = byVatRate[rate].ttc_cents;
-    const ht = Math.round(ttc / (1 + Number(rate) / 100));
-    byVatRate[rate].ht_cents = ht;
-    byVatRate[rate].vat_cents = ttc - ht;
-  });
-  saleItems.forEach((it) => {
-    if (!byItem[it.item_name]) byItem[it.item_name] = { quantity: 0, total_cents: 0 };
-    byItem[it.item_name].quantity += it.quantity;
-    byItem[it.item_name].total_cents += it.quantity * it.unit_price_cents;
-  });
-
-  const id = crypto.randomUUID();
-
-  // Numerotation sequentielle exigee legalement - en cas de collision
-  // (deux clotures lancees en meme temps, course tres improbable mais
-  // possible), reessaie avec le numero suivant plutot que d'echouer,
-  // grace a la contrainte d'unicite (salon_id, z_number) qui detecte
-  // le conflit de facon fiable (contrairement a un simple SELECT MAX
-  // avant l'ecriture, sujet a la meme course).
-  let zNumber;
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const [[{ maxZ }]] = await pool.query(
-      'SELECT COALESCE(MAX(z_number), 0) AS maxZ FROM cash_closings WHERE salon_id = ?',
-      [req.salon.id]
-    );
-    zNumber = maxZ + 1;
-    try {
-      await pool.query(
-        `INSERT INTO cash_closings (id, salon_id, period_start, period_end, total_cents, sales_count, breakdown_json, z_number, starting_cash_cents, by_barber_json, by_item_json, vat_json)
-         VALUES (?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [id, req.salon.id, periodStart, total, sales.length, JSON.stringify(byMethod), zNumber, startingCashCents, JSON.stringify(byBarber), JSON.stringify(byItem), JSON.stringify(byVatRate)]
-      );
-      break;
-    } catch (err) {
-      if (err.code === 'ER_DUP_ENTRY' && attempt < 4) continue;
-      throw err;
-    }
-  }
-
+  // Qui clôture (nom du coiffeur qui a saisi son code, sinon "admin").
   let actorLabel = req.barberId ? 'coiffeur' : 'admin';
   if (req.body.closed_by_barber_id) {
     const [[verifiedBarber]] = await pool.query(
@@ -737,9 +639,124 @@ router.post('/caisse/close', requireAdminOrBarber, wrap(async (req, res) => {
     );
     if (verifiedBarber) actorLabel = verifiedBarber.name;
   }
-  await pool.query('UPDATE cash_closings SET closed_by = ? WHERE id = ?', [actorLabel, id]);
-  logActivity(req.salon.id, 'cash_closing', 'Clôture de caisse Z' + zNumber + ' (' + sales.length + ' vente' + (sales.length > 1 ? 's' : '') + ', ' + (total / 100).toFixed(2) + ' €, ' + actorLabel + ')');
-  res.json({ ok: true, id, z_number: zNumber, total_cents: total, sales_count: sales.length });
+
+  // Calcul des totaux + enregistrement du Z sous le MÊME verrou que la
+  // création d'une vente (lib/cashLock.js) : une vente ne peut plus
+  // s'enregistrer entre le calcul et l'écriture - avant, elle pouvait être
+  // datée avant la fin de période mais absente du Z (donc de tous les Z).
+  let closingResult;
+  try {
+    closingResult = await withCashLock(req.salon.id, async (db) => {
+      const [[lastClosing]] = await db.query(
+        'SELECT period_end FROM cash_closings WHERE salon_id = ? ORDER BY period_end DESC LIMIT 1',
+        [req.salon.id]
+      );
+      const periodStart = lastClosing ? lastClosing.period_end : null;
+
+      const [sales] = await db.query(
+        periodStart
+          ? `SELECT s.payment_method, s.total_price_cents, s.barber_id, b.name AS barber_name
+             FROM sales s LEFT JOIN barbers b ON b.id = s.barber_id
+             WHERE s.salon_id = ? AND s.created_at > ?`
+          : `SELECT s.payment_method, s.total_price_cents, s.barber_id, b.name AS barber_name
+             FROM sales s LEFT JOIN barbers b ON b.id = s.barber_id
+             WHERE s.salon_id = ?`,
+        periodStart ? [req.salon.id, periodStart] : [req.salon.id]
+      );
+
+      if (sales.length === 0) {
+        throw new HttpError(400, 'Aucune vente à clôturer sur cette période.');
+      }
+
+      const byMethod = {};
+      const byBarber = {};
+      let total = 0;
+      sales.forEach((s) => {
+        total += s.total_price_cents;
+        byMethod[s.payment_method] = (byMethod[s.payment_method] || 0) + s.total_price_cents;
+        const barberKey = s.barber_id || '_none';
+        if (!byBarber[barberKey]) byBarber[barberKey] = { name: s.barber_name || 'Non attribué', count: 0, total_cents: 0 };
+        byBarber[barberKey].count += 1;
+        byBarber[barberKey].total_cents += s.total_price_cents;
+      });
+
+      const [saleItems] = await db.query(
+        periodStart
+          ? `SELECT si.item_name, si.item_type, si.quantity, si.unit_price_cents
+             FROM sale_items si JOIN sales s ON s.id = si.sale_id
+             WHERE s.salon_id = ? AND s.created_at > ?`
+          : `SELECT si.item_name, si.item_type, si.quantity, si.unit_price_cents
+             FROM sale_items si JOIN sales s ON s.id = si.sale_id
+             WHERE s.salon_id = ?`,
+        periodStart ? [req.salon.id, periodStart] : [req.salon.id]
+      );
+      const byItem = {};
+      const vatRateFor = (itemType) => {
+        const raw = itemType === 'service' ? req.salon.vat_rate_service
+          : itemType === 'extra' ? req.salon.vat_rate_extra
+          : req.salon.vat_rate_product;
+        return (raw !== undefined && raw !== null && raw !== '') ? Number(raw) : 20;
+      };
+      // Ventilation TVA par taux (comme sur un vrai ticket Z de logiciel de
+      // caisse) : CA TTC, HT et TVA pour chaque taux applique, plus le
+      // total TVA - demande explicitement suite a un test de cloture.
+      const byVatRate = {};
+      saleItems.forEach((it) => {
+        const rate = vatRateFor(it.item_type);
+        const ttc = it.quantity * it.unit_price_cents;
+        if (!byVatRate[rate]) byVatRate[rate] = { ttc_cents: 0 };
+        byVatRate[rate].ttc_cents += ttc;
+      });
+      Object.keys(byVatRate).forEach((rate) => {
+        const ttc = byVatRate[rate].ttc_cents;
+        const ht = Math.round(ttc / (1 + Number(rate) / 100));
+        byVatRate[rate].ht_cents = ht;
+        byVatRate[rate].vat_cents = ttc - ht;
+      });
+      saleItems.forEach((it) => {
+        if (!byItem[it.item_name]) byItem[it.item_name] = { quantity: 0, total_cents: 0 };
+        byItem[it.item_name].quantity += it.quantity;
+        byItem[it.item_name].total_cents += it.quantity * it.unit_price_cents;
+      });
+
+      const id = crypto.randomUUID();
+
+      // Numerotation sequentielle exigee legalement - en cas de collision
+      // (deux clotures lancees en meme temps, course tres improbable mais
+      // possible), reessaie avec le numero suivant plutot que d'echouer,
+      // grace a la contrainte d'unicite (salon_id, z_number) qui detecte
+      // le conflit de facon fiable (contrairement a un simple SELECT MAX
+      // avant l'ecriture, sujet a la meme course).
+      let zNumber;
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const [[{ maxZ }]] = await db.query(
+          'SELECT COALESCE(MAX(z_number), 0) AS maxZ FROM cash_closings WHERE salon_id = ?',
+          [req.salon.id]
+        );
+        zNumber = maxZ + 1;
+        try {
+          await db.query(
+            `INSERT INTO cash_closings (id, salon_id, period_start, period_end, total_cents, sales_count, breakdown_json, z_number, starting_cash_cents, by_barber_json, by_item_json, vat_json, closed_by)
+             VALUES (?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [id, req.salon.id, periodStart, total, sales.length, JSON.stringify(byMethod), zNumber, startingCashCents, JSON.stringify(byBarber), JSON.stringify(byItem), JSON.stringify(byVatRate), actorLabel]
+          );
+          break;
+        } catch (err) {
+          if (err.code === 'ER_DUP_ENTRY' && attempt < 4) continue;
+          throw err;
+        }
+      }
+
+      return { id, zNumber, total, salesCount: sales.length };
+    });
+  } catch (err) {
+    if (err instanceof HttpError) return res.status(err.status).json({ error: err.message });
+    throw err;
+  }
+  const { id, zNumber, total, salesCount } = closingResult;
+
+  logActivity(req.salon.id, 'cash_closing', 'Clôture de caisse Z' + zNumber + ' (' + salesCount + ' vente' + (salesCount > 1 ? 's' : '') + ', ' + (total / 100).toFixed(2) + ' €, ' + actorLabel + ')');
+  res.json({ ok: true, id, z_number: zNumber, total_cents: total, sales_count: salesCount });
 }));
 
 /**

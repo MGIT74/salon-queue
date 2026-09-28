@@ -81,7 +81,7 @@ router.post('/charge', requireAdminOrBarber, wrap(async (req, res) => {
       'SELECT status, result_json FROM tpe_charge_jobs WHERE id = ?',
       [jobId]
     );
-    if (!job || job.status === 'pending') continue;
+    if (!job || job.status === 'pending' || job.status === 'processing') continue;
     if (job.status === 'done' && job.result_json) {
       const result = JSON.parse(job.result_json);
       return res.json({
@@ -94,6 +94,19 @@ router.post('/charge', requireAdminOrBarber, wrap(async (req, res) => {
       });
     }
     return res.status(502).json({ error: 'Paiement impossible : ' + (job.result_json || 'le pont n\'a pas pu joindre le terminal') });
+  }
+  // Délai dépassé. Une demande que le pont n'a JAMAIS prise en charge est
+  // annulée : sinon, si le pont revenait en ligne quelques secondes plus
+  // tard, il enverrait quand même le montant au terminal - un paiement
+  // "fantôme" que plus personne n'attend. Une demande déjà prise en charge
+  // ('processing') n'est PAS touchée : le client est peut-être en train de
+  // payer, on ne peut pas savoir.
+  const [expired] = await pool.query(
+    "UPDATE tpe_charge_jobs SET status = 'expired', updated_at = NOW() WHERE id = ? AND status = 'pending'",
+    [jobId]
+  );
+  if (expired.affectedRows === 0) {
+    return res.status(504).json({ error: 'Le terminal n\'a pas répondu à temps. VÉRIFIEZ SUR LE TERMINAL si le paiement est passé avant de recommencer, pour ne pas débiter le client deux fois.' });
   }
   return res.status(504).json({ error: 'Le terminal de paiement n\'a pas répondu à temps (pont hors ligne ?)' });
 }));
@@ -127,6 +140,16 @@ router.post('/print', requireAdminOrBarber, wrap(async (req, res) => {
 
 /** Le pont réclame les tickets en attente de son salon. */
 router.get('/bridge/poll', requireBridgeKey, wrap(async (req, res) => {
+  // Un ticket ou une ouverture de tiroir déposé pendant que le pont était
+  // éteint (nuit, PC redémarré) ne doit PAS s'exécuter au retour du pont :
+  // le tiroir s'ouvrirait tout seul, et une pile de vieux tickets sortirait.
+  // Tiroir : 2 min de validité. Tickets : 30 min.
+  await pool.query(
+    "UPDATE print_jobs SET status = 'expired', error = 'Expiré (pont hors ligne trop longtemps)' " +
+    "WHERE salon_id = ? AND status = 'pending' AND " +
+    "((mode = 'drawer' AND created_at < (NOW() - INTERVAL 2 MINUTE)) OR created_at < (NOW() - INTERVAL 30 MINUTE))",
+    [req.salon.id]
+  );
   const [jobs] = await pool.query(
     "SELECT id, text, mode FROM print_jobs WHERE salon_id = ? AND status = 'pending' ORDER BY created_at LIMIT 10",
     [req.salon.id]
@@ -144,10 +167,24 @@ router.get('/bridge/poll', requireBridgeKey, wrap(async (req, res) => {
  */
 router.get('/bridge/charge-poll', requireBridgeKey, wrap(async (req, res) => {
   pool.query('UPDATE bridge_keys SET last_charge_poll_at = NOW() WHERE salon_id = ?', [req.salon.id]).catch(() => {});
-  const [jobs] = await pool.query(
+  const [candidates] = await pool.query(
     "SELECT id, amount_cents FROM tpe_charge_jobs WHERE salon_id = ? AND status = 'pending' AND created_at > (NOW() - INTERVAL 2 MINUTE) ORDER BY created_at LIMIT 5",
     [req.salon.id]
   );
+  // Prise en charge ATOMIQUE : chaque demande passe de 'pending' à
+  // 'processing' et n'est livrée qu'au pont qui a réussi cette bascule.
+  // Avant, elle restait 'pending' jusqu'au retour du pont : si ce retour
+  // (charge-ack) se perdait - coupure réseau au mauvais moment - la même
+  // demande était renvoyée au terminal 3 s plus tard, donc un second
+  // débit possible pour un seul achat.
+  const jobs = [];
+  for (const c of candidates) {
+    const [claim] = await pool.query(
+      "UPDATE tpe_charge_jobs SET status = 'processing', updated_at = NOW() WHERE id = ? AND salon_id = ? AND status = 'pending'",
+      [c.id, req.salon.id]
+    );
+    if (claim.affectedRows === 1) jobs.push(c);
+  }
   res.json({ ok: true, jobs });
 }));
 
@@ -157,7 +194,7 @@ router.post('/bridge/charge-ack', requireBridgeKey, wrap(async (req, res) => {
   if (!job_id) return res.status(400).json({ error: 'job_id requis' });
   const status = result ? 'done' : 'failed';
   await pool.query(
-    "UPDATE tpe_charge_jobs SET status = ?, result_json = ?, updated_at = NOW() WHERE id = ? AND salon_id = ? AND status = 'pending'",
+    "UPDATE tpe_charge_jobs SET status = ?, result_json = ?, updated_at = NOW() WHERE id = ? AND salon_id = ? AND status IN ('pending', 'processing')",
     [status, result ? JSON.stringify(result) : (error ? String(error).slice(0, 500) : null), job_id, req.salon.id]
   );
   res.json({ ok: true });

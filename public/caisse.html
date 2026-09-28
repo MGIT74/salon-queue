@@ -810,6 +810,12 @@
       <button class="btn btn-soft" onclick="cancelTpePayment()">Annuler</button>
       <button class="btn btn-primary" onclick="retryTpePayment()">Réessayer</button>
     </div>
+    <!-- Carte DÉJÀ débitée mais vente non enregistrée : on ne propose JAMAIS
+         de refaire payer la carte, seulement de réessayer l'enregistrement. -->
+    <div class="receipt-actions" id="tpe-actions-save" style="display:none">
+      <button class="btn btn-soft" onclick="abandonChargedSale()">Abandonner</button>
+      <button class="btn btn-primary" onclick="retrySaleSave()">Réessayer l'enregistrement</button>
+    </div>
   </div>
 </div>
 
@@ -995,6 +1001,7 @@ function showApp() {
   loadBarberBubbles();
   loadCatalog();
   loadPendingPayments();
+  restoreChargedSale();
   loadMarketingSettings();
   loadInactivitySetting();
   clearInterval(pendingPaymentsInterval);
@@ -2917,7 +2924,7 @@ function pay(method) {
   var soldTicket = ticket.slice();
   var linkedQueueId = ticketQueueId;
   var usedLoyalty = Boolean(loyaltyDiscount);
-  var saleCtx = { method: method, total: total, soldTicket: soldTicket, linkedQueueId: linkedQueueId, gift: gift, usedLoyalty: usedLoyalty };
+  var saleCtx = { method: method, total: total, soldTicket: soldTicket, linkedQueueId: linkedQueueId, gift: gift, usedLoyalty: usedLoyalty, requestId: newRequestId() };
 
   if (method === 'cb') {
     startTpePayment(saleCtx);
@@ -2953,6 +2960,7 @@ function startTpePayment(saleCtx) {
   document.getElementById('tpe-amount').textContent = eur(saleCtx.total);
   document.getElementById('tpe-msg').textContent = 'Présentez la carte sur le terminal…';
   document.getElementById('tpe-actions').style.display = 'none';
+  document.getElementById('tpe-actions-save').style.display = 'none';
   document.getElementById('tpe-overlay').classList.add('on');
 
   // Paiement carte : TOUJOURS via l'API serveur (https, autorisé).
@@ -2964,7 +2972,12 @@ function startTpePayment(saleCtx) {
   barberApi('/api/tpe/charge', { method: 'POST', body: { amount_cents: saleCtx.total } })
     .then(function (r) {
       if (r.success) {
-        document.getElementById('tpe-overlay').classList.remove('on');
+        // La carte est DÉBITÉE à partir d'ici. On garde l'écran d'attente
+        // (au lieu de le fermer) et on mémorise la vente : si son
+        // enregistrement échoue, ou si la page est rechargée, on ne perd
+        // ni la vente ni la trace que la carte a été débitée.
+        rememberChargedSale(saleCtx);
+        document.getElementById('tpe-msg').textContent = 'Paiement accepté — enregistrement de la vente…';
         finalizeSale(saleCtx);
       } else {
         showTpeFailure(r.failure_reason ? 'Paiement refusé : ' + r.failure_reason : 'Paiement refusé par le terminal.');
@@ -3006,11 +3019,13 @@ function finalizeSale(saleCtx) {
     method: 'POST',
     body: {
       payment_method: saleCtx.method, items: saleCtx.soldTicket, queue_id: saleCtx.linkedQueueId,
-      gift: saleCtx.gift, loyalty_redeem: saleCtx.usedLoyalty
+      gift: saleCtx.gift, loyalty_redeem: saleCtx.usedLoyalty, client_request_id: saleCtx.requestId
     }
   }).then(function (r) {
     tpePendingSaleCtx = null;
     paymentInFlight = false;
+    forgetChargedSale();
+    document.getElementById('tpe-actions-save').style.display = 'none';
     document.getElementById('tpe-overlay').classList.remove('on');
     showReceipt(saleCtx.soldTicket, saleCtx.total, saleCtx.method, { ticketNumber: r.sale && r.sale.ticket_number });
     // Si un cadeau a été créé, on avertit toujours le coiffeur si l'email
@@ -3042,6 +3057,14 @@ function finalizeSale(saleCtx) {
     renderTicket();
     loadPendingPayments();
   }).catch(function (e) {
+    // Paiement CARTE déjà accepté : la carte est débitée. Surtout ne pas
+    // laisser croire à un simple échec de paiement (le coiffeur referait
+    // payer la carte) - écran dédié, qui ne permet que de réessayer
+    // l'enregistrement (rejouable sans risque grâce à requestId).
+    if (saleCtx.method === 'cb') {
+      showSaleSaveFailure(saleCtx, e.message);
+      return;
+    }
     // Échec (réseau, validation serveur...) - le ticket n'a PAS été
     // vidé, donc le coiffeur peut corriger et refaire un essai : il faut
     // impérativement débloquer les boutons, sinon la caisse reste
@@ -3051,6 +3074,79 @@ function finalizeSale(saleCtx) {
     document.getElementById('tpe-overlay').classList.remove('on');
     toast(e.message, true);
   });
+}
+
+// ---- Carte débitée mais vente non enregistrée : ne jamais perdre la vente ----
+var CHARGED_SALE_KEY = 'card-charged-sale';
+
+function newRequestId() {
+  if (window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID();
+  // Repli pour un vieux navigateur : suffisamment aléatoire pour identifier UNE tentative.
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+    var r = Math.random() * 16 | 0;
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
+}
+
+function rememberChargedSale(saleCtx) {
+  try { sessionStorage.setItem(CHARGED_SALE_KEY, JSON.stringify(saleCtx)); } catch (e) {}
+}
+function forgetChargedSale() {
+  try { sessionStorage.removeItem(CHARGED_SALE_KEY); } catch (e) {}
+}
+
+function showSaleSaveFailure(saleCtx, message) {
+  tpePendingSaleCtx = saleCtx;
+  paymentInFlight = true;            // les boutons de paiement restent verrouillés
+  setPayButtonsLocked(true);
+  var box = document.getElementById('tpe-box');
+  box.classList.add('fail');
+  document.getElementById('tpe-spinner').style.display = 'none';
+  document.getElementById('tpe-amount').textContent = 'Carte débitée — vente NON enregistrée';
+  document.getElementById('tpe-msg').textContent =
+    'La carte du client a bien été débitée (' + eur(saleCtx.total) + ') mais la vente n\'a pas pu être enregistrée : ' +
+    message + '. NE REPASSEZ PAS la carte. Réessayez l\'enregistrement.';
+  document.getElementById('tpe-actions').style.display = 'none';
+  document.getElementById('tpe-actions-save').style.display = 'flex';
+  document.getElementById('tpe-overlay').classList.add('on');
+}
+
+function retrySaleSave() {
+  if (!tpePendingSaleCtx) return;
+  document.getElementById('tpe-box').classList.remove('fail');
+  document.getElementById('tpe-spinner').style.display = 'block';
+  document.getElementById('tpe-amount').textContent = eur(tpePendingSaleCtx.total);
+  document.getElementById('tpe-msg').textContent = 'Enregistrement de la vente…';
+  document.getElementById('tpe-actions-save').style.display = 'none';
+  finalizeSale(tpePendingSaleCtx);
+}
+
+function abandonChargedSale() {
+  showConfirm(
+    'La carte du client a été débitée. Si vous abandonnez, la vente ne sera PAS enregistrée : il faudra rembourser le client depuis le terminal de paiement. Abandonner quand même ?',
+    { title: 'Abandonner la vente', danger: true, confirmLabel: 'Abandonner' }
+  ).then(function (ok) {
+    if (!ok) return;
+    forgetChargedSale();
+    tpePendingSaleCtx = null;
+    paymentInFlight = false;
+    setPayButtonsLocked(false);
+    document.getElementById('tpe-actions-save').style.display = 'none';
+    document.getElementById('tpe-overlay').classList.remove('on');
+    toast('Vente non enregistrée — pensez à rembourser le client sur le terminal', true);
+  });
+}
+
+// Page rechargée alors qu'une carte avait été débitée sans que la vente ait
+// été confirmée : on ré-affiche l'écran de reprise (la vente est rejouable).
+function restoreChargedSale() {
+  var raw = null;
+  try { raw = sessionStorage.getItem(CHARGED_SALE_KEY); } catch (e) {}
+  if (!raw) return;
+  var ctx;
+  try { ctx = JSON.parse(raw); } catch (e) { forgetChargedSale(); return; }
+  if (!ctx || !ctx.requestId || !ctx.soldTicket) { forgetChargedSale(); return; }
+  showSaleSaveFailure(ctx, 'la page a été rechargée avant la fin de l\'enregistrement');
 }
 
 var PAYMENT_LABELS = { especes: 'Espèces', cb: 'Carte bancaire' };

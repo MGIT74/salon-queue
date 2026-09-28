@@ -57,8 +57,12 @@ function utcIso(v) {
  * derniere cloture ne compte plus - une nouvelle cloture re-verrouille
  * normalement).
  */
-async function getCaisseLockedUntil(salonId, settings) {
-  const [[lastClosing]] = await pool.query(
+// `conn` (optionnel) : connexion à utiliser à la place du pool - indispensable
+// quand on est déjà dans une section verrouillée (voir lib/cashLock.js), sinon
+// une requête supplémentaire sur le pool peut se bloquer si toutes les
+// connexions sont prises par des requêtes en attente du même verrou.
+async function getCaisseLockedUntil(salonId, settings, conn) {
+  const [[lastClosing]] = await (conn || pool).query(
     'SELECT period_end FROM cash_closings WHERE salon_id = ? ORDER BY period_end DESC LIMIT 1',
     [salonId]
   );
@@ -124,8 +128,8 @@ function parisLocalToUtcDate(dateStr, timeStr, tz) {
 // restent lisibles et seront re-chiffrées à leur prochaine réécriture).
 const SECRET_SETTING_KEYS = new Set(['smtp_pass']);
 
-async function getSettings(salonId) {
-  const [rows] = await pool.query('SELECT `key`, value FROM settings WHERE salon_id = ?', [salonId]);
+async function getSettings(salonId, conn) {
+  const [rows] = await (conn || pool).query('SELECT `key`, value FROM settings WHERE salon_id = ?', [salonId]);
   const out = {};
   rows.forEach((r) => { out[r.key] = SECRET_SETTING_KEYS.has(r.key) ? decryptSecret(r.value) : r.value; });
   return out;

@@ -6,6 +6,7 @@ const { sendGiftConfirmation } = require('../lib/mailer');
 const requireAdmin = require('../middleware/auth');
 const requireAdminOrBarber = require('../middleware/barberAuth');
 const { wrap } = require('../lib/wrap');
+const { withCashLock, HttpError } = require('../lib/cashLock');
 
 const router = express.Router();
 
@@ -27,28 +28,40 @@ function generateGiftCode() {
  * vendus à emporter (boissons, cosmétiques...). Accessible aux coiffeurs
  * connectés par PIN (n'importe qui de service peut encaisser), pas
  * seulement l'admin.
+ *
+ * Tout ce qui touche à la base (verrou de caisse, client marqué payé,
+ * numéro de ticket, lignes, stock, cadeau) se fait dans UNE transaction
+ * sous un verrou par salon (lib/cashLock.js) : soit la vente est entièrement
+ * enregistrée, soit rien ne bouge - par exemple un client n'est plus jamais
+ * marqué "encaissé" alors que la vente est refusée juste après (stock
+ * insuffisant...). Le même verrou empêche qu'une clôture de caisse calcule
+ * ses totaux pendant qu'une vente s'enregistre, et rend le numéro de ticket
+ * unique (deux ventes simultanées obtenaient le même).
+ *
+ * `client_request_id` (UUID généré par la caisse pour CETTE tentative
+ * d'encaissement) rend l'appel rejouable sans risque : la même demande
+ * renvoyée deux fois (réseau coupé après l'enregistrement, double envoi,
+ * nouvel essai après une carte débitée) retourne la vente déjà créée au lieu
+ * d'en créer une seconde.
  */
+const ITEM_TYPES = ['service', 'extra', 'product'];
+const MAX_QTY = 999;
+const MAX_UNIT_PRICE_CENTS = 10_000_000; // 100 000 €
+
 router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
   const { payment_method, items, queue_id, gift, loyalty_redeem } = req.body;
+  const clientRequestId = (typeof req.body.client_request_id === 'string' && /^[0-9a-fA-F-]{16,64}$/.test(req.body.client_request_id))
+    ? req.body.client_request_id : null;
 
-  // La caisse peut être verrouillée jusqu'au lendemain suite à une
-  // clôture — vérifié ici côté serveur (pas seulement visuellement),
-  // pour qu'aucune vente ne puisse être créée pendant ce temps, peu
-  // importe comment la requête est envoyée.
-  const settingsForLock = await getSettings(req.salon.id);
-  const lockedUntil = await getCaisseLockedUntil(req.salon.id, settingsForLock);
-  if (lockedUntil) {
-    return res.status(423).json({
-      error: 'La caisse est fermée suite à une clôture — réouverture prévue le ' +
-        new Date(lockedUntil).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) + '.'
-    });
-  }
-
+  // ---- Validations qui ne demandent aucun accès à la base ----
   if (!PAYMENT_METHODS.includes(payment_method)) {
     return res.status(400).json({ error: 'Moyen de paiement invalide' });
   }
   if (!Array.isArray(items) || !items.length) {
     return res.status(400).json({ error: 'Le ticket est vide' });
+  }
+  if (items.length > 100) {
+    return res.status(400).json({ error: 'Ticket trop long (100 lignes maximum)' });
   }
 
   // Un ticket "cadeau" ne peut pas venir d'un encaissement en attente
@@ -74,127 +87,204 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
     }
   }
 
-  // Si la vente correspond à une coupe terminée précise (venant de "En
-  // attente d'encaissement"), on vérifie qu'elle appartient bien à ce
-  // coiffeur et qu'elle n'est pas déjà réglée, avant de l'encaisser.
-  // Le marquage "payé" se fait ICI, de façon ATOMIQUE et AVANT toute
-  // création de vente — si deux requêtes arrivent en même temps (double
-  // clic, deux appareils), une seule doit réussir à marquer paid_at :
-  // la condition "AND paid_at IS NULL" dans le WHERE garantit que seule
-  // la première requête peut effectivement le faire, la seconde reçoit
-  // 0 ligne affectée et est refusée avant même de créer quoi que ce soit.
-  let queueRow = null;
-  if (queue_id) {
-    const [[row]] = await pool.query(
-      'SELECT barber_id, status, paid_at, client_name, email, phone FROM queue WHERE id = ? AND salon_id = ?',
-      [queue_id, req.salon.id]
-    );
-    if (!row) return res.status(404).json({ error: 'Client introuvable' });
-    if (req.actingBarberId && row.barber_id !== req.actingBarberId) {
-      return res.status(403).json({ error: "Ce n'est pas votre client." });
+  // Normalisation des lignes : quantité ENTIÈRE (une quantité fractionnaire
+  // faisait diverger le total de la vente de la somme de ses lignes, donc
+  // le ticket Z), prix entier borné, type connu, textes bornés.
+  const cleanItems = [];
+  for (const it of items) {
+    const qty = it.quantity === undefined || it.quantity === null ? 1 : Number(it.quantity);
+    if (!Number.isInteger(qty) || qty < 1 || qty > MAX_QTY) {
+      return res.status(400).json({ error: 'Quantité invalide (entier de 1 à ' + MAX_QTY + ')' });
     }
-    if (row.paid_at) return res.status(409).json({ error: 'Ce client a déjà été encaissé.' });
-
-    const [markResult] = await pool.query(
-      'UPDATE queue SET paid_at = NOW() WHERE id = ? AND salon_id = ? AND paid_at IS NULL',
-      [queue_id, req.salon.id]
-    );
-    if (markResult.affectedRows === 0) {
-      return res.status(409).json({ error: 'Ce client vient d\'être encaissé (probablement par un autre appareil).' });
-    }
-    queueRow = row;
-  }
-
-  const barberId = req.actingBarberId || (req.body.barber_id || null);
-  const saleId = crypto.randomUUID();
-  let total = 0;
-
-  // Un coiffeur "vendeur" par ligne n'a de sens que pour un produit
-  // (Barbe, Cire, Parfum...) - jamais pour une prestation/supplément,
-  // qui reste attribué à toute la vente (barberId ci-dessus). On
-  // valide que chaque id envoyé appartient bien à CE salon avant de
-  // l'utiliser, comme pour tout autre id de coiffeur dans l'app - sinon
-  // silencieusement ignoré (pas de blocage de la vente pour ça).
-  const lineBarberIds = [...new Set(
-    items.filter((it) => (it.item_type || 'product') === 'product' && it.barber_id).map((it) => it.barber_id)
-  )];
-  let validLineBarberIds = new Set();
-  if (lineBarberIds.length) {
-    const [rows] = await pool.query(
-      'SELECT id FROM barbers WHERE id IN (?) AND salon_id = ? AND active = 1',
-      [lineBarberIds, req.salon.id]
-    );
-    validLineBarberIds = new Set(rows.map((r) => r.id));
-  }
-
-  const itemRows = items.map((it) => {
-    const qty = Math.max(1, Number(it.quantity) || 1);
     const unitPrice = Math.max(0, Math.round(Number(it.unit_price_cents) || 0));
-    total += qty * unitPrice;
-    const itemType = it.item_type || 'product';
-    const lineBarberId = itemType === 'product' && it.barber_id && validLineBarberIds.has(it.barber_id) ? it.barber_id : null;
-    return [crypto.randomUUID(), saleId, itemType, it.item_id || null, it.item_name || 'Article', unitPrice, qty, lineBarberId];
-  });
-
-  // Vérifie le stock AVANT toute écriture - jamais de vente créée si
-  // un produit à stock géré n'a pas assez de quantité disponible
-  // (tout ou rien, pas de vente partiellement créée).
-  const productItems = items.filter((it) => (it.item_type || 'product') === 'product' && it.item_id);
-  if (productItems.length) {
-    const [stockRows] = await pool.query(
-      'SELECT id, name, stock_enabled, stock_quantity FROM products WHERE id IN (?) AND salon_id = ?',
-      [productItems.map((it) => it.item_id), req.salon.id]
-    );
-    const stockById = new Map(stockRows.map((r) => [r.id, r]));
-    for (const it of productItems) {
-      const qty = Math.max(1, Number(it.quantity) || 1);
-      const product = stockById.get(it.item_id);
-      if (product && product.stock_enabled && product.stock_quantity < qty) {
-        return res.status(409).json({
-          error: `Stock insuffisant pour "${product.name}" (${product.stock_quantity} restant, ${qty} demandé${qty > 1 ? 's' : ''})`
-        });
-      }
+    if (unitPrice > MAX_UNIT_PRICE_CENTS) {
+      return res.status(400).json({ error: 'Prix invalide' });
     }
+    cleanItems.push({
+      item_type: ITEM_TYPES.includes(it.item_type) ? it.item_type : 'product',
+      item_id: typeof it.item_id === 'string' && it.item_id ? it.item_id.slice(0, 36) : null,
+      item_name: String(it.item_name || 'Article').slice(0, 255),
+      unit_price_cents: unitPrice,
+      quantity: qty,
+      barber_id: typeof it.barber_id === 'string' ? it.barber_id : null
+    });
   }
 
-  // Numéro de ticket séquentiel par salon (bien plus lisible sur un
-  // ticket imprimé que l'identifiant technique saleId) - même principe
-  // que z_number pour les clôtures de caisse. Léger risque théorique de
-  // collision en cas d'écritures strictement simultanées sur le même
-  // salon (pas de verrou dédié), jugé négligeable pour un usage caisse
-  // mono-salon normal.
-  const [[{ next_ticket_number: ticketNumber }]] = await pool.query(
-    'SELECT COALESCE(MAX(ticket_number), 0) + 1 AS next_ticket_number FROM sales WHERE salon_id = ?',
-    [req.salon.id]
-  );
+  let outcome;
+  try {
+    outcome = await withCashLock(req.salon.id, async (db) => {
+      // 0. Même demande déjà enregistrée : on renvoie la vente existante.
+      if (clientRequestId) {
+        const [[existing]] = await db.query(
+          'SELECT id, total_price_cents, payment_method, barber_id, ticket_number FROM sales WHERE salon_id = ? AND client_request_id = ?',
+          [req.salon.id, clientRequestId]
+        );
+        if (existing) {
+          const [[giftRow]] = await db.query('SELECT code FROM gift_cards WHERE sale_id = ? LIMIT 1', [existing.id]);
+          return { duplicate: true, sale: existing, giftCode: giftRow ? giftRow.code : null };
+        }
+      }
 
-  await pool.query(
-    'INSERT INTO sales (id, salon_id, barber_id, payment_method, total_price_cents, ticket_number, queue_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    [saleId, req.salon.id, barberId, payment_method, total, ticketNumber, queue_id || null]
-  );
-  await pool.query(
-    'INSERT INTO sale_items (id, sale_id, item_type, item_id, item_name, unit_price_cents, quantity, barber_id) VALUES ?',
-    [itemRows]
-  );
+      // 1. La caisse peut être verrouillée jusqu'au lendemain suite à une
+      // clôture — vérifié ici côté serveur (pas seulement visuellement).
+      const settings = await getSettings(req.salon.id, db);
+      const lockedUntil = await getCaisseLockedUntil(req.salon.id, settings, db);
+      if (lockedUntil) {
+        throw new HttpError(423,
+          'La caisse est fermée suite à une clôture — réouverture prévue le ' +
+          new Date(lockedUntil).toLocaleString('fr-FR', {
+            day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
+            timeZone: settings.timezone || 'Europe/Paris'
+          }) + '.');
+      }
 
-  // Décompte le stock des produits vendus (uniquement ceux dont la
-  // gestion de stock est activée - un produit illimité n'est jamais
-  // décompté).
-  for (const it of productItems) {
-    const qty = Math.max(1, Number(it.quantity) || 1);
-    await pool.query(
-      'UPDATE products SET stock_quantity = GREATEST(0, stock_quantity - ?) WHERE id = ? AND salon_id = ? AND stock_enabled = 1',
-      [qty, it.item_id, req.salon.id]
-    );
+      // 2. Client en attente d'encaissement : appartient à ce coiffeur, pas
+      // déjà réglé. Le marquage "payé" est atomique (WHERE paid_at IS NULL)
+      // ET annulé automatiquement si la suite échoue (transaction).
+      let queueRow = null;
+      if (queue_id) {
+        const [[row]] = await db.query(
+          'SELECT barber_id, status, paid_at, client_name, email, phone FROM queue WHERE id = ? AND salon_id = ? FOR UPDATE',
+          [queue_id, req.salon.id]
+        );
+        if (!row) throw new HttpError(404, 'Client introuvable');
+        if (req.actingBarberId && row.barber_id !== req.actingBarberId) {
+          throw new HttpError(403, "Ce n'est pas votre client.");
+        }
+        if (row.paid_at) throw new HttpError(409, 'Ce client a déjà été encaissé.');
+        const [markResult] = await db.query(
+          'UPDATE queue SET paid_at = NOW() WHERE id = ? AND salon_id = ? AND paid_at IS NULL',
+          [queue_id, req.salon.id]
+        );
+        if (markResult.affectedRows === 0) {
+          throw new HttpError(409, 'Ce client vient d\'être encaissé (probablement par un autre appareil).');
+        }
+        queueRow = row;
+      }
+
+      // 3. Coiffeur de la vente. Un id venant du corps de la requête doit
+      // appartenir à CE salon (sinon on ignorerait silencieusement une
+      // référence vers le coiffeur d'un autre salon).
+      let barberId = req.actingBarberId || null;
+      if (!barberId && req.body.barber_id) {
+        const [[b]] = await db.query('SELECT id FROM barbers WHERE id = ? AND salon_id = ?', [req.body.barber_id, req.salon.id]);
+        barberId = b ? b.id : null;
+      }
+
+      // Un coiffeur "vendeur" par ligne n'a de sens que pour un produit -
+      // jamais pour une prestation/supplément. Id validé (même salon, actif),
+      // sinon silencieusement ignoré (pas de blocage de la vente pour ça).
+      const lineBarberIds = [...new Set(cleanItems.filter((it) => it.item_type === 'product' && it.barber_id).map((it) => it.barber_id))];
+      let validLineBarberIds = new Set();
+      if (lineBarberIds.length) {
+        const [rows] = await db.query(
+          'SELECT id FROM barbers WHERE id IN (?) AND salon_id = ? AND active = 1',
+          [lineBarberIds, req.salon.id]
+        );
+        validLineBarberIds = new Set(rows.map((r) => r.id));
+      }
+
+      // 4. Stock : vérifié sur la QUANTITÉ TOTALE par produit (deux lignes du
+      // même produit comptaient chacune séparément), lignes verrouillées.
+      const wantedByProduct = new Map();
+      cleanItems.forEach((it) => {
+        if (it.item_type === 'product' && it.item_id) {
+          wantedByProduct.set(it.item_id, (wantedByProduct.get(it.item_id) || 0) + it.quantity);
+        }
+      });
+      if (wantedByProduct.size) {
+        const [stockRows] = await db.query(
+          'SELECT id, name, stock_enabled, stock_quantity FROM products WHERE id IN (?) AND salon_id = ? FOR UPDATE',
+          [[...wantedByProduct.keys()], req.salon.id]
+        );
+        for (const product of stockRows) {
+          const wanted = wantedByProduct.get(product.id);
+          if (product.stock_enabled && product.stock_quantity < wanted) {
+            throw new HttpError(409,
+              `Stock insuffisant pour "${product.name}" (${product.stock_quantity} restant, ${wanted} demandé${wanted > 1 ? 's' : ''})`);
+          }
+        }
+      }
+
+      // 5. Numéro de ticket séquentiel par salon (sous verrou : sans trou ni doublon).
+      const [[{ next_ticket_number: ticketNumber }]] = await db.query(
+        'SELECT COALESCE(MAX(ticket_number), 0) + 1 AS next_ticket_number FROM sales WHERE salon_id = ?',
+        [req.salon.id]
+      );
+
+      // 6. Vente + lignes. Le total est la somme EXACTE des lignes.
+      const saleId = crypto.randomUUID();
+      let total = 0;
+      const itemRows = cleanItems.map((it) => {
+        total += it.quantity * it.unit_price_cents;
+        const lineBarberId = it.item_type === 'product' && it.barber_id && validLineBarberIds.has(it.barber_id) ? it.barber_id : null;
+        return [crypto.randomUUID(), saleId, it.item_type, it.item_id, it.item_name, it.unit_price_cents, it.quantity, lineBarberId];
+      });
+      await db.query(
+        'INSERT INTO sales (id, salon_id, barber_id, payment_method, total_price_cents, ticket_number, queue_id, client_request_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [saleId, req.salon.id, barberId, payment_method, total, ticketNumber, queue_id || null, clientRequestId]
+      );
+      await db.query(
+        'INSERT INTO sale_items (id, sale_id, item_type, item_id, item_name, unit_price_cents, quantity, barber_id) VALUES ?',
+        [itemRows]
+      );
+
+      // 7. Décompte du stock (uniquement les produits à stock géré).
+      for (const [productId, qty] of wantedByProduct) {
+        await db.query(
+          'UPDATE products SET stock_quantity = GREATEST(0, stock_quantity - ?) WHERE id = ? AND salon_id = ? AND stock_enabled = 1',
+          [qty, productId, req.salon.id]
+        );
+      }
+
+      // 8. Cadeau : créé dans la même transaction que la vente qui l'a payé.
+      let giftInfo = null;
+      if (gift) {
+        const itemsSnapshot = cleanItems.map((it) => ({
+          item_type: it.item_type, item_id: it.item_id, item_name: it.item_name,
+          unit_price_cents: it.unit_price_cents, quantity: it.quantity
+        }));
+        const code = generateGiftCode();
+        await db.query(
+          `INSERT INTO gift_cards (id, salon_id, sale_id, recipient_name, recipient_phone, recipient_email, amount_cents, items_json, code)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [crypto.randomUUID(), req.salon.id, saleId, gift.recipient_name, gift.recipient_phone, gift.recipient_email, total, JSON.stringify(itemsSnapshot), code]
+        );
+        giftInfo = { code, itemsSnapshot };
+      }
+
+      return {
+        duplicate: false,
+        sale: { id: saleId, total_price_cents: total, payment_method, barber_id: barberId, ticket_number: ticketNumber },
+        queueRow, giftInfo
+      };
+    });
+  } catch (err) {
+    if (err instanceof HttpError) return res.status(err.status).json({ error: err.message });
+    throw err;
   }
 
-  if (queue_id) {
+  if (outcome.duplicate) {
+    // Demande déjà traitée : on renvoie la vente d'origine, sans rien refaire
+    // (ni point de fidélité, ni second email).
+    return res.json({
+      ok: true, duplicate: true,
+      sale: {
+        id: outcome.sale.id, total_price_cents: outcome.sale.total_price_cents, payment_method: outcome.sale.payment_method,
+        barber_id: outcome.sale.barber_id, ticket_number: outcome.sale.ticket_number
+      },
+      gift: outcome.giftCode ? { code: outcome.giftCode, email_sent: true } : null
+    });
+  }
+
+  // ---- Après validation de la transaction : effets secondaires ----
+  if (outcome.queueRow) {
     // Ce passage vient d'être réellement payé : +1 point de fidélité.
-    await earnLoyaltyPoint(req.salon.id, queueRow);
+    await earnLoyaltyPoint(req.salon.id, outcome.queueRow);
     // Une récompense de fidélité était appliquée à ce ticket (gagnée à
     // un passage précédent) — on la consomme maintenant.
     if (loyalty_redeem) {
-      const key = clientKey(queueRow);
+      const key = clientKey(outcome.queueRow);
       if (key) {
         await pool.query(
           `UPDATE loyalty_accounts SET rewards_available = GREATEST(rewards_available - 1, 0), updated_at = NOW()
@@ -206,29 +296,14 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
   }
 
   let giftResult = null;
-  if (gift) {
-    const itemsSnapshot = items.map((it) => ({
-      item_type: it.item_type || 'product',
-      item_id: it.item_id || null,
-      item_name: it.item_name || 'Article',
-      unit_price_cents: Math.max(0, Math.round(Number(it.unit_price_cents) || 0)),
-      quantity: Math.max(1, Number(it.quantity) || 1)
-    }));
-    const giftId = crypto.randomUUID();
-    const code = generateGiftCode();
-    await pool.query(
-      `INSERT INTO gift_cards (id, salon_id, sale_id, recipient_name, recipient_phone, recipient_email, amount_cents, items_json, code)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [giftId, req.salon.id, saleId, gift.recipient_name, gift.recipient_phone, gift.recipient_email, total, JSON.stringify(itemsSnapshot), code]
-    );
-
+  if (outcome.giftInfo) {
     let giftEmailSent = true;
     try {
       await sendGiftConfirmation(req.salon.id, gift.recipient_email, {
         recipientName: gift.recipient_name,
-        amountEur: (total / 100).toFixed(2).replace('.', ',') + ' €',
-        items: itemsSnapshot,
-        code
+        amountEur: (outcome.sale.total_price_cents / 100).toFixed(2).replace('.', ',') + ' €',
+        items: outcome.giftInfo.itemsSnapshot,
+        code: outcome.giftInfo.code
       });
     } catch (err) {
       // N'empêche jamais la vente si l'email échoue (ex. SMTP salon pas
@@ -240,10 +315,10 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
       giftEmailSent = false;
       console.error('[gift] envoi email de confirmation échoué:', err.message);
     }
-    giftResult = { code, email_sent: giftEmailSent };
+    giftResult = { code: outcome.giftInfo.code, email_sent: giftEmailSent };
   }
 
-  res.json({ ok: true, sale: { id: saleId, total_price_cents: total, payment_method, barber_id: barberId, ticket_number: ticketNumber }, gift: giftResult });
+  res.json({ ok: true, sale: outcome.sale, gift: giftResult });
 }));
 
 /**
