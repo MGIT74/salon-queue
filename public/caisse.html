@@ -895,7 +895,11 @@ function barberApi(path, opts) {
     body: opts.body ? JSON.stringify(opts.body) : undefined
   }).then(function (r) {
     return r.json().then(function (data) {
-      if (!r.ok) throw new Error(data.error || 'Erreur ' + r.status);
+      if (!r.ok) {
+        var err = new Error(data.error || 'Erreur ' + r.status);
+        err.data = data;   // permet à l'appelant de lire des indicateurs (ex: uncertain)
+        throw err;
+      }
       return data;
     });
   });
@@ -2983,8 +2987,15 @@ function startTpePayment(saleCtx) {
         showTpeFailure(r.failure_reason ? 'Paiement refusé : ' + r.failure_reason : 'Paiement refusé par le terminal.');
       }
     })
-    .catch(function (e) { showTpeFailure(e.message); });
+    .catch(function (e) {
+      tpeResultUncertain = Boolean(e && e.data && e.data.uncertain);
+      showTpeFailure(e.message);
+    });
 }
+
+// Vrai quand le terminal n'a pas répondu à temps : le client a peut-être
+// DÉJÀ payé. "Réessayer" demande alors confirmation (voir retryTpePayment).
+var tpeResultUncertain = false;
 
 function showTpeFailure(message) {
   var box = document.getElementById('tpe-box');
@@ -3001,6 +3012,7 @@ function showTpeFailure(message) {
 }
 
 function cancelTpePayment() {
+  tpeResultUncertain = false;
   tpePendingSaleCtx = null;
   paymentInFlight = false;
   setPayButtonsLocked(false);
@@ -3009,9 +3021,19 @@ function cancelTpePayment() {
 
 function retryTpePayment() {
   if (!tpePendingSaleCtx) return;
-  paymentInFlight = true;
-  setPayButtonsLocked(true);
-  startTpePayment(tpePendingSaleCtx);
+  var go = function () {
+    tpeResultUncertain = false;
+    paymentInFlight = true;
+    setPayButtonsLocked(true);
+    startTpePayment(tpePendingSaleCtx);
+  };
+  if (!tpeResultUncertain) return go();
+  // Le terminal n'a pas répondu : relancer un paiement sans avoir vérifié
+  // pourrait débiter deux fois le client.
+  showConfirm(
+    'Le terminal n\'a pas confirmé le paiement précédent : le client a peut-être déjà payé. Avez-vous vérifié sur le terminal qu\'AUCUN paiement n\'est passé ?',
+    { title: 'Relancer le paiement ?', danger: true, confirmLabel: 'Oui, relancer', cancelLabel: 'Non, vérifier' }
+  ).then(function (ok) { if (ok) go(); });
 }
 
 function finalizeSale(saleCtx) {

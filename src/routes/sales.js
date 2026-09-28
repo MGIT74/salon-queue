@@ -6,6 +6,7 @@ const { sendGiftConfirmation } = require('../lib/mailer');
 const requireAdmin = require('../middleware/auth');
 const requireAdminOrBarber = require('../middleware/barberAuth');
 const { wrap } = require('../lib/wrap');
+const { isBlocked, recordFailure } = require('../middleware/rateLimiter');
 const { withCashLock, HttpError } = require('../lib/cashLock');
 
 const router = express.Router();
@@ -436,6 +437,19 @@ router.get('/gift-cards/lookup', wrap(async (req, res) => {
   const code = String(req.query.code || '').trim().toUpperCase();
   if (!code) return res.status(400).json({ error: 'Code requis' });
 
+  // Route publique qui renvoie le nom, l'email et le téléphone du
+  // bénéficiaire : sans limite, un script pouvait tester des codes en boucle.
+  // On ne compte QUE les codes inconnus (404) - et on ne remet jamais le
+  // compteur à zéro sur un succès (contrairement au limiteur de connexion),
+  // sinon un attaquant qui connaît UN code valide l'utiliserait pour
+  // relancer son compteur entre deux séries d'essais.
+  const rlKey = 'gift-lookup:' + req.salon.id + ':' + (req.ip || 'unknown');
+  const blockedFor = isBlocked(rlKey);
+  if (blockedFor) {
+    res.set('Retry-After', String(blockedFor));
+    return res.status(429).json({ error: 'Trop de tentatives, réessayez dans ' + Math.ceil(blockedFor / 60) + ' min.' });
+  }
+
   const [[gift]] = await pool.query(
     `SELECT g.*, s.barber_id, b.name AS barber_name, b.photo_url AS barber_photo_url, b.active AS barber_active, b.accepts_appointments
      FROM gift_cards g
@@ -444,7 +458,10 @@ router.get('/gift-cards/lookup', wrap(async (req, res) => {
      WHERE g.salon_id = ? AND g.code = ?`,
     [req.salon.id, code]
   );
-  if (!gift) return res.status(404).json({ error: 'Code introuvable pour ce salon' });
+  if (!gift) {
+    recordFailure(rlKey, { max: 15, windowMs: 15 * 60 * 1000, blockMs: 15 * 60 * 1000 });
+    return res.status(404).json({ error: 'Code introuvable pour ce salon' });
+  }
   if (gift.used_at) return res.status(409).json({ error: 'Ce cadeau a déjà été utilisé' });
   if (gift.pending_appointment_id) return res.status(409).json({ error: 'Ce cadeau sert déjà à un rendez-vous en attente - annulez-le pour en reprendre un nouveau.' });
 

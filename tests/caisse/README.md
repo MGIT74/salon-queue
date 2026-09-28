@@ -12,22 +12,31 @@ mariadb -uroot -e "CREATE DATABASE salonq CHARACTER SET utf8mb4;
 mariadb -uroot salonq < sql/schema.sql
 mariadb -uroot salonq < tests/caisse/seed.sql
 
+# TPE_CHARGE_WAIT_MS raccourcit l'attente d'un paiement carte (110 s par defaut) pour le test 06
 DB_HOST=127.0.0.1 DB_USER=sq DB_PASSWORD=sqpass DB_NAME=salonq PORT=3999 \
-SETTINGS_ENCRYPTION_KEY=testkeytestkeytestkeytestkey123456 node server.js &
+SETTINGS_ENCRYPTION_KEY=testkeytestkeytestkeytestkey123456 TPE_CHARGE_WAIT_MS=4000 node server.js &
 ```
 
 Les scripts appellent `mariadb -uroot salonq` et l'application sur `127.0.0.1:3999`.
 
 ## Lancer
 
+Tout d'un coup (remet la base de test a zero entre les scripts et **verifie** les resultats) :
+
 ```bash
-node tests/caisse/01-ventes.js                     # numéros de ticket, file d'attente + stock, quantités, prix
-node tests/caisse/02-pont-cloture-recomptage.js    # pont, paiement CB, vieux tickets, clôture Z, recomptage
-node tests/caisse/03-cloture-pendant-ventes.js     # clôture lancée en pleine rafale de ventes (attendu : 0 vente perdue)
-node tests/caisse/04-rejouabilite-stock-cloture.js # même demande rejouée, cadeau, stock cumulé, cohérence du Z
-npm i --no-save jsdom && node tests/caisse/05-ecran-caisse.js   # l'écran de caisse : carte débitée mais vente non enregistrée
+npm i --no-save jsdom          # necessaire aux scripts 05 et 07 (ecran de caisse simule)
+node tests/caisse/run-all.js   # code de sortie 0 = tout est OK
 ```
 
-Lecture des résultats : 01 doit afficher « numeros en double : aucun » et un
-client resté non encaissé après un refus de stock ; 03 « runs avec vente perdue : 0/8 » ;
-05 « 0 échec ».
+Ou un par un :
+
+```bash
+node tests/caisse/01-ventes.js                       # numeros de ticket, file d'attente + stock, quantites, prix
+node tests/caisse/02-pont-cloture-recomptage.js      # pont, paiement CB, vieux tickets, cloture Z, recomptage
+node tests/caisse/03-cloture-pendant-ventes.js       # cloture en pleine rafale de ventes (attendu : 0 vente perdue)
+node tests/caisse/04-rejouabilite-stock-cloture.js   # meme demande rejouee, cadeau, stock cumule, coherence du Z
+node tests/caisse/05-ecran-caisse.js                 # carte debitee mais vente non enregistree (page simulee)
+node tests/caisse/06-paiement-cb-bout-en-bout.js     # paiement carte avec un faux pont : accepte, refuse, panne, silence, expiration
+node tests/caisse/07-cadeau-limite-et-ecran-incertain.js  # limite de tentatives cadeau + confirmation avant de relancer un paiement incertain
+node tests/caisse/08-heure-de-reouverture.js         # heure de reouverture : fuseaux et changements d'heure
+```

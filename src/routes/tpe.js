@@ -6,6 +6,11 @@ const { wrap } = require('../lib/wrap');
 
 const router = express.Router();
 
+// Attente maximale du résultat d'un paiement carte (sous le délai d'abandon de
+// la caisse). Réglable par variable d'environnement UNIQUEMENT pour pouvoir
+// tester l'expiration sans attendre près de 2 minutes.
+const CHARGE_WAIT_MS = Number(process.env.TPE_CHARGE_WAIT_MS) || 110_000;
+
 /**
  * Authentifie le pont d'impression du salon via X-Bridge-Key (clé
  * générée dans le dashboard, stockée hashée en base - même modèle que
@@ -74,7 +79,7 @@ router.post('/charge', requireAdminOrBarber, wrap(async (req, res) => {
     [jobId, req.salon.id, amountCents]
   );
 
-  const deadline = Date.now() + 110_000;
+  const deadline = Date.now() + CHARGE_WAIT_MS;
   while (Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, 1500));
     const [[job]] = await pool.query(
@@ -106,7 +111,10 @@ router.post('/charge', requireAdminOrBarber, wrap(async (req, res) => {
     [jobId]
   );
   if (expired.affectedRows === 0) {
-    return res.status(504).json({ error: 'Le terminal n\'a pas répondu à temps. VÉRIFIEZ SUR LE TERMINAL si le paiement est passé avant de recommencer, pour ne pas débiter le client deux fois.' });
+    return res.status(504).json({
+      uncertain: true,   // le paiement a pu aboutir : la caisse doit demander confirmation avant de réessayer
+      error: 'Le terminal n\'a pas répondu à temps. VÉRIFIEZ SUR LE TERMINAL si le paiement est passé avant de recommencer, pour ne pas débiter le client deux fois.'
+    });
   }
   return res.status(504).json({ error: 'Le terminal de paiement n\'a pas répondu à temps (pont hors ligne ?)' });
 }));
