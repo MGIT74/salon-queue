@@ -1002,22 +1002,34 @@ function renderConnectionDot() {
   if (connStatus && connStatus.configured) dot.classList.add(connStatus.online ? 'is-online' : 'is-offline');
 }
 
+// Le message est fait de morceaux colores : ainsi "Imprimante connectee" peut
+// etre vert (comme sa pastille) pendant que la suite, qui signale un probleme,
+// reste rouge.
 function connectionSummary(r) {
-  if (!r) return { text: 'Vérification en cours…', tone: 'grey' };
-  if (!r.configured) return { text: 'La connexion n\'est pas encore installée sur cet ordinateur. Demandez à l\'administrateur du salon.', tone: 'grey' };
-  if (!r.online) return { text: 'Non connecté', tone: 'red' };
-  if (!r.tpe_online) return { text: 'Imprimante connectée — terminal de paiement pas encore configuré ou éteint', tone: 'red' };
-  return { text: 'Tout est connecté', tone: 'green' };
+  if (!r) return [{ text: 'Vérification en cours…', tone: 'grey' }];
+  if (!r.configured) return [{ text: 'La connexion n\'est pas encore installée sur cet ordinateur. Demandez à l\'administrateur du salon.', tone: 'grey' }];
+  if (!r.online) return [{ text: 'Non connecté', tone: 'red' }];
+  if (!r.tpe_online) return [
+    { text: 'Imprimante connectée', tone: 'green' },
+    { text: ' — terminal de paiement pas encore configuré ou éteint', tone: 'red' }
+  ];
+  return [{ text: 'Tout est connecté', tone: 'green' }];
 }
+
+var CONN_TONE_COLORS = { green: 'var(--green)', red: 'var(--red)', grey: 'var(--grey)' };
 
 function renderConnectionPopup() {
   if (!connPopup) return;
   var o = connPopup.overlay;
   var r = connStatus;
-  var s = connectionSummary(r);
   var text = o.querySelector('#conn-text');
-  text.textContent = s.text;
-  text.style.color = s.tone === 'green' ? 'var(--green)' : s.tone === 'red' ? 'var(--red)' : 'var(--grey)';
+  text.textContent = '';
+  connectionSummary(r).forEach(function (part) {
+    var span = document.createElement('span');
+    span.textContent = part.text;
+    span.style.color = CONN_TONE_COLORS[part.tone];
+    text.appendChild(span);
+  });
   var cfg = Boolean(r && r.configured);
   o.querySelector('#conn-dot-printer').className = 'bridge-device-dot' + (cfg ? (r.online ? ' is-online' : ' is-offline') : '');
   o.querySelector('#conn-dot-tpe').className = 'bridge-device-dot' + (cfg ? (r.tpe_online ? ' is-online' : ' is-offline') : '');

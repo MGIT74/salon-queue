@@ -52,6 +52,7 @@ const ADMIN = { 'Content-Type':'application/json','X-Salon-Slug':'test','X-Admin
   gear.click(); await sleep(300);
   check('la fenetre s\'ouvre', /Connexion TPE \/ imprimante/.test(modalText()));
   check('"Non connecte"', /Non connecté/.test(modalText()));
+  check('"Non connecte" en rouge', d.querySelector('#conn-text span').style.color === 'var(--red)');
   check('les deux lignes Imprimante et Terminal de paiement', /Imprimante/.test(modalText()) && /Terminal de paiement/.test(modalText()));
   check('le bouton "Connecter" est visible', d.getElementById('conn-connect-btn').style.display === 'block' && /^Connecter$/.test(d.getElementById('conn-connect-btn').textContent.trim()));
   check('pastilles rouges dans la fenetre', d.getElementById('conn-dot-printer').classList.contains('is-offline') && d.getElementById('conn-dot-tpe').classList.contains('is-offline'));
@@ -61,6 +62,7 @@ const ADMIN = { 'Content-Type':'application/json','X-Salon-Slug':'test','X-Admin
   status = { ok: true, configured: true, online: true, tpe_online: true };
   await sleep(3600);
   check('passe a "Tout est connecte" sans rien cliquer', /Tout est connecté/.test(modalText()));
+  check('"Tout est connecte" en vert', d.querySelector('#conn-text span').style.color === 'var(--green)');
   check('le bouton "Connecter" disparait', d.getElementById('conn-connect-btn').style.display === 'none');
   check('pastilles vertes', d.getElementById('conn-dot-printer').classList.contains('is-online') && d.getElementById('conn-dot-tpe').classList.contains('is-online'));
   check('la pastille du bouton passe au vert aussi', d.getElementById('conn-dot').classList.contains('is-online'));
@@ -70,6 +72,10 @@ const ADMIN = { 'Content-Type':'application/json','X-Salon-Slug':'test','X-Admin
   await sleep(3600);
   check('message precis', /Imprimante connectée/.test(modalText()) && /terminal de paiement/.test(modalText()));
   check('imprimante verte, terminal rouge', d.getElementById('conn-dot-printer').classList.contains('is-online') && d.getElementById('conn-dot-tpe').classList.contains('is-offline'));
+  const parts = d.querySelectorAll('#conn-text span');
+  check('"Imprimante connectee" est en VERT', parts.length === 2 && /^Imprimante connectée$/.test(parts[0].textContent) && parts[0].style.color === 'var(--green)', parts[0] && parts[0].style.color);
+  check('la suite (terminal de paiement) reste en ROUGE', /terminal de paiement pas encore configuré ou éteint/.test(parts[1].textContent) && parts[1].style.color === 'var(--red)', parts[1] && parts[1].style.color);
+  check('la phrase se lit d\'un seul tenant', d.getElementById('conn-text').textContent === 'Imprimante connectée — terminal de paiement pas encore configuré ou éteint', d.getElementById('conn-text').textContent);
 
   console.log('\n[U4] Connexion jamais installee sur cet ordinateur');
   status = { ok: true, configured: false, online: false, tpe_online: false };
