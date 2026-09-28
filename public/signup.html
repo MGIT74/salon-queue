@@ -107,6 +107,12 @@
         </div>
       </div>
 
+      <div class="card-box" id="closed-card" style="display:none;text-align:center">
+        <h2 style="font-size:20px;font-weight:600;margin:0 0 8px">Inscriptions fermées</h2>
+        <p style="color:var(--grey);font-size:14.5px;margin:0 0 20px">Les inscriptions ne sont pas ouvertes sur ce service. Si vous avez déjà un compte, connectez-vous ; sinon, contactez votre administrateur.</p>
+        <a class="btn btn-primary" href="/dashboard.html" style="display:block;text-decoration:none;padding:15px;font-size:16px">Se connecter</a>
+      </div>
+
       <div class="card-box success" id="success-card" style="display:none">
         <div class="check"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
         <h2>Salon créé !</h2>
@@ -120,6 +126,20 @@
 </div>
 
 <script src="/app.js"></script>
+<script>
+  // Inscription fermee sur cette installation : on remplace le formulaire par un
+  // message clair. (Le serveur refuse de toute facon la creation : ceci n'est que
+  // de l'affichage - si la verification echoue, le formulaire reste visible.)
+  fetch('/api/signup/status').then(function (r) { return r.json(); }).then(function (s) {
+    if (s && s.enabled === false) {
+      document.getElementById('form-card').style.display = 'none';
+      document.getElementById('closed-card').style.display = 'block';
+      document.querySelector('.auth-title').textContent = 'Inscriptions fermées';
+      document.querySelector('.auth-sub').style.display = 'none';
+      var link = document.querySelector('.login-link'); if (link) link.style.display = 'none';
+    }
+  }).catch(function () { /* on laisse le formulaire */ });
+</script>
 <script>
 mountThemeButton();
 fetch('/api/settings/public').then(function (r) { return r.json(); }).then(function (d) {

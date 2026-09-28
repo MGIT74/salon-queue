@@ -1,4 +1,4 @@
-# Tests d'intégration de la caisse
+# Tests d'intégration (caisse et plateforme)
 
 Ils lancent de **vraies requêtes** contre l'application et une **vraie base**
 (schéma réel `sql/schema.sql`). À n'utiliser que sur une base de TEST : ils
@@ -41,4 +41,5 @@ node tests/caisse/07-cadeau-limite-et-ecran-incertain.js  # limite de tentatives
 node tests/caisse/08-heure-de-reouverture.js         # heure de reouverture : fuseaux et changements d'heure
 node tests/caisse/09-guide-demarrage-pont.js       # guide "Connecter le TPE et l'imprimante" : affichage, lien tpebridge://start, memorisation
 node tests/caisse/10-connexion-caisse.js            # icone reglages de la caisse : pastille, fenetre, etats, suivi en direct, droits
+node tests/caisse/11-inscription-publique.js       # inscription ouverte / fermee (SIGNUP_ENABLED) ; lance une 2e copie du serveur sur le port 3998
 ```

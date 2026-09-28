@@ -5,8 +5,28 @@ const { hashPassword, verifyPassword } = require('../lib/password');
 const { sendPasswordReset, sendVerificationEmail } = require('../lib/platformMailer');
 const { loginRateLimiter, signupRateLimiter } = require('../middleware/rateLimiter');
 const { wrap } = require('../lib/wrap');
+const { signupEnabled } = require('../lib/config');
 
 const router = express.Router();
+
+/**
+ * Garde des DEUX seules routes qui permettent de créer un nouveau compte
+ * propriétaire + salon. Les autres routes de ce fichier (connexion par email,
+ * mot de passe oublié, renvoi de vérification) servent des comptes qui
+ * existent déjà et restent toujours ouvertes.
+ */
+function requireSignupEnabled(req, res, next) {
+  if (signupEnabled()) return next();
+  res.status(403).json({
+    error: 'Les inscriptions sont fermées sur ce service. Contactez votre administrateur.',
+    signup_closed: true
+  });
+}
+
+/** Indique aux pages (connexion, inscription) si l'inscription est ouverte. Public. */
+router.get('/status', (req, res) => {
+  res.json({ ok: true, enabled: signupEnabled() });
+});
 
 /**
  * Vérification en direct (avant même de soumettre le formulaire) : le
@@ -15,7 +35,7 @@ const router = express.Router();
  * point n'est utile QUE pour prévenir plus tôt, la vraie verification
  * (autoritaire) reste celle faite a l'inscription elle-meme.
  */
-router.get('/check-slug', signupRateLimiter('signup-check-slug', { max: 30 }), wrap(async (req, res) => {
+router.get('/check-slug', requireSignupEnabled, signupRateLimiter('signup-check-slug', { max: 30 }), wrap(async (req, res) => {
   const slug = String(req.query.slug || '').trim().toLowerCase();
   if (!slug || !/^[a-z0-9-]+$/.test(slug)) {
     return res.json({ ok: true, available: false, reason: 'invalid' });
@@ -28,7 +48,7 @@ router.get('/check-slug', signupRateLimiter('signup-check-slug', { max: 30 }), w
 // publique qui déclenche l'envoi d'un email par la plateforme SMTP, un
 // flooding automatisé polluerait la boîte d'envoi et harcèlerait des
 // tiers (email de vérification non sollicité).
-router.post('/', signupRateLimiter('signup'), wrap(async (req, res) => {
+router.post('/', requireSignupEnabled, signupRateLimiter('signup'), wrap(async (req, res) => {
   const { owner_name, salon_name, slug, siret, email, phone, password } = req.body;
 
   if (!owner_name || !salon_name || !slug || !siret || !email || !phone || !password) {

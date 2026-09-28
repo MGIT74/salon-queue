@@ -30,7 +30,8 @@ const suite = [
   ['07-cadeau-limite-et-ecran-incertain.js', true, ['exit']],
   ['08-heure-de-reouverture.js', true, ['exit']],
   ['09-guide-demarrage-pont.js', true, ['exit']],
-  ['10-connexion-caisse.js', true, ['exit']]
+  ['10-connexion-caisse.js', true, ['exit']],
+  ['11-inscription-publique.js', true, ['exit']]
 ];
 
 let bad = 0;

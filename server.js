@@ -30,6 +30,7 @@ const salonRoutes = require('./src/routes/salons');
 const automationRoutes = require('./src/routes/automation');
 const ownerRoutes = require('./src/routes/owner');
 const signupRoutes = require('./src/routes/signup');
+const { signupEnabled } = require('./src/lib/config');
 const clientAuthRoutes = require('./src/routes/clientAuth');
 const tpeRoutes = require('./src/routes/tpe');
 const requireAdmin = require('./src/middleware/auth');
@@ -122,6 +123,11 @@ app.get('/', (req, res) => res.redirect('/dashboard.html'));
 
 app.listen(PORT, () => {
   console.log('Serveur démarré sur le port ' + PORT);
+  // Rappel dans les journaux : sur l'installation d'un client unique, l'inscription
+  // publique doit être FERMÉE (SIGNUP_ENABLED=false) - un oubli se voit ici.
+  console.log('[config] Inscription publique de salons : ' + (signupEnabled()
+    ? 'OUVERTE (SIGNUP_ENABLED absent ou vrai)'
+    : 'FERMEE (SIGNUP_ENABLED=false)'));
   startNotifyJob();
   startPurgeJob();
 });

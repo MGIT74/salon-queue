@@ -1069,7 +1069,7 @@
         <button class="btn btn-primary" style="width:100%;padding:15px;font-size:16px" onclick="doLogin()">Entrer</button>
         <div class="auth-links">
           <a href="/forgot-password.html">Mot de passe oublié ?</a>
-          <p style="margin-top:8px;color:var(--grey)">Pas encore de salon ? <a href="/signup.html">Créer mon salon</a></p>
+          <p id="signup-link-row" style="margin-top:8px;color:var(--grey);display:none">Pas encore de salon ? <a href="/signup.html">Créer mon salon</a></p>
         </div>
       </div>
     </div>
@@ -2130,6 +2130,15 @@
 </div>
 
 <script src="/app.js?v=6"></script>
+<script>
+  // Le lien "Creer mon salon" n'a de sens que si l'inscription est ouverte sur
+  // cette installation (fermee chez un client unique). Masque par defaut : s'il
+  // y a le moindre doute, on ne l'affiche pas.
+  fetch('/api/signup/status').then(function (r) { return r.json(); }).then(function (s) {
+    var row = document.getElementById('signup-link-row');
+    if (row && s && s.enabled === true) row.style.display = '';
+  }).catch(function () { /* lien masque */ });
+</script>
 <script>
 mountThemeButton();
 
