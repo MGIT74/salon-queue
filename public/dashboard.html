@@ -222,7 +222,10 @@
     background: var(--fill); color: var(--ink); font-family: inherit; font-size: 13px; font-weight: 500;
     min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
-  .main-content { flex: 1; min-width: 0; margin-left: 266px; }
+  .main-content {
+    flex: 1; min-width: 0; margin-left: 266px;
+    container-type: inline-size; container-name: mainpane;
+  }
 
   .tabs { display: flex; flex-direction: column; gap: 2px; background: none; padding: 0; margin: 0; }
   .tabs button {
@@ -626,13 +629,15 @@
   .rdv-info-grid .f .chip { font-size: 10.5px; padding: 3px 9px; margin-left: 6px; vertical-align: 2px; }
   .rdv-info-head { margin-top: 0; }
   .rdv-info-head .f { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; font-weight: 600; }
-  @media (max-width: 900px) {
-    /* Sur mobile, la grille tabulaire (7 colonnes) devient illisible en
-       1fr 1fr (texte tronqué partout) - on passe plutôt à une carte :
-       nom + statut sur la même ligne en haut, puis prestation, date et
-       coiffeur en pleine largeur (plus la place de tronquer), email et
-       téléphone en petit en bas. Les libellés d'en-tête n'ont plus lieu
-       d'être avec cette mise en page auto-explicative. */
+  @container mainpane (max-width: 760px) {
+    /* La grille tabulaire (6 colonnes) devient illisible en dessous de ce
+       seuil (texte tronqué partout, ex: tablette en paysage avec barre
+       latérale) - on passe plutôt à une carte : nom + statut sur la même
+       ligne en haut, puis prestation, date et coiffeur en pleine largeur
+       (plus la place de tronquer), email et téléphone en petit en bas. Les
+       libellés d'en-tête n'ont plus lieu d'être avec cette mise en page
+       auto-explicative. Requête de CONTENEUR (pas de fenêtre) : voir le
+       commentaire sur .main-content plus haut. */
     #rdv-list-head, .rdv-info-head { display: none; }
     #rdv-list .item {
       align-items: flex-start; flex-wrap: wrap; overflow-x: visible;
