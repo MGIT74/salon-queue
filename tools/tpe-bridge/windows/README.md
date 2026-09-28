@@ -107,7 +107,7 @@ Le pont tourne sans fenêtre : deux fichiers gardent sa trace, dans
 
 | Fichier | Contenu |
 |---|---|
-| `launch.log` | Une ligne à CHAQUE exécution du lanceur : « lanceur execute », puis « pont lance » ou « le pont tourne deja ». Si Windows ne lance pas le lanceur à l'ouverture de session, il n'y a **aucune ligne** à cette heure-là. |
+| `launch.log` | Une ligne à CHAQUE exécution du lanceur : `lanceur execute (declencheur : …, session Windows ouverte depuis …)`, puis « pont lance » ou « le pont tourne deja ». Le **déclencheur** est `demarrage Windows (dossier Demarrage)`, `bouton`, `installeur`, `configuration` ou `manuel`. La **durée de session** départage tout cas douteux : un lancement automatique tombe dans les secondes qui suivent l'ouverture de session (« depuis 12 s »), un clic bien plus tard (« depuis 95 min »). Si `TPE-Bridge.vbs` est ouvert à la main, il se déclare « demarrage Windows » mais la durée de session le trahit. Si Windows ne lance pas le lanceur à l'ouverture de session, il n'y a **aucune ligne** à cette heure-là. |
 | `bridge.log` | Démarrages et arrêts du pont, et tout ce qu'il affiche (erreurs d'impression, serveur injoignable...). Limité à ~500 Ko. |
 
 Le lanceur ne démarre **jamais un deuxième pont** si un tourne déjà.

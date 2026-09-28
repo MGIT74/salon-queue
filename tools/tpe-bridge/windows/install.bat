@@ -98,7 +98,7 @@ REM supplementaires. La commande ne recoit AUCUN argument venant du lien, donc
 REM une page web ne peut rien faire d'autre que demander de lancer le pont.
 reg add "HKCU\Software\Classes\tpebridge" /ve /t REG_SZ /d "URL:TPE Bridge" /f >nul 2>&1
 reg add "HKCU\Software\Classes\tpebridge" /v "URL Protocol" /t REG_SZ /d "" /f >nul 2>&1
-reg add "HKCU\Software\Classes\tpebridge\shell\open\command" /ve /t REG_SZ /d "wscript.exe \"%BRIDGE_DIR%\run-hidden.vbs\"" /f >nul 2>&1
+reg add "HKCU\Software\Classes\tpebridge\shell\open\command" /ve /t REG_SZ /d "wscript.exe \"%BRIDGE_DIR%\run-hidden.vbs\" bouton" /f >nul 2>&1
 if exist "%STARTUP_DIR%\TPE-Bridge.vbs" (
     echo [OK] Demarrage automatique configure.
 ) else (
@@ -124,7 +124,7 @@ if not exist "%APPDATA%\TPE-Bridge\config.json" (
 )
 echo [OK] Configuration enregistree.
 echo.
-wscript.exe "%BRIDGE_DIR%\run-hidden.vbs"
+wscript.exe "%BRIDGE_DIR%\run-hidden.vbs" installeur
 
 echo.
 echo ============================================================
