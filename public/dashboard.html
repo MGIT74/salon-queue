@@ -603,6 +603,15 @@
   .item-name { font-size: 16px; font-weight: 600; letter-spacing: -.015em; }
   .item-meta { font-size: 13px; color: var(--grey); margin-top: 2px; font-variant-numeric: tabular-nums; }
   .item-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  /* Largeur reservee CONSTANTE (independante du nombre reel de boutons
+     affiches sur chaque ligne) pour que .item-main - donc la grille de
+     colonnes proportionnelles en face - recoive systematiquement la MEME
+     largeur disponible, sur l'en-tete comme sur chaque ligne de donnees.
+     Sans ca, l'en-tete (aucun bouton en face) et les lignes de cadeaux
+     (1 a 4 elements selon si le cadeau est deja utilise) desalignaient
+     chacune les colonnes differemment. */
+  #loyalty-accounts-list .item-actions, #loyalty-list-head .item-actions { min-width: 220px; justify-content: flex-end; }
+  #gift-cards-list .item-actions, #gift-list-head .item-actions { min-width: 480px; justify-content: flex-end; }
 
   .barber-quick-actions {
     display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 18px;
@@ -651,7 +660,7 @@
      largeur en premier, puis le reste en petit en dessous. Les boutons
      d'action passent sur leur propre ligne, alignes a droite. */
   @container mainpane (max-width: 760px) {
-    .loyalty-info-head, .gift-info-head { display: none; }
+    #loyalty-list-head, #gift-list-head { display: none; }
     #loyalty-accounts-list .item, #gift-cards-list .item {
       align-items: flex-start; flex-wrap: wrap; padding: 14px 4px;
     }
@@ -1485,9 +1494,14 @@
       </div>
       <p class="hint">Points et récompenses en attente, tous salons de l'enseigne confondus.</p>
       <div class="fld" style="margin-bottom:12px"><input id="loyalty-search" type="text" placeholder="Rechercher (nom, email)…" oninput="filterLoyaltyAccounts(this.value)"></div>
-      <div class="loyalty-info-grid loyalty-info-head">
-        <div class="f">Email</div><div class="f">Points</div><div class="f">Récompenses</div>
-        <div class="f">Activé le</div><div class="f">Dernière activité</div>
+      <div class="item" id="loyalty-list-head" style="background:none;box-shadow:none;border-radius:0;border-bottom:1px solid var(--sep);margin-bottom:0;padding:0 4px 6px">
+        <div class="item-main">
+          <div class="loyalty-info-grid loyalty-info-head">
+            <div class="f">Email</div><div class="f">Points</div><div class="f">Récompenses</div>
+            <div class="f">Activé le</div><div class="f">Dernière activité</div>
+          </div>
+        </div>
+        <div class="item-actions" style="visibility:hidden"></div>
       </div>
       <div id="loyalty-accounts-list"></div>
       <div class="clients-pagination" id="loyalty-pagination"></div>
@@ -1506,9 +1520,14 @@
       </div>
       <p class="hint">Historique des cadeaux achetés dans ce salon.</p>
       <div class="fld" style="margin-bottom:12px"><input id="gift-search" type="text" placeholder="Rechercher (nom, email, téléphone, code, coiffeur)…" oninput="filterGiftCards(this.value)"></div>
-      <div class="gift-info-grid gift-info-head">
-        <div class="f">Email</div><div class="f">Téléphone</div><div class="f">Code</div>
-        <div class="f">Coiffeur</div><div class="f">Acheté le</div><div class="f">Utilisé le</div>
+      <div class="item" id="gift-list-head" style="background:none;box-shadow:none;border-radius:0;border-bottom:1px solid var(--sep);margin-bottom:0;padding:0 4px 6px">
+        <div class="item-main">
+          <div class="gift-info-grid gift-info-head">
+            <div class="f">Email</div><div class="f">Téléphone</div><div class="f">Code</div>
+            <div class="f">Coiffeur</div><div class="f">Acheté le</div><div class="f">Utilisé le</div>
+          </div>
+        </div>
+        <div class="item-actions" style="visibility:hidden"></div>
       </div>
       <div id="gift-cards-list"></div>
       <div class="clients-pagination" id="gifts-pagination"></div>
