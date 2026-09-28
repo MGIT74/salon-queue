@@ -639,13 +639,31 @@
      d'action des que la largeur reelle manque, le texte se tronque
      (ellipsis deja en place) quelle que soit la largeur disponible. */
   .gift-info-grid {
-    display: grid; grid-template-columns: 130fr 120fr 130fr 110fr 110fr; gap: 4px 12px;
+    /* nom+prix partage desormais la MEME ligne que tel/code/coiffeur/
+       achete le/utilise le (demande : eviter l'espace vide laisse a droite
+       du nom pendant que ces colonnes attendaient, seules, tout en bas).
+       Email et prestations restent en pleine largeur juste en dessous. */
+    display: grid;
+    grid-template-columns: minmax(150px, 1.6fr) 130fr 120fr 130fr 110fr 110fr;
+    grid-template-areas: "name tel code coif achete utilise" "email email email email email email" "meta meta meta meta meta meta";
+    column-gap: 12px; row-gap: 4px; align-items: baseline;
     margin-top: 8px;
   }
+  .gift-info-grid .item-name {
+    grid-area: name; margin: 0; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .gift-info-grid .item-email { grid-area: email; margin: 0; }
+  .gift-info-grid .item-meta { grid-area: meta; margin: 0; }
   .gift-info-grid .f { font-size: 12.5px; color: var(--grey); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .gift-info-grid .f b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .gift-info-grid .f-tel { grid-area: tel; }
+  .gift-info-grid .f-code { grid-area: code; }
+  .gift-info-grid .f-coif { grid-area: coif; }
+  .gift-info-grid .f-achete { grid-area: achete; }
+  .gift-info-grid .f-utilise { grid-area: utilise; }
   .gift-info-head { margin-top: 0; padding-bottom: 6px; border-bottom: 1px solid var(--sep); }
-  .gift-info-head .f { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; font-weight: 600; }
+  .gift-info-head .f, .gift-info-head .f-name { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; font-weight: 600; color: var(--grey); }
   .loyalty-info-grid {
     display: grid; grid-template-columns: 220fr 90fr 130fr 120fr 130fr; gap: 4px 12px;
     margin-top: 8px;
@@ -655,11 +673,6 @@
   .loyalty-info-head { margin-top: 0; padding-bottom: 6px; border-bottom: 1px solid var(--sep); }
   .loyalty-info-head .f { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; font-weight: 600; }
 
-  /* En dessous de ce seuil (meme que Clients/Rendez-vous), les colonnes
-     meme proportionnelles deviennent trop etroites pour rester lisibles -
-     bascule en carte : email (le champ le plus important) en pleine
-     largeur en premier, puis le reste en petit en dessous. Les boutons
-     d'action passent sur leur propre ligne, alignes a droite. */
   /* Seuil plus genereux que Clients/Rendez-vous (760px) : ces deux listes
      ont BEAUCOUP plus a caser en largeur - jusqu'a 4 boutons/etiquette
      reserves (voir .item-actions min-width plus haut) en plus de 5-6
@@ -686,18 +699,21 @@
     .loyalty-info-grid .f:nth-child(4) { grid-area: activele; color: var(--grey); font-size: 12px; }
     .loyalty-info-grid .f:nth-child(5) { grid-area: derniere; color: var(--grey); font-size: 12px; text-align: right; }
 
+    /* Carte : nom en pleine largeur en tete (plus assez de place pour le
+       partager avec 5 colonnes), email et prestations en dessous, puis
+       tel/code/coiffeur/achete/utilise en petite grille 2 colonnes. */
     .gift-info-grid {
       display: grid; width: 100%;
       grid-template-columns: 1fr 1fr;
-      grid-template-areas: "tel code" "coif achete" "utilise utilise";
-      gap: 5px 10px;
+      grid-template-areas: "name name" "email email" "meta meta" "tel code" "coif achete" "utilise utilise";
+      column-gap: 10px; row-gap: 5px;
     }
+    .gift-info-grid .item-name { font-size: 15.5px; }
     .gift-info-grid .f { white-space: normal; overflow: visible; text-overflow: clip; }
-    .gift-info-grid .f:nth-child(1) { grid-area: tel; }
-    .gift-info-grid .f:nth-child(2) { grid-area: code; text-align: right; }
-    .gift-info-grid .f:nth-child(3) { grid-area: coif; }
-    .gift-info-grid .f:nth-child(4) { grid-area: achete; color: var(--grey); font-size: 12px; text-align: right; }
-    .gift-info-grid .f:nth-child(5) { grid-area: utilise; color: var(--grey); font-size: 12px; }
+    .gift-info-grid .f-code { text-align: right; }
+    .gift-info-grid .f-achete { color: var(--grey); font-size: 12px; text-align: right; }
+    .gift-info-grid .f-utilise { color: var(--grey); font-size: 12px; }
+
 
     #loyalty-accounts-list .item-actions, #gift-cards-list .item-actions {
       width: 100%; justify-content: flex-end; margin-top: 8px;
@@ -1531,8 +1547,8 @@
       <div class="item" id="gift-list-head" style="background:none;box-shadow:none;border-radius:0;margin-bottom:0;padding:0 4px">
         <div class="item-main">
           <div class="gift-info-grid gift-info-head">
-            <div class="f">Nom</div><div class="f">Code</div>
-            <div class="f">Coiffeur</div><div class="f">Acheté le</div><div class="f">Utilisé le</div>
+            <div class="f f-name">Nom</div><div class="f f-tel">Téléphone</div><div class="f f-code">Code</div>
+            <div class="f f-coif">Coiffeur</div><div class="f f-achete">Acheté le</div><div class="f f-utilise">Utilisé le</div>
           </div>
         </div>
         <div class="item-actions" style="visibility:hidden"></div>
@@ -4524,18 +4540,17 @@ function renderGiftCardsList() {
         var statusLabel = g.used_at ? 'Utilisé' : (g.voided_at ? 'Désactivé' : 'Non utilisé');
         var statusColor = g.used_at ? 'var(--grey)' : (g.voided_at ? 'var(--orange)' : 'var(--green)');
         var fmtDate = function (iso) { return new Date(iso).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }); };
-        var infoGrid = ['<div class="f"><b>' + esc(g.recipient_phone) + '</b></div>',
-          '<div class="f"><b>' + esc(g.code || '—') + '</b></div>',
-          '<div class="f"><b>' + esc(g.barber_name || 'Non désigné') + '</b></div>',
-          '<div class="f"><b>' + fmtDate(g.created_at) + '</b></div>',
-          '<div class="f">' + (g.used_at ? '<b>' + fmtDate(g.used_at) + '</b>' : '') + '</div>'
-        ].join('');
+        var infoGrid = '<div class="item-name">' + esc(g.recipient_name) + ' — ' + eur(g.amount_cents) + '</div>' +
+          '<div class="f f-tel"><b>' + esc(g.recipient_phone) + '</b></div>' +
+          '<div class="f f-code"><b>' + esc(g.code || '—') + '</b></div>' +
+          '<div class="f f-coif"><b>' + esc(g.barber_name || 'Non désigné') + '</b></div>' +
+          '<div class="f f-achete"><b>' + fmtDate(g.created_at) + '</b></div>' +
+          '<div class="f f-utilise">' + (g.used_at ? '<b>' + fmtDate(g.used_at) + '</b>' : '') + '</div>' +
+          '<div class="item-email">' + esc(g.recipient_email) + '</div>' +
+          '<div class="item-meta">' + esc(itemsList) + '</div>';
         var safeName = esc(g.recipient_name).replace(/'/g, "\\'");
         return '<div class="item">' +
-          '<div class="item-main"><div class="item-name">' + esc(g.recipient_name) + ' — ' + eur(g.amount_cents) + '</div>' +
-          '<div class="item-email">' + esc(g.recipient_email) + '</div>' +
-          '<div class="item-meta">' + esc(itemsList) + '</div>' +
-          '<div class="gift-info-grid">' + infoGrid + '</div></div>' +
+          '<div class="item-main"><div class="gift-info-grid">' + infoGrid + '</div></div>' +
           '<div class="item-actions">' +
             (g.used_at ? '' : '<button class="btn btn-soft" onclick="resendGiftCode(\'' + g.id + '\')" style="font-size:13px;padding:6px 12px">Renvoyer le code</button>') +
             (g.used_at ? '' : '<button class="btn btn-soft" onclick="toggleGiftCardVoid(\'' + g.id + '\', \'' + safeName + '\', ' + (g.voided_at ? 'true' : 'false') + ')" style="font-size:13px;padding:6px 12px">' + (g.voided_at ? 'Réactiver' : 'Désactiver') + '</button>') +
