@@ -2626,7 +2626,7 @@ function loadCatalog() {
  * peuvent en revanche y atterrir si un champ etait deja focus a cet instant :
  * limite connue et acceptee de cette detection purement cote navigateur.
  */
-var SCAN_FAST_MS = 40;
+var SCAN_FAST_MS = 60;
 var SCAN_CONFIDENCE = 3;
 var scanBuffer = '';
 var scanLastTime = 0;
@@ -2638,7 +2638,9 @@ document.addEventListener('keydown', function (e) {
   var delta = now - scanLastTime;
   scanLastTime = now;
 
-  if (e.key === 'Enter') {
+  // Beaucoup de douchettes sont configurables et envoient Tab plutot
+  // qu'Entree en fin de scan selon leur reglage - on accepte les deux.
+  if (e.key === 'Enter' || e.key === 'Tab') {
     var confident = scanFastStreak >= SCAN_CONFIDENCE;
     var code = scanBuffer;
     scanBuffer = ''; scanFastStreak = 0;

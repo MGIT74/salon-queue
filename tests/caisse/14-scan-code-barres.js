@@ -12,12 +12,12 @@ let pass = 0, fail = 0;
 const check = (n, ok, x = '') => { (ok ? pass++ : fail++); console.log((ok ? '  OK   ' : '  ECHEC') + ' ' + n + (x ? '  [' + x + ']' : '')); };
 
 // Simule une VRAIE douchette : chaque touche arrive en quelques ms.
-async function scanFast(win, code) {
+async function scanFast(win, code, terminator) {
   for (const ch of code) {
     win.document.dispatchEvent(new win.KeyboardEvent('keydown', { key: ch, bubbles: true }));
-    await sleep(3); // largement sous le seuil de detection (40 ms)
+    await sleep(3); // largement sous le seuil de detection (60 ms)
   }
-  win.document.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  win.document.dispatchEvent(new win.KeyboardEvent('keydown', { key: terminator || 'Enter', bubbles: true }));
 }
 
 // Simule une frappe HUMAINE du meme code (bien plus lente qu'un scanner).
@@ -86,6 +86,17 @@ async function typeSlow(win, code) {
   check('rien ajoute (onglet Agenda actif, pas Caisse)', w.ticket.length === 0);
   check('aucun toast declenche', toasts.length === 0);
   w.doSwitchCaisseTab('caisse'); await sleep(200);
+
+  console.log('\n[G] Douchette reglee pour envoyer Tab plutot que Entree en fin de scan');
+  w.ticket.length = 0; w.renderTicket(); toasts.length = 0;
+  await scanFast(w, '5449000000996', 'Tab'); await sleep(200);
+  check('ajoute quand meme (Tab accepte comme fin de scan)', w.ticket.length === 1 && w.ticket[0].item_name === 'Coca Cola 33cl', JSON.stringify(w.ticket));
+
+  console.log('\n[H] Douchette plus lente (50 ms/caractere) : toujours detectee comme un scan');
+  w.ticket.length = 0; w.renderTicket(); toasts.length = 0;
+  for (const ch of '5449000000996') { w.document.dispatchEvent(new w.KeyboardEvent('keydown', { key: ch, bubbles: true })); await sleep(50); }
+  w.document.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); await sleep(200);
+  check('ajoute (50 ms est sous le nouveau seuil de 60 ms)', w.ticket.length === 1 && w.ticket[0].item_name === 'Coca Cola 33cl', JSON.stringify(w.ticket));
 
   console.log(`\nRESULTAT : ${pass} verifications reussies, ${fail} echec(s)`);
   sql("DELETE FROM products WHERE id IN ('coca_cola_33cl','sans_code_a')");
