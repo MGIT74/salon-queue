@@ -176,6 +176,7 @@ function startBridge(cfg) {
   ];
   if (cfg.printer) args.push('--printer', cfg.printer);
   if (cfg.tpeIp) args.push('--tpe', cfg.tpeIp);
+  if (cfg.tpePos) args.push('--pos', cfg.tpePos);
 
   // Relance automatique : si le process meurt (crash, MAJ réseau...),
   // on le relance après 5 s, indéfiniment.
