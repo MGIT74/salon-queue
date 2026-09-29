@@ -43,4 +43,5 @@ node tests/caisse/09-guide-demarrage-pont.js       # guide "Connecter le TPE et 
 node tests/caisse/10-connexion-caisse.js            # icone reglages de la caisse : pastille, fenetre, etats, suivi en direct, droits
 node tests/caisse/11-inscription-publique.js       # inscription ouverte / fermee (SIGNUP_ENABLED) ; lance une 2e copie du serveur sur le port 3998
 node tests/caisse/12-timer-automatique.js          # demarrage/arret automatique du timer (RDV oublie) ; jamais pour un client absent ou en attente libre
+node tests/caisse/13-pastille-pendant-paiement.js  # la pastille TPE ne doit pas passer rouge en pleine transaction carte (pont juste occupe, pas hors ligne)
 ```

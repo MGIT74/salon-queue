@@ -32,7 +32,8 @@ const suite = [
   ['09-guide-demarrage-pont.js', true, ['exit']],
   ['10-connexion-caisse.js', true, ['exit']],
   ['11-inscription-publique.js', true, ['exit']],
-  ['12-timer-automatique.js', true, ['exit']]
+  ['12-timer-automatique.js', true, ['exit']],
+  ['13-pastille-pendant-paiement.js', true, ['exit']]
 ];
 
 let bad = 0;

@@ -262,7 +262,23 @@ router.get('/bridge-status', requireAdminOrBarber, wrap(async (req, res) => {
   const lastSeenAt = row ? toDate(row.last_seen_at) : null;
   const lastTpeAt = row ? toDate(row.last_charge_poll_at) : null;
   const createdAt = row ? toDate(row.created_at) : null;
-  const online = Boolean(lastSeenAt && (Date.now() - lastSeenAt.getTime()) < 10_000);
+
+  // Le pont signale "je suis vivant" en récupérant une demande de paiement,
+  // PUIS reste silencieux jusqu'à 120 s pendant qu'il attend la réponse du
+  // TERMINAL PHYSIQUE (il ne rappelle pas le serveur pendant ce temps-là) -
+  // ce n'est pas une panne, juste une tâche en cours. Sans cette tolérance,
+  // la pastille passait au rouge en pleine transaction (constaté chez un
+  // client), alors que le pont fonctionnait normalement. On l'élargit donc
+  // UNIQUEMENT s'il y a réellement un paiement 'processing' pour ce salon
+  // (déjà pris en charge par ce pont) ; la détection rapide (10 s) reste
+  // sinon inchangée pour un vrai défaut de connexion (imprimante, réseau).
+  const [[chargeInFlight]] = await pool.query(
+    "SELECT 1 FROM tpe_charge_jobs WHERE salon_id = ? AND status = 'processing' LIMIT 1",
+    [req.salon.id]
+  );
+  const onlineToleranceMs = chargeInFlight ? 130_000 : 10_000;
+
+  const online = Boolean(lastSeenAt && (Date.now() - lastSeenAt.getTime()) < onlineToleranceMs);
   const tpeOnline = Boolean(lastTpeAt && (Date.now() - lastTpeAt.getTime()) < 10_000);
   res.json({
     ok: true,
