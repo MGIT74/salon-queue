@@ -1,6 +1,7 @@
 const cron = require('node-cron');
 const { pool, getSettings, parisLocalToUtcDate } = require('../db');
 const { recompute } = require('../lib/queueMath');
+const { autoManageTimersForSalon } = require('./autoTimer');
 const { sendTurnSoon, sendAppointmentReminder } = require('../lib/mailer');
 const { nowParisDatetimeString } = require('../routes/appointments');
 
@@ -98,6 +99,7 @@ async function checkAndNotify() {
     const [salons] = await pool.query('SELECT id FROM salons WHERE active = 1');
     for (const s of salons) {
       try {
+        await autoManageTimersForSalon(s.id);
         await checkAndNotifyForSalon(s.id);
         await checkAndNotifyAppointmentsForSalon(s.id);
       } catch (err) {

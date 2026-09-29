@@ -42,4 +42,5 @@ node tests/caisse/08-heure-de-reouverture.js         # heure de reouverture : fu
 node tests/caisse/09-guide-demarrage-pont.js       # guide "Connecter le TPE et l'imprimante" : affichage, lien tpebridge://start, memorisation
 node tests/caisse/10-connexion-caisse.js            # icone reglages de la caisse : pastille, fenetre, etats, suivi en direct, droits
 node tests/caisse/11-inscription-publique.js       # inscription ouverte / fermee (SIGNUP_ENABLED) ; lance une 2e copie du serveur sur le port 3998
+node tests/caisse/12-timer-automatique.js          # demarrage/arret automatique du timer (RDV oublie) ; jamais pour un client absent ou en attente libre
 ```
