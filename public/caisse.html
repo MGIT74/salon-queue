@@ -2610,6 +2610,81 @@ function loadCatalog() {
   }).catch(function (e) { toast(e.message, true); });
 }
 
+/* ---------- Scanner de code-barres USB ----------
+ * Une douchette USB se fait passer pour un clavier : elle "tape" le code
+ * tres vite (typiquement 1-15 ms entre chaque caractere) puis appuie sur
+ * Entree toute seule - impossible a la vitesse d'une frappe humaine
+ * (80 ms et plus entre deux touches, meme pour un utilisateur rapide).
+ * On distingue donc un scan d'une frappe normale par cette VITESSE, sans
+ * avoir besoin d'un champ de saisie dedie ni de pilote special.
+ *
+ * Actif uniquement sur l'onglet Caisse (scanner un produit n'a de sens
+ * nulle part ailleurs). Une fois una sequence rapide "confirmee" (3
+ * caracteres consecutifs sous le seuil), les touches suivantes sont
+ * interceptees (preventDefault) pour ne pas se taper en plus dans un champ
+ * qui aurait le focus - les tout premiers caracteres, avant qu'on soit sur,
+ * peuvent en revanche y atterrir si un champ etait deja focus a cet instant :
+ * limite connue et acceptee de cette detection purement cote navigateur.
+ */
+var SCAN_FAST_MS = 40;
+var SCAN_CONFIDENCE = 3;
+var scanBuffer = '';
+var scanLastTime = 0;
+var scanFastStreak = 0;
+
+document.addEventListener('keydown', function (e) {
+  if (!document.getElementById('panel-caisse').classList.contains('on')) return;
+  var now = Date.now();
+  var delta = now - scanLastTime;
+  scanLastTime = now;
+
+  if (e.key === 'Enter') {
+    var confident = scanFastStreak >= SCAN_CONFIDENCE;
+    var code = scanBuffer;
+    scanBuffer = ''; scanFastStreak = 0;
+    if (confident && code) {
+      e.preventDefault();
+      handleScannedBarcode(code);
+    }
+    return;
+  }
+
+  // Une seule touche imprimable (ecarte Shift, Tab, fleches, etc. - un
+  // "e.key" de plusieurs caracteres designe toujours une touche speciale).
+  if (e.key.length !== 1) { scanBuffer = ''; scanFastStreak = 0; return; }
+
+  if (delta < SCAN_FAST_MS) {
+    scanFastStreak++;
+    if (scanFastStreak >= SCAN_CONFIDENCE) {
+      e.preventDefault();
+      // Le champ qui avait le focus a peut-etre deja recu les tout
+      // premiers caracteres avant qu'on soit sur qu'il s'agit d'un scan -
+      // on lui retire le focus pour que la suite n'y atterisse plus.
+      if (document.activeElement && document.activeElement !== document.body) {
+        document.activeElement.blur();
+      }
+    }
+  } else {
+    scanBuffer = ''; scanFastStreak = 0;
+  }
+  scanBuffer += e.key;
+});
+
+function handleScannedBarcode(code) {
+  var product = catalog.products.find(function (p) { return p.barcode === code; });
+  if (!product) {
+    toast('Aucun produit ne correspond à ce code (' + code + ')', true);
+    return;
+  }
+  var outOfStock = product.stock_enabled && product.stock_quantity <= 0;
+  if (outOfStock) {
+    toast(product.name + ' : rupture de stock', true);
+    return;
+  }
+  addToTicket('product', product.id, product.name, product.price_cents);
+  toast(product.name + ' ajouté au ticket');
+}
+
 document.getElementById('cat-tabs').addEventListener('click', function (e) {
   var btn = e.target.closest('button');
   if (!btn) return;

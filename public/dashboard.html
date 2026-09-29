@@ -2260,6 +2260,11 @@
         <p class="hint" style="margin-top:4px">Décoché : le produit est illimité, toujours disponible à la vente.</p>
       </div>
       <div class="fld" id="sc-stock-qty-fld" style="display:none"><label for="sc-stock-qty">Quantité en stock</label><input id="sc-stock-qty" type="number" min="0" value="0"></div>
+      <div class="fld" id="sc-barcode-fld" style="display:none">
+        <label for="sc-barcode">Code-barres</label>
+        <input id="sc-barcode" type="text" placeholder="Cliquez ici puis scannez le produit">
+        <p class="hint" style="margin-top:4px">Cliquez dans ce champ puis scannez l'emballage du produit avec la douchette USB - le code s'y écrit tout seul. Vous pouvez aussi le taper à la main.</p>
+      </div>
     </div>
     <div class="sheet-foot"><button class="btn btn-primary" onclick="saveCatalog()">Enregistrer</button></div>
   </div>
@@ -3690,6 +3695,9 @@ function openCatalogForm(table, id) {
   document.getElementById('sc-stock-qty-fld').style.display = table === 'products' && stockEnabled ? 'block' : 'none';
   document.getElementById('sc-stock-qty').value = item ? (item.stock_quantity || 0) : 0;
 
+  document.getElementById('sc-barcode-fld').style.display = table === 'products' ? 'block' : 'none';
+  document.getElementById('sc-barcode').value = (table === 'products' && item && item.barcode) ? item.barcode : '';
+
   document.getElementById('sheet-catalog').classList.add('on');
   _lockBodyScroll();
 }
@@ -3706,6 +3714,7 @@ function saveCatalog() {
   } else {
     body.stock_enabled = document.getElementById('sc-stock-enabled').checked;
     body.stock_quantity = Number(document.getElementById('sc-stock-qty').value) || 0;
+    body.barcode = document.getElementById('sc-barcode').value.trim();
   }
   var p = editingCat.id
     ? api('/api/catalog/' + editingCat.table + '/' + editingCat.id, { method: 'PUT', body: body })

@@ -119,11 +119,19 @@ router.post('/products', requireAdmin, wrap(async (req, res) => {
   if (!name) return res.status(400).json({ error: 'Le nom est requis' });
   const stockEnabled = req.body.stock_enabled ? 1 : 0;
   const stockQuantity = Math.max(0, Number(req.body.stock_quantity) || 0);
+  // Vide -> NULL (jamais une chaine vide, pour laisser plusieurs produits
+  // sans code coexister sous la contrainte d'unicite par salon).
+  const barcode = req.body.barcode ? String(req.body.barcode).trim().slice(0, 64) || null : null;
   const id = await uniqueId('products', slugify(name));
-  await pool.query(
-    'INSERT INTO products (id, salon_id, name, price_cents, category, sort_order, stock_enabled, stock_quantity) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-    [id, req.salon.id, name, Number(price_cents) || 0, category || null, Number(sort_order) || 0, stockEnabled, stockQuantity]
-  );
+  try {
+    await pool.query(
+      'INSERT INTO products (id, salon_id, name, price_cents, category, sort_order, stock_enabled, stock_quantity, barcode) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [id, req.salon.id, name, Number(price_cents) || 0, category || null, Number(sort_order) || 0, stockEnabled, stockQuantity, barcode]
+    );
+  } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') return res.status(400).json({ error: 'Ce code-barres est déjà utilisé par un autre produit' });
+    throw err;
+  }
   const [[item]] = await pool.query('SELECT * FROM products WHERE id = ?', [id]);
   logActivity(req.salon.id, 'catalog_create', 'Produit "' + name + '" créé');
   res.json({ ok: true, item });
@@ -142,6 +150,10 @@ router.put('/products/:id', requireAdmin, wrap(async (req, res) => {
     sets.push('image_url = ?'); params.push(req.body.image_url || null);
   }
   if (req.body.stock_enabled !== undefined) { sets.push('stock_enabled = ?'); params.push(req.body.stock_enabled ? 1 : 0); }
+  if (req.body.barcode !== undefined) {
+    const barcode = req.body.barcode ? String(req.body.barcode).trim().slice(0, 64) || null : null;
+    sets.push('barcode = ?'); params.push(barcode);
+  }
   ['price_cents', 'sort_order', 'stock_quantity'].forEach((k) => {
     if (req.body[k] !== undefined) { sets.push(k + ' = ?'); params.push(Math.max(0, Number(req.body[k]) || 0)); }
   });
@@ -151,7 +163,12 @@ router.put('/products/:id', requireAdmin, wrap(async (req, res) => {
   const label = 'Produit "' + (req.body.name || (before ? before.name : req.params.id)) + '"';
 
   params.push(req.params.id, req.salon.id);
-  await pool.query(`UPDATE products SET ${sets.join(', ')} WHERE id = ? AND salon_id = ?`, params);
+  try {
+    await pool.query(`UPDATE products SET ${sets.join(', ')} WHERE id = ? AND salon_id = ?`, params);
+  } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') return res.status(400).json({ error: 'Ce code-barres est déjà utilisé par un autre produit' });
+    throw err;
+  }
 
   if (req.body.active !== undefined) {
     logActivity(req.salon.id, req.body.active ? 'catalog_restore' : 'catalog_archive', label + (req.body.active ? ' réactivé' : ' archivé'));

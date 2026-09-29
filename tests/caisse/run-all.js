@@ -33,7 +33,8 @@ const suite = [
   ['10-connexion-caisse.js', true, ['exit']],
   ['11-inscription-publique.js', true, ['exit']],
   ['12-timer-automatique.js', true, ['exit']],
-  ['13-pastille-pendant-paiement.js', true, ['exit']]
+  ['13-pastille-pendant-paiement.js', true, ['exit']],
+  ['14-scan-code-barres.js', true, ['exit']]
 ];
 
 let bad = 0;

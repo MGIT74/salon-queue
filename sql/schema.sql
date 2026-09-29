@@ -294,7 +294,9 @@ CREATE TABLE IF NOT EXISTS products (
   sort_order INT NOT NULL DEFAULT 0,
   stock_enabled TINYINT(1) NOT NULL DEFAULT 0,
   stock_quantity INT NOT NULL DEFAULT 0,
-  FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE
+  barcode VARCHAR(64) NULL,
+  FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE,
+  UNIQUE KEY uniq_salon_barcode (salon_id, barcode)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Une vente en caisse (independante de la file d'attente) : qui l'a
@@ -1048,4 +1050,19 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 SET @dups := (SELECT COUNT(*) FROM (SELECT 1 FROM sales WHERE ticket_number IS NOT NULL GROUP BY salon_id, ticket_number HAVING COUNT(*) > 1) d);
 SET @c := (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'sales' AND index_name = 'uniq_salon_ticket');
 SET @sql := IF(@c = 0 AND @dups = 0, 'ALTER TABLE sales ADD UNIQUE KEY uniq_salon_ticket (salon_id, ticket_number)', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- ============================================================
+-- Code-barres sur les produits (scanner USB a la caisse)
+-- ============================================================
+
+-- NULL autorise (un produit peut ne pas avoir de code) ; la contrainte
+-- d'unicite ci-dessous n'empeche pas plusieurs produits d'avoir NULL
+-- (MySQL n'applique l'unicite qu'entre valeurs non-NULL).
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'products' AND column_name = 'barcode');
+SET @sql := IF(@c = 0, 'ALTER TABLE products ADD COLUMN barcode VARCHAR(64) NULL', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @c := (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'products' AND index_name = 'uniq_salon_barcode');
+SET @sql := IF(@c = 0, 'ALTER TABLE products ADD UNIQUE KEY uniq_salon_barcode (salon_id, barcode)', 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
