@@ -5077,7 +5077,7 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
   var when = new Date(dateStr + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' });
   var preBarber = preselectedBarberId && rdvBarbers.find(function (b) { return b.id === preselectedBarberId; });
 
-  var state = { barberId: preselectedBarberId || null, serviceId: null, extraIds: [], time: null };
+  var state = { barberId: preselectedBarberId || null, serviceId: null, extraIds: [], productIds: [], time: null };
 
   var overlay = _buildModal(
     '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px">' +
@@ -5108,11 +5108,20 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
       '<div class="aa-chips">' + extras.map(function (e) {
         return '<button class="aa-chip" data-id="' + e.id + '" onclick="aaToggleExtra(this)">' + esc(e.name) + '<span class="aa-meta">+' + formatMinutes(e.duration_min) + '</span></button>';
       }).join('') + '</div>' +
+      '<button class="btn btn-primary" style="width:100%;margin-top:10px" onclick="aaGoStep(\'products\')">Suivant</button>' +
+    '</div>' +
+
+    '<div id="aa-step-products" style="display:none">' +
+      '<button class="aa-back" onclick="aaGoStep(\'extras\')">‹ Retour</button>' +
+      '<div class="aa-step-title">Un produit à acheter sur place ? (optionnel)</div>' +
+      '<div class="aa-chips">' + products.map(function (p) {
+        return '<button class="aa-chip" data-id="' + p.id + '" onclick="aaToggleProduct(this)">' + esc(p.name) + '<span class="aa-meta">' + eur(p.price_cents) + '</span></button>';
+      }).join('') + '</div>' +
       '<button class="btn btn-primary" style="width:100%;margin-top:10px" onclick="aaGoStep(\'datetime\')">Suivant</button>' +
     '</div>' +
 
     '<div id="aa-step-datetime" style="display:none">' +
-      '<button class="aa-back" onclick="aaGoStep(\'extras\')">‹ Retour</button>' +
+      '<button class="aa-back" onclick="aaGoStep(\'products\')">‹ Retour</button>' +
       '<div class="aa-step-title">Créneau</div>' +
       '<div id="aa-half-toggle" class="half-toggle" style="display:none;margin-bottom:8px">' +
         '<button id="aa-half-morning" onclick="aaShowHalf(\'morning\')">Matin</button>' +
@@ -5135,7 +5144,7 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
     '</div>'
   );
 
-  var STEPS = ['barber', 'service', 'extras', 'datetime', 'contact'];
+  var STEPS = ['barber', 'service', 'extras', 'products', 'datetime', 'contact'];
   attachClientAutocomplete(overlay, 'aa-name', 'aa-email', 'aa-phone', api);
 
   // Clic sur la ligne d'un coiffeur précis dans le planning (au lieu du
@@ -5175,6 +5184,15 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
     var id = el.dataset.id;
     var i = state.extraIds.indexOf(id);
     if (i === -1) state.extraIds.push(id); else state.extraIds.splice(i, 1);
+    el.classList.toggle('sel');
+  };
+
+  // Un seul exemplaire par produit depuis ce parcours (comme sur rdv.html) -
+  // le coiffeur ajuste la quantite lui-meme a la caisse si besoin de plus.
+  window.aaToggleProduct = function (el) {
+    var id = el.dataset.id;
+    var i = state.productIds.indexOf(id);
+    if (i === -1) state.productIds.push(id); else state.productIds.splice(i, 1);
     el.classList.toggle('sel');
   };
 
@@ -5248,6 +5266,7 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
         email: overlay.querySelector('#aa-email').value.trim(),
         phone: overlay.querySelector('#aa-phone').value.trim(),
         service_id: state.serviceId, barber_id: state.barberId, extras: state.extraIds,
+        products: state.productIds.map(function (id) { return { id: id, quantity: 1 }; }),
         date: dateStr, time: state.time,
         base_url: window.location.origin + '/rdv.html'
       }

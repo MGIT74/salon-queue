@@ -50,4 +50,5 @@ node tests/caisse/16-alignement-clients.js         # colonnes de la liste Client
 node tests/caisse/17-kiosk-sans-rdv.js             # le kiosque ne compte/affiche que l'attente libre, jamais les RDV programmes
 node tests/caisse/18-liste-suivants-timer.js       # onglet Timer : la liste des suivants reste visible pendant une prestation en cours, premier verrouille
 node tests/caisse/19-produits-preselectionnes-rdv.js  # produits pre-choisis a la reservation - remontent jusqu'a la file, sans toucher a la duree/au prix
+node tests/caisse/20-produits-rdv-dashboard.js     # meme fonctionnalite, formulaire 'Ajouter un RDV' du dashboard (parcours complet, vrai serveur)
 ```
