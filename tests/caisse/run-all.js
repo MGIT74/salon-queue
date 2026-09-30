@@ -41,7 +41,8 @@ const suite = [
   ['18-liste-suivants-timer.js', true, ['exit']],
   ['19-produits-preselectionnes-rdv.js', true, ['exit']],
   ['20-produits-rdv-dashboard.js', true, ['exit']],
-  ['21-produits-rdv-caisse-poste.js', true, ['exit']]
+  ['21-produits-rdv-caisse-poste.js', true, ['exit']],
+  ['22-produits-rdv-compte.js', true, ['exit']]
 ];
 
 let bad = 0;

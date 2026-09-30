@@ -522,11 +522,18 @@
     <button class="back" onclick="show('p-book-service')">‹ Retour</button>
     <div class="eyebrow">Suppléments (optionnels)</div>
     <div class="extras-grid" id="bk-extras-grid"></div>
+    <button class="go" onclick="goToBookProductsStep()">Suivant</button>
+  </section>
+
+  <section class="panel" id="p-book-products">
+    <button class="back" onclick="show('p-book-extras')">‹ Retour</button>
+    <div class="eyebrow">Un produit à acheter sur place ? (optionnel)</div>
+    <div class="extras-grid" id="bk-products-grid"></div>
     <button class="go" onclick="goToBookDateStep()">Suivant</button>
   </section>
 
   <section class="panel" id="p-book-datetime">
-    <button class="back" id="bk-datetime-back-btn" onclick="show('p-book-extras')">‹ Retour</button>
+    <button class="back" id="bk-datetime-back-btn" onclick="show('p-book-products')">‹ Retour</button>
     <button class="gift-cancel-btn" id="bk-datetime-cancel-btn" style="display:none" onclick="cancelBookGift()">
       <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
       Annuler l'utilisation du cadeau
@@ -970,8 +977,8 @@ function rebook(salonSlug, serviceId, barberId) {
 /* ---------- Réservation intégrée ---------- */
 var bookCatalogLoaded = false;
 var bookSalonSlug = SALON_SLUG;
-var bookServices = [], bookExtras = [], bookBarbers = [];
-var selBookBarber = null, selBookService = null, selBookExtras = [], selBookDate = null, selBookSlot = null;
+var bookServices = [], bookExtras = [], bookBarbers = [], bookProducts = [];
+var selBookBarber = null, selBookService = null, selBookExtras = [], selBookProducts = [], selBookDate = null, selBookSlot = null;
 var activeBookGift = null;
 
 function iconForItem(name) {
@@ -1020,11 +1027,13 @@ function goBook(afterLoad) {
   Promise.all([
     apiForBooking('/api/catalog/services'),
     apiForBooking('/api/catalog/extras'),
+    apiForBooking('/api/catalog/products'),
     apiForBooking('/api/barbers')
   ]).then(function (r) {
     bookServices = r[0].items;
     bookExtras = r[1].items;
-    bookBarbers = r[2].items.filter(function (b) { return b.accepts_appointments && hasBookableSchedule(b); });
+    bookProducts = r[2].items;
+    bookBarbers = r[3].items.filter(function (b) { return b.accepts_appointments && hasBookableSchedule(b); });
     bookCatalogLoaded = true;
     renderBookBarberGrid();
     renderBookServiceGrid();
@@ -1215,7 +1224,7 @@ function closeGiftCancelModal() {
 }
 function confirmCancelBookGift() {
   closeGiftCancelModal();
-  selBookBarber = null; selBookService = null; selBookExtras = []; selBookDate = null; selBookSlot = null; activeBookGift = null;
+  selBookBarber = null; selBookService = null; selBookExtras = []; selBookProducts = []; selBookDate = null; selBookSlot = null; activeBookGift = null;
   document.getElementById('bk-barber-eyebrow').textContent = 'Choisissez votre coiffeur';
   document.getElementById('bk-date').value = '';
   document.querySelectorAll('#bk-barber-grid .svc-card').forEach(function (c) { c.classList.remove('sel'); });
@@ -1233,6 +1242,10 @@ function renderBookServiceGrid() {
     return '<button class="xchip" data-id="' + e.id + '" onclick="toggleBookExtra(this,\'' + e.id + '\')">' +
       '<span>' + esc(e.name) + '</span><span class="xm">+' + formatMinutes(e.duration_min) + ' · ' + eur(e.price_cents) + '</span></button>';
   }).join('');
+  document.getElementById('bk-products-grid').innerHTML = bookProducts.map(function (p) {
+    return '<button class="xchip" data-id="' + p.id + '" onclick="toggleBookProduct(this,\'' + p.id + '\')">' +
+      '<span>' + esc(p.name) + '</span><span class="xm">' + eur(p.price_cents) + '</span></button>';
+  }).join('');
   document.getElementById('bk-service-next-btn').disabled = !selBookService;
 }
 
@@ -1249,9 +1262,22 @@ function toggleBookExtra(el, id) {
   el.classList.toggle('sel');
 }
 
+// Un seul exemplaire par produit depuis cette etape (comme sur rdv.html) -
+// le coiffeur ajuste la quantite lui-meme a la caisse si besoin de plus.
+function toggleBookProduct(el, id) {
+  var i = selBookProducts.indexOf(id);
+  if (i === -1) selBookProducts.push(id); else selBookProducts.splice(i, 1);
+  el.classList.toggle('sel');
+}
+
 function goToBookExtrasStep() {
   if (!selBookService) { toast('Choisissez une prestation', true); return; }
   show('p-book-extras');
+}
+
+function goToBookProductsStep() {
+  if (!selBookService) { toast('Choisissez une prestation', true); return; }
+  show('p-book-products');
 }
 
 function goToBookDateStep() {
@@ -1342,6 +1368,7 @@ function submitBookAppointment() {
       body: {
         client_name: me.profile.name, email: me.profile.email, phone: me.profile.phone || null,
         service_id: selBookService, extras: selBookExtras, client_note: note || null,
+        products: selBookProducts.map(function (id) { return { id: id, quantity: 1 }; }),
         barber_id: selBookSlot.barberId, date: selBookDate, time: selBookSlot.time,
         gift_id: activeBookGift ? activeBookGift.id : null,
         base_url: window.location.origin + '/rdv.html' + (bookSalonSlug ? '?salon=' + bookSalonSlug : '')
@@ -1352,7 +1379,7 @@ function submitBookAppointment() {
     var when = new Date(selBookDate + 'T' + selBookSlot.time).toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' }) + ' à ' + selBookSlot.time;
     document.getElementById('bk-confirm-details').textContent = when + ' — ' + s.name + (activeBookGift ? ' (cadeau utilisé — présentez-le à votre coiffeur)' : '');
     show('p-book-confirmed');
-    selBookBarber = null; selBookService = null; selBookExtras = []; selBookDate = null; selBookSlot = null; activeBookGift = null;
+    selBookBarber = null; selBookService = null; selBookExtras = []; selBookProducts = []; selBookDate = null; selBookSlot = null; activeBookGift = null;
     document.getElementById('bk-barber-eyebrow').textContent = 'Choisissez votre coiffeur';
     document.getElementById('bk-date').value = '';
     document.getElementById('bk-note').value = '';

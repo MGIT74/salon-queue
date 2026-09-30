@@ -52,4 +52,5 @@ node tests/caisse/18-liste-suivants-timer.js       # onglet Timer : la liste des
 node tests/caisse/19-produits-preselectionnes-rdv.js  # produits pre-choisis a la reservation - remontent jusqu'a la file, sans toucher a la duree/au prix
 node tests/caisse/20-produits-rdv-dashboard.js     # meme fonctionnalite, formulaire 'Ajouter un RDV' du dashboard (parcours complet, vrai serveur)
 node tests/caisse/21-produits-rdv-caisse-poste.js  # meme fonctionnalite, formulaires 'Ajouter un RDV' de caisse.html et poste.html
+node tests/caisse/22-produits-rdv-compte.js        # meme fonctionnalite, espace client (compte.html) - derniere des 6 pages
 ```
