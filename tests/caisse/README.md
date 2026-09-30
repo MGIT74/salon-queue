@@ -46,4 +46,5 @@ node tests/caisse/12-timer-automatique.js          # demarrage/arret automatique
 node tests/caisse/13-pastille-pendant-paiement.js  # la pastille TPE ne doit pas passer rouge en pleine transaction carte (pont juste occupe, pas hors ligne)
 node tests/caisse/14-scan-code-barres.js           # scanner USB (douchette) : detection par vitesse, ajout au ticket, code inconnu, rupture de stock
 node tests/caisse/15-deplacer-dans-tiroir.js       # bouton Deplacer dans le tiroir client (dashboard) - meme fonction que celui de la liste RDV
+node tests/caisse/16-alignement-clients.js         # colonnes de la liste Clients ne se decalent pas selon la presence du bouton Terminer
 ```
