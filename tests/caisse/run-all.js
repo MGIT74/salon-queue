@@ -36,7 +36,8 @@ const suite = [
   ['13-pastille-pendant-paiement.js', true, ['exit']],
   ['14-scan-code-barres.js', true, ['exit']],
   ['15-deplacer-dans-tiroir.js', false, ['exit']],
-  ['16-alignement-clients.js', false, ['exit']]
+  ['16-alignement-clients.js', false, ['exit']],
+  ['17-kiosk-sans-rdv.js', true, ['exit']]
 ];
 
 let bad = 0;

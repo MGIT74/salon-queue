@@ -469,7 +469,7 @@ function cutTimerDisplay(cut) {
 
 function renderBoard() {
   var active = queue.filter(function (q) { return q.status === 'in_progress'; });
-  var waiting = queue.filter(function (q) { return q.status === 'waiting'; });
+  var waiting = queue.filter(function (q) { return q.status === 'waiting' && !q.is_appointment; });
   document.getElementById('wait-count').textContent = waiting.length;
 
   document.getElementById('serving').innerHTML = barbers.map(function (b) {
@@ -516,7 +516,7 @@ function remainingForCut(cur) {
 }
 
 function computeLanes() {
-  var waiting = queue.filter(function (q) { return q.status === 'waiting'; });
+  var waiting = queue.filter(function (q) { return q.status === 'waiting' && !q.is_appointment; });
   var active = queue.filter(function (q) { return q.status === 'in_progress'; });
 
   var lanes = barbers.map(function (b) {
@@ -541,7 +541,7 @@ function computeLanes() {
 }
 
 function waitForBarber(barberId) {
-  var waiting = queue.filter(function (q) { return q.status === 'waiting'; });
+  var waiting = queue.filter(function (q) { return q.status === 'waiting' && !q.is_appointment; });
   var active = queue.filter(function (q) { return q.status === 'in_progress'; });
 
   if (!barberId) {
@@ -821,7 +821,7 @@ function renderIdleWait() {
   if (!barbers.length) { el.textContent = ''; return; }
 
   var active = queue.filter(function (q) { return q.status === 'in_progress'; });
-  var waiting = queue.filter(function (q) { return q.status === 'waiting'; });
+  var waiting = queue.filter(function (q) { return q.status === 'waiting' && !q.is_appointment; });
 
   var shortest = null;
   barbers.forEach(function (b) {
