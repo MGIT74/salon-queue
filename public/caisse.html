@@ -1571,10 +1571,12 @@ function renderNext() {
   var zone = document.getElementById('next-zone');
   if (!zone) return;
   var activeBarber = activeBarberId && allBarbers.find(function (b) { return b.id === activeBarberId; });
-  if (myActive()) {
-    zone.innerHTML = '<div class="empty">Terminez la coupe en cours pour passer à la suivante</div>';
-    return;
-  }
+  // Une prestation en cours ne masque plus la liste des suivants (le
+  // coiffeur veut voir qui arrive) - elle verrouille seulement le tout
+  // premier de la liste en plus des autres (voir "locked" plus bas),
+  // pour ne jamais permettre de commencer une nouvelle coupe avant que
+  // celle en cours soit terminee.
+  var somethingActive = myActive();
 
   var userIsEditing = zone.contains(document.activeElement) && document.activeElement !== document.body;
   if (userIsEditing && zone.children.length) return;
@@ -1595,7 +1597,7 @@ function renderNext() {
     // un client en avance), mais l'ordre (un seul bouton actif a la
     // fois) reste respecte comme pour tout le monde.
     var noTimerBarber = Boolean(activeBarber && activeBarber.timer_enabled === 0);
-    var locked = i > 0 || (isAppointmentNotYet && !noTimerBarber);
+    var locked = somethingActive || i > 0 || (isAppointmentNotYet && !noTimerBarber);
     var detail = q.service.name + (q.extras.length ? ' + ' + q.extras.map(function (x) { return x.name; }).join(', ') : '');
     var open = Boolean(nextDetailOpen[q.id]);
     var minutesUntil = isAppointmentNotYet ? Math.round((new Date(q.checkin_at) - new Date()) / 60000) : null;
