@@ -300,6 +300,7 @@ var queue = [];
 var barbers = [];
 var extras = [];
 var services = [];
+var products = [];
 var pinBuffer = '';
 
 var SALON_SLUG = (function () {
@@ -466,12 +467,14 @@ function refresh() {
     barberApi('/api/queue'),
     barberApi('/api/barbers'),
     extras.length ? Promise.resolve({ items: extras }) : barberApi('/api/catalog/extras'),
-    services.length ? Promise.resolve({ items: services }) : barberApi('/api/catalog/services')
+    services.length ? Promise.resolve({ items: services }) : barberApi('/api/catalog/services'),
+    products.length ? Promise.resolve({ items: products }) : barberApi('/api/catalog/products')
   ]).then(function (r) {
     queue = r[0].queue;
     barbers = r[1].items;
     extras = r[2].items;
     services = r[3].items;
+    products = r[4].items;
     renderActive();
     renderNext();
   }).catch(function (e) { toast(e.message, true); });
@@ -994,7 +997,7 @@ function selectCalDay(dateStr) {
  */
 function openPosteAddAppointment(dateStr) {
   var when = new Date(dateStr + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' });
-  var state = { serviceId: null, extraIds: [], time: null };
+  var state = { serviceId: null, extraIds: [], productIds: [], time: null };
 
   var overlay = _buildModal(
     '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px">' +
@@ -1016,11 +1019,20 @@ function openPosteAddAppointment(dateStr) {
       '<div class="aa-chips">' + extras.map(function (e) {
         return '<button class="aa-chip" data-id="' + e.id + '" onclick="paToggleExtra(this)">' + esc(e.name) + '<span class="aa-meta">+' + formatMinutes(e.duration_min) + '</span></button>';
       }).join('') + '</div>' +
+      '<button class="btn btn-primary" style="width:100%;margin-top:10px" onclick="paGoStep(\'products\')">Suivant</button>' +
+    '</div>' +
+
+    '<div id="pa-step-products" style="display:none">' +
+      '<button class="aa-back" onclick="paGoStep(\'extras\')">‹ Retour</button>' +
+      '<div class="aa-step-title">Un produit à acheter sur place ? (optionnel)</div>' +
+      '<div class="aa-chips">' + products.map(function (p) {
+        return '<button class="aa-chip" data-id="' + p.id + '" onclick="paToggleProduct(this)">' + esc(p.name) + '<span class="aa-meta">' + eur(p.price_cents) + '</span></button>';
+      }).join('') + '</div>' +
       '<button class="btn btn-primary" style="width:100%;margin-top:10px" onclick="paGoStep(\'datetime\')">Suivant</button>' +
     '</div>' +
 
     '<div id="pa-step-datetime" style="display:none">' +
-      '<button class="aa-back" onclick="paGoStep(\'extras\')">‹ Retour</button>' +
+      '<button class="aa-back" onclick="paGoStep(\'products\')">‹ Retour</button>' +
       '<div class="aa-step-title">Créneau</div>' +
       '<div id="pa-half-toggle" class="half-toggle" style="display:none;margin-bottom:8px">' +
         '<button id="pa-half-morning" onclick="paShowHalf(\'morning\')">Matin</button>' +
@@ -1043,7 +1055,7 @@ function openPosteAddAppointment(dateStr) {
     '</div>'
   );
 
-  var STEPS = ['service', 'extras', 'datetime', 'contact'];
+  var STEPS = ['service', 'extras', 'products', 'datetime', 'contact'];
   attachClientAutocomplete(overlay, 'pa-name', 'pa-email', 'pa-phone', barberApi);
 
   window.paGoStep = function (step) {
@@ -1066,6 +1078,13 @@ function openPosteAddAppointment(dateStr) {
     var id = el.dataset.id;
     var i = state.extraIds.indexOf(id);
     if (i === -1) state.extraIds.push(id); else state.extraIds.splice(i, 1);
+    el.classList.toggle('sel');
+  };
+
+  window.paToggleProduct = function (el) {
+    var id = el.dataset.id;
+    var i = state.productIds.indexOf(id);
+    if (i === -1) state.productIds.push(id); else state.productIds.splice(i, 1);
     el.classList.toggle('sel');
   };
 
@@ -1135,6 +1154,7 @@ function openPosteAddAppointment(dateStr) {
         email: overlay.querySelector('#pa-email').value.trim(),
         phone: overlay.querySelector('#pa-phone').value.trim(),
         service_id: state.serviceId, extras: state.extraIds,
+        products: state.productIds.map(function (id) { return { id: id, quantity: 1 }; }),
         date: dateStr, time: state.time,
         base_url: window.location.origin + '/rdv.html'
       }
