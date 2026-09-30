@@ -63,7 +63,11 @@ async function attachGiftInfo(rows, salonId) {
 router.get('/', wrap(async (req, res) => {
   await promoteTodayAppointments(req.salon.id);
   await recompute(req.salon.id);
-  let rows = await loadQueue(req.salon.id);
+  // include_done=1 : utilise par la frise de l'Agenda pour placer les
+  // clients sans RDV deja termines aujourd'hui - la file, par defaut,
+  // n'expose que ce qui reste actionnable (attente/en cours).
+  const statuses = req.query.include_done === '1' ? ['waiting', 'in_progress', 'done'] : undefined;
+  let rows = await loadQueue(req.salon.id, statuses);
   rows = await attachGiftInfo(rows, req.salon.id);
   rows.sort((a, b) => {
     if (a.status !== b.status) return a.status === 'in_progress' ? -1 : 1;
