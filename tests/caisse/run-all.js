@@ -38,7 +38,8 @@ const suite = [
   ['15-deplacer-dans-tiroir.js', false, ['exit']],
   ['16-alignement-clients.js', false, ['exit']],
   ['17-kiosk-sans-rdv.js', true, ['exit']],
-  ['18-liste-suivants-timer.js', true, ['exit']]
+  ['18-liste-suivants-timer.js', true, ['exit']],
+  ['19-produits-preselectionnes-rdv.js', true, ['exit']]
 ];
 
 let bad = 0;

@@ -1066,3 +1066,28 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 SET @c := (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'products' AND index_name = 'uniq_salon_barcode');
 SET @sql := IF(@c = 0, 'ALTER TABLE products ADD UNIQUE KEY uniq_salon_barcode (salon_id, barcode)', 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- ============================================================
+-- Produits choisis d'avance par le client au moment de la reservation
+-- (ex: une boisson, en plus de sa coupe) - jamais de duree associee
+-- (contrairement aux supplements) : acheter un produit n'allonge pas la
+-- prestation. Meme principe que appointment_extras/queue_extras, avec
+-- une quantite en plus (on peut vouloir 2 boissons).
+-- ============================================================
+CREATE TABLE IF NOT EXISTS appointment_products (
+  appointment_id CHAR(36) NOT NULL,
+  product_id CHAR(36) NOT NULL,
+  quantity INT NOT NULL DEFAULT 1,
+  PRIMARY KEY (appointment_id, product_id),
+  FOREIGN KEY (appointment_id) REFERENCES appointments(id) ON DELETE CASCADE,
+  FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS queue_products (
+  queue_id CHAR(36) NOT NULL,
+  product_id CHAR(36) NOT NULL,
+  quantity INT NOT NULL DEFAULT 1,
+  PRIMARY KEY (queue_id, product_id),
+  FOREIGN KEY (queue_id) REFERENCES queue(id) ON DELETE CASCADE,
+  FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

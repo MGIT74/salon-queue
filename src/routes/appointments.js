@@ -424,6 +424,24 @@ router.post('/', wrap(async (req, res) => {
   if (!email) return res.status(400).json({ error: "L'email est requis pour la confirmation" });
   if (!service_id || !date || !time) return res.status(400).json({ error: 'Prestation, date et créneau requis' });
 
+  // Produits choisis d'avance (ex: une boisson) - jamais d'impact sur la
+  // duree/le creneau, juste une liste a retrouver au moment d'encaisser.
+  // Chaque quantite est bornee (1-99) et le produit doit vraiment
+  // appartenir a ce salon, sinon silencieusement ignore plutot que de
+  // planter toute la reservation pour une ligne invalide.
+  const rawProducts = Array.isArray(req.body.products) ? req.body.products : [];
+  let productSelections = [];
+  if (rawProducts.length) {
+    const productIds = rawProducts.map((p) => p && p.id).filter(Boolean);
+    const [rows] = productIds.length
+      ? await pool.query('SELECT id FROM products WHERE id IN (?) AND salon_id = ?', [productIds, req.salon.id])
+      : [[]];
+    const validIds = new Set(rows.map((r) => r.id));
+    productSelections = rawProducts
+      .filter((p) => p && validIds.has(p.id))
+      .map((p) => ({ id: p.id, quantity: Math.min(99, Math.max(1, Number(p.quantity) || 1)) }));
+  }
+
   const rdvSettings = await getSettings(req.salon.id);
 
   // Le champ 'min' du calendrier n'est qu'une protection côté
@@ -509,6 +527,12 @@ router.post('/', wrap(async (req, res) => {
       [extraIds.map((eid) => [id, eid])]
     );
   }
+  if (productSelections.length) {
+    await pool.query(
+      'INSERT INTO appointment_products (appointment_id, product_id, quantity) VALUES ?',
+      [productSelections.map((p) => [id, p.id, p.quantity])]
+    );
+  }
 
   const [[barber]] = finalBarberId
     ? await pool.query('SELECT name FROM barbers WHERE id = ?', [finalBarberId])
@@ -545,7 +569,7 @@ router.post('/', wrap(async (req, res) => {
   // dans la file (verrouillé jusqu'à l'heure prévue côté interface).
   const today = nowInParis(rdvSettings.timezone).dateStr;
   if (date === today) {
-    await promoteAppointment({ id, salon_id: req.salon.id, barber_id: finalBarberId, client_name, email, phone, service_id, scheduled_at: scheduledAt }, extraIds);
+    await promoteAppointment({ id, salon_id: req.salon.id, barber_id: finalBarberId, client_name, email, phone, service_id, scheduled_at: scheduledAt }, extraIds, productSelections);
   }
 
   res.json({ ok: true, id });
@@ -569,6 +593,19 @@ router.post('/admin-create', requireAdminOrBarber, wrap(async (req, res) => {
   if (!client_name) return res.status(400).json({ error: 'Le nom est requis' });
   if (!barber_id) return res.status(400).json({ error: 'Le coiffeur est requis' });
   if (!service_id || !date || !time) return res.status(400).json({ error: 'Prestation, date et créneau requis' });
+
+  const rawProducts = Array.isArray(req.body.products) ? req.body.products : [];
+  let productSelections = [];
+  if (rawProducts.length) {
+    const productIds = rawProducts.map((p) => p && p.id).filter(Boolean);
+    const [prodRows] = productIds.length
+      ? await pool.query('SELECT id FROM products WHERE id IN (?) AND salon_id = ?', [productIds, req.salon.id])
+      : [[]];
+    const validIds = new Set(prodRows.map((r) => r.id));
+    productSelections = rawProducts
+      .filter((p) => p && validIds.has(p.id))
+      .map((p) => ({ id: p.id, quantity: Math.min(99, Math.max(1, Number(p.quantity) || 1)) }));
+  }
 
   const rdvSettings = await getSettings(req.salon.id);
 
@@ -621,6 +658,9 @@ router.post('/admin-create', requireAdminOrBarber, wrap(async (req, res) => {
   if (extraIds.length) {
     await pool.query('INSERT INTO appointment_extras (appointment_id, extra_id) VALUES ?', [extraIds.map((eid) => [id, eid])]);
   }
+  if (productSelections.length) {
+    await pool.query('INSERT INTO appointment_products (appointment_id, product_id, quantity) VALUES ?', [productSelections.map((p) => [id, p.id, p.quantity])]);
+  }
 
   if (email) {
     const [[barber]] = await pool.query('SELECT name FROM barbers WHERE id = ?', [barber_id]);
@@ -645,7 +685,7 @@ router.post('/admin-create', requireAdminOrBarber, wrap(async (req, res) => {
   if (date === today) {
     await promoteAppointment(
       { id, salon_id: req.salon.id, barber_id, client_name, email: email || null, phone, service_id, scheduled_at: scheduledAt },
-      extraIds
+      extraIds, productSelections
     );
   }
 
@@ -780,6 +820,8 @@ router.put('/:id/reschedule', requireAdmin, wrap(async (req, res) => {
   const extraIds = extraLinks.map((e) => e.id);
   const extraDuration = extraLinks.reduce((a, e) => a + e.duration_min, 0);
   const durationMin = appt.duration_min + extraDuration;
+  const [productLinks] = await pool.query('SELECT product_id, quantity FROM appointment_products WHERE appointment_id = ?', [appt.id]);
+  const productSelections = productLinks.map((p) => ({ id: p.product_id, quantity: p.quantity }));
 
   const slots = await computeSlotsForBarber(finalBarberId, date, durationMin, rdvSettings, { skipLead: true, excludeAppointmentId: appt.id });
   if (!slots.includes(time)) return res.status(409).json({ error: "Ce créneau n'est plus disponible" });
@@ -813,7 +855,7 @@ router.put('/:id/reschedule', requireAdmin, wrap(async (req, res) => {
 
   if (date === today && !stillPromotedId) {
     const [[fresh]] = await pool.query('SELECT * FROM appointments WHERE id = ?', [appt.id]);
-    await promoteAppointment(fresh, extraIds);
+    await promoteAppointment(fresh, extraIds, productSelections);
   }
 
   if (appt.email) {
@@ -854,7 +896,7 @@ router.put('/:id/reschedule', requireAdmin, wrap(async (req, res) => {
  * IS NULL - un seul appel peut reussir cette reservation, l'autre
  * voit 0 ligne affectee et abandonne proprement sans rien creer.
  */
-async function promoteAppointment(appt, extraIds) {
+async function promoteAppointment(appt, extraIds, productSelections) {
   const queueId = crypto.randomUUID();
 
   const [claimResult] = await pool.query(
@@ -886,6 +928,12 @@ async function promoteAppointment(appt, extraIds) {
       [extraIds.map((eid) => [queueId, eid])]
     );
   }
+  if (productSelections && productSelections.length) {
+    await pool.query(
+      'INSERT INTO queue_products (queue_id, product_id, quantity) VALUES ?',
+      [productSelections.map((p) => [queueId, p.id, p.quantity])]
+    );
+  }
   return queueId;
 }
 
@@ -904,7 +952,8 @@ async function promoteTodayAppointments(salonId) {
   );
   for (const appt of rows) {
     const [extraRows] = await pool.query('SELECT extra_id FROM appointment_extras WHERE appointment_id = ?', [appt.id]);
-    await promoteAppointment(appt, extraRows.map((r) => r.extra_id));
+    const [productRows] = await pool.query('SELECT product_id, quantity FROM appointment_products WHERE appointment_id = ?', [appt.id]);
+    await promoteAppointment(appt, extraRows.map((r) => r.extra_id), productRows.map((r) => ({ id: r.product_id, quantity: r.quantity })));
   }
 }
 

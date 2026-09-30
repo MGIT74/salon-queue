@@ -190,11 +190,18 @@
     <button class="back" onclick="show('p-service')">‹ Retour</button>
     <div class="eyebrow">Suppléments (optionnels)</div>
     <div class="extras-grid" id="extras-grid"></div>
+    <button class="go" onclick="goToProductsStep()">Suivant</button>
+  </section>
+
+  <section class="panel" id="p-products">
+    <button class="back" onclick="show('p-extras')">‹ Retour</button>
+    <div class="eyebrow">Un produit à acheter sur place ? (optionnel)</div>
+    <div class="extras-grid" id="products-grid"></div>
     <button class="go" onclick="goToDateStep()">Suivant</button>
   </section>
 
   <section class="panel" id="p-datetime">
-    <button class="back" id="datetime-back-btn" onclick="show('p-extras')">‹ Retour</button>
+    <button class="back" id="datetime-back-btn" onclick="show('p-products')">‹ Retour</button>
     <button class="gift-cancel-btn" id="datetime-cancel-btn" style="display:none" onclick="cancelGiftBooking()">
       <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
       Annuler l'utilisation du cadeau
@@ -317,9 +324,9 @@ function iconForItem(name) {
   return '✂️';
 }
 
-var services = [], extras = [], barbers = [];
+var services = [], extras = [], barbers = [], products = [];
 var giftCardImageUrl = '';
-var selBarber = null, selService = null, selExtras = [], selDate = null, selSlot = null;
+var selBarber = null, selService = null, selExtras = [], selProducts = [], selDate = null, selSlot = null;
 var activeGift = null;
 
 /* ---------- Chargement ---------- */
@@ -327,16 +334,18 @@ function loadCatalog() {
   return Promise.all([
     api('/api/catalog/services'),
     api('/api/catalog/extras'),
+    api('/api/catalog/products'),
     api('/api/barbers'),
     api('/api/settings/public')
   ]).then(function (r) {
     services = r[0].items;
     extras = r[1].items;
-    barbers = r[2].items.filter(function (b) { return b.accepts_appointments && hasBookableSchedule(b); });
-    var salonName = r[3].salon_name;
-    CURRENCY = r[3].currency || 'EUR';
-    giftCardImageUrl = r[3].gift_card_image_url || '';
-    applyAccentColor(r[3].accent_color);
+    products = r[2].items;
+    barbers = r[3].items.filter(function (b) { return b.accepts_appointments && hasBookableSchedule(b); });
+    var salonName = r[4].salon_name;
+    CURRENCY = r[4].currency || 'EUR';
+    giftCardImageUrl = r[4].gift_card_image_url || '';
+    applyAccentColor(r[4].accent_color);
     document.title = 'Rendez-vous — ' + salonName;
     document.getElementById('salon-mark').textContent = salonName.toUpperCase();
     renderBarberGrid();
@@ -493,6 +502,11 @@ function renderServiceGrid() {
     return '<button class="xchip" data-id="' + e.id + '" onclick="toggleExtra(this,\'' + e.id + '\')">' +
       '<span>' + esc(e.name) + '</span><span class="xm">+' + formatMinutes(e.duration_min) + ' · ' + eur(e.price_cents) + '</span></button>';
   }).join('');
+
+  document.getElementById('products-grid').innerHTML = products.map(function (p) {
+    return '<button class="xchip" data-id="' + p.id + '" onclick="toggleProduct(this,\'' + p.id + '\')">' +
+      '<span>' + esc(p.name) + '</span><span class="xm">' + eur(p.price_cents) + '</span></button>';
+  }).join('');
 }
 
 function selectService(el, id) {
@@ -508,9 +522,23 @@ function toggleExtra(el, id) {
   el.classList.toggle('sel');
 }
 
+// Un seul exemplaire par produit depuis cette étape (le coiffeur ajuste
+// la quantité lui-même à la caisse si le client en veut plusieurs) -
+// reste donc un simple bouton a bascule, comme pour les suppléments.
+function toggleProduct(el, id) {
+  var i = selProducts.indexOf(id);
+  if (i === -1) selProducts.push(id); else selProducts.splice(i, 1);
+  el.classList.toggle('sel');
+}
+
 function goToExtrasStep() {
   if (!selService) { toast('Choisissez une prestation', true); return; }
   show('p-extras');
+}
+
+function goToProductsStep() {
+  if (!selService) { toast('Choisissez une prestation', true); return; }
+  show('p-products');
 }
 
 function goToDateStep() {
@@ -620,6 +648,7 @@ function submitAppointment() {
     body: {
       client_name: name, email: email, phone: phone || null,
       service_id: selService, extras: selExtras,
+      products: selProducts.map(function (id) { return { id: id, quantity: 1 }; }),
       barber_id: selSlot.barberId, date: selDate, time: selSlot.time,
       gift_id: activeGift ? activeGift.id : null,
       base_url: window.location.origin + window.location.pathname + (SALON_SLUG ? '?salon=' + SALON_SLUG : '')
@@ -637,7 +666,7 @@ function submitAppointment() {
 }
 
 function startNewBooking() {
-  selBarber = null; selService = null; selExtras = []; selDate = null; selSlot = null; activeGift = null;
+  selBarber = null; selService = null; selExtras = []; selProducts = []; selDate = null; selSlot = null; activeGift = null;
   document.getElementById('barber-eyebrow').textContent = 'Choisissez votre coiffeur';
   document.getElementById('rdv-name').value = '';
   document.getElementById('rdv-email').value = '';

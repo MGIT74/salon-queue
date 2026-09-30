@@ -2840,6 +2840,13 @@ function usePendingForTicket(queueId) {
   q.extras.forEach(function (e) {
     ticket.push({ item_type: 'extra', item_id: e.id, item_name: e.name, unit_price_cents: e.price_cents, quantity: 1 });
   });
+  // Produits choisis d'avance par le client au moment de sa reservation
+  // (ex: une boisson) - deja pretes dans le ticket, le coiffeur peut les
+  // retirer si le client a change d'avis, sans avoir a se souvenir de
+  // les chercher lui-meme dans l'onglet Produits.
+  (q.products || []).forEach(function (p) {
+    ticket.push({ item_type: 'product', item_id: p.id, item_name: p.name, unit_price_cents: p.price_cents, quantity: p.quantity });
+  });
   ticketQueueId = queueId;
   loyaltyRewardsAvailable = q.loyalty_rewards_available || 0;
   loyaltyDiscount = null;

@@ -56,7 +56,7 @@ async function earnLoyaltyPoint(salonId, row) {
 async function loadQueue(salonId, statuses, onlyUnpaid) {
   statuses = statuses || ['waiting', 'in_progress'];
   const statusPlaceholders = statuses.map(() => '?').join(',');
-  const [[rows], [services], [extras], [links], [notes], [svcPrices], [extPrices], [gifts], [loyaltyRows]] = await Promise.all([
+  const [[rows], [services], [extras], [links], [notes], [svcPrices], [extPrices], [gifts], [loyaltyRows], [prodLinks], [allProducts]] = await Promise.all([
     pool.query(
       `SELECT * FROM queue WHERE salon_id = ? AND status IN (${statusPlaceholders})` +
       (onlyUnpaid ? ' AND paid_at IS NULL' : '') +
@@ -83,12 +83,24 @@ async function loadQueue(salonId, statuses, onlyUnpaid) {
       [salonId]
     ),
     pool.query('SELECT * FROM gift_cards WHERE salon_id = ? AND used_at IS NULL', [salonId]),
-    pool.query('SELECT client_key, rewards_available FROM loyalty_accounts WHERE salon_id = ? AND rewards_available > 0', [salonId])
+    pool.query('SELECT client_key, rewards_available FROM loyalty_accounts WHERE salon_id = ? AND rewards_available > 0', [salonId]),
+    // Produits choisis d'avance a la reservation (ex: une boisson) - a
+    // ne pas confondre avec queue_extras : jamais d'impact sur la duree
+    // ni le prix "total_..." de la prestation, juste une liste a part
+    // (q.products) a retrouver au moment d'encaisser.
+    pool.query(
+      `SELECT qp.* FROM queue_products qp
+       JOIN queue q ON q.id = qp.queue_id
+       WHERE q.salon_id = ?`,
+      [salonId]
+    ),
+    pool.query('SELECT * FROM products WHERE salon_id = ?', [salonId])
   ]);
 
   const svcById = Object.fromEntries(services.map((s) => [s.id, s]));
   const extById = Object.fromEntries(extras.map((e) => [e.id, e]));
   const noteByKey = Object.fromEntries(notes.map((n) => [n.client_key, n.note]));
+  const productById = Object.fromEntries(allProducts.map((p) => [p.id, p]));
 
   // Rapprochement cadeau/fidélité — disponible pour QUI QUE CE SOIT qui
   // regarde ce client (Mon poste, dashboard, caisse), pas seulement au
@@ -132,6 +144,18 @@ async function loadQueue(salonId, statuses, onlyUnpaid) {
     const price = svcPrice + chosen.reduce((a, e) => a + e.price_cents, 0);
     const key = clientKey(r);
 
+    // Produits choisis d'avance a la reservation - jamais ajoutes a
+    // "duration"/"price" ci-dessus (acheter une boisson n'allonge pas la
+    // coupe) : juste une liste a part, a proposer au barbier au moment
+    // d'encaisser (voir usePendingForTicket cote caisse.html).
+    const products = prodLinks
+      .filter((l) => l.queue_id === r.id)
+      .map((l) => {
+        const p = productById[l.product_id];
+        return p ? Object.assign({}, p, { quantity: l.quantity }) : null;
+      })
+      .filter(Boolean);
+
     return Object.assign({}, r, {
       position: r.queue_position,
       checkin_at: utcIso(r.checkin_at),
@@ -139,6 +163,7 @@ async function loadQueue(salonId, statuses, onlyUnpaid) {
       end_at: utcIso(r.end_at),
       service: effectiveService,
       extras: chosen,
+      products: products,
       total_duration_min: duration,
       total_price_cents: price,
       note: (key && noteByKey[key]) || ''

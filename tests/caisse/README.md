@@ -49,4 +49,5 @@ node tests/caisse/15-deplacer-dans-tiroir.js       # bouton Deplacer dans le tir
 node tests/caisse/16-alignement-clients.js         # colonnes de la liste Clients ne se decalent pas selon la presence du bouton Terminer
 node tests/caisse/17-kiosk-sans-rdv.js             # le kiosque ne compte/affiche que l'attente libre, jamais les RDV programmes
 node tests/caisse/18-liste-suivants-timer.js       # onglet Timer : la liste des suivants reste visible pendant une prestation en cours, premier verrouille
+node tests/caisse/19-produits-preselectionnes-rdv.js  # produits pre-choisis a la reservation - remontent jusqu'a la file, sans toucher a la duree/au prix
 ```
