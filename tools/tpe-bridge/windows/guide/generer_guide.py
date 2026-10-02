@@ -127,13 +127,30 @@ s += bullets([
     "(Ne choisissez <b>pas</b> « Aucun » ni « Nepting ».)",
     f"Vérifiez le <b>Port d'écoute TPE</b> : il doit être <b>{TPE_PORT}</b>. "
     "S'il est différent, notez le chiffre affiché et prévenez votre développeur.",
-    "Dans la partie <b>Lien</b>, laissez <b>IP</b> coché.",
+    "Ne touchez pas au <b>Port d'écoute caisse</b> (20006) : il n'est pas utilisé.",
+    "Dans la partie <b>Lien</b>, laissez <b>IP</b> coché. C'est seulement le type de connexion "
+    "(réseau, au lieu d'un câble) : <b>il n'y a aucune adresse IP à taper dans le TPE</b>.",
     "Touchez <b>VALIDER</b>. Si le TPE le propose, redémarrez-le.",
 ], numbered=True)
 s.append(Spacer(1, 6))
 s.append(box([P("Pour vérifier, imprimez un ticket de configuration : il doit afficher "
                 "<b>PROTOCOL: ConcertV3 IP</b>. Envoyez-en une photo à votre développeur.")],
              bg=OK_BG, border=OK_BD))
+
+s.append(Spacer(1, 6))
+s.append(P("<b>Les deux adresses IP, pour ne pas les confondre :</b>"))
+s.append(Spacer(1, 4))
+s.append(grid([
+    ["Adresse", "Où la trouver", "Où la taper"],
+    [f"<b>IP du TPE</b> : {TPE_IP}", "Sur le ticket de configuration du TPE",
+     "Sur l'ordinateur : dans le test de l'étape 2 et dans la fenêtre de configuration (étape 5)."],
+    ["<b>IP de l'ordinateur</b> (ex. 192.168.1.35)", "Avec la commande ipconfig (étape 2)",
+     "Nulle part. Elle sert seulement à vérifier que l'ordinateur est sur le même réseau "
+     "(elle doit commencer par 192.168.1.)."],
+], [50, 50, 70]))
+s.append(Spacer(1, 4))
+s.append(P("C'est l'ordinateur qui va chercher le TPE, pas l'inverse : le TPE n'a pas besoin "
+           "de connaître l'adresse de l'ordinateur."))
 
 # ---------------- Etape 2
 s.append(P("Étape 2 - Tester la communication entre l'ordinateur et le TPE", h2))
@@ -167,7 +184,8 @@ s.append(grid([
 s.append(Spacer(1, 6))
 s.append(P("<b>Test dans l'autre sens (facultatif) :</b> sur le TPE, menu <b>Diagnostics</b>, "
            "<b>Test réseau (Ping)</b>. Tapez l'adresse IPv4 de l'ordinateur notée ci-dessus, "
-           "puis VALIDER. Le test doit réussir."))
+           "puis VALIDER. Le test doit réussir. (C'est le seul endroit où l'on tape l'IP de "
+           "l'ordinateur sur le TPE, et cela ne change aucun réglage.)"))
 
 s.append(P("Corriger le réseau du TPE (seulement si le test échoue)", h2))
 s.append(P("Le plus simple est de passer le TPE en <b>DHCP</b> : la box lui donne alors "
