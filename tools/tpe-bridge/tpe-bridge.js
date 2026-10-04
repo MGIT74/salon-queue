@@ -93,67 +93,84 @@ DEUX MODES (cumulables) :
 `);
 }
 
-/* ---------- Trame Concert v3 (même logique que src/lib/tpeConcert.js) ---------- */
+/* ---------- Nepting Local API (Concert v3 IP / TLV) ---------- */
 
-const STX = 0x02;
-const ETX = 0x03;
-
-function computeLrc(buf) {
-  let lrc = 0;
-  for (const b of buf) lrc ^= b;
-  return lrc;
+/**
+ * Format réellement validé sur le terminal Nepting du salon :
+ * TCP port 8888, champs TLV ASCII CZ/CJ/CA/CB/CD/CE, fin de requête CRLF.
+ * CJ est un identifiant logique de caisse sur 12 caractères ; on le dérive
+ * du numéro de caisse afin qu'il soit stable et unique par poste.
+ */
+function neptingTlv(tag, value) {
+  const v = String(value);
+  return tag + String(v.length).padStart(3, '0') + v;
 }
 
 function buildConcertFrame(posNumber, amountCents, transactionType) {
-  const amount = String(amountCents).padStart(8, '0');
-  const msg =
-    String(posNumber).slice(0, 1) +
-    amount +
-    '0' +                                     // answer_flag
-    '1' +                                     // payment_mode CB
-    (transactionType === 'credit' ? '1' : '0') +
-    '978' +                                   // EUR
-    ' '.repeat(10) +                          // private
-    'A010' +                                  // réponse fin de transaction
-    'B010';                                   // autorisation auto
-  const body = Buffer.concat([Buffer.from(msg, 'ascii'), Buffer.from([ETX])]);
-  return Buffer.concat([Buffer.from([STX]), body, Buffer.from([computeLrc(body)])]);
+  const pos = String(posNumber).replace(/\D/g, '') || '2';
+  const pos2 = pos.padStart(2, '0').slice(-2);
+  const cashRegisterId = pos.padStart(12, '0').slice(-12);
+
+  return Buffer.from(
+    neptingTlv('CZ', '0320') +
+    neptingTlv('CJ', cashRegisterId) +
+    neptingTlv('CA', pos2) +
+    neptingTlv('CB', String(amountCents)) +
+    neptingTlv('CD', transactionType === 'credit' ? '1' : '0') +
+    neptingTlv('CE', '978') +
+    '\r\n',
+    'ascii'
+  );
 }
 
-const RESULT_LABELS = {
-  '0': 'Accepté',
-  '1': 'Appel autorisation requis',
-  '2': 'Forçage',
-  '3': 'Refusé',
-  '4': 'Carte interdite',
-  '5': 'Annulé',
-  '6': 'Transaction non effectuée',
-  '7': 'Transaction impossible',
-  '8': 'Erreur inconnue'
-};
+function parseNeptingTlv(text) {
+  const fields = {};
+  const clean = String(text).replace(/[\r\n]/g, '');
+  let i = 0;
+
+  while (i + 5 <= clean.length) {
+    const tag = clean.slice(i, i + 2);
+    const lenText = clean.slice(i + 2, i + 5);
+    if (!/^[A-Z0-9]{2}$/.test(tag) || !/^\d{3}$/.test(lenText)) {
+      i += 1;
+      continue;
+    }
+    const len = Number(lenText);
+    const valueStart = i + 5;
+    const valueEnd = valueStart + len;
+    if (valueEnd > clean.length) break;
+    fields[tag] = clean.slice(valueStart, valueEnd);
+    i = valueEnd;
+  }
+  return fields;
+}
 
 function interpretResponse(frame) {
-  const t = frame.replace(/\r/g, '');
-  if (t.length < 14) throw new Error('Réponse TPE trop courte (' + t.length + ')');
+  const fields = parseNeptingTlv(frame);
+  if (!fields.AE) throw new Error('Réponse Nepting incomplète (champ AE absent)');
+
+  const success = fields.AE === '10';
   return {
-    success: t.charAt(1) === '0',
-    resultCode: t.charAt(1),
-    failureReason: t.charAt(1) === '0' ? null : (RESULT_LABELS[t.charAt(1)] || 'Échec (code ' + t.charAt(1) + ')'),
-    amountCents: parseInt(t.slice(2, 10), 10),
-    currency: t.slice(11, 14)
+    success,
+    resultCode: fields.AE,
+    failureCode: success ? null : (fields.AF || fields.AE),
+    failureReason: success ? null : ('Paiement refusé/annulé (AE=' + fields.AE + (fields.AF ? ', AF=' + fields.AF : '') + ')'),
+    authNumber: fields.AC || null,
+    amountCents: fields.CB ? Number(fields.CB) : null,
+    currency: fields.CE || null
   };
 }
 
 /**
- * Envoie la demande au TPE et résout avec le résultat une fois la
- * réponse lue (même connexion TCP). Le paiement carte dure typiquement
- * 10-30 s (présentation de la carte, PIN...), d'où un timeout large.
+ * Envoie une demande Nepting au TPE et attend le résultat de transaction.
+ * La réponse Nepting n'est pas nécessairement terminée par CR/LF : on
+ * considère la réponse exploitable dès que le champ AE complet est reçu.
  */
 function concertCharge(host, port, pos, amountCents, timeoutMs) {
   return new Promise((resolve, reject) => {
     const frame = buildConcertFrame(pos, amountCents, 'debit');
     const socket = net.createConnection({ host, port });
-    let buffer = Buffer.alloc(0);
+    let response = '';
     let settled = false;
 
     const timeoutHandle = setTimeout(() => {
@@ -163,41 +180,42 @@ function concertCharge(host, port, pos, amountCents, timeoutMs) {
       reject(new Error("Le TPE n'a pas répondu à temps (terminal en veille ? hors ligne ?)"));
     }, timeoutMs);
 
-    const settle = (fn, v) => {
+    const settle = (fn, value) => {
       if (settled) return;
       settled = true;
       clearTimeout(timeoutHandle);
       socket.destroy();
-      fn(v);
+      fn(value);
+    };
+
+    const tryInterpret = () => {
+      const fields = parseNeptingTlv(response);
+      if (!fields.AE) return false;
+      try {
+        settle(resolve, interpretResponse(response));
+      } catch (err) {
+        settle(reject, err);
+      }
+      return true;
     };
 
     socket.on('connect', () => {
-      console.log(`[>] Demande de ${(amountCents / 100).toFixed(2)} € envoyée à ${host}:${port}`);
+      console.log(`[>] Demande Nepting de ${(amountCents / 100).toFixed(2)} € envoyée à ${host}:${port} (caisse ${pos})`);
       socket.write(frame);
     });
 
     socket.on('data', (chunk) => {
-      buffer = Buffer.concat([buffer, chunk]);
-      const start = buffer.indexOf(STX);
-      if (start === -1) return;
-      const end = buffer.indexOf(ETX, start + 1);
-      if (end === -1) return;
-      const payload = buffer.subarray(start + 1, end).toString('ascii');
-      try {
-        settle(resolve, interpretResponse(payload));
-      } catch (err) {
-        settle(reject, err);
-      }
+      response += chunk.toString('ascii');
+      tryInterpret();
     });
 
     socket.once('close', () => {
       if (settled) return;
-      const start = buffer.indexOf(STX);
-      const end = buffer.indexOf(ETX, start + 1);
-      if (start !== -1 && end !== -1) {
-        try {
-          settle(resolve, interpretResponse(buffer.subarray(start + 1, end).toString('ascii')));
-        } catch (err) { settle(reject, err); }
+      if (!response) return settle(reject, new Error('Connexion TPE fermée sans réponse'));
+      try {
+        settle(resolve, interpretResponse(response));
+      } catch (err) {
+        settle(reject, err);
       }
     });
 
