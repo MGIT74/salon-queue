@@ -30,28 +30,29 @@ check('le menu est une colonne flex', /\.sidebar \{ display: flex; flex-directio
 check('en-tete et pied ne retrecissent pas (fixes)', /\.sidebar-brand, \.sidebar-collapse-btn, \.sidebar-logout, \.sidebar-theme-btn \{ flex-shrink: 0; \}/.test(desktop));
 check('la navigation est la seule zone qui defile (min-height:0 + overflow-y:auto)', /\.tabs \{[^}]*min-height: 0;[^}]*overflow-y: auto;/.test(desktop));
 check('les boutons de la navigation ne s\'ecrasent pas', /\.tabs button \{ flex-shrink: 0; \}/.test(desktop));
-check('fine ligne au-dessus du pied', /\.sidebar-logout::before/.test(desktop));
+check('fine ligne au-dessus du pied (accrochee au 1er element : Theme)', /\.sidebar-theme-btn::before/.test(desktop) && !/\.sidebar-logout::before/.test(desktop));
 
 console.log('\n[B] RIEN de tout cela dans le bloc MOBILE (<= 860px)');
 check('bloc mobile trouve', Boolean(mobile));
 check('le mobile ne recoit pas la colonne flex du menu', !/\.sidebar \{ display: flex; flex-direction: column; \}/.test(mobile));
 check('le mobile ne recoit pas la zone defilante de la navigation', !/\.tabs \{[^}]*min-height: 0;[^}]*overflow-y: auto;/.test(mobile));
-check('le mobile ne recoit pas la ligne du pied', !/\.sidebar-logout::before/.test(mobile));
+check('le mobile ne recoit pas la ligne du pied', !/\.sidebar-theme-btn::before/.test(mobile));
 
 console.log('\n[C] Ces regles ne fuient pas hors du bloc bureau');
 const outside = src.replace(desktop, '');
-check('aucune autre definition de .sidebar-logout::before hors du bloc bureau', !/\.sidebar-logout::before/.test(outside));
+check('aucune autre definition de la ligne du pied hors du bloc bureau', !/\.sidebar-theme-btn::before/.test(outside));
 check('aucune autre colonne flex du menu hors du bloc bureau', !/\.sidebar \{ display: flex; flex-direction: column; \}/.test(outside));
 
-console.log('\n[D] Ordre dans la page : en-tete, navigation, Deconnexion, Theme, REDUIRE en dernier');
-const aside = src.slice(src.indexOf('<aside class="sidebar">'), src.indexOf('</aside>'));
+console.log('\n[D] Ordre dans la page : en-tete, navigation, Theme, Reduire, DECONNEXION en tout dernier');
+const aside = src.slice(src.indexOf('<aside class="sidebar">'), src.indexOf('</aside>', src.indexOf('<aside class="sidebar">')));
 const pos = (k) => aside.indexOf(k);
-check('Reduire est APRES Theme', pos('class="sidebar-collapse-btn"') > pos('class="sidebar-theme-btn"') && pos('class="sidebar-theme-btn"') > pos('class="sidebar-logout"'));
+check('ordre du pied : Theme < Reduire < Deconnexion', pos('class="sidebar-theme-btn"') < pos('class="sidebar-collapse-btn"') && pos('class="sidebar-collapse-btn"') < pos('class="sidebar-logout"'));
+check('la navigation est avant tout le pied', pos('id="tabs"') < pos('class="sidebar-theme-btn"'));
+check('Deconnexion est le TOUT DERNIER bouton du menu (aucun autre bouton apres lui)', aside.slice(pos('class="sidebar-logout"')).indexOf('<button') === -1);
 check('Reduire n\'est plus entre l\'en-tete et la navigation', !(pos('class="sidebar-collapse-btn"') > pos('class="sidebar-brand"') && pos('class="sidebar-collapse-btn"') < pos('id="tabs"')));
-check('Reduire reste dans le menu (avant </aside>)', pos('class="sidebar-collapse-btn"') !== -1);
-check('le bouton garde son action de repli', /class="sidebar-collapse-btn" onclick="toggleSidebarCollapsed\(\)"/.test(aside));
-check('marges du bouton ajustees pour sa place en bas (bloc bureau)', /\.sidebar-collapse-btn \{ margin: 4px 0 0; \}/.test(desktop));
-check('...et pas dans le bloc mobile (ou il reste masque)', !/\.sidebar-collapse-btn \{ margin/.test(mobile) && /\.sidebar-collapse-btn \{ display: none; \}/.test(mobile));
+check('les boutons gardent leurs actions (repli, deconnexion, theme)', /class="sidebar-collapse-btn" onclick="toggleSidebarCollapsed\(\)"/.test(aside) && /class="sidebar-logout" onclick="logout\(\)"/.test(aside) && /class="sidebar-theme-btn" onclick="toggleTheme\(\)"/.test(aside));
+check('espacements du pied dans le bloc bureau', /\.sidebar-theme-btn \{ position: relative; margin-top: 10px; \}/.test(desktop) && /\.sidebar-collapse-btn \{ margin: 4px 0 0; \}/.test(desktop) && /\.sidebar-logout \{ margin-top: 4px; \}/.test(desktop));
+check('...et aucun dans le bloc mobile (ou ces boutons restent masques)', !/\.sidebar-(collapse-btn|logout|theme-btn) \{ (margin|position)/.test(mobile));
 
 console.log(`\nRESULTAT : ${pass} verifications reussies, ${fail} echec(s)`);
 process.exit(fail ? 1 : 0);
