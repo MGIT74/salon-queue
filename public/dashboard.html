@@ -1308,7 +1308,7 @@
   <div class="tab-panel on" id="t-dashboard">
     <div class="dash-hero">
       <div>
-        <h2 class="dash-title">Bienvenue, <span id="dash-welcome-name">—</span></h2>
+        <h2 class="dash-title">Bienvenue, <span id="dash-welcome-name" style="visibility:hidden"></span></h2>
         <div class="dash-subtitle" id="dash-date"></div>
       </div>
       <div class="dash-kpis">
@@ -2812,15 +2812,42 @@ function renderDashLeaderboard() {
 
 // "Bienvenue, <nom>" : le nom du PROFIL de l'admin (Reglages > Mon profil),
 // pas celui de l'enseigne - celui-ci reste affiche partout ailleurs (menu
-// lateral, kiosque, pages client). Retombe sur le nom de l'enseigne si le
-// profil n'a pas de nom ou si la lecture echoue : jamais d'accueil vide.
+// lateral, kiosque, pages client).
+//
+// Jamais de nom PROVISOIRE : afficher d'abord le nom de l'enseigne puis le
+// remplacer par celui du profil se voyait a chaque rafraichissement (un
+// clignotement peu professionnel). Le texte reste donc invisible tant que le
+// bon nom n'est pas connu ; le dernier nom connu est garde en memoire de
+// session pour s'afficher instantanement aux rafraichissements suivants. Le
+// nom de l'enseigne n'apparait qu'en DERNIER recours (profil sans nom, erreur,
+// ou reponse trop lente) - jamais d'accueil vide.
 function loadWelcomeName() {
   var el = document.getElementById('dash-welcome-name');
-  el.textContent = currentSalonName || '—';
+  var cacheKey = 'welcome-name:' + (typeof SALON_SLUG === 'string' ? SALON_SLUG : '');
+  function show(name) { el.textContent = name; el.style.visibility = 'visible'; }
+  function fallback() { show(currentSalonName || ''); }
+
+  var cached = '';
+  try { cached = sessionStorage.getItem(cacheKey) || ''; } catch (e) { /* stockage indisponible */ }
+  if (cached) show(cached);
+
+  var done = false;
+  var slowTimer = setTimeout(function () { if (!done && !cached) fallback(); }, 3000);
+
   api('/api/owner/profile').then(function (r) {
+    done = true; clearTimeout(slowTimer);
     var name = r && r.name ? String(r.name).trim() : '';
-    if (name) el.textContent = name;
-  }).catch(function () { /* on garde le nom de l'enseigne */ });
+    if (name) {
+      try { sessionStorage.setItem(cacheKey, name); } catch (e) { /* ignore */ }
+      show(name);
+    } else {
+      try { sessionStorage.removeItem(cacheKey); } catch (e) { /* ignore */ }
+      fallback();
+    }
+  }).catch(function () {
+    done = true; clearTimeout(slowTimer);
+    if (!cached) fallback(); // sinon on garde le nom deja affiche
+  });
 }
 
 function loadDashboardTab() {
