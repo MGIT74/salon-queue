@@ -1,0 +1,58 @@
+# Deploiement production (xCloud, serveur Docker) : l'app Node + sa base
+# MariaDB. Les secrets arrivent par le fichier .env que xCloud depose a cote
+# de ce fichier - JAMAIS ecrits ici ni commites.
+#
+# Base calee sur MariaDB 10.11 / utf8mb4_general_ci : c'est exactement la
+# version et la collation sur lesquelles toute la batterie de tests
+# (tests/caisse) a ete executee.
+
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      TZ: UTC
+      PORT: "3000"
+      DB_HOST: db
+      DB_PORT: "3306"
+      DB_NAME: ${DB_NAME:-salonq}
+      DB_USER: ${DB_USER:-salonq}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD manquant}
+      SETTINGS_ENCRYPTION_KEY: ${SETTINGS_ENCRYPTION_KEY:?SETTINGS_ENCRYPTION_KEY manquant}
+      SUPER_ADMIN_PASSWORD: ${SUPER_ADMIN_PASSWORD:?SUPER_ADMIN_PASSWORD manquant}
+      SIGNUP_ENABLED: ${SIGNUP_ENABLED:-false}
+    ports:
+      # Uniquement sur la boucle locale : seul le reverse proxy (nginx +
+      # HTTPS) du serveur doit atteindre l'app, jamais Internet directement
+      # en HTTP clair sur le port 3000.
+      - "127.0.0.1:3000:3000"
+
+  db:
+    image: mariadb:10.11
+    restart: unless-stopped
+    environment:
+      TZ: UTC
+      MARIADB_DATABASE: ${DB_NAME:-salonq}
+      MARIADB_USER: ${DB_USER:-salonq}
+      MARIADB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD manquant}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?DB_ROOT_PASSWORD manquant}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_general_ci
+    volumes:
+      # Volume nomme : survit aux redeploiements (git reset/clean ne le touche
+      # pas) et a la recreation des conteneurs. SEULE donnee a ne jamais perdre.
+      - db_data:/var/lib/mysql
+    # Aucun "ports:" : la base n'est jamais exposee hors du reseau Docker.
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+volumes:
+  db_data:
