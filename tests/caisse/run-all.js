@@ -45,7 +45,8 @@ const suite = [
   ['22-produits-rdv-compte.js', true, ['exit']],
   ['23-sans-rdv-sur-frise.js', true, ['exit']],
   ['24-nom-bienvenue-dashboard.js', false, ['exit']],
-  ['25-logo-menu-lateral.js', false, ['exit']]
+  ['25-logo-menu-lateral.js', false, ['exit']],
+  ['26-menu-lateral-trois-zones.js', false, ['exit']]
 ];
 
 let bad = 0;

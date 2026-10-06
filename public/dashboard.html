@@ -306,6 +306,26 @@
   .sidebar-collapse-btn .ic svg { transition: transform .2s ease; }
   html[data-sidebar-collapsed="1"] .sidebar-collapse-btn .ic svg { transform: rotate(180deg); }
 
+  /* BUREAU UNIQUEMENT (>= 861px, la version mobile ci-dessous n'est pas touchee).
+     Menu lateral en 3 zones : en-tete FIXE (logo, selecteur d'enseigne, Reduire),
+     navigation qui DEFILE (de Dashboard a Reglages), pied FIXE (Deconnexion, Theme).
+     Avant, tout le menu defilait ensemble : sur un ecran peu haut, Deconnexion et
+     Theme sortaient de l'ecran. */
+  @media (min-width: 861px) {
+    .sidebar { display: flex; flex-direction: column; }
+    .sidebar-brand, .sidebar-collapse-btn, .sidebar-logout, .sidebar-theme-btn { flex-shrink: 0; }
+    /* min-height:0 : sans lui, un element flex refuse de devenir plus petit que
+       son contenu et la liste ne defilerait jamais. */
+    .tabs { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+    /* Les boutons gardent leur taille : sans cela ils s'ecraseraient pour tenir
+       au lieu de laisser la liste defiler. */
+    .tabs button { flex-shrink: 0; }
+    /* Fine ligne au-dessus du pied, comme celle sous l'en-tete : on voit ou
+       s'arrete la zone qui defile. */
+    .sidebar-logout { position: relative; }
+    .sidebar-logout::before { content: ''; position: absolute; left: 10px; right: 10px; top: -6px; height: 1px; background: var(--sep); }
+  }
+
   @media (max-width: 860px) {
     .app-shell { flex-direction: column; align-items: stretch; }
 
