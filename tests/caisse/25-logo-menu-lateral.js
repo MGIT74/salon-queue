@@ -26,6 +26,7 @@ function page(slug) {
   const w = dom.window;
   w.SALON_SLUG = slug || 'oyonnax';
   w.applyAccentColor = () => {};
+  w.rdvSlotStepMin = 15; w.rerenderAllTimelines = () => {};   // globaux de la vraie page, lus par loadCurrentSalonName
   w.eval(fnSrc);
   return w;
 }

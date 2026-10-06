@@ -949,6 +949,7 @@
   .timeline-inner { position: relative; }
   .timeline-hours { position: relative; height: 18px; margin-bottom: 6px; }
   .timeline-hours span { position: absolute; top: 0; font-size: 12px; color: var(--grey); white-space: nowrap; transform: translateX(-1px); }
+  .timeline-hours span.h { color: var(--ink); font-weight: 600; }
   .timeline-row { display: flex; align-items: center; min-height: 54px; border-top: 1px solid var(--sep); position: relative; }
   .timeline-row:first-child { border-top: none; }
   .timeline-row-label { width: 22px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; padding-right: 0; }
@@ -976,8 +977,10 @@
      15 min (via background-size en %, calculé selon la plage affichée). */
   .timeline-minute-grid {
     position: absolute; left: 22px; right: 0; top: 0; bottom: 0; pointer-events: none; z-index: 0;
-    background-image: linear-gradient(to right, var(--sep) 1px, transparent 1px);
-    background-repeat: repeat-x; background-position: left top;
+    /* 1re couche : un trait fin a chaque pas ; 2e couche : un trait plus marque a chaque heure */
+    background-image: linear-gradient(to right, var(--sep) 1px, transparent 1px),
+                      linear-gradient(to right, rgba(128,128,128,.38) 1px, transparent 1px);
+    background-repeat: repeat-x, repeat-x; background-position: left top, left top;
   }
   .timeline-zoom-ctrl {
     display: flex; align-items: center; justify-content: flex-end; gap: 6px;
@@ -2454,6 +2457,11 @@ function loadCurrentSalonName() {
       currentSalonName = name;
       currentSalonLogo = d.logo_url || '';
       currentGiftTileImage = d.gift_tile_image_url || '';
+      var newSlotStep = Number(d.rdv_slot_step_min) || 15;
+      var slotStepChanged = newSlotStep !== rdvSlotStepMin;
+      rdvSlotStepMin = newSlotStep;
+      // Isole : un souci de redessin des frises ne doit jamais empecher le reste du chargement (logo, apercus...).
+      if (slotStepChanged) { try { rerenderAllTimelines(); } catch (e) { /* la frise se corrigera au prochain rendu */ } }
       var loginEl = document.getElementById('login-salon-name');
       if (SALON_SLUG) {
         // Un salon precis est demande (lien direct/bookmark) — on peut
@@ -4868,6 +4876,35 @@ function loadSalonScheduleForTimeline() {
  * ergonomique qu'une liste qui s'allonge indéfiniment.
  */
 var timelineZoom = 1; // partagé entre l'onglet RDV et l'aperçu du Dashboard
+// Pas des creneaux (Rendez-vous > Parametres) : l'echelle de la frise affiche une heure A CHAQUE PAS.
+// 15 par defaut, comme cote serveur ; mis a jour depuis les reglages.
+var rdvSlotStepMin = 15;
+var TIMELINE_LABEL_PX = 44;        // place reservee a chaque libelle d'heure (ex. "08:05") : ils ne se chevauchent jamais
+var timelineMinZoom = 0.6;         // zoom minimum REEL du dernier rendu (en dessous, les libelles se chevaucheraient)
+var timelineEffectiveZoom = null;  // zoom reellement applique par le dernier rendu
+
+// Une frise LARGE (pas fin) depasse l'ecran : au lieu de l'ouvrir sur le matin, on la centre sur le trait
+// "maintenant" quand on regarde AUJOURD'HUI. Se declenche des qu'une frise apparait dans la page, quel que
+// soit l'endroit qui l'affiche (aucun appel a ajouter nulle part).
+(function installTimelineAutoScroll() {
+  function scrollToNow(sc) {
+    var now = sc.querySelector('.timeline-now-line');
+    // Un debordement de quelques pixels (le dernier libelle) ne justifie pas de decaler la frise (cela
+    // cacherait la colonne de gauche) : on ne centre que si elle est VRAIMENT plus large que l'ecran.
+    if (!now || sc.scrollWidth - sc.clientWidth < 80) return;
+    sc.scrollLeft = Math.max(0, now.offsetLeft - sc.clientWidth / 2);
+  }
+  new MutationObserver(function (muts) {
+    muts.forEach(function (m) {
+      m.addedNodes.forEach(function (n) {
+        if (n.nodeType !== 1) return;
+        if (n.classList.contains('timeline-scroll')) scrollToNow(n);
+        else if (n.querySelectorAll) n.querySelectorAll('.timeline-scroll').forEach(scrollToNow);
+      });
+    });
+  }).observe(document.body || document.documentElement, { childList: true, subtree: true });
+})();
+
 var dashTimelineCache = null; // {dateStr, appts} - pour re-rendre au zoom sans re-fetcher
 
 function renderDayTimelineHtml(dateStr, dayAppts) {
@@ -4911,12 +4948,14 @@ function renderDayTimelineHtml(dateStr, dayAppts) {
   if (rangeEnd - rangeStart < 4 * 60) rangeEnd = rangeStart + 4 * 60;
 
   var hourCount = (rangeEnd - rangeStart) / 60;
+  // Une heure A CHAQUE PAS des creneaux (Rendez-vous > Parametres) : 08:00, 08:05, 08:10...
+  // avec un pas de 5 min. Les heures pleines ressortent (classe "h").
+  var stepMin = rdvSlotStepMin > 0 ? rdvSlotStepMin : 15;
   var hoursHtml = '';
-  for (var h = 0; h <= hourCount; h++) {
-    var totalMin = rangeStart + h * 60;
-    var hourFrac = (h * 60) / (rangeEnd - rangeStart);
-    hoursHtml += '<span style="left: calc(22px + (100% - 22px) * ' + hourFrac + ')">' +
-      String(Math.floor(totalMin / 60)).padStart(2, '0') + ':00</span>';
+  for (var t = rangeStart; t <= rangeEnd; t += stepMin) {
+    var tFrac = (t - rangeStart) / (rangeEnd - rangeStart);
+    hoursHtml += '<span' + (t % 60 === 0 ? ' class="h"' : '') + ' style="left: calc(22px + (100% - 22px) * ' + tFrac + ')">' +
+      String(Math.floor(t / 60)).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0') + '</span>';
   }
 
   var rowsHtml = barberIds.map(function (bid) {
@@ -4961,18 +5000,22 @@ function renderDayTimelineHtml(dateStr, dayAppts) {
     }
   }
 
-  // Repère de minutes en fond : une ligne fine tous les quarts d'heure.
-  // background-size en % du conteneur = 15 min exprimees en pourcentage
-  // de la plage totale affichee (rangeEnd - rangeStart).
-  var minuteStepPct = (15 / (rangeEnd - rangeStart)) * 100;
-  var minuteGridHtml = '<div class="timeline-minute-grid" style="background-size:' + minuteStepPct + '% 100%"></div>';
+  // Reperes en fond : un trait fin a chaque PAS, un trait plus marque a chaque heure
+  // (background-size en % de la plage totale affichee).
+  var stepPct = (stepMin / (rangeEnd - rangeStart)) * 100;
+  var hourPct = (60 / (rangeEnd - rangeStart)) * 100;
+  var minuteGridHtml = '<div class="timeline-minute-grid" style="background-size:' + stepPct + '% 100%, ' + hourPct + '% 100%"></div>';
 
-  // Largeur ajustable au zoom : ~90px/heure a zoom 1 (comme le minimum
-  // fixe d'avant, mais qui suit desormais le nombre d'heures affichees
-  // au lieu d'une largeur fixe qui coupait les plages courtes ou
-  // ecrasait les plages longues).
-  var innerWidth = Math.round(hourCount * 90 * timelineZoom);
-  var zoomPct = Math.round(timelineZoom * 100);
+  // Largeur : chaque libelle d'heure garde sa place (TIMELINE_LABEL_PX) quel que soit le pas - sans
+  // cela, a 5 min, les "08:05", "08:10"... se chevaucheraient. La frise s'elargit donc (defilement
+  // horizontal). Le zoom part de cette largeur "juste suffisante" et ne peut pas descendre en dessous.
+  var labelsPerHour = 60 / stepMin;
+  var fitPerHour = Math.max(90, labelsPerHour * TIMELINE_LABEL_PX);   // px par heure a 100%
+  var minZoom = Math.max(0.6, (labelsPerHour * TIMELINE_LABEL_PX) / fitPerHour);
+  var effZoom = Math.max(timelineZoom, minZoom);
+  timelineMinZoom = minZoom; timelineEffectiveZoom = effZoom;          // +/- repartent de la valeur AFFICHEE
+  var innerWidth = Math.round(hourCount * fitPerHour * effZoom);
+  var zoomPct = Math.round(effZoom * 100);
   var zoomCtrl = '<div class="timeline-zoom-ctrl"><div class="timeline-zoom-ctrl-inner">' +
     '<button type="button" onclick="event.stopPropagation();adjustTimelineZoom(-1)" title="Dézoomer">−</button>' +
     '<span>' + zoomPct + '%</span>' +
@@ -5032,9 +5075,7 @@ function updateTimelineNowLines() {
  * 250%). Ré-affiche tous les plannings jour actuellement visibles avec
  * les données déjà en mémoire, sans nouvel appel réseau.
  */
-function adjustTimelineZoom(delta) {
-  timelineZoom = Math.max(0.6, Math.min(2.5, +(timelineZoom + delta * 0.2).toFixed(2)));
-
+function rerenderAllTimelines() {
   if (dashTimelineCache) {
     var dashEl = document.getElementById('dash-timeline');
     if (dashEl) dashEl.innerHTML = renderDayTimelineHtml(dashTimelineCache.dateStr, dashTimelineCache.appts);
@@ -5046,6 +5087,13 @@ function adjustTimelineZoom(delta) {
       else if (calViewMode === 'week') renderWeekView();
     }
   }
+}
+
+function adjustTimelineZoom(delta) {
+  // On part du zoom REELLEMENT affiche (il peut etre au-dessus de celui demande : le minimum depend du pas).
+  var base = timelineEffectiveZoom == null ? timelineZoom : timelineEffectiveZoom;
+  timelineZoom = Math.max(timelineMinZoom, Math.min(2.5, +(base + delta * 0.2).toFixed(2)));
+  rerenderAllTimelines();
 }
 
 /**
@@ -7138,6 +7186,8 @@ function openRdvSettings() {
         rdv_prep_alert_min: overlay.querySelector('#rs-prep').value
       }
     }).then(function () {
+      rdvSlotStepMin = Number(overlay.querySelector('#rs-step').value) || 15;
+      rerenderAllTimelines();   // l'echelle des chronologies suit le nouveau pas tout de suite
       _closeModal(overlay);
       toast('Paramètres enregistrés');
     }).catch(function (e) { errEl.textContent = e.message; errEl.style.display = 'block'; });

@@ -237,6 +237,7 @@
   .timeline-inner { position: relative; }
   .timeline-hours { position: relative; height: 18px; margin-bottom: 6px; }
   .timeline-hours span { position: absolute; top: 0; font-size: 12px; color: var(--grey); white-space: nowrap; transform: translateX(-1px); }
+  .timeline-hours span.h { color: var(--ink); font-weight: 600; }
   .timeline-row { display: flex; align-items: center; min-height: 54px; border-top: 1px solid var(--sep); }
   .timeline-row:first-child { border-top: none; }
   .timeline-row-label { width: 22px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; padding-right: 0; }
@@ -264,8 +265,10 @@
   .timeline-row-track:hover { background: var(--fill); border-radius: 8px; }
   .timeline-minute-grid {
     position: absolute; left: 22px; right: 0; top: 0; bottom: 0; pointer-events: none; z-index: 0;
-    background-image: linear-gradient(to right, var(--sep) 1px, transparent 1px);
-    background-repeat: repeat-x; background-position: left top;
+    /* 1re couche : un trait fin a chaque pas ; 2e couche : un trait plus marque a chaque heure */
+    background-image: linear-gradient(to right, var(--sep) 1px, transparent 1px),
+                      linear-gradient(to right, rgba(128,128,128,.38) 1px, transparent 1px);
+    background-repeat: repeat-x, repeat-x; background-position: left top, left top;
   }
   .timeline-zoom-ctrl { display: flex; align-items: center; justify-content: flex-end; gap: 6px; margin-bottom: 8px; }
   .timeline-zoom-ctrl-inner { display: flex; align-items: center; gap: 6px; background: var(--fill); border-radius: 999px; padding: 4px 6px; }
@@ -1769,7 +1772,10 @@ function loadAgendaPeriod() {
       // rendez-vous deja demarres (voir renderAgendaTimeline) - queue
       // n'est sinon rafraichie que par l'onglet Timer, qui peut ne
       // jamais avoir ete visite.
-      barberApi('/api/queue?include_done=1').then(function (r) { queue = r.queue; })
+      barberApi('/api/queue?include_done=1').then(function (r) { queue = r.queue; }),
+      // Le pas des creneaux gouverne l'echelle de la frise : lu AVANT le rendu pour ne jamais afficher
+      // une echelle au mauvais pas, meme une fraction de seconde.
+      loadRdvSlotStep()
     ])
   ).then(function () {
     if (calViewMode === 'month') renderCalMonth();
@@ -1929,6 +1935,46 @@ function selectCalDay(dateStr) {
  * RDV utilisée dans "Mon poste".
  */
 var timelineZoom = 1;
+// Pas des creneaux (Rendez-vous > Parametres) : l'echelle de la frise affiche une heure A CHAQUE PAS.
+// 15 par defaut, comme cote serveur ; mis a jour depuis les reglages.
+var rdvSlotStepMin = 15;
+var TIMELINE_LABEL_PX = 44;        // place reservee a chaque libelle d'heure (ex. "08:05") : ils ne se chevauchent jamais
+var timelineMinZoom = 0.6;         // zoom minimum REEL du dernier rendu (en dessous, les libelles se chevaucheraient)
+var timelineEffectiveZoom = null;  // zoom reellement applique par le dernier rendu
+
+// Une frise LARGE (pas fin) depasse l'ecran : au lieu de l'ouvrir sur le matin, on la centre sur le trait
+// "maintenant" quand on regarde AUJOURD'HUI. Se declenche des qu'une frise apparait dans la page, quel que
+// soit l'endroit qui l'affiche (aucun appel a ajouter nulle part).
+(function installTimelineAutoScroll() {
+  function scrollToNow(sc) {
+    var now = sc.querySelector('.timeline-now-line');
+    // Un debordement de quelques pixels (le dernier libelle) ne justifie pas de decaler la frise (cela
+    // cacherait la colonne de gauche) : on ne centre que si elle est VRAIMENT plus large que l'ecran.
+    if (!now || sc.scrollWidth - sc.clientWidth < 80) return;
+    sc.scrollLeft = Math.max(0, now.offsetLeft - sc.clientWidth / 2);
+  }
+  new MutationObserver(function (muts) {
+    muts.forEach(function (m) {
+      m.addedNodes.forEach(function (n) {
+        if (n.nodeType !== 1) return;
+        if (n.classList.contains('timeline-scroll')) scrollToNow(n);
+        else if (n.querySelectorAll) n.querySelectorAll('.timeline-scroll').forEach(scrollToNow);
+      });
+    });
+  }).observe(document.body || document.documentElement, { childList: true, subtree: true });
+})();
+
+/**
+ * Pas des creneaux, lu dans les reglages PUBLICS (accessibles avec le code PIN d'un coiffeur) : relu a chaque
+ * chargement de l'Agenda, donc un changement fait par l'admin est pris en compte sans recharger la page.
+ */
+function loadRdvSlotStep() {
+  var headers = SALON_SLUG ? { 'X-Salon-Slug': SALON_SLUG } : {};
+  return fetch('/api/settings/public', { headers: headers })
+    .then(function (r) { return r.json(); })
+    .then(function (d) { rdvSlotStepMin = Number(d.rdv_slot_step_min) || 15; })
+    .catch(function () { /* on garde la derniere valeur connue */ });
+}
 
 function renderAgendaTimeline(dateStr) {
   var d = new Date(dateStr + 'T00:00:00');
@@ -2005,12 +2051,14 @@ function renderAgendaTimeline(dateStr) {
   if (rangeEnd - rangeStart < 4 * 60) rangeEnd = rangeStart + 4 * 60;
 
   var hourCount = (rangeEnd - rangeStart) / 60;
+  // Une heure A CHAQUE PAS des creneaux (Rendez-vous > Parametres) : 08:00, 08:05, 08:10...
+  // avec un pas de 5 min. Les heures pleines ressortent (classe "h").
+  var stepMin = rdvSlotStepMin > 0 ? rdvSlotStepMin : 15;
   var hoursHtml = '';
-  for (var h = 0; h <= hourCount; h++) {
-    var totalMin = rangeStart + h * 60;
-    var hourFrac = (h * 60) / (rangeEnd - rangeStart);
-    hoursHtml += '<span style="left: calc(22px + (100% - 22px) * ' + hourFrac + ')">' +
-      String(Math.floor(totalMin / 60)).padStart(2, '0') + ':00</span>';
+  for (var t = rangeStart; t <= rangeEnd; t += stepMin) {
+    var tFrac = (t - rangeStart) / (rangeEnd - rangeStart);
+    hoursHtml += '<span' + (t % 60 === 0 ? ' class="h"' : '') + ' style="left: calc(22px + (100% - 22px) * ' + tFrac + ')">' +
+      String(Math.floor(t / 60)).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0') + '</span>';
   }
 
   var byBarber = {};
@@ -2065,11 +2113,22 @@ function renderAgendaTimeline(dateStr) {
     }
   }
 
-  var minuteStepPct = (15 / (rangeEnd - rangeStart)) * 100;
-  var minuteGridHtml = '<div class="timeline-minute-grid" style="background-size:' + minuteStepPct + '% 100%"></div>';
+  // Reperes en fond : un trait fin a chaque PAS, un trait plus marque a chaque heure
+  // (background-size en % de la plage totale affichee).
+  var stepPct = (stepMin / (rangeEnd - rangeStart)) * 100;
+  var hourPct = (60 / (rangeEnd - rangeStart)) * 100;
+  var minuteGridHtml = '<div class="timeline-minute-grid" style="background-size:' + stepPct + '% 100%, ' + hourPct + '% 100%"></div>';
 
-  var innerWidth = Math.round(hourCount * 90 * timelineZoom);
-  var zoomPct = Math.round(timelineZoom * 100);
+  // Largeur : chaque libelle d'heure garde sa place (TIMELINE_LABEL_PX) quel que soit le pas - sans
+  // cela, a 5 min, les "08:05", "08:10"... se chevaucheraient. La frise s'elargit donc (defilement
+  // horizontal). Le zoom part de cette largeur "juste suffisante" et ne peut pas descendre en dessous.
+  var labelsPerHour = 60 / stepMin;
+  var fitPerHour = Math.max(90, labelsPerHour * TIMELINE_LABEL_PX);   // px par heure a 100%
+  var minZoom = Math.max(0.6, (labelsPerHour * TIMELINE_LABEL_PX) / fitPerHour);
+  var effZoom = Math.max(timelineZoom, minZoom);
+  timelineMinZoom = minZoom; timelineEffectiveZoom = effZoom;          // +/- repartent de la valeur AFFICHEE
+  var innerWidth = Math.round(hourCount * fitPerHour * effZoom);
+  var zoomPct = Math.round(effZoom * 100);
   var zoomCtrl = '<div class="timeline-zoom-ctrl"><div class="timeline-zoom-ctrl-inner">' +
     '<button type="button" onclick="event.stopPropagation();adjustAgendaZoom(-1)" title="Dézoomer">−</button>' +
     '<span>' + zoomPct + '%</span>' +
@@ -2119,7 +2178,9 @@ function updateAgendaNowLines() {
 
 /** +1 pour zoomer, -1 pour dézoomer (pas de 20%, borné 60%-250%). */
 function adjustAgendaZoom(delta) {
-  timelineZoom = Math.max(0.6, Math.min(2.5, +(timelineZoom + delta * 0.2).toFixed(2)));
+  // On part du zoom REELLEMENT affiche (il peut etre au-dessus de celui demande : le minimum depend du pas).
+  var base = timelineEffectiveZoom == null ? timelineZoom : timelineEffectiveZoom;
+  timelineZoom = Math.max(timelineMinZoom, Math.min(2.5, +(base + delta * 0.2).toFixed(2)));
   if (calViewMode === 'day') renderCalDay();
   else if (calSelectedDate) { if (calViewMode === 'month') renderCalMonth(); else renderCalWeek(); }
 }

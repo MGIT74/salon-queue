@@ -68,6 +68,7 @@ console.log('\n[C] LOGO : le bouton "Retirer le logo" n\'apparait que s\'il y a 
     const dom = new JSDOM('<div class="sidebar-brand">' + brand + '</div>' + cardHtml, { runScripts: 'outside-only', url: 'http://localhost/' });
     const w = dom.window;
     w.SALON_SLUG = 'oyonnax'; w.applyAccentColor = () => {};
+    w.rdvSlotStepMin = 15; w.rerenderAllTimelines = () => {};   // globaux de la vraie page, lus par loadCurrentSalonName
     w.fetch = () => Promise.resolve({ json: () => Promise.resolve({ salon_name: 'TBO OYONNAX', logo_url: logo }) });
     w.eval(fnSrc(dash, 'applySidebarBrand') + '\n' + fnSrc(dash, 'brandCacheKey') + '\n' + 'var currentSalonName="",currentSalonLogo="",currentGiftTileImage="",currentLoginImage="",currentLoyaltyCardImage="",currentGiftCardImage="";\n' + fnSrc(dash, 'loadCurrentSalonName'));
     w.loadCurrentSalonName(); await sleep(40);

@@ -58,4 +58,5 @@ node tests/caisse/24-nom-bienvenue-dashboard.js    # 'Bienvenue, <nom du profil>
 node tests/caisse/25-logo-menu-lateral.js         # menu lateral : logo de l'enseigne a la place du titre redondant (repli sur le nom, jamais de texte provisoire)
 node tests/caisse/26-menu-lateral-trois-zones.js  # menu lateral BUREAU : en-tete fixe / navigation qui defile / pied fixe - regles confinees au bloc >= 861px, mobile intact
 node tests/caisse/27-retrait-des-photos.js         # TOUTE photo ajoutable (dashboard + super-admin) a son retrait ; logo du salon et photo de coiffeur
+node tests/caisse/28-chrono-pas-des-creneaux.js   # chronologies : une heure A CHAQUE PAS des creneaux (5/10/15/20/30), frise assez large pour qu'aucun libelle ne chevauche, zoom coherent
 ```
