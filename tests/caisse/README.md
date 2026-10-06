@@ -55,4 +55,5 @@ node tests/caisse/21-produits-rdv-caisse-poste.js  # meme fonctionnalite, formul
 node tests/caisse/22-produits-rdv-compte.js        # meme fonctionnalite, espace client (compte.html) - derniere des 6 pages
 node tests/caisse/23-sans-rdv-sur-frise.js         # client sans RDV demarre : apparait sur la frise de l'Agenda (en cours + termine), jamais en attente
 node tests/caisse/24-nom-bienvenue-dashboard.js    # 'Bienvenue, <nom du profil>' (repli sur le nom de l'enseigne), nom de l'enseigne inchange ailleurs
+node tests/caisse/25-logo-menu-lateral.js         # menu lateral : logo de l'enseigne a la place du titre redondant (repli sur le nom, jamais de texte provisoire)
 ```

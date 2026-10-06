@@ -228,6 +228,11 @@
   .sidebar-brand { padding: 4px 10px 16px; margin-bottom: 12px; border-bottom: 1px solid var(--sep); }
   .sidebar-brand .name { font-size: 15px; font-weight: 600; letter-spacing: -.01em;
                           min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* Logo de l'enseigne (image carree, 300x300 a l'envoi) OU, a defaut, son nom.
+     Hauteur reservee : meme encombrement dans les deux cas, donc rien ne bouge
+     quand le bloc se remplit. */
+  .sidebar-brand .brand-head { display: flex; align-items: center; min-height: 52px; min-width: 0; }
+  .sidebar-brand .brand-head img { display: block; width: 52px; height: 52px; object-fit: cover; border-radius: 14px; }
   .sidebar-brand select {
     width: 100%; margin-top: 10px; padding: 9px 12px; border: none; border-radius: 10px;
     background: var(--fill); color: var(--ink); font-family: inherit; font-size: 13px; font-weight: 500;
@@ -338,6 +343,8 @@
     }
     [data-theme="dark"] .sidebar-brand { background: rgba(28,28,30,.55); }
     .sidebar-brand .name { font-size: 14px; flex: 1 1 auto; min-width: 0; }
+    .sidebar-brand .brand-head { flex: 1 1 auto; min-width: 0; min-height: 0; }
+    .sidebar-brand .brand-head img { width: 34px; height: 34px; border-radius: 10px; }
     .sidebar-brand select { width: auto; margin: 0; max-width: 42vw; flex-shrink: 0; box-sizing: border-box; }
 
     body.impersonating .sidebar-brand { top: 44px; }
@@ -1257,7 +1264,10 @@
   <div class="app-shell">
     <aside class="sidebar">
       <div class="sidebar-brand">
-        <div class="name" id="app-salon-badge">Dashboard</div>
+        <div class="brand-head">
+          <img id="app-salon-logo" alt="" style="display:none">
+          <div class="name" id="app-salon-badge" style="display:none"></div>
+        </div>
         <select id="salon-switcher" onchange="switchSalon(this.value)">
           <option value="">Chargement…</option>
         </select>
@@ -1912,7 +1922,7 @@
   <div class="tab-panel" id="t-account">
     <div class="card-box">
       <h3>Logo du salon</h3>
-      <p class="hint">Affiché à côté du nom du salon dans le dashboard. Une image carrée fonctionne mieux.</p>
+      <p class="hint">Affiché en haut du menu du dashboard, à la place du nom du salon. Une image carrée fonctionne mieux.</p>
       <div style="display:flex;align-items:center;gap:16px;margin-bottom:22px">
         <div id="salon-logo-preview" onclick="document.getElementById('logo-input').click()"
              style="width:72px;height:72px;border-radius:16px;cursor:pointer;background:var(--fill);
@@ -2352,7 +2362,44 @@ var currentLoyaltyCardImage = '';
 var currentGiftCardImage = '';
 var currentLoginImage = '';
 
+// Bloc du haut du menu lateral : le LOGO de l'enseigne s'il en a un, sinon son
+// nom. Le nom n'est plus affiche EN PLUS du logo (le selecteur juste en dessous
+// l'affiche deja : redondant). Il reste cependant dans #app-salon-badge, meme
+// masque : d'autres fonctions le lisent (ex. impression du ticket Z).
+// Rien n'est affiche tant qu'on ne sait pas quoi montrer : pas de texte
+// provisoire, et jamais le logo de l'enseigne PRECEDENTE apres un changement.
+function applySidebarBrand(name, logoUrl) {
+  var logo = document.getElementById('app-salon-logo');
+  var badge = document.getElementById('app-salon-badge');
+  if (!badge) return;
+  badge.textContent = name || '';
+  function showName() {
+    if (logo) logo.style.display = 'none';
+    badge.style.display = name ? '' : 'none';
+  }
+  if (logo && logoUrl) {
+    // Logo illisible (lien casse...) : on retombe sur le nom plutot qu'une image vide.
+    logo.onerror = showName;
+    logo.alt = name || '';
+    if (logo.getAttribute('src') !== logoUrl) logo.src = logoUrl;
+    logo.style.display = '';
+    badge.style.display = 'none';
+  } else {
+    if (logo) logo.removeAttribute('src');
+    showName();
+  }
+}
+
+function brandCacheKey() { return 'salon-brand:' + (typeof SALON_SLUG === 'string' ? SALON_SLUG : ''); }
+
 function loadCurrentSalonName() {
+  // Affichage instantane du dernier logo/nom connu de CETTE enseigne (memoire
+  // de session) ; s'il n'y en a pas, le bloc reste vide plutot que de montrer
+  // celui de l'enseigne precedente.
+  var cachedBrand = null;
+  try { cachedBrand = JSON.parse(sessionStorage.getItem(brandCacheKey()) || 'null'); } catch (e) { /* stockage indisponible */ }
+  applySidebarBrand(cachedBrand ? cachedBrand.name : '', cachedBrand ? cachedBrand.logo : '');
+
   // Si l'URL ne precise pas de salon (lien universel, pas un lien
   // bookmark d'une enseigne precise), on n'affiche PAS le nom du
   // salon par defaut avant connexion - ce serait trompeur pour
@@ -2383,8 +2430,8 @@ function loadCurrentSalonName() {
       }
       // Une fois connecte (app-screen visible), le nom affiche est
       // toujours celui du salon REELLEMENT resolu pour cette session.
-      var brandEl = document.getElementById('app-salon-badge');
-      if (brandEl) brandEl.textContent = name;
+      applySidebarBrand(name, currentSalonLogo);
+      try { sessionStorage.setItem(brandCacheKey(), JSON.stringify({ name: name, logo: currentSalonLogo })); } catch (e) { /* ignore */ }
       var impNameEl = document.getElementById('imp-salon-name');
       if (impNameEl) impNameEl.textContent = name;
       var logoPreview = document.getElementById('salon-logo-preview');
