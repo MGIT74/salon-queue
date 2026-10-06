@@ -57,4 +57,5 @@ node tests/caisse/23-sans-rdv-sur-frise.js         # client sans RDV demarre : a
 node tests/caisse/24-nom-bienvenue-dashboard.js    # 'Bienvenue, <nom du profil>' (repli sur le nom de l'enseigne), nom de l'enseigne inchange ailleurs
 node tests/caisse/25-logo-menu-lateral.js         # menu lateral : logo de l'enseigne a la place du titre redondant (repli sur le nom, jamais de texte provisoire)
 node tests/caisse/26-menu-lateral-trois-zones.js  # menu lateral BUREAU : en-tete fixe / navigation qui defile / pied fixe - regles confinees au bloc >= 861px, mobile intact
+node tests/caisse/27-retrait-des-photos.js         # TOUTE photo ajoutable (dashboard + super-admin) a son retrait ; logo du salon et photo de coiffeur
 ```
