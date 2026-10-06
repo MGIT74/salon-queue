@@ -1091,3 +1091,26 @@ CREATE TABLE IF NOT EXISTS queue_products (
   FOREIGN KEY (queue_id) REFERENCES queue(id) ON DELETE CASCADE,
   FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================================
+-- Suppression d'un article du catalogue (prestation / supplement / produit)
+-- ============================================================
+-- deleted_at : l'article a ete SUPPRIME depuis l'administration. S'il n'a jamais
+-- servi, il est efface pour de bon (cette colonne ne sert alors a rien). S'il
+-- figure dans l'historique (passages, rendez-vous), il est GARDE ici, invisible
+-- partout (admin, caisse, borne, reservation) : l'historique, lui, y fait
+-- reference (queue.service_id n'a aucune cle etrangere, et appointments.service_id
+-- est en ON DELETE CASCADE - un effacement physique ferait disparaitre ces
+-- passages ou ces rendez-vous). Distinct de active=0 ("archive"), qui reste
+-- visible dans l'admin avec le bouton Reactiver.
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'services' AND column_name = 'deleted_at');
+SET @sql := IF(@c = 0, 'ALTER TABLE services ADD COLUMN deleted_at DATETIME NULL', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'extras' AND column_name = 'deleted_at');
+SET @sql := IF(@c = 0, 'ALTER TABLE extras ADD COLUMN deleted_at DATETIME NULL', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'products' AND column_name = 'deleted_at');
+SET @sql := IF(@c = 0, 'ALTER TABLE products ADD COLUMN deleted_at DATETIME NULL', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;

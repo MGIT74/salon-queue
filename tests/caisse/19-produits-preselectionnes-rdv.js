@@ -15,12 +15,15 @@ const check = (n, ok, x = '') => { (ok ? pass++ : fail++); console.log((ok ? '  
   // b1 doit accepter les RDV et avoir un horaire large pour aujourd'hui -
   // prepare et nettoye ici (pas a la main en dehors du test), pour que ce
   // script reste reproductible tel quel, tout seul comme dans la batterie.
-  sql("UPDATE barbers SET accepts_appointments=1 WHERE id='b1'");
-  sql("DELETE FROM barber_schedules WHERE barber_id='b1'");
-  for (let w = 0; w <= 6; w++) {
-    sql(`INSERT INTO barber_schedules (id, barber_id, weekday, start_time, end_time, active) VALUES (UUID(), 'b1', ${w}, '00:00:00', '23:59:00', 1)`);
+  for (const bid of ['b1', 'b2']) {
+    sql(`UPDATE barbers SET accepts_appointments=1 WHERE id='${bid}'`);
+    sql(`DELETE FROM barber_schedules WHERE barber_id='${bid}'`);
+    for (let w = 0; w <= 6; w++) {
+      sql(`INSERT INTO barber_schedules (id, barber_id, weekday, start_time, end_time, active) VALUES (UUID(), '${bid}', ${w}, '00:00:00', '23:59:00', 1)`);
+    }
   }
-  const today = new Date().toISOString().slice(0, 10);
+  // "aujourd'hui" = la date de PARIS (le serveur compare a l'heure de Paris), pas celle du conteneur (UTC).
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
   // Des creneaux surs quelle que soit l'heure reelle a laquelle ce test
   // tourne : bases sur MAINTENANT + un delai, jamais une heure fixe qui
   // finirait par etre dans le passe. Espaces de 40 min (le service dure
@@ -43,7 +46,19 @@ const check = (n, ok, x = '') => { (ok ? pass++ : fail++); console.log((ok ? '  
     mm = totalMin % 60;
     return String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0');
   }
-  const timeA = futureTime(20), timeB = futureTime(90), timeC = futureTime(160);
+  // UN seul creneau proche (maintenant + 15 min, sur la grille de 15 min) : A pour b1, B pour b2 au MEME
+  // horaire (deux coiffeurs, donc aucun conflit), et C pour b1 juste apres A. Avant : trois creneaux espaces
+  // jusqu'a +160 min, qui depassaient minuit (et la fin des horaires) passe ~21h20 - le test echouait pour une
+  // raison sans rapport avec ce qu'il verifie. Trop tard pour qu'il reste de la place aujourd'hui : on le dit.
+  const timeA = futureTime(15), timeB = timeA;
+  const toMin = (t) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3));
+  const timeCmin = toMin(timeA) + 30;
+  if (toMin(timeA) < toMin(futureTime(0)) || timeCmin + 30 > 23 * 60 + 59) {
+    console.log('  SKIP  trop tard dans la journee (heure de Paris) : plus de creneau libre aujourd\'hui pour ce test');
+    for (const bid of ['b1', 'b2']) { sql(`DELETE FROM barber_schedules WHERE barber_id='${bid}'`); sql(`UPDATE barbers SET accepts_appointments=0 WHERE id='${bid}'`); }
+    process.exit(0);
+  }
+  const timeC = String(Math.floor(timeCmin / 60)).padStart(2, '0') + ':' + String(timeCmin % 60).padStart(2, '0');
 
   console.log('\n[A] Reservation publique AVEC produits pre-choisis, pour aujourd\'hui');
   let r = await (await fetch(BASE + '/api/appointments', {
@@ -68,7 +83,7 @@ const check = (n, ok, x = '') => { (ok ? pass++ : fail++); console.log((ok ? '  
     method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Salon-Slug': 'test' },
     body: JSON.stringify({
       client_name: 'Test Sans Produits', email: 'testsansproduits@example.com', phone: '0600000001',
-      service_id: 'sv1', barber_id: 'b1', date: today, time: timeB
+      service_id: 'sv1', barber_id: 'b2', date: today, time: timeB
     })
   })).json();
   check('rendez-vous cree sans probleme', r.ok === true, JSON.stringify(r));
@@ -91,8 +106,7 @@ const check = (n, ok, x = '') => { (ok ? pass++ : fail++); console.log((ok ? '  
 
   sql("DELETE FROM queue WHERE client_name IN ('Test Produits','Test Sans Produits')");
   sql("DELETE FROM appointments WHERE client_name IN ('Test Produits','Test Sans Produits')");
-  sql("DELETE FROM barber_schedules WHERE barber_id='b1'");
-  sql("UPDATE barbers SET accepts_appointments=0 WHERE id='b1'");
+  for (const bid of ['b1', 'b2']) { sql(`DELETE FROM barber_schedules WHERE barber_id='${bid}'`); sql(`UPDATE barbers SET accepts_appointments=0 WHERE id='${bid}'`); }
   console.log(`\nRESULTAT : ${pass} verifications reussies, ${fail} echec(s)`);
   process.exit(fail ? 1 : 0);
 })().catch(e => { console.error('ERREUR TEST', e); process.exit(2); });

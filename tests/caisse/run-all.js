@@ -48,7 +48,9 @@ const suite = [
   ['25-logo-menu-lateral.js', false, ['exit']],
   ['26-menu-lateral-trois-zones.js', false, ['exit']],
   ['27-retrait-des-photos.js', false, ['exit']],
-  ['28-chrono-pas-des-creneaux.js', false, ['exit']]
+  ['28-chrono-pas-des-creneaux.js', false, ['exit']],
+  ['29-catalogue-suppression-ordre.js', true, ['exit']],
+  ['30-catalogue-ecran-supprimer-deplacer.js', false, ['exit']]
 ];
 
 let bad = 0;

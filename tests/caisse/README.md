@@ -59,4 +59,6 @@ node tests/caisse/25-logo-menu-lateral.js         # menu lateral : logo de l'ens
 node tests/caisse/26-menu-lateral-trois-zones.js  # menu lateral BUREAU : en-tete fixe / navigation qui defile / pied fixe - regles confinees au bloc >= 861px, mobile intact
 node tests/caisse/27-retrait-des-photos.js         # TOUTE photo ajoutable (dashboard + super-admin) a son retrait ; logo du salon et photo de coiffeur
 node tests/caisse/28-chrono-pas-des-creneaux.js   # chronologies : une heure A CHAQUE PAS des creneaux (5/10/15/20/30), frise assez large pour qu'aucun libelle ne chevauche, zoom coherent
+node tests/caisse/29-catalogue-suppression-ordre.js  # catalogue : suppression (effacee si jamais utilisee, CONSERVEE invisible si dans l'historique) + ordre suivi par la caisse (vraie base)
+node tests/caisse/30-catalogue-ecran-supprimer-deplacer.js  # catalogue, ecran : bouton Supprimer + messages, enregistrement de l'ordre, deplacement au clavier
 ```

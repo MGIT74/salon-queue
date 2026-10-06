@@ -1232,7 +1232,7 @@ function doSwitchCaisseTab(tab) {
   updateTabLockState();
   if (tab === 'timer') startTimerAutoRefresh(); else stopTimerAutoRefresh();
   if (tab === 'cloture') loadClotureTab();
-  if (tab === 'caisse') { refreshCaisseLockState(); focusScanCatcher(); }
+  if (tab === 'caisse') { refreshCaisseLockState(); focusScanCatcher(); if (Date.now() - catalogLoadedAt > 15000) loadCatalog(); }
   if (tab === 'agenda') {
     startAgendaAutoRefresh();
     if (!calBooted) {
@@ -2763,6 +2763,11 @@ function forceOpenCaisse() {
 })();
 
 /* ---------- Catalogue ---------- */
+// Derniere lecture du catalogue : l'administration peut en changer l'ORDRE (ou les prix, le stock...)
+// pendant que la caisse reste ouverte - on le relit au retour sur l'onglet Caisse (pas plus d'une fois
+// toutes les 15 s) pour que l'ordre des articles suive sans recharger la page.
+var catalogLoadedAt = 0;
+
 function loadCatalog() {
   Promise.all([
     barberApi('/api/catalog/services'),
@@ -2772,6 +2777,7 @@ function loadCatalog() {
     catalog.services = r[0].items;
     catalog.extras = r[1].items;
     catalog.products = r[2].items;
+    catalogLoadedAt = Date.now();
     renderItemGrid();
   }).catch(function (e) { toast(e.message, true); });
 }

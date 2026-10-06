@@ -663,6 +663,17 @@
   .quick-action:hover { background: var(--fill-2); }
   .quick-action.danger { color: var(--red); }
   .item-actions .btn { font-size: 14px; padding: 9px 16px; }
+  .item-actions .btn-delete { color: var(--red); }
+  /* Poignee de deplacement des listes du catalogue (souris, doigt, stylet). touch-action:none : sans cela,
+     faire glisser au doigt ferait defiler la page au lieu de deplacer l'element. */
+  .drag-handle {
+    flex: 0 0 auto; width: 30px; height: 44px; margin: -6px 0 -6px -8px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center; color: var(--grey);
+    cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none;
+  }
+  .drag-handle:hover, .drag-handle:focus-visible { background: var(--fill); color: var(--ink); outline: none; }
+  .item.dragging { background: var(--fill); box-shadow: 0 8px 24px rgba(0,0,0,.18); position: relative; z-index: 2; }
+  body.sorting, body.sorting * { cursor: grabbing !important; user-select: none; -webkit-user-select: none; }
 
   /* Listes Marketing (fidélité, cadeaux) : séparateur discret entre
      les lignes, pour différencier sans surcharger visuellement. */
@@ -3757,7 +3768,8 @@ function renderCatalog(table) {
           ? eur(x.price_cents) + (x.stock_enabled ? ' · ' + (x.stock_quantity > 0 ? x.stock_quantity + ' en stock' : 'rupture de stock') : ' · illimité')
           : formatMinutes(x.duration_min) + ' · ' + (table === 'extras' ? '+ ' : '') + eur(x.price_cents);
         var photoStyle = x.image_url ? 'background:url(&quot;' + esc(x.image_url) + '&quot;) center/cover' : '';
-        return '<div class="item' + (x.active ? '' : ' off') + '">' +
+        return '<div class="item' + (x.active ? '' : ' off') + '" data-id="' + x.id + '">' +
+          '<span class="drag-handle" role="button" tabindex="0" aria-label="Déplacer (glisser, ou flèches haut et bas)" title="Glisser pour déplacer — l\'ordre est celui de la caisse">' + GRIP_ICON + '</span>' +
           '<div class="cat-photo" style="' + photoStyle + '" onclick="document.getElementById(\'cat-photo-input-' + x.id + '\').click()">' +
             (x.image_url
               ? '<button type="button" class="cat-photo-remove" title="Supprimer la photo" onclick="event.stopPropagation();removeCatalogImage(\'' + table + '\',\'' + x.id + '\')">' +
@@ -3772,8 +3784,10 @@ function renderCatalog(table) {
           (x.active
             ? '<button class="btn btn-ghost" onclick="archiveCatalog(\'' + table + '\',\'' + x.id + '\')">Archiver</button>'
             : '<button class="btn btn-soft" onclick="restoreCatalog(\'' + table + '\',\'' + x.id + '\')">Réactiver</button>') +
+          '<button class="btn btn-ghost btn-delete" onclick="deleteCatalog(\'' + table + '\',\'' + x.id + '\')">Supprimer</button>' +
           '</div></div>';
       }).join('');
+  initCatalogSort(table);
 }
 
 function uploadCatalogImage(table, id, input) {
@@ -3862,6 +3876,120 @@ function saveCatalog() {
   p.then(function () { closeSheet('sheet-catalog'); return loadCatalog(); })
    .then(function () { toast('Enregistré'); })
    .catch(function (e) { toast(e.message, true); });
+}
+
+var GRIP_ICON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>';
+
+/**
+ * Suppression DEFINITIVE (le bouton "Archiver" ne fait que masquer a la borne). Le serveur decide : un
+ * article jamais utilise est efface pour de bon ; un article deja dans l'historique disparait de partout
+ * mais sa fiche est gardee, invisible, pour que les passages et rendez-vous deja enregistres restent
+ * corrects. On le dit AVANT de supprimer, avec les vrais chiffres.
+ */
+function deleteCatalog(table, id) {
+  api('/api/catalog/' + table + '/' + id + '/usage').then(function (r) {
+    var u = r.usage, parts = [];
+    if (u.passages) parts.push(u.passages + (u.passages > 1 ? ' passages' : ' passage'));
+    if (u.rendez_vous) parts.push(u.rendez_vous + ' rendez-vous');
+    // La phrase s'accorde avec ce qui existe vraiment (passages et/ou rendez-vous, un ou plusieurs).
+    var both = u.passages > 0 && u.rendez_vous > 0, many = both || u.total > 1;
+    var what = both ? 'ces passages et rendez-vous'
+      : (u.passages ? (u.passages > 1 ? 'ces passages' : 'ce passage') : (u.rendez_vous > 1 ? 'ces rendez-vous' : 'ce rendez-vous'));
+    var msg = u.total === 0
+      ? 'Supprimer définitivement « ' + r.name + ' » ? Cette action est irréversible.'
+      : 'Supprimer « ' + r.name + ' » ? Il disparaîtra du catalogue, de la caisse, de la borne et de la réservation. ' +
+        'Il est déjà utilisé (' + parts.join(' et ') + ') : ' + what + (many ? ' sont conservés tels quels' : ' est conservé tel quel') + ' dans l\'historique.' +
+        (u.a_venir ? ' ' + u.a_venir + (u.a_venir > 1 ? ' rendez-vous à venir l\'utilisent' : ' rendez-vous à venir l\'utilise') + ' encore : ' + (u.a_venir > 1 ? 'ils restent valables.' : 'il reste valable.') : '');
+    return showConfirm(msg, { title: 'Supprimer', confirmLabel: 'Supprimer', danger: true }).then(function (ok) {
+      if (!ok) return;
+      return api('/api/catalog/' + table + '/' + id + '?permanent=1', { method: 'DELETE' })
+        .then(loadCatalog).then(function () { toast('Supprimé'); });
+    });
+  }).catch(function (e) { toast(e.message, true); });
+}
+
+/** Enregistre l'ordre affiche. Le meme ordre est repris par la caisse, la borne et la reservation. */
+function persistCatalogOrder(table) {
+  var list = document.getElementById(table + '-list');
+  var ids = [].slice.call(list.querySelectorAll('.item[data-id]')).map(function (el) { return el.dataset.id; });
+  var arr = table === 'services' ? services : (table === 'extras' ? extras : products);
+  var byId = {}; arr.forEach(function (x) { byId[x.id] = x; });
+  var ordered = ids.map(function (i) { return byId[i]; }).filter(Boolean);
+  arr.forEach(function (x) { if (ids.indexOf(x.id) === -1) ordered.push(x); });
+  arr.splice.apply(arr, [0, arr.length].concat(ordered));   // meme tableau (d'autres ecrans le lisent) : l'ordre local suit tout de suite
+  return api('/api/catalog/' + table + '/reorder', { method: 'POST', body: { ids: ids } })
+    .then(function () { toast('Ordre enregistré'); })
+    .catch(function (e) { toast(e.message, true); return loadCatalog(); });   // en cas d'echec : on reaffiche l'ordre reel
+}
+
+/**
+ * Deplacer un article : glisser la poignee (souris, doigt, stylet) ou, au clavier, fleches haut/bas sur la
+ * poignee. Delegation d'evenements sur la liste (une seule fois, meme si la liste est redessinee).
+ * La capture du pointeur est prise sur la LISTE et non sur la poignee : l'element deplace change de place
+ * dans la page pendant le glissement, et un element qui change de place perd sa capture.
+ */
+function initCatalogSort(table) {
+  var list = document.getElementById(table + '-list');
+  if (!list || list.__sortReady) return;
+  list.__sortReady = true;
+  var drag = null, kbTimer = null;
+
+  function reposition() {
+    if (!drag) return;
+    var after = null, items = [].slice.call(list.querySelectorAll('.item[data-id]')).filter(function (el) { return el !== drag.item; });
+    for (var i = 0; i < items.length; i++) {
+      var r = items[i].getBoundingClientRect();
+      if (drag.lastY < r.top + r.height / 2) { after = items[i]; break; }
+    }
+    if (after === null) { if (list.lastElementChild !== drag.item) list.appendChild(drag.item); }
+    else if (after !== drag.item.nextElementSibling) list.insertBefore(drag.item, after);
+  }
+  function autoScroll() {   // pres du bord de l'ecran, la page defile toute seule (longues listes)
+    if (!drag) return;
+    var edge = 90, y = drag.lastY, h = window.innerHeight;
+    if (y < edge) window.scrollBy(0, -Math.ceil((edge - y) / 6));
+    else if (y > h - edge) window.scrollBy(0, Math.ceil((y - (h - edge)) / 6));
+    else return;
+    reposition();
+  }
+  function orderKey() { return [].slice.call(list.querySelectorAll('.item[data-id]')).map(function (el) { return el.dataset.id; }).join(','); }
+
+  list.addEventListener('pointerdown', function (e) {
+    var handle = e.target.closest && e.target.closest('.drag-handle');
+    if (!handle || drag || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    var item = handle.closest('.item'); if (!item) return;
+    e.preventDefault();
+    drag = { item: item, pointerId: e.pointerId, lastY: e.clientY, before: orderKey(), timer: setInterval(autoScroll, 16) };
+    try { list.setPointerCapture(e.pointerId); } catch (x) { /* pas de capture : le glissement marche quand meme tant que le pointeur reste sur la liste */ }
+    item.classList.add('dragging'); document.body.classList.add('sorting');
+  });
+  list.addEventListener('pointermove', function (e) {
+    if (!drag || e.pointerId !== drag.pointerId) return;
+    drag.lastY = e.clientY; reposition();
+  });
+  function end(e) {
+    if (!drag || e.pointerId !== drag.pointerId) return;
+    clearInterval(drag.timer);
+    drag.item.classList.remove('dragging'); document.body.classList.remove('sorting');
+    try { list.releasePointerCapture(e.pointerId); } catch (x) { /* deja relache */ }
+    var changed = orderKey() !== drag.before; drag = null;
+    if (changed) persistCatalogOrder(table);
+  }
+  list.addEventListener('pointerup', end);
+  list.addEventListener('pointercancel', end);
+
+  // Clavier : sur la poignee, fleche haut / bas deplace l'element d'un cran.
+  list.addEventListener('keydown', function (e) {
+    var handle = e.target.closest && e.target.closest('.drag-handle');
+    if (!handle || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+    var item = handle.closest('.item'); if (!item) return;
+    e.preventDefault();
+    if (e.key === 'ArrowUp' && item.previousElementSibling) list.insertBefore(item, item.previousElementSibling);
+    else if (e.key === 'ArrowDown' && item.nextElementSibling) list.insertBefore(item.nextElementSibling, item);
+    else return;
+    handle.focus();
+    clearTimeout(kbTimer); kbTimer = setTimeout(function () { persistCatalogOrder(table); }, 600);   // on attend la fin d'une serie de fleches
+  });
 }
 
 function archiveCatalog(table, id) {
