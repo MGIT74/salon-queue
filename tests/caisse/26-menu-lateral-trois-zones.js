@@ -43,5 +43,15 @@ const outside = src.replace(desktop, '');
 check('aucune autre definition de .sidebar-logout::before hors du bloc bureau', !/\.sidebar-logout::before/.test(outside));
 check('aucune autre colonne flex du menu hors du bloc bureau', !/\.sidebar \{ display: flex; flex-direction: column; \}/.test(outside));
 
+console.log('\n[D] Ordre dans la page : en-tete, navigation, Deconnexion, Theme, REDUIRE en dernier');
+const aside = src.slice(src.indexOf('<aside class="sidebar">'), src.indexOf('</aside>'));
+const pos = (k) => aside.indexOf(k);
+check('Reduire est APRES Theme', pos('class="sidebar-collapse-btn"') > pos('class="sidebar-theme-btn"') && pos('class="sidebar-theme-btn"') > pos('class="sidebar-logout"'));
+check('Reduire n\'est plus entre l\'en-tete et la navigation', !(pos('class="sidebar-collapse-btn"') > pos('class="sidebar-brand"') && pos('class="sidebar-collapse-btn"') < pos('id="tabs"')));
+check('Reduire reste dans le menu (avant </aside>)', pos('class="sidebar-collapse-btn"') !== -1);
+check('le bouton garde son action de repli', /class="sidebar-collapse-btn" onclick="toggleSidebarCollapsed\(\)"/.test(aside));
+check('marges du bouton ajustees pour sa place en bas (bloc bureau)', /\.sidebar-collapse-btn \{ margin: 4px 0 0; \}/.test(desktop));
+check('...et pas dans le bloc mobile (ou il reste masque)', !/\.sidebar-collapse-btn \{ margin/.test(mobile) && /\.sidebar-collapse-btn \{ display: none; \}/.test(mobile));
+
 console.log(`\nRESULTAT : ${pass} verifications reussies, ${fail} echec(s)`);
 process.exit(fail ? 1 : 0);
