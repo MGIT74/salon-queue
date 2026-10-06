@@ -54,4 +54,5 @@ node tests/caisse/20-produits-rdv-dashboard.js     # meme fonctionnalite, formul
 node tests/caisse/21-produits-rdv-caisse-poste.js  # meme fonctionnalite, formulaires 'Ajouter un RDV' de caisse.html et poste.html
 node tests/caisse/22-produits-rdv-compte.js        # meme fonctionnalite, espace client (compte.html) - derniere des 6 pages
 node tests/caisse/23-sans-rdv-sur-frise.js         # client sans RDV demarre : apparait sur la frise de l'Agenda (en cours + termine), jamais en attente
+node tests/caisse/24-nom-bienvenue-dashboard.js    # 'Bienvenue, <nom du profil>' (repli sur le nom de l'enseigne), nom de l'enseigne inchange ailleurs
 ```

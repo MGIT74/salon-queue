@@ -1308,7 +1308,7 @@
   <div class="tab-panel on" id="t-dashboard">
     <div class="dash-hero">
       <div>
-        <h2 class="dash-title">Bienvenue, <span id="dash-salon-name">—</span></h2>
+        <h2 class="dash-title">Bienvenue, <span id="dash-welcome-name">—</span></h2>
         <div class="dash-subtitle" id="dash-date"></div>
       </div>
       <div class="dash-kpis">
@@ -2810,8 +2810,21 @@ function renderDashLeaderboard() {
       }).join('');
 }
 
+// "Bienvenue, <nom>" : le nom du PROFIL de l'admin (Reglages > Mon profil),
+// pas celui de l'enseigne - celui-ci reste affiche partout ailleurs (menu
+// lateral, kiosque, pages client). Retombe sur le nom de l'enseigne si le
+// profil n'a pas de nom ou si la lecture echoue : jamais d'accueil vide.
+function loadWelcomeName() {
+  var el = document.getElementById('dash-welcome-name');
+  el.textContent = currentSalonName || '—';
+  api('/api/owner/profile').then(function (r) {
+    var name = r && r.name ? String(r.name).trim() : '';
+    if (name) el.textContent = name;
+  }).catch(function () { /* on garde le nom de l'enseigne */ });
+}
+
 function loadDashboardTab() {
-  document.getElementById('dash-salon-name').textContent = currentSalonName || '—';
+  loadWelcomeName();
   document.getElementById('dash-date').textContent = new Date().toLocaleDateString('fr-FR', {
     weekday: 'long', day: 'numeric', month: 'long'
   });
