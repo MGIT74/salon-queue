@@ -59,7 +59,9 @@ const suite = [
   ['36-installation-salon-par-defaut.js', false, ['exit']],
   ['37-identifiant-salon-alias.js', false, ['exit']],
   ['38-logo-connexion-et-ecran-identifiant.js', false, ['exit']],
-  ['39-photos-prestations-reservation.js', false, ['exit']]
+  ['39-photos-prestations-reservation.js', false, ['exit']],
+  ['40-vitrine-supplements-produits.js', false, ['exit']],
+  ['41-vitrine-compte.js', false, ['exit']]
 ];
 
 let bad = 0;

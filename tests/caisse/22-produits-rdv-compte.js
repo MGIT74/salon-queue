@@ -56,7 +56,7 @@ const check = (n, ok, x = '') => { (ok ? pass++ : fail++); console.log((ok ? '  
   w.selBookBarber = 'b1'; w.selectBookService(d.querySelector('#bk-svc-grid .svc-card[data-id="sv1"]') || { classList: { add(){}, remove(){} } }, 'sv1');
   w.goToBookProductsStep();
   check('etape Produits bien affichee', d.getElementById('p-book-products').classList.contains('on'));
-  const tile = d.getElementById('bk-products-grid').querySelector('.xchip[data-id="p1"]');
+  const tile = d.getElementById('bk-products-grid').querySelector('.item-card[data-id="p1"]');
   check('la tuile "Gel" existe bien', Boolean(tile));
   w.toggleBookProduct(tile, 'p1');
   check('produit bien enregistre dans selBookProducts', w.selBookProducts.indexOf('p1') !== -1);

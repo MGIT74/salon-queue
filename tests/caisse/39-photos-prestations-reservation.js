@@ -15,12 +15,15 @@ const fnSrc = (src, name) => { const i = src.indexOf('function ' + name + '('); 
 const IMG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
 
 function page(services, extras, products) {
-  const dom = new JSDOM('<button id="service-next-btn" disabled></button><div id="svc-grid"></div><div id="extras-grid"></div><div id="products-grid"></div>', { runScripts: 'outside-only', url: 'http://localhost/' });
+  const dom = new JSDOM('<button id="service-next-btn" disabled></button><div id="svc-grid"></div>' +
+    ['extras', 'products'].map(k => '<div id="' + k + '-search" style="display:none"><input id="' + k + '-q"></div><div id="' + k + '-grid"></div><div id="' + k + '-empty"></div><div id="' + k + '-summary"></div>').join(''),
+    { runScripts: 'outside-only', url: 'http://localhost/' });
   const w = dom.window;
   w.eval(fnSrc(app, 'esc'));
   w.formatMinutes = (m) => m + ' min'; w.eur = (c) => (c / 100).toFixed(2) + ' €';
   w.services = services; w.extras = extras || []; w.products = products || [];
-  w.eval('var selService = null, selExtras = [], selProducts = [];' + fnSrc(rdv, 'iconForItem') + fnSrc(rdv, 'renderServiceGrid') + fnSrc(rdv, 'selectService') + fnSrc(rdv, 'toggleExtra'));
+  const vars = rdv.match(/^var PLUS_SVG = .*;$/m)[0] + '\n' + rdv.match(/^var CHECK_SVG = .*;$/m)[0] + '\n';
+  w.eval('var selService = null, selExtras = [], selProducts = [];\n' + vars + ['iconForItem', 'renderServiceGrid', 'normText', 'extraIcon', 'productIcon', 'groupItems', 'itemCardHtml', 'renderItemList', 'updateItemsSummary', 'selectService', 'toggleExtra', 'toggleProduct'].map(n => fnSrc(rdv, n)).join('\n'));
   w.renderServiceGrid();
   return w;
 }
@@ -49,22 +52,11 @@ const cards = (w) => [...w.document.querySelectorAll('#svc-grid .svc-card')];
   w.selectService(c[1], 's2');
   check('on choisit une autre carte : l\'ancienne est desélectionnée, une seule reste choisie', !c[0].classList.contains('sel') && c[1].classList.contains('sel') && cards(w).filter(x => x.classList.contains('sel')).length === 1);
 
-  console.log('\n[C] Supplements et produits : petite photo ronde si elle existe');
-  w = page([{ id: 's1', name: 'Coupe', duration_min: 10, price_cents: 1000 }],
-    [{ id: 'e1', name: 'Shampoing', duration_min: 5, price_cents: 300, image_url: IMG }, { id: 'e2', name: 'Soin', duration_min: 5, price_cents: 400 }],
-    [{ id: 'p1', name: 'Cire', price_cents: 700, image_url: IMG }, { id: 'p2', name: 'Gel', price_cents: 500, image_url: null }]);
-  const ex = [...w.document.querySelectorAll('#extras-grid .xchip')], pr = [...w.document.querySelectorAll('#products-grid .xchip')];
-  check('supplement AVEC photo : petite photo ronde devant le nom', !!ex[0].querySelector('.xphoto') && ex[0].querySelector('.xphoto').getAttribute('style').includes(IMG));
-  check('supplement SANS photo : chip inchangee (pas de photo)', !ex[1].querySelector('.xphoto') && ex[1].textContent.includes('Soin'));
-  check('produit avec photo / sans photo : meme regle', !!pr[0].querySelector('.xphoto') && !pr[1].querySelector('.xphoto'));
-  check('les chips restent cliquables (supplement -> toggleExtra, produit -> toggleProduct)', /toggleExtra\(this,'e1'\)/.test(ex[0].getAttribute('onclick')) && /toggleProduct\(this,'p1'\)/.test(pr[0].getAttribute('onclick')));
-
   console.log('\n[D] Securite : une adresse d\'image piegee ne peut pas injecter de HTML');
   const evil = 'https://x.example/a.png"onerror="alert(1)';
-  w = page([{ id: 's1', name: 'Coupe', duration_min: 10, price_cents: 1000, image_url: evil }], [{ id: 'e1', name: 'X', duration_min: 1, price_cents: 1, image_url: evil }], []);
-  const bg = w.document.querySelector('#svc-grid .photo-bg'), xp = w.document.querySelector('#extras-grid .xphoto');
-  check('prestation : l\'element ne porte QUE l\'attribut style (aucun "onerror" injecte)', [...bg.attributes].map(a => a.name).join() === 'class,style' && !w.document.querySelector('#svc-grid [onerror]'));
-  check('supplement : idem', [...xp.attributes].map(a => a.name).join() === 'class,style' && !w.document.querySelector('#extras-grid [onerror]'));
+  w = page([{ id: 's1', name: 'Coupe', duration_min: 10, price_cents: 1000, image_url: evil }]);
+  const bg = w.document.querySelector('#svc-grid .photo-bg');
+  check('prestation : l\'element ne porte QUE les attributs class et style (aucun "onerror" injecte)', [...bg.attributes].map(a => a.name).join() === 'class,style' && !w.document.querySelector('#svc-grid [onerror]'));
   w = page([{ id: 's1', name: '"><img src=x onerror=alert(1)>', duration_min: 10, price_cents: 1000, image_url: IMG }]);
   check('nom piege : echappe (aucune balise <img> creee)', !w.document.querySelector('#svc-grid img') && w.document.querySelector('#svc-grid .name').textContent === '"><img src=x onerror=alert(1)>');
   check('adresse https avec "&" : conservee correctement', page([{ id: 's1', name: 'A', duration_min: 1, price_cents: 1, image_url: 'https://cdn.example/a.png?x=1&y=2' }]).document.querySelector('.photo-bg').style.backgroundImage.includes('x=1&y=2'));
@@ -72,7 +64,6 @@ const cards = (w) => [...w.document.querySelectorAll('#svc-grid .svc-card')];
   console.log('\n[E] Style : meme rendu que la borne, selection visible PAR-DESSUS la photo');
   check('carte a photo : photo en fond plein, voile degrade, texte blanc', /\.svc-card\.has-photo \.photo-bg \{ position: absolute; inset: 0; background-size: cover/.test(rdv) && /linear-gradient\(to top, rgba\(0,0,0,\.78\)/.test(rdv) && /\.svc-card\.has-photo \.name, \.svc-card\.has-photo \.meta \{ color: #fff; \}/.test(rdv));
   check('anneau de selection pose par-dessus la photo (::after, z-index 2) - un anneau interieur serait cache par elle', /\.svc-card\.has-photo\.sel::after \{[^}]*box-shadow: inset 0 0 0 3px var\(--blue\)[^}]*z-index: 2/.test(rdv));
-  check('petite photo ronde des chips', /\.xchip \.xphoto \{ width: 22px; height: 22px; border-radius: 50%/.test(rdv));
 
   console.log('\n[F] Borne : la selection d\'une prestation a photo etait INVISIBLE (mesure : 0 pixel bleu au bord) - meme correction');
   const kiosk = fs.readFileSync(path.join(__dirname, '../../public/kiosk.html'), 'utf8');

@@ -69,5 +69,7 @@ node tests/caisse/35-adresse-sans-salon.js  # compte.html / rdv.html sans ?salon
 node tests/caisse/36-installation-salon-par-defaut.js  # schema rejoue a chaque demarrage : 'Le Salon'/'change-moi' et les donnees de depart ne se creent que sur une base VIERGE (jamais sur une instance en service)
 node tests/caisse/37-identifiant-salon-alias.js  # changer l'identifiant (slug) d'un salon : l'ancien reste valable (alias) et reserve ; super-admin seulement
 node tests/caisse/38-logo-connexion-et-ecran-identifiant.js  # logo du salon dans l'icone de connexion du dashboard (sans eclair) ; bouton 'Identifiant' du super-admin
-node tests/caisse/39-photos-prestations-reservation.js  # reservation en ligne : photos des prestations / supplements / produits (comme la borne), selection visible par-dessus la photo
+node tests/caisse/39-photos-prestations-reservation.js  # reservation en ligne : photos des prestations (comme la borne), selection visible par-dessus la photo
+node tests/caisse/40-vitrine-supplements-produits.js  # reservation en ligne : supplements et produits en cartes de vitrine (photo ou icone, recherche, categories, epuise, resume + barre du bas)
+node tests/caisse/41-vitrine-compte.js  # meme chose sur la reservation de 'Mon compte' (+ remise a zero d'une nouvelle reservation)
 ```
