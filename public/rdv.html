@@ -110,6 +110,21 @@
   .svc-card.sel .meta { color: rgba(255,255,255,.8); }
   .svc-card:active { transform: scale(.96); }
 
+  /* Prestation avec PHOTO (meme rendu que la borne) : la photo remplit la carte, un voile garde le texte lisible. */
+  .svc-card.has-photo { padding: 0; overflow: hidden; position: relative; }
+  .svc-card.has-photo .photo-bg { position: absolute; inset: 0; background-size: cover; background-position: center; }
+  .svc-card.has-photo .overlay {
+    position: relative; z-index: 1; width: 100%; height: 100%; min-height: 108px; box-sizing: border-box;
+    display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 2px;
+    padding: 12px 10px; background: linear-gradient(to top, rgba(0,0,0,.78), rgba(0,0,0,.1) 65%, transparent);
+  }
+  .svc-card.has-photo .name, .svc-card.has-photo .meta { color: #fff; }
+  .svc-card.has-photo .meta { color: rgba(255,255,255,.85); }
+  /* Selection : un anneau POSE PAR-DESSUS la photo (un anneau interieur serait cache par elle). */
+  .svc-card.has-photo.sel { background: var(--fill); }
+  .svc-card.has-photo.sel::after { content: ''; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 3px var(--blue); z-index: 2; pointer-events: none; }
+  .xchip .xphoto { width: 22px; height: 22px; border-radius: 50%; background-size: cover; background-position: center; flex-shrink: 0; align-self: center; }
+
   .svc-card.gift-tile { background: linear-gradient(160deg, #b8860b, #8a5a00); color: #fff; }
   .svc-card.gift-tile .icon { font-size: 34px; }
   .svc-card.gift-tile .meta { color: rgba(255,255,255,.85); }
@@ -523,20 +538,30 @@ function lookupGiftCode() {
 }
 
 function renderServiceGrid() {
+  // Une prestation avec PHOTO l'affiche (comme sur la borne) ; sans photo, l'icone par defaut d'apres son nom.
   document.getElementById('svc-grid').innerHTML = services.map(function (s) {
+    var meta = '<span class="meta">' + formatMinutes(s.duration_min) + ' · ' + eur(s.price_cents) + '</span>';
+    if (s.image_url) {
+      return '<button class="svc-card has-photo" data-id="' + s.id + '" onclick="selectService(this,\'' + s.id + '\')">' +
+        '<span class="photo-bg" style="background-image:url(&quot;' + esc(s.image_url) + '&quot;)"></span>' +
+        '<span class="overlay"><span class="name">' + esc(s.name) + '</span>' + meta + '</span></button>';
+    }
     return '<button class="svc-card" data-id="' + s.id + '" onclick="selectService(this,\'' + s.id + '\')">' +
       '<span class="icon">' + iconForItem(s.name) + '</span>' +
-      '<span class="name">' + esc(s.name) + '</span>' +
-      '<span class="meta">' + formatMinutes(s.duration_min) + ' · ' + eur(s.price_cents) + '</span></button>';
+      '<span class="name">' + esc(s.name) + '</span>' + meta + '</button>';
   }).join('');
 
+  // Petite photo ronde devant le nom d'un supplement / d'un produit qui en a une.
+  function chipPhoto(item) {
+    return item.image_url ? '<span class="xphoto" style="background-image:url(&quot;' + esc(item.image_url) + '&quot;)"></span>' : '';
+  }
   document.getElementById('extras-grid').innerHTML = extras.map(function (e) {
-    return '<button class="xchip" data-id="' + e.id + '" onclick="toggleExtra(this,\'' + e.id + '\')">' +
+    return '<button class="xchip" data-id="' + e.id + '" onclick="toggleExtra(this,\'' + e.id + '\')">' + chipPhoto(e) +
       '<span>' + esc(e.name) + '</span><span class="xm">+' + formatMinutes(e.duration_min) + ' · ' + eur(e.price_cents) + '</span></button>';
   }).join('');
 
   document.getElementById('products-grid').innerHTML = products.map(function (p) {
-    return '<button class="xchip" data-id="' + p.id + '" onclick="toggleProduct(this,\'' + p.id + '\')">' +
+    return '<button class="xchip" data-id="' + p.id + '" onclick="toggleProduct(this,\'' + p.id + '\')">' + chipPhoto(p) +
       '<span>' + esc(p.name) + '</span><span class="xm">' + eur(p.price_cents) + '</span></button>';
   }).join('');
 }
