@@ -156,7 +156,8 @@
   /* Prestation avec photo : la photo EN HAUT (vignette 4/3), le texte EN DESSOUS sur fond uni. Un texte pose SUR la photo
      etait illisible avec des dessins noirs sur fond blanc. */
   .svc-card.has-photo { padding: 0; overflow: hidden; position: relative; justify-content: flex-start; align-items: stretch; gap: 0; }
-  .svc-card.has-photo .photo-bg { position: relative; display: block; width: 100%; aspect-ratio: 4 / 3; flex-shrink: 0; background-size: cover; background-position: center; }
+  /* Image entiere, jamais recadree (contain) sur fond blanc : voir rdv.html. */
+  .svc-card.has-photo .photo-bg { position: relative; display: block; width: 100%; aspect-ratio: 4 / 3; flex-shrink: 0; background-color: #fff; background-size: contain; background-repeat: no-repeat; background-position: center; }
   .svc-card.has-photo .overlay { position: static; z-index: auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
     flex: 1; width: auto; height: auto; min-height: 0; padding: 10px 10px 14px; background: none; }
   .svc-card.has-photo .name { color: var(--ink); }

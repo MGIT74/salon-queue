@@ -139,7 +139,9 @@
   .item-card:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
   .item-media { display: flex; align-items: center; justify-content: center; height: 84px; font-size: 38px; line-height: 1;
     background: linear-gradient(145deg, rgba(var(--accent-rgb), .20), rgba(var(--accent-rgb), .05)); background-size: cover; background-position: center; }
-  .item-card.has-photo .item-media { height: auto; aspect-ratio: 4 / 3; }
+  /* Image entiere, jamais recadree (contain) : en mode "cover", une image carree dans un cadre 4:3 etait coupee en haut et en bas.
+     Fond blanc : les marges eventuelles se fondent avec les dessins noirs sur fond blanc. */
+  .item-card.has-photo .item-media { height: auto; aspect-ratio: 4 / 3; background-color: #fff; background-size: contain; background-repeat: no-repeat; background-position: center; }
   .item-body { display: flex; flex-direction: column; gap: 3px; flex: 1; padding: 12px 14px 14px; }
   .item-name { font-size: 15px; font-weight: 600; line-height: 1.25; letter-spacing: -.01em; word-break: break-word;
     display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }

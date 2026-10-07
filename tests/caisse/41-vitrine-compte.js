@@ -133,6 +133,9 @@ const P = (id, name, cents, extra) => Object.assign({ id, name, price_cents: cen
   check('...et le code de compte.html reaffiche bien les listes aux deux endroits ou la reservation est remise a zero', (rdv.match(/renderBookServiceGrid\(\);\s*\/\/ (les cartes|une nouvelle reservation)/g) || []).length === 2);
   check('le bouton "Suivant" des prestations suit la selection (desactive tant qu\'aucune prestation n\'est choisie)', w.document.getElementById('bk-service-next-btn').disabled === true);
 
+  const cRule = (() => { const i = rdv.indexOf('.item-card.has-photo .item-media {'); return i === -1 ? '' : rdv.slice(i, rdv.indexOf('}', i)); })();
+  check('"Mon compte" : vignette d\'image en "contain" sur fond blanc (image entiere, jamais recadree), pas "cover"', /background-size: contain/.test(cRule) && /background-repeat: no-repeat/.test(cRule) && /background-color: #fff/.test(cRule) && !/cover/.test(cRule), cRule.replace(/\s+/g, ' ').slice(0, 160));
+
   console.log(`\nRESULTAT : ${pass} verifications reussies, ${fail} echec(s)`);
   process.exit(fail ? 1 : 0);
 })().catch(e => { console.error('ERREUR TEST', e); process.exit(2); });

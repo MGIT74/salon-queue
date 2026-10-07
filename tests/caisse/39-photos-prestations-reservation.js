@@ -71,6 +71,12 @@ const cards = (w) => [...w.document.querySelectorAll('#svc-grid .item-card')];
   check('borne : plus d\'anneau "inset" pose sur la carte elle-meme (cache par la photo)', !/\.svc-card\.has-photo\.sel \{ box-shadow: inset/.test(kiosk));
   check('borne : la photo en HAUT (vignette 4/3), le texte EN DESSOUS (plus de texte sur le dessin)', /\.svc-card\.has-photo \.photo-bg \{ position: relative;[^}]*aspect-ratio: 4 \/ 3/.test(kiosk) && /\.svc-card\.has-photo \.overlay \{ position: static;[^}]*background: none/.test(kiosk) && /\.svc-card\.has-photo \.name \{ color: var\(--ink\); \}/.test(kiosk) && !/linear-gradient\(to top, rgba\(0,0,0,\.78\)/.test(kiosk));
 
+  console.log('\n[G] Images ENTIERES (jamais recadrees) : "contain" sur fond blanc, pas "cover"');
+  const rule = (src, sel) => { const i = src.indexOf(sel + ' {'); return i === -1 ? '' : src.slice(i, src.indexOf('}', i)); };
+  const rdvRule = rule(rdv, '.item-card.has-photo .item-media'), kioskRule = rule(kiosk, '.svc-card.has-photo .photo-bg');
+  check('reservation : vignette d\'image en "contain", sans repetition, centree, fond blanc (une image carree n\'est plus coupee en haut et en bas)', /background-size: contain/.test(rdvRule) && /background-repeat: no-repeat/.test(rdvRule) && /background-position: center/.test(rdvRule) && /background-color: #fff/.test(rdvRule) && !/cover/.test(rdvRule), rdvRule.replace(/\s+/g, ' ').slice(0, 160));
+  check('borne : meme regle (contain, fond blanc, pas de cover)', /background-size: contain/.test(kioskRule) && /background-repeat: no-repeat/.test(kioskRule) && /background-color: #fff/.test(kioskRule) && !/cover/.test(kioskRule), kioskRule.replace(/\s+/g, ' ').slice(0, 160));
+
   console.log(`\nRESULTAT : ${pass} verifications reussies, ${fail} echec(s)`);
   process.exit(fail ? 1 : 0);
 })().catch(e => { console.error('ERREUR TEST', e); process.exit(2); });
