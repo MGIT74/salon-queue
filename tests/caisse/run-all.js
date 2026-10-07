@@ -54,7 +54,8 @@ const suite = [
   ['31-poste-suit-ordre-catalogue.js', false, ['exit']],
   ['32-schema-applique-au-demarrage.js', false, ['exit']],
   ['33-catalogue-mouvement.js', false, ['exit']],
-  ['34-compte-client-inscription.js', false, ['exit']]
+  ['34-compte-client-inscription.js', false, ['exit']],
+  ['35-adresse-sans-salon.js', false, ['exit']]
 ];
 
 let bad = 0;

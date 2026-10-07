@@ -32,6 +32,7 @@ const ownerRoutes = require('./src/routes/owner');
 const signupRoutes = require('./src/routes/signup');
 const { signupEnabled } = require('./src/lib/config');
 const clientAuthRoutes = require('./src/routes/clientAuth');
+const { requireExplicitSalon } = require('./src/middleware/requireSalon');
 const tpeRoutes = require('./src/routes/tpe');
 const requireAdmin = require('./src/middleware/auth');
 const resolveSalon = require('./src/middleware/resolveSalon');
@@ -110,7 +111,7 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/salon-calendar', salonCalendarRoutes);
 app.use('/api/ai-chat', aiChatRoutes);
 app.use('/api/owner', ownerRoutes);
-app.use('/api/client-auth', clientAuthRoutes);
+app.use('/api/client-auth', requireExplicitSalon, clientAuthRoutes);
 app.use('/api/tpe', tpeRoutes);
 
 // Vérification du mot de passe depuis l'écran de connexion du dashboard

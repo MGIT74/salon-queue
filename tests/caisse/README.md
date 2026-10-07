@@ -65,4 +65,5 @@ node tests/caisse/31-poste-suit-ordre-catalogue.js  # 'Mon poste' : relit le cat
 node tests/caisse/32-schema-applique-au-demarrage.js  # le serveur applique schema.sql a chaque demarrage : base ancienne reparee seule, echec de droits toleree (demarre + avertit)
 node tests/caisse/33-catalogue-mouvement.js  # deplacement des articles : la ligne suit le pointeur, les autres glissent (FLIP), elle se pose ; 'reduire les animations' respecte
 node tests/caisse/34-compte-client-inscription.js  # compte client : inscription sur base STRICTE (owner_id), parcours complet, 'Renvoyer le lien', ecran ; aucune requete INSERT n'oublie une colonne obligatoire
+node tests/caisse/35-adresse-sans-salon.js  # compte.html / rdv.html sans ?salon= : 'Lien incomplet' si plusieurs salons (serveur + pages) ; creation de salon fermee ; un seul salon : inchange
 ```

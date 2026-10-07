@@ -19,8 +19,20 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Prendre rendez-vous</title>
 <link rel="stylesheet" href="/app.css?v=5">
+<script>
+  // Adresse SANS ?salon=... : on masque la page le temps de savoir si la plateforme heberge plusieurs salons
+  // (voir guardMissingSalon) - pour ne jamais montrer, meme une fraction de seconde, un formulaire sans salon.
+  try { if (!new URLSearchParams(window.location.search).get('salon')) document.documentElement.classList.add('no-slug'); } catch (e) {}
+</script>
 <style>
   html, body { min-height: 100%; }
+  /* Adresse sans nom de salon : tout est masque, sauf le message "Lien incomplet" (affiche si plusieurs salons). */
+  html.no-slug body > *:not(#no-salon) { visibility: hidden !important; }
+  #no-salon { display: none; position: fixed; inset: 0; z-index: 99999; align-items: center; justify-content: center; padding: 28px;
+    background: var(--bg, #000); color: var(--ink, #fff); text-align: center; font-family: inherit; }
+  #no-salon .box { max-width: 420px; }
+  #no-salon h1 { font-size: 26px; font-weight: 600; letter-spacing: -.03em; margin: 0 0 12px; }
+  #no-salon p { font-size: 16px; line-height: 1.5; color: var(--grey, #8e8e93); margin: 0; }
   body { min-height: 100vh; margin: 0; display: flex; align-items: center; justify-content: center; }
   .wrap {
     max-width: 640px; width: 100%; margin: 0 auto; padding: clamp(24px,4vw,44px) clamp(20px,4vw,36px);
@@ -132,6 +144,8 @@
 </style>
 </head>
 <body>
+<div id="no-salon" role="alert"><div class="box"><h1>Lien incomplet</h1><p>Cette adresse ne précise pas de salon. Pour prendre rendez-vous, utilisez le lien (ou le QR code) fourni par votre salon.</p></div></div>
+
 
 <div class="modal-backdrop" id="gift-cancel-modal-backdrop" onclick="if(event.target===this)closeGiftCancelModal()">
   <div class="modal-box">
@@ -260,6 +274,24 @@ var SALON_SLUG = (function () {
   try { return new URLSearchParams(window.location.search).get('salon') || ''; }
   catch (e) { return ''; }
 })();
+
+/**
+ * Adresse SANS nom de salon (pas de ?salon=...). Quand la plateforme heberge plusieurs salons elle est ambigue :
+ * elle retombait sur le salon "par defaut" et proposait d'y creer un compte / d'y reserver sans que la personne
+ * sache dans quel salon. On affiche alors un message neutre, sans formulaire. Une installation a UN seul salon
+ * garde son comportement historique. En cas de doute (serveur injoignable) la page s'ouvre comme avant.
+ */
+function guardMissingSalon() {
+  if (SALON_SLUG) return;
+  function reveal() { document.documentElement.classList.remove('no-slug'); }
+  var timer = setTimeout(reveal, 4000);   // filet de securite : la page ne reste jamais masquee
+  fetch('/api/signup/status').then(function (r) { return r.json(); }).then(function (d) {
+    clearTimeout(timer);
+    if (d && d.multi_salon) document.getElementById('no-salon').style.display = 'flex';
+    else reveal();
+  }).catch(function () { clearTimeout(timer); reveal(); });
+}
+guardMissingSalon();
 
 function api(path, opts) {
   opts = opts || {};

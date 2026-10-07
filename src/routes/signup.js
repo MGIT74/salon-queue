@@ -6,6 +6,7 @@ const { sendPasswordReset, sendVerificationEmail } = require('../lib/platformMai
 const { loginRateLimiter, signupRateLimiter } = require('../middleware/rateLimiter');
 const { wrap } = require('../lib/wrap');
 const { signupEnabled } = require('../lib/config');
+const { countActiveSalons } = require('../middleware/requireSalon');
 
 const router = express.Router();
 
@@ -23,10 +24,14 @@ function requireSignupEnabled(req, res, next) {
   });
 }
 
-/** Indique aux pages (connexion, inscription) si l'inscription est ouverte. Public. */
-router.get('/status', (req, res) => {
-  res.json({ ok: true, enabled: signupEnabled() });
-});
+/**
+ * Indique aux pages (connexion, inscription) si l'inscription est ouverte, et si la plateforme heberge PLUSIEURS
+ * salons (multi_salon) : dans ce cas, compte.html et rdv.html refusent de s'ouvrir sans nom de salon dans l'adresse.
+ * Public.
+ */
+router.get('/status', wrap(async (req, res) => {
+  res.json({ ok: true, enabled: signupEnabled(), multi_salon: (await countActiveSalons()) > 1 });
+}));
 
 /**
  * Vérification en direct (avant même de soumettre le formulaire) : le
