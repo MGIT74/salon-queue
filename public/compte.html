@@ -267,19 +267,6 @@
   .svc-card.sel .meta { color: rgba(255,255,255,.8); }
   .svc-card:active { transform: scale(.96); }
 
-  /* Prestation avec PHOTO (meme rendu que la borne) : la photo remplit la carte, un voile garde le texte lisible. */
-  .svc-card.has-photo { padding: 0; overflow: hidden; position: relative; }
-  .svc-card.has-photo .photo-bg { position: absolute; inset: 0; background-size: cover; background-position: center; }
-  .svc-card.has-photo .overlay {
-    position: relative; z-index: 1; width: 100%; height: 100%; min-height: 108px; box-sizing: border-box;
-    display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 2px;
-    padding: 12px 10px; background: linear-gradient(to top, rgba(0,0,0,.78), rgba(0,0,0,.1) 65%, transparent);
-  }
-  .svc-card.has-photo .name, .svc-card.has-photo .meta { color: #fff; }
-  .svc-card.has-photo .meta { color: rgba(255,255,255,.85); }
-  /* Selection : un anneau POSE PAR-DESSUS la photo (un anneau interieur serait cache par elle). */
-  .svc-card.has-photo.sel { background: var(--fill); }
-  .svc-card.has-photo.sel::after { content: ''; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 3px var(--blue); z-index: 2; pointer-events: none; }
 
 
   .svc-card.gift-tile { background: linear-gradient(160deg, #b8860b, #8a5a00); color: #fff; }
@@ -321,6 +308,12 @@
   .item-card.sel .item-add { background: var(--accent); color: #fff; box-shadow: none; }
   .item-card.sel .ic-plus { display: none; }
   .item-card.sel .ic-check { display: block; }
+  /* Prestations (choix unique) : meme carte que les supplements. Coche sur la photo / l'icone de la carte choisie. */
+  .item-media { position: relative; }
+  .item-check { position: absolute; top: 10px; right: 10px; display: none; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%;
+    background: var(--accent); color: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.35); }
+  .item-check svg { width: 16px; height: 16px; }
+  .item-card.sel .item-check { display: flex; }
   .item-card.out { cursor: default; }
   .item-card.out .item-media, .item-card.out .item-name, .item-card.out .item-price { opacity: .45; }
   .item-card.out:active { transform: none; }
@@ -587,7 +580,7 @@
   <section class="panel" id="p-book-service">
     <button class="back" onclick="show('p-book-barber')">‹ Retour</button>
     <div class="eyebrow">Prestation</div>
-    <div class="svc-grid" id="bk-svc-grid"></div>
+    <div class="item-grid" id="bk-svc-grid"></div>
     <button class="go" id="bk-service-next-btn" onclick="goToBookExtrasStep()" disabled>Suivant</button>
   </section>
 
@@ -1351,25 +1344,26 @@ function confirmCancelBookGift() {
 }
 
 function renderBookServiceGrid() {
-  // Une prestation avec PHOTO l'affiche (comme sur la borne et la reservation en ligne) ; sans photo, l'icone d'apres son nom.
-  document.getElementById('bk-svc-grid').innerHTML = bookServices.map(function (s) {
-    var meta = '<span class="meta">' + formatMinutes(s.duration_min) + ' · ' + eur(s.price_cents) + '</span>';
-    var sel = selBookService === s.id ? ' sel' : '';
-    if (s.image_url) {
-      return '<button class="svc-card has-photo' + sel + '" data-id="' + s.id + '" onclick="selectBookService(this,\'' + s.id + '\')">' +
-        '<span class="photo-bg" style="background-image:url(&quot;' + esc(s.image_url) + '&quot;)"></span>' +
-        '<span class="overlay"><span class="name">' + esc(s.name) + '</span>' + meta + '</span></button>';
-    }
-    return '<button class="svc-card' + sel + '" data-id="' + s.id + '" onclick="selectBookService(this,\'' + s.id + '\')">' +
-      '<span class="icon">' + iconForItem(s.name) + '</span>' +
-      '<span class="name">' + esc(s.name) + '</span>' + meta + '</button>';
-  }).join('');
+  document.getElementById('bk-svc-grid').innerHTML = bookServices.map(function (s) { return bookServiceCardHtml(s, selBookService === s.id); }).join('');
   renderBookItemList('extras');
   renderBookItemList('products');
   document.getElementById('bk-service-next-btn').disabled = !selBookService;
 }
 
+function bookServiceCardHtml(s, selected) {
+  // Carte de prestation : photo (ou icone d'apres le nom) EN HAUT, nom / duree / prix EN DESSOUS sur fond uni - comme les
+  // supplements. Un texte pose SUR la photo etait illisible avec des dessins noirs sur fond blanc.
+  var photo = s.image_url ? ' style="background-image:url(&quot;' + esc(s.image_url) + '&quot;)"' : ' aria-hidden="true"';
+  return '<button type="button" class="item-card' + (s.image_url ? ' has-photo' : '') + (selected ? ' sel' : '') + '" data-id="' + s.id + '"' +
+    ' title="' + esc(s.name) + '" aria-pressed="' + (selected ? 'true' : 'false') + '" onclick="selectBookService(this,\'' + s.id + '\')">' +
+    '<span class="item-media"' + photo + '>' + (s.image_url ? '' : iconForItem(s.name)) + '<span class="item-check">' + CHECK_SM_SVG + '</span></span>' +
+    '<span class="item-body"><span class="item-name">' + esc(s.name) + '</span>' +
+    '<span class="item-meta">' + formatMinutes(s.duration_min) + '</span>' +
+    '<span class="item-foot"><span class="item-price">' + eur(s.price_cents) + '</span></span></span></button>';
+}
+
 // ---------- Supplements et produits : cartes de vitrine (meme rendu que rdv.html) ----------
+var CHECK_SM_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>';
 var PLUS_SVG = '<svg class="ic-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>';
 var CHECK_SVG = '<svg class="ic-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>';
 
@@ -1487,8 +1481,8 @@ function filterBookItems(kind) {
 
 function selectBookService(el, id) {
   selBookService = id;
-  document.querySelectorAll('#bk-svc-grid .svc-card').forEach(function (c) { c.classList.remove('sel'); });
-  el.classList.add('sel');
+  document.querySelectorAll('#bk-svc-grid .item-card').forEach(function (c) { c.classList.remove('sel'); c.setAttribute('aria-pressed', 'false'); });
+  el.classList.add('sel'); el.setAttribute('aria-pressed', 'true');
   document.getElementById('bk-service-next-btn').disabled = false;
 }
 

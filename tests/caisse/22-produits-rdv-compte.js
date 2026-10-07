@@ -53,7 +53,7 @@ const check = (n, ok, x = '') => { (ok ? pass++ : fail++); console.log((ok ? '  
   check('elle propose bien "Gel"', /Gel/.test(d.getElementById('p-book-products').textContent));
 
   console.log('\n[B] Parcours complet jusqu\'a l\'envoi, avec un produit choisi');
-  w.selBookBarber = 'b1'; w.selectBookService(d.querySelector('#bk-svc-grid .svc-card[data-id="sv1"]') || { classList: { add(){}, remove(){} } }, 'sv1');
+  w.selBookBarber = 'b1'; w.selectBookService(d.querySelector('#bk-svc-grid .item-card[data-id="sv1"]') || { classList: { add(){}, remove(){} } }, 'sv1');
   w.goToBookProductsStep();
   check('etape Produits bien affichee', d.getElementById('p-book-products').classList.contains('on'));
   const tile = d.getElementById('bk-products-grid').querySelector('.item-card[data-id="p1"]');

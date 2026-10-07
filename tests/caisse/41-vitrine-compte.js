@@ -24,9 +24,9 @@ function page(extras, products, opts) {
   w.formatMinutes = (m) => { m = Number(m); return m >= 60 ? Math.floor(m / 60) + 'h' + (m % 60 ? String(m % 60).padStart(2, '0') : '') : m + ' min'; };
   w.eur = (c) => (c / 100).toFixed(2).replace('.', ',') + ' €';
   w.bookServices = opts.services || []; w.bookExtras = extras; w.bookProducts = products;
-  const vars = rdv.match(/^var PLUS_SVG = .*;$/m)[0] + '\n' + rdv.match(/^var CHECK_SVG = .*;$/m)[0] + '\n';
+  const vars = rdv.match(/^var PLUS_SVG = .*;$/m)[0] + '\n' + rdv.match(/^var CHECK_SVG = .*;$/m)[0] + '\n' + rdv.match(/^var CHECK_SM_SVG = .*;$/m)[0] + '\n';
   w.eval('var selBookService = null, selBookExtras = ' + JSON.stringify(opts.selExtras || []) + ', selBookProducts = ' + JSON.stringify(opts.selProducts || []) + ';\n' + vars +
-    ['iconForItem', 'renderBookServiceGrid', 'normText', 'extraIcon', 'productIcon', 'groupItems', 'bookItemCardHtml', 'renderBookItemList', 'updateBookItemsSummary', 'filterBookItems', 'toggleBookExtra', 'toggleBookProduct'].map(n => fnSrc(rdv, n)).join('\n'));
+    ['iconForItem', 'renderBookServiceGrid', 'bookServiceCardHtml', 'normText', 'extraIcon', 'productIcon', 'groupItems', 'bookItemCardHtml', 'renderBookItemList', 'updateBookItemsSummary', 'filterBookItems', 'toggleBookExtra', 'toggleBookProduct'].map(n => fnSrc(rdv, n)).join('\n'));
   w.renderBookServiceGrid();
   return w;
 }
@@ -123,9 +123,9 @@ const P = (id, name, cents, extra) => Object.assign({ id, name, price_cents: cen
 
   console.log('\n[G] "Mon compte" : prestations a photo + remise a zero d\'une nouvelle reservation');
   w = page([], [], { services: [{ id: 's1', name: 'Barbe premium', duration_min: 20, price_cents: 1300, image_url: IMG }, { id: 's2', name: 'Coupe homme', duration_min: 25, price_cents: 1500, image_url: null }] });
-  const sv = $$(w, '#bk-svc-grid .svc-card');
-  check('prestation AVEC photo : photo en fond de carte + nom / duree / prix par-dessus ; SANS photo : icone par defaut', sv[0].classList.contains('has-photo') && sv[0].querySelector('.photo-bg').getAttribute('style').includes(IMG) && !sv[0].querySelector('.icon') && /20 min · 13,00 €/.test(sv[0].querySelector('.meta').textContent) && !sv[1].classList.contains('has-photo') && !!sv[1].querySelector('.icon'));
-  check('anneau de selection d\'une carte a photo pose par-dessus la photo (::after)', /\.svc-card\.has-photo\.sel::after \{[^}]*box-shadow: inset 0 0 0 3px var\(--blue\)[^}]*z-index: 2/.test(rdv));
+  const sv = $$(w, '#bk-svc-grid .item-card');
+  check('prestation AVEC photo : photo EN HAUT, nom / duree / prix EN DESSOUS (jamais sur le dessin) ; SANS photo : icone par defaut', sv[0].classList.contains('has-photo') && sv[0].querySelector('.item-media').getAttribute('style').includes(IMG) && !sv[0].querySelector('.item-media .item-name') && sv[0].querySelector('.item-body .item-name').textContent === 'Barbe premium' && sv[0].querySelector('.item-meta').textContent === '20 min' && /13,00 €/.test(sv[0].querySelector('.item-price').textContent) && !sv[1].classList.contains('has-photo') && sv[1].querySelector('.item-media').textContent.length > 0);
+  check('carte choisie : anneau ::after + coche ronde affichee seulement sur la carte choisie', /\.item-card\.sel::after \{[^}]*z-index: 2/.test(rdv) && /\.item-card\.sel \.item-check \{ display: flex; \}/.test(rdv) && !/\.svc-card\.has-photo/.test(rdv));
   w = page(EXTRAS, [], { selExtras: ['e2', 'e4'], services: [{ id: 's1', name: 'Coupe', duration_min: 10, price_cents: 1000 }] });
   check('une reservation en cours : suppléments e2 et e4 marques, resume "2 suppléments"', $$(w, '#bk-extras-grid .item-card.sel').length === 2 && /2 suppléments/.test(w.document.getElementById('bk-extras-summary').textContent));
   w.eval('selBookExtras = []; selBookProducts = []; selBookService = null;'); w.renderBookServiceGrid();

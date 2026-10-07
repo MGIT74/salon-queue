@@ -22,12 +22,12 @@ function page(services, extras, products) {
   w.eval(fnSrc(app, 'esc'));
   w.formatMinutes = (m) => m + ' min'; w.eur = (c) => (c / 100).toFixed(2) + ' €';
   w.services = services; w.extras = extras || []; w.products = products || [];
-  const vars = rdv.match(/^var PLUS_SVG = .*;$/m)[0] + '\n' + rdv.match(/^var CHECK_SVG = .*;$/m)[0] + '\n';
-  w.eval('var selService = null, selExtras = [], selProducts = [];\n' + vars + ['iconForItem', 'renderServiceGrid', 'normText', 'extraIcon', 'productIcon', 'groupItems', 'itemCardHtml', 'renderItemList', 'updateItemsSummary', 'selectService', 'toggleExtra', 'toggleProduct'].map(n => fnSrc(rdv, n)).join('\n'));
+  const vars = rdv.match(/^var PLUS_SVG = .*;$/m)[0] + '\n' + rdv.match(/^var CHECK_SVG = .*;$/m)[0] + '\n' + rdv.match(/^var CHECK_SM_SVG = .*;$/m)[0] + '\n';
+  w.eval('var selService = null, selExtras = [], selProducts = [];\n' + vars + ['iconForItem', 'renderServiceGrid', 'serviceCardHtml', 'normText', 'extraIcon', 'productIcon', 'groupItems', 'itemCardHtml', 'renderItemList', 'updateItemsSummary', 'selectService', 'toggleExtra', 'toggleProduct'].map(n => fnSrc(rdv, n)).join('\n'));
   w.renderServiceGrid();
   return w;
 }
-const cards = (w) => [...w.document.querySelectorAll('#svc-grid .svc-card')];
+const cards = (w) => [...w.document.querySelectorAll('#svc-grid .item-card')];
 
 (async () => {
   console.log('\n[A] Prestations : photo si elle existe, sinon l\'icone par defaut');
@@ -38,11 +38,11 @@ const cards = (w) => [...w.document.querySelectorAll('#svc-grid .svc-card')];
   ]);
   let c = cards(w);
   check('3 cartes, dans l\'ordre de la liste', c.map(x => x.dataset.id).join() === 's1,s2,s3');
-  check('prestation AVEC photo : carte "has-photo" dont le fond est la photo', c[0].classList.contains('has-photo') && c[0].querySelector('.photo-bg').getAttribute('style').includes(IMG), c[0].className);
-  check('...avec son nom et sa duree / son prix lisibles par-dessus (voile)', c[0].querySelector('.overlay .name').textContent === 'Barbe premium' && /20 min · 13\.00 €/.test(c[0].querySelector('.overlay .meta').textContent));
-  check('...et plus d\'icone par defaut sur cette carte', !c[0].querySelector('.icon'));
-  check('prestation SANS photo (null) : icone par defaut, comme avant', !c[1].classList.contains('has-photo') && !!c[1].querySelector('.icon') && !c[1].querySelector('.photo-bg'));
-  check('prestation sans photo (chaine vide) : idem', !c[2].classList.contains('has-photo') && !!c[2].querySelector('.icon'));
+  check('prestation AVEC photo : carte "has-photo" dont l\'image du haut est la photo (vignette), sans icone', c[0].classList.contains('has-photo') && c[0].querySelector('.item-media').getAttribute('style').includes(IMG) && c[0].querySelector('.item-media').textContent === '', c[0].className);
+  check('...le texte (nom, duree, prix) est EN DESSOUS de l\'image, dans un bloc a part : jamais pose sur le dessin', c[0].children[0].classList.contains('item-media') && c[0].children[1].classList.contains('item-body') && !c[0].querySelector('.item-media .item-name') && c[0].querySelector('.item-body .item-name').textContent === 'Barbe premium' && c[0].querySelector('.item-meta').textContent === '20 min' && c[0].querySelector('.item-price').textContent === '13.00 €');
+  check('...et une coche cachee dans l\'image, affichee seulement quand la prestation est choisie', !!c[0].querySelector('.item-media .item-check svg'));
+  check('prestation SANS photo (null) : icone par defaut en haut (d\'apres le nom), meme carte', !c[1].classList.contains('has-photo') && c[1].querySelector('.item-media').textContent === w.eval('iconForItem')('Coupe homme') && !c[1].querySelector('.item-media').getAttribute('style'));
+  check('prestation sans photo (chaine vide) : idem', !c[2].classList.contains('has-photo') && c[2].querySelector('.item-media').textContent === w.eval('iconForItem')('Shampoing'));
   check('toutes les cartes restent cliquables vers selectService', c.every(x => /selectService\(this,'s\d'\)/.test(x.getAttribute('onclick'))));
 
   console.log('\n[B] La selection fonctionne aussi sur une carte a photo');
@@ -55,20 +55,21 @@ const cards = (w) => [...w.document.querySelectorAll('#svc-grid .svc-card')];
   console.log('\n[D] Securite : une adresse d\'image piegee ne peut pas injecter de HTML');
   const evil = 'https://x.example/a.png"onerror="alert(1)';
   w = page([{ id: 's1', name: 'Coupe', duration_min: 10, price_cents: 1000, image_url: evil }]);
-  const bg = w.document.querySelector('#svc-grid .photo-bg');
-  check('prestation : l\'element ne porte QUE les attributs class et style (aucun "onerror" injecte)', [...bg.attributes].map(a => a.name).join() === 'class,style' && !w.document.querySelector('#svc-grid [onerror]'));
+  const bg = w.document.querySelector('#svc-grid .item-media');
+  check('prestation : l\'image ne porte QUE les attributs class et style (aucun "onerror" injecte)', [...bg.attributes].map(a => a.name).join() === 'class,style' && !w.document.querySelector('#svc-grid [onerror]'));
   w = page([{ id: 's1', name: '"><img src=x onerror=alert(1)>', duration_min: 10, price_cents: 1000, image_url: IMG }]);
-  check('nom piege : echappe (aucune balise <img> creee)', !w.document.querySelector('#svc-grid img') && w.document.querySelector('#svc-grid .name').textContent === '"><img src=x onerror=alert(1)>');
-  check('adresse https avec "&" : conservee correctement', page([{ id: 's1', name: 'A', duration_min: 1, price_cents: 1, image_url: 'https://cdn.example/a.png?x=1&y=2' }]).document.querySelector('.photo-bg').style.backgroundImage.includes('x=1&y=2'));
+  check('nom piege : echappe (aucune balise <img> creee)', !w.document.querySelector('#svc-grid img') && w.document.querySelector('#svc-grid .item-name').textContent === '"><img src=x onerror=alert(1)>');
+  check('adresse https avec "&" : conservee correctement', page([{ id: 's1', name: 'A', duration_min: 1, price_cents: 1, image_url: 'https://cdn.example/a.png?x=1&y=2' }]).document.querySelector('#svc-grid .item-media').style.backgroundImage.includes('x=1&y=2'));
 
   console.log('\n[E] Style : meme rendu que la borne, selection visible PAR-DESSUS la photo');
-  check('carte a photo : photo en fond plein, voile degrade, texte blanc', /\.svc-card\.has-photo \.photo-bg \{ position: absolute; inset: 0; background-size: cover/.test(rdv) && /linear-gradient\(to top, rgba\(0,0,0,\.78\)/.test(rdv) && /\.svc-card\.has-photo \.name, \.svc-card\.has-photo \.meta \{ color: #fff; \}/.test(rdv));
-  check('anneau de selection pose par-dessus la photo (::after, z-index 2) - un anneau interieur serait cache par elle', /\.svc-card\.has-photo\.sel::after \{[^}]*box-shadow: inset 0 0 0 3px var\(--blue\)[^}]*z-index: 2/.test(rdv));
+  check('plus aucun texte pose SUR la photo : l\'ancien rendu (voile degrade, .photo-bg, .overlay) a disparu de la reservation', !/photo-bg|\.overlay|linear-gradient\(to top/.test(rdv));
+  check('carte choisie : anneau ::after + coche ronde (.item-check) affichee seulement sur la carte choisie', /\.item-card\.sel::after \{[^}]*z-index: 2/.test(rdv) && /\.item-check \{[^}]*display: none/.test(rdv) && /\.item-card\.sel \.item-check \{ display: flex; \}/.test(rdv));
 
   console.log('\n[F] Borne : la selection d\'une prestation a photo etait INVISIBLE (mesure : 0 pixel bleu au bord) - meme correction');
   const kiosk = fs.readFileSync(path.join(__dirname, '../../public/kiosk.html'), 'utf8');
   check('borne : anneau de selection pose par-dessus la photo (::after, z-index 2)', /\.svc-card\.has-photo\.sel::after \{[^}]*box-shadow: inset 0 0 0 3px var\(--blue\)[^}]*z-index: 2/.test(kiosk));
   check('borne : plus d\'anneau "inset" pose sur la carte elle-meme (cache par la photo)', !/\.svc-card\.has-photo\.sel \{ box-shadow: inset/.test(kiosk));
+  check('borne : la photo en HAUT (vignette 4/3), le texte EN DESSOUS (plus de texte sur le dessin)', /\.svc-card\.has-photo \.photo-bg \{ position: relative;[^}]*aspect-ratio: 4 \/ 3/.test(kiosk) && /\.svc-card\.has-photo \.overlay \{ position: static;[^}]*background: none/.test(kiosk) && /\.svc-card\.has-photo \.name \{ color: var\(--ink\); \}/.test(kiosk) && !/linear-gradient\(to top, rgba\(0,0,0,\.78\)/.test(kiosk));
 
   console.log(`\nRESULTAT : ${pass} verifications reussies, ${fail} echec(s)`);
   process.exit(fail ? 1 : 0);
