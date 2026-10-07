@@ -51,7 +51,8 @@ const suite = [
   ['28-chrono-pas-des-creneaux.js', false, ['exit']],
   ['29-catalogue-suppression-ordre.js', true, ['exit']],
   ['30-catalogue-ecran-supprimer-deplacer.js', false, ['exit']],
-  ['31-poste-suit-ordre-catalogue.js', false, ['exit']]
+  ['31-poste-suit-ordre-catalogue.js', false, ['exit']],
+  ['32-schema-applique-au-demarrage.js', false, ['exit']]
 ];
 
 let bad = 0;

@@ -62,4 +62,5 @@ node tests/caisse/28-chrono-pas-des-creneaux.js   # chronologies : une heure A C
 node tests/caisse/29-catalogue-suppression-ordre.js  # catalogue : suppression (effacee si jamais utilisee, CONSERVEE invisible si dans l'historique) + ordre suivi par la caisse (vraie base)
 node tests/caisse/30-catalogue-ecran-supprimer-deplacer.js  # catalogue, ecran : bouton Supprimer + messages, enregistrement de l'ordre, deplacement au clavier
 node tests/caisse/31-poste-suit-ordre-catalogue.js  # 'Mon poste' : relit le catalogue au plus toutes les 15 s (ordre/prix/stock changes dans l'admin repris sans recharger)
+node tests/caisse/32-schema-applique-au-demarrage.js  # le serveur applique schema.sql a chaque demarrage : base ancienne reparee seule, echec de droits toleree (demarre + avertit)
 ```
