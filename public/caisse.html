@@ -26,6 +26,11 @@
     } catch (e) {}
   })();
 </script>
+<script>
+  // Adresse SANS ?salon=... : on masque la page le temps de savoir si la plateforme heberge plusieurs salons
+  // (voir requireSalonInUrl dans app.js) - pour ne jamais montrer, meme une fraction de seconde, un ecran sans salon.
+  try { if (!new URLSearchParams(window.location.search).get('salon')) { document.documentElement.classList.add('no-slug'); var st = document.createElement('style'); st.textContent = 'html.no-slug body > *:not(#no-salon) { visibility: hidden !important; }'; document.head.appendChild(st); } } catch (e) {}
+</script>
 <style>
   html.auth-checking #login-screen { display: none; }
 </style>
@@ -837,7 +842,8 @@
   </div>
 </div>
 
-<script src="/app.js?v=6"></script>
+<script src="/app.js?v=7"></script>
+<script>requireSalonInUrl("Pour utiliser la caisse, ouvrez le lien de votre salon.");</script>
 <script>
 mountThemeButton();
 

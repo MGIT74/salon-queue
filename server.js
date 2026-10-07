@@ -102,11 +102,11 @@ app.use('/api/signup', signupRoutes);
 // Toutes les routes ci-dessous sont scopées au salon résolu depuis
 // l'en-tête X-Salon-Slug (ou le salon par défaut si absent).
 app.use('/api', resolveSalon);
-app.use('/api/queue', queueRoutes);
+app.use('/api/queue', requireExplicitSalon, queueRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/catalog', catalogRoutes);
 app.use('/api/sales', salesRoutes);
-app.use('/api/barbers', barberRoutes);
+app.use('/api/barbers', requireExplicitSalon, barberRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/salon-calendar', salonCalendarRoutes);
 app.use('/api/ai-chat', aiChatRoutes);

@@ -35,6 +35,12 @@ const call = async (method, p, body, slug) => { const h = { 'Content-Type': 'app
     check('mot de passe oublie client SANS salon : refuse (400)', (await call('POST', '/api/client-auth/forgot-password', { email: 'a@b.fr' })).s === 400);
     r = await call('POST', '/api/client-auth/signup', { name: 'Client', email: 'zt-salon-2@example.com', phone: '+33600000022', password: 'motdepasse1' }, 'salon-deux');
     check('MEME inscription AVEC le nom du salon : acceptee, rattachee a CE salon', r.s === 200 && sql("SELECT COUNT(*) FROM clients c JOIN salons s ON s.id=c.salon_id WHERE c.email='zt-salon-2@example.com' AND s.slug='salon-deux'") === '1', r.s + ' ' + JSON.stringify(r.b));
+    r = await call('GET', '/api/queue');
+    check('la FILE (borne, affichage, poste, caisse) SANS salon : refusee (400) - plus de file du salon par defaut', r.s === 400 && r.b.needs_salon === true, r.s + ' ' + JSON.stringify(r.b));
+    check('connexion par code PIN d\'un coiffeur SANS salon : refusee (400) - plus de devinette de PIN sur le salon par defaut', (await call('POST', '/api/barbers/login', { barber_id: 'b1', pin: '0000' })).s === 400);
+    const avantQ = sql("SELECT COUNT(*) FROM queue");
+    check('enregistrement a la borne SANS salon : refuse (400), rien n\'est ajoute a la file', (await call('POST', '/api/queue/checkin', { name: 'Intrus', service_id: 'sv1' })).s === 400 && sql("SELECT COUNT(*) FROM queue") === avantQ);
+    check('MEME file AVEC le nom du salon : normale (200)', (await call('GET', '/api/queue', null, 'test')).s === 200);
     check('un nom de salon INCONNU reste refuse comme avant (404)', (await call('POST', '/api/client-auth/login', { email: 'a@b.fr', password: 'x' }, 'salon-qui-n-existe-pas')).s === 404);
 
     console.log('\n[B] Aucun moyen de CREER un salon depuis ces pages (inscriptions fermees)');
@@ -51,6 +57,7 @@ const call = async (method, p, body, slug) => { const h = { 'Content-Type': 'app
     r = await call('GET', '/api/signup/status');
     check('la plateforme n\'est plus multi-salons', r.b.multi_salon === false, JSON.stringify(r.b));
     r = await call('POST', '/api/client-auth/signup', { name: 'Client', email: 'zt-salon-3@example.com', phone: '+33600000023', password: 'motdepasse1' });
+    check('un seul salon : la file sans nom de salon reste accessible comme avant (200)', (await call('GET', '/api/queue')).s === 200);
     check('inscription sans nom de salon : acceptee comme avant (salon par defaut)', r.s === 200 && sql("SELECT s.slug FROM clients c JOIN salons s ON s.id=c.salon_id WHERE c.email='zt-salon-3@example.com'") === 'test', r.s + ' ' + JSON.stringify(r.b));
   } finally {
     server.kill('SIGKILL'); clean();
@@ -78,6 +85,32 @@ const call = async (method, p, body, slug) => { const h = { 'Content-Type': 'app
     const dom = new JSDOM('<html class="no-slug"><body><div id="no-salon" style="display:none"></div></body></html>', { runScripts: 'outside-only', url: 'http://localhost/' });
     const w = dom.window; w.SALON_SLUG = ''; w.fetch = () => new Promise(() => {}); w.eval(html.slice(i, html.indexOf('\n}\n', i) + 3)); w.guardMissingSalon(); await sleep(4300);
     check('serveur qui ne repond jamais : la page est revelee apres 4 s (filet de securite)', !w.document.documentElement.classList.contains('no-slug'));
+  }
+
+  console.log('\n[E] Poste, caisse, borne, affichage : meme protection (fonction commune de app.js)');
+  {
+    const app = fs.readFileSync(path.join(ROOT, 'public/app.js'), 'utf8'); const i = app.indexOf('function requireSalonInUrl(');
+    const fnSrc = app.slice(i, app.indexOf('\n}\n', i) + 3);
+    const sentences = { poste: 'votre poste', caisse: 'la caisse', kiosk: 'cette borne', display: 'cet affichage' };
+    for (const [name, who] of Object.entries(sentences)) {
+      const html = fs.readFileSync(path.join(ROOT, 'public', name + '.html'), 'utf8');
+      check(name + '.html : entete anti-eclair + appel de requireSalonInUrl("... ' + who + ' ...") + app.js recharge (v=7)', /classList\.add\('no-slug'\)/.test(html) && new RegExp('requireSalonInUrl\\("[^"]*' + who + '[^"]*"\\);').test(html) && /src="\/app\.js\?v=7"/.test(html));
+    }
+    const make = (slug) => { const dom = new JSDOM('<html class="no-slug"><body><main id="page">Clavier PIN</main></body></html>', { runScripts: 'outside-only', url: 'http://localhost/' }); const w = dom.window; w.SALON_SLUG = slug; w.__fetched = 0; w.eval(fnSrc); return w; };
+    const hidden = (w) => w.document.documentElement.classList.contains('no-slug');
+    let w = make(''); w.fetch = () => Promise.resolve({ json: () => Promise.resolve({ multi_salon: true }) }); w.requireSalonInUrl('Pour utiliser votre poste, ouvrez le lien de votre salon.'); await sleep(40);
+    const box = w.document.getElementById('no-salon');
+    check('plusieurs salons : message "Lien incomplet" + la phrase de la page, page masquee', box && /Lien incomplet/.test(box.textContent) && /Pour utiliser votre poste/.test(box.textContent) && hidden(w), box ? box.textContent : 'absent');
+    w = make(''); w.fetch = () => Promise.resolve({ json: () => Promise.resolve({ multi_salon: false }) }); w.requireSalonInUrl('x'); await sleep(40);
+    check('un seul salon : page revelee, aucun message', !hidden(w) && !w.document.getElementById('no-salon'));
+    w = make(''); w.fetch = () => Promise.reject(new Error('reseau')); w.requireSalonInUrl('x'); await sleep(40);
+    check('serveur injoignable : la page s\'ouvre comme avant', !hidden(w) && !w.document.getElementById('no-salon'));
+    w = make('mon-salon'); w.fetch = () => { w.__fetched++; return Promise.resolve({ json: () => Promise.resolve({ multi_salon: true }) }); }; w.requireSalonInUrl('x'); await sleep(40);
+    check('AVEC un nom de salon : aucun appel, rien ne change', w.__fetched === 0 && !w.document.getElementById('no-salon'));
+    for (const name of ['dashboard', 'signup', 'super-admin', 'forgot-password', 'reset-password', 'verify-email']) {
+      const html = fs.readFileSync(path.join(ROOT, 'public', name + '.html'), 'utf8');
+      check(name + '.html NON concerne (la connexion de l\'administration marche depuis une adresse nue)', !/requireSalonInUrl\(/.test(html) && !/classList\.add\('no-slug'\)/.test(html));
+    }
   }
 
   console.log(`\nRESULTAT : ${pass} verifications reussies, ${fail} echec(s)`);

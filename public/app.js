@@ -358,6 +358,31 @@ var SALON_SLUG = (function () {
   catch (e) { return ''; }
 })();
 
+/**
+ * Pages liees a UN salon (poste, caisse, borne, affichage) ouvertes SANS ?salon=... : quand la plateforme heberge
+ * plusieurs salons, une telle adresse est ambigue - elle retombait sur le salon "par defaut" (celui que la base cree
+ * toute seule) et affichait, par exemple, le clavier de code PIN d'un salon que la personne n'a pas choisi. On affiche
+ * alors un message neutre a la place. Une installation a UN seul salon garde son comportement ; en cas de doute (serveur
+ * injoignable) la page s'ouvre comme avant. Le tableau de bord n'appelle PAS cette fonction : sa connexion par email
+ * retrouve le salon toute seule, depuis une adresse nue.
+ * A coupler avec le script d'entete de la page (classe "no-slug") qui evite tout eclair de la page avant ce controle.
+ */
+function requireSalonInUrl(sentence) {
+  if (SALON_SLUG) return;
+  function reveal() { document.documentElement.classList.remove('no-slug'); }
+  var timer = setTimeout(reveal, 4000);   // filet de securite : la page ne reste jamais masquee
+  fetch('/api/signup/status').then(function (r) { return r.json(); }).then(function (d) {
+    clearTimeout(timer);
+    if (!(d && d.multi_salon)) { reveal(); return; }
+    var box = document.createElement('div');
+    box.id = 'no-salon'; box.setAttribute('role', 'alert');
+    box.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:28px;text-align:center;background:var(--bg,#000);color:var(--ink,#fff);font-family:inherit';
+    box.innerHTML = '<div style="max-width:420px"><h1 style="font-size:26px;font-weight:600;letter-spacing:-.03em;margin:0 0 12px">Lien incomplet</h1><p style="font-size:16px;line-height:1.5;color:var(--grey,#8e8e93);margin:0"></p></div>';
+    box.querySelector('p').textContent = 'Cette adresse ne précise pas de salon. ' + sentence;
+    document.body.appendChild(box);
+  }).catch(function () { clearTimeout(timer); reveal(); });
+}
+
 // Change de salon SANS recharger la page : met à jour l'en-tête envoyé à
 // chaque appel API, et l'URL (pour rester partageable/rafraîchissable),
 // sans navigation complète.
