@@ -53,4 +53,16 @@ node tests/caisse/19-produits-preselectionnes-rdv.js  # produits pre-choisis a l
 node tests/caisse/20-produits-rdv-dashboard.js     # meme fonctionnalite, formulaire 'Ajouter un RDV' du dashboard (parcours complet, vrai serveur)
 node tests/caisse/21-produits-rdv-caisse-poste.js  # meme fonctionnalite, formulaires 'Ajouter un RDV' de caisse.html et poste.html
 node tests/caisse/22-produits-rdv-compte.js        # meme fonctionnalite, espace client (compte.html) - derniere des 6 pages
+node tests/caisse/23-sans-rdv-sur-frise.js         # client sans RDV demarre : apparait sur la frise de l'Agenda (en cours + termine), jamais en attente
+node tests/caisse/24-nom-bienvenue-dashboard.js    # 'Bienvenue, <nom du profil>' (repli sur le nom de l'enseigne), nom de l'enseigne inchange ailleurs
+node tests/caisse/25-logo-menu-lateral.js         # menu lateral : logo de l'enseigne a la place du titre redondant (repli sur le nom, jamais de texte provisoire)
+node tests/caisse/26-menu-lateral-trois-zones.js  # menu lateral BUREAU : en-tete fixe / navigation qui defile / pied fixe - regles confinees au bloc >= 861px, mobile intact
+node tests/caisse/27-retrait-des-photos.js         # TOUTE photo ajoutable (dashboard + super-admin) a son retrait ; logo du salon et photo de coiffeur
+node tests/caisse/28-chrono-pas-des-creneaux.js   # chronologies : une heure A CHAQUE PAS des creneaux (5/10/15/20/30), frise assez large pour qu'aucun libelle ne chevauche, zoom coherent
+node tests/caisse/29-catalogue-suppression-ordre.js  # catalogue : suppression (effacee si jamais utilisee, CONSERVEE invisible si dans l'historique) + ordre suivi par la caisse (vraie base)
+node tests/caisse/30-catalogue-ecran-supprimer-deplacer.js  # catalogue, ecran : bouton Supprimer + messages, enregistrement de l'ordre, deplacement au clavier
+node tests/caisse/31-poste-suit-ordre-catalogue.js  # 'Mon poste' : relit le catalogue au plus toutes les 15 s (ordre/prix/stock changes dans l'admin repris sans recharger)
+node tests/caisse/32-schema-applique-au-demarrage.js  # le serveur applique schema.sql a chaque demarrage : base ancienne reparee seule, echec de droits toleree (demarre + avertit)
+node tests/caisse/33-catalogue-mouvement.js  # deplacement des articles : la ligne suit le pointeur, les autres glissent (FLIP), elle se pose ; 'reduire les animations' respecte
+node tests/caisse/34-compte-client-inscription.js  # compte client : inscription sur base STRICTE (owner_id), parcours complet, 'Renvoyer le lien', ecran ; aucune requete INSERT n'oublie une colonne obligatoire
 ```

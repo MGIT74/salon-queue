@@ -228,6 +228,11 @@
   .sidebar-brand { padding: 4px 10px 16px; margin-bottom: 12px; border-bottom: 1px solid var(--sep); }
   .sidebar-brand .name { font-size: 15px; font-weight: 600; letter-spacing: -.01em;
                           min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* Logo de l'enseigne (image carree, 300x300 a l'envoi) OU, a defaut, son nom.
+     Hauteur reservee : meme encombrement dans les deux cas, donc rien ne bouge
+     quand le bloc se remplit. */
+  .sidebar-brand .brand-head { display: flex; align-items: center; min-height: 52px; min-width: 0; }
+  .sidebar-brand .brand-head img { display: block; width: 52px; height: 52px; object-fit: cover; border-radius: 14px; }
   .sidebar-brand select {
     width: 100%; margin-top: 10px; padding: 9px 12px; border: none; border-radius: 10px;
     background: var(--fill); color: var(--ink); font-family: inherit; font-size: 13px; font-weight: 500;
@@ -301,6 +306,32 @@
   .sidebar-collapse-btn .ic svg { transition: transform .2s ease; }
   html[data-sidebar-collapsed="1"] .sidebar-collapse-btn .ic svg { transform: rotate(180deg); }
 
+  /* BUREAU UNIQUEMENT (>= 861px, la version mobile ci-dessous n'est pas touchee).
+     Menu lateral en 3 zones : en-tete FIXE (logo, selecteur d'enseigne, Reduire),
+     navigation qui DEFILE (de Dashboard a Reglages), pied FIXE (Deconnexion, Theme).
+     Avant, tout le menu defilait ensemble : sur un ecran peu haut, Deconnexion et
+     Theme sortaient de l'ecran. */
+  @media (min-width: 861px) {
+    .sidebar { display: flex; flex-direction: column; }
+    .sidebar-brand, .sidebar-collapse-btn, .sidebar-logout, .sidebar-theme-btn { flex-shrink: 0; }
+    /* min-height:0 : sans lui, un element flex refuse de devenir plus petit que
+       son contenu et la liste ne defilerait jamais. */
+    .tabs { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+    /* Les boutons gardent leur taille : sans cela ils s'ecraseraient pour tenir
+       au lieu de laisser la liste defiler. */
+    .tabs button { flex-shrink: 0; }
+    /* Fine ligne au-dessus du pied, comme celle sous l'en-tete : on voit ou
+       s'arrete la zone qui defile. */
+    /* Pied : Theme, Reduire, puis Deconnexion en tout dernier. Reduire (controle
+       secondaire) ne prend plus la place d'un lien de navigation. Espacements
+       recales pour cet ordre ; la fine ligne est accrochee au 1er element du pied
+       (Theme) pour separer tout le pied de la navigation. */
+    .sidebar-theme-btn { position: relative; margin-top: 10px; }
+    .sidebar-collapse-btn { margin: 4px 0 0; }
+    .sidebar-logout { margin-top: 4px; }
+    .sidebar-theme-btn::before { content: ''; position: absolute; left: 10px; right: 10px; top: -6px; height: 1px; background: var(--sep); }
+  }
+
   @media (max-width: 860px) {
     .app-shell { flex-direction: column; align-items: stretch; }
 
@@ -338,6 +369,8 @@
     }
     [data-theme="dark"] .sidebar-brand { background: rgba(28,28,30,.55); }
     .sidebar-brand .name { font-size: 14px; flex: 1 1 auto; min-width: 0; }
+    .sidebar-brand .brand-head { flex: 1 1 auto; min-width: 0; min-height: 0; }
+    .sidebar-brand .brand-head img { width: 34px; height: 34px; border-radius: 10px; }
     .sidebar-brand select { width: auto; margin: 0; max-width: 42vw; flex-shrink: 0; box-sizing: border-box; }
 
     body.impersonating .sidebar-brand { top: 44px; }
@@ -617,6 +650,10 @@
   .barber-quick-actions {
     display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 18px;
   }
+  /* Nombre IMPAIR de boutons (un coiffeur avec photo en a 5 : "Retirer la photo" s'ajoute) :
+     le dernier prend toute la largeur au lieu de rester seul dans un coin. On compte les
+     <button> uniquement (le champ d'envoi de photo cache est un <input>, pas un bouton). */
+  .barber-quick-actions > button:last-of-type:nth-of-type(odd) { grid-column: 1 / -1; }
   .quick-action {
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
     background: var(--fill); border: none; border-radius: 14px; padding: 14px 8px;
@@ -626,6 +663,21 @@
   .quick-action:hover { background: var(--fill-2); }
   .quick-action.danger { color: var(--red); }
   .item-actions .btn { font-size: 14px; padding: 9px 16px; }
+  .item-actions .btn-delete { color: var(--red); }
+  /* Poignee de deplacement des listes du catalogue (souris, doigt, stylet). touch-action:none : sans cela,
+     faire glisser au doigt ferait defiler la page au lieu de deplacer l'element. */
+  .drag-handle {
+    flex: 0 0 auto; width: 30px; height: 44px; margin: -6px 0 -6px -8px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center; color: var(--grey);
+    cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none;
+  }
+  .drag-handle:hover, .drag-handle:focus-visible { background: var(--fill); color: var(--ink); outline: none; }
+  /* Ligne tenue : soulevee, elle suit le pointeur SANS retard (pas de transition). Une fois lachee ("settling"),
+     elle se pose en douceur. Les autres lignes glissent via des transitions posees par le script (technique FLIP). */
+  .item.dragging { transition: none !important; background: var(--fill); box-shadow: 0 16px 36px rgba(0,0,0,.32); position: relative; z-index: 5; }
+  .item.settling { transition: transform .22s cubic-bezier(.2,.8,.2,1), box-shadow .22s ease; background: var(--fill); box-shadow: 0 16px 36px rgba(0,0,0,.32); position: relative; z-index: 5; }
+  @media (prefers-reduced-motion: reduce) { .item, .item.settling { transition: none !important; } }
+  body.sorting, body.sorting * { cursor: grabbing !important; user-select: none; -webkit-user-select: none; }
 
   /* Listes Marketing (fidélité, cadeaux) : séparateur discret entre
      les lignes, pour différencier sans surcharger visuellement. */
@@ -912,6 +964,7 @@
   .timeline-inner { position: relative; }
   .timeline-hours { position: relative; height: 18px; margin-bottom: 6px; }
   .timeline-hours span { position: absolute; top: 0; font-size: 12px; color: var(--grey); white-space: nowrap; transform: translateX(-1px); }
+  .timeline-hours span.h { color: var(--ink); font-weight: 600; }
   .timeline-row { display: flex; align-items: center; min-height: 54px; border-top: 1px solid var(--sep); position: relative; }
   .timeline-row:first-child { border-top: none; }
   .timeline-row-label { width: 22px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; padding-right: 0; }
@@ -939,8 +992,10 @@
      15 min (via background-size en %, calculé selon la plage affichée). */
   .timeline-minute-grid {
     position: absolute; left: 22px; right: 0; top: 0; bottom: 0; pointer-events: none; z-index: 0;
-    background-image: linear-gradient(to right, var(--sep) 1px, transparent 1px);
-    background-repeat: repeat-x; background-position: left top;
+    /* 1re couche : un trait fin a chaque pas ; 2e couche : un trait plus marque a chaque heure */
+    background-image: linear-gradient(to right, var(--sep) 1px, transparent 1px),
+                      linear-gradient(to right, rgba(128,128,128,.38) 1px, transparent 1px);
+    background-repeat: repeat-x, repeat-x; background-position: left top, left top;
   }
   .timeline-zoom-ctrl {
     display: flex; align-items: center; justify-content: flex-end; gap: 6px;
@@ -1257,15 +1312,14 @@
   <div class="app-shell">
     <aside class="sidebar">
       <div class="sidebar-brand">
-        <div class="name" id="app-salon-badge">Dashboard</div>
+        <div class="brand-head">
+          <img id="app-salon-logo" alt="" style="display:none">
+          <div class="name" id="app-salon-badge" style="display:none"></div>
+        </div>
         <select id="salon-switcher" onchange="switchSalon(this.value)">
           <option value="">Chargement…</option>
         </select>
       </div>
-      <button class="sidebar-collapse-btn" onclick="toggleSidebarCollapsed()" title="Réduire la barre latérale">
-        <span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/><line x1="4" y1="4" x2="4" y2="20"/></svg></span>
-        <span class="label">Réduire</span>
-      </button>
       <nav class="tabs" id="tabs">
         <button class="on" data-t="dashboard"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg></span> Dashboard</button>
         <button data-t="queue"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></span> File d'attente</button>
@@ -1286,16 +1340,20 @@
           <span class="ic"><svg id="mobile-more-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.5" fill="currentColor" stroke="none"/></svg></span> Plus
         </button>
       </nav>
-      <button class="sidebar-logout" onclick="logout()">
-        <span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></span>
-        <span class="label">Déconnexion</span>
-      </button>
       <button class="sidebar-theme-btn" onclick="toggleTheme()" title="Changer de thème">
         <span class="ic">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" class="sun"><circle cx="12" cy="12" r="4.5"/><path d="M12 2.5v2.5M12 19v2.5M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M2.5 12H5M19 12h2.5M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></svg>
           <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" class="moon"><path d="M20.4 14.7A8.5 8.5 0 0 1 9.3 3.6a.6.6 0 0 0-.8-.7A9.5 9.5 0 1 0 21.1 15.5a.6.6 0 0 0-.7-.8Z"/></svg>
         </span>
         <span class="label">Thème</span>
+      </button>
+      <button class="sidebar-collapse-btn" onclick="toggleSidebarCollapsed()" title="Réduire la barre latérale">
+        <span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/><line x1="4" y1="4" x2="4" y2="20"/></svg></span>
+        <span class="label">Réduire</span>
+      </button>
+      <button class="sidebar-logout" onclick="logout()">
+        <span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></span>
+        <span class="label">Déconnexion</span>
       </button>
     </aside>
 
@@ -1308,7 +1366,7 @@
   <div class="tab-panel on" id="t-dashboard">
     <div class="dash-hero">
       <div>
-        <h2 class="dash-title">Bienvenue, <span id="dash-salon-name">—</span></h2>
+        <h2 class="dash-title">Bienvenue, <span id="dash-welcome-name" style="visibility:hidden"></span></h2>
         <div class="dash-subtitle" id="dash-date"></div>
       </div>
       <div class="dash-kpis">
@@ -1912,14 +1970,17 @@
   <div class="tab-panel" id="t-account">
     <div class="card-box">
       <h3>Logo du salon</h3>
-      <p class="hint">Affiché à côté du nom du salon dans le dashboard. Une image carrée fonctionne mieux.</p>
+      <p class="hint">Affiché en haut du menu du dashboard, à la place du nom du salon. Une image carrée fonctionne mieux.</p>
       <div style="display:flex;align-items:center;gap:16px;margin-bottom:22px">
         <div id="salon-logo-preview" onclick="document.getElementById('logo-input').click()"
              style="width:72px;height:72px;border-radius:16px;cursor:pointer;background:var(--fill);
              display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;
              color:var(--grey);font-size:12px;text-align:center;background-size:cover;background-position:center">Ajouter</div>
         <input type="file" id="logo-input" accept="image/*" style="display:none" onchange="uploadSalonLogo(this)">
-        <div class="hint" style="margin:0">Cliquez sur le cadre pour choisir une image.</div>
+        <div>
+          <div class="hint" style="margin:0 0 8px">Cliquez sur le cadre pour choisir une image.</div>
+          <button class="btn btn-ghost" style="padding:8px 14px;font-size:13px;display:none" id="logo-remove-btn" onclick="removeSalonLogo()">Retirer le logo</button>
+        </div>
       </div>
 
       <h4 style="font-size:14.5px;font-weight:600;margin:0 0 4px">Couleur d'accentuation</h4>
@@ -2352,7 +2413,44 @@ var currentLoyaltyCardImage = '';
 var currentGiftCardImage = '';
 var currentLoginImage = '';
 
+// Bloc du haut du menu lateral : le LOGO de l'enseigne s'il en a un, sinon son
+// nom. Le nom n'est plus affiche EN PLUS du logo (le selecteur juste en dessous
+// l'affiche deja : redondant). Il reste cependant dans #app-salon-badge, meme
+// masque : d'autres fonctions le lisent (ex. impression du ticket Z).
+// Rien n'est affiche tant qu'on ne sait pas quoi montrer : pas de texte
+// provisoire, et jamais le logo de l'enseigne PRECEDENTE apres un changement.
+function applySidebarBrand(name, logoUrl) {
+  var logo = document.getElementById('app-salon-logo');
+  var badge = document.getElementById('app-salon-badge');
+  if (!badge) return;
+  badge.textContent = name || '';
+  function showName() {
+    if (logo) logo.style.display = 'none';
+    badge.style.display = name ? '' : 'none';
+  }
+  if (logo && logoUrl) {
+    // Logo illisible (lien casse...) : on retombe sur le nom plutot qu'une image vide.
+    logo.onerror = showName;
+    logo.alt = name || '';
+    if (logo.getAttribute('src') !== logoUrl) logo.src = logoUrl;
+    logo.style.display = '';
+    badge.style.display = 'none';
+  } else {
+    if (logo) logo.removeAttribute('src');
+    showName();
+  }
+}
+
+function brandCacheKey() { return 'salon-brand:' + (typeof SALON_SLUG === 'string' ? SALON_SLUG : ''); }
+
 function loadCurrentSalonName() {
+  // Affichage instantane du dernier logo/nom connu de CETTE enseigne (memoire
+  // de session) ; s'il n'y en a pas, le bloc reste vide plutot que de montrer
+  // celui de l'enseigne precedente.
+  var cachedBrand = null;
+  try { cachedBrand = JSON.parse(sessionStorage.getItem(brandCacheKey()) || 'null'); } catch (e) { /* stockage indisponible */ }
+  applySidebarBrand(cachedBrand ? cachedBrand.name : '', cachedBrand ? cachedBrand.logo : '');
+
   // Si l'URL ne precise pas de salon (lien universel, pas un lien
   // bookmark d'une enseigne precise), on n'affiche PAS le nom du
   // salon par defaut avant connexion - ce serait trompeur pour
@@ -2374,6 +2472,11 @@ function loadCurrentSalonName() {
       currentSalonName = name;
       currentSalonLogo = d.logo_url || '';
       currentGiftTileImage = d.gift_tile_image_url || '';
+      var newSlotStep = Number(d.rdv_slot_step_min) || 15;
+      var slotStepChanged = newSlotStep !== rdvSlotStepMin;
+      rdvSlotStepMin = newSlotStep;
+      // Isole : un souci de redessin des frises ne doit jamais empecher le reste du chargement (logo, apercus...).
+      if (slotStepChanged) { try { rerenderAllTimelines(); } catch (e) { /* la frise se corrigera au prochain rendu */ } }
       var loginEl = document.getElementById('login-salon-name');
       if (SALON_SLUG) {
         // Un salon precis est demande (lien direct/bookmark) — on peut
@@ -2383,8 +2486,8 @@ function loadCurrentSalonName() {
       }
       // Une fois connecte (app-screen visible), le nom affiche est
       // toujours celui du salon REELLEMENT resolu pour cette session.
-      var brandEl = document.getElementById('app-salon-badge');
-      if (brandEl) brandEl.textContent = name;
+      applySidebarBrand(name, currentSalonLogo);
+      try { sessionStorage.setItem(brandCacheKey(), JSON.stringify({ name: name, logo: currentSalonLogo })); } catch (e) { /* ignore */ }
       var impNameEl = document.getElementById('imp-salon-name');
       if (impNameEl) impNameEl.textContent = name;
       var logoPreview = document.getElementById('salon-logo-preview');
@@ -2397,6 +2500,8 @@ function loadCurrentSalonName() {
           logoPreview.textContent = 'Ajouter';
         }
       }
+      var logoRemoveBtn = document.getElementById('logo-remove-btn');
+      if (logoRemoveBtn) logoRemoveBtn.style.display = currentSalonLogo ? 'inline-block' : 'none';
       if (d.accent_color) {
         applyAccentColor(d.accent_color);
         var accentInput = document.getElementById('acc-accent-color');
@@ -2810,8 +2915,48 @@ function renderDashLeaderboard() {
       }).join('');
 }
 
+// "Bienvenue, <nom>" : le nom du PROFIL de l'admin (Reglages > Mon profil),
+// pas celui de l'enseigne - celui-ci reste affiche partout ailleurs (menu
+// lateral, kiosque, pages client).
+//
+// Jamais de nom PROVISOIRE : afficher d'abord le nom de l'enseigne puis le
+// remplacer par celui du profil se voyait a chaque rafraichissement (un
+// clignotement peu professionnel). Le texte reste donc invisible tant que le
+// bon nom n'est pas connu ; le dernier nom connu est garde en memoire de
+// session pour s'afficher instantanement aux rafraichissements suivants. Le
+// nom de l'enseigne n'apparait qu'en DERNIER recours (profil sans nom, erreur,
+// ou reponse trop lente) - jamais d'accueil vide.
+function loadWelcomeName() {
+  var el = document.getElementById('dash-welcome-name');
+  var cacheKey = 'welcome-name:' + (typeof SALON_SLUG === 'string' ? SALON_SLUG : '');
+  function show(name) { el.textContent = name; el.style.visibility = 'visible'; }
+  function fallback() { show(currentSalonName || ''); }
+
+  var cached = '';
+  try { cached = sessionStorage.getItem(cacheKey) || ''; } catch (e) { /* stockage indisponible */ }
+  if (cached) show(cached);
+
+  var done = false;
+  var slowTimer = setTimeout(function () { if (!done && !cached) fallback(); }, 3000);
+
+  api('/api/owner/profile').then(function (r) {
+    done = true; clearTimeout(slowTimer);
+    var name = r && r.name ? String(r.name).trim() : '';
+    if (name) {
+      try { sessionStorage.setItem(cacheKey, name); } catch (e) { /* ignore */ }
+      show(name);
+    } else {
+      try { sessionStorage.removeItem(cacheKey); } catch (e) { /* ignore */ }
+      fallback();
+    }
+  }).catch(function () {
+    done = true; clearTimeout(slowTimer);
+    if (!cached) fallback(); // sinon on garde le nom deja affiche
+  });
+}
+
 function loadDashboardTab() {
-  document.getElementById('dash-salon-name').textContent = currentSalonName || '—';
+  loadWelcomeName();
   document.getElementById('dash-date').textContent = new Date().toLocaleDateString('fr-FR', {
     weekday: 'long', day: 'numeric', month: 'long'
   });
@@ -3627,7 +3772,8 @@ function renderCatalog(table) {
           ? eur(x.price_cents) + (x.stock_enabled ? ' · ' + (x.stock_quantity > 0 ? x.stock_quantity + ' en stock' : 'rupture de stock') : ' · illimité')
           : formatMinutes(x.duration_min) + ' · ' + (table === 'extras' ? '+ ' : '') + eur(x.price_cents);
         var photoStyle = x.image_url ? 'background:url(&quot;' + esc(x.image_url) + '&quot;) center/cover' : '';
-        return '<div class="item' + (x.active ? '' : ' off') + '">' +
+        return '<div class="item' + (x.active ? '' : ' off') + '" data-id="' + x.id + '">' +
+          '<span class="drag-handle" role="button" tabindex="0" aria-label="Déplacer (glisser, ou flèches haut et bas)" title="Glisser pour déplacer — l\'ordre est celui de la caisse">' + GRIP_ICON + '</span>' +
           '<div class="cat-photo" style="' + photoStyle + '" onclick="document.getElementById(\'cat-photo-input-' + x.id + '\').click()">' +
             (x.image_url
               ? '<button type="button" class="cat-photo-remove" title="Supprimer la photo" onclick="event.stopPropagation();removeCatalogImage(\'' + table + '\',\'' + x.id + '\')">' +
@@ -3642,8 +3788,10 @@ function renderCatalog(table) {
           (x.active
             ? '<button class="btn btn-ghost" onclick="archiveCatalog(\'' + table + '\',\'' + x.id + '\')">Archiver</button>'
             : '<button class="btn btn-soft" onclick="restoreCatalog(\'' + table + '\',\'' + x.id + '\')">Réactiver</button>') +
+          '<button class="btn btn-ghost btn-delete" onclick="deleteCatalog(\'' + table + '\',\'' + x.id + '\')">Supprimer</button>' +
           '</div></div>';
       }).join('');
+  initCatalogSort(table);
 }
 
 function uploadCatalogImage(table, id, input) {
@@ -3734,6 +3882,182 @@ function saveCatalog() {
    .catch(function (e) { toast(e.message, true); });
 }
 
+var GRIP_ICON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>';
+
+/**
+ * Suppression DEFINITIVE (le bouton "Archiver" ne fait que masquer a la borne). Le serveur decide : un
+ * article jamais utilise est efface pour de bon ; un article deja dans l'historique disparait de partout
+ * mais sa fiche est gardee, invisible, pour que les passages et rendez-vous deja enregistres restent
+ * corrects. On le dit AVANT de supprimer, avec les vrais chiffres.
+ */
+function deleteCatalog(table, id) {
+  api('/api/catalog/' + table + '/' + id + '/usage').then(function (r) {
+    var u = r.usage, parts = [];
+    if (u.passages) parts.push(u.passages + (u.passages > 1 ? ' passages' : ' passage'));
+    if (u.rendez_vous) parts.push(u.rendez_vous + ' rendez-vous');
+    // La phrase s'accorde avec ce qui existe vraiment (passages et/ou rendez-vous, un ou plusieurs).
+    var both = u.passages > 0 && u.rendez_vous > 0, many = both || u.total > 1;
+    var what = both ? 'ces passages et rendez-vous'
+      : (u.passages ? (u.passages > 1 ? 'ces passages' : 'ce passage') : (u.rendez_vous > 1 ? 'ces rendez-vous' : 'ce rendez-vous'));
+    var msg = u.total === 0
+      ? 'Supprimer définitivement « ' + r.name + ' » ? Cette action est irréversible.'
+      : 'Supprimer « ' + r.name + ' » ? Il disparaîtra du catalogue, de la caisse, de la borne et de la réservation. ' +
+        'Il est déjà utilisé (' + parts.join(' et ') + ') : ' + what + (many ? ' sont conservés tels quels' : ' est conservé tel quel') + ' dans l\'historique.' +
+        (u.a_venir ? ' ' + u.a_venir + (u.a_venir > 1 ? ' rendez-vous à venir l\'utilisent' : ' rendez-vous à venir l\'utilise') + ' encore : ' + (u.a_venir > 1 ? 'ils restent valables.' : 'il reste valable.') : '');
+    return showConfirm(msg, { title: 'Supprimer', confirmLabel: 'Supprimer', danger: true }).then(function (ok) {
+      if (!ok) return;
+      return api('/api/catalog/' + table + '/' + id + '?permanent=1', { method: 'DELETE' })
+        .then(loadCatalog).then(function () { toast('Supprimé'); });
+    });
+  }).catch(function (e) { toast(e.message, true); });
+}
+
+/** Enregistre l'ordre affiche. Le meme ordre est repris par la caisse, la borne et la reservation. */
+function persistCatalogOrder(table) {
+  var list = document.getElementById(table + '-list');
+  var ids = [].slice.call(list.querySelectorAll('.item[data-id]')).map(function (el) { return el.dataset.id; });
+  var arr = table === 'services' ? services : (table === 'extras' ? extras : products);
+  var byId = {}; arr.forEach(function (x) { byId[x.id] = x; });
+  var ordered = ids.map(function (i) { return byId[i]; }).filter(Boolean);
+  arr.forEach(function (x) { if (ids.indexOf(x.id) === -1) ordered.push(x); });
+  arr.splice.apply(arr, [0, arr.length].concat(ordered));   // meme tableau (d'autres ecrans le lisent) : l'ordre local suit tout de suite
+  return api('/api/catalog/' + table + '/reorder', { method: 'POST', body: { ids: ids } })
+    .then(function () { toast('Ordre enregistré'); })
+    .catch(function (e) { toast(e.message, true); return loadCatalog(); });   // en cas d'echec : on reaffiche l'ordre reel
+}
+
+/**
+ * Deplacer un article : glisser la poignee (souris, doigt, stylet) ou, au clavier, fleches haut/bas sur la
+ * poignee. La ligne tenue SUIT le pointeur (soulevee, avec une ombre), les autres GLISSENT pour lui faire de
+ * la place, et elle SE POSE a l'arrivee. Delegation d'evenements sur la liste (une seule fois, meme si la
+ * liste est redessinee).
+ * La capture du pointeur est prise sur la LISTE et non sur la poignee : l'element deplace change de place
+ * dans la page pendant le glissement, et un element qui change de place perd sa capture.
+ */
+function initCatalogSort(table) {
+  var list = document.getElementById(table + '-list');
+  if (!list || list.__sortReady) return;
+  list.__sortReady = true;
+  var drag = null, kbTimer = null;
+  // Si le systeme demande de reduire les animations, rien ne glisse : les lignes changent de place d'un coup.
+  var calm = Boolean(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+  function rows(except) { return [].slice.call(list.querySelectorAll('.item[data-id]')).filter(function (el) { return el !== except; }); }
+  function orderKey() { return rows().map(function (el) { return el.dataset.id; }).join(','); }
+  // Decalage vertical actuellement applique a une ligne : pendant qu'elle glisse, son rectangle l'inclut.
+  function shiftOf(el) {
+    var t = window.getComputedStyle(el).transform;
+    var m = t && t !== 'none' && t.match(/matrix(3d)?\(([^)]+)\)/);
+    if (!m) return 0;
+    var v = m[2].split(',').map(parseFloat);
+    return m[1] ? v[13] : v[5];
+  }
+
+  /**
+   * Change l'ordre des lignes EN DOUCEUR (technique "FLIP") : on note ou chaque ligne se trouve, on change
+   * l'ordre, puis chaque ligne qui a bouge part de son ancienne position et glisse vers la nouvelle. Une ligne
+   * deja en train de glisser repart de l'endroit ou elle se trouve reellement (pas de saut).
+   */
+  function animateMove(mutate, except) {
+    if (calm) { mutate(); return; }
+    var els = rows(except);
+    var before = els.map(function (el) { return el.getBoundingClientRect().top; });
+    mutate();
+    els.forEach(function (el) { el.style.transition = 'none'; el.style.transform = ''; });   // met de cote les glissements en cours
+    var moving = [];
+    els.forEach(function (el, i) {
+      var d = before[i] - el.getBoundingClientRect().top;
+      if (Math.abs(d) > 1) { el.style.transform = 'translateY(' + d + 'px)'; moving.push(el); }
+    });
+    void list.offsetHeight;   // fige l'etat de depart avant de lancer le glissement
+    els.forEach(function (el) { if (moving.indexOf(el) === -1) el.style.transition = ''; });   // les lignes qui ne bougent pas ne gardent aucun reste
+    moving.forEach(function (el) {
+      el.style.transition = 'transform .2s cubic-bezier(.2,.8,.2,1)';
+      el.style.transform = '';
+      var token = el.__flip = (el.__flip || 0) + 1;
+      setTimeout(function () { if (el.__flip === token) el.style.transition = ''; }, 260);
+    });
+  }
+
+  // La ligne tenue SUIT le pointeur (elle ne saute pas de case en case) : on la decale de l'ecart entre sa
+  // place dans la liste et l'endroit ou le pointeur la tient. Elle est un peu soulevee (ombre, leger agrandissement).
+  function placeDragged() {
+    var it = drag.item;
+    it.style.transform = 'none';
+    var natural = it.getBoundingClientRect().top;
+    it.style.transform = 'translateY(' + (drag.lastY - drag.grabDy - natural) + 'px) scale(1.012)';
+  }
+  function reposition() {
+    if (!drag) return;
+    var center = drag.lastY - drag.grabDy + drag.height / 2, items = rows(drag.item), after = null;
+    for (var i = 0; i < items.length; i++) {
+      var r = items[i].getBoundingClientRect();
+      if (center < r.top - shiftOf(items[i]) + r.height / 2) { after = items[i]; break; }   // milieu SANS le glissement en cours : pas de va-et-vient
+    }
+    var moved = after === null ? list.lastElementChild !== drag.item : after !== drag.item.nextElementSibling;
+    if (moved) animateMove(function () { if (after === null) list.appendChild(drag.item); else list.insertBefore(drag.item, after); }, drag.item);
+    placeDragged();
+  }
+  function autoScroll() {   // pres du bord de l'ecran, la page defile toute seule (longues listes)
+    if (!drag) return;
+    var edge = 90, y = drag.lastY, h = window.innerHeight;
+    if (y < edge) window.scrollBy(0, -Math.ceil((edge - y) / 6));
+    else if (y > h - edge) window.scrollBy(0, Math.ceil((y - (h - edge)) / 6));
+    else return;
+    reposition();
+  }
+
+  list.addEventListener('pointerdown', function (e) {
+    var handle = e.target.closest && e.target.closest('.drag-handle');
+    if (!handle || drag || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    var item = handle.closest('.item'); if (!item) return;
+    e.preventDefault();
+    var rect = item.getBoundingClientRect();
+    drag = { item: item, pointerId: e.pointerId, lastY: e.clientY, grabDy: e.clientY - rect.top, height: rect.height, before: orderKey(), timer: setInterval(autoScroll, 16) };
+    try { list.setPointerCapture(e.pointerId); } catch (x) { /* pas de capture : le glissement marche quand meme tant que le pointeur reste sur la liste */ }
+    item.style.transition = ''; item.style.boxShadow = '';
+    item.classList.remove('settling'); item.classList.add('dragging'); document.body.classList.add('sorting');
+    placeDragged();
+  });
+  list.addEventListener('pointermove', function (e) {
+    if (!drag || e.pointerId !== drag.pointerId) return;
+    drag.lastY = e.clientY; reposition();
+  });
+  function end(e) {
+    if (!drag || e.pointerId !== drag.pointerId) return;
+    clearInterval(drag.timer);
+    var it = drag.item, changed = orderKey() !== drag.before; drag = null;
+    document.body.classList.remove('sorting');
+    try { list.releasePointerCapture(e.pointerId); } catch (x) { /* deja relache */ }
+    it.classList.remove('dragging');
+    if (calm) { it.style.transform = ''; }
+    else {
+      // La ligne se POSE dans son emplacement : elle glisse de l'endroit ou on l'a lachee vers sa place, en perdant son ombre.
+      it.classList.add('settling');
+      void it.offsetHeight;
+      it.style.transform = 'translateY(0) scale(1)'; it.style.boxShadow = '0 0 0 rgba(0,0,0,0)';
+      setTimeout(function () { it.classList.remove('settling'); it.style.transform = ''; it.style.boxShadow = ''; }, 260);
+    }
+    if (changed) persistCatalogOrder(table);
+  }
+  list.addEventListener('pointerup', end);
+  list.addEventListener('pointercancel', end);
+
+  // Clavier : sur la poignee, fleche haut / bas deplace l'element d'un cran (en glissant, lui aussi).
+  list.addEventListener('keydown', function (e) {
+    var handle = e.target.closest && e.target.closest('.drag-handle');
+    if (!handle || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+    var item = handle.closest('.item'); if (!item) return;
+    e.preventDefault();
+    var up = e.key === 'ArrowUp';
+    if (up && !item.previousElementSibling) return;
+    if (!up && !item.nextElementSibling) return;
+    animateMove(function () { if (up) list.insertBefore(item, item.previousElementSibling); else list.insertBefore(item.nextElementSibling, item); });
+    handle.focus();
+    clearTimeout(kbTimer); kbTimer = setTimeout(function () { persistCatalogOrder(table); }, 600);   // on attend la fin d'une serie de fleches
+  });
+}
+
 function archiveCatalog(table, id) {
   showConfirm('Archiver cet élément ? Il ne sera plus proposé à la borne.', { title: 'Archiver' }).then(function (ok) {
     if (!ok) return;
@@ -3817,6 +4141,12 @@ function renderBarberDetail(b) {
         '<span>Photo</span>' +
       '</button>' +
       '<input type="file" accept="image/*" id="photo-input-' + b.id + '" style="display:none" onchange="event.stopPropagation();uploadBarberPhoto(\'' + b.id + '\', this)">' +
+      (b.photo_url
+        ? '<button class="quick-action" onclick="event.stopPropagation();removeBarberPhoto(\'' + b.id + '\')">' +
+            '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>' +
+            '<span>Retirer la photo</span>' +
+          '</button>'
+        : '') +
       '<button class="quick-action" onclick="event.stopPropagation();setBarberPin(\'' + b.id + '\',\'' + esc(b.name).replace(/'/g, "\\'") + '\')">' +
         '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10.5" width="16" height="10" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></svg>' +
         '<span>' + (b.has_pin ? 'Changer le code' : 'Définir un code') + '</span>' +
@@ -4255,6 +4585,16 @@ function uploadBarberPhoto(id, input) {
     img.src = e.target.result;
   };
   reader.readAsDataURL(file);
+}
+
+function removeBarberPhoto(id) {
+  showConfirm('Retirer la photo de ce coiffeur ? Son initiale s\'affichera à la place.', { title: 'Retirer la photo', confirmLabel: 'Retirer' }).then(function (ok) {
+    if (!ok) return;
+    api('/api/barbers/' + id, { method: 'PUT', body: { photo_url: '' } })
+      .then(loadBarbers)
+      .then(function () { toast('Photo retirée'); })
+      .catch(function (e) { toast(e.message, true); });
+  });
 }
 
 function setBarberPin(id, name) {
@@ -4730,6 +5070,35 @@ function loadSalonScheduleForTimeline() {
  * ergonomique qu'une liste qui s'allonge indéfiniment.
  */
 var timelineZoom = 1; // partagé entre l'onglet RDV et l'aperçu du Dashboard
+// Pas des creneaux (Rendez-vous > Parametres) : l'echelle de la frise affiche une heure A CHAQUE PAS.
+// 15 par defaut, comme cote serveur ; mis a jour depuis les reglages.
+var rdvSlotStepMin = 15;
+var TIMELINE_LABEL_PX = 44;        // place reservee a chaque libelle d'heure (ex. "08:05") : ils ne se chevauchent jamais
+var timelineMinZoom = 0.6;         // zoom minimum REEL du dernier rendu (en dessous, les libelles se chevaucheraient)
+var timelineEffectiveZoom = null;  // zoom reellement applique par le dernier rendu
+
+// Une frise LARGE (pas fin) depasse l'ecran : au lieu de l'ouvrir sur le matin, on la centre sur le trait
+// "maintenant" quand on regarde AUJOURD'HUI. Se declenche des qu'une frise apparait dans la page, quel que
+// soit l'endroit qui l'affiche (aucun appel a ajouter nulle part).
+(function installTimelineAutoScroll() {
+  function scrollToNow(sc) {
+    var now = sc.querySelector('.timeline-now-line');
+    // Un debordement de quelques pixels (le dernier libelle) ne justifie pas de decaler la frise (cela
+    // cacherait la colonne de gauche) : on ne centre que si elle est VRAIMENT plus large que l'ecran.
+    if (!now || sc.scrollWidth - sc.clientWidth < 80) return;
+    sc.scrollLeft = Math.max(0, now.offsetLeft - sc.clientWidth / 2);
+  }
+  new MutationObserver(function (muts) {
+    muts.forEach(function (m) {
+      m.addedNodes.forEach(function (n) {
+        if (n.nodeType !== 1) return;
+        if (n.classList.contains('timeline-scroll')) scrollToNow(n);
+        else if (n.querySelectorAll) n.querySelectorAll('.timeline-scroll').forEach(scrollToNow);
+      });
+    });
+  }).observe(document.body || document.documentElement, { childList: true, subtree: true });
+})();
+
 var dashTimelineCache = null; // {dateStr, appts} - pour re-rendre au zoom sans re-fetcher
 
 function renderDayTimelineHtml(dateStr, dayAppts) {
@@ -4773,12 +5142,14 @@ function renderDayTimelineHtml(dateStr, dayAppts) {
   if (rangeEnd - rangeStart < 4 * 60) rangeEnd = rangeStart + 4 * 60;
 
   var hourCount = (rangeEnd - rangeStart) / 60;
+  // Une heure A CHAQUE PAS des creneaux (Rendez-vous > Parametres) : 08:00, 08:05, 08:10...
+  // avec un pas de 5 min. Les heures pleines ressortent (classe "h").
+  var stepMin = rdvSlotStepMin > 0 ? rdvSlotStepMin : 15;
   var hoursHtml = '';
-  for (var h = 0; h <= hourCount; h++) {
-    var totalMin = rangeStart + h * 60;
-    var hourFrac = (h * 60) / (rangeEnd - rangeStart);
-    hoursHtml += '<span style="left: calc(22px + (100% - 22px) * ' + hourFrac + ')">' +
-      String(Math.floor(totalMin / 60)).padStart(2, '0') + ':00</span>';
+  for (var t = rangeStart; t <= rangeEnd; t += stepMin) {
+    var tFrac = (t - rangeStart) / (rangeEnd - rangeStart);
+    hoursHtml += '<span' + (t % 60 === 0 ? ' class="h"' : '') + ' style="left: calc(22px + (100% - 22px) * ' + tFrac + ')">' +
+      String(Math.floor(t / 60)).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0') + '</span>';
   }
 
   var rowsHtml = barberIds.map(function (bid) {
@@ -4823,18 +5194,22 @@ function renderDayTimelineHtml(dateStr, dayAppts) {
     }
   }
 
-  // Repère de minutes en fond : une ligne fine tous les quarts d'heure.
-  // background-size en % du conteneur = 15 min exprimees en pourcentage
-  // de la plage totale affichee (rangeEnd - rangeStart).
-  var minuteStepPct = (15 / (rangeEnd - rangeStart)) * 100;
-  var minuteGridHtml = '<div class="timeline-minute-grid" style="background-size:' + minuteStepPct + '% 100%"></div>';
+  // Reperes en fond : un trait fin a chaque PAS, un trait plus marque a chaque heure
+  // (background-size en % de la plage totale affichee).
+  var stepPct = (stepMin / (rangeEnd - rangeStart)) * 100;
+  var hourPct = (60 / (rangeEnd - rangeStart)) * 100;
+  var minuteGridHtml = '<div class="timeline-minute-grid" style="background-size:' + stepPct + '% 100%, ' + hourPct + '% 100%"></div>';
 
-  // Largeur ajustable au zoom : ~90px/heure a zoom 1 (comme le minimum
-  // fixe d'avant, mais qui suit desormais le nombre d'heures affichees
-  // au lieu d'une largeur fixe qui coupait les plages courtes ou
-  // ecrasait les plages longues).
-  var innerWidth = Math.round(hourCount * 90 * timelineZoom);
-  var zoomPct = Math.round(timelineZoom * 100);
+  // Largeur : chaque libelle d'heure garde sa place (TIMELINE_LABEL_PX) quel que soit le pas - sans
+  // cela, a 5 min, les "08:05", "08:10"... se chevaucheraient. La frise s'elargit donc (defilement
+  // horizontal). Le zoom part de cette largeur "juste suffisante" et ne peut pas descendre en dessous.
+  var labelsPerHour = 60 / stepMin;
+  var fitPerHour = Math.max(90, labelsPerHour * TIMELINE_LABEL_PX);   // px par heure a 100%
+  var minZoom = Math.max(0.6, (labelsPerHour * TIMELINE_LABEL_PX) / fitPerHour);
+  var effZoom = Math.max(timelineZoom, minZoom);
+  timelineMinZoom = minZoom; timelineEffectiveZoom = effZoom;          // +/- repartent de la valeur AFFICHEE
+  var innerWidth = Math.round(hourCount * fitPerHour * effZoom);
+  var zoomPct = Math.round(effZoom * 100);
   var zoomCtrl = '<div class="timeline-zoom-ctrl"><div class="timeline-zoom-ctrl-inner">' +
     '<button type="button" onclick="event.stopPropagation();adjustTimelineZoom(-1)" title="Dézoomer">−</button>' +
     '<span>' + zoomPct + '%</span>' +
@@ -4894,9 +5269,7 @@ function updateTimelineNowLines() {
  * 250%). Ré-affiche tous les plannings jour actuellement visibles avec
  * les données déjà en mémoire, sans nouvel appel réseau.
  */
-function adjustTimelineZoom(delta) {
-  timelineZoom = Math.max(0.6, Math.min(2.5, +(timelineZoom + delta * 0.2).toFixed(2)));
-
+function rerenderAllTimelines() {
   if (dashTimelineCache) {
     var dashEl = document.getElementById('dash-timeline');
     if (dashEl) dashEl.innerHTML = renderDayTimelineHtml(dashTimelineCache.dateStr, dashTimelineCache.appts);
@@ -4908,6 +5281,13 @@ function adjustTimelineZoom(delta) {
       else if (calViewMode === 'week') renderWeekView();
     }
   }
+}
+
+function adjustTimelineZoom(delta) {
+  // On part du zoom REELLEMENT affiche (il peut etre au-dessus de celui demande : le minimum depend du pas).
+  var base = timelineEffectiveZoom == null ? timelineZoom : timelineEffectiveZoom;
+  timelineZoom = Math.max(timelineMinZoom, Math.min(2.5, +(base + delta * 0.2).toFixed(2)));
+  rerenderAllTimelines();
 }
 
 /**
@@ -6611,6 +6991,19 @@ function addSalon() {
 /* ============ Réglages ============ */
 // Redimensionne l'image côté navigateur avant envoi (300x300 recadré,
 // JPEG compressé), même principe que la photo de coiffeur.
+function removeSalonLogo() {
+  api('/api/settings', { method: 'PUT', body: { logo_url: '' } })
+    .then(function () {
+      // Menu lateral : on memorise TOUT DE SUITE "pas de logo" pour que le bloc
+      // retombe sur le nom de l'enseigne sans reafficher l'ancien logo ni passer
+      // par un bloc vide le temps de la relecture.
+      try { sessionStorage.setItem(brandCacheKey(), JSON.stringify({ name: currentSalonName, logo: '' })); } catch (e) { /* ignore */ }
+      loadCurrentSalonName();
+      toast('Logo retiré');
+    })
+    .catch(function (e) { toast(e.message, true); });
+}
+
 function uploadSalonLogo(input) {
   var file = input.files && input.files[0];
   if (!file) return;
@@ -6987,6 +7380,8 @@ function openRdvSettings() {
         rdv_prep_alert_min: overlay.querySelector('#rs-prep').value
       }
     }).then(function () {
+      rdvSlotStepMin = Number(overlay.querySelector('#rs-step').value) || 15;
+      rerenderAllTimelines();   // l'echelle des chronologies suit le nouveau pas tout de suite
       _closeModal(overlay);
       toast('Paramètres enregistrés');
     }).catch(function (e) { errEl.textContent = e.message; errEl.style.display = 'block'; });

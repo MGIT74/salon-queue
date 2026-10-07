@@ -54,20 +54,29 @@ router.post('/signup', signupRateLimiter('client-signup'), wrap(async (req, res)
   const verifyExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
   const id = crypto.randomUUID();
 
+  // owner_id est OBLIGATOIRE dans la table clients (NOT NULL, sans valeur par defaut). Le passage "par salon" (10/08)
+  // l'avait retire de cette requete : sur une base STRICTE (neuve - c'est le cas de la production) l'inscription
+  // repondait 500 "Erreur interne du serveur" (Field 'owner_id' doesn't have a default value). Le client appartient
+  // au proprietaire de SON salon.
   await pool.query(
-    `INSERT INTO clients (id, salon_id, name, email, phone, password_hash, verify_token, verify_token_expires)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [id, salonId, name, email, phone, passwordHash, verifyToken, verifyExpires]
+    `INSERT INTO clients (id, owner_id, salon_id, name, email, phone, password_hash, verify_token, verify_token_expires)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [id, req.salon.owner_id, salonId, name, email, phone, passwordHash, verifyToken, verifyExpires]
   );
 
+  // Le compte est cree dans tous les cas ; mais le client doit confirmer son email pour pouvoir se connecter. Si
+  // l'envoi echoue (SMTP non configure pour ce salon : Dashboard > Reglages), on le DIT : sinon l'ecran affirmait
+  // "un email vient de vous etre envoye" alors qu'il n'arrivera jamais, et le client restait bloque sans comprendre.
+  let emailSent = true;
   try {
     const verifyUrl = appendParam(req.body.base_url, 'verify', verifyToken);
     await sendClientVerificationEmail(req.salon.id, email, verifyUrl);
   } catch (err) {
+    emailSent = false;
     console.error('[client signup] envoi email échoué:', err.message);
   }
 
-  res.json({ ok: true, needs_email_verification: true });
+  res.json({ ok: true, needs_email_verification: true, email_sent: emailSent });
 }));
 
 router.post('/verify-email', wrap(async (req, res) => {

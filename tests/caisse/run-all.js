@@ -42,7 +42,19 @@ const suite = [
   ['19-produits-preselectionnes-rdv.js', true, ['exit']],
   ['20-produits-rdv-dashboard.js', true, ['exit']],
   ['21-produits-rdv-caisse-poste.js', true, ['exit']],
-  ['22-produits-rdv-compte.js', true, ['exit']]
+  ['22-produits-rdv-compte.js', true, ['exit']],
+  ['23-sans-rdv-sur-frise.js', true, ['exit']],
+  ['24-nom-bienvenue-dashboard.js', false, ['exit']],
+  ['25-logo-menu-lateral.js', false, ['exit']],
+  ['26-menu-lateral-trois-zones.js', false, ['exit']],
+  ['27-retrait-des-photos.js', false, ['exit']],
+  ['28-chrono-pas-des-creneaux.js', false, ['exit']],
+  ['29-catalogue-suppression-ordre.js', true, ['exit']],
+  ['30-catalogue-ecran-supprimer-deplacer.js', false, ['exit']],
+  ['31-poste-suit-ordre-catalogue.js', false, ['exit']],
+  ['32-schema-applique-au-demarrage.js', false, ['exit']],
+  ['33-catalogue-mouvement.js', false, ['exit']],
+  ['34-compte-client-inscription.js', false, ['exit']]
 ];
 
 let bad = 0;

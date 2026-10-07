@@ -121,6 +121,19 @@ app.get('/healthz', (req, res) => res.json({ ok: true, uptime: process.uptime() 
 // Raccourcis de navigation
 app.get('/', (req, res) => res.redirect('/dashboard.html'));
 
+// Le schema de la base est applique a CHAQUE demarrage, AVANT d'accepter des requetes : il est idempotent
+// (c'est ce que fait deja le conteneur de production). Sans cela, un redeploiement qui ajoute une colonne
+// laissait l'installation de test (PM2) avec du code a jour et une base pas migree tant que quelqu'un ne
+// lancait pas scripts/run-migration.sh a la main : erreurs 500 et listes vides. S'il ne peut pas etre applique
+// (droits insuffisants...), le serveur demarre quand meme - et le dit clairement dans son journal.
+const { applySchema } = require('./scripts/apply-schema');
+applySchema({ attempts: 3, delayMs: 2000 })
+  .then((r) => console.log('[schema] base a jour (' + r.tables + ' tables dans ' + r.database + ')'))
+  .catch((e) => console.error('[schema] ATTENTION - schema NON applique automatiquement (' + e.message + '). ' +
+    'Des colonnes recentes peuvent manquer : lancez  bash scripts/run-migration.sh  puis redemarrez.'))
+  .then(startServer);
+
+function startServer() {
 app.listen(PORT, () => {
   console.log('Serveur démarré sur le port ' + PORT);
   // Rappel dans les journaux : sur l'installation d'un client unique, l'inscription
@@ -131,3 +144,4 @@ app.listen(PORT, () => {
   startNotifyJob();
   startPurgeJob();
 });
+}

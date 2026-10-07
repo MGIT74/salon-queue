@@ -237,6 +237,7 @@
   .timeline-inner { position: relative; }
   .timeline-hours { position: relative; height: 18px; margin-bottom: 6px; }
   .timeline-hours span { position: absolute; top: 0; font-size: 12px; color: var(--grey); white-space: nowrap; transform: translateX(-1px); }
+  .timeline-hours span.h { color: var(--ink); font-weight: 600; }
   .timeline-row { display: flex; align-items: center; min-height: 54px; border-top: 1px solid var(--sep); }
   .timeline-row:first-child { border-top: none; }
   .timeline-row-label { width: 22px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; padding-right: 0; }
@@ -264,8 +265,10 @@
   .timeline-row-track:hover { background: var(--fill); border-radius: 8px; }
   .timeline-minute-grid {
     position: absolute; left: 22px; right: 0; top: 0; bottom: 0; pointer-events: none; z-index: 0;
-    background-image: linear-gradient(to right, var(--sep) 1px, transparent 1px);
-    background-repeat: repeat-x; background-position: left top;
+    /* 1re couche : un trait fin a chaque pas ; 2e couche : un trait plus marque a chaque heure */
+    background-image: linear-gradient(to right, var(--sep) 1px, transparent 1px),
+                      linear-gradient(to right, rgba(128,128,128,.38) 1px, transparent 1px);
+    background-repeat: repeat-x, repeat-x; background-position: left top, left top;
   }
   .timeline-zoom-ctrl { display: flex; align-items: center; justify-content: flex-end; gap: 6px; margin-bottom: 8px; }
   .timeline-zoom-ctrl-inner { display: flex; align-items: center; gap: 6px; background: var(--fill); border-radius: 999px; padding: 4px 6px; }
@@ -1229,7 +1232,7 @@ function doSwitchCaisseTab(tab) {
   updateTabLockState();
   if (tab === 'timer') startTimerAutoRefresh(); else stopTimerAutoRefresh();
   if (tab === 'cloture') loadClotureTab();
-  if (tab === 'caisse') { refreshCaisseLockState(); focusScanCatcher(); }
+  if (tab === 'caisse') { refreshCaisseLockState(); focusScanCatcher(); if (Date.now() - catalogLoadedAt > 15000) loadCatalog(); }
   if (tab === 'agenda') {
     startAgendaAutoRefresh();
     if (!calBooted) {
@@ -1726,6 +1729,7 @@ var calMonthCache = {};
 var calSelectedDate = null;
 var calBooted = false;
 var calApptById = {};
+var calQueueById = {};
 var monthNames = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
 
 function ymd(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
@@ -1760,13 +1764,38 @@ function neededMonthKeys() {
 function loadAgendaPeriod() {
   var keys = neededMonthKeys();
   var toFetch = keys.filter(function (k) { return !calMonthCache[k]; });
-  Promise.all(toFetch.map(function (k) {
-    return barberApi('/api/appointments?month=' + k + '&all=1&caisse_view=1').then(function (r) { calMonthCache[k] = r.items; });
-  })).then(function () {
+  Promise.all(
+    toFetch.map(function (k) {
+      return barberApi('/api/appointments?month=' + k + '&all=1&caisse_view=1').then(function (r) { calMonthCache[k] = r.items; });
+    }).concat([
+      // Necessaire pour placer sur la frise du jour les clients SANS
+      // rendez-vous deja demarres (voir renderAgendaTimeline) - queue
+      // n'est sinon rafraichie que par l'onglet Timer, qui peut ne
+      // jamais avoir ete visite.
+      barberApi('/api/queue?include_done=1').then(function (r) { queue = r.queue; }),
+      // Le pas des creneaux gouverne l'echelle de la frise : lu AVANT le rendu pour ne jamais afficher
+      // une echelle au mauvais pas, meme une fraction de seconde.
+      loadRdvSlotStep()
+    ])
+  ).then(function () {
     if (calViewMode === 'month') renderCalMonth();
     else if (calViewMode === 'week') renderCalWeek();
     else renderCalDay();
   }).catch(function (e) { toast(e.message, true); });
+}
+
+// Convertit un horodatage (chaine ISO UTC ou objet Date) en date/minutes
+// LOCALES AU SALON (fuseau configure) - necessaire pour placer un client
+// sans RDV (start_at, un vrai timestamp UTC) au bon endroit sur la frise,
+// exactement comme scheduled_at l'est deja nativement pour un RDV.
+function salonDateAndMinutesOf(input) {
+  var d = new Date(input);
+  var parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: SALON_TIMEZONE, year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+  }).formatToParts(d);
+  var get = function (t) { return parts.find(function (p) { return p.type === t; }).value; };
+  return { dateStr: get('year') + '-' + get('month') + '-' + get('day'), minutes: Number(get('hour')) * 60 + Number(get('minute')) };
 }
 
 function apptsForRange(startDate, endDate) {
@@ -1906,6 +1935,46 @@ function selectCalDay(dateStr) {
  * RDV utilisée dans "Mon poste".
  */
 var timelineZoom = 1;
+// Pas des creneaux (Rendez-vous > Parametres) : l'echelle de la frise affiche une heure A CHAQUE PAS.
+// 15 par defaut, comme cote serveur ; mis a jour depuis les reglages.
+var rdvSlotStepMin = 15;
+var TIMELINE_LABEL_PX = 44;        // place reservee a chaque libelle d'heure (ex. "08:05") : ils ne se chevauchent jamais
+var timelineMinZoom = 0.6;         // zoom minimum REEL du dernier rendu (en dessous, les libelles se chevaucheraient)
+var timelineEffectiveZoom = null;  // zoom reellement applique par le dernier rendu
+
+// Une frise LARGE (pas fin) depasse l'ecran : au lieu de l'ouvrir sur le matin, on la centre sur le trait
+// "maintenant" quand on regarde AUJOURD'HUI. Se declenche des qu'une frise apparait dans la page, quel que
+// soit l'endroit qui l'affiche (aucun appel a ajouter nulle part).
+(function installTimelineAutoScroll() {
+  function scrollToNow(sc) {
+    var now = sc.querySelector('.timeline-now-line');
+    // Un debordement de quelques pixels (le dernier libelle) ne justifie pas de decaler la frise (cela
+    // cacherait la colonne de gauche) : on ne centre que si elle est VRAIMENT plus large que l'ecran.
+    if (!now || sc.scrollWidth - sc.clientWidth < 80) return;
+    sc.scrollLeft = Math.max(0, now.offsetLeft - sc.clientWidth / 2);
+  }
+  new MutationObserver(function (muts) {
+    muts.forEach(function (m) {
+      m.addedNodes.forEach(function (n) {
+        if (n.nodeType !== 1) return;
+        if (n.classList.contains('timeline-scroll')) scrollToNow(n);
+        else if (n.querySelectorAll) n.querySelectorAll('.timeline-scroll').forEach(scrollToNow);
+      });
+    });
+  }).observe(document.body || document.documentElement, { childList: true, subtree: true });
+})();
+
+/**
+ * Pas des creneaux, lu dans les reglages PUBLICS (accessibles avec le code PIN d'un coiffeur) : relu a chaque
+ * chargement de l'Agenda, donc un changement fait par l'admin est pris en compte sans recharger la page.
+ */
+function loadRdvSlotStep() {
+  var headers = SALON_SLUG ? { 'X-Salon-Slug': SALON_SLUG } : {};
+  return fetch('/api/settings/public', { headers: headers })
+    .then(function (r) { return r.json(); })
+    .then(function (d) { rdvSlotStepMin = Number(d.rdv_slot_step_min) || 15; })
+    .catch(function () { /* on garde la derniere valeur connue */ });
+}
 
 function renderAgendaTimeline(dateStr) {
   var d = new Date(dateStr + 'T00:00:00');
@@ -1913,7 +1982,23 @@ function renderAgendaTimeline(dateStr) {
   if (activeBarberId) appts = appts.filter(function (a) { return a.barber_id === activeBarberId; });
   appts.forEach(function (a) { calApptById[a.id] = a; });
 
-  if (appts.length === 0) {
+  // Clients SANS rendez-vous deja demarres par un coiffeur (en cours ou
+  // deja termines) - ils ont maintenant un vrai horaire (start_at) et une
+  // vraie duree, exactement comme un RDV, donc leur place est legitime
+  // sur cette meme frise. Seulement pour AUJOURD'HUI : passe la cloture,
+  // ces lignes de file disparaissent de toute facon (purgees), la frise
+  // d'un jour passe ne pourrait donc plus jamais les retrouver.
+  var walkIns = (dateStr === salonDateAndMinutesOf(new Date()).dateStr)
+    ? queue.filter(function (q) {
+        if (q.is_appointment || !q.start_at) return false;
+        if (q.status !== 'in_progress' && q.status !== 'done') return false;
+        return salonDateAndMinutesOf(q.start_at).dateStr === dateStr;
+      })
+    : [];
+  if (activeBarberId) walkIns = walkIns.filter(function (q) { return q.barber_id === activeBarberId; });
+  walkIns.forEach(function (q) { calQueueById[q.id] = q; });
+
+  if (appts.length === 0 && walkIns.length === 0) {
     var activeB = activeBarberId && allBarbers.find(function (b) { return b.id === activeBarberId; });
     if (activeB && !activeB.accepts_appointments) {
       return '<div class="timeline-empty">' + esc(activeB.name) + ' ne prend pas de RDV en ligne (sans-rdv uniquement)</div>';
@@ -1933,8 +2018,21 @@ function renderAgendaTimeline(dateStr) {
     return Number(hm[0]) * 60 + Number(hm[1]);
   }
 
-  var starts = appts.map(apptMinutes);
-  var ends = appts.map(function (a) { return apptMinutes(a) + Math.max(a.duration_min || 30, 15); });
+  // Chaque entree (RDV ou sans-rdv demarre) normalisee sur la meme forme
+  // pour le reste du calcul - seule la facon de trouver son heure/duree
+  // et son clic differe selon l'origine.
+  var items = appts.map(function (a) {
+    return { kind: 'appt', id: a.id, barberId: a.barber_id, clientName: a.client_name, serviceName: a.service_name,
+      startMin: apptMinutes(a), durMin: Math.max(a.duration_min || 30, 15), timeLabel: a.scheduled_at.slice(11, 16) };
+  }).concat(walkIns.map(function (q) {
+    var sm = salonDateAndMinutesOf(q.start_at).minutes;
+    var hh = String(Math.floor(sm / 60)).padStart(2, '0'), mm = String(sm % 60).padStart(2, '0');
+    return { kind: 'walkin', id: q.id, barberId: q.barber_id, clientName: q.client_name, serviceName: q.service.name,
+      startMin: sm, durMin: Math.max(q.total_duration_min || 30, 15), timeLabel: hh + ':' + mm };
+  }));
+
+  var starts = items.map(function (it) { return it.startMin; });
+  var ends = items.map(function (it) { return it.startMin + it.durMin; });
   var apptMin = Math.min.apply(null, starts);
   var apptMax = Math.max.apply(null, ends);
 
@@ -1953,34 +2051,39 @@ function renderAgendaTimeline(dateStr) {
   if (rangeEnd - rangeStart < 4 * 60) rangeEnd = rangeStart + 4 * 60;
 
   var hourCount = (rangeEnd - rangeStart) / 60;
+  // Une heure A CHAQUE PAS des creneaux (Rendez-vous > Parametres) : 08:00, 08:05, 08:10...
+  // avec un pas de 5 min. Les heures pleines ressortent (classe "h").
+  var stepMin = rdvSlotStepMin > 0 ? rdvSlotStepMin : 15;
   var hoursHtml = '';
-  for (var h = 0; h <= hourCount; h++) {
-    var totalMin = rangeStart + h * 60;
-    var hourFrac = (h * 60) / (rangeEnd - rangeStart);
-    hoursHtml += '<span style="left: calc(22px + (100% - 22px) * ' + hourFrac + ')">' +
-      String(Math.floor(totalMin / 60)).padStart(2, '0') + ':00</span>';
+  for (var t = rangeStart; t <= rangeEnd; t += stepMin) {
+    var tFrac = (t - rangeStart) / (rangeEnd - rangeStart);
+    hoursHtml += '<span' + (t % 60 === 0 ? ' class="h"' : '') + ' style="left: calc(22px + (100% - 22px) * ' + tFrac + ')">' +
+      String(Math.floor(t / 60)).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0') + '</span>';
   }
 
   var byBarber = {};
-  appts.forEach(function (a) {
-    var key = a.barber_id || 'unassigned';
-    if (!byBarber[key]) byBarber[key] = { name: a.barber_name || 'Non assigné', items: [] };
-    byBarber[key].items.push(a);
+  items.forEach(function (it) {
+    var key = it.barberId || 'unassigned';
+    if (!byBarber[key]) {
+      var bb = it.barberId && allBarbers.find(function (x) { return x.id === it.barberId; });
+      byBarber[key] = { name: (bb && bb.name) || 'Non assigné', items: [] };
+    }
+    byBarber[key].items.push(it);
   });
   var barberIds = Object.keys(byBarber).sort(function (x, y) { return byBarber[x].name.localeCompare(byBarber[y].name); });
 
   var rowsHtml = barberIds.map(function (bid) {
     var b = byBarber[bid];
     var color = bid === 'unassigned' ? 'var(--grey)' : stableColorForId(bid);
-    var blocksHtml = b.items.map(function (a) {
-      var startMin = apptMinutes(a);
-      var dur = Math.max(a.duration_min || 30, 15);
-      var leftPct = ((startMin - rangeStart) / (rangeEnd - rangeStart)) * 100;
-      var widthPct = (dur / (rangeEnd - rangeStart)) * 100;
-      var time = a.scheduled_at.slice(11, 16);
+    var blocksHtml = b.items.map(function (it) {
+      var leftPct = ((it.startMin - rangeStart) / (rangeEnd - rangeStart)) * 100;
+      var widthPct = (it.durMin / (rangeEnd - rangeStart)) * 100;
+      var onclick = it.kind === 'appt'
+        ? 'openAgendaClientDrawer(\'' + it.id + '\')'
+        : 'openAgendaWalkInDrawer(\'' + it.id + '\')';
       return '<div class="timeline-block" style="left:' + leftPct + '%;width:' + widthPct + '%;background:' + color + '" ' +
-        'title="' + esc(time + ' — ' + a.client_name + ' — ' + (a.service_name || '')) + '" ' +
-        'onclick="event.stopPropagation();openAgendaClientDrawer(\'' + a.id + '\')">' + esc(a.client_name) + '</div>';
+        'title="' + esc(it.timeLabel + ' — ' + it.clientName + ' — ' + (it.serviceName || '') + (it.kind === 'walkin' ? ' (sans RDV)' : '')) + '" ' +
+        'onclick="event.stopPropagation();' + onclick + '">' + esc(it.clientName) + '</div>';
     }).join('');
     // Sans-rdv uniquement : la ligne reste visible (pour voir ses RDV
     // deja enregistres) mais pas cliquable pour en ajouter un nouveau -
@@ -2010,11 +2113,22 @@ function renderAgendaTimeline(dateStr) {
     }
   }
 
-  var minuteStepPct = (15 / (rangeEnd - rangeStart)) * 100;
-  var minuteGridHtml = '<div class="timeline-minute-grid" style="background-size:' + minuteStepPct + '% 100%"></div>';
+  // Reperes en fond : un trait fin a chaque PAS, un trait plus marque a chaque heure
+  // (background-size en % de la plage totale affichee).
+  var stepPct = (stepMin / (rangeEnd - rangeStart)) * 100;
+  var hourPct = (60 / (rangeEnd - rangeStart)) * 100;
+  var minuteGridHtml = '<div class="timeline-minute-grid" style="background-size:' + stepPct + '% 100%, ' + hourPct + '% 100%"></div>';
 
-  var innerWidth = Math.round(hourCount * 90 * timelineZoom);
-  var zoomPct = Math.round(timelineZoom * 100);
+  // Largeur : chaque libelle d'heure garde sa place (TIMELINE_LABEL_PX) quel que soit le pas - sans
+  // cela, a 5 min, les "08:05", "08:10"... se chevaucheraient. La frise s'elargit donc (defilement
+  // horizontal). Le zoom part de cette largeur "juste suffisante" et ne peut pas descendre en dessous.
+  var labelsPerHour = 60 / stepMin;
+  var fitPerHour = Math.max(90, labelsPerHour * TIMELINE_LABEL_PX);   // px par heure a 100%
+  var minZoom = Math.max(0.6, (labelsPerHour * TIMELINE_LABEL_PX) / fitPerHour);
+  var effZoom = Math.max(timelineZoom, minZoom);
+  timelineMinZoom = minZoom; timelineEffectiveZoom = effZoom;          // +/- repartent de la valeur AFFICHEE
+  var innerWidth = Math.round(hourCount * fitPerHour * effZoom);
+  var zoomPct = Math.round(effZoom * 100);
   var zoomCtrl = '<div class="timeline-zoom-ctrl"><div class="timeline-zoom-ctrl-inner">' +
     '<button type="button" onclick="event.stopPropagation();adjustAgendaZoom(-1)" title="Dézoomer">−</button>' +
     '<span>' + zoomPct + '%</span>' +
@@ -2064,7 +2178,9 @@ function updateAgendaNowLines() {
 
 /** +1 pour zoomer, -1 pour dézoomer (pas de 20%, borné 60%-250%). */
 function adjustAgendaZoom(delta) {
-  timelineZoom = Math.max(0.6, Math.min(2.5, +(timelineZoom + delta * 0.2).toFixed(2)));
+  // On part du zoom REELLEMENT affiche (il peut etre au-dessus de celui demande : le minimum depend du pas).
+  var base = timelineEffectiveZoom == null ? timelineZoom : timelineEffectiveZoom;
+  timelineZoom = Math.max(timelineMinZoom, Math.min(2.5, +(base + delta * 0.2).toFixed(2)));
   if (calViewMode === 'day') renderCalDay();
   else if (calSelectedDate) { if (calViewMode === 'month') renderCalMonth(); else renderCalWeek(); }
 }
@@ -2142,6 +2258,34 @@ function openAgendaClientDrawer(id) {
         .catch(function (e) { toast(e.message, true); });
     };
   }
+}
+
+/**
+ * Client SANS rendez-vous, deja demarre, clique sur la frise de l'Agenda -
+ * juste une consultation (heure reelle, prestation, statut), aucune des
+ * actions propres a un RDV en ligne (rien a annuler/deplacer ici : un
+ * client sans RDV se gere depuis Timer/Caisse, pas depuis l'Agenda).
+ */
+function openAgendaWalkInDrawer(id) {
+  var q = calQueueById[id];
+  if (!q) return;
+  var startInfo = salonDateAndMinutesOf(q.start_at);
+  var hh = String(Math.floor(startInfo.minutes / 60)).padStart(2, '0'), mm = String(startInfo.minutes % 60).padStart(2, '0');
+  var barber = q.barber_id && allBarbers.find(function (b) { return b.id === q.barber_id; });
+  var detail = q.service.name + (q.extras && q.extras.length ? ' + ' + q.extras.map(function (x) { return x.name; }).join(', ') : '');
+
+  var overlay = _buildModal(
+    '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px">' +
+    '<div class="modal-title" style="margin-bottom:0">' + esc(q.client_name) + '</div>' +
+    '<button id="awd-close-x" style="background:var(--fill);border:none;width:30px;height:30px;border-radius:50%;color:var(--grey);font-size:14px;cursor:pointer;flex-shrink:0;margin-left:10px">✕</button>' +
+    '</div>' +
+    '<p class="hint" style="margin:-4px 0 12px">Client sans rendez-vous, pris en charge directement en salon.</p>' +
+    '<div class="detail-row"><span class="detail-label">Début</span><span class="detail-value">' + hh + ':' + mm + '</span></div>' +
+    '<div class="detail-row"><span class="detail-label">Coiffeur</span><span class="detail-value">' + esc(barber ? barber.name : 'Non assigné') + '</span></div>' +
+    '<div class="detail-row"><span class="detail-label">Prestation</span><span class="detail-value">' + esc(detail) + '</span></div>' +
+    '<div class="detail-row"><span class="detail-label">Statut</span><span class="detail-value">' + (q.status === 'in_progress' ? 'En cours' : 'Terminé') + '</span></div>'
+  );
+  overlay.querySelector('#awd-close-x').onclick = function () { _closeModal(overlay); };
 }
 
 var agendaNowLineTimer = null;
@@ -2619,6 +2763,11 @@ function forceOpenCaisse() {
 })();
 
 /* ---------- Catalogue ---------- */
+// Derniere lecture du catalogue : l'administration peut en changer l'ORDRE (ou les prix, le stock...)
+// pendant que la caisse reste ouverte - on le relit au retour sur l'onglet Caisse (pas plus d'une fois
+// toutes les 15 s) pour que l'ordre des articles suive sans recharger la page.
+var catalogLoadedAt = 0;
+
 function loadCatalog() {
   Promise.all([
     barberApi('/api/catalog/services'),
@@ -2628,6 +2777,7 @@ function loadCatalog() {
     catalog.services = r[0].items;
     catalog.extras = r[1].items;
     catalog.products = r[2].items;
+    catalogLoadedAt = Date.now();
     renderItemGrid();
   }).catch(function (e) { toast(e.message, true); });
 }

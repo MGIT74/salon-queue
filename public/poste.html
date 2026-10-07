@@ -301,6 +301,12 @@ var barbers = [];
 var extras = [];
 var services = [];
 var products = [];
+// Derniere lecture du catalogue (ms ; 0 = jamais lu). Avant, le catalogue etait garde A VIE une fois charge : un
+// ordre (ou un prix, un stock...) change dans l'administration n'apparaissait qu'apres rechargement de la page.
+// refresh() tourne toutes les 4 s ; on ne relit donc le catalogue qu'au plus toutes les 15 s, et on reutilise
+// les listes en memoire entre deux relectures. DECLAREE ICI, avec les listes : la connexion automatique appelle
+// boot() -> refresh() des l'ouverture de la page, avant que le reste du script ait fini de s'executer.
+var catalogLoadedAt = 0;
 var pinBuffer = '';
 
 var SALON_SLUG = (function () {
@@ -463,18 +469,21 @@ function boot() {
 
 function refresh() {
   if (!me) return;
+  // "Jamais lu" (0 ou indefini) compte comme "a relire" : sans cela, la 1re lecture pouvait etre sautee a l'ouverture.
+  var reloadCatalog = !catalogLoadedAt || Date.now() - catalogLoadedAt > 15000;
   return Promise.all([
     barberApi('/api/queue'),
     barberApi('/api/barbers'),
-    extras.length ? Promise.resolve({ items: extras }) : barberApi('/api/catalog/extras'),
-    services.length ? Promise.resolve({ items: services }) : barberApi('/api/catalog/services'),
-    products.length ? Promise.resolve({ items: products }) : barberApi('/api/catalog/products')
+    reloadCatalog ? barberApi('/api/catalog/extras') : Promise.resolve({ items: extras }),
+    reloadCatalog ? barberApi('/api/catalog/services') : Promise.resolve({ items: services }),
+    reloadCatalog ? barberApi('/api/catalog/products') : Promise.resolve({ items: products })
   ]).then(function (r) {
     queue = r[0].queue;
     barbers = r[1].items;
     extras = r[2].items;
     services = r[3].items;
     products = r[4].items;
+    if (reloadCatalog) catalogLoadedAt = Date.now();   // seulement si la lecture a REUSSI : sinon on reessaie au prochain tour
     renderActive();
     renderNext();
   }).catch(function (e) { toast(e.message, true); });
