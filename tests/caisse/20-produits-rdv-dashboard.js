@@ -61,12 +61,12 @@ const check = (n, ok, x = '') => { (ok ? pass++ : fail++); console.log((ok ? '  
   check('elle propose bien "Gel" (produit de test)', /Gel/.test(d.getElementById('aa-step-products').textContent));
 
   console.log('\n[B] Parcours complet : coiffeur deja preselectionne -> prestation -> supplement -> PRODUIT -> creneau -> contact -> envoi');
-  d.getElementById('aa-step-service').querySelector('.aa-card[data-id="sv1"]').click();
+  d.getElementById('aa-step-service').querySelector('.item-card[data-id="sv1"]').click();
   check('etape suivante : Supplements affichee', d.getElementById('aa-step-extras').style.display === 'block');
   w.aaGoStep('products');
   check('bouton Retour de l\'etape Produits ramene bien vers Supplements', d.getElementById('aa-step-products').querySelector('.aa-back').getAttribute('onclick') === "aaGoStep('extras')");
-  d.getElementById('aa-step-products').querySelector('.aa-chip[data-id="p1"]').click();
-  check('la tuile "Gel" est bien marquee selectionnee', d.getElementById('aa-step-products').querySelector('.aa-chip[data-id="p1"]').classList.contains('sel'));
+  d.getElementById('aa-step-products').querySelector('.item-card[data-id="p1"]').click();
+  check('la tuile "Gel" est bien marquee selectionnee', d.getElementById('aa-step-products').querySelector('.item-card[data-id="p1"]').classList.contains('sel'));
   w.aaGoStep('datetime');
   check('etape suivante : Creneau affichee', d.getElementById('aa-step-datetime').style.display === 'block');
 

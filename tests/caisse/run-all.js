@@ -5,7 +5,7 @@
 const { spawnSync, execSync } = require('child_process');
 const path = require('path');
 const sql = (q) => execSync(`mariadb -uroot salonq -e "${q.replace(/"/g,'\\"')}"`, { stdio: 'pipe' });
-const reset = () => sql("DELETE FROM cash_closings; DELETE FROM sales; DELETE FROM queue; DELETE FROM gift_cards; DELETE FROM print_jobs; DELETE FROM tpe_charge_jobs; DELETE FROM bridge_keys; UPDATE products SET stock_quantity=3 WHERE id='p1';");
+const reset = () => sql("DELETE FROM cash_closings; DELETE FROM sales; DELETE FROM queue; DELETE FROM appointments; DELETE FROM gift_cards; DELETE FROM print_jobs; DELETE FROM tpe_charge_jobs; DELETE FROM bridge_keys; UPDATE products SET stock_quantity=3 WHERE id='p1';");
 const run = (file) => {
   const r = spawnSync('node', [path.join(__dirname, file)], { encoding: 'utf8', timeout: 240000, env: process.env });
   return { out: (r.stdout || '') + (r.stderr || ''), code: r.status };
@@ -61,7 +61,8 @@ const suite = [
   ['38-logo-connexion-et-ecran-identifiant.js', false, ['exit']],
   ['39-photos-prestations-reservation.js', false, ['exit']],
   ['40-vitrine-supplements-produits.js', false, ['exit']],
-  ['41-vitrine-compte.js', false, ['exit']]
+  ['41-vitrine-compte.js', false, ['exit']],
+  ['42-vitrine-assistants-borne.js', false, ['exit']]
 ];
 
 let bad = 0;

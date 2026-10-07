@@ -44,10 +44,10 @@ async function testCaisse() {
   check('l\'etape #pa-step-products existe', Boolean(d.getElementById('pa-step-products')));
   check('elle propose bien "Gel"', /Gel/.test(d.getElementById('pa-step-products').textContent));
 
-  d.getElementById('pa-step-service').querySelector('.aa-card[data-id="sv1"]').click();
+  d.getElementById('pa-step-service').querySelector('.item-card[data-id="sv1"]').click();
   w.paGoStep('products');
-  d.getElementById('pa-step-products').querySelector('.aa-chip[data-id="p1"]').click();
-  check('tuile "Gel" bien selectionnee', d.getElementById('pa-step-products').querySelector('.aa-chip[data-id="p1"]').classList.contains('sel'));
+  d.getElementById('pa-step-products').querySelector('.item-card[data-id="p1"]').click();
+  check('tuile "Gel" bien selectionnee', d.getElementById('pa-step-products').querySelector('.item-card[data-id="p1"]').classList.contains('sel'));
   w.paGoStep('datetime');
   await sleep(700);
   const slotBtn = d.getElementById('pa-slots').querySelector('.aa-slot');
@@ -96,10 +96,10 @@ async function testPoste() {
   check('l\'etape #pa-step-products existe', Boolean(d.getElementById('pa-step-products')));
   check('elle propose bien "Gel"', /Gel/.test(d.getElementById('pa-step-products').textContent));
 
-  d.getElementById('pa-step-service').querySelector('.aa-card[data-id="sv1"]').click();
+  d.getElementById('pa-step-service').querySelector('.item-card[data-id="sv1"]').click();
   w.paGoStep('products');
-  d.getElementById('pa-step-products').querySelector('.aa-chip[data-id="p1"]').click();
-  check('tuile "Gel" bien selectionnee', d.getElementById('pa-step-products').querySelector('.aa-chip[data-id="p1"]').classList.contains('sel'));
+  d.getElementById('pa-step-products').querySelector('.item-card[data-id="p1"]').click();
+  check('tuile "Gel" bien selectionnee', d.getElementById('pa-step-products').querySelector('.item-card[data-id="p1"]').classList.contains('sel'));
   w.paGoStep('datetime');
   await sleep(700);
   const slotBtn = d.getElementById('pa-slots').querySelector('.aa-slot');

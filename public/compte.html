@@ -29,7 +29,7 @@
   html.auth-checking #p-login { display: none !important; }
   html.auth-checking #auth-layout { display: none !important; }
 </style>
-<link rel="stylesheet" href="/app.css?v=5">
+<link rel="stylesheet" href="/app.css?v=6">
 <script>
   // Applique tout de suite la couleur du salon si on l'a déjà vue lors
   // d'une visite précédente (cache localStorage par salon), plutôt que
@@ -273,61 +273,10 @@
   .svc-card.gift-tile .icon { font-size: 34px; }
   .svc-card.gift-tile .meta { color: rgba(255,255,255,.85); }
 
-  /* ---------- Supplements et produits : cartes de vitrine ---------- */
-  .step-sub { margin: -6px 0 16px; font-size: 14px; color: var(--grey); }
-  .items-search { position: relative; margin: 0 0 14px; }
-  .items-search svg { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; color: var(--grey); pointer-events: none; }
-  .items-search input { width: 100%; box-sizing: border-box; border: none; background: var(--fill); color: var(--ink); border-radius: 14px;
-    padding: 13px 14px 13px 42px; font-family: inherit; font-size: 16px; outline: none; }
-  .items-search input:focus { box-shadow: 0 0 0 2.5px rgba(var(--accent-rgb), .45); }
-  .item-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-bottom: 8px; }
-  .item-group { grid-column: 1 / -1; margin: 12px 2px 0; font-size: 12.5px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--grey); }
-  .item-group:first-child { margin-top: 0; }
-  .item-group[hidden] { display: none; }
-  .item-card { position: relative; display: flex; flex-direction: column; text-align: left; padding: 0; border: none; background: var(--fill); color: var(--ink);
-    border-radius: 20px; overflow: hidden; cursor: pointer; font-family: inherit; -webkit-tap-highlight-color: transparent;
-    transition: transform .12s ease, background .15s ease; }
-  .item-card[hidden] { display: none; }
-  .item-card:active { transform: scale(.97); }
-  .item-card:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
-  .item-media { display: flex; align-items: center; justify-content: center; height: 84px; font-size: 38px; line-height: 1;
-    background: linear-gradient(145deg, rgba(var(--accent-rgb), .20), rgba(var(--accent-rgb), .05)); background-size: cover; background-position: center; }
-  /* Image entiere, jamais recadree (contain) : en mode "cover", une image carree dans un cadre 4:3 etait coupee en haut et en bas.
-     Fond blanc : les marges eventuelles se fondent avec les dessins noirs sur fond blanc. */
-  .item-card.has-photo .item-media { height: auto; aspect-ratio: 4 / 3; background-color: #fff; background-size: contain; background-repeat: no-repeat; background-position: center; }
-  .item-body { display: flex; flex-direction: column; gap: 3px; flex: 1; padding: 12px 14px 14px; }
-  .item-name { font-size: 15px; font-weight: 600; line-height: 1.25; letter-spacing: -.01em; word-break: break-word;
-    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-  .item-meta { font-size: 12.5px; color: var(--grey); }
-  .item-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: auto; padding-top: 10px; }
-  .item-price { font-size: 16px; font-weight: 700; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
-  .item-add { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%;
-    background: var(--card); color: var(--accent); box-shadow: inset 0 0 0 1.5px rgba(var(--accent-rgb), .55); transition: background .15s ease, color .15s ease; }
-  .item-add svg { width: 17px; height: 17px; }
-  .item-add .ic-check { display: none; }
-  .item-card.sel { background: rgba(var(--accent-rgb), .13); }
-  .item-card.sel::after { content: ''; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 2.5px var(--accent); pointer-events: none; z-index: 2; }
-  .item-card.sel .item-add { background: var(--accent); color: #fff; box-shadow: none; }
-  .item-card.sel .ic-plus { display: none; }
-  .item-card.sel .ic-check { display: block; }
-  /* Prestations (choix unique) : meme carte que les supplements. Coche sur la photo / l'icone de la carte choisie. */
-  .item-media { position: relative; }
-  .item-check { position: absolute; top: 10px; right: 10px; display: none; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%;
-    background: var(--accent); color: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.35); }
-  .item-check svg { width: 16px; height: 16px; }
-  .item-card.sel .item-check { display: flex; }
-  .item-card.out { cursor: default; }
-  .item-card.out .item-media, .item-card.out .item-name, .item-card.out .item-price { opacity: .45; }
-  .item-card.out:active { transform: none; }
-  .item-out { font-size: 12px; font-weight: 700; color: var(--grey); text-transform: uppercase; letter-spacing: .05em; }
-  .items-empty { display: none; text-align: center; padding: 28px 12px; color: var(--grey); font-size: 15px; }
   /* Barre du bas : resume du choix + bouton Suivant, toujours a portee de pouce meme avec 25 articles.
-     Ici la page n'est pas une carte blanche mais le fond de page (.wrap : 18 px de marge, 60 px en bas). */
+     Les cartes elles-memes (.item-card ...) viennent de app.css : un seul rendu pour toutes les pages. */
   .step-bar { position: sticky; bottom: 0; z-index: 5; margin: 14px -18px -60px; padding: 12px 18px calc(24px + env(safe-area-inset-bottom));
     background: var(--bg); box-shadow: 0 -1px 0 var(--sep); }
-  .step-summary { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 10px; font-size: 13.5px; color: var(--grey); font-variant-numeric: tabular-nums; }
-  .step-summary.has { color: var(--ink); }
-  .step-summary strong { font-weight: 700; }
   /* app.css pose "overflow-x: hidden" sur html ET sur body : body devient un conteneur de defilement et "position: sticky" n'agit plus.
      Avec html "visible", l'overflow du body s'applique a la fenetre : meme protection, la barre reste collee. */
   html { overflow-x: visible; }
@@ -696,7 +645,7 @@
 
 </div>
 
-<script src="/app.js?v=6"></script>
+<script src="/app.js?v=8"></script>
 <script>
 mountThemeButton();
 var SALON_SLUG = (function () {
@@ -1346,153 +1295,34 @@ function confirmCancelBookGift() {
 }
 
 function renderBookServiceGrid() {
-  document.getElementById('bk-svc-grid').innerHTML = bookServices.map(function (s) { return bookServiceCardHtml(s, selBookService === s.id); }).join('');
+  vitrineRender({ kind: 'services', gridId: 'bk-svc-grid', items: bookServices, chosen: selBookService ? [selBookService] : [], onclick: "selectBookService(this,'{id}')" });
   renderBookItemList('extras');
   renderBookItemList('products');
   document.getElementById('bk-service-next-btn').disabled = !selBookService;
 }
 
-function bookServiceCardHtml(s, selected) {
-  // Carte de prestation : photo (ou icone d'apres le nom) EN HAUT, nom / duree / prix EN DESSOUS sur fond uni - comme les
-  // supplements. Un texte pose SUR la photo etait illisible avec des dessins noirs sur fond blanc.
-  var photo = s.image_url ? ' style="background-image:url(&quot;' + esc(s.image_url) + '&quot;)"' : ' aria-hidden="true"';
-  return '<button type="button" class="item-card' + (s.image_url ? ' has-photo' : '') + (selected ? ' sel' : '') + '" data-id="' + s.id + '"' +
-    ' title="' + esc(s.name) + '" aria-pressed="' + (selected ? 'true' : 'false') + '" onclick="selectBookService(this,\'' + s.id + '\')">' +
-    '<span class="item-media"' + photo + '>' + (s.image_url ? '' : iconForItem(s.name)) + '<span class="item-check">' + CHECK_SM_SVG + '</span></span>' +
-    '<span class="item-body"><span class="item-name">' + esc(s.name) + '</span>' +
-    '<span class="item-meta">' + formatMinutes(s.duration_min) + '</span>' +
-    '<span class="item-foot"><span class="item-price">' + eur(s.price_cents) + '</span></span></span></button>';
+// Supplements et produits : le rendu des cartes (photo ou icone en haut, texte dessous, recherche, resume...) vient de app.js.
+function bookItemListConfig(kind) {
+  return {
+    kind: kind, gridId: 'bk-' + kind + '-grid', searchId: 'bk-' + kind + '-search', qId: 'bk-' + kind + '-q', emptyId: 'bk-' + kind + '-empty', summaryId: 'bk-' + kind + '-summary',
+    items: kind === 'extras' ? bookExtras : bookProducts, chosen: kind === 'extras' ? selBookExtras : selBookProducts,
+    onclick: kind === 'extras' ? "toggleBookExtra(this,'{id}')" : "toggleBookProduct(this,'{id}')"
+  };
 }
-
-// ---------- Supplements et produits : cartes de vitrine (meme rendu que rdv.html) ----------
-var CHECK_SM_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>';
-var PLUS_SVG = '<svg class="ic-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>';
-var CHECK_SVG = '<svg class="ic-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>';
-
-// Minuscules et sans accents : "Epilation" retrouve "Épilation".
-function normText(s) {
-  return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-}
-
-// Icone par defaut d'un supplement / produit SANS photo (d'apres son nom).
-function extraIcon(name) {
-  var n = normText(name);
-  var rules = [['bougie', '🕯️'], ['meche', '🎨'], ['color', '🎨'], ['epilation', '✨'], ['defris', '💇'], ['visage', '🧖'], ['masque', '🧖'], ['mask', '🧖']];
-  for (var k = 0; k < rules.length; k++) if (n.indexOf(rules[k][0]) !== -1) return rules[k][1];
-  var common = iconForItem(name);
-  return common === '✂️' ? '✨' : common;
-}
-function productIcon(name) {
-  var n = normText(name);
-  if (/\b(canette|redbull|red bull|eau|pago|soda|coca|jus|boisson|orangina)\b/.test(n)) return '🥤';
-  if (/shampo/.test(n)) return '🚿';
-  if (/(huile|serum|baume)/.test(n)) return '💧';
-  if (/(poudre|fibre)/.test(n)) return '✨';
-  if (/(cire|gel|pate|spray|creme|pommade|laque)/.test(n)) return '🧴';
-  return '🛍️';
-}
-
-// Les produits sont regroupes par categorie quand le gerant en a renseigne ; sinon une simple liste.
-function groupItems(kind, items) {
-  if (kind !== 'products') return [{ title: '', items: items }];
-  var order = [], map = Object.create(null);
-  items.forEach(function (it) {
-    var c = String(it.category || '').trim();
-    if (!(c in map)) { map[c] = []; order.push(c); }
-    map[c].push(it);
-  });
-  var named = order.filter(function (c) { return c; });
-  if (!named.length) return [{ title: '', items: items }];
-  var groups = named.map(function (c) { return { title: c, items: map[c] }; });
-  if (map['']) groups.push({ title: 'Autres', items: map[''] });
-  return groups;
-}
-
-function bookItemCardHtml(kind, it, selected) {
-  var out = kind === 'products' && it.stock_enabled && Number(it.stock_quantity) <= 0;
-  var media = it.image_url
-    ? '<span class="item-media" style="background-image:url(&quot;' + esc(it.image_url) + '&quot;)"></span>'
-    : '<span class="item-media" aria-hidden="true">' + (kind === 'extras' ? extraIcon(it.name) : productIcon(it.name)) + '</span>';
-  var meta = '';
-  if (kind === 'extras' && Number(it.duration_min) > 0) meta = '+' + formatMinutes(it.duration_min);
-  if (kind === 'products' && it.stock_enabled && it.stock_quantity > 0 && it.stock_quantity <= 3) meta = 'Plus que ' + it.stock_quantity;
-  var price = (kind === 'extras' ? '+' : '') + eur(it.price_cents);
-  var action = out ? '<span class="item-out">Épuisé</span>' : '<span class="item-add">' + PLUS_SVG + CHECK_SVG + '</span>';
-  var handler = out ? '' : ' onclick="' + (kind === 'extras' ? 'toggleBookExtra' : 'toggleBookProduct') + '(this,\'' + it.id + '\')"';
-  return '<button type="button" class="item-card' + (it.image_url ? ' has-photo' : '') + (selected && !out ? ' sel' : '') + (out ? ' out' : '') + '"' +
-    ' data-id="' + it.id + '" data-name="' + esc(normText(it.name)) + '" title="' + esc(it.name) + '"' +
-    ' aria-pressed="' + (selected && !out ? 'true' : 'false') + '"' + (out ? ' disabled' : '') + handler + '>' +
-    media + '<span class="item-body"><span class="item-name">' + esc(it.name) + '</span>' +
-    (meta ? '<span class="item-meta">' + esc(meta) + '</span>' : '') +
-    '<span class="item-foot"><span class="item-price">' + price + '</span>' + action + '</span></span></button>';
-}
-
-function renderBookItemList(kind) {
-  var items = kind === 'extras' ? bookExtras : bookProducts;
-  var chosen = kind === 'extras' ? selBookExtras : selBookProducts;
-  var html = groupItems(kind, items).map(function (g) {
-    return (g.title ? '<div class="item-group">' + esc(g.title) + '</div>' : '') +
-      g.items.map(function (it) { return bookItemCardHtml(kind, it, chosen.indexOf(it.id) !== -1); }).join('');
-  }).join('');
-  document.getElementById('bk-' + kind + '-grid').innerHTML = html;
-  document.getElementById('bk-' + kind + '-search').style.display = items.length > 8 ? '' : 'none';
-  document.getElementById('bk-' + kind + '-q').value = '';
-  var empty = document.getElementById('bk-' + kind + '-empty');
-  empty.textContent = items.length ? 'Aucun résultat' : (kind === 'extras' ? 'Aucun supplément disponible pour le moment.' : 'Aucun produit disponible pour le moment.');
-  empty.style.display = items.length ? 'none' : 'block';
-  updateBookItemsSummary(kind);
-}
-
-// Resume du choix en bas de l'etape : combien, et l'effet sur la duree et le prix.
-function updateBookItemsSummary(kind) {
-  var el = document.getElementById('bk-' + kind + '-summary');
-  if (!el) return;
-  var ids = kind === 'extras' ? selBookExtras : selBookProducts;
-  var picked = (kind === 'extras' ? bookExtras : bookProducts).filter(function (it) { return ids.indexOf(it.id) !== -1; });
-  var noun = kind === 'extras' ? 'supplément' : 'produit';
-  if (!picked.length) {
-    el.className = 'step-summary';
-    el.innerHTML = '<span>Aucun ' + noun + ' choisi</span><span>Facultatif</span>';
-    return;
-  }
-  var cents = picked.reduce(function (t, it) { return t + (Number(it.price_cents) || 0); }, 0);
-  var minutes = kind === 'extras' ? picked.reduce(function (t, it) { return t + (Number(it.duration_min) || 0); }, 0) : 0;
-  el.className = 'step-summary has';
-  el.innerHTML = '<span><strong>' + picked.length + ' ' + noun + (picked.length > 1 ? 's' : '') + '</strong></span>' +
-    '<span>' + (minutes ? '+' + formatMinutes(minutes) + ' · ' : '') + (kind === 'extras' ? '+' : '') + eur(cents) + '</span>';
-}
-
-// Recherche instantanee dans la liste (sans accents ni majuscules) ; les en-tetes de categorie vides disparaissent.
-function filterBookItems(kind) {
-  var q = normText(document.getElementById('bk-' + kind + '-q').value).trim();
-  var grid = document.getElementById('bk-' + kind + '-grid'), any = false;
-  grid.querySelectorAll('.item-card').forEach(function (c) {
-    var ok = !q || c.getAttribute('data-name').indexOf(q) !== -1;
-    c.hidden = !ok;
-    if (ok) any = true;
-  });
-  grid.querySelectorAll('.item-group').forEach(function (g) {
-    var n = g.nextElementSibling, visible = false;
-    while (n && !n.classList.contains('item-group')) { if (!n.hidden) visible = true; n = n.nextElementSibling; }
-    g.hidden = !visible;
-  });
-  var empty = document.getElementById('bk-' + kind + '-empty');
-  empty.textContent = 'Aucun résultat pour « ' + document.getElementById('bk-' + kind + '-q').value.trim() + ' »';
-  empty.style.display = any ? 'none' : 'block';
-}
+function renderBookItemList(kind) { vitrineRender(bookItemListConfig(kind)); }
+function updateBookItemsSummary(kind) { vitrineSummary(bookItemListConfig(kind)); }
+function filterBookItems(kind) { vitrineFilter(bookItemListConfig(kind)); }
 
 function selectBookService(el, id) {
   selBookService = id;
-  document.querySelectorAll('#bk-svc-grid .item-card').forEach(function (c) { c.classList.remove('sel'); c.setAttribute('aria-pressed', 'false'); });
-  el.classList.add('sel'); el.setAttribute('aria-pressed', 'true');
+  vitrineSelectOne(el);
   document.getElementById('bk-service-next-btn').disabled = false;
 }
 
 function toggleBookExtra(el, id) {
   var i = selBookExtras.indexOf(id);
   if (i === -1) selBookExtras.push(id); else selBookExtras.splice(i, 1);
-  el.classList.toggle('sel');
-  el.setAttribute('aria-pressed', el.classList.contains('sel') ? 'true' : 'false');
+  vitrineToggle(el);
   updateBookItemsSummary('extras');
 }
 
@@ -1501,8 +1331,7 @@ function toggleBookExtra(el, id) {
 function toggleBookProduct(el, id) {
   var i = selBookProducts.indexOf(id);
   if (i === -1) selBookProducts.push(id); else selBookProducts.splice(i, 1);
-  el.classList.toggle('sel');
-  el.setAttribute('aria-pressed', el.classList.contains('sel') ? 'true' : 'false');
+  vitrineToggle(el);
   updateBookItemsSummary('products');
 }
 

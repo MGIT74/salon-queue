@@ -94,7 +94,7 @@ const call = async (method, p, body, slug) => { const h = { 'Content-Type': 'app
     const sentences = { poste: 'votre poste', caisse: 'la caisse', kiosk: 'cette borne', display: 'cet affichage' };
     for (const [name, who] of Object.entries(sentences)) {
       const html = fs.readFileSync(path.join(ROOT, 'public', name + '.html'), 'utf8');
-      check(name + '.html : entete anti-eclair + appel de requireSalonInUrl("... ' + who + ' ...") + app.js recharge (v=7)', /classList\.add\('no-slug'\)/.test(html) && new RegExp('requireSalonInUrl\\("[^"]*' + who + '[^"]*"\\);').test(html) && /src="\/app\.js\?v=7"/.test(html));
+      check(name + '.html : entete anti-eclair + appel de requireSalonInUrl("... ' + who + ' ...") + app.js recharge (v=8)', /classList\.add\('no-slug'\)/.test(html) && new RegExp('requireSalonInUrl\\("[^"]*' + who + '[^"]*"\\);').test(html) && /src="\/app\.js\?v=8"/.test(html));
     }
     const make = (slug) => { const dom = new JSDOM('<html class="no-slug"><body><main id="page">Clavier PIN</main></body></html>', { runScripts: 'outside-only', url: 'http://localhost/' }); const w = dom.window; w.SALON_SLUG = slug; w.__fetched = 0; w.eval(fnSrc); return w; };
     const hidden = (w) => w.document.documentElement.classList.contains('no-slug');

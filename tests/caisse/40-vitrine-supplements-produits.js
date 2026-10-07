@@ -8,6 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const rdv = fs.readFileSync(path.join(__dirname, '../../public/rdv.html'), 'utf8');
 const app = fs.readFileSync(path.join(__dirname, '../../public/app.js'), 'utf8');
+const css = fs.readFileSync(path.join(__dirname, '../../public/app.css'), 'utf8');   // style partage des cartes de vitrine
 let pass = 0, fail = 0;
 const check = (n, ok, x = '') => { (ok ? pass++ : fail++); console.log((ok ? '  OK   ' : '  ECHEC') + ' ' + n + (x ? '  [' + x + ']' : '')); };
 // Une fonction va de "function nom(" a sa PROPRE accolade fermante (ligne "}") : jamais jusqu'a la suivante.
@@ -24,9 +25,10 @@ function page(extras, products, opts) {
   w.formatMinutes = (m) => { m = Number(m); return m >= 60 ? Math.floor(m / 60) + 'h' + (m % 60 ? String(m % 60).padStart(2, '0') : '') : m + ' min'; };
   w.eur = (c) => (c / 100).toFixed(2).replace('.', ',') + ' €';
   w.services = []; w.extras = extras; w.products = products;
-  const vars = rdv.match(/^var PLUS_SVG = .*;$/m)[0] + '\n' + rdv.match(/^var CHECK_SVG = .*;$/m)[0] + '\n';
+  const vars = ['VITRINE_PLUS_SVG', 'VITRINE_CHECK_SVG', 'VITRINE_CHECK_SM_SVG'].map(n => app.match(new RegExp('^var ' + n + ' = .*;$', 'm'))[0]).join('\n') + '\n';
   w.eval('var selService = null, selExtras = ' + JSON.stringify(opts.selExtras || []) + ', selProducts = ' + JSON.stringify(opts.selProducts || []) + ';\n' + vars +
-    ['iconForItem', 'renderServiceGrid', 'normText', 'extraIcon', 'productIcon', 'groupItems', 'itemCardHtml', 'renderItemList', 'updateItemsSummary', 'filterItems', 'toggleExtra', 'toggleProduct'].map(n => fnSrc(rdv, n)).join('\n'));
+    ['normText', 'vitrineIcon', 'vitrineBaseIcon', 'extraIcon', 'productIcon', 'groupItems', 'vitrineCardHtml', 'vitrineRender', 'vitrineSummary', 'vitrineFilter', 'vitrineSelectOne', 'vitrineToggle'].map(n => fnSrc(app, n)).join('\n') + '\n' +
+    ['iconForItem', 'renderServiceGrid', 'itemListConfig', 'renderItemList', 'updateItemsSummary', 'filterItems', 'toggleExtra', 'toggleProduct'].map(n => fnSrc(rdv, n)).join('\n'));
   w.renderServiceGrid();
   return w;
 }
@@ -117,8 +119,8 @@ const P = (id, name, cents, extra) => Object.assign({ id, name, price_cents: cen
   const must = [['grille reguliere', /\.item-grid \{ display: grid; grid-template-columns: repeat\(auto-fill, minmax\(150px, 1fr\)\)/], ['nom limite a 3 lignes', /\.item-name \{[^}]*-webkit-line-clamp: 3/], ['carte choisie : anneau + fond teinte aux couleurs du salon (--accent)', /\.item-card\.sel \{ background: rgba\(var\(--accent-rgb\), \.13\)/],
     ['anneau de selection pose par-dessus (::after)', /\.item-card\.sel::after \{[^}]*box-shadow: inset 0 0 0 2\.5px var\(--accent\)/], ['coche a la place du + quand choisi', /\.item-card\.sel \.ic-check \{ display: block; \}/],
     ['barre du bas collee (sticky)', /\.step-bar \{ position: sticky; bottom: 0;/], ['html "visible" pour que le sticky fonctionne malgre app.css', /html \{ overflow-x: visible; \}/], ['champ de recherche a 16 px (pas de zoom sur telephone)', /\.items-search input \{[^}]*font-size: 16px/],
-    ['produit epuise grise', /\.item-card\.out \.item-media, \.item-card\.out \.item-name, \.item-card\.out \.item-price \{ opacity: \.45; \}/], ['les anciennes puces ont disparu', /^(?![\s\S]*xchip)/]];
-  for (const [n, re] of must) check(n, re.test(rdv));
+    ['produit epuise grise', /\.item-card\.out \.item-media, \.item-card\.out \.item-name, \.item-card\.out \.item-price \{ opacity: \.45; \}/], ['les anciennes puces ont disparu (page et style partage)', { test: (s) => !/xchip/.test(rdv) && !/xchip/.test(css) }]];
+  for (const [n, re] of must) check(n, re.test(rdv) || re.test(css));   // le style des cartes vient de app.css ; la barre collee, de la page
   check('chaque etape a sa barre (resume + Suivant) et son champ de recherche', ['extras', 'products'].every(k => new RegExp('id="' + k + '-summary"').test(rdv) && new RegExp('id="' + k + '-search"').test(rdv)) && (rdv.match(/class="step-bar"/g) || []).length === 2);
 
   console.log(`\nRESULTAT : ${pass} verifications reussies, ${fail} echec(s)`);

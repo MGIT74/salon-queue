@@ -691,3 +691,178 @@ function onBridgeStartClick() {
     }
   }, 45000);
 }
+
+/* =====================================================================================================================
+ * CARTES DE VITRINE - prestations, supplements, produits (le style est dans app.css).
+ * Partagees par la reservation en ligne (rdv.html), "Mon compte" (compte.html), la borne (kiosk.html) et les assistants
+ * "Ajouter un RDV" du tableau de bord et de "Mon poste" : meme rendu partout, un seul code a maintenir.
+ * ===================================================================================================================== */
+var VITRINE_PLUS_SVG = '<svg class="ic-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>';
+var VITRINE_CHECK_SVG = '<svg class="ic-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>';
+var VITRINE_CHECK_SM_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>';
+
+// Minuscules et sans accents : "Epilation" retrouve "Épilation".
+function normText(s) {
+  return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+// Icone par defaut d'une prestation SANS photo, d'apres son nom.
+function vitrineIcon(name) {
+  var n = (name || '').toLowerCase();
+  if (n.indexOf('enfant') !== -1) return '🧒';
+  if (n.indexOf('barbe') !== -1) return '🧔';
+  if (n.indexOf('shampoo') !== -1 || n.indexOf('shampooing') !== -1) return '🧴';
+  if (n.indexOf('couleur') !== -1 || n.indexOf('colorat') !== -1) return '🎨';
+  if (n.indexOf('serviette') !== -1 || n.indexOf('chaude') !== -1) return '🔥';
+  if (n.indexOf('contour') !== -1 || n.indexOf('traçage') !== -1 || n.indexOf('tracage') !== -1) return '📏';
+  if (n.indexOf('dégradé') !== -1 || n.indexOf('degrade') !== -1 || n.indexOf('américain') !== -1) return '💈';
+  if (n.indexOf('huile') !== -1 || n.indexOf('soin') !== -1) return '💧';
+  if (n.indexOf('cire') !== -1 || n.indexOf('gel') !== -1) return '🧴';
+  if (n.indexOf('zéro') !== -1 || n.indexOf('zero') !== -1) return '🪒';
+  if (n.indexOf('parfum') !== -1) return '🌸';
+  if (n.indexOf('coupe') !== -1) return '✂️';
+  return '✂️';
+}
+
+// Une page qui a sa propre fonction iconForItem (reservation, compte, borne, caisse) garde la sienne.
+function vitrineBaseIcon(name) {
+  return (typeof iconForItem === 'function' ? iconForItem : vitrineIcon)(name);
+}
+
+// Icone par defaut d'un supplement / produit SANS photo (d'apres son nom).
+function extraIcon(name) {
+  var n = normText(name);
+  var rules = [['bougie', '🕯️'], ['meche', '🎨'], ['color', '🎨'], ['epilation', '✨'], ['defris', '💇'], ['visage', '🧖'], ['masque', '🧖'], ['mask', '🧖']];
+  for (var k = 0; k < rules.length; k++) if (n.indexOf(rules[k][0]) !== -1) return rules[k][1];
+  var common = vitrineBaseIcon(name);
+  return common === '✂️' ? '✨' : common;
+}
+function productIcon(name) {
+  var n = normText(name);
+  if (/\b(canette|redbull|red bull|eau|pago|soda|coca|jus|boisson|orangina)\b/.test(n)) return '🥤';
+  if (/shampo/.test(n)) return '🚿';
+  if (/(huile|serum|baume)/.test(n)) return '💧';
+  if (/(poudre|fibre)/.test(n)) return '✨';
+  if (/(cire|gel|pate|spray|creme|pommade|laque)/.test(n)) return '🧴';
+  return '🛍️';
+}
+
+// Les produits sont regroupes par categorie quand le gerant en a renseigne ; sinon une simple liste.
+function groupItems(kind, items) {
+  if (kind !== 'products') return [{ title: '', items: items }];
+  var order = [], map = Object.create(null);
+  items.forEach(function (it) {
+    var c = String(it.category || '').trim();
+    if (!(c in map)) { map[c] = []; order.push(c); }
+    map[c].push(it);
+  });
+  var named = order.filter(function (c) { return c; });
+  if (!named.length) return [{ title: '', items: items }];
+  var groups = named.map(function (c) { return { title: c, items: map[c] }; });
+  if (map['']) groups.push({ title: 'Autres', items: map[''] });
+  return groups;
+}
+
+/**
+ * HTML d'une carte. kind : 'services' (choix unique : coche sur l'image) | 'extras' | 'products' (bouton + qui devient une coche).
+ * onclick : expression JS executee au clic ; "{id}" y est remplace par l'identifiant de l'article, ex. "toggleExtra(this,'{id}')".
+ * Photo EN HAUT (entiere, jamais recadree), nom / duree / prix EN DESSOUS sur fond uni : jamais de texte pose sur un dessin.
+ */
+function vitrineCardHtml(kind, it, selected, onclick) {
+  var isSvc = kind === 'services';
+  var out = kind === 'products' && it.stock_enabled && Number(it.stock_quantity) <= 0;
+  var photo = it.image_url ? ' style="background-image:url(&quot;' + esc(it.image_url) + '&quot;)"' : ' aria-hidden="true"';
+  var icon = it.image_url ? '' : (kind === 'extras' ? extraIcon(it.name) : kind === 'products' ? productIcon(it.name) : vitrineBaseIcon(it.name));
+  var meta = '';
+  if (isSvc) meta = formatMinutes(it.duration_min);
+  else if (kind === 'extras' && Number(it.duration_min) > 0) meta = '+' + formatMinutes(it.duration_min);
+  else if (kind === 'products' && it.stock_enabled && it.stock_quantity > 0 && it.stock_quantity <= 3) meta = 'Plus que ' + it.stock_quantity;
+  var price = (kind === 'extras' ? '+' : '') + eur(it.price_cents);
+  var action = isSvc ? '' : out ? '<span class="item-out">Épuisé</span>' : '<span class="item-add">' + VITRINE_PLUS_SVG + VITRINE_CHECK_SVG + '</span>';
+  var on = !out && selected;
+  return '<button type="button" class="item-card' + (it.image_url ? ' has-photo' : '') + (on ? ' sel' : '') + (out ? ' out' : '') + '"' +
+    ' data-id="' + it.id + '" data-name="' + esc(normText(it.name)) + '" title="' + esc(it.name) + '"' +
+    ' aria-pressed="' + (on ? 'true' : 'false') + '"' + (out ? ' disabled' : ' onclick="' + String(onclick).replace(/\{id\}/g, it.id) + '"') + '>' +
+    '<span class="item-media"' + photo + '>' + icon + (isSvc ? '<span class="item-check">' + VITRINE_CHECK_SM_SVG + '</span>' : '') + '</span>' +
+    '<span class="item-body"><span class="item-name">' + esc(it.name) + '</span>' +
+    (meta ? '<span class="item-meta">' + esc(meta) + '</span>' : '') +
+    '<span class="item-foot"><span class="item-price">' + price + '</span>' + action + '</span></span></button>';
+}
+
+/**
+ * Remplit une liste de cartes. cfg : { kind, gridId, items, chosen (tableau d'identifiants, par reference), onclick,
+ *   searchId?, qId?, emptyId?, summaryId? }. La recherche n'apparait que si la liste depasse 8 articles ; elle repart vide.
+ */
+function vitrineRender(cfg) {
+  var chosen = cfg.chosen || [];
+  document.getElementById(cfg.gridId).innerHTML = groupItems(cfg.kind, cfg.items).map(function (g) {
+    return (g.title ? '<div class="item-group">' + esc(g.title) + '</div>' : '') +
+      g.items.map(function (it) { return vitrineCardHtml(cfg.kind, it, chosen.indexOf(it.id) !== -1, cfg.onclick); }).join('');
+  }).join('');
+  if (cfg.searchId) document.getElementById(cfg.searchId).style.display = cfg.items.length > 8 ? '' : 'none';
+  if (cfg.qId) document.getElementById(cfg.qId).value = '';
+  if (cfg.emptyId) {
+    var empty = document.getElementById(cfg.emptyId);
+    var none = { services: 'Aucune prestation disponible pour le moment.', extras: 'Aucun supplément disponible pour le moment.', products: 'Aucun produit disponible pour le moment.' }[cfg.kind];
+    empty.textContent = cfg.items.length ? 'Aucun résultat' : none;
+    empty.style.display = cfg.items.length ? 'none' : 'block';
+  }
+  if (cfg.summaryId) vitrineSummary(cfg);
+}
+
+// Resume du choix : combien, et l'effet sur la duree et le prix. cfg : { kind, summaryId, items, chosen }.
+function vitrineSummary(cfg) {
+  var el = document.getElementById(cfg.summaryId);
+  if (!el) return;
+  var picked = cfg.items.filter(function (it) { return cfg.chosen.indexOf(it.id) !== -1; });
+  var noun = cfg.kind === 'extras' ? 'supplément' : 'produit';
+  if (!picked.length) {
+    el.className = 'step-summary';
+    el.innerHTML = '<span>Aucun ' + noun + ' choisi</span><span>Facultatif</span>';
+    return;
+  }
+  var cents = picked.reduce(function (t, it) { return t + (Number(it.price_cents) || 0); }, 0);
+  var minutes = cfg.kind === 'extras' ? picked.reduce(function (t, it) { return t + (Number(it.duration_min) || 0); }, 0) : 0;
+  el.className = 'step-summary has';
+  el.innerHTML = '<span><strong>' + picked.length + ' ' + noun + (picked.length > 1 ? 's' : '') + '</strong></span>' +
+    '<span>' + (minutes ? '+' + formatMinutes(minutes) + ' · ' : '') + (cfg.kind === 'extras' ? '+' : '') + eur(cents) + '</span>';
+}
+
+// Recherche instantanee (sans accents ni majuscules) ; les en-tetes de categorie vides disparaissent. cfg : { gridId, qId, emptyId }.
+function vitrineFilter(cfg) {
+  var raw = document.getElementById(cfg.qId).value;
+  var q = normText(raw).trim();
+  var grid = document.getElementById(cfg.gridId), any = false;
+  grid.querySelectorAll('.item-card').forEach(function (c) {
+    var ok = !q || c.getAttribute('data-name').indexOf(q) !== -1;
+    c.hidden = !ok;
+    if (ok) any = true;
+  });
+  grid.querySelectorAll('.item-group').forEach(function (g) {
+    var n = g.nextElementSibling, visible = false;
+    while (n && !n.classList.contains('item-group')) { if (!n.hidden) visible = true; n = n.nextElementSibling; }
+    g.hidden = !visible;
+  });
+  var empty = document.getElementById(cfg.emptyId);
+  empty.textContent = 'Aucun résultat pour « ' + raw.trim() + ' »';
+  empty.style.display = any ? 'none' : 'block';
+}
+
+// Choix unique (prestation) : desélectionne les autres cartes de la liste et marque celle-ci.
+function vitrineSelectOne(el) {
+  el.parentNode.querySelectorAll('.item-card').forEach(function (c) { c.classList.remove('sel'); c.setAttribute('aria-pressed', 'false'); });
+  el.classList.add('sel');
+  el.setAttribute('aria-pressed', 'true');
+}
+// Choix multiple (supplement / produit) : bascule la carte.
+function vitrineToggle(el) {
+  el.classList.toggle('sel');
+  el.setAttribute('aria-pressed', el.classList.contains('sel') ? 'true' : 'false');
+}
+
+// Bloc HTML du champ de recherche (pour les assistants construits en JavaScript). idBase : ex. "aa-extras".
+function vitrineSearchHtml(idBase, placeholder, filterCall) {
+  return '<div class="items-search" id="' + idBase + '-search" style="display:none">' +
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>' +
+    '<input type="search" id="' + idBase + '-q" placeholder="' + placeholder + '" autocomplete="off" oninput="' + filterCall + '"></div>';
+}

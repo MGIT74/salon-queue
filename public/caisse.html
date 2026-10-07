@@ -34,7 +34,7 @@
 <style>
   html.auth-checking #login-screen { display: none; }
 </style>
-<link rel="stylesheet" href="/app.css?v=5">
+<link rel="stylesheet" href="/app.css?v=6">
 <style>
   html, body { min-height: 100%; }
   .wrap { max-width: 1100px; margin: 0 auto; padding: 20px 18px 40px; }
@@ -842,7 +842,7 @@
   </div>
 </div>
 
-<script src="/app.js?v=7"></script>
+<script src="/app.js?v=8"></script>
 <script>requireSalonInUrl("Pour utiliser la caisse, ouvrez le lien de votre salon.");</script>
 <script>
 mountThemeButton();
@@ -2341,28 +2341,27 @@ function openCaisseAddAppointment(dateStr, barberId) {
 
     '<div id="pa-step-service">' +
       '<div class="aa-step-title">Prestation</div>' +
-      '<div class="aa-grid">' + catalog.services.map(function (s) {
-        return '<button class="aa-card" data-id="' + s.id + '" onclick="paSelectService(this)">' + esc(s.name) +
-          '<span class="aa-meta">' + formatMinutes(s.duration_min) + ' · ' + eur(s.price_cents) + '</span></button>';
-      }).join('') + '</div>' +
+      '<div class="item-grid compact" id="pa-service-grid"></div>' +
     '</div>' +
 
     '<div id="pa-step-extras" style="display:none">' +
       '<button class="aa-back" onclick="paGoStep(\'service\')">‹ Retour</button>' +
       '<div class="aa-step-title">Suppléments (optionnels)</div>' +
-      '<div class="aa-chips">' + catalog.extras.map(function (e) {
-        return '<button class="aa-chip" data-id="' + e.id + '" onclick="paToggleExtra(this)">' + esc(e.name) + '<span class="aa-meta">+' + formatMinutes(e.duration_min) + '</span></button>';
-      }).join('') + '</div>' +
-      '<button class="btn btn-primary" style="width:100%;margin-top:10px" onclick="paGoStep(\'products\')">Suivant</button>' +
+      vitrineSearchHtml('pa-extras', 'Rechercher un supplément', "paFilter('extras')") +
+      '<div class="item-grid compact" id="pa-extras-grid"></div>' +
+      '<div class="items-empty" id="pa-extras-empty">Aucun résultat</div>' +
+      '<div class="step-bar"><div class="step-summary" id="pa-extras-summary"></div>' +
+      '<button class="btn btn-primary" style="width:100%" onclick="paGoStep(\'products\')">Suivant</button></div>' +
     '</div>' +
 
     '<div id="pa-step-products" style="display:none">' +
       '<button class="aa-back" onclick="paGoStep(\'extras\')">‹ Retour</button>' +
       '<div class="aa-step-title">Un produit à acheter sur place ? (optionnel)</div>' +
-      '<div class="aa-chips">' + catalog.products.map(function (p) {
-        return '<button class="aa-chip" data-id="' + p.id + '" onclick="paToggleProduct(this)">' + esc(p.name) + '<span class="aa-meta">' + eur(p.price_cents) + '</span></button>';
-      }).join('') + '</div>' +
-      '<button class="btn btn-primary" style="width:100%;margin-top:10px" onclick="paGoStep(\'datetime\')">Suivant</button>' +
+      vitrineSearchHtml('pa-products', 'Rechercher un produit', "paFilter('products')") +
+      '<div class="item-grid compact" id="pa-products-grid"></div>' +
+      '<div class="items-empty" id="pa-products-empty">Aucun résultat</div>' +
+      '<div class="step-bar"><div class="step-summary" id="pa-products-summary"></div>' +
+      '<button class="btn btn-primary" style="width:100%" onclick="paGoStep(\'datetime\')">Suivant</button></div>' +
     '</div>' +
 
     '<div id="pa-step-datetime" style="display:none">' +
@@ -2401,10 +2400,22 @@ function openCaisseAddAppointment(dateStr, barberId) {
     }
   };
 
+  // Prestations, supplements et produits : memes cartes de vitrine que la reservation en ligne (code partage dans app.js).
+  function paListCfg(kind) {
+    return {
+      kind: kind, gridId: 'pa-' + kind + '-grid', searchId: 'pa-' + kind + '-search', qId: 'pa-' + kind + '-q', emptyId: 'pa-' + kind + '-empty', summaryId: 'pa-' + kind + '-summary',
+      items: kind === 'extras' ? catalog.extras : catalog.products, chosen: kind === 'extras' ? state.extraIds : state.productIds,
+      onclick: kind === 'extras' ? 'paToggleExtra(this)' : 'paToggleProduct(this)'
+    };
+  }
+  vitrineRender({ kind: 'services', gridId: 'pa-service-grid', items: catalog.services, chosen: [], onclick: 'paSelectService(this)' });
+  vitrineRender(paListCfg('extras'));
+  vitrineRender(paListCfg('products'));
+  window.paFilter = function (kind) { vitrineFilter(paListCfg(kind)); };
+
   window.paSelectService = function (el) {
     state.serviceId = el.dataset.id;
-    overlay.querySelectorAll('#pa-step-service .aa-card').forEach(function (c) { c.classList.remove('sel'); });
-    el.classList.add('sel');
+    vitrineSelectOne(el);
     paGoStep('extras');
   };
 
@@ -2412,17 +2423,21 @@ function openCaisseAddAppointment(dateStr, barberId) {
     var id = el.dataset.id;
     var i = state.extraIds.indexOf(id);
     if (i === -1) state.extraIds.push(id); else state.extraIds.splice(i, 1);
-    el.classList.toggle('sel');
+    vitrineToggle(el);
+    vitrineSummary(paListCfg('extras'));
   };
 
+  // Un seul exemplaire par produit depuis ce parcours (comme sur rdv.html) - le coiffeur ajuste la quantite
+  // lui-meme a la caisse si besoin de plus.
   window.paToggleProduct = function (el) {
     var id = el.dataset.id;
     var i = state.productIds.indexOf(id);
     if (i === -1) state.productIds.push(id); else state.productIds.splice(i, 1);
-    el.classList.toggle('sel');
+    vitrineToggle(el);
+    vitrineSummary(paListCfg('products'));
   };
 
-  var slotsByHalf = { morning: [], afternoon: [] };
+    var slotsByHalf = { morning: [], afternoon: [] };
   var currentHalf = 'afternoon';
 
   function paRenderHalf() {

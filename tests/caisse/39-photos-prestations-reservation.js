@@ -7,6 +7,7 @@ const fs = require('fs');
 const path = require('path');
 const rdv = fs.readFileSync(path.join(__dirname, '../../public/rdv.html'), 'utf8');
 const app = fs.readFileSync(path.join(__dirname, '../../public/app.js'), 'utf8');
+const css = fs.readFileSync(path.join(__dirname, '../../public/app.css'), 'utf8');   // style partage des cartes de vitrine
 let pass = 0, fail = 0;
 const check = (n, ok, x = '') => { (ok ? pass++ : fail++); console.log((ok ? '  OK   ' : '  ECHEC') + ' ' + n + (x ? '  [' + x + ']' : '')); };
 // Une fonction va de "function nom(" a sa PROPRE accolade fermante (ligne "}") : jamais jusqu'a la fonction suivante, pour ne pas
@@ -22,8 +23,10 @@ function page(services, extras, products) {
   w.eval(fnSrc(app, 'esc'));
   w.formatMinutes = (m) => m + ' min'; w.eur = (c) => (c / 100).toFixed(2) + ' €';
   w.services = services; w.extras = extras || []; w.products = products || [];
-  const vars = rdv.match(/^var PLUS_SVG = .*;$/m)[0] + '\n' + rdv.match(/^var CHECK_SVG = .*;$/m)[0] + '\n' + rdv.match(/^var CHECK_SM_SVG = .*;$/m)[0] + '\n';
-  w.eval('var selService = null, selExtras = [], selProducts = [];\n' + vars + ['iconForItem', 'renderServiceGrid', 'serviceCardHtml', 'normText', 'extraIcon', 'productIcon', 'groupItems', 'itemCardHtml', 'renderItemList', 'updateItemsSummary', 'selectService', 'toggleExtra', 'toggleProduct'].map(n => fnSrc(rdv, n)).join('\n'));
+  const vars = ['VITRINE_PLUS_SVG', 'VITRINE_CHECK_SVG', 'VITRINE_CHECK_SM_SVG'].map(n => app.match(new RegExp('^var ' + n + ' = .*;$', 'm'))[0]).join('\n') + '\n';
+  w.eval('var selService = null, selExtras = [], selProducts = [];\n' + vars +
+    ['normText', 'vitrineIcon', 'vitrineBaseIcon', 'extraIcon', 'productIcon', 'groupItems', 'vitrineCardHtml', 'vitrineRender', 'vitrineSummary', 'vitrineFilter', 'vitrineSelectOne', 'vitrineToggle'].map(n => fnSrc(app, n)).join('\n') + '\n' +
+    ['iconForItem', 'renderServiceGrid', 'itemListConfig', 'renderItemList', 'updateItemsSummary', 'selectService', 'toggleExtra', 'toggleProduct'].map(n => fnSrc(rdv, n)).join('\n'));
   w.renderServiceGrid();
   return w;
 }
@@ -63,19 +66,19 @@ const cards = (w) => [...w.document.querySelectorAll('#svc-grid .item-card')];
 
   console.log('\n[E] Style : meme rendu que la borne, selection visible PAR-DESSUS la photo');
   check('plus aucun texte pose SUR la photo : l\'ancien rendu (voile degrade, .photo-bg, .overlay) a disparu de la reservation', !/photo-bg|\.overlay|linear-gradient\(to top/.test(rdv));
-  check('carte choisie : anneau ::after + coche ronde (.item-check) affichee seulement sur la carte choisie', /\.item-card\.sel::after \{[^}]*z-index: 2/.test(rdv) && /\.item-check \{[^}]*display: none/.test(rdv) && /\.item-card\.sel \.item-check \{ display: flex; \}/.test(rdv));
+  check('carte choisie : anneau ::after + coche ronde (.item-check) affichee seulement sur la carte choisie', /\.item-card\.sel::after \{[^}]*z-index: 2/.test(css) && /\.item-check \{[^}]*display: none/.test(css) && /\.item-card\.sel \.item-check \{ display: flex; \}/.test(css));
 
   console.log('\n[F] Borne : la selection d\'une prestation a photo etait INVISIBLE (mesure : 0 pixel bleu au bord) - meme correction');
   const kiosk = fs.readFileSync(path.join(__dirname, '../../public/kiosk.html'), 'utf8');
-  check('borne : anneau de selection pose par-dessus la photo (::after, z-index 2)', /\.svc-card\.has-photo\.sel::after \{[^}]*box-shadow: inset 0 0 0 3px var\(--blue\)[^}]*z-index: 2/.test(kiosk));
+  check('borne : prestations et supplements sont des cartes de vitrine PARTAGEES (item-grid + vitrineRender), plus de regle .svc-card.has-photo ni .xchip', /class="item-grid" id="svc-grid"/.test(kiosk) && /class="item-grid" id="extras-grid"/.test(kiosk) && /vitrineRender\(\{ kind: 'services'/.test(kiosk) && /vitrineRender\(\{ kind: 'extras'/.test(kiosk) && !/\.svc-card\.has-photo|xchip/.test(kiosk));
   check('borne : plus d\'anneau "inset" pose sur la carte elle-meme (cache par la photo)', !/\.svc-card\.has-photo\.sel \{ box-shadow: inset/.test(kiosk));
-  check('borne : la photo en HAUT (vignette 4/3), le texte EN DESSOUS (plus de texte sur le dessin)', /\.svc-card\.has-photo \.photo-bg \{ position: relative;[^}]*aspect-ratio: 4 \/ 3/.test(kiosk) && /\.svc-card\.has-photo \.overlay \{ position: static;[^}]*background: none/.test(kiosk) && /\.svc-card\.has-photo \.name \{ color: var\(--ink\); \}/.test(kiosk) && !/linear-gradient\(to top, rgba\(0,0,0,\.78\)/.test(kiosk));
+  check('borne : le style (photo ENTIERE en haut, texte dessous, anneau + coche) vient de app.css, comme sur la reservation', /\.item-card\.sel::after \{[^}]*z-index: 2/.test(css) && /\.item-card\.has-photo \.item-media \{[^}]*aspect-ratio: 4 \/ 3/.test(css) && !/photo-bg|\.overlay/.test(kiosk));
 
   console.log('\n[G] Images ENTIERES (jamais recadrees) : "contain" sur fond blanc, pas "cover"');
   const rule = (src, sel) => { const i = src.indexOf(sel + ' {'); return i === -1 ? '' : src.slice(i, src.indexOf('}', i)); };
-  const rdvRule = rule(rdv, '.item-card.has-photo .item-media'), kioskRule = rule(kiosk, '.svc-card.has-photo .photo-bg');
+  const rdvRule = rule(css, '.item-card.has-photo .item-media'), kioskRule = rule(kiosk, '.svc-card.has-photo .photo-bg');
   check('reservation : vignette d\'image en "contain", sans repetition, centree, fond blanc (une image carree n\'est plus coupee en haut et en bas)', /background-size: contain/.test(rdvRule) && /background-repeat: no-repeat/.test(rdvRule) && /background-position: center/.test(rdvRule) && /background-color: #fff/.test(rdvRule) && !/cover/.test(rdvRule), rdvRule.replace(/\s+/g, ' ').slice(0, 160));
-  check('borne : meme regle (contain, fond blanc, pas de cover)', /background-size: contain/.test(kioskRule) && /background-repeat: no-repeat/.test(kioskRule) && /background-color: #fff/.test(kioskRule) && !/cover/.test(kioskRule), kioskRule.replace(/\s+/g, ' ').slice(0, 160));
+  check('borne : aucune regle d\'image recadree propre a la borne (plus de "cover" local), seule la regle "contain" partagee s\'applique', !/background-size: cover/.test(kiosk.slice(kiosk.indexOf('<style'), kiosk.indexOf('</style>'))) || !/photo-bg|item-media/.test(kiosk));
 
   console.log(`\nRESULTAT : ${pass} verifications reussies, ${fail} echec(s)`);
   process.exit(fail ? 1 : 0);

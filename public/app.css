@@ -386,3 +386,72 @@ input[type="date"] { -webkit-appearance: none; appearance: none; }
             border: 2px solid var(--bg); display: none; }
 .conn-dot.is-online { display: block; background: var(--green); }
 .conn-dot.is-offline { display: block; background: var(--red); }
+
+/* =====================================================================================================================
+   CARTES DE VITRINE - prestations, supplements, produits.
+   Un seul rendu pour la reservation en ligne (rdv.html), "Mon compte" (compte.html), la borne (kiosk.html) et les
+   assistants "Ajouter un RDV" du tableau de bord et de "Mon poste". Le HTML vient de app.js (fonctions vitrine*).
+   ===================================================================================================================== */
+/* ---------- Supplements et produits : cartes de vitrine ---------- */
+.step-sub { margin: -6px 0 16px; font-size: 14px; color: var(--grey); }
+.items-search { position: relative; margin: 0 0 14px; }
+.items-search svg { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; color: var(--grey); pointer-events: none; }
+.items-search input { width: 100%; box-sizing: border-box; border: none; background: var(--fill); color: var(--ink); border-radius: 14px;
+  padding: 13px 14px 13px 42px; font-family: inherit; font-size: 16px; outline: none; }
+.items-search input:focus { box-shadow: 0 0 0 2.5px rgba(var(--accent-rgb), .45); }
+.item-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-bottom: 8px; }
+.item-group { grid-column: 1 / -1; margin: 12px 2px 0; font-size: 12.5px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--grey); }
+.item-group:first-child { margin-top: 0; }
+.item-group[hidden] { display: none; }
+.item-card { position: relative; display: flex; flex-direction: column; text-align: left; padding: 0; border: none; background: var(--fill); color: var(--ink);
+  border-radius: 20px; overflow: hidden; cursor: pointer; font-family: inherit; -webkit-tap-highlight-color: transparent;
+  transition: transform .12s ease, background .15s ease; }
+.item-card[hidden] { display: none; }
+.item-card:active { transform: scale(.97); }
+.item-card:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.item-media { display: flex; align-items: center; justify-content: center; height: 84px; font-size: 38px; line-height: 1;
+  background: linear-gradient(145deg, rgba(var(--accent-rgb), .20), rgba(var(--accent-rgb), .05)); background-size: cover; background-position: center; }
+/* Image entiere, jamais recadree (contain) : en mode "cover", une image carree dans un cadre 4:3 etait coupee en haut et en bas.
+   Fond blanc : les marges eventuelles se fondent avec les dessins noirs sur fond blanc. */
+.item-card.has-photo .item-media { height: auto; aspect-ratio: 4 / 3; background-color: #fff; background-size: contain; background-repeat: no-repeat; background-position: center; }
+.item-body { display: flex; flex-direction: column; gap: 3px; flex: 1; padding: 12px 14px 14px; }
+.item-name { font-size: 15px; font-weight: 600; line-height: 1.25; letter-spacing: -.01em; word-break: break-word;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.item-meta { font-size: 12.5px; color: var(--grey); }
+.item-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: auto; padding-top: 10px; }
+.item-price { font-size: 16px; font-weight: 700; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+.item-add { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%;
+  background: var(--card); color: var(--accent); box-shadow: inset 0 0 0 1.5px rgba(var(--accent-rgb), .55); transition: background .15s ease, color .15s ease; }
+.item-add svg { width: 17px; height: 17px; }
+.item-add .ic-check { display: none; }
+.item-card.sel { background: rgba(var(--accent-rgb), .13); }
+.item-card.sel::after { content: ''; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 2.5px var(--accent); pointer-events: none; z-index: 2; }
+.item-card.sel .item-add { background: var(--accent); color: #fff; box-shadow: none; }
+.item-card.sel .ic-plus { display: none; }
+.item-card.sel .ic-check { display: block; }
+/* Prestations (choix unique) : meme carte que les supplements. Coche sur la photo / l'icone de la carte choisie. */
+.item-media { position: relative; }
+.item-check { position: absolute; top: 10px; right: 10px; display: none; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%;
+  background: var(--accent); color: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.35); }
+.item-check svg { width: 16px; height: 16px; }
+.item-card.sel .item-check { display: flex; }
+.item-card.out { cursor: default; }
+.item-card.out .item-media, .item-card.out .item-name, .item-card.out .item-price { opacity: .45; }
+.item-card.out:active { transform: none; }
+.item-out { font-size: 12px; font-weight: 700; color: var(--grey); text-transform: uppercase; letter-spacing: .05em; }
+.items-empty { display: none; text-align: center; padding: 28px 12px; color: var(--grey); font-size: 15px; }
+.step-summary { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 10px; font-size: 13.5px; color: var(--grey); font-variant-numeric: tabular-nums; }
+.step-summary.has { color: var(--ink); }
+.step-summary strong { font-weight: 700; }
+
+/* Variante compacte : fenetres modales (assistants "Ajouter un RDV" du tableau de bord et de Mon poste). */
+.item-grid.compact { grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 10px; }
+.item-grid.compact .item-media { height: 64px; font-size: 30px; }
+.item-grid.compact .item-card.has-photo .item-media { height: auto; }
+.item-grid.compact .item-body { padding: 10px 12px 12px; }
+.item-grid.compact .item-name { font-size: 14px; }
+.item-grid.compact .item-price { font-size: 15px; }
+.item-grid.compact .item-add { width: 30px; height: 30px; }
+/* Barre du bas (resume + bouton) dans une fenetre modale : la fenetre defile, la barre reste collee en bas. */
+.modal-box .step-bar { position: sticky; bottom: -26px; z-index: 5; margin: 12px -26px -26px; padding: 12px 26px 22px;
+  background: var(--card); border-radius: 0 0 20px 20px; box-shadow: 0 -1px 0 var(--sep); }

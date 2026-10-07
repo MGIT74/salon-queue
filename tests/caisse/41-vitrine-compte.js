@@ -8,6 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const rdv = fs.readFileSync(path.join(__dirname, '../../public/compte.html'), 'utf8');
 const app = fs.readFileSync(path.join(__dirname, '../../public/app.js'), 'utf8');
+const css = fs.readFileSync(path.join(__dirname, '../../public/app.css'), 'utf8');   // style partage des cartes de vitrine
 let pass = 0, fail = 0;
 const check = (n, ok, x = '') => { (ok ? pass++ : fail++); console.log((ok ? '  OK   ' : '  ECHEC') + ' ' + n + (x ? '  [' + x + ']' : '')); };
 // Une fonction va de "function nom(" a sa PROPRE accolade fermante (ligne "}") : jamais jusqu'a la suivante.
@@ -24,9 +25,10 @@ function page(extras, products, opts) {
   w.formatMinutes = (m) => { m = Number(m); return m >= 60 ? Math.floor(m / 60) + 'h' + (m % 60 ? String(m % 60).padStart(2, '0') : '') : m + ' min'; };
   w.eur = (c) => (c / 100).toFixed(2).replace('.', ',') + ' €';
   w.bookServices = opts.services || []; w.bookExtras = extras; w.bookProducts = products;
-  const vars = rdv.match(/^var PLUS_SVG = .*;$/m)[0] + '\n' + rdv.match(/^var CHECK_SVG = .*;$/m)[0] + '\n' + rdv.match(/^var CHECK_SM_SVG = .*;$/m)[0] + '\n';
+  const vars = ['VITRINE_PLUS_SVG', 'VITRINE_CHECK_SVG', 'VITRINE_CHECK_SM_SVG'].map(n => app.match(new RegExp('^var ' + n + ' = .*;$', 'm'))[0]).join('\n') + '\n';
   w.eval('var selBookService = null, selBookExtras = ' + JSON.stringify(opts.selExtras || []) + ', selBookProducts = ' + JSON.stringify(opts.selProducts || []) + ';\n' + vars +
-    ['iconForItem', 'renderBookServiceGrid', 'bookServiceCardHtml', 'normText', 'extraIcon', 'productIcon', 'groupItems', 'bookItemCardHtml', 'renderBookItemList', 'updateBookItemsSummary', 'filterBookItems', 'toggleBookExtra', 'toggleBookProduct'].map(n => fnSrc(rdv, n)).join('\n'));
+    ['normText', 'vitrineIcon', 'vitrineBaseIcon', 'extraIcon', 'productIcon', 'groupItems', 'vitrineCardHtml', 'vitrineRender', 'vitrineSummary', 'vitrineFilter', 'vitrineSelectOne', 'vitrineToggle'].map(n => fnSrc(app, n)).join('\n') + '\n' +
+    ['iconForItem', 'renderBookServiceGrid', 'bookItemListConfig', 'renderBookItemList', 'updateBookItemsSummary', 'filterBookItems', 'toggleBookExtra', 'toggleBookProduct'].map(n => fnSrc(rdv, n)).join('\n'));
   w.renderBookServiceGrid();
   return w;
 }
@@ -117,15 +119,15 @@ const P = (id, name, cents, extra) => Object.assign({ id, name, price_cents: cen
   const must = [['grille reguliere', /\.item-grid \{ display: grid; grid-template-columns: repeat\(auto-fill, minmax\(150px, 1fr\)\)/], ['nom limite a 3 lignes', /\.item-name \{[^}]*-webkit-line-clamp: 3/], ['carte choisie : anneau + fond teinte aux couleurs du salon (--accent)', /\.item-card\.sel \{ background: rgba\(var\(--accent-rgb\), \.13\)/],
     ['anneau de selection pose par-dessus (::after)', /\.item-card\.sel::after \{[^}]*box-shadow: inset 0 0 0 2\.5px var\(--accent\)/], ['coche a la place du + quand choisi', /\.item-card\.sel \.ic-check \{ display: block; \}/],
     ['barre du bas collee (sticky)', /\.step-bar \{ position: sticky; bottom: 0;/], ['html "visible" pour que le sticky fonctionne malgre app.css', /html \{ overflow-x: visible; \}/], ['champ de recherche a 16 px (pas de zoom sur telephone)', /\.items-search input \{[^}]*font-size: 16px/],
-    ['produit epuise grise', /\.item-card\.out \.item-media, \.item-card\.out \.item-name, \.item-card\.out \.item-price \{ opacity: \.45; \}/], ['les anciennes puces ont disparu', /^(?![\s\S]*xchip)/]];
-  for (const [n, re] of must) check(n, re.test(rdv));
+    ['produit epuise grise', /\.item-card\.out \.item-media, \.item-card\.out \.item-name, \.item-card\.out \.item-price \{ opacity: \.45; \}/], ['les anciennes puces ont disparu (page et style partage)', { test: (s) => !/xchip/.test(rdv) && !/xchip/.test(css) }]];
+  for (const [n, re] of must) check(n, re.test(rdv) || re.test(css));   // le style des cartes vient de app.css ; la barre collee, de la page
   check('chaque etape a sa barre (resume + Suivant) et son champ de recherche', ['extras', 'products'].every(k => new RegExp('id="bk-' + k + '-summary"').test(rdv) && new RegExp('id="bk-' + k + '-search"').test(rdv)) && (rdv.match(/class="step-bar"/g) || []).length === 2);
 
   console.log('\n[G] "Mon compte" : prestations a photo + remise a zero d\'une nouvelle reservation');
   w = page([], [], { services: [{ id: 's1', name: 'Barbe premium', duration_min: 20, price_cents: 1300, image_url: IMG }, { id: 's2', name: 'Coupe homme', duration_min: 25, price_cents: 1500, image_url: null }] });
   const sv = $$(w, '#bk-svc-grid .item-card');
   check('prestation AVEC photo : photo EN HAUT, nom / duree / prix EN DESSOUS (jamais sur le dessin) ; SANS photo : icone par defaut', sv[0].classList.contains('has-photo') && sv[0].querySelector('.item-media').getAttribute('style').includes(IMG) && !sv[0].querySelector('.item-media .item-name') && sv[0].querySelector('.item-body .item-name').textContent === 'Barbe premium' && sv[0].querySelector('.item-meta').textContent === '20 min' && /13,00 €/.test(sv[0].querySelector('.item-price').textContent) && !sv[1].classList.contains('has-photo') && sv[1].querySelector('.item-media').textContent.length > 0);
-  check('carte choisie : anneau ::after + coche ronde affichee seulement sur la carte choisie', /\.item-card\.sel::after \{[^}]*z-index: 2/.test(rdv) && /\.item-card\.sel \.item-check \{ display: flex; \}/.test(rdv) && !/\.svc-card\.has-photo/.test(rdv));
+  check('carte choisie : anneau ::after + coche ronde affichee seulement sur la carte choisie', /\.item-card\.sel::after \{[^}]*z-index: 2/.test(css) && /\.item-card\.sel \.item-check \{ display: flex; \}/.test(css) && !/\.svc-card\.has-photo/.test(rdv));
   w = page(EXTRAS, [], { selExtras: ['e2', 'e4'], services: [{ id: 's1', name: 'Coupe', duration_min: 10, price_cents: 1000 }] });
   check('une reservation en cours : suppléments e2 et e4 marques, resume "2 suppléments"', $$(w, '#bk-extras-grid .item-card.sel').length === 2 && /2 suppléments/.test(w.document.getElementById('bk-extras-summary').textContent));
   w.eval('selBookExtras = []; selBookProducts = []; selBookService = null;'); w.renderBookServiceGrid();
@@ -133,7 +135,7 @@ const P = (id, name, cents, extra) => Object.assign({ id, name, price_cents: cen
   check('...et le code de compte.html reaffiche bien les listes aux deux endroits ou la reservation est remise a zero', (rdv.match(/renderBookServiceGrid\(\);\s*\/\/ (les cartes|une nouvelle reservation)/g) || []).length === 2);
   check('le bouton "Suivant" des prestations suit la selection (desactive tant qu\'aucune prestation n\'est choisie)', w.document.getElementById('bk-service-next-btn').disabled === true);
 
-  const cRule = (() => { const i = rdv.indexOf('.item-card.has-photo .item-media {'); return i === -1 ? '' : rdv.slice(i, rdv.indexOf('}', i)); })();
+  const cRule = (() => { const i = css.indexOf('.item-card.has-photo .item-media {'); return i === -1 ? '' : css.slice(i, css.indexOf('}', i)); })();
   check('"Mon compte" : vignette d\'image en "contain" sur fond blanc (image entiere, jamais recadree), pas "cover"', /background-size: contain/.test(cRule) && /background-repeat: no-repeat/.test(cRule) && /background-color: #fff/.test(cRule) && !/cover/.test(cRule), cRule.replace(/\s+/g, ' ').slice(0, 160));
 
   console.log(`\nRESULTAT : ${pass} verifications reussies, ${fail} echec(s)`);
