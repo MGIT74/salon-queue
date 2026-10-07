@@ -64,4 +64,5 @@ node tests/caisse/30-catalogue-ecran-supprimer-deplacer.js  # catalogue, ecran :
 node tests/caisse/31-poste-suit-ordre-catalogue.js  # 'Mon poste' : relit le catalogue au plus toutes les 15 s (ordre/prix/stock changes dans l'admin repris sans recharger)
 node tests/caisse/32-schema-applique-au-demarrage.js  # le serveur applique schema.sql a chaque demarrage : base ancienne reparee seule, echec de droits toleree (demarre + avertit)
 node tests/caisse/33-catalogue-mouvement.js  # deplacement des articles : la ligne suit le pointeur, les autres glissent (FLIP), elle se pose ; 'reduire les animations' respecte
+node tests/caisse/34-compte-client-inscription.js  # compte client : inscription sur base STRICTE (owner_id), parcours complet, 'Renvoyer le lien', ecran ; aucune requete INSERT n'oublie une colonne obligatoire
 ```

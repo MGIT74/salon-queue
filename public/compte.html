@@ -347,7 +347,8 @@
         <div class="err" id="login-err"></div>
         <div style="text-align:center;margin-top:16px;display:flex;justify-content:space-between">
           <button class="link-btn" onclick="show('p-signup')">Créer un compte</button>
-          <button class="link-btn" onclick="show('p-forgot')">Mot de passe oublié ?</button>
+          <button class="link-btn" id="resend-btn" style="display:none" onclick="doResendVerification()">Renvoyer le lien de confirmation</button>
+        <button class="link-btn" onclick="show('p-forgot')">Mot de passe oublié ?</button>
         </div>
       </section>
 
@@ -381,8 +382,8 @@
 
       <!-- Vérification email envoyée -->
       <section class="panel" id="p-check-email">
-        <h1 class="auth-title">Vérifiez vos emails</h1>
-        <div class="msg" style="text-align:center;font-size:15px">
+        <h1 class="auth-title" id="check-title">Vérifiez vos emails</h1>
+        <div class="msg" id="check-msg" style="text-align:center;font-size:15px">
           Un email de confirmation vient de vous être envoyé. Cliquez sur le lien qu'il contient pour activer votre compte, puis revenez vous connecter ici.
         </div>
         <button class="go" style="margin-top:18px" onclick="show('p-login')">Retour à la connexion</button>
@@ -634,7 +635,11 @@ function api(path, opts) {
     body: opts.body ? JSON.stringify(opts.body) : undefined
   }).then(function (r) {
     return r.json().then(function (data) {
-      if (!r.ok) throw new Error(data.error || 'Erreur ' + r.status);
+      if (!r.ok) {
+        var err = new Error(data.error || 'Erreur ' + r.status);
+        err.status = r.status; err.data = data;   // ex. data.needs_email_verification : la connexion est refusee tant que l'email n'est pas confirme
+        throw err;
+      }
       return data;
     });
   });
@@ -708,7 +713,14 @@ function doSignup() {
   errEl.textContent = '';
   if (!phoneRaw) { errEl.textContent = 'Le téléphone est requis'; return; }
   api('/api/client-auth/signup', { method: 'POST', body: { name: name, email: email, phone: phone, password: password, base_url: baseUrl() } })
-    .then(function () { show('p-check-email'); })
+    .then(function (d) {
+      var sent = !(d && d.email_sent === false);
+      document.getElementById('check-title').textContent = sent ? 'Vérifiez vos emails' : 'Compte créé';
+      document.getElementById('check-msg').textContent = sent
+        ? "Un email de confirmation vient de vous être envoyé. Cliquez sur le lien qu'il contient pour activer votre compte, puis revenez vous connecter ici."
+        : "Votre compte est créé, mais l'email de confirmation n'a pas pu être envoyé : l'envoi d'emails n'est pas encore activé pour ce salon. Dès que ce sera fait, revenez ici, connectez-vous et demandez un nouveau lien de confirmation.";
+      show('p-check-email');
+    })
     .catch(function (e) { errEl.textContent = e.message; });
 }
 
@@ -716,12 +728,28 @@ function doLogin() {
   var email = document.getElementById('li-email').value.trim();
   var password = document.getElementById('li-pass').value;
   document.getElementById('login-err').textContent = '';
+  document.getElementById('resend-btn').style.display = 'none';
   api('/api/client-auth/login', { method: 'POST', body: { email: email, password: password } })
     .then(function (d) {
       localStorage.setItem('client_token', d.token);
       loadProfile();
     })
-    .catch(function (e) { document.getElementById('login-err').textContent = e.message; });
+    .catch(function (e) {
+      document.getElementById('login-err').textContent = e.message;
+      // Compte cree mais email jamais confirme (lien perdu, expire apres 24 h, envoi impossible...) : on propose un nouveau lien.
+      if (e.data && e.data.needs_email_verification) document.getElementById('resend-btn').style.display = '';
+    });
+}
+
+function doResendVerification() {
+  var email = document.getElementById('li-email').value.trim();
+  var errEl = document.getElementById('login-err');
+  api('/api/client-auth/resend-verification', { method: 'POST', body: { email: email, base_url: baseUrl() } })
+    .then(function (d) {
+      errEl.textContent = d.message || 'Un nouveau lien de confirmation vient d\'être envoyé.';
+      document.getElementById('resend-btn').style.display = 'none';
+    })
+    .catch(function (e) { errEl.textContent = e.message; });
 }
 
 function doLogout() {
