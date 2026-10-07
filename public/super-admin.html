@@ -483,8 +483,11 @@ function renderOwners() {
           return '<div class="owner-salon-row">' +
             '<div><div class="owner-salon-name">' + esc(s.name) + (s.is_default ? ' <span class="badge on">défaut</span>' : '') +
             (s.active ? '' : ' <span class="badge off">désactivé</span>') + '</div>' +
-            '<div class="owner-salon-slug">?salon=' + esc(s.slug) + '</div></div>' +
+            '<div class="owner-salon-slug">?salon=' + esc(s.slug) +
+            (s.old_slugs && s.old_slugs.length ? ' <span style="opacity:.7">· ancien lien toujours valable : ' + s.old_slugs.map(function (x) { return '?salon=' + esc(x); }).join(', ') + '</span>' : '') +
+            '</div></div>' +
             '<div class="owner-salon-links">' + links +
+            '<button onclick="changeSalonSlug(\'' + s.id + '\')">Identifiant</button>' +
             '<button onclick="impersonate(\'' + s.id + '\',\'' + esc(s.slug) + '\')">Assistance</button>' +
             '</div></div>';
         }).join('');
@@ -536,6 +539,33 @@ function createSalon() {
       return showAlert(msg, { title: 'Enseigne "' + name + '" créée' });
     })
     .catch(function (e) { toast(e.message, true); });
+}
+
+/** Identifiant (slug) proposé d'après le nom du salon : "THE BARBER ONE - OYONNAX" -> "the-barber-one-oyonnax". */
+function slugFromName(name) {
+  return String(name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80);
+}
+
+/**
+ * Change l'identifiant d'un salon (la partie ?salon=... de ses liens). L'ancien RESTE valable pour toujours : les liens
+ * deja donnes aux clients, les e-mails deja envoyes, les favoris et les QR codes continuent de fonctionner.
+ */
+function changeSalonSlug(id) {
+  var salon = null;
+  owners.forEach(function (o) { o.salons.forEach(function (x) { if (x.id === id) salon = x; }); });
+  if (!salon) return;
+  var suggestion = slugFromName(salon.name) || salon.slug;
+  showPrompt(
+    'Identifiant actuel : ?salon=' + salon.slug + '. Proposé d\'après le nom du salon. Lettres minuscules, chiffres et tirets uniquement. ' +
+    'L\'ancien lien continuera de fonctionner.',
+    { title: 'Identifiant de « ' + salon.name + ' »', defaultValue: suggestion }
+  ).then(function (value) {
+    var slug = String(value || '').trim().toLowerCase();
+    if (!slug || slug === salon.slug) return;
+    superApi('/api/super/salons/' + id + '/slug', { method: 'PUT', body: { slug: slug } })
+      .then(function (r) { toast('Identifiant changé : ?salon=' + r.slug + ' (l\'ancien reste valable)'); return loadOwners(); })
+      .catch(function (e) { toast(e.message, true); });
+  });
 }
 
 function renameOwner(id) {

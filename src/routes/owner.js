@@ -1,6 +1,7 @@
 const express = require('express');
 const crypto = require('crypto');
 const { pool, utcIso, getOwnerSettings, setOwnerSettings } = require('../db');
+const { slugTaken } = require('../lib/slugs');
 const requireAdmin = require('../middleware/auth');
 const requireAdminOrBarber = require('../middleware/barberAuth');
 const { hashPassword } = require('../lib/password');
@@ -33,8 +34,7 @@ router.post('/salons', requireAdmin, wrap(async (req, res) => {
     });
   }
 
-  const [[existing]] = await pool.query('SELECT id FROM salons WHERE slug = ?', [slug]);
-  if (existing) return res.status(409).json({ error: 'Cet identifiant est déjà utilisé' });
+  if (await slugTaken(slug)) return res.status(409).json({ error: 'Cet identifiant est déjà utilisé' });
 
   const id = crypto.randomUUID();
   await pool.query(

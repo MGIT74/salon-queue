@@ -1,11 +1,13 @@
 const express = require('express');
 const crypto = require('crypto');
 const { pool, getPlatformSettings, setPlatformSettings } = require('../db');
+const { slugTaken } = require('../lib/slugs');
 const { sendTestEmail, sendVerificationEmail, invalidateTransport } = require('../lib/platformMailer');
 const { hashPassword } = require('../lib/password');
 const { createToken } = require('../lib/impersonation');
 const { isBlocked, recordFailure, recordSuccess } = require('../middleware/rateLimiter');
 const { wrap } = require('../lib/wrap');
+const { logActivity } = require('../lib/activityLog');
 
 const router = express.Router();
 
@@ -99,8 +101,7 @@ router.post('/salons', requireSuperAdmin, wrap(async (req, res) => {
     return res.status(400).json({ error: 'Adresse email invalide' });
   }
 
-  const [[existing]] = await pool.query('SELECT id FROM salons WHERE slug = ?', [slug]);
-  if (existing) return res.status(409).json({ error: 'Cet identifiant est déjà utilisé' });
+  if (await slugTaken(slug)) return res.status(409).json({ error: 'Cet identifiant est déjà utilisé' });
 
   if (email) {
     const [[existingEmail]] = await pool.query('SELECT id FROM owners WHERE email = ?', [email]);
@@ -244,14 +245,46 @@ router.get('/overview', requireSuperAdmin, wrap(async (req, res) => {
  * Enseignes (propriétaires) avec leurs salons regroupés dessous — la
  * vraie unité de gestion pour la plateforme, plutôt que des salons isolés.
  */
+/**
+ * Change l'identifiant (slug) d'un salon. L'ANCIEN reste valable pour toujours (alias) : les liens deja distribues -
+ * celui des clients, les liens d'annulation et de confirmation deja envoyes par e-mail, les favoris, les QR codes -
+ * continuent de mener au meme salon. Seul le super-admin peut le faire : l'identifiant fait partie des liens publics.
+ * Un ancien identifiant reste reserve (voir slugTaken) ; revenir a l'un des anciens identifiants de CE salon est permis.
+ */
+router.put('/salons/:id/slug', requireSuperAdmin, wrap(async (req, res) => {
+  const slug = String(req.body.slug || '').trim();
+  if (!slug) return res.status(400).json({ error: 'Identifiant requis' });
+  if (slug.length > 80 || !/^[a-z0-9-]+$/.test(slug)) {
+    return res.status(400).json({ error: "L'identifiant ne doit contenir que des lettres minuscules, chiffres et tirets (80 caractères au plus)" });
+  }
+  const [[salon]] = await pool.query('SELECT id, name, slug FROM salons WHERE id = ?', [req.params.id]);
+  if (!salon) return res.status(404).json({ error: 'Salon introuvable' });
+  if (salon.slug === slug) return res.json({ ok: true, slug, previous: slug, unchanged: true });
+  if (await slugTaken(slug, salon.id)) return res.status(409).json({ error: 'Cet identifiant est déjà utilisé' });
+
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    await conn.query('DELETE FROM salon_slug_aliases WHERE slug = ? AND salon_id = ?', [slug, salon.id]);   // retour a un ancien identifiant : il redevient l'actuel
+    await conn.query('INSERT IGNORE INTO salon_slug_aliases (slug, salon_id) VALUES (?, ?)', [salon.slug, salon.id]);   // l'actuel devient un ancien identifiant
+    await conn.query('UPDATE salons SET slug = ? WHERE id = ?', [slug, salon.id]);
+    await conn.commit();
+  } catch (e) { await conn.rollback(); throw e; } finally { conn.release(); }
+  logActivity(salon.id, 'salon_slug_change', 'Identifiant "' + salon.slug + '" remplacé par "' + slug + '" (l\'ancien reste valable)');
+  res.json({ ok: true, slug, previous: salon.slug });
+}));
+
 router.get('/owners', requireSuperAdmin, wrap(async (req, res) => {
   const [owners] = await pool.query(
     'SELECT id, name, email, active, created_at FROM owners ORDER BY created_at DESC'
   );
   const [salons] = await pool.query('SELECT id, owner_id, name, slug, is_default, active FROM salons');
+  const [aliases] = await pool.query('SELECT slug, salon_id FROM salon_slug_aliases ORDER BY created_at');
 
   const items = owners.map((o) => Object.assign({}, o, {
-    salons: salons.filter((s) => s.owner_id === o.id)
+    salons: salons.filter((s) => s.owner_id === o.id).map((s) => Object.assign({}, s, {
+      old_slugs: aliases.filter((a) => a.salon_id === s.id).map((a) => a.slug)
+    }))
   }));
 
   res.json({ ok: true, items });

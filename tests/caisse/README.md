@@ -67,4 +67,6 @@ node tests/caisse/33-catalogue-mouvement.js  # deplacement des articles : la lig
 node tests/caisse/34-compte-client-inscription.js  # compte client : inscription sur base STRICTE (owner_id), parcours complet, 'Renvoyer le lien', ecran ; aucune requete INSERT n'oublie une colonne obligatoire
 node tests/caisse/35-adresse-sans-salon.js  # compte.html / rdv.html sans ?salon= : 'Lien incomplet' si plusieurs salons (serveur + pages) ; creation de salon fermee ; un seul salon : inchange
 node tests/caisse/36-installation-salon-par-defaut.js  # schema rejoue a chaque demarrage : 'Le Salon'/'change-moi' et les donnees de depart ne se creent que sur une base VIERGE (jamais sur une instance en service)
+node tests/caisse/37-identifiant-salon-alias.js  # changer l'identifiant (slug) d'un salon : l'ancien reste valable (alias) et reserve ; super-admin seulement
+node tests/caisse/38-logo-connexion-et-ecran-identifiant.js  # logo du salon dans l'icone de connexion du dashboard (sans eclair) ; bouton 'Identifiant' du super-admin
 ```

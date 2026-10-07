@@ -2,6 +2,17 @@
 <html lang="fr" data-theme="light">
 <head>
 <script>
+  // Adresse d'un salon precis (?salon=...) : l'icone du formulaire de connexion est cachee le temps de savoir si ce salon a
+  // un LOGO (voir setLoginIconLogo) - pour ne jamais montrer, meme une fraction de seconde, l'icone par defaut puis le logo.
+  // Sans ?salon= (connexion generique) : l'icone par defaut s'affiche tout de suite. Filet de securite : 2,5 s.
+  try {
+    if (new URLSearchParams(window.location.search).get('salon')) {
+      document.documentElement.classList.add('login-icon-pending');
+      setTimeout(function () { document.documentElement.classList.remove('login-icon-pending'); }, 2500);
+    }
+  } catch (e) {}
+</script>
+<script>
   // Anti-flash de theme : applique le mode sombre AVANT le premier
   // affichage si necessaire (au lieu d'attendre le chargement d'app.js,
   // ce qui provoquait un flash visible du mode clair a chaque
@@ -664,6 +675,9 @@
   .quick-action.danger { color: var(--red); }
   .item-actions .btn { font-size: 14px; padding: 9px 16px; }
   .item-actions .btn-delete { color: var(--red); }
+  /* Icone du formulaire de connexion : cachee (sans decaler la page) tant qu'on ne sait pas si le salon a un logo. */
+  .auth-glow-icon { transition: opacity .2s ease; }
+  html.login-icon-pending .auth-glow-icon { opacity: 0; }
   /* Poignee de deplacement des listes du catalogue (souris, doigt, stylet). touch-action:none : sans cela,
      faire glisser au doigt ferait defiler la page au lieu de deplacer l'element. */
   .drag-handle {
@@ -1288,7 +1302,7 @@
     </div>
     <div class="auth-form-side">
       <div class="auth-form-card">
-        <div class="auth-glow-icon">
+        <div class="auth-glow-icon" id="auth-glow-icon">
           <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M19 9V6a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v3"/><path d="M3 16a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2z"/><path d="M5 18v2"/><path d="M19 18v2"/></svg>
         </div>
         <h1 class="auth-title">Dashboard</h1>
@@ -2443,6 +2457,23 @@ function applySidebarBrand(name, logoUrl) {
 
 function brandCacheKey() { return 'salon-brand:' + (typeof SALON_SLUG === 'string' ? SALON_SLUG : ''); }
 
+/**
+ * Logo du salon dans l'icone du formulaire de connexion (comme sur la page "Mon compte" des clients). Sans logo, l'icone
+ * d'origine est conservee ou retablie. Meme regle que l'image de gauche : le logo n'est utilise que sur l'adresse d'un
+ * salon PRECIS ; sur la connexion generique (sans ?salon=), c'est l'icone de la plateforme.
+ */
+function setLoginIconLogo(icon, logoUrl) {
+  if (!icon) return;
+  if (icon.__defaultHtml === undefined) icon.__defaultHtml = icon.innerHTML;   // l'icone d'origine, retenue une fois pour toutes
+  if (logoUrl) {
+    icon.style.background = 'url("' + logoUrl + '") center/cover';
+    icon.innerHTML = '';
+  } else {
+    icon.style.background = '';
+    icon.innerHTML = icon.__defaultHtml;
+  }
+}
+
 function loadCurrentSalonName() {
   // Affichage instantane du dernier logo/nom connu de CETTE enseigne (memoire
   // de session) ; s'il n'y en a pas, le bloc reste vide plutot que de montrer
@@ -2510,6 +2541,8 @@ function loadCurrentSalonName() {
           document.getElementById('acc-accent-color-hex').textContent = d.accent_color;
         }
       }
+      setLoginIconLogo(document.getElementById('auth-glow-icon'), SALON_SLUG ? currentSalonLogo : '');
+      document.documentElement.classList.remove('login-icon-pending');   // on sait maintenant : logo ou icone d'origine
       currentLoginImage = d.login_image_url || '';
       var visualPanel = document.getElementById('auth-visual-panel');
       // Sans salon precis dans l'URL (ecran de connexion generique), on
@@ -2566,7 +2599,7 @@ function loadCurrentSalonName() {
       }
       renderBarbers();
     })
-    .catch(function () {});
+    .catch(function () { document.documentElement.classList.remove('login-icon-pending'); });
 }
 loadCurrentSalonName();
 

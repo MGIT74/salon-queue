@@ -1,6 +1,7 @@
 const express = require('express');
 const crypto = require('crypto');
 const { pool } = require('../db');
+const { slugTaken } = require('../lib/slugs');
 const { hashPassword, verifyPassword } = require('../lib/password');
 const { sendPasswordReset, sendVerificationEmail } = require('../lib/platformMailer');
 const { loginRateLimiter, signupRateLimiter } = require('../middleware/rateLimiter');
@@ -45,8 +46,7 @@ router.get('/check-slug', requireSignupEnabled, signupRateLimiter('signup-check-
   if (!slug || !/^[a-z0-9-]+$/.test(slug)) {
     return res.json({ ok: true, available: false, reason: 'invalid' });
   }
-  const [[existing]] = await pool.query('SELECT id FROM salons WHERE slug = ?', [slug]);
-  res.json({ ok: true, available: !existing });
+  res.json({ ok: true, available: !(await slugTaken(slug)) });
 }));
 
 // Création de compte : fortement limitée par IP (5/h) - c'est une route
@@ -74,8 +74,7 @@ router.post('/', requireSignupEnabled, signupRateLimiter('signup'), wrap(async (
     return res.status(400).json({ error: 'Adresse email invalide' });
   }
 
-  const [[existingSlug]] = await pool.query('SELECT id FROM salons WHERE slug = ?', [slug]);
-  if (existingSlug) return res.status(409).json({ error: 'Cet identifiant de salon est déjà utilisé' });
+  if (await slugTaken(slug)) return res.status(409).json({ error: 'Cet identifiant de salon est déjà utilisé' });
 
   const [[existingEmail]] = await pool.query('SELECT id FROM owners WHERE email = ?', [email]);
   if (existingEmail) return res.status(409).json({ error: 'Un compte existe déjà avec cet email' });

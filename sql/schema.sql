@@ -1126,3 +1126,17 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'products' AND column_name = 'deleted_at');
 SET @sql := IF(@c = 0, 'ALTER TABLE products ADD COLUMN deleted_at DATETIME NULL', 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- ============================================================
+-- Anciens identifiants (slugs) de salons
+-- ============================================================
+-- Quand l'identifiant d'un salon change (super-admin), l'ancien reste valable pour TOUJOURS et mene au meme salon :
+-- le lien deja donne aux clients (?salon=ancien), les liens d'annulation et de confirmation deja envoyes par e-mail,
+-- les favoris de l'equipe, les QR codes... continuent de fonctionner. Un ancien identifiant reste aussi RESERVE : aucun
+-- autre salon ne peut le reprendre (sinon il detournerait ces liens).
+CREATE TABLE IF NOT EXISTS salon_slug_aliases (
+  slug VARCHAR(80) NOT NULL PRIMARY KEY,
+  salon_id CHAR(36) NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
