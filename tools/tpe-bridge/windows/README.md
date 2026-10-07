@@ -17,7 +17,7 @@ manipulation quotidienne.
    - copie le pont dans `C:\TPE-Bridge`
    - ouvre le pare-feu pour le TPE/l'impression
    - programme le **démarrage automatique** à chaque boot de Windows
-4. Une **petite fenêtre** (pas un terminal) s'ouvre pour les 5 derniers
+4. Une **petite fenêtre** (pas un terminal) s'ouvre pour les derniers
    réglages — copier/coller normal (Ctrl+V ou clic droit fonctionnent,
    contrairement à un terminal classique) :
    - Adresse de l'app : déjà pré-remplie (`https://rdv.handsgraphic.com`)
@@ -28,6 +28,10 @@ manipulation quotidienne.
    - Nom de partage de l'imprimante : déjà pré-rempli si le partage
      automatique a réussi
    - IP du TPE : facultatif à ce stade
+   - Numéro de caisse du TPE : celui du ticket de config (souvent `2`)
+   - Port du TPE : le « Port d'écoute TPE » du menu **Protocole caisse** du
+     terminal (`8888` par défaut ; `20002` sur les DX8000 Nepting). Le TPE
+     doit être réglé sur **Concert** + case **Version 3**, lien **IP**.
 5. Cliquer sur **"Valider et démarrer"** — le pont se lance immédiatement.
 
 C'est fini. Le pont tourne en arrière-plan, tout de suite et à chaque

@@ -37,7 +37,7 @@ if ([string]::IsNullOrWhiteSpace($autoShare) -and $existingCfg) { $autoShare = $
 
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "TPE Bridge - Configuration"
-$form.Size = [System.Drawing.Size]::new(480, 510)
+$form.Size = [System.Drawing.Size]::new(480, 560)
 $form.StartPosition = "CenterScreen"
 $form.FormBorderStyle = "FixedDialog"
 $form.MaximizeBox = $false
@@ -74,6 +74,9 @@ $defaultTpeIp = if ($existingCfg) { $existingCfg.tpeIp } else { "" }
 # la valeur la plus courante, gardee par defaut pour ne rien changer aux
 # installations existantes qui marchaient deja avec ce reglage.
 $defaultTpePos = if ($existingCfg -and $existingCfg.tpePos) { $existingCfg.tpePos } else { "2" }
+# Port Concert du TPE : "Port d'ecoute TPE" dans le menu Protocole caisse du
+# terminal (ex. 20002 sur les DX8000 Nepting). 8888 reste le defaut du pont.
+$defaultTpePort = if ($existingCfg -and $existingCfg.tpePort) { $existingCfg.tpePort } else { "8888" }
 
 $tbServer = Add-Field "Adresse de votre application" 55 $defaultServer
 $tbSalon = Add-Field "Identifiant du salon (celui dans l'URL ?salon=...)" 105 $defaultSalon
@@ -81,16 +84,17 @@ $tbKey = Add-Field "Cle du pont (Dashboard > Reglages > Terminal de paiement)" 1
 $tbPrinter = Add-Field "Nom de partage de l'imprimante" 205 $autoShare
 $tbTpeIp = Add-Field "IP du TPE (facultatif, laisser vide si pas encore configure)" 255 $defaultTpeIp
 $tbTpePos = Add-Field "Numero de caisse du TPE (voir son ticket, souvent 2)" 305 $defaultTpePos
+$tbTpePort = Add-Field "Port du TPE (TPE > Protocole caisse > Port d'ecoute TPE)" 355 $defaultTpePort
 
 $lblStatus = New-Object System.Windows.Forms.Label
-$lblStatus.Location = [System.Drawing.Point]::new(20, 350)
+$lblStatus.Location = [System.Drawing.Point]::new(20, 400)
 $lblStatus.Size = [System.Drawing.Size]::new(430, 20)
 $lblStatus.ForeColor = [System.Drawing.Color]::Firebrick
 $form.Controls.Add($lblStatus)
 
 $btnOk = New-Object System.Windows.Forms.Button
 $btnOk.Text = "Valider et demarrer"
-$btnOk.Location = [System.Drawing.Point]::new(20, 380)
+$btnOk.Location = [System.Drawing.Point]::new(20, 430)
 $btnOk.Size = [System.Drawing.Size]::new(200, 36)
 $btnOk.Font = [System.Drawing.Font]::new("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
 $btnOk.Add_Click({
@@ -106,6 +110,7 @@ $btnOk.Add_Click({
         printer = $tbPrinter.Text.Trim()
         tpeIp   = $tbTpeIp.Text.Trim()
         tpePos  = $tbTpePos.Text.Trim()
+        tpePort = $tbTpePort.Text.Trim()
     }
     $json = $cfg | ConvertTo-Json
     # Set-Content -Encoding UTF8 ajoute un BOM invisible en tete de fichier
@@ -120,14 +125,14 @@ $form.AcceptButton = $btnOk
 
 $btnCancel = New-Object System.Windows.Forms.Button
 $btnCancel.Text = "Annuler"
-$btnCancel.Location = [System.Drawing.Point]::new(230, 380)
+$btnCancel.Location = [System.Drawing.Point]::new(230, 430)
 $btnCancel.Size = [System.Drawing.Size]::new(120, 36)
 $btnCancel.Add_Click({ $form.Tag = "cancel"; $form.Close() })
 $form.Controls.Add($btnCancel)
 
 $lblNote = New-Object System.Windows.Forms.Label
 $lblNote.Text = "La cle et l'identifiant du salon se trouvent dans le Dashboard,`nsous Reglages > Terminal de paiement > Generer la cle du pont."
-$lblNote.Location = [System.Drawing.Point]::new(20, 425)
+$lblNote.Location = [System.Drawing.Point]::new(20, 475)
 $lblNote.Size = [System.Drawing.Size]::new(430, 40)
 $lblNote.ForeColor = [System.Drawing.Color]::Gray
 $form.Controls.Add($lblNote)
