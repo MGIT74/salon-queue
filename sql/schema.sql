@@ -33,15 +33,22 @@ CREATE TABLE IF NOT EXISTS salons (
 -- Le propriétaire et le salon par défaut : sert de secours quand une page
 -- est ouverte sans ?salon=... dans l'URL (rétro-compatibilité avec les
 -- bornes déjà configurées avant l'ajout du multi-salon).
+-- UNIQUEMENT sur une base VIERGE (aucun proprietaire) : @fresh est calcule UNE fois, avant toute creation. Avant, la
+-- condition etait "aucun salon par defaut" : or ce schema est rejoue a CHAQUE demarrage, donc supprimer l'enseigne
+-- qui possede ce salon faisait REAPPARAITRE un proprietaire "Le Salon" avec le mot de passe connu 'change-moi' au
+-- prochain demarrage ; et, s'il restait d'autres enseignes, le nouveau salon etait rattache a l'une d'elles.
+-- Une instance deja en service (au moins un proprietaire) ne recoit donc plus jamais ce salon d'attente.
+SET @fresh := (SELECT COUNT(*) = 0 FROM owners);
+
 INSERT INTO owners (id, name, admin_password)
 SELECT UUID(), 'Le Salon', 'change-moi'
-WHERE NOT EXISTS (SELECT 1 FROM salons WHERE is_default = 1);
+WHERE @fresh = 1;
 
 SET @seed_owner_id = (SELECT id FROM owners ORDER BY created_at DESC LIMIT 1);
 
 INSERT INTO salons (id, owner_id, name, slug, is_default)
 SELECT UUID(), @seed_owner_id, 'Le Salon', 'le-salon', 1
-WHERE NOT EXISTS (SELECT 1 FROM salons WHERE is_default = 1);
+WHERE @fresh = 1;
 
 CREATE TABLE IF NOT EXISTS barbers (
   id CHAR(36) PRIMARY KEY,
@@ -183,6 +190,10 @@ CREATE TABLE IF NOT EXISTS platform_settings (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ---------- Données de départ pour le salon par défaut ----------
+-- Premiere installation SEULEMENT (@fresh, calcule plus haut). Avant, elles etaient re-inserees a chaque demarrage des
+-- que le salon par defaut n'avait plus de prestation (ou de supplement) : supprimer tous les supplements d'un salon les
+-- faisait revenir au deploiement suivant. Et sans salon par defaut (@default_salon_id NULL), ces insertions faisaient
+-- echouer tout le demarrage.
 SET @default_salon_id = (SELECT id FROM salons WHERE is_default = 1 LIMIT 1);
 
 INSERT INTO services (id, salon_id, name, duration_min, price_cents, sort_order)
@@ -193,7 +204,7 @@ FROM (
   UNION ALL SELECT 'Coupe et barbe', 45, 2800, 3
   UNION ALL SELECT 'Coupe enfant', 20, 1500, 4
 ) v
-WHERE NOT EXISTS (SELECT 1 FROM services WHERE salon_id = @default_salon_id);
+WHERE @fresh = 1 AND @default_salon_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM services WHERE salon_id = @default_salon_id);
 
 INSERT INTO extras (id, salon_id, name, duration_min, price_cents, sort_order)
 SELECT UUID(), @default_salon_id, v.name, v.duration_min, v.price_cents, v.sort_order
@@ -205,7 +216,7 @@ FROM (
   UNION ALL SELECT 'Coloration', 25, 2000, 5
   UNION ALL SELECT 'Soin barbe à l''huile', 10, 1000, 6
 ) v
-WHERE NOT EXISTS (SELECT 1 FROM extras WHERE salon_id = @default_salon_id);
+WHERE @fresh = 1 AND @default_salon_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM extras WHERE salon_id = @default_salon_id);
 
 INSERT INTO settings (salon_id, `key`, value)
 SELECT @default_salon_id, v.k, v.val FROM (
@@ -217,6 +228,7 @@ SELECT @default_salon_id, v.k, v.val FROM (
   UNION ALL SELECT 'smtp_pass', ''
   UNION ALL SELECT 'smtp_from', ''
 ) v
+WHERE @fresh = 1 AND @default_salon_id IS NOT NULL
 ON DUPLICATE KEY UPDATE `key` = VALUES(`key`);
 
 -- Notes sur un client (préférences, habitudes...), pour qu'un coiffeur

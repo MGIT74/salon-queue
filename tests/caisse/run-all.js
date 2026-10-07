@@ -55,7 +55,8 @@ const suite = [
   ['32-schema-applique-au-demarrage.js', false, ['exit']],
   ['33-catalogue-mouvement.js', false, ['exit']],
   ['34-compte-client-inscription.js', false, ['exit']],
-  ['35-adresse-sans-salon.js', false, ['exit']]
+  ['35-adresse-sans-salon.js', false, ['exit']],
+  ['36-installation-salon-par-defaut.js', false, ['exit']]
 ];
 
 let bad = 0;

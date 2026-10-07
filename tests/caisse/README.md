@@ -66,4 +66,5 @@ node tests/caisse/32-schema-applique-au-demarrage.js  # le serveur applique sche
 node tests/caisse/33-catalogue-mouvement.js  # deplacement des articles : la ligne suit le pointeur, les autres glissent (FLIP), elle se pose ; 'reduire les animations' respecte
 node tests/caisse/34-compte-client-inscription.js  # compte client : inscription sur base STRICTE (owner_id), parcours complet, 'Renvoyer le lien', ecran ; aucune requete INSERT n'oublie une colonne obligatoire
 node tests/caisse/35-adresse-sans-salon.js  # compte.html / rdv.html sans ?salon= : 'Lien incomplet' si plusieurs salons (serveur + pages) ; creation de salon fermee ; un seul salon : inchange
+node tests/caisse/36-installation-salon-par-defaut.js  # schema rejoue a chaque demarrage : 'Le Salon'/'change-moi' et les donnees de depart ne se creent que sur une base VIERGE (jamais sur une instance en service)
 ```
