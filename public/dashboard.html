@@ -672,7 +672,11 @@
     cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none;
   }
   .drag-handle:hover, .drag-handle:focus-visible { background: var(--fill); color: var(--ink); outline: none; }
-  .item.dragging { background: var(--fill); box-shadow: 0 8px 24px rgba(0,0,0,.18); position: relative; z-index: 2; }
+  /* Ligne tenue : soulevee, elle suit le pointeur SANS retard (pas de transition). Une fois lachee ("settling"),
+     elle se pose en douceur. Les autres lignes glissent via des transitions posees par le script (technique FLIP). */
+  .item.dragging { transition: none !important; background: var(--fill); box-shadow: 0 16px 36px rgba(0,0,0,.32); position: relative; z-index: 5; }
+  .item.settling { transition: transform .22s cubic-bezier(.2,.8,.2,1), box-shadow .22s ease; background: var(--fill); box-shadow: 0 16px 36px rgba(0,0,0,.32); position: relative; z-index: 5; }
+  @media (prefers-reduced-motion: reduce) { .item, .item.settling { transition: none !important; } }
   body.sorting, body.sorting * { cursor: grabbing !important; user-select: none; -webkit-user-select: none; }
 
   /* Listes Marketing (fidélité, cadeaux) : séparateur discret entre
@@ -3924,7 +3928,9 @@ function persistCatalogOrder(table) {
 
 /**
  * Deplacer un article : glisser la poignee (souris, doigt, stylet) ou, au clavier, fleches haut/bas sur la
- * poignee. Delegation d'evenements sur la liste (une seule fois, meme si la liste est redessinee).
+ * poignee. La ligne tenue SUIT le pointeur (soulevee, avec une ombre), les autres GLISSENT pour lui faire de
+ * la place, et elle SE POSE a l'arrivee. Delegation d'evenements sur la liste (une seule fois, meme si la
+ * liste est redessinee).
  * La capture du pointeur est prise sur la LISTE et non sur la poignee : l'element deplace change de place
  * dans la page pendant le glissement, et un element qui change de place perd sa capture.
  */
@@ -3933,16 +3939,64 @@ function initCatalogSort(table) {
   if (!list || list.__sortReady) return;
   list.__sortReady = true;
   var drag = null, kbTimer = null;
+  // Si le systeme demande de reduire les animations, rien ne glisse : les lignes changent de place d'un coup.
+  var calm = Boolean(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 
+  function rows(except) { return [].slice.call(list.querySelectorAll('.item[data-id]')).filter(function (el) { return el !== except; }); }
+  function orderKey() { return rows().map(function (el) { return el.dataset.id; }).join(','); }
+  // Decalage vertical actuellement applique a une ligne : pendant qu'elle glisse, son rectangle l'inclut.
+  function shiftOf(el) {
+    var t = window.getComputedStyle(el).transform;
+    var m = t && t !== 'none' && t.match(/matrix(3d)?\(([^)]+)\)/);
+    if (!m) return 0;
+    var v = m[2].split(',').map(parseFloat);
+    return m[1] ? v[13] : v[5];
+  }
+
+  /**
+   * Change l'ordre des lignes EN DOUCEUR (technique "FLIP") : on note ou chaque ligne se trouve, on change
+   * l'ordre, puis chaque ligne qui a bouge part de son ancienne position et glisse vers la nouvelle. Une ligne
+   * deja en train de glisser repart de l'endroit ou elle se trouve reellement (pas de saut).
+   */
+  function animateMove(mutate, except) {
+    if (calm) { mutate(); return; }
+    var els = rows(except);
+    var before = els.map(function (el) { return el.getBoundingClientRect().top; });
+    mutate();
+    els.forEach(function (el) { el.style.transition = 'none'; el.style.transform = ''; });   // met de cote les glissements en cours
+    var moving = [];
+    els.forEach(function (el, i) {
+      var d = before[i] - el.getBoundingClientRect().top;
+      if (Math.abs(d) > 1) { el.style.transform = 'translateY(' + d + 'px)'; moving.push(el); }
+    });
+    void list.offsetHeight;   // fige l'etat de depart avant de lancer le glissement
+    els.forEach(function (el) { if (moving.indexOf(el) === -1) el.style.transition = ''; });   // les lignes qui ne bougent pas ne gardent aucun reste
+    moving.forEach(function (el) {
+      el.style.transition = 'transform .2s cubic-bezier(.2,.8,.2,1)';
+      el.style.transform = '';
+      var token = el.__flip = (el.__flip || 0) + 1;
+      setTimeout(function () { if (el.__flip === token) el.style.transition = ''; }, 260);
+    });
+  }
+
+  // La ligne tenue SUIT le pointeur (elle ne saute pas de case en case) : on la decale de l'ecart entre sa
+  // place dans la liste et l'endroit ou le pointeur la tient. Elle est un peu soulevee (ombre, leger agrandissement).
+  function placeDragged() {
+    var it = drag.item;
+    it.style.transform = 'none';
+    var natural = it.getBoundingClientRect().top;
+    it.style.transform = 'translateY(' + (drag.lastY - drag.grabDy - natural) + 'px) scale(1.012)';
+  }
   function reposition() {
     if (!drag) return;
-    var after = null, items = [].slice.call(list.querySelectorAll('.item[data-id]')).filter(function (el) { return el !== drag.item; });
+    var center = drag.lastY - drag.grabDy + drag.height / 2, items = rows(drag.item), after = null;
     for (var i = 0; i < items.length; i++) {
       var r = items[i].getBoundingClientRect();
-      if (drag.lastY < r.top + r.height / 2) { after = items[i]; break; }
+      if (center < r.top - shiftOf(items[i]) + r.height / 2) { after = items[i]; break; }   // milieu SANS le glissement en cours : pas de va-et-vient
     }
-    if (after === null) { if (list.lastElementChild !== drag.item) list.appendChild(drag.item); }
-    else if (after !== drag.item.nextElementSibling) list.insertBefore(drag.item, after);
+    var moved = after === null ? list.lastElementChild !== drag.item : after !== drag.item.nextElementSibling;
+    if (moved) animateMove(function () { if (after === null) list.appendChild(drag.item); else list.insertBefore(drag.item, after); }, drag.item);
+    placeDragged();
   }
   function autoScroll() {   // pres du bord de l'ecran, la page defile toute seule (longues listes)
     if (!drag) return;
@@ -3952,16 +4006,18 @@ function initCatalogSort(table) {
     else return;
     reposition();
   }
-  function orderKey() { return [].slice.call(list.querySelectorAll('.item[data-id]')).map(function (el) { return el.dataset.id; }).join(','); }
 
   list.addEventListener('pointerdown', function (e) {
     var handle = e.target.closest && e.target.closest('.drag-handle');
     if (!handle || drag || (e.pointerType === 'mouse' && e.button !== 0)) return;
     var item = handle.closest('.item'); if (!item) return;
     e.preventDefault();
-    drag = { item: item, pointerId: e.pointerId, lastY: e.clientY, before: orderKey(), timer: setInterval(autoScroll, 16) };
+    var rect = item.getBoundingClientRect();
+    drag = { item: item, pointerId: e.pointerId, lastY: e.clientY, grabDy: e.clientY - rect.top, height: rect.height, before: orderKey(), timer: setInterval(autoScroll, 16) };
     try { list.setPointerCapture(e.pointerId); } catch (x) { /* pas de capture : le glissement marche quand meme tant que le pointeur reste sur la liste */ }
-    item.classList.add('dragging'); document.body.classList.add('sorting');
+    item.style.transition = ''; item.style.boxShadow = '';
+    item.classList.remove('settling'); item.classList.add('dragging'); document.body.classList.add('sorting');
+    placeDragged();
   });
   list.addEventListener('pointermove', function (e) {
     if (!drag || e.pointerId !== drag.pointerId) return;
@@ -3970,23 +4026,33 @@ function initCatalogSort(table) {
   function end(e) {
     if (!drag || e.pointerId !== drag.pointerId) return;
     clearInterval(drag.timer);
-    drag.item.classList.remove('dragging'); document.body.classList.remove('sorting');
+    var it = drag.item, changed = orderKey() !== drag.before; drag = null;
+    document.body.classList.remove('sorting');
     try { list.releasePointerCapture(e.pointerId); } catch (x) { /* deja relache */ }
-    var changed = orderKey() !== drag.before; drag = null;
+    it.classList.remove('dragging');
+    if (calm) { it.style.transform = ''; }
+    else {
+      // La ligne se POSE dans son emplacement : elle glisse de l'endroit ou on l'a lachee vers sa place, en perdant son ombre.
+      it.classList.add('settling');
+      void it.offsetHeight;
+      it.style.transform = 'translateY(0) scale(1)'; it.style.boxShadow = '0 0 0 rgba(0,0,0,0)';
+      setTimeout(function () { it.classList.remove('settling'); it.style.transform = ''; it.style.boxShadow = ''; }, 260);
+    }
     if (changed) persistCatalogOrder(table);
   }
   list.addEventListener('pointerup', end);
   list.addEventListener('pointercancel', end);
 
-  // Clavier : sur la poignee, fleche haut / bas deplace l'element d'un cran.
+  // Clavier : sur la poignee, fleche haut / bas deplace l'element d'un cran (en glissant, lui aussi).
   list.addEventListener('keydown', function (e) {
     var handle = e.target.closest && e.target.closest('.drag-handle');
     if (!handle || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
     var item = handle.closest('.item'); if (!item) return;
     e.preventDefault();
-    if (e.key === 'ArrowUp' && item.previousElementSibling) list.insertBefore(item, item.previousElementSibling);
-    else if (e.key === 'ArrowDown' && item.nextElementSibling) list.insertBefore(item.nextElementSibling, item);
-    else return;
+    var up = e.key === 'ArrowUp';
+    if (up && !item.previousElementSibling) return;
+    if (!up && !item.nextElementSibling) return;
+    animateMove(function () { if (up) list.insertBefore(item, item.previousElementSibling); else list.insertBefore(item.nextElementSibling, item); });
     handle.focus();
     clearTimeout(kbTimer); kbTimer = setTimeout(function () { persistCatalogOrder(table); }, 600);   // on attend la fin d'une serie de fleches
   });
