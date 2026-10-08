@@ -1,4 +1,4 @@
-// Calendrier maison (ordinateur) : remplace la fenetre native des champs date ; valeur AAAA-MM-JJ + evenements input/change conserves.
+// Calendrier maison (ordinateur) : remplace la fenetre native des champs date ; valeur AAAA-MM-JJ + evenements input/change conserves. + Mon compte : barre Suivant au-dessus du menu du bas.
 const fs = require('fs'), path = require('path');
 const rd = (f) => fs.readFileSync(path.join(__dirname, '../../' + f), 'utf8');
 const app = rd('public/app.js'), css = rd('public/app.css');
@@ -11,5 +11,8 @@ check('ecoute globale : fonctionne aussi pour les champs ajoutes apres coup (mod
 check('respecte min / max, Aujourd\'hui, Effacer, Echap, choix du mois', /getAttribute\('min'\)/.test(blk) && /getAttribute\('max'\)/.test(blk) && /a === 'today'/.test(blk) && /a === 'clear'/.test(blk) && /Escape/.test(blk) && /dp-months/.test(blk));
 check('semaine commençant le lundi, mois en francais', /'lu', 'ma', 'me', 'je', 've', 'sa', 'di'/.test(blk) && /'août'/.test(blk));
 check('CSS : fenetre aux couleurs du theme (clair / sombre via variables), icone calendrier, indicateur natif masque sur ordinateur', /\.dp-pop \{[^}]*var\(--card\)/.test(css) && /::-webkit-calendar-picker-indicator \{ display: none/.test(css));
+const compte = rd('public/compte.html');
+check('Mon compte mobile : la barre Suivant se colle AU-DESSUS du menu du bas (hauteur mesuree), jamais dessous', /body\.has-footer \.step-bar \{ bottom: var\(--footer-h/.test(compte) && /setProperty\('--footer-h'/.test(compte) && /new ResizeObserver\(sync\)/.test(compte));
+
 console.log('\n' + pass + ' OK, ' + fail + ' ECHEC');
 process.exit(fail ? 1 : 0);

@@ -222,7 +222,9 @@
   }
   .client-footer button .ic { display: block; }
   .client-footer button.on { color: var(--blue); font-weight: 600; }
-  body.has-footer .wrap { padding-bottom: 90px; }
+  body.has-footer .wrap { padding-bottom: calc(var(--footer-h, 72px) + 24px); }
+  /* Barre Suivant des etapes de reservation : elle se colle AU-DESSUS du menu du bas (hauteur mesuree en JS), jamais dessous. */
+  body.has-footer .step-bar { bottom: var(--footer-h, 72px); margin-bottom: 0; padding-bottom: 14px; }
 
   /* Barre du bas remplacée par un simple bouton Annuler pendant les
      étapes créneau/confirmation d'une réservation par cadeau - le
@@ -1609,6 +1611,26 @@ function guardMissingSalon() {
   // de connexion, laissant apparaître l'ancien en-tête vide en bas de
   // page.
   show('p-login');
+})();
+</script>
+<script>
+/* Mesure la hauteur reelle du menu du bas (Accueil / Reserver / Compte, ou barre "Annuler" du cadeau) pour que la barre
+   Suivant des etapes de reservation ne passe jamais dessous : --footer-h = 0 quand aucun menu n'est affiche. */
+(function () {
+  function sync() {
+    var h = 0;
+    document.querySelectorAll('.client-footer, .client-footer-gift-lock').forEach(function (f) {
+      if (getComputedStyle(f).display !== 'none') h = Math.max(h, f.offsetHeight);
+    });
+    document.documentElement.style.setProperty('--footer-h', h + 'px');
+  }
+  if (window.ResizeObserver) {
+    var ro = new ResizeObserver(sync);
+    document.querySelectorAll('.client-footer, .client-footer-gift-lock').forEach(function (f) { ro.observe(f); });
+  }
+  window.addEventListener('resize', sync);
+  window.addEventListener('orientationchange', sync);
+  sync();
 })();
 </script>
 </body>
