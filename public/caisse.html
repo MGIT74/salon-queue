@@ -34,7 +34,7 @@
 <style>
   html.auth-checking #login-screen { display: none; }
 </style>
-<link rel="stylesheet" href="/app.css?v=16">
+<link rel="stylesheet" href="/app.css?v=17">
 <style>
   html, body { min-height: 100%; }
   .wrap { max-width: 1100px; margin: 0 auto; padding: 20px 18px 40px; }
@@ -842,7 +842,7 @@
   </div>
 </div>
 
-<script src="/app.js?v=13"></script>
+<script src="/app.js?v=14"></script>
 <script>requireSalonInUrl("Pour utiliser la caisse, ouvrez le lien de votre salon.");</script>
 <script>
 mountThemeButton();
@@ -3072,32 +3072,33 @@ function iconForItem(name) {
 function renderItemGrid() {
   var items = catalog[currentCat] || [];
   var typeSingular = currentCat === 'services' ? 'service' : (currentCat === 'extras' ? 'extra' : 'product');
-  document.getElementById('item-grid').innerHTML = items.length === 0
-    ? '<div class="empty">Rien à afficher ici</div>'
-    : items.map(function (it) {
-        var outOfStock = typeSingular === 'product' && it.stock_enabled && it.stock_quantity <= 0;
-        var onclickAttr = outOfStock ? '' : ' onclick="addToTicket(\'' + typeSingular + '\',\'' + it.id + '\',\'' + esc(it.name).replace(/'/g, "\\'") + '\',' + it.price_cents + ')"';
-        var disabledAttr = outOfStock ? ' disabled' : '';
-        var stockHtml = '';
-        if (typeSingular === 'product' && it.stock_enabled) {
-          stockHtml = '<div class="stock' + (outOfStock ? ' low' : '') + '">' + (outOfStock ? 'Rupture' : it.stock_quantity + ' en stock') + '</div>';
-        }
-        if (it.image_url) {
-          return '<button class="item-btn has-photo' + (outOfStock ? ' out-of-stock' : '') + '"' + onclickAttr + disabledAttr + '>' +
-            '<span class="photo-bg" style="background-image:url(&quot;' + esc(it.image_url) + '&quot;)"></span>' +
-            '<span class="overlay">' +
-              '<span class="name">' + esc(it.name) + '</span>' +
-              '<span class="price">' + eur(it.price_cents) + '</span>' +
-              stockHtml +
-            '</span></button>';
-        }
-        return '<button class="item-btn' + (outOfStock ? ' out-of-stock' : '') + '"' + onclickAttr + disabledAttr + '>' +
-          '<span class="icon">' + iconForItem(it.name) + '</span>' +
-          '<div class="name">' + esc(it.name) + '</div>' +
-          '<div class="price">' + eur(it.price_cents) + '</div>' +
-          stockHtml +
-          '</button>';
-      }).join('');
+  var grid = document.getElementById('item-grid');
+  if (items.length === 0) { grid.innerHTML = '<div class="empty">Rien à afficher ici</div>'; return; }
+  // Meme carte que la page de RDV en ligne (photo entiere, nom, duree, prix, bouton +). Un appui ajoute une unite au ticket ;
+  // une carte deja presente au ticket est surlignee (voir syncGridSel).
+  vitrineRender({
+    kind: currentCat, gridId: 'item-grid', items: items,
+    chosen: ticket.filter(function (l) { return l.item_type === typeSingular; }).map(function (l) { return l.item_id; }),
+    onclick: "addCatalogItem('" + typeSingular + "','{id}')",
+    card: { add: true, stock: true }
+  });
+}
+
+function addCatalogItem(typeSingular, id) {
+  var list = catalog[typeSingular === 'service' ? 'services' : (typeSingular === 'extra' ? 'extras' : 'products')] || [];
+  var it = list.find(function (x) { return String(x.id) === String(id); });
+  if (it) addToTicket(typeSingular, String(it.id), it.name, it.price_cents);
+}
+
+// Surligne les cartes deja presentes au ticket, sans reconstruire la grille.
+function syncGridSel() {
+  var typeSingular = currentCat === 'services' ? 'service' : (currentCat === 'extras' ? 'extra' : 'product');
+  var ids = {};
+  ticket.forEach(function (l) { if (l.item_type === typeSingular) ids[String(l.item_id)] = true; });
+  document.querySelectorAll('#item-grid .item-card').forEach(function (c) {
+    var on = !c.classList.contains('out') && !!ids[c.getAttribute('data-id')];
+    c.classList.toggle('sel', on); c.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
 }
 
 /* ---------- Ticket ---------- */
@@ -3158,6 +3159,7 @@ function renderTicket(justAddedIndex) {
   ['especes', 'cb'].forEach(function (m) {
     document.getElementById('pay-' + m).disabled = ticket.length === 0;
   });
+  syncGridSel();
   updateGiftVisibility();
   updateLoyaltyVisibility();
 }

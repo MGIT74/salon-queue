@@ -79,7 +79,7 @@ function scan(win, code, terminator) {
   console.log('\n[G] Cliquer une tuile produit (pas un champ de saisie) redonne le focus au scanner');
   d.getElementById('scan-catcher').blur();
   check('le focus est bien parti ailleurs', d.activeElement !== d.getElementById('scan-catcher'));
-  var tile = d.querySelector('.item-btn, [onclick*="addToTicket"]');
+  var tile = d.querySelector('.item-card, .item-btn, [onclick*="addToTicket"]');
   if (tile) tile.dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
   await sleep(50);
   check('le focus revient sur le scanner apres un clic sur le fond/une tuile', d.activeElement === d.getElementById('scan-catcher'), d.activeElement && d.activeElement.id);

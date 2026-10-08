@@ -774,7 +774,8 @@ function groupItems(kind, items) {
  * onclick : expression JS executee au clic ; "{id}" y est remplace par l'identifiant de l'article, ex. "toggleExtra(this,'{id}')".
  * Photo EN HAUT (entiere, jamais recadree), nom / duree / prix EN DESSOUS sur fond uni : jamais de texte pose sur un dessin.
  */
-function vitrineCardHtml(kind, it, selected, onclick) {
+function vitrineCardHtml(kind, it, selected, onclick, opts) {
+  opts = opts || {};
   var isSvc = kind === 'services';
   var out = kind === 'products' && it.stock_enabled && Number(it.stock_quantity) <= 0;
   var photo = it.image_url ? ' style="background-image:url(&quot;' + esc(it.image_url) + '&quot;)"' : ' aria-hidden="true"';
@@ -782,14 +783,14 @@ function vitrineCardHtml(kind, it, selected, onclick) {
   var meta = '';
   if (isSvc) meta = formatMinutes(it.duration_min);
   else if (kind === 'extras' && Number(it.duration_min) > 0) meta = '+' + formatMinutes(it.duration_min);
-  else if (kind === 'products' && it.stock_enabled && it.stock_quantity > 0 && it.stock_quantity <= 3) meta = 'Plus que ' + it.stock_quantity;
+  else if (kind === 'products' && it.stock_enabled && it.stock_quantity > 0 && (opts.stock || it.stock_quantity <= 3)) meta = opts.stock ? it.stock_quantity + ' en stock' : 'Plus que ' + it.stock_quantity;
   var price = (kind === 'extras' ? '+' : '') + eur(it.price_cents);
-  var action = isSvc ? '' : out ? '<span class="item-out">Épuisé</span>' : '<span class="item-add">' + VITRINE_PLUS_SVG + VITRINE_CHECK_SVG + '</span>';
+  var action = (isSvc && !opts.add) ? '' : out ? '<span class="item-out">Épuisé</span>' : '<span class="item-add">' + VITRINE_PLUS_SVG + VITRINE_CHECK_SVG + '</span>';
   var on = !out && selected;
   return '<button type="button" class="item-card' + (it.image_url ? ' has-photo' : '') + (on ? ' sel' : '') + (out ? ' out' : '') + '"' +
     ' data-id="' + it.id + '" data-name="' + esc(normText(it.name)) + '" title="' + esc(it.name) + '"' +
     ' aria-pressed="' + (on ? 'true' : 'false') + '"' + (out ? ' disabled' : ' onclick="' + String(onclick).replace(/\{id\}/g, it.id) + '"') + '>' +
-    '<span class="item-media"' + photo + '>' + icon + (isSvc ? '<span class="item-check">' + VITRINE_CHECK_SM_SVG + '</span>' : '') + '</span>' +
+    '<span class="item-media"' + photo + '>' + icon + (isSvc && !opts.add ? '<span class="item-check">' + VITRINE_CHECK_SM_SVG + '</span>' : '') + '</span>' +
     '<span class="item-body"><span class="item-name">' + esc(it.name) + '</span>' +
     (meta ? '<span class="item-meta">' + esc(meta) + '</span>' : '') +
     '<span class="item-foot"><span class="item-price">' + price + '</span>' + action + '</span></span></button>';
@@ -803,7 +804,7 @@ function vitrineRender(cfg) {
   var chosen = cfg.chosen || [];
   document.getElementById(cfg.gridId).innerHTML = groupItems(cfg.kind, cfg.items).map(function (g) {
     return (g.title ? '<div class="item-group">' + esc(g.title) + '</div>' : '') +
-      g.items.map(function (it) { return vitrineCardHtml(cfg.kind, it, chosen.indexOf(it.id) !== -1, cfg.onclick); }).join('');
+      g.items.map(function (it) { return vitrineCardHtml(cfg.kind, it, chosen.indexOf(it.id) !== -1, cfg.onclick, cfg.card); }).join('');
   }).join('');
   if (cfg.searchId) document.getElementById(cfg.searchId).style.display = cfg.items.length > 8 ? '' : 'none';
   if (cfg.qId) document.getElementById(cfg.qId).value = '';

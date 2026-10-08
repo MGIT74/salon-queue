@@ -66,7 +66,8 @@ const suite = [
   ['43-coiffeurs-en-conge.js', false, ['exit']],
   ['44-photo-coiffeur-entiere.js', false, ['exit']],
   ['45-rdv-en-ligne-3-zones.js', false, ['exit']],
-  ['46-calendrier-maison.js', false, ['exit']]
+  ['46-calendrier-maison.js', false, ['exit']],
+  ['47-caisse-cartes-vitrine.js', false, ['exit']]
 ];
 
 let bad = 0;
