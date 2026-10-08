@@ -455,3 +455,20 @@ input[type="date"] { -webkit-appearance: none; appearance: none; }
 /* Barre du bas (resume + bouton) dans une fenetre modale : la fenetre defile, la barre reste collee en bas. */
 .modal-box .step-bar { position: sticky; bottom: -26px; z-index: 5; margin: 12px -26px -26px; padding: 12px 26px 22px;
   background: var(--card); border-radius: 0 0 20px 20px; box-shadow: 0 -1px 0 var(--sep); }
+
+/* ---- Ordinateur : les etapes prestation / supplements / produits prennent toute la largeur (meme design, plus de colonnes).
+   Mobile et tablette etroite : inchanges. ---- */
+@media (min-width: 900px) {
+  .wrap:has(#p-service.on, #p-extras.on, #p-products.on, #p-book-service.on, #p-book-extras.on, #p-book-products.on) { max-width: 1080px; }
+  .wrap:has(#p-service.on, #p-extras.on, #p-products.on, #p-book-service.on, #p-book-extras.on, #p-book-products.on) .item-grid { grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 16px; }
+  .wrap:has(#p-service.on, #p-extras.on, #p-products.on, #p-book-service.on, #p-book-extras.on, #p-book-products.on) .item-name { font-size: 16px; }
+  /* Fenetres "Ajouter un RDV" (tableau de bord, Mon poste, caisse) */
+  .modal-box.modal-wide { max-width: min(1080px, 94vw); padding: 30px 32px; }
+  .modal-box.modal-wide .step-bar { bottom: -30px; margin: 12px -32px -30px; padding: 12px 32px 22px; }
+  .modal-box.modal-wide .item-grid.compact { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 14px; }
+  .modal-box.modal-wide .item-grid.compact .item-media { height: 84px; font-size: 38px; }
+  .modal-box.modal-wide .item-grid.compact .item-card.has-photo .item-media { height: auto; }
+  .modal-box.modal-wide .item-grid.compact .item-body { padding: 12px 14px 14px; }
+  .modal-box.modal-wide .item-grid.compact .item-name { font-size: 15px; }
+  .modal-box.modal-wide .item-grid.compact .item-price { font-size: 16px; }
+}

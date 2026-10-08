@@ -49,7 +49,7 @@
 <style>
   html.auth-checking #login { display: none; }
 </style>
-<link rel="stylesheet" href="/app.css?v=6">
+<link rel="stylesheet" href="/app.css?v=7">
 <style>
   .wrap { max-width: none; margin: 0; padding: clamp(16px,1.8vw,28px); }
 
@@ -5555,6 +5555,7 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
       '</div>' +
     '</div>'
   );
+  overlay.firstChild.classList.add('modal-wide');
 
   var STEPS = ['barber', 'service', 'extras', 'products', 'datetime', 'contact'];
   attachClientAutocomplete(overlay, 'aa-name', 'aa-email', 'aa-phone', api);
