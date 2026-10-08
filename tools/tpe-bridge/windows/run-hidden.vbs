@@ -104,7 +104,23 @@ If PontDejaEnCours() Then
 Else
   ' Le "0" = fenetre cachee, le "False" = ne pas attendre (le pont tourne indefiniment).
   On Error Resume Next
-  sh.Run Chr(34) & "C:\Program Files\nodejs\node.exe" & Chr(34) & " " & Chr(34) & "C:\TPE-Bridge\tpe-bridge-win.js" & Chr(34), 0, False
+  Dim nodePath, shellPath
+  nodePath = ""
+  shellPath = sh.ExpandEnvironmentStrings("%ProgramFiles%") & "\\nodejs\\node.exe"
+  If fso.FileExists(shellPath) Then nodePath = shellPath
+  If nodePath = "" Then
+    shellPath = sh.ExpandEnvironmentStrings("%ProgramFiles(x86)%") & "\\nodejs\\node.exe"
+    If fso.FileExists(shellPath) Then nodePath = shellPath
+  End If
+  If nodePath = "" Then
+    shellPath = sh.ExpandEnvironmentStrings("%ProgramW6432%") & "\\nodejs\\node.exe"
+    If fso.FileExists(shellPath) Then nodePath = shellPath
+  End If
+  If nodePath = "" Then
+    Journal "ECHEC : node.exe introuvable dans Program Files ou Program Files (x86)"
+  Else
+    sh.Run Chr(34) & nodePath & Chr(34) & " " & Chr(34) & "C:\\TPE-Bridge\\tpe-bridge-win.js" & Chr(34), 0, False
+  End If
   If Err.Number <> 0 Then
     Journal "ECHEC du lancement : " & Err.Description
     Err.Clear
