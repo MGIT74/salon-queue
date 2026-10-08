@@ -506,3 +506,8 @@ input[type="date"] { -webkit-appearance: none; appearance: none; }
 .wrap .flow-recap { background: var(--fill); border-radius: 14px; padding: 12px 14px; margin: 0 0 16px; }
 .wrap .step-bar .flow-recap { background: none; padding: 0; margin-bottom: 10px; }
 .step-bar .flow-recap:not(:empty) + .step-summary { display: none; }
+
+/* Coiffeur avec photo : photo entiere (contain) sur fond blanc, nom en dessous (rdv, Mon compte). */
+.svc-card.has-photo { padding: 0; overflow: hidden; gap: 0; justify-content: flex-start; align-items: stretch; }
+.svc-card.has-photo .barber-photo { display: block; width: 100%; aspect-ratio: 1 / 1; background-color: #fff; background-size: contain; background-repeat: no-repeat; background-position: center; }
+.svc-card.has-photo .name { padding: 10px 8px 12px; }

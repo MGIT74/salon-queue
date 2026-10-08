@@ -18,7 +18,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Prendre rendez-vous</title>
-<link rel="stylesheet" href="/app.css?v=8">
+<link rel="stylesheet" href="/app.css?v=9">
 <script>
   // Adresse SANS ?salon=... : on masque la page le temps de savoir si la plateforme heberge plusieurs salons
   // (voir guardMissingSalon) - pour ne jamais montrer, meme une fraction de seconde, un formulaire sans salon.
@@ -293,7 +293,7 @@
   </section>
 </div>
 
-<script src="/app.js?v=10"></script>
+<script src="/app.js?v=11"></script>
 <script>
 mountThemeButton();
 
@@ -428,11 +428,7 @@ function renderBarberGrid() {
     '<span class="icon">🎁</span><span class="name">Utiliser un cadeau</span></button>';
 
   document.getElementById('barber-grid').innerHTML = giftTile + barbers.map(function (b) {
-    var photoStyle = b.photo_url ? 'background-image:url(&quot;' + esc(b.photo_url) + '&quot;);background-size:cover;background-position:center' : '';
-    return '<button class="svc-card' + (selBarber === b.id ? ' sel' : '') + '" data-barber-id="' + b.id + '" style="' + photoStyle + '" onclick="selectBarber(this, \'' + b.id + '\')">' +
-      (b.photo_url ? '' : '<span class="icon">' + esc(b.name.charAt(0).toUpperCase()) + '</span>') +
-      '<span class="name" style="' + (b.photo_url ? 'color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.6)' : '') + '">' + esc(b.name) + '</span>' +
-      '</button>';
+    return barberTileHtml(b, selBarber === b.id, "selectBarber(this, '" + b.id + "')");
   }).join('');
 
   if (barbers.length === 0) {

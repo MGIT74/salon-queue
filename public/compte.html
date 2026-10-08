@@ -29,7 +29,7 @@
   html.auth-checking #p-login { display: none !important; }
   html.auth-checking #auth-layout { display: none !important; }
 </style>
-<link rel="stylesheet" href="/app.css?v=8">
+<link rel="stylesheet" href="/app.css?v=9">
 <script>
   // Applique tout de suite la couleur du salon si on l'a déjà vue lors
   // d'une visite précédente (cache localStorage par salon), plutôt que
@@ -650,7 +650,7 @@
 
 </div>
 
-<script src="/app.js?v=10"></script>
+<script src="/app.js?v=11"></script>
 <script>
 mountThemeButton();
 var SALON_SLUG = (function () {
@@ -1113,11 +1113,7 @@ function renderBookBarberGrid() {
     '<span class="icon">🎁</span><span class="name">Utiliser un cadeau</span></button>';
 
   document.getElementById('bk-barber-grid').innerHTML = giftTile + bookBarbers.map(function (b) {
-    var photoStyle = b.photo_url ? 'background-image:url(&quot;' + esc(b.photo_url) + '&quot;);background-size:cover;background-position:center' : '';
-    return '<button class="svc-card' + (selBookBarber === b.id ? ' sel' : '') + '" style="' + photoStyle + '" onclick="selectBookBarber(this, \'' + b.id + '\')">' +
-      (b.photo_url ? '' : '<span class="icon">' + esc(b.name.charAt(0).toUpperCase()) + '</span>') +
-      '<span class="name" style="' + (b.photo_url ? 'color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.6)' : '') + '">' + esc(b.name) + '</span>' +
-      '</button>';
+    return barberTileHtml(b, selBookBarber === b.id, "selectBookBarber(this, '" + b.id + "')");
   }).join('');
   if (bookBarbers.length === 0) {
     document.getElementById('bk-barber-grid').innerHTML = giftTile + '<div class="empty">Aucun coiffeur ne prend de RDV en ligne pour le moment — présentez-vous directement au salon.</div>';

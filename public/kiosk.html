@@ -18,7 +18,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>File d'attente</title>
-<link rel="stylesheet" href="/app.css?v=8">
+<link rel="stylesheet" href="/app.css?v=9">
 <script>
   // Adresse SANS ?salon=... : on masque la page le temps de savoir si la plateforme heberge plusieurs salons
   // (voir requireSalonInUrl dans app.js) - pour ne jamais montrer, meme une fraction de seconde, un ecran sans salon.
@@ -118,6 +118,13 @@
     text-shadow: 0 1px 3px rgba(0,0,0,0.9), 0 1px 8px rgba(0,0,0,0.6);
   }
   .barber-wait.free { color: var(--green); }
+  /* Photo entiere (contain) sur fond blanc, nom et attente en dessous : plus de photo coupee. */
+  .barber-card.has-photo:not(.gift-tile) { aspect-ratio: auto; display: flex; flex-direction: column; text-align: left; }
+  .barber-card.has-photo:not(.gift-tile) .barber-photo { width: 100%; aspect-ratio: 1 / 1; background: #fff center / contain no-repeat; flex: none; }
+  .barber-card.has-photo:not(.gift-tile) .barber-overlay { position: static; background: none; padding: clamp(10px,1.4vh,14px) clamp(12px,1.4vw,16px) clamp(12px,1.6vh,16px); }
+  .barber-card.has-photo:not(.gift-tile) .barber-name { color: var(--ink); text-shadow: none; }
+  .barber-card.has-photo:not(.gift-tile) .barber-wait { color: var(--grey); text-shadow: none; }
+  .barber-card.has-photo:not(.gift-tile) .barber-wait.free { color: var(--green); text-shadow: none; }
   .hero-sub { font-size: clamp(14px,1.4vw,17px); color: var(--grey); letter-spacing: -.01em; }
   .hero-sub b { color: var(--ink); font-weight: 600; }
   .plate { border: none; background: var(--fill); color: var(--ink); border-radius: 999px;
@@ -302,7 +309,7 @@
   </main>
 </div>
 
-<script src="/app.js?v=10"></script>
+<script src="/app.js?v=11"></script>
 <script>requireSalonInUrl("Pour utiliser cette borne, ouvrez le lien de votre salon.");</script>
 <script>
 mountThemeButton();
@@ -552,12 +559,10 @@ function renderBarberGrid() {
     var over = isOverrun(b.id);
     var free = w === 0;
     var waitLabel = free ? 'Disponible' : (over ? '~' : '') + formatMinutes(w);
-    var photoAttr = b.photo_url
-      ? ' style="background-image:url(&quot;' + esc(b.photo_url) + '&quot;)"'
-      : '';
-    return '<button class="barber-card' + (b.photo_url ? ' has-photo' : '') + '"' + photoAttr +
+    return '<button class="barber-card' + (b.photo_url ? ' has-photo' : '') + '"' +
       ' onclick="pickBarberAndGo(\'' + b.id + '\')">' +
-      (b.photo_url ? '' : '<div class="barber-fallback">' + esc(b.name.charAt(0).toUpperCase()) + '</div>') +
+      (b.photo_url ? '<div class="barber-photo" style="background-image:url(&quot;' + esc(b.photo_url) + '&quot;)"></div>'
+                   : '<div class="barber-fallback">' + esc(b.name.charAt(0).toUpperCase()) + '</div>') +
       '<div class="barber-overlay">' +
         '<div class="barber-name">' + esc(b.name) + '</div>' +
         '<div class="barber-wait' + (free ? ' free' : '') + '">' + waitLabel + '</div>' +

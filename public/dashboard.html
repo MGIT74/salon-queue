@@ -49,7 +49,7 @@
 <style>
   html.auth-checking #login { display: none; }
 </style>
-<link rel="stylesheet" href="/app.css?v=8">
+<link rel="stylesheet" href="/app.css?v=9">
 <style>
   .wrap { max-width: none; margin: 0; padding: clamp(16px,1.8vw,28px); }
 
@@ -2410,7 +2410,7 @@
   </div>
 </div>
 
-<script src="/app.js?v=10"></script>
+<script src="/app.js?v=11"></script>
 <script>
   // Le lien "Creer mon salon" n'a de sens que si l'inscription est ouverte sur
   // cette installation (fermee chez un client unique). Masque par defaut : s'il
@@ -4632,13 +4632,13 @@ function uploadBarberPhoto(id, input) {
   reader.onload = function (e) {
     var img = new Image();
     img.onload = function () {
-      var size = 300;
+      // Photo conservee ENTIERE (aucun recadrage) : on la reduit simplement a 600 px maximum de cote.
+      var scale = Math.min(1, 600 / Math.max(img.width, img.height));
       var canvas = document.createElement('canvas');
-      canvas.width = size; canvas.height = size;
+      canvas.width = Math.round(img.width * scale); canvas.height = Math.round(img.height * scale);
       var ctx = canvas.getContext('2d');
-      var side = Math.min(img.width, img.height);
-      var sx = (img.width - side) / 2, sy = (img.height - side) / 2;
-      ctx.drawImage(img, sx, sy, side, side, 0, 0, size, size);
+      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       var dataUrl = canvas.toDataURL('image/jpeg', 0.82);
 
       api('/api/barbers/' + id, { method: 'PUT', body: { photo_url: dataUrl } })

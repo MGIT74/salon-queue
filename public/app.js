@@ -948,3 +948,13 @@ function vitrineRecapFill(sel) {
   var html = vitrineRecapHtml(sel);
   document.querySelectorAll('[data-recap]').forEach(function (el) { el.innerHTML = html; });
 }
+
+/* Tuile "coiffeur" des pages de reservation : la photo est affichee ENTIERE (jamais recadree), le nom en dessous.
+   Sans photo : l'initiale. onclick : code JS de l'attribut (ex. "selectBarber(this,'id')"). */
+function barberTileHtml(b, selected, onclick) {
+  var cls = 'svc-card barber-tile' + (b.photo_url ? ' has-photo' : '') + (selected ? ' sel' : '');
+  return '<button class="' + cls + '" data-barber-id="' + b.id + '" onclick="' + onclick + '">' +
+    (b.photo_url ? '<span class="barber-photo" style="background-image:url(&quot;' + esc(b.photo_url) + '&quot;)"></span>'
+                 : '<span class="icon">' + esc(String(b.name || '?').charAt(0).toUpperCase()) + '</span>') +
+    '<span class="name">' + esc(b.name) + '</span></button>';
+}
