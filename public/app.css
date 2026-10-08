@@ -527,3 +527,9 @@ input[type="date"] { -webkit-appearance: none; appearance: none; }
   .wrap.page-flow .step-bar .step-summary { display: none; }
   .wrap.page-flow .panel.flow .go { margin-top: 0; }
 }
+
+/* Mode clair : fines bordures + ombre legere pour que le contour des cartes se voie sur le fond blanc. */
+:root:not([data-theme="dark"]) .item-card,
+:root:not([data-theme="dark"]) .svc-card { box-shadow: 0 0 0 1px #cfcfd6, 0 2px 6px rgba(0,0,0,.07); }
+:root:not([data-theme="dark"]) .item-card.sel,
+:root:not([data-theme="dark"]) .svc-card.sel { box-shadow: none; }
