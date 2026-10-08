@@ -66,7 +66,7 @@ function Add-Field($labelText, $y, $defaultValue) {
     return $textbox
 }
 
-$defaultServer = if ($existingCfg) { $existingCfg.server } else { "https://rdv.handsgraphic.com" }
+$defaultServer = if ($existingCfg -and -not [string]::IsNullOrWhiteSpace($existingCfg.server)) { $existingCfg.server } else { "https://app.thebarberone.com" }
 $defaultSalon = if ($existingCfg) { $existingCfg.salon } else { "" }
 $defaultTpeIp = if ($existingCfg) { $existingCfg.tpeIp } else { "" }
 # Le pont s'attend au meme numero de caisse que celui affiche sur le
@@ -77,7 +77,7 @@ $defaultTpePos = if ($existingCfg -and $existingCfg.tpePos) { $existingCfg.tpePo
 
 $tbServer = Add-Field "Adresse de votre application" 55 $defaultServer
 $tbSalon = Add-Field "Identifiant du salon (celui dans l'URL ?salon=...)" 105 $defaultSalon
-$tbKey = Add-Field "Cle du pont (Dashboard > Reglages > Terminal de paiement)" 155 ""
+$tbKey = Add-Field "Cle du pont (Dashboard > Reglages > Terminal de paiement)" 155 $(if ($existingCfg) { $existingCfg.key } else { "" })
 $tbPrinter = Add-Field "Nom de partage de l'imprimante" 205 $autoShare
 $tbTpeIp = Add-Field "IP du TPE (facultatif, laisser vide si pas encore configure)" 255 $defaultTpeIp
 $tbTpePos = Add-Field "Numero de caisse du TPE (voir son ticket, souvent 2)" 305 $defaultTpePos
