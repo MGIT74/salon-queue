@@ -618,6 +618,12 @@ function hasBookableSchedule(b) {
   return schedules.some(function (s) { return s.active; });
 }
 
+/** Coiffeur en conge ce jour-la ? (dateStr "YYYY-MM-DD" ; sans date : aujourd'hui, calcule par le serveur) */
+function isOnLeaveOn(b, dateStr) {
+  if (!dateStr) return Boolean(b.on_leave_today);
+  return (b.leaves || []).some(function (l) { return dateStr >= l.start_date && dateStr <= l.end_date; });
+}
+
 // Palette de couleurs stables pour associer une couleur à un coiffeur
 // sans champ "color" explicite (bulles, timeline...) - le même id donne
 // toujours la même couleur, sans avoir besoin de la stocker en base.

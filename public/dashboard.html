@@ -2400,7 +2400,7 @@
   </div>
 </div>
 
-<script src="/app.js?v=9"></script>
+<script src="/app.js?v=10"></script>
 <script>
   // Le lien "Creer mon salon" n'a de sens que si l'inscription est ouverte sur
   // cette installation (fermee chez un client unique). Masque par defaut : s'il
@@ -3291,8 +3291,9 @@ function cancelAppointmentByAdmin() {
  * que soit la date choisie, ce qui faisait perdre du temps (on ne le
  * découvrait qu'à l'étape "créneau").
  */
-function isBookableForAdmin(b) {
-  return Boolean(b.accepts_appointments && b.active && hasBookableSchedule(b));
+function isBookableForAdmin(b, dateStr) {
+  // dateStr (YYYY-MM-DD) : le jour du planning / du RDV. Un coiffeur en conge ce jour-la n'a aucun creneau : on ne le propose pas.
+  return Boolean(b.accepts_appointments && b.active && hasBookableSchedule(b) && (typeof dateStr !== 'string' || !isOnLeaveOn(b, dateStr)));
 }
 
 /**
@@ -5143,7 +5144,7 @@ function renderDayTimelineHtml(dateStr, dayAppts) {
   // de la liste des coiffeurs bookables, pas seulement de ceux qui ont
   // déjà un RDV ce jour-là.
   var byBarber = {};
-  barbers.filter(isBookableForAdmin).forEach(function (b) {
+  barbers.filter(function (b) { return isBookableForAdmin(b, dateStr); }).forEach(function (b) {
     byBarber[b.id] = { name: b.name, items: [], bookable: true };
   });
   dayAppts.forEach(function (a) {
@@ -5486,7 +5487,7 @@ function renderExpandPanel(dateStr, dayAppts) {
  * panneau du jour - email optionnel, mais coiffeur toujours requis.
  */
 function openAdminAddAppointment(dateStr, preselectedBarberId) {
-  var rdvBarbers = barbers.filter(isBookableForAdmin);
+  var rdvBarbers = barbers.filter(function (b) { return isBookableForAdmin(b, dateStr); });
   var when = new Date(dateStr + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' });
   var preBarber = preselectedBarberId && rdvBarbers.find(function (b) { return b.id === preselectedBarberId; });
 

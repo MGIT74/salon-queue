@@ -302,7 +302,7 @@
   </main>
 </div>
 
-<script src="/app.js?v=9"></script>
+<script src="/app.js?v=10"></script>
 <script>requireSalonInUrl("Pour utiliser cette borne, ouvrez le lien de votre salon.");</script>
 <script>
 mountThemeButton();
@@ -416,7 +416,7 @@ function goToExtrasStep() {
 function refresh() {
   return Promise.all([api('/api/queue'), api('/api/barbers')]).then(function (r) {
     queue = r[0].queue;
-    barbers = r[1].items.filter(function (b) { return !b.kiosk_hidden && !b.on_break_now && !b.outside_hours_now; });
+    barbers = r[1].items.filter(function (b) { return !b.kiosk_hidden && !b.on_break_now && !b.outside_hours_now && !isOnLeaveOn(b); });
     renderBoard(); renderBarberGrid();
   }).catch(function (err) { toast(err.message, true); });
 }

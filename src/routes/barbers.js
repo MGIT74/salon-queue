@@ -68,6 +68,16 @@ router.get('/', wrap(async (req, res) => {
   const nowWeekday = new Date(`${g('year')}-${g('month')}-${g('day')}T00:00:00Z`).getUTCDay();
   const nowMinutes = Number(g('hour')) * 60 + Number(g('minute'));
   const toMinutes = (t) => { const [h, m] = String(t).split(':').map(Number); return h * 60 + m; };
+  const todayStr = `${g('year')}-${g('month')}-${g('day')}`;
+
+  // Conges en cours ou a venir (dates de salon, YYYY-MM-DD) : les pages de reservation ne doivent plus proposer un
+  // coiffeur en conge (le client perdait du temps a choisir quelqu'un sans aucun creneau). Pas de note : c'est public.
+  const [leaveRows] = await pool.query(
+    `SELECT bl.barber_id, bl.start_date, bl.end_date FROM barber_leaves bl
+     JOIN barbers b ON b.id = bl.barber_id
+     WHERE b.salon_id = ? AND bl.end_date >= ? ORDER BY bl.start_date`,
+    [req.salon.id, todayStr]
+  );
 
   // Identifiants de prestations/suppléments NON réalisés par ce coiffeur —
   // pas un secret (les catalogues sont déjà publics), utile au kiosk pour
@@ -89,7 +99,12 @@ router.get('/', wrap(async (req, res) => {
     const withinHours = myScheduleToday.some((s) => nowMinutes >= toMinutes(s.start_time) && nowMinutes < toMinutes(s.end_time));
     const outsideHoursNow = myScheduleEver.length > 0 && !withinHours;
 
+    const myLeaves = leaveRows.filter((l) => l.barber_id === b.id)
+      .map((l) => ({ start_date: String(l.start_date).slice(0, 10), end_date: String(l.end_date).slice(0, 10) }));
+
     return Object.assign({}, stripSecrets(b), {
+      leaves: myLeaves,
+      on_leave_today: myLeaves.some((l) => l.start_date <= todayStr && todayStr <= l.end_date),
       schedules: schedules.filter((s) => s.barber_id === b.id).sort((a, c) => a.weekday - c.weekday),
       breaks: breaks.filter((bk) => bk.barber_id === b.id).sort((a, c) => a.weekday - c.weekday),
       on_break_now: onBreakNow,

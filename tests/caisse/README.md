@@ -73,4 +73,5 @@ node tests/caisse/39-photos-prestations-reservation.js  # reservation en ligne :
 node tests/caisse/40-vitrine-supplements-produits.js  # reservation en ligne : supplements et produits en cartes de vitrine (photo ou icone, recherche, categories, epuise, resume + barre du bas)
 node tests/caisse/41-vitrine-compte.js  # meme chose sur la reservation de 'Mon compte' (+ remise a zero d'une nouvelle reservation)
 node tests/caisse/42-vitrine-assistants-borne.js  # memes cartes dans l'assistant 'Ajouter un RDV' du tableau de bord et de Mon poste, et sur la borne ; fichiers partages (app.css v6 / app.js v8)
+node tests/caisse/43-coiffeurs-en-conge.js  # un coiffeur en conge n'est plus propose (RDV en ligne, Mon compte, borne, planning et assistant du tableau de bord)
 ```

@@ -293,7 +293,7 @@
   </section>
 </div>
 
-<script src="/app.js?v=9"></script>
+<script src="/app.js?v=10"></script>
 <script>
 mountThemeButton();
 
@@ -400,7 +400,7 @@ function loadCatalog() {
     services = r[0].items;
     extras = r[1].items;
     products = r[2].items;
-    barbers = r[3].items.filter(function (b) { return b.accepts_appointments && hasBookableSchedule(b); });
+    barbers = r[3].items.filter(function (b) { return b.accepts_appointments && hasBookableSchedule(b) && !isOnLeaveOn(b); });
     var salonName = r[4].salon_name;
     CURRENCY = r[4].currency || 'EUR';
     giftCardImageUrl = r[4].gift_card_image_url || '';

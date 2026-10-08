@@ -62,7 +62,8 @@ const suite = [
   ['39-photos-prestations-reservation.js', false, ['exit']],
   ['40-vitrine-supplements-produits.js', false, ['exit']],
   ['41-vitrine-compte.js', false, ['exit']],
-  ['42-vitrine-assistants-borne.js', false, ['exit']]
+  ['42-vitrine-assistants-borne.js', false, ['exit']],
+  ['43-coiffeurs-en-conge.js', false, ['exit']]
 ];
 
 let bad = 0;
