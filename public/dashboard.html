@@ -1073,6 +1073,11 @@
   .email-tpl-block { border-bottom: 1px solid var(--sep); margin-bottom: 20px; padding-bottom: 4px; }
   .email-tpl-block h4 { font-size: 14.5px; font-weight: 600; margin: 0 0 4px; }
   .email-tpl-block .hint { margin: 0 0 10px; }
+  .tpl-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 12px; }
+  .tpl-chip { border: none; cursor: pointer; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; padding: 5px 10px; border-radius: 999px;
+    background: rgba(var(--accent-rgb), .13); color: var(--accent); }
+  .tpl-chip:hover { background: rgba(var(--accent-rgb), .22); }
+  .tpl-reset { margin-left: auto; border: none; background: none; cursor: pointer; font-family: inherit; font-size: 13px; color: var(--grey); text-decoration: underline; }
   .fld textarea { resize: vertical; min-height: 60px; font-family: inherit; line-height: 1.4; }
 
   /* Horaires */
@@ -2205,9 +2210,10 @@
       </h3>
       <div class="accordion-body" id="email-templates-body" style="display:none">
       <p class="hint">
-        Personnalisez le sujet et le texte des emails envoyés automatiquement aux clients. Laissez un champ vide
-        pour garder le message par défaut de l'app. Les jetons entre accolades sont remplacés automatiquement
-        par les vraies valeurs à l'envoi.
+        Voici les emails envoyés automatiquement aux clients : les textes actuels sont déjà écrits, modifiez-les
+        librement. Les jetons entre accolades (ex. <code>{{client_name}}</code>) sont remplacés automatiquement par
+        les vraies valeurs à l'envoi : gardez-les tels quels, ou ajoutez-en en cliquant sur leur pastille.
+        « Rétablir » remet le texte d'origine de l'app.
       </p>
 
       <div class="email-tpl-block">
@@ -2216,7 +2222,7 @@
         <div class="fld"><label for="tpl-confirmation-subject">Sujet</label>
           <input id="tpl-confirmation-subject" type="text" placeholder="Confirmation de votre rendez-vous — {{salon}}"></div>
         <div class="fld"><label for="tpl-confirmation-body">Message</label>
-          <textarea id="tpl-confirmation-body" rows="4" placeholder="Bonjour {{client_name}}, votre rendez-vous chez {{salon}} est confirmé : {{when}} — {{service_name}}."></textarea></div>
+          <textarea id="tpl-confirmation-body" rows="9" placeholder="Bonjour {{client_name}}, votre rendez-vous chez {{salon}} est confirmé : {{when}} — {{service_name}}."></textarea></div>
       </div>
 
       <div class="email-tpl-block">
@@ -2225,7 +2231,7 @@
         <div class="fld"><label for="tpl-reminder-subject">Sujet</label>
           <input id="tpl-reminder-subject" type="text" placeholder="Rappel — votre rendez-vous chez {{salon}}"></div>
         <div class="fld"><label for="tpl-reminder-body">Message</label>
-          <textarea id="tpl-reminder-body" rows="4" placeholder="Bonjour {{client_name}}, petit rappel : votre rendez-vous ({{service_name}}) est prévu {{when}}."></textarea></div>
+          <textarea id="tpl-reminder-body" rows="9" placeholder="Bonjour {{client_name}}, petit rappel : votre rendez-vous ({{service_name}}) est prévu {{when}}."></textarea></div>
       </div>
 
       <div class="email-tpl-block">
@@ -2234,7 +2240,7 @@
         <div class="fld"><label for="tpl-cancelled-subject">Sujet</label>
           <input id="tpl-cancelled-subject" type="text" placeholder="Votre rendez-vous a été annulé — {{salon}}"></div>
         <div class="fld"><label for="tpl-cancelled-body">Message</label>
-          <textarea id="tpl-cancelled-body" rows="4" placeholder="Bonjour {{client_name}}, votre rendez-vous du {{when}} a dû être annulé. {{custom_message}}"></textarea></div>
+          <textarea id="tpl-cancelled-body" rows="9" placeholder="Bonjour {{client_name}}, votre rendez-vous du {{when}} a dû être annulé. {{custom_message}}"></textarea></div>
       </div>
 
       <div class="email-tpl-block">
@@ -2243,7 +2249,7 @@
         <div class="fld"><label for="tpl-rescheduled-subject">Sujet</label>
           <input id="tpl-rescheduled-subject" type="text" placeholder="Votre rendez-vous a été modifié — {{salon}}"></div>
         <div class="fld"><label for="tpl-rescheduled-body">Message</label>
-          <textarea id="tpl-rescheduled-body" rows="4" placeholder="Bonjour {{client_name}}, votre rendez-vous a été modifié. Nouvel horaire : {{when}}."></textarea></div>
+          <textarea id="tpl-rescheduled-body" rows="9" placeholder="Bonjour {{client_name}}, votre rendez-vous a été modifié. Nouvel horaire : {{when}}."></textarea></div>
       </div>
 
       <div class="email-tpl-block">
@@ -2254,7 +2260,7 @@
         <div class="fld"><label for="tpl-turn-soon-subject">Sujet</label>
           <input id="tpl-turn-soon-subject" type="text" placeholder="Votre tour approche"></div>
         <div class="fld"><label for="tpl-turn-soon-body">Message</label>
-          <textarea id="tpl-turn-soon-body" rows="4" placeholder="Bonjour {{client_name}}, votre tour est estimé dans environ {{wait_min}} minutes."></textarea></div>
+          <textarea id="tpl-turn-soon-body" rows="9" placeholder="Bonjour {{client_name}}, votre tour est estimé dans environ {{wait_min}} minutes."></textarea></div>
       </div>
 
       <div class="email-tpl-block" style="border-bottom:none;margin-bottom:0;padding-bottom:0">
@@ -2263,7 +2269,7 @@
         <div class="fld"><label for="tpl-closure-subject">Sujet</label>
           <input id="tpl-closure-subject" type="text" placeholder="Fermeture exceptionnelle — {{salon}}"></div>
         <div class="fld"><label for="tpl-closure-body">Message</label>
-          <textarea id="tpl-closure-body" rows="4" placeholder="Bonjour {{client_name}}, {{salon}} sera exceptionnellement fermé {{when}}{{reason}}."></textarea></div>
+          <textarea id="tpl-closure-body" rows="9" placeholder="Bonjour {{client_name}}, {{salon}} sera exceptionnellement fermé {{when}}{{reason}}."></textarea></div>
       </div>
 
       <div style="display:flex;gap:10px;flex-wrap:wrap">
@@ -6458,9 +6464,11 @@ function loadCaisseTab() {
 
     EMAIL_TPL_TYPES.forEach(function (type) {
       var key = type.replace(/-/g, '_');
-      document.getElementById('tpl-' + type + '-subject').value = r.settings['email_tpl_' + key + '_subject'] || '';
-      document.getElementById('tpl-' + type + '-body').value = r.settings['email_tpl_' + key + '_body'] || '';
+      // Texte enregistre, sinon le texte d'origine de l'app (ecrit dans le champ, pas seulement en grise).
+      document.getElementById('tpl-' + type + '-subject').value = r.settings['email_tpl_' + key + '_subject'] || EMAIL_TPL_DEFAULTS[type].subject;
+      document.getElementById('tpl-' + type + '-body').value = r.settings['email_tpl_' + key + '_body'] || EMAIL_TPL_DEFAULTS[type].body;
     });
+    initEmailTplUi();
   }).catch(function () {});
 }
 
@@ -7871,13 +7879,89 @@ function copyBridgeSetup() {
 
 var EMAIL_TPL_TYPES = ['confirmation', 'reminder', 'cancelled', 'rescheduled', 'turn-soon', 'closure'];
 
+/* Textes d'origine de l'app (identiques aux emails envoyes quand rien n'est personnalise). Affiches DANS les champs : on les modifie directement.
+   Un texte laisse identique a l'original est enregistre vide : l'app continue d'utiliser son message d'origine (et ses futures ameliorations). */
+var EMAIL_TPL_DEFAULTS = {
+  confirmation: {
+    subject: 'Confirmation de votre rendez-vous — {{salon}}',
+    body: "Bonjour {{client_name}},\n\nVotre rendez-vous chez {{salon}} est confirmé :\n{{when}} — {{service_name}}\n\nBesoin d'annuler ? {{cancel_url}}\n\n{{salon}}"
+  },
+  reminder: {
+    subject: 'Rappel — votre rendez-vous chez {{salon}}',
+    body: 'Bonjour {{client_name}},\n\nPetit rappel : votre rendez-vous ({{service_name}}) est prévu {{when}}.\n\n{{salon}}'
+  },
+  cancelled: {
+    subject: 'Votre rendez-vous a été annulé — {{salon}}',
+    body: 'Bonjour {{client_name}},\n\nNous sommes désolés de vous informer que votre rendez-vous du {{when}} ({{service_name}}) chez {{salon}} a dû être annulé.\n{{custom_message}}\n\nToutes nos excuses pour la gêne occasionnée.\n\n{{salon}}'
+  },
+  rescheduled: {
+    subject: 'Votre rendez-vous a été modifié — {{salon}}',
+    body: "Bonjour {{client_name}},\n\nVotre rendez-vous chez {{salon}} a été modifié.\n\nNouvel horaire : {{when}} — {{service_name}}\n\nBesoin d'annuler ? {{cancel_url}}\n\n{{salon}}"
+  },
+  'turn-soon': {
+    subject: 'Votre tour approche',
+    body: "Bonjour {{client_name}},\n\nVotre tour est estimé dans environ {{wait_min}} minutes.\nMerci de revenir vers le salon d'ici là.\n\n{{salon}}"
+  },
+  closure: {
+    subject: 'Fermeture exceptionnelle — {{salon}}',
+    body: '{{salon}} sera exceptionnellement fermé : {{when}}.\n\nMerci de votre compréhension.'
+  }
+};
+
+function emailTplAllowedTokens(type) {
+  var block = document.getElementById('tpl-' + type + '-body').closest('.email-tpl-block');
+  var hint = block && block.querySelector('p.hint');
+  var out = [];
+  ((hint && hint.textContent) || '').replace(/\{\{(\w+)\}\}/g, function (m, k) { if (out.indexOf(k) === -1) out.push(k); return m; });
+  return out;
+}
+
+// Pastilles de jetons (clic = insere le jeton au curseur du dernier champ touche du bloc) + bouton "Rétablir".
+function initEmailTplUi() {
+  EMAIL_TPL_TYPES.forEach(function (type) {
+    var body = document.getElementById('tpl-' + type + '-body');
+    var subj = document.getElementById('tpl-' + type + '-subject');
+    var block = body.closest('.email-tpl-block');
+    if (!block || block.querySelector('.tpl-chips')) return;
+    var last = body;
+    [subj, body].forEach(function (f) { f.addEventListener('focus', function () { last = f; }); });
+    var bar = document.createElement('div'); bar.className = 'tpl-chips';
+    emailTplAllowedTokens(type).forEach(function (tok) {
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'tpl-chip'; b.textContent = '{{' + tok + '}}';
+      b.addEventListener('mousedown', function (e) { e.preventDefault(); });
+      b.addEventListener('click', function () {
+        var t = '{{' + tok + '}}', a = last.selectionStart == null ? last.value.length : last.selectionStart, z = last.selectionEnd == null ? a : last.selectionEnd;
+        last.value = last.value.slice(0, a) + t + last.value.slice(z);
+        last.focus(); last.setSelectionRange(a + t.length, a + t.length);
+      });
+      bar.appendChild(b);
+    });
+    var reset = document.createElement('button'); reset.type = 'button'; reset.className = 'tpl-reset'; reset.textContent = 'Rétablir le texte d\'origine';
+    reset.addEventListener('click', function () { subj.value = EMAIL_TPL_DEFAULTS[type].subject; body.value = EMAIL_TPL_DEFAULTS[type].body; });
+    bar.appendChild(reset);
+    var hint = block.querySelector('p.hint'); hint.parentNode.insertBefore(bar, hint.nextSibling);
+  });
+}
+
 function saveEmailTemplates() {
   var body = { notify_before_min: document.getElementById('set-notify').value };
+  var bad = null;
   EMAIL_TPL_TYPES.forEach(function (type) {
     var key = type.replace(/-/g, '_');
-    body['email_tpl_' + key + '_subject'] = document.getElementById('tpl-' + type + '-subject').value;
-    body['email_tpl_' + key + '_body'] = document.getElementById('tpl-' + type + '-body').value;
+    var allowed = emailTplAllowedTokens(type);
+    var d = EMAIL_TPL_DEFAULTS[type];
+    [['subject', 'tpl-' + type + '-subject'], ['body', 'tpl-' + type + '-body']].forEach(function (f) {
+      var v = document.getElementById(f[1]).value;
+      // Un jeton mal ecrit ({{clientname}}) partirait tel quel dans l'email du client : on bloque.
+      (v.match(/\{\{[^}]*\}\}/g) || []).forEach(function (m) {
+        var name = m.slice(2, -2);
+        if (allowed.indexOf(name) === -1 && !bad) bad = m + ' (' + (EMAIL_TPL_LABELS[type] || type) + ')';
+      });
+      // Identique au texte d'origine (ou vide) : on enregistre vide, l'app garde son message d'origine.
+      body['email_tpl_' + key + '_' + f[0]] = (v.trim() === d[f[0]].trim() || !v.trim()) ? '' : v;
+    });
   });
+  if (bad) { toast('Jeton inconnu : ' + bad + '. Utilisez les pastilles pour insérer les jetons.', true); return; }
   api('/api/settings', { method: 'PUT', body: body })
     .then(function () { toast('Modèles enregistrés'); })
     .catch(function (e) { toast(e.message, true); });

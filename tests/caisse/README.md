@@ -78,4 +78,5 @@ node tests/caisse/44-photo-coiffeur-entiere.js  # photo du coiffeur entiere (jam
 node tests/caisse/45-rdv-en-ligne-3-zones.js  # rdv.html en ligne : design 3 zones sur ordinateur (en-tete / liste / pied fixe avec recap), mobile inchange
 node tests/caisse/46-calendrier-maison.js  # calendrier maison sur ordinateur (champs date), mobile natif
 node tests/caisse/47-caisse-cartes-vitrine.js  # caisse : memes cartes que la page de RDV en ligne (prestations / supplements / produits)
+node tests/caisse/48-notifications-email-textes.js  # notifications email : textes d origine ecrits dans les champs, jetons proteges
 ```
