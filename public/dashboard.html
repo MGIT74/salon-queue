@@ -1102,6 +1102,12 @@
                     font-weight: 600; color: var(--grey); background: var(--fill); }
   .barber-head-info { flex: 1; min-width: 0; }
   .barber-head-info .name { font-size: 16px; font-weight: 600; letter-spacing: -.02em; }
+  .leave-badge { display: inline-flex; align-items: center; gap: 5px; margin-left: 8px; padding: 2px 9px 2px 7px; border-radius: 999px; background: rgba(255,59,48,.14); color: var(--red); font-size: 12px; font-weight: 600; letter-spacing: 0; vertical-align: middle; white-space: nowrap; }
+  .leave-badge svg { flex-shrink: 0; }
+  .dash-kpi.leave .dash-kpi-ic { color: var(--red); background: rgba(255,59,48,.12); box-shadow: 0 0 0 1px rgba(255,59,48,.28); }
+  .dash-kpi.leave .dash-kpi-v { color: var(--red); }
+  .dash-kpi.leave.none .dash-kpi-ic { color: var(--grey); background: var(--card); box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 0 0 1px var(--sep); }
+  .dash-kpi.leave.none .dash-kpi-v { color: inherit; }
   .barber-head-info .sub { font-size: 12.5px; color: var(--grey); margin-top: 1px; }
   .barber-chevron { color: var(--grey); flex-shrink: 0; transition: transform .18s ease; }
   .barber-chevron.open { transform: rotate(180deg); }
@@ -1384,6 +1390,10 @@
         <div class="dash-subtitle" id="dash-date"></div>
       </div>
       <div class="dash-kpis">
+        <div class="dash-kpi leave none" id="dash-kpi-leave-box" title="Coiffeurs en congé aujourd'hui">
+          <span class="dash-kpi-ic"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 18 0z"/><path d="M12 12v6.5a2.5 2.5 0 0 0 5 0"/></svg></span>
+          <div><div class="dash-kpi-v" id="dash-kpi-leave">0</div><div class="dash-kpi-l">En congé</div></div>
+        </div>
         <div class="dash-kpi">
           <span class="dash-kpi-ic"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="4"/><path d="M17 11a4 4 0 1 0 0-8"/><path d="M1 21v-1a6 6 0 0 1 12 0v1"/><path d="M17 13a6 6 0 0 1 6 6v1"/></svg></span>
           <div><div class="dash-kpi-v" id="dash-kpi-barbers">0</div><div class="dash-kpi-l">Coiffeurs actifs</div></div>
@@ -3003,6 +3013,7 @@ function loadDashboardTab() {
   var occupancy = onDuty > 0 ? Math.round((activeCount / onDuty) * 100) : 0;
 
   document.getElementById('dash-kpi-barbers').textContent = onDuty;
+  updateLeaveKpi();
   document.getElementById('dash-pill-wait').textContent = waitingCount;
   document.getElementById('dash-pill-occ').textContent = occupancy + ' %';
   document.getElementById('dash-pill-active').textContent = activeCount;
@@ -3208,11 +3219,19 @@ function loadCatalog() {
 // automatique — sinon des horaires en cours de modification se font
 // écraser par la dernière version enregistrée en base avant que
 // l'utilisateur ait cliqué "Enregistrer".
+// Carre "En congé" du dashboard : nombre de coiffeurs actifs dont un congé couvre aujourd'hui.
+function updateLeaveKpi() {
+  var n = barbers.filter(function (b) { return b.active && b.on_leave_today; }).length;
+  var el = document.getElementById('dash-kpi-leave'), box = document.getElementById('dash-kpi-leave-box');
+  if (el) el.textContent = n;
+  if (box) box.classList.toggle('none', n === 0);
+}
+
 function loadBarbers() {
   return api('/api/barbers?all=1').then(function (r) {
     barbers = r.items; onDuty = r.on_duty;
     document.getElementById('s-duty').textContent = onDuty;
-    renderSeg(); renderBarbers();
+    renderSeg(); renderBarbers(); updateLeaveKpi();
   }).catch(function (err) { toast(err.message, true); });
 }
 
@@ -4112,6 +4131,17 @@ var barberDetailTab = {};   // { [barberId]: 'horaires'|'stats'|'conges' }
 var barberStatsState = {};  // { [barberId]: { period, offset } }
 var barberLeaves = {};      // { [barberId]: [...] }
 
+// Etiquette rouge "En congé" (avec la date de retour) pour un coiffeur dont un congé couvre aujourd'hui.
+function leaveBadgeHtml(b) {
+  if (!b.on_leave_today) return '';
+  var t = new Date(), today = t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0');
+  var cur = (b.leaves || []).filter(function (l) { return l.start_date <= today && today <= l.end_date; })[0];
+  var until = cur ? ' · jusqu\'au ' + cur.end_date.slice(8, 10) + '/' + cur.end_date.slice(5, 7) : '';
+  return '<span class="leave-badge" title="En congé aujourd\'hui : plus proposé à la réservation">' +
+    '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 18 0z"/><path d="M12 12v6.5a2.5 2.5 0 0 0 5 0"/></svg>' +
+    'En congé' + until + '</span>';
+}
+
 function renderBarbers() {
   document.getElementById('barbers-list').innerHTML = barbers.length === 0
     ? '<div class="empty">Aucun coiffeur. Ajoutez-en un pour que la file fonctionne.</div>'
@@ -4122,7 +4152,7 @@ function renderBarbers() {
           '<div class="barber-head" onclick="toggleBarberExpand(\'' + b.id + '\')">' +
           '<div class="barber-avatar" style="' + photoStyle + '">' + (b.photo_url ? '' : esc(b.name.charAt(0).toUpperCase())) + '</div>' +
           '<div class="barber-head-info">' +
-          '<div class="name">' + esc(b.name) + (b.active ? '' : ' · inactif') + '</div>' +
+          '<div class="name">' + esc(b.name) + (b.active ? '' : ' · inactif') + leaveBadgeHtml(b) + '</div>' +
           '<div class="sub">' + (currentSalonName ? esc(currentSalonName) + ' · ' : '') + (b.has_pin ? 'Code PIN configuré' : 'Aucun code PIN') +
           ' · ' + (b.kiosk_hidden && b.accepts_appointments
             ? '<span style="color:var(--blue)">RDV uniquement</span>'
@@ -4578,7 +4608,7 @@ function addLeave(id) {
   if (!start || !end) { toast('Dates requises', true); return; }
 
   api('/api/barbers/' + id + '/leaves', { method: 'POST', body: { start_date: start, end_date: end, note: note } })
-    .then(function () { toast('Congé ajouté'); return loadBarberLeaves(id); })
+    .then(function () { toast('Congé ajouté'); return loadBarbers().then(function () { return loadBarberLeaves(id); }); })
     .catch(function (e) { toast(e.message, true); });
 }
 
@@ -4586,7 +4616,7 @@ function deleteLeave(barberId, leaveId) {
   showConfirm('Supprimer ce congé ?', { title: 'Supprimer' }).then(function (ok) {
     if (!ok) return;
     api('/api/barbers/' + barberId + '/leaves/' + leaveId, { method: 'DELETE' })
-      .then(function () { toast('Supprimé'); return loadBarberLeaves(barberId); })
+      .then(function () { toast('Supprimé'); return loadBarbers().then(function () { return loadBarberLeaves(barberId); }); })
       .catch(function (e) { toast(e.message, true); });
   });
 }

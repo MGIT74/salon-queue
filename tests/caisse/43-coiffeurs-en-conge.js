@@ -32,5 +32,24 @@ check('kiosk.html : idem', /!b\.outside_hours_now && !isOnLeaveOn\(b\)/.test(kio
 check('dashboard : lignes du planning ET assistant "Ajouter un RDV" filtrent sur la date du jour affiche', (dash.match(/return isBookableForAdmin\(b, dateStr\)/g) || []).length === 2);
 check('API /api/barbers : renvoie on_leave_today et les conges (dates seulement, sans la note)', /on_leave_today:/.test(api) && /leaves: myLeaves/.test(api) && /SELECT bl\.barber_id, bl\.start_date, bl\.end_date FROM barber_leaves/.test(api) && !/bl\.note/.test(api.slice(api.indexOf('leaveRows'), api.indexOf('leaveRows') + 400)));
 
+console.log('\n[C] Etiquette rouge (liste des coiffeurs) et carre "En conge" (dashboard)');
+const c2 = vm.createContext({ barbers: [], document: { getElementById: (id) => (el[id] = el[id] || { textContent: '', classList: { toggle: (c, on) => { el[id].none = on; } } }) } });
+var el = {};
+vm.runInContext(fnSrc(dash, 'leaveBadgeHtml') + '\n' + fnSrc(dash, 'updateLeaveKpi'), c2);
+const t = new Date(), ymd = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+const fin = new Date(t.getTime() + 3 * 864e5);
+const html = c2.leaveBadgeHtml({ on_leave_today: true, leaves: [{ start_date: ymd(t), end_date: ymd(fin) }] });
+check('en conge : etiquette "En conge" avec la date de retour (jj/mm)', /leave-badge/.test(html) && /En congé · jusqu'au \d\d\/\d\d/.test(html) && html.indexOf(String(ymd(fin)).slice(8, 10) + '/' + String(ymd(fin)).slice(5, 7)) > -1);
+check('pas en conge : aucune etiquette', c2.leaveBadgeHtml({ on_leave_today: false, leaves: [] }) === '');
+check('la liste des coiffeurs affiche l\'etiquette a cote du nom', /esc\(b\.name\) \+ \(b\.active \? '' : ' · inactif'\) \+ leaveBadgeHtml\(b\)/.test(dash));
+c2.barbers = [{ active: 1, on_leave_today: true }, { active: 1, on_leave_today: false }, { active: 0, on_leave_today: true }, { active: 1, on_leave_today: true }];
+vm.runInContext('updateLeaveKpi()', c2);
+check('dashboard : le carre compte les coiffeurs ACTIFS en conge (2, pas l\'inactif)', el['dash-kpi-leave'].textContent === 2);
+c2.barbers = [{ active: 1, on_leave_today: false }];
+vm.runInContext('updateLeaveKpi()', c2);
+check('aucun conge : 0 et carre neutre (non rouge)', el['dash-kpi-leave'].textContent === 0 && el['dash-kpi-leave-box'].none === true);
+check('le carre est dans l\'en-tete du dashboard, avec une icone', /id="dash-kpi-leave-box"[\s\S]{0,400}<svg[\s\S]{0,600}id="dash-kpi-leave"/.test(dash));
+check('ajout / suppression d\'un conge : liste et carre se rafraichissent aussitot', (dash.match(/return loadBarbers\(\)\.then\(function \(\) \{ return loadBarberLeaves/g) || []).length === 2);
+
 console.log('\n' + pass + ' OK, ' + fail + ' ECHEC');
 process.exit(fail ? 1 : 0);
