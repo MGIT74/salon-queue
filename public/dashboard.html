@@ -6462,13 +6462,7 @@ function loadCaisseTab() {
     pollBridgeStatus();
     window.__bridgeStatusInterval = setInterval(pollBridgeStatus, 5000);
 
-    EMAIL_TPL_TYPES.forEach(function (type) {
-      var key = type.replace(/-/g, '_');
-      // Texte enregistre, sinon le texte d'origine de l'app (ecrit dans le champ, pas seulement en grise).
-      document.getElementById('tpl-' + type + '-subject').value = r.settings['email_tpl_' + key + '_subject'] || EMAIL_TPL_DEFAULTS[type].subject;
-      document.getElementById('tpl-' + type + '-body').value = r.settings['email_tpl_' + key + '_body'] || EMAIL_TPL_DEFAULTS[type].body;
-    });
-    initEmailTplUi();
+    fillEmailTemplates(r.settings);
   }).catch(function () {});
 }
 
@@ -7559,6 +7553,8 @@ function loadSettings() {
     document.getElementById('set-vat-service').value = s.vat_rate_service || '';
     document.getElementById('set-vat-extra').value = s.vat_rate_extra || '';
     document.getElementById('set-vat-product').value = s.vat_rate_product || '';
+    // Les modeles d'email sont dans cet onglet (Reglages) : on les remplit ICI (avant, seul l'onglet Caisse le faisait).
+    fillEmailTemplates(s);
   }).catch(function (e) { toast(e.message, true); });
 
   loadSalonSchedule();
@@ -7907,6 +7903,16 @@ var EMAIL_TPL_DEFAULTS = {
     body: '{{salon}} sera exceptionnellement fermé : {{when}}.\n\nMerci de votre compréhension.'
   }
 };
+
+// Remplit les champs : texte enregistre, sinon texte d'origine de l'app (ecrit dans le champ, pas seulement en grise).
+function fillEmailTemplates(settings) {
+  EMAIL_TPL_TYPES.forEach(function (type) {
+    var key = type.replace(/-/g, '_');
+    document.getElementById('tpl-' + type + '-subject').value = settings['email_tpl_' + key + '_subject'] || EMAIL_TPL_DEFAULTS[type].subject;
+    document.getElementById('tpl-' + type + '-body').value = settings['email_tpl_' + key + '_body'] || EMAIL_TPL_DEFAULTS[type].body;
+  });
+  initEmailTplUi();
+}
 
 function emailTplAllowedTokens(type) {
   var block = document.getElementById('tpl-' + type + '-body').closest('.email-tpl-block');

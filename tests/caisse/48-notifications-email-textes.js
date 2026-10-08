@@ -19,6 +19,7 @@ check('champs pre-remplis avec le texte d\'origine si rien n\'est enregistre', /
 check('texte inchange = enregistre vide (l\'app garde son message d\'origine)', /v\.trim\(\) === d\[f\[0\]\]\.trim\(\) \|\| !v\.trim\(\)\) \? '' : v/.test(dash));
 check('jeton inconnu ({{clientname}}) : enregistrement refuse avec message clair', /Jeton inconnu/.test(dash) && /allowed\.indexOf\(name\) === -1/.test(dash));
 check('pastilles de jetons (insertion au curseur) + bouton "Rétablir le texte d\'origine"', /className = 'tpl-chip'/.test(dash) && /Rétablir le texte d/.test(dash));
+check('les champs sont remplis a l\'ouverture de l\'onglet Reglages (loadSettings), pas seulement via l\'onglet Caisse', /function loadSettings\(\)[\s\S]*?fillEmailTemplates\(s\);[\s\S]*?\n\}\n/.test(dash) && /function loadCaisseTab\(\)[\s\S]*?fillEmailTemplates\(r\.settings\)/.test(dash));
 
 console.log('\n' + pass + ' OK, ' + fail + ' ECHEC');
 process.exit(fail ? 1 : 0);
