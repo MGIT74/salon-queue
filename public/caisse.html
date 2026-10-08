@@ -34,7 +34,7 @@
 <style>
   html.auth-checking #login-screen { display: none; }
 </style>
-<link rel="stylesheet" href="/app.css?v=7">
+<link rel="stylesheet" href="/app.css?v=8">
 <style>
   html, body { min-height: 100%; }
   .wrap { max-width: 1100px; margin: 0 auto; padding: 20px 18px 40px; }
@@ -842,7 +842,7 @@
   </div>
 </div>
 
-<script src="/app.js?v=8"></script>
+<script src="/app.js?v=9"></script>
 <script>requireSalonInUrl("Pour utiliser la caisse, ouvrez le lien de votre salon.");</script>
 <script>
 mountThemeButton();
@@ -2387,13 +2387,20 @@ function openCaisseAddAppointment(dateStr, barberId) {
       '</div>' +
     '</div>'
   );
-  overlay.firstChild.classList.add('modal-wide');
+  var flowRefresh = vitrineFlow(overlay, function () {
+    function pick(list, ids) { return list.filter(function (x) { return ids.indexOf(String(x.id)) !== -1; }); }
+    return {
+      service: catalog.services.find(function (x) { return String(x.id) === String(state.serviceId); }),
+      extras: pick(catalog.extras, state.extraIds.map(String)), products: pick(catalog.products, state.productIds.map(String)),
+      barber: (barber ? barber.name : ''), when: when, time: state.time
+    };
+  });
 
   var STEPS = ['service', 'extras', 'products', 'datetime', 'contact'];
   attachClientAutocomplete(overlay, 'pa-name', 'pa-email', 'pa-phone', barberApi);
 
   window.paGoStep = function (step) {
-    STEPS.forEach(function (s) { overlay.querySelector('#pa-step-' + s).style.display = s === step ? 'block' : 'none'; });
+    STEPS.forEach(function (s) { overlay.querySelector('#pa-step-' + s).style.display = s === step ? 'flex' : 'none'; });
     if (step === 'datetime') paLoadSlots();
     if (step === 'contact') {
       var s = catalog.services.find(function (x) { return x.id === state.serviceId; });

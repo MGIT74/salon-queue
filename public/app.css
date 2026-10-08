@@ -463,8 +463,7 @@ input[type="date"] { -webkit-appearance: none; appearance: none; }
   .wrap:has(#p-service.on, #p-extras.on, #p-products.on, #p-book-service.on, #p-book-extras.on, #p-book-products.on) .item-grid { grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 16px; }
   .wrap:has(#p-service.on, #p-extras.on, #p-products.on, #p-book-service.on, #p-book-extras.on, #p-book-products.on) .item-name { font-size: 16px; }
   /* Fenetres "Ajouter un RDV" (tableau de bord, Mon poste, caisse) */
-  .modal-box.modal-wide { max-width: min(1080px, 94vw); padding: 30px 32px; }
-  .modal-box.modal-wide .step-bar { bottom: -30px; margin: 12px -32px -30px; padding: 12px 32px 22px; }
+  .modal-box.modal-wide { max-width: min(1080px, 94vw); }
   .modal-box.modal-wide .item-grid.compact { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 14px; }
   .modal-box.modal-wide .item-grid.compact .item-media { height: 84px; font-size: 38px; }
   .modal-box.modal-wide .item-grid.compact .item-card.has-photo .item-media { height: auto; }
@@ -472,3 +471,38 @@ input[type="date"] { -webkit-appearance: none; appearance: none; }
   .modal-box.modal-wide .item-grid.compact .item-name { font-size: 15px; }
   .modal-box.modal-wide .item-grid.compact .item-price { font-size: 16px; }
 }
+
+/* ---- Recapitulatif du panier ---- */
+.flow-recap:empty { display: none; }
+.flow-recap { margin-bottom: 10px; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+.recap-ctx { font-size: 12.5px; color: var(--grey); margin-bottom: 6px; }
+.recap-list { display: flex; flex-direction: column; gap: 5px; max-height: 118px; overflow-y: auto; padding-right: 2px; }
+.recap-row { display: grid; grid-template-columns: 82px 1fr auto; gap: 8px; align-items: baseline; }
+.recap-k { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--grey); }
+.recap-n { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.recap-n em { font-style: normal; color: var(--grey); font-size: 12.5px; margin-left: 4px; }
+.recap-p { font-weight: 600; }
+.recap-total { display: flex; justify-content: space-between; gap: 12px; margin-top: 7px; padding-top: 7px; border-top: 1px solid var(--sep); font-weight: 600; }
+.recap-total strong { font-weight: 700; }
+@media (min-width: 900px) { .recap-list { max-height: 150px; } .recap-row { grid-template-columns: 100px 1fr auto; } }
+
+/* ---- Fenetres "Ajouter un RDV" : en-tete fixe / liste qui defile / pied fixe ---- */
+.modal-box.modal-flow { display: flex; flex-direction: column; padding: 0; overflow: hidden; max-height: min(92vh, 900px); }
+.modal-flow > .flow-head { flex: none; padding: 22px 26px 8px; }
+.modal-flow > [id*="-step-"] { flex: 1 1 auto; min-height: 0; flex-direction: column; }
+.modal-flow .flow-top { flex: none; padding: 0 26px 8px; }
+.modal-flow .flow-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 2px 26px 14px; overscroll-behavior: contain; }
+.modal-flow .step-bar { position: static; flex: none; margin: 0; padding: 12px 26px 20px; border-radius: 0; background: var(--card); box-shadow: 0 -1px 0 var(--sep); }
+.modal-flow .step-bar .step-summary { display: none; }
+@media (min-width: 900px) {
+  .modal-box.modal-flow.modal-wide { padding: 0; }
+  .modal-flow > .flow-head { padding: 26px 32px 8px; }
+  .modal-flow .flow-top { padding: 0 32px; }
+  .modal-flow .flow-body { padding: 2px 32px 16px; }
+  .modal-flow .step-bar { margin: 0; padding: 14px 32px 22px; }
+}
+.modal-flow > [id*="-step-"] { display: flex; }
+/* Pages de reservation (rdv, Mon compte) : le recapitulatif suit le client d'une etape a l'autre. */
+.wrap .flow-recap { background: var(--fill); border-radius: 14px; padding: 12px 14px; margin: 0 0 16px; }
+.wrap .step-bar .flow-recap { background: none; padding: 0; margin-bottom: 10px; }
+.step-bar .flow-recap:not(:empty) + .step-summary { display: none; }

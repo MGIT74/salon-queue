@@ -49,7 +49,7 @@
 <style>
   html.auth-checking #login { display: none; }
 </style>
-<link rel="stylesheet" href="/app.css?v=7">
+<link rel="stylesheet" href="/app.css?v=8">
 <style>
   .wrap { max-width: none; margin: 0; padding: clamp(16px,1.8vw,28px); }
 
@@ -2400,7 +2400,7 @@
   </div>
 </div>
 
-<script src="/app.js?v=8"></script>
+<script src="/app.js?v=9"></script>
 <script>
   // Le lien "Creer mon salon" n'a de sens que si l'inscription est ouverte sur
   // cette installation (fermee chez un client unique). Masque par defaut : s'il
@@ -5555,7 +5555,14 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
       '</div>' +
     '</div>'
   );
-  overlay.firstChild.classList.add('modal-wide');
+  var flowRefresh = vitrineFlow(overlay, function () {
+    function pick(list, ids) { return list.filter(function (x) { return ids.indexOf(String(x.id)) !== -1; }); }
+    return {
+      service: services.find(function (x) { return String(x.id) === String(state.serviceId); }),
+      extras: pick(extras, state.extraIds.map(String)), products: pick(products, state.productIds.map(String)),
+      barber: (function(){var b=(typeof rdvBarbers!=='undefined')&&rdvBarbers.find(function(x){return String(x.id)===String(state.barberId);});return b?b.name:'';})(), when: when, time: state.time
+    };
+  });
 
   var STEPS = ['barber', 'service', 'extras', 'products', 'datetime', 'contact'];
   attachClientAutocomplete(overlay, 'aa-name', 'aa-email', 'aa-phone', api);
@@ -5569,7 +5576,7 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
   }
 
   window.aaGoStep = function (step) {
-    STEPS.forEach(function (s) { overlay.querySelector('#aa-step-' + s).style.display = s === step ? 'block' : 'none'; });
+    STEPS.forEach(function (s) { overlay.querySelector('#aa-step-' + s).style.display = s === step ? 'flex' : 'none'; });
     if (step === 'datetime') aaLoadSlots();
     if (step === 'contact') {
       var s = services.find(function (x) { return x.id === state.serviceId; });

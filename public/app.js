@@ -866,3 +866,79 @@ function vitrineSearchHtml(idBase, placeholder, filterCall) {
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>' +
     '<input type="search" id="' + idBase + '-q" placeholder="' + placeholder + '" autocomplete="off" oninput="' + filterCall + '"></div>';
 }
+
+/* ---- Recapitulatif du panier (prestation + supplements + produits, avec le detail) et fenetres "Ajouter un RDV" a zones fixes ----
+   sel : { service, extras[], products[], barber?, when?, time? } (objets du catalogue). Retourne '' tant qu'aucune prestation n'est choisie. */
+function vitrineRecapHtml(sel) {
+  if (!sel || !sel.service) return '';
+  var rows = '', cents = 0, mins = 0;
+  function row(label, name, meta, price) {
+    rows += '<div class="recap-row"><span class="recap-k">' + label + '</span><span class="recap-n">' + esc(name) +
+      (meta ? ' <em>' + esc(meta) + '</em>' : '') + '</span><span class="recap-p">' + price + '</span></div>';
+  }
+  var s = sel.service;
+  cents += Number(s.price_cents) || 0; mins += Number(s.duration_min) || 0;
+  row('Prestation', s.name, Number(s.duration_min) > 0 ? formatMinutes(s.duration_min) : '', eur(Number(s.price_cents) || 0));
+  (sel.extras || []).forEach(function (x) {
+    cents += Number(x.price_cents) || 0; mins += Number(x.duration_min) || 0;
+    row('Supplément', x.name, Number(x.duration_min) > 0 ? '+' + formatMinutes(x.duration_min) : '', '+' + eur(Number(x.price_cents) || 0));
+  });
+  (sel.products || []).forEach(function (x) {
+    cents += Number(x.price_cents) || 0;
+    row('Produit', x.name, '', eur(Number(x.price_cents) || 0));
+  });
+  var ctx = [];
+  if (sel.barber) ctx.push(esc(sel.barber));
+  if (sel.when) ctx.push(esc(sel.when) + (sel.time ? ' à ' + esc(sel.time) : ''));
+  return (ctx.length ? '<div class="recap-ctx">' + ctx.join(' · ') + '</div>' : '') +
+    '<div class="recap-list">' + rows + '</div>' +
+    '<div class="recap-total"><span>Total</span><span>' + (mins ? formatMinutes(mins) + ' · ' : '') + '<strong>' + eur(cents) + '</strong></span></div>';
+}
+
+/**
+ * Met une fenetre "Ajouter un RDV" en trois zones : en-tete fixe (titre, retour, recherche), liste qui defile, pied fixe
+ * (recapitulatif + bouton). Regroupe automatiquement le contenu de chaque etape (div id="...-step-...").
+ * getSel() renvoie l'objet attendu par vitrineRecapHtml ; le recapitulatif se met a jour apres chaque clic.
+ */
+function vitrineFlow(overlay, getSel) {
+  var box = overlay.querySelector('.modal-box');
+  box.classList.add('modal-flow', 'modal-wide');
+  if (box.firstElementChild) box.firstElementChild.classList.add('flow-head');
+  var BODY_START = '.item-grid,.aa-grid,.aa-slots,.fld,.modal-error,.hint,.items-empty';
+  var recaps = [];
+  Array.prototype.slice.call(box.children).forEach(function (step) {
+    if (!/-step-/.test(step.id || '')) return;
+    var kids = Array.prototype.slice.call(step.children);
+    var top = document.createElement('div'); top.className = 'flow-top';
+    var body = document.createElement('div'); body.className = 'flow-body';
+    var bar = null, actions = null, inTop = true;
+    kids.forEach(function (k) {
+      if (k.classList.contains('step-bar')) { bar = k; return; }
+      if (k.classList.contains('modal-actions')) { actions = k; return; }
+      if (inTop && k.matches(BODY_START)) inTop = false;
+      (inTop ? top : body).appendChild(k);
+    });
+    if (!bar) { bar = document.createElement('div'); bar.className = 'step-bar' + (actions ? '' : ' recap-only'); }
+    if (actions) bar.appendChild(actions);
+    var recap = document.createElement('div'); recap.className = 'flow-recap';
+    bar.insertBefore(recap, bar.firstChild);
+    recaps.push({ el: recap, bar: bar });
+    step.appendChild(top); step.appendChild(body); step.appendChild(bar);
+  });
+  function refresh() {
+    var html = vitrineRecapHtml(getSel());
+    recaps.forEach(function (r) {
+      r.el.innerHTML = html;
+      if (r.bar.classList.contains('recap-only')) r.bar.style.display = html ? '' : 'none';
+    });
+  }
+  overlay.addEventListener('click', function () { setTimeout(refresh, 0); });
+  refresh();
+  return refresh;
+}
+
+/* Remplit tous les emplacements <div data-recap> de la page avec le recapitulatif (pages de reservation). */
+function vitrineRecapFill(sel) {
+  var html = vitrineRecapHtml(sel);
+  document.querySelectorAll('[data-recap]').forEach(function (el) { el.innerHTML = html; });
+}

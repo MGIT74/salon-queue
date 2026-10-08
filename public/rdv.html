@@ -18,7 +18,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Prendre rendez-vous</title>
-<link rel="stylesheet" href="/app.css?v=7">
+<link rel="stylesheet" href="/app.css?v=8">
 <script>
   // Adresse SANS ?salon=... : on masque la page le temps de savoir si la plateforme heberge plusieurs salons
   // (voir guardMissingSalon) - pour ne jamais montrer, meme une fraction de seconde, un formulaire sans salon.
@@ -201,6 +201,7 @@
     <button class="back" onclick="show('p-barber')">‹ Retour</button>
     <div class="eyebrow">Prestation</div>
     <div class="item-grid" id="svc-grid"></div>
+    <div class="flow-recap" data-recap></div>
     <button class="go" id="service-next-btn" onclick="goToExtrasStep()" disabled>Suivant</button>
   </section>
 
@@ -215,6 +216,7 @@
     <div class="item-grid" id="extras-grid"></div>
     <div class="items-empty" id="extras-empty">Aucun résultat</div>
     <div class="step-bar">
+      <div class="flow-recap" data-recap></div>
       <div class="step-summary" id="extras-summary"></div>
       <button class="go" onclick="goToProductsStep()">Suivant</button>
     </div>
@@ -231,6 +233,7 @@
     <div class="item-grid" id="products-grid"></div>
     <div class="items-empty" id="products-empty">Aucun résultat</div>
     <div class="step-bar">
+      <div class="flow-recap" data-recap></div>
       <div class="step-summary" id="products-summary"></div>
       <button class="go" onclick="goToDateStep()">Suivant</button>
     </div>
@@ -242,6 +245,7 @@
       <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
       Annuler l'utilisation du cadeau
     </button>
+    <div class="flow-recap" data-recap></div>
     <div class="fld"><label for="rdv-date">Date</label><input id="rdv-date" type="date" onchange="loadSlots()"></div>
     <div class="eyebrow" style="margin-top:20px">Créneaux disponibles</div>
     <div id="half-toggle" class="half-toggle" style="display:none;margin-bottom:14px">
@@ -255,6 +259,7 @@
   <section class="panel" id="p-contact">
     <button class="back" onclick="show('p-datetime')">‹ Retour</button>
     <div class="eyebrow" id="contact-summary"></div>
+    <div class="flow-recap" data-recap></div>
     <div class="fld"><label for="rdv-name">Prénom</label><input id="rdv-name" type="text" autocomplete="given-name"></div>
     <div class="fld"><label for="rdv-email">Email — pour la confirmation</label><input id="rdv-email" type="email" autocomplete="email"></div>
     <div class="fld"><label for="rdv-phone">Téléphone</label><input id="rdv-phone" type="tel" autocomplete="tel"></div>
@@ -288,7 +293,7 @@
   </section>
 </div>
 
-<script src="/app.js?v=8"></script>
+<script src="/app.js?v=9"></script>
 <script>
 mountThemeButton();
 
@@ -558,6 +563,20 @@ function itemListConfig(kind) {
     onclick: kind === 'extras' ? "toggleExtra(this,'{id}')" : "toggleProduct(this,'{id}')"
   };
 }
+
+// Recapitulatif du panier (prestation, supplements, produits, creneau) visible a chaque etape.
+function refreshRecap() {
+  function pick(list, ids) { return list.filter(function (x) { return ids.indexOf(String(x.id)) !== -1; }); }
+  var b = selBarber && barbers.find(function (x) { return String(x.id) === String(selBarber); });
+  vitrineRecapFill({
+    service: services.find(function (x) { return String(x.id) === String(selService); }),
+    extras: pick(extras, selExtras.map(String)), products: pick(products, selProducts.map(String)),
+    barber: b ? b.name : '', time: selSlot ? selSlot.time : '',
+    when: selDate ? new Date(selDate + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' }) : ''
+  });
+}
+document.addEventListener('click', function () { setTimeout(refreshRecap, 0); });
+document.addEventListener('change', function () { setTimeout(refreshRecap, 0); });
 function renderItemList(kind) { vitrineRender(itemListConfig(kind)); }
 function updateItemsSummary(kind) { vitrineSummary(itemListConfig(kind)); }
 function filterItems(kind) { vitrineFilter(itemListConfig(kind)); }

@@ -29,7 +29,7 @@
   html.auth-checking #p-login { display: none !important; }
   html.auth-checking #auth-layout { display: none !important; }
 </style>
-<link rel="stylesheet" href="/app.css?v=7">
+<link rel="stylesheet" href="/app.css?v=8">
 <script>
   // Applique tout de suite la couleur du salon si on l'a déjà vue lors
   // d'une visite précédente (cache localStorage par salon), plutôt que
@@ -532,6 +532,7 @@
     <button class="back" onclick="show('p-book-barber')">‹ Retour</button>
     <div class="eyebrow">Prestation</div>
     <div class="item-grid" id="bk-svc-grid"></div>
+    <div class="flow-recap" data-recap></div>
     <button class="go" id="bk-service-next-btn" onclick="goToBookExtrasStep()" disabled>Suivant</button>
   </section>
 
@@ -546,6 +547,7 @@
     <div class="item-grid" id="bk-extras-grid"></div>
     <div class="items-empty" id="bk-extras-empty">Aucun résultat</div>
     <div class="step-bar">
+      <div class="flow-recap" data-recap></div>
       <div class="step-summary" id="bk-extras-summary"></div>
       <button class="go" onclick="goToBookProductsStep()">Suivant</button>
     </div>
@@ -562,6 +564,7 @@
     <div class="item-grid" id="bk-products-grid"></div>
     <div class="items-empty" id="bk-products-empty">Aucun résultat</div>
     <div class="step-bar">
+      <div class="flow-recap" data-recap></div>
       <div class="step-summary" id="bk-products-summary"></div>
       <button class="go" onclick="goToBookDateStep()">Suivant</button>
     </div>
@@ -573,6 +576,7 @@
       <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
       Annuler l'utilisation du cadeau
     </button>
+    <div class="flow-recap" data-recap></div>
     <div class="fld"><label for="bk-date">Date</label><input id="bk-date" type="date" onchange="loadBookSlots()"></div>
     <div class="eyebrow" style="margin-top:20px">Créneaux disponibles</div>
     <div id="bk-half-toggle" class="half-toggle" style="display:none;margin-bottom:14px">
@@ -586,6 +590,7 @@
   <section class="panel" id="p-book-confirm">
     <button class="back" onclick="show('p-book-datetime')">‹ Retour</button>
     <div class="eyebrow" id="bk-confirm-summary"></div>
+    <div class="flow-recap" data-recap></div>
     <div class="fld"><label for="bk-note">Note pour le salon (allergie, préférence… optionnel)</label><textarea id="bk-note" rows="3" style="width:100%;font-family:inherit;font-size:15px;padding:12px;border-radius:12px;border:1px solid var(--sep);background:var(--card);color:var(--ink);resize:vertical"></textarea></div>
     <button class="go" id="bk-confirm-btn" onclick="submitBookAppointment()">Confirmer le rendez-vous</button>
   </section>
@@ -645,7 +650,7 @@
 
 </div>
 
-<script src="/app.js?v=8"></script>
+<script src="/app.js?v=9"></script>
 <script>
 mountThemeButton();
 var SALON_SLUG = (function () {
@@ -1309,6 +1314,20 @@ function bookItemListConfig(kind) {
     onclick: kind === 'extras' ? "toggleBookExtra(this,'{id}')" : "toggleBookProduct(this,'{id}')"
   };
 }
+
+// Recapitulatif du panier (prestation, supplements, produits, creneau) visible a chaque etape.
+function refreshBookRecap() {
+  function pick(list, ids) { return list.filter(function (x) { return ids.indexOf(String(x.id)) !== -1; }); }
+  var b = selBookBarber && bookBarbers.find(function (x) { return String(x.id) === String(selBookBarber); });
+  vitrineRecapFill({
+    service: bookServices.find(function (x) { return String(x.id) === String(selBookService); }),
+    extras: pick(bookExtras, selBookExtras.map(String)), products: pick(bookProducts, selBookProducts.map(String)),
+    barber: b ? b.name : '', time: selBookSlot ? selBookSlot.time : '',
+    when: selBookDate ? new Date(selBookDate + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' }) : ''
+  });
+}
+document.addEventListener('click', function () { setTimeout(refreshBookRecap, 0); });
+document.addEventListener('change', function () { setTimeout(refreshBookRecap, 0); });
 function renderBookItemList(kind) { vitrineRender(bookItemListConfig(kind)); }
 function updateBookItemsSummary(kind) { vitrineSummary(bookItemListConfig(kind)); }
 function filterBookItems(kind) { vitrineFilter(bookItemListConfig(kind)); }
