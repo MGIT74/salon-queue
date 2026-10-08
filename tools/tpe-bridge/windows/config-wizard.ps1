@@ -98,9 +98,19 @@ $btnOk.Add_Click({
         $lblStatus.Text = "L'identifiant du salon et la cle du pont sont obligatoires."
         return
     }
+    $serverUrl = $tbServer.Text.Trim()
+    if ($serverUrl -notmatch '^https?://') { $serverUrl = 'https://' + $serverUrl }
+    try {
+        $parsedUrl = [Uri]$serverUrl
+        if ($parsedUrl.Scheme -ne 'https' -or [string]::IsNullOrWhiteSpace($parsedUrl.Host)) { throw 'Invalid URL' }
+    } catch {
+        $lblStatus.Text = "Adresse invalide : utilisez https://app.thebarberone.com"
+        return
+    }
+    $tbServer.Text = $serverUrl
     New-Item -ItemType Directory -Force -Path $configDir | Out-Null
     $cfg = [ordered]@{
-        server  = $tbServer.Text.Trim()
+        server  = $serverUrl
         salon   = $tbSalon.Text.Trim()
         key     = $tbKey.Text.Trim()
         printer = $tbPrinter.Text.Trim()
