@@ -64,7 +64,8 @@ const suite = [
   ['41-vitrine-compte.js', false, ['exit']],
   ['42-vitrine-assistants-borne.js', false, ['exit']],
   ['43-coiffeurs-en-conge.js', false, ['exit']],
-  ['44-photo-coiffeur-entiere.js', false, ['exit']]
+  ['44-photo-coiffeur-entiere.js', false, ['exit']],
+  ['45-rdv-en-ligne-3-zones.js', false, ['exit']]
 ];
 
 let bad = 0;

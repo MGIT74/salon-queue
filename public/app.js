@@ -958,3 +958,34 @@ function barberTileHtml(b, selected, onclick) {
                  : '<span class="icon">' + esc(String(b.name || '?').charAt(0).toUpperCase()) + '</span>') +
     '<span class="name">' + esc(b.name) + '</span></button>';
 }
+
+/* Page de reservation publique (rdv.html) : meme decoupage en 3 zones que les fenetres d'ajout de RDV (vitrineFlow).
+   En haut : retour + titre de l'etape. Au milieu : la liste, qui defile. En bas : recapitulatif detaille + bouton, fixes.
+   Le decoupage ne change rien sur mobile (display: contents, voir app.css) : seul le bureau (>= 900px) passe en 3 zones. */
+function vitrinePageFlow(wrap, panelIds) {
+  wrap.classList.add('page-flow');
+  var BODY_START = '.item-grid,.aa-grid,.slots-grid,.fld,.modal-error,.hint,.items-empty,.items-search';
+  panelIds.forEach(function (id) {
+    var panel = document.getElementById(id);
+    if (!panel || panel.classList.contains('flow')) return;
+    panel.classList.add('flow');
+    var kids = Array.prototype.slice.call(panel.children);
+    var top = document.createElement('div'); top.className = 'flow-top';
+    var body = document.createElement('div'); body.className = 'flow-body';
+    var bar = null, go = null, inTop = true;
+    kids.forEach(function (k) {
+      if (k.classList.contains('step-bar')) { bar = k; return; }
+      if (k.classList.contains('go')) { go = k; return; }
+      if (k.classList.contains('flow-recap')) k.classList.add('recap-top');
+      if (inTop && k.matches(BODY_START) && !k.classList.contains('items-search')) inTop = false;
+      (inTop ? top : body).appendChild(k);
+    });
+    if (!bar) {
+      bar = document.createElement('div'); bar.className = 'step-bar own-bar';
+      var rc = document.createElement('div'); rc.className = 'flow-recap recap-foot'; rc.setAttribute('data-recap', '');
+      bar.appendChild(rc);
+      if (go) bar.appendChild(go);
+    }
+    panel.appendChild(top); panel.appendChild(body); panel.appendChild(bar);
+  });
+}

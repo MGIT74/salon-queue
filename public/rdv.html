@@ -18,7 +18,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Prendre rendez-vous</title>
-<link rel="stylesheet" href="/app.css?v=10">
+<link rel="stylesheet" href="/app.css?v=11">
 <script>
   // Adresse SANS ?salon=... : on masque la page le temps de savoir si la plateforme heberge plusieurs salons
   // (voir guardMissingSalon) - pour ne jamais montrer, meme une fraction de seconde, un formulaire sans salon.
@@ -140,6 +140,7 @@
   .go:disabled { opacity: .5; }
 
   .empty { color: var(--grey); font-size: 14px; padding: 20px 0; text-align: center; }
+  .slots-grid > .empty { grid-column: 1 / -1; text-align: left; padding: 8px 0; }
   .confirm-box { text-align: center; padding: 20px 0; }
   .confirm-box .check {
     width: 56px; height: 56px; border-radius: 50%; background: var(--green); margin: 0 auto 18px;
@@ -293,9 +294,10 @@
   </section>
 </div>
 
-<script src="/app.js?v=11"></script>
+<script src="/app.js?v=12"></script>
 <script>
 mountThemeButton();
+vitrinePageFlow(document.querySelector('.wrap'), ['p-service', 'p-extras', 'p-products', 'p-datetime', 'p-contact']);
 
 var SALON_SLUG = (function () {
   try { return new URLSearchParams(window.location.search).get('salon') || ''; }

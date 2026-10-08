@@ -75,4 +75,5 @@ node tests/caisse/41-vitrine-compte.js  # meme chose sur la reservation de 'Mon 
 node tests/caisse/42-vitrine-assistants-borne.js  # memes cartes dans l'assistant 'Ajouter un RDV' du tableau de bord et de Mon poste, et sur la borne ; fichiers partages (app.css v6 / app.js v8)
 node tests/caisse/43-coiffeurs-en-conge.js  # un coiffeur en conge n'est plus propose (RDV en ligne, Mon compte, borne, planning et assistant du tableau de bord)
 node tests/caisse/44-photo-coiffeur-entiere.js  # photo du coiffeur entiere (jamais coupee) sur rdv, Mon compte et la borne ; televersement sans recadrage
+node tests/caisse/45-rdv-en-ligne-3-zones.js  # rdv.html en ligne : design 3 zones sur ordinateur (en-tete / liste / pied fixe avec recap), mobile inchange
 ```

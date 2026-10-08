@@ -507,3 +507,23 @@ input[type="date"] { -webkit-appearance: none; appearance: none; }
 .svc-card.has-photo { padding: 0; overflow: hidden; gap: 0; justify-content: flex-start; align-items: stretch; }
 .svc-card.has-photo .barber-photo { display: block; width: 100%; aspect-ratio: 1 / 1; background-color: #fff; background-size: contain; background-repeat: no-repeat; background-position: center; }
 .svc-card.has-photo .name { padding: 10px 8px 12px; }
+
+/* ===== Page de reservation publique (rdv.html) : 3 zones sur ordinateur, inchangee sur mobile ===== */
+.page-flow .panel.flow > .flow-top, .page-flow .panel.flow > .flow-body, .page-flow .panel.flow > .step-bar.own-bar { display: contents; }
+.page-flow .step-bar.own-bar .recap-foot { display: none; }
+@media (min-width: 900px) {
+  .wrap.page-flow { max-width: min(1080px, 94vw); padding: 0; display: flex; flex-direction: column; overflow: hidden; }
+  .wrap.page-flow:has(.panel.flow.on) { height: min(92vh, 900px); }
+  .wrap.page-flow .rdv-header { flex: none; padding: 30px 32px 0; margin-bottom: 22px; }
+  .wrap.page-flow .gift-summary-box { flex: none; margin: 0 32px 16px; }
+  .wrap.page-flow .panel.on { padding: 0 32px 32px; }
+  .wrap.page-flow .panel.flow.on { padding: 0; display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+  .wrap.page-flow .panel.flow > .flow-top { display: block; flex: none; padding: 0 32px 8px; }
+  .wrap.page-flow .panel.flow > .flow-body { display: block; flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 2px 32px 16px; overscroll-behavior: contain; }
+  .wrap.page-flow .panel.flow > .step-bar { display: block; position: static; flex: none; margin: 0; padding: 14px 32px 22px; border-radius: 0; background: var(--card); box-shadow: 0 -1px 0 var(--sep); }
+  .wrap.page-flow .step-bar.own-bar .recap-foot { display: block; }
+  .wrap.page-flow .recap-top { display: none; }
+  .wrap.page-flow .step-bar .flow-recap { margin-bottom: 10px; }
+  .wrap.page-flow .step-bar .step-summary { display: none; }
+  .wrap.page-flow .panel.flow .go { margin-top: 0; }
+}
