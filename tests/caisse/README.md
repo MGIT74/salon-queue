@@ -76,4 +76,5 @@ node tests/caisse/42-vitrine-assistants-borne.js  # memes cartes dans l'assistan
 node tests/caisse/43-coiffeurs-en-conge.js  # un coiffeur en conge n'est plus propose (RDV en ligne, Mon compte, borne, planning et assistant du tableau de bord)
 node tests/caisse/44-photo-coiffeur-entiere.js  # photo du coiffeur entiere (jamais coupee) sur rdv, Mon compte et la borne ; televersement sans recadrage
 node tests/caisse/45-rdv-en-ligne-3-zones.js  # rdv.html en ligne : design 3 zones sur ordinateur (en-tete / liste / pied fixe avec recap), mobile inchange
+node tests/caisse/46-calendrier-maison.js  # calendrier maison sur ordinateur (champs date), mobile natif
 ```

@@ -989,3 +989,99 @@ function vitrinePageFlow(wrap, panelIds) {
     panel.appendChild(top); panel.appendChild(body); panel.appendChild(bar);
   });
 }
+
+/* ===== Calendrier maison (ordinateur) =====
+   Remplace la fenetre native des <input type="date"> sur grand ecran avec souris (>= 900px). La valeur reste au format AAAA-MM-JJ et
+   les evenements input / change sont emis : tout le code existant (onchange, .value) fonctionne sans changement.
+   Sur mobile / tablette tactile, le selecteur natif du telephone reste utilise. Les champs ajoutes plus tard sont geres (ecoute globale). */
+(function () {
+  var MQ = '(min-width: 900px) and (pointer: fine)';
+  var MONTHS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+  var DOW = ['lu', 'ma', 'me', 'je', 've', 'sa', 'di'];
+  var pop = null, cur = null, vy = 0, vm = 0, mode = 'days';
+  function on() { return window.matchMedia && window.matchMedia(MQ).matches; }
+  function pad(n) { return (n < 10 ? '0' : '') + n; }
+  function iso(y, m, d) { return y + '-' + pad(m + 1) + '-' + pad(d); }
+  function parse(v) { var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v || ''); return m ? { y: +m[1], m: +m[2] - 1, d: +m[3] } : null; }
+  function todayIso() { var t = new Date(); return iso(t.getFullYear(), t.getMonth(), t.getDate()); }
+  function close() { if (pop) { pop.remove(); pop = null; } cur = null; }
+  function setValue(v) {
+    if (!cur) return;
+    var inp = cur; inp.value = v; close();
+    inp.dispatchEvent(new Event('input', { bubbles: true }));
+    inp.dispatchEvent(new Event('change', { bubbles: true }));
+    try { inp.focus(); } catch (e) {}
+  }
+  function render() {
+    if (!pop || !cur) return;
+    var min = cur.getAttribute('min') || '', max = cur.getAttribute('max') || '', sel = cur.value || '', today = todayIso(), h = '';
+    h += '<div class="dp-head"><button type="button" class="dp-nav" data-a="prev" aria-label="Précédent">‹</button>' +
+         '<button type="button" class="dp-title" data-a="mode">' + (mode === 'days' ? MONTHS[vm] + ' ' + vy : vy) + ' <span class="dp-caret">▾</span></button>' +
+         '<button type="button" class="dp-nav" data-a="next" aria-label="Suivant">›</button></div>';
+    if (mode === 'months') {
+      h += '<div class="dp-months">';
+      for (var i = 0; i < 12; i++) h += '<button type="button" class="dp-m' + (i === vm ? ' cur' : '') + '" data-m="' + i + '">' + MONTHS[i].slice(0, 4) + (MONTHS[i].length > 4 ? '.' : '') + '</button>';
+      h += '</div>';
+    } else {
+      h += '<div class="dp-dow">' + DOW.map(function (d) { return '<span>' + d + '</span>'; }).join('') + '</div><div class="dp-days">';
+      var first = (new Date(vy, vm, 1).getDay() + 6) % 7, dim = new Date(vy, vm + 1, 0).getDate(), prevDim = new Date(vy, vm, 0).getDate();
+      var cells = Math.ceil((first + dim) / 7) * 7;
+      for (var c = 0; c < cells; c++) {
+        var d, y = vy, m = vm, out = false;
+        if (c < first) { d = prevDim - first + c + 1; m = vm - 1; out = true; }
+        else if (c >= first + dim) { d = c - first - dim + 1; m = vm + 1; out = true; }
+        else d = c - first + 1;
+        if (m < 0) { m = 11; y--; } else if (m > 11) { m = 0; y++; }
+        var s = iso(y, m, d), dis = (min && s < min) || (max && s > max);
+        h += '<button type="button" class="dp-d' + (out ? ' out' : '') + (s === today ? ' today' : '') + (s === sel ? ' sel' : '') + '" data-v="' + s + '"' + (dis ? ' disabled' : '') + '>' + d + '</button>';
+      }
+      h += '</div>';
+    }
+    h += '<div class="dp-foot"><button type="button" class="dp-link" data-a="clear">Effacer</button><button type="button" class="dp-link" data-a="today">Aujourd\'hui</button></div>';
+    pop.innerHTML = h;
+  }
+  function place() {
+    var r = cur.getBoundingClientRect(), w = pop.offsetWidth, hh = pop.offsetHeight;
+    var left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8));
+    var top = r.bottom + 6;
+    if (top + hh > window.innerHeight - 8 && r.top - hh - 6 > 8) top = r.top - hh - 6;
+    pop.style.left = left + 'px'; pop.style.top = Math.max(8, top) + 'px';
+  }
+  function open(inp) {
+    if (cur === inp && pop) return;
+    close(); cur = inp; mode = 'days';
+    var p = parse(inp.value) || parse(todayIso()); vy = p.y; vm = p.m;
+    pop = document.createElement('div'); pop.className = 'dp-pop'; pop.setAttribute('role', 'dialog');
+    document.body.appendChild(pop); render(); place();
+  }
+  document.addEventListener('mousedown', function (e) {
+    var t = e.target;
+    if (pop && pop.contains(t)) { e.preventDefault(); return; }
+    if (t && t.matches && t.matches('input[type="date"]') && on() && !t.disabled && !t.readOnly) { e.preventDefault(); try { t.focus(); } catch (x) {} open(t); return; }
+    if (pop) close();
+  }, true);
+  document.addEventListener('click', function (e) {
+    var t = e.target;
+    if (t && t.matches && t.matches('input[type="date"]') && on()) { e.preventDefault(); return; }
+    if (!pop || !pop.contains(t)) return;
+    var b = t.closest('button'); if (!b) return;
+    if (b.dataset.v) return setValue(b.dataset.v);
+    if (b.dataset.m !== undefined) { vm = +b.dataset.m; mode = 'days'; return render(); }
+    var a = b.dataset.a;
+    if (a === 'clear') return setValue('');
+    if (a === 'today') return setValue(todayIso());
+    if (a === 'mode') { mode = mode === 'days' ? 'months' : 'days'; return render(); }
+    if (a === 'prev' || a === 'next') {
+      var k = a === 'prev' ? -1 : 1;
+      if (mode === 'months') vy += k; else { vm += k; if (vm < 0) { vm = 11; vy--; } else if (vm > 11) { vm = 0; vy++; } }
+      render();
+    }
+  }, true);
+  document.addEventListener('keydown', function (e) {
+    var t = e.target;
+    if (e.key === 'Escape' && pop) { close(); return; }
+    if (t && t.matches && t.matches('input[type="date"]') && on() && (e.key === 'ArrowDown' && e.altKey || e.key === 'F4')) { e.preventDefault(); open(t); }
+  }, true);
+  window.addEventListener('resize', close);
+  window.addEventListener('scroll', function (e) { if (pop && !pop.contains(e.target)) close(); }, true);
+})();
