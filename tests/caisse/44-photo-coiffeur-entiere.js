@@ -21,6 +21,7 @@ check('CSS : photo en "contain" sur fond blanc, cadre carre, plus de recadrage',
 check('rdv.html et Mon compte utilisent la tuile partagee (plus de background-size:cover)', /barberTileHtml\(b, selBarber === b\.id/.test(rdv) && /barberTileHtml\(b, selBookBarber === b\.id/.test(compte) && !/background-size:cover;background-position:center' : ''/.test(rdv + compte));
 check('borne : photo entiere (contain) dans un cadre, nom et attente sous la photo (la tuile cadeau est epargnee)', /barber-photo" style="background-image/.test(kiosk) && /\.barber-card\.has-photo:not\(\.gift-tile\) \.barber-photo \{[^}]*contain/.test(kiosk));
 check('televersement (tableau de bord) : plus de recadrage carre 300x300, image conservee entiere', /function uploadBarberPhoto[\s\S]*?Photo conservee ENTIERE[\s\S]*?toDataURL/.test(dash) && /Photo conservee ENTIERE/.test(dash) && /600 \/ Math\.max\(img\.width, img\.height\)/.test(dash));
+check('page de RDV / Mon compte : la carte garde la MEME largeur a toutes les etapes (aucun elargissement des etapes prestation/supplements/produits)', !/\.wrap:has\(/.test(css));
 
 console.log('\n' + pass + ' OK, ' + fail + ' ECHEC');
 process.exit(fail ? 1 : 0);
