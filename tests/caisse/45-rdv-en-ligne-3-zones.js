@@ -14,7 +14,7 @@ check('le bouton Suivant / Confirmer est deplace (pas copie) : ids conserves', /
 console.log('\n[B] Style');
 const desk = css.slice(css.indexOf('Page de reservation publique (rdv.html)'));
 check('mobile : zones en display: contents (rendu inchange), recap du pied masque', /\.page-flow \.panel\.flow > \.flow-top[^{]*\{ display: contents/.test(desk) && /\.recap-foot \{ display: none/.test(desk));
-check('ordinateur : carte large 1240px, recap + bouton en colonne verticale a droite, hauteur fixe, liste qui defile, pied fixe', /@media \(min-width: 900px\)/.test(desk) && /max-width: min\(1240px, 96vw\)/.test(desk) && /height: min\(92vh, 900px\)/.test(desk) && /\.flow-body \{[^}]*overflow-y: auto/.test(desk) && /> \.step-bar \{[^}]*grid-column: 2[^}]*position: static/.test(desk));
+check('ordinateur : carte large 1240px, recap + bouton en colonne verticale a droite, hauteur fixe, liste qui defile, pied fixe', /@media \(min-width: 900px\)/.test(desk) && /max-width: min\(1240px, 96vw\)/.test(desk) && /height: min\(92vh, 900px\)/.test(desk) && /\.flow-body \{[^}]*overflow-y: auto/.test(desk) && /> \.step-bar \{[^}]*grid-column: 2/.test(desk));
 check('ordinateur : le recap du haut est masque (il est dans le pied)', /\.recap-top \{ display: none/.test(desk));
 check('la largeur ne change pas selon l\'etape (aucun .wrap:has de largeur)', !/\.wrap:has\(/.test(css) && !/width[^;{]*:has\(/.test(desk));
 check('mode clair : contour visible sur les cartes (bordure fine + ombre)', /:not\(\[data-theme="dark"\]\) \.item-card[\s\S]*?box-shadow: 0 0 0 1px/.test(css));

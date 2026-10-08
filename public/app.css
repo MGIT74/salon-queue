@@ -521,8 +521,9 @@ input[type="date"] { -webkit-appearance: none; appearance: none; }
   .wrap.page-flow .panel.flow > .flow-top { display: block; grid-column: 1; grid-row: 1; padding: 0 32px 8px; }
   .wrap.page-flow .panel.flow > .flow-body { display: block; grid-column: 1; grid-row: 2; min-height: 0; overflow-y: auto; padding: 2px 32px 16px; overscroll-behavior: contain; }
   /* Recapitulatif + bouton : colonne verticale fixe a droite */
-  .wrap.page-flow .panel.flow > .step-bar { display: flex; flex-direction: column; grid-column: 2; grid-row: 1 / span 2; position: static; margin: 0; padding: 14px 28px 24px 24px; border-radius: 0; background: var(--card); box-shadow: -1px 0 0 var(--sep); min-height: 0; }
-  .wrap.page-flow .step-bar .flow-recap { flex: 1 1 auto; min-height: 0; overflow-y: auto; margin-bottom: 14px; }
+  .wrap.page-flow .panel.flow > .step-bar { display: flex; flex-direction: column; grid-column: 2; grid-row: 1 / span 2; position: relative; margin: 0; padding: 18px 28px 26px 28px; border-radius: 0; background: var(--card); box-shadow: none; min-height: 0; }
+  .wrap.page-flow .panel.flow > .step-bar::before { content: ''; position: absolute; left: 0; top: 18px; bottom: 26px; width: 1px; background: var(--sep); }
+  .wrap.page-flow .step-bar .flow-recap { flex: 1 1 auto; min-height: 0; overflow-y: auto; margin-bottom: 14px; padding: 6px 2px 4px 0; }
   .wrap.page-flow .step-bar .recap-list { max-height: none; overflow: visible; gap: 12px; }
   .wrap.page-flow .step-bar .recap-row { grid-template-columns: minmax(0, 1fr) auto; row-gap: 1px; }
   .wrap.page-flow .step-bar .recap-k { grid-column: 1 / -1; }
