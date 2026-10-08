@@ -144,7 +144,7 @@ async function firstRunWizard() {
   const readline = require('readline');
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 
-  const server = await ask(rl, 'Adresse de votre application (ex: https://rdv.handsgraphic.com)', 'https://rdv.handsgraphic.com');
+  const server = await ask(rl, 'Adresse de votre application (ex: https://app.thebarberone.com)', 'https://app.thebarberone.com');
   const salon = await ask(rl, 'Identifiant du salon (celui dans l\'URL ?salon=...)', '');
   const key = await ask(rl, 'Cle du pont', '');
   const printer = await ask(rl, 'Nom de partage de l\'imprimante', defaultPrinterAnswer);
