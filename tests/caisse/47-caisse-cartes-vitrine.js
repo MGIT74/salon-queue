@@ -25,5 +25,10 @@ check('renderItemGrid utilise vitrineRender (plus de tuiles .item-btn maison)', 
 check('un appui ajoute au ticket via le catalogue (addCatalogItem -> addToTicket)', /function addCatalogItem/.test(caisse) && /addToTicket\(typeSingular, String\(it\.id\)/.test(caisse));
 check('les cartes deja au ticket sont surlignees sans reconstruire la grille (syncGridSel dans renderTicket)', /function syncGridSel/.test(caisse) && /syncGridSel\(\);\s*updateGiftVisibility/.test(caisse));
 
+console.log('\n[C] Ordinateur : seule la liste des articles defile');
+check('onglet Caisse (>= 861px) : page figee, hauteur de l\'ecran, seule la grille #item-grid a overflow-y: auto', /@media \(min-width: 861px\) \{[\s\S]*body:has\(#panel-caisse\.on #item-grid\)[\s\S]*overflow: hidden/.test(caisse) && /#panel-caisse #item-grid \{[^}]*overflow-y: auto/.test(caisse));
+check('ticket, onglets et pastilles restent fixes (ticket non "sticky" : il occupe la hauteur)', /#panel-caisse \.ticket-panel \{ position: static; max-height: none/.test(caisse) && /#panel-caisse \.caisse-grid-col \.cat-tabs \{ flex: none/.test(caisse));
+check('mobile / autres onglets : regle limitee a l\'onglet Caisse sur grand ecran (Agenda, Cloture defilent normalement)', /body:has\(#panel-caisse\.on #item-grid\)/.test(caisse));
+
 console.log('\n' + pass + ' OK, ' + fail + ' ECHEC');
 process.exit(fail ? 1 : 0);

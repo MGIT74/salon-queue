@@ -568,6 +568,23 @@
     }
     .z-actions { display: none; }
   }
+
+  /* Onglet Caisse sur ordinateur : tout reste fixe (pastilles coiffeurs, onglets Prestations / Supplements / Produits, ticket, menu du bas) ;
+     seule la liste des articles defile. Les autres onglets (Agenda, Cloture...) gardent le defilement normal de la page. */
+  @media (min-width: 861px) {
+    body:has(#panel-caisse.on #item-grid):has(#app-screen:not([style*="display: none"])) { overflow: hidden; }
+    body:has(#panel-caisse.on #item-grid):has(#app-screen:not([style*="display: none"])) .wrap { height: 100vh; height: 100dvh; box-sizing: border-box; padding-bottom: 0; display: flex; flex-direction: column; }
+    body:has(#panel-caisse.on #item-grid) #app-screen:not([style*="display: none"]) { flex: 1 1 auto; min-height: 0; display: flex !important; flex-direction: column; box-sizing: border-box; }
+    body:has(#panel-caisse.on #item-grid) #app-screen > .topbar,
+    body:has(#panel-caisse.on #item-grid) #app-screen > .barber-bubbles { flex: none; }
+    #app-screen > #panel-caisse.on { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+    #panel-caisse .caisse-layout { flex: 1 1 auto; min-height: 0; grid-template-rows: minmax(0, 1fr) auto; align-items: stretch; }
+    #panel-caisse .caisse-grid-col { display: flex; flex-direction: column; min-height: 0; }
+    #panel-caisse .caisse-grid-col .cat-tabs { flex: none; }
+    #panel-caisse #item-grid { flex: 1 1 auto; min-height: 0; overflow-y: auto; align-content: start; grid-auto-rows: max-content; padding: 3px 6px 16px 3px; margin-bottom: 0; overscroll-behavior: contain; }
+    #panel-caisse .pending-list { max-height: 26vh; margin-bottom: 8px; }
+    #panel-caisse .ticket-panel { position: static; max-height: none; min-height: 0; margin-bottom: 10px; }
+  }
 </style>
 </head>
 <body>
