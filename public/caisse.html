@@ -584,6 +584,11 @@
     #panel-caisse #item-grid { flex: 1 1 auto; min-height: 0; overflow-y: auto; align-content: start; grid-auto-rows: max-content; padding: 3px 6px 16px 3px; margin-bottom: 0; overscroll-behavior: contain; }
     #panel-caisse .pending-list { max-height: 26vh; margin-bottom: 8px; }
     #panel-caisse .ticket-panel { position: static; max-height: none; min-height: 0; margin-bottom: 10px; }
+    /* Ticket : les lignes s'etirent avec le contenu (plus de mini-zone de 2 lignes) ; Espèces/CB plus compacts pour laisser la place ;
+       seul le panneau defile si le ticket depasse vraiment la hauteur de l'ecran. */
+    #panel-caisse .ticket-panel { overflow-y: auto; overscroll-behavior: contain; align-self: stretch; }
+    #panel-caisse .ticket-lines { flex: none; overflow: visible; min-height: 60px; }
+    #panel-caisse .ticket-panel .pay-grid button { aspect-ratio: auto; min-height: 0; height: 64px; font-size: 18px; }
   }
 </style>
 </head>

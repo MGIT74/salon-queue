@@ -69,7 +69,8 @@ const suite = [
   ['46-calendrier-maison.js', false, ['exit']],
   ['47-caisse-cartes-vitrine.js', false, ['exit']],
   ['48-notifications-email-textes.js', false, ['exit']],
-  ['49-vendeur-par-ligne.js', false, ['exit']]
+  ['49-vendeur-par-ligne.js', false, ['exit']],
+  ['50-ticket-etire.js', false, ['exit']]
 ];
 
 let bad = 0;
