@@ -172,10 +172,9 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
         barberId = b ? b.id : null;
       }
 
-      // Un coiffeur "vendeur" par ligne n'a de sens que pour un produit -
-      // jamais pour une prestation/supplément. Id validé (même salon, actif),
-      // sinon silencieusement ignoré (pas de blocage de la vente pour ça).
-      const lineBarberIds = [...new Set(cleanItems.filter((it) => it.item_type === 'product' && it.barber_id).map((it) => it.barber_id))];
+      // Coiffeur "vendeur" / "réalisateur" par ligne (produit, prestation ou supplément) : peut différer du coiffeur qui encaisse.
+      // Id validé (même salon, actif), sinon silencieusement ignoré (pas de blocage de la vente pour ça).
+      const lineBarberIds = [...new Set(cleanItems.filter((it) => it.barber_id).map((it) => it.barber_id))];
       let validLineBarberIds = new Set();
       if (lineBarberIds.length) {
         const [rows] = await db.query(
@@ -218,7 +217,7 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
       let total = 0;
       const itemRows = cleanItems.map((it) => {
         total += it.quantity * it.unit_price_cents;
-        const lineBarberId = it.item_type === 'product' && it.barber_id && validLineBarberIds.has(it.barber_id) ? it.barber_id : null;
+        const lineBarberId = it.barber_id && validLineBarberIds.has(it.barber_id) ? it.barber_id : null;
         return [crypto.randomUUID(), saleId, it.item_type, it.item_id, it.item_name, it.unit_price_cents, it.quantity, lineBarberId];
       });
       await db.query(

@@ -79,4 +79,5 @@ node tests/caisse/45-rdv-en-ligne-3-zones.js  # rdv.html en ligne : design 3 zon
 node tests/caisse/46-calendrier-maison.js  # calendrier maison sur ordinateur (champs date), mobile natif
 node tests/caisse/47-caisse-cartes-vitrine.js  # caisse : memes cartes que la page de RDV en ligne (prestations / supplements / produits)
 node tests/caisse/48-notifications-email-textes.js  # notifications email : textes d origine ecrits dans les champs, jetons proteges
+node tests/caisse/49-vendeur-par-ligne.js  # vendeur/realisateur par ligne (prestation, supplement, produit) + stats
 ```

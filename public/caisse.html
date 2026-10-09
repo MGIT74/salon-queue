@@ -3049,9 +3049,12 @@ function usePendingForTicket(queueId) {
   var q = pendingPayments.find(function (x) { return x.id === queueId; });
   if (!q) return;
 
-  ticket = [{ item_type: 'service', item_id: q.service.id, item_name: q.service.name, unit_price_cents: q.service.price_cents, quantity: 1 }];
+  // Prestation/supplément : réalisés par le coiffeur de la file (modifiable
+  // ligne par ligne si un collègue a fait une partie du travail).
+  var doneBy = q.barber_id || activeBarberId || null;
+  ticket = [{ item_type: 'service', item_id: q.service.id, item_name: q.service.name, unit_price_cents: q.service.price_cents, quantity: 1, barber_id: doneBy }];
   q.extras.forEach(function (e) {
-    ticket.push({ item_type: 'extra', item_id: e.id, item_name: e.name, unit_price_cents: e.price_cents, quantity: 1 });
+    ticket.push({ item_type: 'extra', item_id: e.id, item_name: e.name, unit_price_cents: e.price_cents, quantity: 1, barber_id: doneBy });
   });
   // Produits choisis d'avance par le client au moment de sa reservation
   // (ex: une boisson) - deja pretes dans le ticket, le coiffeur peut les
@@ -3127,7 +3130,11 @@ function addToTicket(itemType, itemId, itemName, unitPriceCents) {
     // renderTicket) - par défaut le coiffeur actif au moment de
     // l'ajout, modifiable ensuite ligne par ligne si un autre coiffeur
     // a en réalité vendu ce produit précis.
-    var lineBarberId = itemType === 'product' ? activeBarberId : null;
+    var lineBarberId = activeBarberId || null;
+    if (itemType !== 'product' && ticketQueueId) {
+      var pq = pendingPayments.find(function (x) { return x.id === ticketQueueId; });
+      if (pq && pq.barber_id) lineBarberId = pq.barber_id;
+    }
     ticket.push({ item_type: itemType, item_id: itemId, item_name: itemName, unit_price_cents: unitPriceCents, quantity: 1, barber_id: lineBarberId });
     newIndex = ticket.length - 1;
   }
@@ -3160,7 +3167,7 @@ function renderTicket(justAddedIndex) {
     ? '<div class="empty">Aucun article sélectionné</div>'
     : ticket.map(function (l, i) {
         return '<div class="ticket-line' + (i === justAddedIndex ? ' enter' : '') + '">' +
-          (l.item_type === 'product' ? lineSellerBubbleHtml(l, i) : '') +
+          lineSellerBubbleHtml(l, i) +
           '<div class="name">' + esc(l.item_name) + '</div>' +
           '<div class="qty-ctrl">' +
             '<button onclick="changeQty(' + i + ',-1)">−</button>' +
@@ -3185,9 +3192,14 @@ function renderTicket(justAddedIndex) {
  * Petite bulle "qui a vendu ce produit" sur chaque ligne produit du
  * ticket - par défaut le coiffeur actif au moment de l'ajout, mais
  * modifiable indépendamment (ex: un autre coiffeur a vendu ce parfum
- * au client d'un collègue). Sans effet sur les prestations/suppléments,
- * qui restent attribués à toute la vente.
+ * au client d'un collègue). Idem pour prestations/suppléments : le
+ * réalisateur compte dans ses statistiques même si un autre encaisse.
  */
+function lineSellerLabel(line) {
+  return line.item_type === 'product' ? 'Qui a vendu ce produit ?'
+    : (line.item_type === 'extra' ? 'Qui a réalisé ce supplément ?' : 'Qui a réalisé cette prestation ?');
+}
+
 function lineSellerBubbleHtml(line, index) {
   var seller = allBarbers.find(function (b) { return b.id === line.barber_id; });
   var color = seller ? (seller.color || stableColorForId(seller.id)) : 'var(--fill)';
@@ -3195,7 +3207,7 @@ function lineSellerBubbleHtml(line, index) {
   var avatarStyle = seller && seller.photo_url
     ? 'background-image:url(\'' + seller.photo_url + '\')'
     : 'background:' + color + ';color:' + (seller ? '#fff' : 'var(--grey)');
-  return '<button type="button" class="line-seller-avatar" style="' + avatarStyle + '" title="Qui a vendu ce produit ?" onclick="openLineSellerModal(' + index + ')">' +
+  return '<button type="button" class="line-seller-avatar" style="' + avatarStyle + '" title="' + esc(lineSellerLabel(line)) + '" onclick="openLineSellerModal(' + index + ')">' +
     (seller && seller.photo_url ? '' : esc(initial)) +
   '</button>';
 }
@@ -3215,7 +3227,7 @@ function openLineSellerModal(index) {
 
   var overlay = _buildModal(
     '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px">' +
-    '<div class="modal-title" style="margin-bottom:0">Qui a vendu "' + esc(line.item_name) + '" ?</div>' +
+    '<div class="modal-title" style="margin-bottom:0">' + esc(lineSellerLabel(line)) + ' « ' + esc(line.item_name) + ' »</div>' +
     '<button id="lsm-close-x" style="background:var(--fill);border:none;width:30px;height:30px;border-radius:50%;color:var(--grey);font-size:14px;cursor:pointer;flex-shrink:0;margin-left:10px">✕</button>' +
     '</div>' +
     '<div class="line-seller-options">' + options + '</div>'

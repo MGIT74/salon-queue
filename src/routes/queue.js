@@ -2,6 +2,7 @@ const express = require('express');
 const crypto = require('crypto');
 const { pool, utcIso, getSettings } = require('../db');
 const { loadQueue, recompute, clientKey } = require('../lib/queueMath');
+const { serviceLineTransfers, applyTransfers } = require('../lib/lineAttribution');
 const { promoteTodayAppointments, nowParisDatetimeString } = require('./appointments');
 const requireAdmin = require('../middleware/auth');
 const { verifyOwnerPassword } = require('../middleware/auth');
@@ -588,13 +589,25 @@ router.get('/stats/week', requireAdmin, wrap(async (req, res) => {
     days.push(Object.assign({ date: key, revenue_cents: 0, done_count: 0 }, byDay[key] || {}));
   }
 
-  const [byRevenue] = await pool.query(
+  const [byRevenueAll] = await pool.query(
     `SELECT b.id, b.name, b.photo_url, COALESCE(SUM(q.total_price_cents), 0) AS revenue_cents, COUNT(*) AS done_count
      FROM queue q JOIN barbers b ON b.id = q.barber_id
      WHERE q.salon_id = ? AND q.status = 'done' AND q.end_at >= CURDATE()
-     GROUP BY b.id ORDER BY revenue_cents DESC LIMIT 3`,
+     GROUP BY b.id ORDER BY revenue_cents DESC`,
     [req.salon.id]
   );
+  // Lignes de ticket attribuees a un autre coiffeur que celui du passage (voir lineAttribution.js), puis top 3.
+  const revMap = new Map();
+  byRevenueAll.forEach((r) => revMap.set(r.id, { name: r.name, photo_url: r.photo_url, count: Number(r.done_count), cents: Number(r.revenue_cents) }));
+  applyTransfers(revMap, await serviceLineTransfers(pool, req.salon.id, { sinceToday: true }));
+  const [photoRows] = await pool.query('SELECT id, name, photo_url FROM barbers WHERE salon_id = ?', [req.salon.id]);
+  const photoById = Object.fromEntries(photoRows.map((b) => [b.id, b]));
+  const byRevenue = [...revMap.entries()]
+    .filter(([id]) => id && photoById[id])
+    .map(([id, v]) => ({ id, name: photoById[id].name, photo_url: photoById[id].photo_url, revenue_cents: Math.max(0, v.cents), done_count: Math.max(0, v.count) }))
+    .filter((r) => r.done_count > 0 || r.revenue_cents > 0)
+    .sort((a, b) => b.revenue_cents - a.revenue_cents)
+    .slice(0, 3);
 
   // Vitesse : duree REELLE (start_at -> end_at), pas la duree prevue au
   // catalogue - c'est la vraie rapidite d'execution qui nous interesse

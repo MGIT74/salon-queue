@@ -7,6 +7,7 @@ const requireAdmin = require('../middleware/auth');
 const { loginRateLimiter } = require('../middleware/rateLimiter');
 const { logActivity } = require('../lib/activityLog');
 const { wrap } = require('../lib/wrap');
+const { serviceLineTransfers, applyTransfers } = require('../lib/lineAttribution');
 
 const router = express.Router();
 
@@ -347,8 +348,13 @@ router.get('/:id/stats', requireAdmin, wrap(async (req, res) => {
     [req.salon.id, req.params.id, startSql, endSql]
   );
 
-  const doneCount = Number(row.done_count);
-  const revenueCents = Number(row.revenue_cents);
+  // Lignes de ticket attribuees a ce coiffeur par un AUTRE coiffeur (ou retirees de ses passages) : voir lineAttribution.js.
+  const adj = applyTransfers(
+    new Map([[req.params.id, { name: null, count: Number(row.done_count), cents: Number(row.revenue_cents) }]]),
+    await serviceLineTransfers(pool, req.salon.id, { fromSql: startSql, toSql: endSql })
+  ).get(req.params.id);
+  const doneCount = Math.max(0, adj.count);
+  const revenueCents = Math.max(0, adj.cents);
   const bookedMinutes = Number(row.booked_minutes);
   const productCount = Number(productRow.product_count);
   const productRevenueCents = Number(productRow.product_revenue_cents);

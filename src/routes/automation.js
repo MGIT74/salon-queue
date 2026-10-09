@@ -4,6 +4,7 @@ const requireAutomationKey = require('../middleware/automationAuth');
 const { computeSlotsForBarber, nowInParis } = require('./appointments');
 const { sendCustomClientEmail } = require('../lib/mailer');
 const { wrap } = require('../lib/wrap');
+const { serviceLineTransfers, applyTransfers } = require('../lib/lineAttribution');
 
 const router = express.Router();
 
@@ -423,12 +424,19 @@ router.get('/salons/:id/revenue', requireAutomationKey, wrap(async (req, res) =>
     [salonId, start + ' 00:00:00', end + ' 23:59:59']
   );
 
-  const byBarberMap = new Map();
+  // Prestations / suppléments attribués ligne par ligne à un autre coiffeur que celui du passage (voir lineAttribution.js).
+  const svcMap = new Map();
   byBarberServices.forEach((r) => {
-    byBarberMap.set(r.barber_id, {
-      barber_name: r.barber_name || 'Non assigné',
-      services_count: Number(r.done_count),
-      service_revenue_cents: Number(r.revenue_cents),
+    svcMap.set(r.barber_id, { name: r.barber_name, count: Number(r.done_count), cents: Number(r.revenue_cents) });
+  });
+  applyTransfers(svcMap, await serviceLineTransfers(pool, salonId, { fromSql: start + ' 00:00:00', toInclusiveSql: end + ' 23:59:59' }));
+
+  const byBarberMap = new Map();
+  svcMap.forEach((v, barberId) => {
+    byBarberMap.set(barberId, {
+      barber_name: v.name || 'Non assigné',
+      services_count: v.count,
+      service_revenue_cents: v.cents,
       product_count: 0,
       product_revenue_cents: 0
     });
