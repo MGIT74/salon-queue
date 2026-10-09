@@ -590,6 +590,8 @@
        seul le panneau defile si le ticket depasse vraiment la hauteur de l'ecran. */
     #panel-caisse .ticket-panel { overflow-y: auto; overscroll-behavior: contain; align-self: stretch; }
     #panel-caisse .ticket-lines { flex: none; overflow: visible; min-height: 60px; }
+    /* Bloc de paiement (Espèces/CB, Partager, Vider, Ouvrir la caisse) collé en bas du panneau ticket */
+    #panel-caisse .ticket-panel .pay-grid { margin-top: auto; padding-top: 14px; }
     #panel-caisse .ticket-panel .pay-grid button { aspect-ratio: auto; min-height: 0; height: 64px; font-size: 18px; }
   }
 </style>

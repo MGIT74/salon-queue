@@ -8,4 +8,5 @@ check('le panneau ticket defile seulement s\'il depasse', /#panel-caisse \.ticke
 check('boutons Especes/CB compacts (plus carres)', /\.pay-grid button \{ aspect-ratio: auto; min-height: 0; height: 64px/.test(c));
 check('le defilement de la liste des cartes est conserve', /#panel-caisse #item-grid \{ flex: 1 1 auto; min-height: 0; overflow-y: auto/.test(c));
 check('regles dans le bloc desktop (min-width: 861px) : mobile inchange', c.indexOf('#panel-caisse .ticket-lines { flex: none') > c.indexOf('@media (min-width: 861px) {\n    body:has(#panel-caisse.on #item-grid)'));
+check('bloc de paiement colle en bas du panneau ticket (desktop)', /#panel-caisse \.ticket-panel \.pay-grid \{ margin-top: auto/.test(c));
 console.log('\n' + pass + ' OK, ' + fail + ' ECHEC'); process.exit(fail ? 1 : 0);
