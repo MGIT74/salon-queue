@@ -83,4 +83,5 @@ node tests/caisse/49-vendeur-par-ligne.js  # vendeur/realisateur par ligne (pres
 node tests/caisse/50-ticket-etire.js  # ticket desktop : lignes extensibles, boutons compacts
 node tests/caisse/51-tiroir-sur-especes.js  # clic Especes = ouverture immediate du tiroir
 node tests/caisse/52-paiement-partage.js  # paiement partage especes + carte (bouton Partager)
+node tests/caisse/53-lignes-separees.js  # un clic = une ligne separee (un coiffeur par ligne)
 ```

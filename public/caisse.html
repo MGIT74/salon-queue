@@ -2893,7 +2893,7 @@ function handleScannedBarcode(code) {
     toast(product.name + ' : rupture de stock', true);
     return;
   }
-  addToTicket('product', product.id, product.name, product.price_cents);
+  addToTicket('product', product.id, product.name, product.price_cents, { merge: true });
   toast(product.name + ' ajouté au ticket');
 }
 
@@ -3132,8 +3132,12 @@ function syncGridSel() {
 }
 
 /* ---------- Ticket ---------- */
-function addToTicket(itemType, itemId, itemName, unitPriceCents) {
-  var existing = ticket.find(function (l) { return l.item_type === itemType && l.item_id === itemId; });
+function addToTicket(itemType, itemId, itemName, unitPriceCents, opts) {
+  // Un clic sur une carte ajoute TOUJOURS une nouvelle ligne (quantité 1) : chaque ligne
+  // garde son propre coiffeur (ex. deux mêmes coupes faites par deux coiffeurs différents).
+  // Le coiffeur ajuste ensuite avec + / − si besoin. Seul le scanner de codes-barres regroupe
+  // les produits identiques du même vendeur (scans répétés = quantité).
+  var existing = (opts && opts.merge) ? ticket.find(function (l) { return l.item_type === itemType && l.item_id === itemId && (l.barber_id || null) === (activeBarberId || null); }) : null;
   var newIndex = null;
   if (existing) { existing.quantity++; } else {
     // Le "vendeur" par ligne n'a de sens que pour un produit (voir
