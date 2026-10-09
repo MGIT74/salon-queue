@@ -29,6 +29,7 @@ console.log('\n[C] Ordinateur : seule la liste des articles defile');
 check('onglet Caisse (>= 861px) : page figee, hauteur de l\'ecran, seule la grille #item-grid a overflow-y: auto', /@media \(min-width: 861px\) \{[\s\S]*body:has\(#panel-caisse\.on #item-grid\)[\s\S]*overflow: hidden/.test(caisse) && /#panel-caisse #item-grid \{[^}]*overflow-y: auto/.test(caisse));
 check('ticket, onglets et pastilles restent fixes (ticket non "sticky" : il occupe la hauteur)', /#panel-caisse \.ticket-panel \{ position: static; max-height: none/.test(caisse) && /#panel-caisse \.caisse-grid-col \.cat-tabs \{ flex: none/.test(caisse));
 check('mobile / autres onglets : regle limitee a l\'onglet Caisse sur grand ecran (Agenda, Cloture defilent normalement)', /body:has\(#panel-caisse\.on #item-grid\)/.test(caisse));
+check('AVANT le code PIN : la mise en page figee ne s\'applique que si l\'ecran Caisse est reellement affiche (display: block pose par le JS), jamais sur le display:none du HTML', /#app-screen\[style\*="display: block"\]/.test(caisse) && !/#app-screen:not\(\[style/.test(caisse));
 
 console.log('\n' + pass + ' OK, ' + fail + ' ECHEC');
 process.exit(fail ? 1 : 0);

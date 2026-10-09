@@ -572,9 +572,9 @@
   /* Onglet Caisse sur ordinateur : tout reste fixe (pastilles coiffeurs, onglets Prestations / Supplements / Produits, ticket, menu du bas) ;
      seule la liste des articles defile. Les autres onglets (Agenda, Cloture...) gardent le defilement normal de la page. */
   @media (min-width: 861px) {
-    body:has(#panel-caisse.on #item-grid):has(#app-screen:not([style*="display: none"])) { overflow: hidden; }
-    body:has(#panel-caisse.on #item-grid):has(#app-screen:not([style*="display: none"])) .wrap { height: 100vh; height: 100dvh; box-sizing: border-box; padding-bottom: 0; display: flex; flex-direction: column; }
-    body:has(#panel-caisse.on #item-grid) #app-screen:not([style*="display: none"]) { flex: 1 1 auto; min-height: 0; display: flex !important; flex-direction: column; box-sizing: border-box; }
+    body:has(#panel-caisse.on #item-grid):has(#app-screen[style*="display: block"]) { overflow: hidden; }
+    body:has(#panel-caisse.on #item-grid):has(#app-screen[style*="display: block"]) .wrap { height: 100vh; height: 100dvh; box-sizing: border-box; padding-bottom: 0; display: flex; flex-direction: column; }
+    body:has(#panel-caisse.on #item-grid) #app-screen[style*="display: block"] { flex: 1 1 auto; min-height: 0; display: flex !important; flex-direction: column; box-sizing: border-box; }
     body:has(#panel-caisse.on #item-grid) #app-screen > .topbar,
     body:has(#panel-caisse.on #item-grid) #app-screen > .barber-bubbles { flex: none; }
     #app-screen > #panel-caisse.on { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
