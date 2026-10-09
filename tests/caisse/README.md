@@ -81,4 +81,5 @@ node tests/caisse/47-caisse-cartes-vitrine.js  # caisse : memes cartes que la pa
 node tests/caisse/48-notifications-email-textes.js  # notifications email : textes d origine ecrits dans les champs, jetons proteges
 node tests/caisse/49-vendeur-par-ligne.js  # vendeur/realisateur par ligne (prestation, supplement, produit) + stats
 node tests/caisse/50-ticket-etire.js  # ticket desktop : lignes extensibles, boutons compacts
+node tests/caisse/51-tiroir-sur-especes.js  # clic Especes = ouverture immediate du tiroir
 ```

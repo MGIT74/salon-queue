@@ -3364,6 +3364,12 @@ function pay(method) {
     return;
   }
 
+  // Espèces : le tiroir-caisse s'ouvre DES le clic sur "Espèces" (pour
+  // rendre la monnaie), sans attendre la fin de l'encaissement. Avec le
+  // pont d'impression c'est une commande silencieuse ; sans pont, c'est
+  // l'impression du ticket en fin de vente (pilote) qui l'ouvre, comme avant.
+  openCashDrawerOnCash();
+
   // Espèces : même écran d'attente que la carte (sans les boutons
   // Annuler/Réessayer) - l'encaissement peut prendre un instant (ex.
   // envoi de l'email du code cadeau), sans retour visuel on pouvait
@@ -3970,6 +3976,14 @@ function reprintSale(index) {
 // papier. Sans pont, repli historique : impression d'un mini-bout de
 // papier via le dialogue, qui ouvre le tiroir si le pilote l'y est
 // configuré.
+function openCashDrawerOnCash() {
+  if (!tpeBridgeUrl) return;
+  barberApi('/api/tpe/print', {
+    method: 'POST',
+    body: { text: '\x1B\x70\x00\x19\xFA', mode: 'drawer' }
+  }).catch(function (e) { toast('Tiroir non ouvert : ' + e.message + ' — ouvrez-le avec le bouton « Ouvrir la caisse »', true); });
+}
+
 function openCashDrawer() {
   toast('Ouverture du tiroir…');
   if (!tpeBridgeUrl) {
