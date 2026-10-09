@@ -456,6 +456,8 @@
     min-height: 84px;
   }
   .pay-grid button:disabled { opacity: .4; cursor: default; }
+  .pay-split-btn { width: 100%; margin-top: 10px; font-weight: 600; }
+  .pay-split-btn:disabled { opacity: .4; cursor: default; }
   .pay-grid button:active { transform: scale(.96); }
   .clear-ticket-btn {
     display: flex; align-items: center; justify-content: center; gap: 8px;
@@ -734,6 +736,7 @@
           <button onclick="pay('especes')" id="pay-especes">Espèces</button>
           <button onclick="pay('cb')" id="pay-cb">CB</button>
         </div>
+        <button class="btn btn-soft pay-split-btn" id="pay-partage" onclick="pay('partage')">Partager (espèces + carte)</button>
         <button class="clear-ticket-btn" onclick="clearTicket()">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
           Vider le ticket
@@ -3185,7 +3188,7 @@ function renderTicket(justAddedIndex) {
 
   var total = ticketTotal();
   document.getElementById('ticket-total').textContent = eur(total);
-  ['especes', 'cb'].forEach(function (m) {
+  ['especes', 'cb', 'partage'].forEach(function (m) {
     document.getElementById('pay-' + m).disabled = ticket.length === 0;
   });
   syncGridSel();
@@ -3322,10 +3325,13 @@ var paymentInFlight = false;
 function setPayButtonsLocked(locked) {
   document.getElementById('pay-especes').disabled = locked || ticket.length === 0;
   document.getElementById('pay-cb').disabled = locked || ticket.length === 0;
+  document.getElementById('pay-partage').disabled = locked || ticket.length === 0;
 }
 
-function pay(method) {
+function pay(method, cashCents) {
   if (!ticket.length || paymentInFlight) return;
+  // Paiement partagé : on demande d'abord la part en espèces, puis on relance pay() avec ce montant.
+  if (method === 'partage' && cashCents === undefined) { askSplitCash(); return; }
 
   var gift = null;
   if (document.getElementById('gift-checkbox').checked) {
@@ -3357,9 +3363,16 @@ function pay(method) {
   var soldTicket = ticket.slice();
   var linkedQueueId = ticketQueueId;
   var usedLoyalty = Boolean(loyaltyDiscount);
-  var saleCtx = { method: method, total: total, soldTicket: soldTicket, linkedQueueId: linkedQueueId, gift: gift, usedLoyalty: usedLoyalty, requestId: newRequestId() };
+  var saleCtx = { method: method, cashCents: method === 'partage' ? cashCents : null, chargeCents: method === 'partage' ? total - cashCents : total, total: total, soldTicket: soldTicket, linkedQueueId: linkedQueueId, gift: gift, usedLoyalty: usedLoyalty, requestId: newRequestId() };
 
   if (method === 'cb') {
+    startTpePayment(saleCtx);
+    return;
+  }
+
+  // Partagé : le tiroir s'ouvre tout de suite pour la part en espèces, puis le terminal est lancé pour la part carte.
+  if (method === 'partage') {
+    openCashDrawerOnCash();
     startTpePayment(saleCtx);
     return;
   }
@@ -3396,8 +3409,8 @@ function startTpePayment(saleCtx) {
   var box = document.getElementById('tpe-box');
   box.classList.remove('fail');
   document.getElementById('tpe-spinner').style.display = 'block';
-  document.getElementById('tpe-amount').textContent = eur(saleCtx.total);
-  document.getElementById('tpe-msg').textContent = 'Présentez la carte sur le terminal…';
+  document.getElementById('tpe-amount').textContent = eur(saleCtx.chargeCents != null ? saleCtx.chargeCents : saleCtx.total);
+  document.getElementById('tpe-msg').textContent = saleCtx.method === 'partage' ? 'Espèces ' + eur(saleCtx.cashCents) + ' reçues — présentez la carte pour ' + eur(saleCtx.chargeCents) + '…' : 'Présentez la carte sur le terminal…';
   document.getElementById('tpe-actions').style.display = 'none';
   document.getElementById('tpe-actions-save').style.display = 'none';
   document.getElementById('tpe-overlay').classList.add('on');
@@ -3408,7 +3421,7 @@ function startTpePayment(saleCtx) {
   // au TPE en TCP local et rapporte le résultat. Sans pont, le serveur
   // essaie de joindre le TPE directement (ne fonctionne que si le
   // serveur est sur le réseau du salon).
-  barberApi('/api/tpe/charge', { method: 'POST', body: { amount_cents: saleCtx.total } })
+  barberApi('/api/tpe/charge', { method: 'POST', body: { amount_cents: saleCtx.chargeCents != null ? saleCtx.chargeCents : saleCtx.total } })
     .then(function (r) {
       if (r.success) {
         // La carte est DÉBITÉE à partir d'ici. On garde l'écran d'attente
@@ -3475,7 +3488,7 @@ function finalizeSale(saleCtx) {
   barberApi('/api/sales', {
     method: 'POST',
     body: {
-      payment_method: saleCtx.method, items: saleCtx.soldTicket, queue_id: saleCtx.linkedQueueId,
+      payment_method: saleCtx.method, cash_cents: saleCtx.cashCents != null ? saleCtx.cashCents : undefined, items: saleCtx.soldTicket, queue_id: saleCtx.linkedQueueId,
       gift: saleCtx.gift, loyalty_redeem: saleCtx.usedLoyalty, client_request_id: saleCtx.requestId
     }
   }).then(function (r) {
@@ -3484,7 +3497,7 @@ function finalizeSale(saleCtx) {
     forgetChargedSale();
     document.getElementById('tpe-actions-save').style.display = 'none';
     document.getElementById('tpe-overlay').classList.remove('on');
-    showReceipt(saleCtx.soldTicket, saleCtx.total, saleCtx.method, { ticketNumber: r.sale && r.sale.ticket_number });
+    showReceipt(saleCtx.soldTicket, saleCtx.total, saleCtx.method, { ticketNumber: r.sale && r.sale.ticket_number, cashCents: saleCtx.cashCents });
     // Si un cadeau a été créé, on avertit toujours le coiffeur si l'email
     // du code n'est pas parti (SMTP non configuré, panne...) - sans ça,
     // le client repart sans son code et personne ne s'en aperçoit avant
@@ -3518,7 +3531,7 @@ function finalizeSale(saleCtx) {
     // laisser croire à un simple échec de paiement (le coiffeur referait
     // payer la carte) - écran dédié, qui ne permet que de réessayer
     // l'enregistrement (rejouable sans risque grâce à requestId).
-    if (saleCtx.method === 'cb') {
+    if (saleCtx.method === 'cb' || saleCtx.method === 'partage') {
       showSaleSaveFailure(saleCtx, e.message);
       return;
     }
@@ -3561,7 +3574,7 @@ function showSaleSaveFailure(saleCtx, message) {
   document.getElementById('tpe-spinner').style.display = 'none';
   document.getElementById('tpe-amount').textContent = 'Carte débitée — vente NON enregistrée';
   document.getElementById('tpe-msg').textContent =
-    'La carte du client a bien été débitée (' + eur(saleCtx.total) + ') mais la vente n\'a pas pu être enregistrée : ' +
+    'La carte du client a bien été débitée (' + eur(saleCtx.chargeCents != null ? saleCtx.chargeCents : saleCtx.total) + ') mais la vente n\'a pas pu être enregistrée : ' +
     message + '. NE REPASSEZ PAS la carte. Réessayez l\'enregistrement.';
   document.getElementById('tpe-actions').style.display = 'none';
   document.getElementById('tpe-actions-save').style.display = 'flex';
@@ -3572,7 +3585,7 @@ function retrySaleSave() {
   if (!tpePendingSaleCtx) return;
   document.getElementById('tpe-box').classList.remove('fail');
   document.getElementById('tpe-spinner').style.display = 'block';
-  document.getElementById('tpe-amount').textContent = eur(tpePendingSaleCtx.total);
+  document.getElementById('tpe-amount').textContent = eur(tpePendingSaleCtx.chargeCents != null ? tpePendingSaleCtx.chargeCents : tpePendingSaleCtx.total);
   document.getElementById('tpe-msg').textContent = 'Enregistrement de la vente…';
   document.getElementById('tpe-actions-save').style.display = 'none';
   finalizeSale(tpePendingSaleCtx);
@@ -3606,7 +3619,38 @@ function restoreChargedSale() {
   showSaleSaveFailure(ctx, 'la page a été rechargée avant la fin de l\'enregistrement');
 }
 
-var PAYMENT_LABELS = { especes: 'Espèces', cb: 'Carte bancaire' };
+var PAYMENT_LABELS = { especes: 'Espèces', cb: 'Carte bancaire', partage: 'Espèces + carte' };
+
+// Lignes "moyen de paiement" d'un ticket : [libellé, centimes]. Un paiement partagé
+// montre les deux parts (espèces puis carte), les autres une seule ligne.
+function paymentRowsFor(method, total, cashCents) {
+  if (method === 'partage' && cashCents != null && cashCents > 0 && cashCents < total) {
+    return [['Espèces', cashCents], ['Carte bancaire', total - cashCents]];
+  }
+  return [[PAYMENT_LABELS[method] || method, total]];
+}
+
+// Paiement partagé : demande la part payée en espèces (le reste passe par la carte).
+function parseEuroToCents(txt) {
+  var t = String(txt || '').replace(/\s/g, '').replace('€', '').replace(',', '.');
+  if (!/^\d+(\.\d{1,2})?$/.test(t)) return null;
+  return Math.round(parseFloat(t) * 100);
+}
+
+function askSplitCash() {
+  var total = ticketTotal();
+  showPrompt('Total à payer : ' + eur(total) + '. Quelle part le client paie-t-il en espèces ? Le reste sera payé par carte.', {
+    title: 'Partager le paiement', inputMode: 'decimal', placeholder: 'Montant en espèces (ex. 10)', confirmLabel: 'Continuer'
+  }).then(function (val) {
+    if (val === null) return;
+    var cash = parseEuroToCents(val);
+    if (cash === null || cash <= 0 || cash >= total) {
+      toast('Montant invalide : la part en espèces doit être entre 0 et ' + eur(total) + ' (exclus).', true);
+      return;
+    }
+    pay('partage', cash);
+  });
+}
 
 /**
  * Calcule le taux de TVA applicable à un article selon sa catégorie
@@ -3682,8 +3726,9 @@ function showReceipt(lines, total, method, opts) {
     vatHtml = '<div class="rsep"></div><div class="rlegal-line" style="text-align:center">TVA non applicable, art. 293 B du CGI</div>';
   }
 
-  var paymentHtml = '<div class="rsep"></div>' +
-    '<div class="rline rtotal"><span>' + esc(PAYMENT_LABELS[method] || method) + '</span><span>' + eur(total) + '</span></div>';
+  var paymentHtml = '<div class="rsep"></div>' + paymentRowsFor(method, total, opts.cashCents).map(function (r) {
+    return '<div class="rline rtotal"><span>' + esc(r[0]) + '</span><span>' + eur(r[1]) + '</span></div>';
+  }).join('');
 
   // Mentions légales obligatoires en pied de ticket.
   var footerParts = [];
@@ -3726,7 +3771,7 @@ function showReceipt(lines, total, method, opts) {
   // de pont configuré, le bouton retombe sur window.print() (dialogue
   // navigateur, comportement historique).
   currentReceiptCtx = {
-    lines: lines, total: total, method: method,
+    lines: lines, total: total, method: method, cashCents: opts.cashCents,
     whenDate: whenDate, ticketNumber: ticketNumber, barberName: barberName, salonName: salonName
   };
 }
@@ -3746,6 +3791,7 @@ function printReceiptSilent() {
   var btn = document.getElementById('receipt-print-btn');
   if (btn) { btn.disabled = true; }
   var ticketText = buildReceiptText(currentReceiptCtx.lines, currentReceiptCtx.total, currentReceiptCtx.method, {
+    cashCents: currentReceiptCtx.cashCents,
     whenDate: currentReceiptCtx.whenDate, ticketNumber: currentReceiptCtx.ticketNumber,
     barberName: currentReceiptCtx.barberName, salonName: currentReceiptCtx.salonName
   });
@@ -3876,7 +3922,7 @@ function buildReceiptText(lines, total, method, o) {
   }
 
   out.push(sep());
-  out.push(twoCols(PAYMENT_LABELS[method] || method, money(o.total != null ? o.total : total)));
+  paymentRowsFor(method, o.total != null ? o.total : total, o.cashCents).forEach(function (r) { out.push(twoCols(r[0], money(r[1]))); });
 
   if (legalInfo.siret) {
     var siretLine = 'SIRET ' + legalInfo.siret;
@@ -3966,7 +4012,7 @@ function renderHistoryList() {
 
 function reprintSale(index) {
   var s = historySalesCache[index];
-  showReceipt(s.items, s.total_price_cents, s.payment_method, { when: s.created_at, barberName: s.barber_name || 'Non assigné', ticketNumber: s.ticket_number });
+  showReceipt(s.items, s.total_price_cents, s.payment_method, { when: s.created_at, barberName: s.barber_name || 'Non assigné', ticketNumber: s.ticket_number, cashCents: s.cash_cents });
 }
 
 // Ouvre le tiroir-caisse sans passer par une vente (pour rendre la

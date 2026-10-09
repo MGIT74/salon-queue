@@ -1140,3 +1140,10 @@ CREATE TABLE IF NOT EXISTS salon_slug_aliases (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Paiement PARTAGE (une partie en especes, le reste par carte) : une seule vente,
+-- payment_method = 'partage', et cash_cents = la part payee en especes (NULL sinon).
+-- La part carte = total_price_cents - cash_cents.
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'sales' AND column_name = 'cash_cents');
+SET @sql := IF(@c = 0, 'ALTER TABLE sales ADD COLUMN cash_cents INT NULL', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;

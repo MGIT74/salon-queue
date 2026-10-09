@@ -6304,7 +6304,7 @@ function renderSalesDetailPage() {
     function (s) {
       var when = new Date(s.created_at).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
       var itemsList = s.items.map(function (it) { return it.quantity + ' × ' + it.item_name; }).join(', ');
-      var methodLabel2 = { especes: 'Espèces', cb: 'CB', autre: 'Autre' }[s.payment_method] || s.payment_method;
+      var methodLabel2 = { especes: 'Espèces', cb: 'CB', autre: 'Autre', partage: 'Partagé' }[s.payment_method] || s.payment_method;
       return '<div class="item"><div class="item-main">' +
         '<div class="item-name">' + esc(s.barber_name || 'Non assigné') + ' — ' + eur(s.total_price_cents) + '</div>' +
         '<div class="item-meta">' + esc(itemsList) + '</div>' +

@@ -582,6 +582,22 @@ router.get('/client-marketing', requireAdmin, wrap(async (req, res) => {
  * ou depuis le debut si jamais cloture) - total, nombre de ventes,
  * detail par mode de paiement, detail par coiffeur.
  */
+/**
+ * Ventilation par moyen de paiement. Une vente "partage" (une part en
+ * espèces, le reste par carte) est coupée en deux : la part espèces va dans
+ * "especes" (donc dans les espèces attendues dans le tiroir) et le reste dans
+ * "cb" - sinon le comptage du tiroir à la clôture serait faux.
+ */
+function addSaleToMethods(byMethod, s) {
+  if (s.payment_method === 'partage' && s.cash_cents != null) {
+    const cash = Number(s.cash_cents);
+    byMethod.especes = (byMethod.especes || 0) + cash;
+    byMethod.cb = (byMethod.cb || 0) + (s.total_price_cents - cash);
+    return;
+  }
+  byMethod[s.payment_method] = (byMethod[s.payment_method] || 0) + s.total_price_cents;
+}
+
 router.get('/caisse/current-period', requireAdminOrBarber, wrap(async (req, res) => {
   const [[lastClosing]] = await pool.query(
     'SELECT period_end FROM cash_closings WHERE salon_id = ? ORDER BY period_end DESC LIMIT 1',
@@ -601,7 +617,7 @@ router.get('/caisse/current-period', requireAdminOrBarber, wrap(async (req, res)
   let total = 0;
   sales.forEach((s) => {
     total += s.total_price_cents;
-    byMethod[s.payment_method] = (byMethod[s.payment_method] || 0) + s.total_price_cents;
+    addSaleToMethods(byMethod, s);
     const bName = s.barber_name || 'Non assigné';
     if (!byBarber[bName]) byBarber[bName] = { total_cents: 0, count: 0 };
     byBarber[bName].total_cents += s.total_price_cents;
@@ -655,10 +671,10 @@ router.post('/caisse/close', requireAdminOrBarber, wrap(async (req, res) => {
 
       const [sales] = await db.query(
         periodStart
-          ? `SELECT s.payment_method, s.total_price_cents, s.barber_id, b.name AS barber_name
+          ? `SELECT s.payment_method, s.cash_cents, s.total_price_cents, s.barber_id, b.name AS barber_name
              FROM sales s LEFT JOIN barbers b ON b.id = s.barber_id
              WHERE s.salon_id = ? AND s.created_at > ?`
-          : `SELECT s.payment_method, s.total_price_cents, s.barber_id, b.name AS barber_name
+          : `SELECT s.payment_method, s.cash_cents, s.total_price_cents, s.barber_id, b.name AS barber_name
              FROM sales s LEFT JOIN barbers b ON b.id = s.barber_id
              WHERE s.salon_id = ?`,
         periodStart ? [req.salon.id, periodStart] : [req.salon.id]
@@ -673,7 +689,7 @@ router.post('/caisse/close', requireAdminOrBarber, wrap(async (req, res) => {
       let total = 0;
       sales.forEach((s) => {
         total += s.total_price_cents;
-        byMethod[s.payment_method] = (byMethod[s.payment_method] || 0) + s.total_price_cents;
+        addSaleToMethods(byMethod, s);
         const barberKey = s.barber_id || '_none';
         if (!byBarber[barberKey]) byBarber[barberKey] = { name: s.barber_name || 'Non attribué', count: 0, total_cents: 0 };
         byBarber[barberKey].count += 1;

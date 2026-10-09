@@ -11,7 +11,7 @@ const { withCashLock, HttpError } = require('../lib/cashLock');
 
 const router = express.Router();
 
-const PAYMENT_METHODS = ['especes', 'cb', 'autre'];
+const PAYMENT_METHODS = ['especes', 'cb', 'autre', 'partage'];
 
 // Alphabet sans caractères ambigus à l'oral/à l'écrit (pas de 0/O, 1/I).
 const GIFT_CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
@@ -117,7 +117,7 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
       // 0. Même demande déjà enregistrée : on renvoie la vente existante.
       if (clientRequestId) {
         const [[existing]] = await db.query(
-          'SELECT id, total_price_cents, payment_method, barber_id, ticket_number FROM sales WHERE salon_id = ? AND client_request_id = ?',
+          'SELECT id, total_price_cents, payment_method, cash_cents, barber_id, ticket_number FROM sales WHERE salon_id = ? AND client_request_id = ?',
           [req.salon.id, clientRequestId]
         );
         if (existing) {
@@ -220,9 +220,17 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
         const lineBarberId = it.barber_id && validLineBarberIds.has(it.barber_id) ? it.barber_id : null;
         return [crypto.randomUUID(), saleId, it.item_type, it.item_id, it.item_name, it.unit_price_cents, it.quantity, lineBarberId];
       });
+      // Paiement partagé : la part en espèces doit être strictement entre 0 et le total (le reste = carte).
+      let cashCents = null;
+      if (payment_method === 'partage') {
+        cashCents = Number(req.body.cash_cents);
+        if (!Number.isInteger(cashCents) || cashCents <= 0 || cashCents >= total) {
+          throw new HttpError(400, 'Paiement partagé : la part en espèces doit être comprise entre 0 et le total du ticket.');
+        }
+      }
       await db.query(
-        'INSERT INTO sales (id, salon_id, barber_id, payment_method, total_price_cents, ticket_number, queue_id, client_request_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-        [saleId, req.salon.id, barberId, payment_method, total, ticketNumber, queue_id || null, clientRequestId]
+        'INSERT INTO sales (id, salon_id, barber_id, payment_method, total_price_cents, cash_cents, ticket_number, queue_id, client_request_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [saleId, req.salon.id, barberId, payment_method, total, cashCents, ticketNumber, queue_id || null, clientRequestId]
       );
       await db.query(
         'INSERT INTO sale_items (id, sale_id, item_type, item_id, item_name, unit_price_cents, quantity, barber_id) VALUES ?',
@@ -255,7 +263,7 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
 
       return {
         duplicate: false,
-        sale: { id: saleId, total_price_cents: total, payment_method, barber_id: barberId, ticket_number: ticketNumber },
+        sale: { id: saleId, total_price_cents: total, payment_method, cash_cents: cashCents, barber_id: barberId, ticket_number: ticketNumber },
         queueRow, giftInfo
       };
     });
@@ -270,7 +278,7 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
     return res.json({
       ok: true, duplicate: true,
       sale: {
-        id: outcome.sale.id, total_price_cents: outcome.sale.total_price_cents, payment_method: outcome.sale.payment_method,
+        id: outcome.sale.id, total_price_cents: outcome.sale.total_price_cents, payment_method: outcome.sale.payment_method, cash_cents: outcome.sale.cash_cents == null ? null : outcome.sale.cash_cents,
         barber_id: outcome.sale.barber_id, ticket_number: outcome.sale.ticket_number
       },
       gift: outcome.giftCode ? { code: outcome.giftCode, email_sent: true } : null
