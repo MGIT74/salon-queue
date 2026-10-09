@@ -29,6 +29,7 @@ check('la vente envoie cash_cents', /cash_cents: saleCtx\.cashCents != null/.tes
 check('carte debitee puis echec d\'enregistrement : meme ecran de reprise que la CB', /saleCtx\.method === 'cb' \|\| saleCtx\.method === 'partage'/.test(caisse));
 check('reimpression/historique gardent le partage', /cashCents: s\.cash_cents/.test(caisse) && /partage: 'Espèces \+ carte'/.test(caisse));
 
+check('bouton Partager : coins comme Vider/Ouvrir la caisse (12px), pas en pilule', /\.pay-split-btn \{[^}]*border-radius: 12px/.test(caisse));
 console.log('\n[C] Serveur');
 check('methode "partage" acceptee', /PAYMENT_METHODS = \['especes', 'cb', 'autre', 'partage'\]/.test(sales));
 check('part especes validee (entier, > 0, < total)', /cashCents <= 0 \|\| cashCents >= total/.test(sales) && /Number\.isInteger\(cashCents\)/.test(sales));
