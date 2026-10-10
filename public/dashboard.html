@@ -1276,12 +1276,23 @@
 .z-box .zsection-label { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: #888; margin: 14px 0 4px; }
 .z-actions { display: flex; gap: 8px; margin-top: 18px; }
 .z-actions .btn { flex: 1; }
+/* Ticket long (ex. ticket Z d'une journee chargee) : la carte ne depasse jamais l'ecran, son contenu defile,
+   et la barre d'actions (Fermer / Imprimer) reste collee en bas, toujours visible. A l'impression : tout est imprime. */
+.z-box, .receipt-box { max-height: calc(100vh - 40px); max-height: calc(100dvh - 40px); overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box; scrollbar-width: thin; scrollbar-color: #c9c9c9 transparent; }
+.z-box::-webkit-scrollbar, .receipt-box::-webkit-scrollbar { width: 6px; }
+.z-box::-webkit-scrollbar-thumb, .receipt-box::-webkit-scrollbar-thumb { background: #c9c9c9; border-radius: 3px; }
+.z-box .z-actions, .receipt-box .receipt-actions {
+  position: sticky; bottom: -26px; margin: 18px -26px -26px; padding: 14px 26px 18px;
+  background: linear-gradient(to bottom, rgba(255,255,255,0), #fff 14px); border-radius: 0 0 14px 14px;
+}
+@media print { .z-box, .receipt-box { max-height: none !important; overflow: visible !important; } }
 @media print {
   @page { size: 80mm auto; margin: 0; }
   .wrap { display: none !important; }
   body * { visibility: hidden; }
   .z-box, .z-box * { visibility: visible; }
   .z-box {
+    max-height: none; overflow: visible;
     position: fixed; top: 0; left: 0; width: 80mm; max-width: none;
     box-shadow: none; border-radius: 0; padding: 4mm; font-size: 12px;
   }

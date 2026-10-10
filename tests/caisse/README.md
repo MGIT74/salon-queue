@@ -84,4 +84,5 @@ node tests/caisse/50-ticket-etire.js  # ticket desktop : lignes extensibles, bou
 node tests/caisse/51-tiroir-sur-especes.js  # clic Especes = ouverture immediate du tiroir
 node tests/caisse/52-paiement-partage.js  # paiement partage especes + carte (bouton Partager)
 node tests/caisse/53-lignes-separees.js  # un clic = une ligne separee (un coiffeur par ligne)
+node tests/caisse/54-ticket-z-long-defile.js  # ticket Z / recu long : defile, boutons toujours visibles
 ```
