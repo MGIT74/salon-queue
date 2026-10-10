@@ -127,6 +127,8 @@ router.put('/', requireAdmin, wrap(async (req, res) => {
   }
   if (patch.sms_reminder_template !== undefined) {
     patch.sms_reminder_template = String(patch.sms_reminder_template).slice(0, 480);
+    // Message identique au message par defaut : on ne le fige pas, il suit les futures mises a jour.
+    if (patch.sms_reminder_template.trim() === sms.DEFAULT_TEMPLATE) patch.sms_reminder_template = '';
   }
 
   // Un SIRET mal formé ne serait détecté qu'au moment de l'impression

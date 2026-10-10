@@ -26,4 +26,5 @@ check('SMS de test salon : bloque sans credit', /Plus de credits SMS/.test(st));
 check('historique : ligne marquee SMS de test', /SMS de test ·/.test(d));
 check('rappel : nom du coiffeur dans le message, plus de lien court', /coiffeur: a\.barber_name/.test(a) && !/shortCancelLink|smsPublicBase/.test(a) && !fs.existsSync(path.join(__dirname, '../../src/routes/shortLinks.js')));
 check('interface : pastille {coiffeur}, pas de {lien}', /smsInsert\('\{coiffeur\}'\)/.test(d) && !/smsInsert\('\{lien\}'\)/.test(d));
+check('message identique au defaut non fige + anciens defauts migres', /=== sms\.DEFAULT_TEMPLATE\) patch\.sms_reminder_template = ''/.test(st) && /DELETE FROM settings WHERE `key` = 'sms_reminder_template'/.test(sql));
 console.log('\n' + pass + ' OK, ' + fail + ' ECHEC'); process.exit(fail ? 1 : 0);

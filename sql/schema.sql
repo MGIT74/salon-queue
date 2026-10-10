@@ -1191,3 +1191,9 @@ CREATE TABLE IF NOT EXISTS sms_log (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 -- SMS de test : pas de RDV associe (kind = 'test'), mais ils comptent dans les credits.
 ALTER TABLE sms_log MODIFY appointment_id CHAR(36) NULL;
+-- Les anciens messages par defaut enregistres tels quels suivent a nouveau le message par defaut actuel.
+DELETE FROM settings WHERE `key` = 'sms_reminder_template' AND value IN (
+  'Bonjour {prenom}, rappel de votre RDV {date} a {heure} chez {salon}. A demain !',
+  'Bonjour {prenom}, rappel de votre RDV {date} a {heure} avec {coiffeur} chez {salon}. Annuler : {lien}',
+  'Bonjour {prenom}, rappel de votre RDV {date} a {heure} avec {coiffeur} chez {salon}. Pour annuler, utilisez le lien recu par email ou dans votre compte client.'
+);
