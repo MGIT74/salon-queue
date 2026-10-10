@@ -10,7 +10,7 @@
  * 70 caracteres, puis 67 par segment. Chaque segment = 1 credit.
  */
 
-const DEFAULT_TEMPLATE = 'Bonjour {prenom}, rappel de votre RDV {date} a {heure} avec {coiffeur} chez {salon}. Annuler : {lien}';
+const DEFAULT_TEMPLATE = 'Bonjour {prenom}, rappel de votre RDV {date} a {heure} avec {coiffeur} chez {salon}. Pour annuler : lien recu par email ou dans votre compte.';
 
 const GSM_BASIC = '@£$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ !"#¤%&\'()*+,-./0123456789:;<=>?¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§¿abcdefghijklmnopqrstuvwxyzäöñüà';
 const GSM_EXT = '^{}\\[~]|€\f';
@@ -92,7 +92,7 @@ function formatAppointmentWhen(scheduledAt) {
   };
 }
 
-/** Remplace {prenom} {nom} {date} {heure} {salon} {coiffeur} {lien} (les inconnues sont retirees). */
+/** Remplace {prenom} {nom} {date} {heure} {salon} {coiffeur} (les inconnues sont retirees). */
 function buildMessage(template, vars, opts) {
   const o = opts || {};
   const tpl = String(template || '').trim() || DEFAULT_TEMPLATE;
@@ -104,18 +104,11 @@ function buildMessage(template, vars, opts) {
     date: vars.date || '',
     heure: vars.heure || '',
     salon: vars.salon || '',
-    coiffeur: vars.coiffeur || '',
-    lien: vars.lien || ''
+    coiffeur: vars.coiffeur || ''
   };
   let msg = tpl.replace(/\{(\w+)\}/g, (all, k) => (k in map ? map[k] : ''));
   msg = msg.replace(/[ \t]+/g, ' ').replace(/ ([,.])/g, '$1').trim();
   return o.stripAccents ? stripAccents(msg) : msg;
-}
-
-/** Lien court d'annulation : /c/<16 premiers caracteres du jeton> (redirige vers la page d'annulation). */
-function shortCancelLink(baseUrl, cancelToken) {
-  if (!baseUrl || !/^[0-9a-f]{16,}$/.test(String(cancelToken || ''))) return '';
-  return String(baseUrl).replace(/\/$/, '') + '/c/' + String(cancelToken).slice(0, 16);
 }
 
 /**
@@ -148,7 +141,6 @@ async function sendTestSms({ phone, sender, message }) {
 }
 
 module.exports = {
-  shortCancelLink,
   sendTestSms, testWebhookUrl,
   DEFAULT_TEMPLATE, countSegments, isGsm, stripAccents, normalizePhone, sanitizeSender,
   formatAppointmentWhen, buildMessage

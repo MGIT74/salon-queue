@@ -20,11 +20,8 @@ check('expediteur trop court -> repli salon', s.sanitizeSender('a', 'Chez Tony')
 check('expediteur vide -> RDV', s.sanitizeSender('', '') === 'RDV');
 const w = s.formatAppointmentWhen('2026-10-10 14:30:00');
 check('date FR lisible', w.date === 'samedi 10 octobre' && w.heure === '14h30');
-const lien = s.shortCancelLink('https://app.thebarberone.com/', 'a1b2c3d4e5f60718' + 'ab'.repeat(16));
-check('lien court d\'annulation', lien === 'https://app.thebarberone.com/c/a1b2c3d4e5f60718');
-check('pas de lien sans jeton valide', s.shortCancelLink('https://x.fr', null) === '' && s.shortCancelLink('', 'a1b2c3d4e5f60718') === '');
-const m = s.buildMessage(s.DEFAULT_TEMPLATE, { client_name: 'Jean Dupont', date: w.date, heure: w.heure, salon: 'Tony', coiffeur: 'Karim', lien }, { stripAccents: true });
-check('message par defaut rempli (coiffeur + lien)', m === 'Bonjour Jean, rappel de votre RDV samedi 10 octobre a 14h30 avec Karim chez Tony. Annuler : https://app.thebarberone.com/c/a1b2c3d4e5f60718');
+const m = s.buildMessage(s.DEFAULT_TEMPLATE, { client_name: 'Jean Dupont', date: w.date, heure: w.heure, salon: 'Tony', coiffeur: 'Karim' }, { stripAccents: true });
+check('message par defaut rempli (coiffeur + phrase d\'annulation)', m === 'Bonjour Jean, rappel de votre RDV samedi 10 octobre a 14h30 avec Karim chez Tony. Pour annuler : lien recu par email ou dans votre compte.');
 check('variables {nom} et inconnues', s.buildMessage('{prenom} {nom} {zzz}x', { client_name: 'Jean Paul Dupont' }) === 'Jean Paul Dupont x');
 check('message par defaut = 1 segment', s.countSegments(m) === 1);
 console.log('\n' + pass + ' OK, ' + fail + ' ECHEC'); process.exit(fail ? 1 : 0);
