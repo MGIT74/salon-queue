@@ -171,7 +171,7 @@ router.get('/sms', requireAdmin, wrap(async (req, res) => {
   await pool.query('INSERT IGNORE INTO sms_credits (salon_id) VALUES (?)', [req.salon.id]);
   const [[c]] = await pool.query('SELECT sms_enabled, credits_granted, credits_used FROM sms_credits WHERE salon_id = ?', [req.salon.id]);
   const [log] = await pool.query(
-    `SELECT client_name, phone, sender, message, segments, status, error, scheduled_at, sent_at, updated_at
+    `SELECT kind, client_name, phone, sender, message, segments, status, error, scheduled_at, sent_at, updated_at
      FROM sms_log WHERE salon_id = ? ORDER BY updated_at DESC LIMIT 30`, [req.salon.id]);
   const [[counts]] = await pool.query(
     `SELECT SUM(status = 'sent') AS sent, SUM(status = 'no_credit') AS no_credit, SUM(status = 'failed') AS failed
@@ -189,15 +189,16 @@ router.get('/sms', requireAdmin, wrap(async (req, res) => {
 }));
 
 /**
- * Envoi d'un SMS de test au numero saisi (comme l'email de test). Ne consomme
- * pas les credits du salon ; limite a 5 essais par heure et par salon.
+ * Envoi d'un SMS de test au numero saisi (comme l'email de test). Le SMS est
+ * reel : il apparait dans l'historique (etiquette "Test") et consomme les
+ * credits du salon, comme un rappel. Limite a 5 essais par heure et par salon.
  */
 const smsTestHits = new Map();
 router.post('/sms/test', requireAdmin, wrap(async (req, res) => {
   const phone = sms.normalizePhone(req.body.to);
   if (!phone) return res.status(400).json({ error: 'Numero de telephone invalide (ex : 06 12 34 56 78)' });
   await pool.query('INSERT IGNORE INTO sms_credits (salon_id) VALUES (?)', [req.salon.id]);
-  const [[c]] = await pool.query('SELECT sms_enabled FROM sms_credits WHERE salon_id = ?', [req.salon.id]);
+  const [[c]] = await pool.query('SELECT sms_enabled, credits_granted, credits_used FROM sms_credits WHERE salon_id = ?', [req.salon.id]);
   if (!c.sms_enabled) return res.status(403).json({ error: "Les SMS ne sont pas actives pour votre salon." });
   const now = Date.now();
   const hits = (smsTestHits.get(req.salon.id) || []).filter(t => now - t < 3600000);
@@ -208,11 +209,27 @@ router.post('/sms/test', requireAdmin, wrap(async (req, res) => {
   const message = sms.buildMessage(s.sms_reminder_template, {
     client_name: 'Test', date: 'demain', heure: '14h30', salon: salonName
   }, { stripAccents: s.sms_strip_accents !== '0' });
+  const planned = sms.countSegments(message);
+  if (Number(c.credits_granted) - Number(c.credits_used) < planned) {
+    return res.status(402).json({ error: 'Plus de credits SMS : envoi du test impossible.' });
+  }
+  hits.push(now); smsTestHits.set(req.salon.id, hits);
   try {
     const r = await sms.sendTestSms({ phone, sender, message });
-    hits.push(now); smsTestHits.set(req.salon.id, hits);
-    res.json({ ok: true, sent: true, sender, message, segments: r.segments || sms.countSegments(message) });
+    const segments = Math.min(10, Math.max(1, Number(r.segments) || planned));
+    await pool.query(
+      `INSERT INTO sms_log (id, salon_id, appointment_id, kind, client_name, phone, sender, message, segments, attempts, status, provider_message_id, sent_at)
+       VALUES (UUID(), ?, NULL, 'test', 'Test', ?, ?, ?, ?, 1, 'sent', ?, NOW())`,
+      [req.salon.id, phone, sender, message, segments, String(r.messageId || '').slice(0, 100) || null]
+    );
+    await pool.query('UPDATE sms_credits SET credits_used = credits_used + ? WHERE salon_id = ?', [segments, req.salon.id]);
+    res.json({ ok: true, sent: true, sender, message, segments });
   } catch (err) {
+    await pool.query(
+      `INSERT INTO sms_log (id, salon_id, appointment_id, kind, client_name, phone, sender, message, segments, attempts, status, error)
+       VALUES (UUID(), ?, NULL, 'test', 'Test', ?, ?, ?, ?, 1, 'failed', ?)`,
+      [req.salon.id, phone, sender, message, planned, String(err.message).slice(0, 500)]
+    ).catch(() => {});
     res.status(400).json({ error: "Envoi du test impossible : " + err.message });
   }
 }));

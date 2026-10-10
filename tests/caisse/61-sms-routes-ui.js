@@ -21,4 +21,7 @@ check('SMS de test : routes salon + super admin protegees', /router\.post\('\/sm
 check('SMS de test : limite 5/heure et numero valide', /hits\.length >= 5/.test(st) && /normalizePhone\(req\.body\.to\)/.test(st));
 check('SMS de test : passe par le webhook n8n (pas de cle Brevo dans l\'app)', /tbo-sms-test/.test(lib) && !/api\.brevo\.com/.test(lib));
 check('SMS de test : boutons salon + super admin', /onclick="testSms\(\)"/.test(d) && /onclick="sendTestSms\(\)"/.test(s));
+check('SMS de test salon : trace dans l\'historique (kind test) et consomme les credits', /'test', 'Test'/.test(st) && /credits_used = credits_used \+ \?/.test(st) && /MODIFY appointment_id CHAR\(36\) NULL/.test(sql));
+check('SMS de test salon : bloque sans credit', /Plus de credits SMS/.test(st));
+check('historique : ligne marquee SMS de test', /SMS de test ·/.test(d));
 console.log('\n' + pass + ' OK, ' + fail + ' ECHEC'); process.exit(fail ? 1 : 0);

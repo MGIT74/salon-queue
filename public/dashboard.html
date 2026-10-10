@@ -2254,7 +2254,7 @@
           <div class="sms-sub-head">
             <div>
               <div class="sms-sub-title">Rappel SMS</div>
-              <div class="hint" style="margin:2px 0 0">Un SMS est envoyé automatiquement au client environ 24 h avant son rendez-vous (pris en ligne ou saisi par vous). Pas de rappel si le rendez-vous est pris moins de 24 h à l'avance.</div>
+              <div class="hint" style="margin:2px 0 0">Un SMS est envoyé automatiquement la veille à 10 h à chaque client ayant un rendez-vous le lendemain (pris en ligne ou saisi par vous). Les SMS de test comptent dans vos crédits.</div>
             </div>
             <div class="switch" id="sms-enabled-switch" onclick="this.classList.toggle('on'); saveSmsSettings(true)"></div>
           </div>
@@ -8198,7 +8198,7 @@ function testSms() {
     if (!to) return;
     toast('Envoi en cours…');
     api('/api/settings/sms/test', { method: 'POST', body: { to: to } })
-      .then(function (r) { toast('SMS de test envoyé à ' + to + (r && r.sender ? ' (expéditeur ' + r.sender + ')' : '')); })
+      .then(function (r) { toast('SMS de test envoyé à ' + to + (r && r.sender ? ' (expéditeur ' + r.sender + ')' : '') + ' — ' + (r.segments || 1) + ' crédit' + ((r.segments || 1) > 1 ? 's' : '') + ' utilisé' + ((r.segments || 1) > 1 ? 's' : '')); loadSmsSettings(); })
       .catch(function (e) { toast(e.message, true); });
   });
 }
@@ -8230,7 +8230,7 @@ function loadSmsSettings() {
       ? '<div class="hint">Aucun SMS pour le moment.</div>'
       : r.log.map(function (l) {
           return '<div class="sms-row-log"><div><b>' + esc(l.client_name || '') + '</b> · ' + esc(l.phone ? '+' + l.phone : '') +
-            ' <span class="hint">RDV ' + esc(String(l.scheduled_at || '').slice(0, 16).replace('T', ' ')) + '</span></div>' +
+            (l.kind === 'test' ? ' <span class="hint">SMS de test · ' + esc(String(l.sent_at || l.updated_at || '').slice(0, 16).replace('T', ' ')) + '</span>' : ' <span class="hint">RDV ' + esc(String(l.scheduled_at || '').slice(0, 16).replace('T', ' ')) + '</span>') + '</div>' +
             '<span class="sms-badge ' + l.status + '">' + smsStatusLabel(l.status) + (l.status === 'sent' ? ' · ' + l.segments + ' crédit' + (l.segments > 1 ? 's' : '') : '') + '</span>' +
             '<div class="sub">' + esc(l.message || '') + (l.error ? ' — ' + esc(l.error) : '') + '</div></div>';
         }).join('');

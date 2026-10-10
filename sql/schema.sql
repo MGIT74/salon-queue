@@ -1189,3 +1189,5 @@ CREATE TABLE IF NOT EXISTS sms_log (
   FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE,
   FOREIGN KEY (appointment_id) REFERENCES appointments(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+-- SMS de test : pas de RDV associe (kind = 'test'), mais ils comptent dans les credits.
+ALTER TABLE sms_log MODIFY appointment_id CHAR(36) NULL;
