@@ -24,6 +24,10 @@ services:
       SETTINGS_ENCRYPTION_KEY: ${SETTINGS_ENCRYPTION_KEY:?SETTINGS_ENCRYPTION_KEY manquant}
       SUPER_ADMIN_PASSWORD: ${SUPER_ADMIN_PASSWORD:?SUPER_ADMIN_PASSWORD manquant}
       SIGNUP_ENABLED: ${SIGNUP_ENABLED:-false}
+      # Assistant IA du dashboard (n8n) : le .env de xCloud ne sert qu'a Docker Compose, il faut donc
+      # TRANSMETTRE ces variables au conteneur, sinon l'app ne les voit jamais. Optionnelles (vides = IA desactivee).
+      N8N_CHAT_WEBHOOK_URL: ${N8N_CHAT_WEBHOOK_URL:-}
+      AUTOMATION_API_KEY: ${AUTOMATION_API_KEY:-}
     ports:
       # Uniquement sur la boucle locale : seul le reverse proxy (nginx +
       # HTTPS) du serveur doit atteindre l'app, jamais Internet directement

@@ -87,4 +87,5 @@ node tests/caisse/53-lignes-separees.js  # un clic = une ligne separee (un coiff
 node tests/caisse/54-ticket-z-long-defile.js  # ticket Z / recu long : defile, boutons toujours visibles
 node tests/caisse/55-ticket-z-pont.js  # ticket Z : impression via le pont (caisse + admin), 32 colonnes
 node tests/caisse/56-z-montants-non-coupes.js  # Z / recu : montant + devise jamais coupes
+node tests/caisse/57-compose-env-ia.js  # prod Docker : variables IA transmises au conteneur
 ```
