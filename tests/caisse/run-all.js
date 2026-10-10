@@ -75,7 +75,8 @@ const suite = [
   ['52-paiement-partage.js', false, ['exit']],
   ['53-lignes-separees.js', false, ['exit']],
   ['54-ticket-z-long-defile.js', false, ['exit']],
-  ['55-ticket-z-pont.js', false, ['exit']]
+  ['55-ticket-z-pont.js', false, ['exit']],
+  ['56-z-montants-non-coupes.js', false, ['exit']]
 ];
 
 let bad = 0;

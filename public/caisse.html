@@ -511,6 +511,10 @@
   .receipt-box .rvathead { font-weight: 700; font-size: 11px; }
   .receipt-box .rline span { flex: 1; text-align: right; }
   .receipt-box .rline span:first-child { text-align: left; }
+  /* Montants jamais coupes : le libelle passe a la ligne, pas le prix ni la devise */
+  .receipt-box .rline { gap: 10px; }
+  .receipt-box .rline > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+  .receipt-box .rline > span:last-child:not(:first-child) { flex: 0 0 auto; white-space: nowrap; }
   .receipt-actions { display: flex; gap: 8px; margin-top: 18px; }
   .receipt-actions .btn { flex: 1; }
 
@@ -556,6 +560,9 @@
   .z-box .z-num { text-align: center; font-size: 14px; font-weight: 700; margin-bottom: 4px; }
   .z-box .sub { text-align: center; font-size: 12px; color: #666; margin-bottom: 16px; }
   .z-box .zline { display: flex; justify-content: space-between; font-size: 13px; padding: 3px 0; }
+  .z-box .zline { gap: 10px; }
+  .z-box .zline > span:first-child { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+  .z-box .zline > span:last-child:not(:first-child) { flex: 0 0 auto; white-space: nowrap; text-align: right; }
   .z-box .zline.total { border-top: 1px dashed #999; margin-top: 8px; padding-top: 8px; font-weight: 700; font-size: 14px; }
   .z-box .zline.grand { font-weight: 700; margin-top: 4px; }
   .z-box .zsection-label { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: #888; margin: 14px 0 4px; }
