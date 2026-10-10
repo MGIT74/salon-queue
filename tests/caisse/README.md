@@ -89,4 +89,5 @@ node tests/caisse/55-ticket-z-pont.js  # ticket Z : impression via le pont (cais
 node tests/caisse/56-z-montants-non-coupes.js  # Z / recu : montant + devise jamais coupes
 node tests/caisse/57-compose-env-ia.js  # prod Docker : variables IA transmises au conteneur
 node tests/caisse/58-ia-base-url.js  # IA : adresse de l'instance transmise a n8n (liste blanche)
+node tests/caisse/59-ia-ventes-caisse.js  # IA : outil des ventes reelles de la caisse + register_today
 ```

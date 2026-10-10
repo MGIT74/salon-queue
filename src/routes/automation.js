@@ -9,6 +9,46 @@ const { serviceLineTransfers, applyTransfers } = require('../lib/lineAttribution
 const router = express.Router();
 
 /**
+ * Resume des encaissements REELS de la caisse (table sales) sur une
+ * periode : nombre de tickets, total, repartition par moyen de paiement
+ * (un paiement partage est ventile en especes + carte) et par type de
+ * ligne (prestation, supplement, produit, carte cadeau...). C'est ce que
+ * le coiffeur voit passer en caisse - different de la file d'attente.
+ */
+async function registerSummary(salonId, fromSql, toSql) {
+  const [sales] = await pool.query(
+    `SELECT id, payment_method, total_price_cents, cash_cents
+     FROM sales WHERE salon_id = ? AND created_at BETWEEN ? AND ?`,
+    [salonId, fromSql, toSql]
+  );
+  const byMethod = {};
+  let total = 0;
+  sales.forEach((s) => {
+    total += Number(s.total_price_cents);
+    if (s.payment_method === 'partage' && s.cash_cents != null) {
+      const cash = Number(s.cash_cents);
+      byMethod.especes = (byMethod.especes || 0) + cash;
+      byMethod.cb = (byMethod.cb || 0) + (Number(s.total_price_cents) - cash);
+    } else {
+      byMethod[s.payment_method] = (byMethod[s.payment_method] || 0) + Number(s.total_price_cents);
+    }
+  });
+  const [byType] = await pool.query(
+    `SELECT si.item_type, COALESCE(SUM(si.quantity), 0) AS qty, COALESCE(SUM(si.unit_price_cents * si.quantity), 0) AS cents
+     FROM sale_items si JOIN sales s ON s.id = si.sale_id
+     WHERE s.salon_id = ? AND s.created_at BETWEEN ? AND ? GROUP BY si.item_type`,
+    [salonId, fromSql, toSql]
+  );
+  const euros = (c) => Math.round(Number(c)) / 100;
+  return {
+    tickets_count: sales.length,
+    total_euros: euros(total),
+    by_payment_method_euros: Object.fromEntries(Object.entries(byMethod).map(([k, v]) => [k, euros(v)])),
+    by_item_type: byType.map((r) => ({ type: r.item_type, quantity: Number(r.qty), total_euros: euros(r.cents) }))
+  };
+}
+
+/**
  * Liste tous les salons actifs - nécessaire pour qu'un workflow
  * d'automatisation (ex: rapport quotidien) puisse boucler sur
  * l'ensemble d'entre eux en une seule exécution.
@@ -76,10 +116,14 @@ router.get('/salons/:id/daily-report', requireAutomationKey, wrap(async (req, re
     freeSlots += slots.length;
   }
 
+  const register_today = await registerSummary(salonId, todayStr + ' 00:00:00', todayStr + ' 23:59:59');
+
   res.json({
     ok: true,
     salon_name: salon.name,
     date: todayStr,
+    // Encaissements reels passes en caisse aujourd'hui (tickets, total, especes/carte, produits...).
+    register_today,
     revenue_cents: Number(revenueRow.revenue_cents),
     done_count: Number(revenueRow.done_count),
     top_service: topService ? topService.name : null,
@@ -379,6 +423,73 @@ router.get('/salons/:id/history', requireAutomationKey, wrap(async (req, res) =>
       service_name: r.service_name,
       barber_name: r.barber_name,
       price_euros: r.total_price_cents / 100
+    }))
+  });
+}));
+
+/**
+ * Transactions reellement passees en CAISSE sur une periode (ticket par
+ * ticket) : numero, heure, coiffeur, moyen de paiement (avec la part
+ * especes d'un paiement partage) et chaque ligne vendue (prestation,
+ * supplement, produit, carte cadeau) avec le coiffeur qui l'a realisee.
+ * Plus un resume (total, par moyen de paiement, par type de ligne).
+ * Aujourd'hui par defaut. Lecture seule, vraies donnees uniquement.
+ */
+router.get('/salons/:id/sales', requireAutomationKey, wrap(async (req, res) => {
+  const salonId = req.params.id;
+  const [[salon]] = await pool.query('SELECT id FROM salons WHERE id = ? AND active = 1', [salonId]);
+  if (!salon) return res.status(404).json({ error: 'Salon introuvable ou inactif' });
+
+  const settings = await getSettings(salonId);
+  const today = nowInParis(settings.timezone).dateStr;
+  const start = /^\d{4}-\d{2}-\d{2}$/.test(req.query.start || '') ? req.query.start : today;
+  const end = /^\d{4}-\d{2}-\d{2}$/.test(req.query.end || '') ? req.query.end : today;
+  const fromSql = start + ' 00:00:00';
+  const toSql = end + ' 23:59:59';
+
+  const [rows] = await pool.query(
+    `SELECT s.id, s.ticket_number, s.created_at, s.payment_method, s.total_price_cents, s.cash_cents, b.name AS barber_name
+     FROM sales s LEFT JOIN barbers b ON b.id = s.barber_id
+     WHERE s.salon_id = ? AND s.created_at BETWEEN ? AND ?
+     ORDER BY s.created_at DESC LIMIT 200`,
+    [salonId, fromSql, toSql]
+  );
+
+  const linesBySale = new Map();
+  if (rows.length) {
+    const [lines] = await pool.query(
+      `SELECT si.sale_id, si.item_type, si.item_name, si.unit_price_cents, si.quantity, b.name AS barber_name
+       FROM sale_items si LEFT JOIN barbers b ON b.id = si.barber_id
+       WHERE si.sale_id IN (?)`,
+      [rows.map((r) => r.id)]
+    );
+    lines.forEach((l) => {
+      if (!linesBySale.has(l.sale_id)) linesBySale.set(l.sale_id, []);
+      linesBySale.get(l.sale_id).push({
+        type: l.item_type,
+        name: l.item_name,
+        quantity: Number(l.quantity),
+        unit_price_euros: l.unit_price_cents / 100,
+        done_by: l.barber_name || null
+      });
+    });
+  }
+
+  const summary = await registerSummary(salonId, fromSql, toSql);
+  res.json({
+    ok: true,
+    start,
+    end,
+    summary,
+    shown: rows.length,
+    sales: rows.map((r) => ({
+      ticket_number: r.ticket_number,
+      when: String(r.created_at),
+      barber_name: r.barber_name || null,
+      payment_method: r.payment_method,
+      cash_part_euros: r.payment_method === 'partage' && r.cash_cents != null ? r.cash_cents / 100 : null,
+      total_euros: r.total_price_cents / 100,
+      lines: linesBySale.get(r.id) || []
     }))
   });
 }));
