@@ -808,6 +808,8 @@ router.get('/sms-reminders/due', requireAutomationKey, wrap(async (req, res) => 
 
     for (const a of appts) {
       if (a.log_status === 'sent') continue;
+      // Plus de credits a l'heure d'envoi : definitivement NON envoye (pas de renvoi plus tard ni le mois suivant).
+      if (a.log_status === 'no_credit') continue;
       if (a.log_status === 'pending' && Number(a.log_recent)) continue;
       if (a.log_status === 'failed' && Number(a.log_attempts) >= SMS_MAX_ATTEMPTS) continue;
 
