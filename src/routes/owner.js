@@ -844,9 +844,10 @@ router.post('/caisse/confirm-recount', requireAdminOrBarber, wrap(async (req, re
 }));
 
 /**
- * Historique des clotures precedentes.
+ * Historique des clotures precedentes - reserve a l'admin (la caisse partagee, accessible
+ * aux coiffeurs par PIN, ne l'affiche pas ; un coiffeur ne peut que voir le Z qu'il vient de faire).
  */
-router.get('/caisse/closings', requireAdminOrBarber, wrap(async (req, res) => {
+router.get('/caisse/closings', requireAdmin, wrap(async (req, res) => {
   const conditions = ['salon_id = ?'];
   const params = [req.salon.id];
   if (req.query.date_from) { conditions.push('period_end >= ?'); params.push(req.query.date_from + ' 00:00:00'); }

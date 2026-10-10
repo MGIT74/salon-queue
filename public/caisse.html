@@ -784,8 +784,6 @@
         Clôturer la caisse (ticket Z)
       </button>
 
-      <h3 style="margin:28px 0 14px">Historique des clôtures</h3>
-      <div id="cloture-history-list" style="max-height:340px;overflow-y:auto"></div>
     </div>
     </div>
   </div>
@@ -2740,26 +2738,8 @@ function loadClotureTab() {
         '<span style="font-weight:700">' + eur(r.total_cents) + '</span>' +
       '</div>';
   }).catch(function (e) { toast(e.message, true); });
-
-  var sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-  var dateFrom = sevenDaysAgo.toISOString().slice(0, 10);
-  barberApi('/api/owner/caisse/closings?date_from=' + dateFrom).then(function (r) {
-    var list = document.getElementById('cloture-history-list');
-    if (!r.items.length) {
-      list.innerHTML = '<p class="hint">Aucune clôture sur les 7 derniers jours.</p>';
-      return;
-    }
-    list.innerHTML = r.items.map(function (c) {
-      var when = new Date(c.period_end).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' });
-      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 4px;border-bottom:1px solid var(--sep)">' +
-        '<div><div style="font-weight:600">Z' + String(c.z_number).padStart(3, '0') + '</div>' +
-        '<div class="hint" style="margin:2px 0 0">' + esc(when) + '</div></div>' +
-        '<div style="display:flex;align-items:center;gap:14px">' +
-          '<span style="font-weight:600">' + eur(c.total_cents) + '</span>' +
-          '<button class="btn btn-soft" style="padding:6px 10px;font-size:12.5px" onclick="printZTicket(\'' + c.id + '\')">Voir / imprimer</button>' +
-        '</div></div>';
-    }).join('');
-  }).catch(function (e) { toast(e.message, true); });
+  // L'historique des clôtures n'est PAS affiché ici (caisse partagée par tous les coiffeurs) :
+  // il est réservé à l'admin, dans son tableau de bord (Caisse > Historique des clôtures).
 }
 
 var pendingRecountClosingId = null;
