@@ -77,7 +77,8 @@ const suite = [
   ['54-ticket-z-long-defile.js', false, ['exit']],
   ['55-ticket-z-pont.js', false, ['exit']],
   ['56-z-montants-non-coupes.js', false, ['exit']],
-  ['57-compose-env-ia.js', false, ['exit']]
+  ['57-compose-env-ia.js', false, ['exit']],
+  ['58-ia-base-url.js', false, ['exit']]
 ];
 
 let bad = 0;

@@ -6,7 +6,19 @@ const { wrap } = require('../lib/wrap');
 const router = express.Router();
 
 const DEFAULT_FREE_CREDITS_PER_MONTH = 10;
-const N8N_CHAT_WEBHOOK_URL = process.env.N8N_CHAT_WEBHOOK_URL;
+const N8N_CHAT_WEBHOOK_URL = String(process.env.N8N_CHAT_WEBHOOK_URL || '').replace(/[\r\n"']/g, '').trim();
+
+// Adresse publique de CETTE instance, transmise a n8n pour que ses outils
+// rappellent le bon serveur (prod ou test) au lieu d'une adresse figee.
+// Liste blanche : la cle d'automatisation n'est jamais envoyee a un hote
+// quelconque, meme si l'en-tete Host est falsifie.
+const ALLOWED_API_HOSTS = (process.env.AI_CHAT_ALLOWED_HOSTS || 'app.thebarberone.com,rdv.handsgraphic.com')
+  .split(',').map(h => h.trim().toLowerCase()).filter(Boolean);
+function apiBaseUrl(req) {
+  const raw = String(req.get('x-forwarded-host') || req.get('host') || '').split(',')[0];
+  const host = raw.trim().toLowerCase().replace(/:\d+$/, '');
+  return ALLOWED_API_HOSTS.includes(host) ? 'https://' + host : null;
+}
 
 function currentMonthStr() {
   return new Date().toISOString().slice(0, 7); // 'YYYY-MM'
@@ -84,8 +96,8 @@ router.post('/message', requireAdmin, wrap(async (req, res) => {
     const [[owner]] = await pool.query('SELECT name FROM owners WHERE id = ?', [req.ownerId]);
     const n8nRes = await fetch(N8N_CHAT_WEBHOOK_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Automation-Key': process.env.AUTOMATION_API_KEY || '' },
-      body: JSON.stringify({ salon_id: req.salon.id, salon_name: req.salon.name, admin_name: owner ? owner.name : null, message }),
+      headers: { 'Content-Type': 'application/json', 'X-Automation-Key': String(process.env.AUTOMATION_API_KEY || '').replace(/[\r\n"']/g, '').trim() },
+      body: JSON.stringify({ salon_id: req.salon.id, salon_name: req.salon.name, admin_name: owner ? owner.name : null, api_base_url: apiBaseUrl(req), message }),
       signal: AbortSignal.timeout(30000)
     });
     if (!n8nRes.ok) throw new Error('Le service IA a répondu avec une erreur (' + n8nRes.status + ')');

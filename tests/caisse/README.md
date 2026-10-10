@@ -88,4 +88,5 @@ node tests/caisse/54-ticket-z-long-defile.js  # ticket Z / recu long : defile, b
 node tests/caisse/55-ticket-z-pont.js  # ticket Z : impression via le pont (caisse + admin), 32 colonnes
 node tests/caisse/56-z-montants-non-coupes.js  # Z / recu : montant + devise jamais coupes
 node tests/caisse/57-compose-env-ia.js  # prod Docker : variables IA transmises au conteneur
+node tests/caisse/58-ia-base-url.js  # IA : adresse de l'instance transmise a n8n (liste blanche)
 ```
