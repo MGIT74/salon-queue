@@ -309,6 +309,84 @@ function nowSalonDatetimeString() {
 var CURRENCY = 'EUR';
 function eur(cents) { return (cents / 100).toFixed(2).replace('.', ',') + ' ' + (CURRENCY === 'CHF' ? 'CHF' : '€'); }
 
+/**
+ * Version TEXTE (32 colonnes) d'un ticket Z (clôture de caisse), pour l'imprimer via le pont du
+ * salon (imprimante thermique), comme les reçus. Même contenu que l'aperçu : modes de paiement,
+ * total, détail par coiffeur, par prestation/produit, TVA, fond de caisse.
+ * r = réponse de /api/owner/caisse/closings/:id ; o = { salonName, labels }.
+ */
+function buildZText(r, o) {
+  o = o || {};
+  var COLS = 32;
+  var code = (CURRENCY || 'EUR');   // pas de symbole € : absent de CP850, on écrit le code devise
+  function money(c) { return (c / 100).toFixed(2).replace('.', ',') + ' ' + code; }
+  function center(t) { t = String(t); return ' '.repeat(Math.max(0, Math.floor((COLS - t.length) / 2))) + t; }
+  function sep() { return '-'.repeat(COLS); }
+  function twoCols(a, b) {
+    a = String(a); b = String(b);
+    var space = COLS - a.length - b.length;
+    return space < 1 ? (a + ' ' + b).slice(0, COLS) : a + ' '.repeat(space) + b;
+  }
+  function wrapWords(text, first, next) {
+    var lines = [], cur = '', width = first;
+    String(text).split(/\s+/).filter(Boolean).forEach(function (word) {
+      while (true) {
+        var cand = cur ? cur + ' ' + word : word;
+        if (cand.length <= width) { cur = cand; break; }
+        if (cur) { lines.push(cur); cur = ''; width = next; continue; }
+        lines.push(word.slice(0, width)); word = word.slice(width); width = next;
+        if (!word) break;
+      }
+    });
+    if (cur) lines.push(cur);
+    return lines.length ? lines : [''];
+  }
+  // Libellé long + montant à droite (retour à la ligne sans jamais tronquer le montant).
+  function row(name, price) {
+    var lines = wrapWords(name, COLS, COLS - 2).map(function (t, i) { return (i ? '  ' : '') + t; });
+    var last = lines[lines.length - 1];
+    if (last.length + 1 + price.length <= COLS) lines[lines.length - 1] = last + ' '.repeat(COLS - last.length - price.length) + price;
+    else lines.push(' '.repeat(Math.max(0, COLS - price.length)) + price);
+    return lines;
+  }
+  var labels = o.labels || { especes: 'Especes', cb: 'Carte bancaire', autre: 'Autre' };
+  function dt(v) { return new Date(v).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }); }
+  var out = [];
+  var push = function (arr) { arr.forEach(function (l) { out.push(l); }); };
+  if (o.salonName) out.push(center(o.salonName));
+  out.push(center('CLOTURE Z' + String(r.z_number).padStart(3, '0')));
+  out.push(center('Du ' + (r.period_start ? dt(r.period_start) : 'mise en service')));
+  out.push(center('au ' + dt(r.period_end)));
+  if (r.closed_by) out.push(center('Cloture par : ' + r.closed_by));
+  out.push(sep());
+  out.push('PAIEMENTS');
+  Object.keys(r.breakdown || {}).forEach(function (m) { out.push(twoCols(labels[m] || m, money(r.breakdown[m]))); });
+  out.push(sep());
+  out.push(twoCols('TOTAL (' + r.sales_count + ' vente' + (r.sales_count > 1 ? 's' : '') + ')', money(r.total_cents)));
+
+  var barbers = Object.keys(r.by_barber || {}).map(function (k) { return r.by_barber[k]; }).sort(function (a, b) { return b.total_cents - a.total_cents; });
+  if (barbers.length) { out.push(sep()); out.push('PAR COIFFEUR'); barbers.forEach(function (b) { push(row(b.name + ' (' + b.count + ')', money(b.total_cents))); }); }
+
+  var items = Object.keys(r.by_item || {}).map(function (n) { return Object.assign({ name: n }, r.by_item[n]); }).sort(function (a, b) { return b.total_cents - a.total_cents; });
+  if (items.length) { out.push(sep()); out.push('PAR PRESTATION / PRODUIT'); items.forEach(function (it) { push(row(it.quantity + ' x ' + it.name, money(it.total_cents))); }); }
+
+  var rates = Object.keys(r.by_vat || {}).sort(function (a, b) { return Number(b) - Number(a); });
+  if (rates.length) {
+    out.push(sep()); out.push('TVA');
+    var totalVat = 0;
+    rates.forEach(function (rate) { var v = r.by_vat[rate]; totalVat += v.vat_cents; push(row('TVA ' + rate + '% (HT ' + money(v.ht_cents) + ')', money(v.vat_cents))); });
+    out.push(twoCols('TOTAL TVA', money(totalVat)));
+  }
+
+  var cash = (r.breakdown || {}).especes || 0, start = r.starting_cash_cents || 0;
+  out.push(sep()); out.push('FOND DE CAISSE');
+  push(row('Fond de caisse (reste en caisse)', money(start)));
+  out.push(twoCols('+ Ventes en especes', money(cash)));
+  out.push(twoCols('= Especes attendues', money(start + cash)));
+  out.push(sep());
+  return out.join('\n');
+}
+
 // Format lisible d'une durée en minutes : sous 60 -> "45 min", au-delà
 // -> "1h", "1h20"... jamais un grand nombre de minutes brut (ex:
 // "200 min" fait fuir un client qui ne veut pas calculer que ça fait

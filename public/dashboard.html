@@ -2427,7 +2427,7 @@
   </div>
 </div>
 
-<script src="/app.js?v=14"></script>
+<script src="/app.js?v=15"></script>
 <script>
   // Le lien "Creer mon salon" n'a de sens que si l'inscription est ouverte sur
   // cette installation (fermee chez un client unique). Masque par defaut : s'il
@@ -6361,6 +6361,33 @@ function changeClosingsPerPage(v) {
 
 var ZTICKET_METHOD_LABELS = { especes: 'Espèces', cb: 'Carte bancaire', autre: 'Autre' };
 
+// Ticket Z affiché (pour l'envoyer au pont d'impression depuis le bouton Imprimer).
+var currentZClosing = null, currentZSalonName = '';
+
+/**
+ * Bouton "Imprimer" du ticket Z : comme dans la caisse, envoi silencieux à l'imprimante du salon via
+ * le pont quand il est configuré ; sinon (ou en cas d'échec) dialogue d'impression du navigateur.
+ */
+function printZNow() {
+  if (!currentZClosing) { window.print(); return; }
+  var btn = document.getElementById('z-print-btn');
+  if (btn) btn.disabled = true;
+  var done = function () { if (btn) btn.disabled = false; };
+  api('/api/settings/public').then(function (d) {
+    if (!d.tpe_bridge_url) { done(); window.print(); return; }
+    var text = buildZText(currentZClosing, { salonName: currentZSalonName });
+    return api('/api/tpe/print', { method: 'POST', body: { text: text, mode: d.tpe_print_mode === 'text' ? 'text' : 'escpos' } })
+      .then(function (p) {
+        done();
+        if (p.ok) { toast('Ticket Z envoyé à l\'imprimante'); closeZTicket(); } else { window.print(); }
+      });
+  }).catch(function () {
+    done();
+    toast('File d\'impression indisponible — le dialogue va s\'ouvrir', true);
+    window.print();
+  });
+}
+
 function printZTicket(id) {
   api('/api/owner/caisse/closings/' + id).then(function (r) {
     var salonName = (document.getElementById('app-salon-badge').textContent || 'Salon').trim();
@@ -6413,9 +6440,10 @@ function printZTicket(id) {
       '<div class="zline total"><span>= Espèces attendues dans le tiroir</span><span>' + eur(expectedInDrawer) + '</span></div>' +
       '<div class="z-actions">' +
         '<button class="btn btn-soft" onclick="closeZTicket()">Fermer</button>' +
-        '<button class="btn btn-primary" onclick="window.print()">Imprimer</button>' +
+        '<button class="btn btn-primary" id="z-print-btn" onclick="printZNow()">Imprimer</button>' +
       '</div>';
 
+    currentZClosing = r; currentZSalonName = salonName;
     document.getElementById('z-box').innerHTML = html;
     document.getElementById('z-overlay').classList.add('on');
   }).catch(function (e) { toast(e.message, true); });

@@ -85,4 +85,5 @@ node tests/caisse/51-tiroir-sur-especes.js  # clic Especes = ouverture immediate
 node tests/caisse/52-paiement-partage.js  # paiement partage especes + carte (bouton Partager)
 node tests/caisse/53-lignes-separees.js  # un clic = une ligne separee (un coiffeur par ligne)
 node tests/caisse/54-ticket-z-long-defile.js  # ticket Z / recu long : defile, boutons toujours visibles
+node tests/caisse/55-ticket-z-pont.js  # ticket Z : impression via le pont (caisse + admin), 32 colonnes
 ```

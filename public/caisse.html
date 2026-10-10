@@ -881,7 +881,7 @@
   </div>
 </div>
 
-<script src="/app.js?v=14"></script>
+<script src="/app.js?v=15"></script>
 <script>requireSalonInUrl("Pour utiliser la caisse, ouvrez le lien de votre salon.");</script>
 <script>
 mountThemeButton();
@@ -2631,6 +2631,30 @@ function startCaisseClosing() {
 
 var ZTICKET_METHOD_LABELS = { especes: 'Espèces', cb: 'Carte bancaire', autre: 'Autre' };
 
+// Ticket Z affiché (pour l'envoyer au pont d'impression depuis le bouton Imprimer).
+var currentZClosing = null, currentZSalonName = '';
+
+/**
+ * Bouton "Imprimer" du ticket Z : envoi silencieux à l'imprimante du salon via le pont (comme les
+ * reçus) ; sans pont, ou si l'envoi échoue, repli sur le dialogue d'impression du navigateur.
+ */
+function printZNow() {
+  if (!tpeBridgeUrl || !currentZClosing) { window.print(); return; }
+  var btn = document.getElementById('z-print-btn');
+  if (btn) btn.disabled = true;
+  var text = buildZText(currentZClosing, { salonName: currentZSalonName, labels: { especes: 'Especes', cb: 'Carte bancaire', autre: 'Autre' } });
+  barberApi('/api/tpe/print', { method: 'POST', body: { text: text, mode: tpePrintMode } })
+    .then(function (d) {
+      if (btn) btn.disabled = false;
+      if (d.ok) { toast('Ticket Z envoyé à l\'imprimante'); closeZTicket(); } else { window.print(); }
+    })
+    .catch(function () {
+      if (btn) btn.disabled = false;
+      toast('File d\'impression indisponible — le dialogue va s\'ouvrir', true);
+      window.print();
+    });
+}
+
 function printZTicket(id) {
   barberApi('/api/owner/caisse/closings/' + id).then(function (r) {
     var salonName = (document.getElementById('salon-name-tag') && document.getElementById('salon-name-tag').textContent) || 'Salon';
@@ -2683,9 +2707,10 @@ function printZTicket(id) {
       '<div class="zline total"><span>= Espèces attendues dans le tiroir</span><span>' + eur(expectedInDrawer) + '</span></div>' +
       '<div class="z-actions">' +
         '<button class="btn btn-soft" onclick="closeZTicket()">Fermer</button>' +
-        '<button class="btn btn-primary" onclick="window.print()">Imprimer</button>' +
+        '<button class="btn btn-primary" id="z-print-btn" onclick="printZNow()">Imprimer</button>' +
       '</div>';
 
+    currentZClosing = r; currentZSalonName = salonName;
     document.getElementById('z-box').innerHTML = html;
     document.getElementById('z-overlay').classList.add('on');
     loadPendingPayments();
