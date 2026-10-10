@@ -172,9 +172,12 @@ router.put('/', requireAdmin, wrap(async (req, res) => {
  */
 router.get('/sms', requireAdmin, wrap(async (req, res) => {
   const c = await getSmsCredits(req.salon.id);
+  const onlyBlocked = req.query.only === 'no_credit';
   const [log] = await pool.query(
     `SELECT kind, client_name, phone, sender, message, segments, status, error, scheduled_at, sent_at, updated_at
-     FROM sms_log WHERE salon_id = ? ORDER BY updated_at DESC LIMIT 30`, [req.salon.id]);
+     FROM sms_log WHERE salon_id = ?` + (onlyBlocked ? " AND status = 'no_credit'" : '') + ` ORDER BY updated_at DESC LIMIT ` + (onlyBlocked ? 200 : 50), [req.salon.id]);
+  const [[blocked]] = await pool.query(
+    "SELECT COUNT(*) AS n FROM sms_log WHERE salon_id = ? AND status = 'no_credit' AND created_at >= DATE_FORMAT(NOW(), '%Y-%m-01')", [req.salon.id]);
   const [[counts]] = await pool.query(
     `SELECT SUM(status = 'sent') AS sent, SUM(status = 'no_credit') AS no_credit, SUM(status = 'failed') AS failed
      FROM sms_log WHERE salon_id = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)`, [req.salon.id]);
@@ -187,6 +190,7 @@ router.get('/sms', requireAdmin, wrap(async (req, res) => {
     credits_used: c.credits_used,
     credits_remaining: Math.max(0, c.credits_granted - c.credits_used),
     last_30_days: { sent: Number(counts.sent || 0), no_credit: Number(counts.no_credit || 0), failed: Number(counts.failed || 0) },
+    blocked_this_month: Number(blocked.n),
     default_template: sms.DEFAULT_TEMPLATE,
     log
   });

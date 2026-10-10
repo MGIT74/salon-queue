@@ -28,4 +28,5 @@ check('rappel : nom du coiffeur dans le message, plus de lien court', /coiffeur:
 check('interface : pastille {coiffeur}, pas de {lien}', /smsInsert\('\{coiffeur\}'\)/.test(d) && !/smsInsert\('\{lien\}'\)/.test(d));
 check('message identique au defaut non fige + anciens defauts migres', /=== sms\.DEFAULT_TEMPLATE\) patch\.sms_reminder_template = ''/.test(st) && /DELETE FROM settings WHERE `key` = 'sms_reminder_template'/.test(sql));
 check('non envoye faute de credits = definitif (jamais renvoye)', /if \(a\.log_status === 'no_credit'\) continue;/.test(a));
+check('historique : alerte rouge des SMS refuses du mois + filtre', /blocked_this_month/.test(st) && /sms-alert/.test(d) && /smsToggleBlocked/.test(d) && /only === 'no_credit'/.test(st));
 console.log('\n' + pass + ' OK, ' + fail + ' ECHEC'); process.exit(fail ? 1 : 0);

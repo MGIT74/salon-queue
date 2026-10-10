@@ -304,7 +304,9 @@
   .sms-row-log .sub { grid-column: 1 / -1; color: var(--grey); font-size: 12.5px; }
   .sms-badge { font-size: 11.5px; font-weight: 600; padding: 3px 9px; border-radius: 999px; white-space: nowrap; align-self: start; }
   .sms-badge.sent { background: rgba(52,199,89,.15); color: #1f9d4a; }
-  .sms-badge.no_credit { background: rgba(255,149,0,.18); color: #c25e00; }
+  .sms-badge.no_credit { background: rgba(255,59,48,.15); color: #d1362b; }
+  .sms-row-log.refused .sub { color: #d1362b; }
+  .sms-alert { background: rgba(255,59,48,.10); border: 1px solid rgba(255,59,48,.35); color: #d1362b; border-radius: 12px; padding: 10px 14px; font-size: 13.5px; margin-bottom: 10px; }
   .sms-badge.failed { background: rgba(255,59,48,.15); color: #d1362b; }
   .sms-badge.pending { background: var(--fill); color: var(--grey); }
   .sidebar-version { text-align: right; padding: 4px 14px 0; font-size: 11.5px; color: var(--grey); opacity: .8; letter-spacing: .02em; user-select: none; }
@@ -8206,6 +8208,7 @@ function testSms() {
 
 /* ============ Reglages > SMS (rappel 24h) ============ */
 var smsDefaultTemplate = '';
+var smsOnlyBlocked = false;
 var smsPreviewTimer = null;
 
 function smsStatusLabel(st) {
@@ -8213,7 +8216,7 @@ function smsStatusLabel(st) {
 }
 
 function loadSmsSettings() {
-  Promise.all([api('/api/settings/sms'), api('/api/settings')]).then(function (res) {
+  Promise.all([api('/api/settings/sms' + (smsOnlyBlocked ? '?only=no_credit' : '')), api('/api/settings')]).then(function (res) {
     var r = res[0], s = res[1].settings;
     smsDefaultTemplate = r.default_template;
     document.getElementById('sms-blocked').style.display = r.permitted ? 'none' : 'block';
@@ -8227,17 +8230,24 @@ function loadSmsSettings() {
       '<div class="sms-tile"><b>' + r.credits_used + ' / ' + r.credits_granted + '</b><span>utilisés / accordés ce mois</span></div>' +
       '<div class="sms-tile"><b>' + r.last_30_days.sent + '</b><span>envoyés (30 j)</span></div>' +
       (r.last_30_days.no_credit ? '<div class="sms-tile warn"><b>' + r.last_30_days.no_credit + '</b><span>non envoyés (plus de crédits)</span></div>' : '');
-    document.getElementById('sms-log').innerHTML = r.log.length === 0
+    var banner = r.blocked_this_month
+      ? '<div class="sms-alert"><b>' + r.blocked_this_month + ' SMS refusé' + (r.blocked_this_month > 1 ? 's' : '') + ' ce mois-ci : plus de crédits.</b> ' +
+        'Ces clients n\'ont pas reçu leur rappel (ils ne seront pas renvoyés). Contactez votre prestataire pour augmenter votre quota mensuel.' +
+        ' <button class="btn btn-soft" style="padding:5px 12px;font-size:12.5px;margin-left:6px" onclick="smsToggleBlocked()">' + (smsOnlyBlocked ? 'Voir tous les SMS' : 'Voir uniquement les refusés') + '</button></div>'
+      : '';
+    document.getElementById('sms-log').innerHTML = banner + (r.log.length === 0
       ? '<div class="hint">Aucun SMS pour le moment.</div>'
       : r.log.map(function (l) {
-          return '<div class="sms-row-log"><div><b>' + esc(l.client_name || '') + '</b> · ' + esc(l.phone ? '+' + l.phone : '') +
+          return '<div class="sms-row-log' + (l.status === 'no_credit' ? ' refused' : '') + '"><div><b>' + esc(l.client_name || '') + '</b> · ' + esc(l.phone ? '+' + l.phone : '') +
             (l.kind === 'test' ? ' <span class="hint">SMS de test · ' + esc(String(l.sent_at || l.updated_at || '').slice(0, 16).replace('T', ' ')) + '</span>' : ' <span class="hint">RDV ' + esc(String(l.scheduled_at || '').slice(0, 16).replace('T', ' ')) + '</span>') + '</div>' +
             '<span class="sms-badge ' + l.status + '">' + smsStatusLabel(l.status) + (l.status === 'sent' ? ' · ' + l.segments + ' crédit' + (l.segments > 1 ? 's' : '') : '') + '</span>' +
             '<div class="sub">' + esc(l.message || '') + (l.error ? ' — ' + esc(l.error) : '') + '</div></div>';
-        }).join('');
+        }).join(''));
     smsPreview();
   }).catch(function (e) { toast(e.message, true); });
 }
+
+function smsToggleBlocked() { smsOnlyBlocked = !smsOnlyBlocked; loadSmsSettings(); }
 
 function smsInsert(token) {
   var el = document.getElementById('sms-template');
