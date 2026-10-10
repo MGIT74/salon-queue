@@ -110,7 +110,37 @@ function buildMessage(template, vars, opts) {
   return o.stripAccents ? stripAccents(msg) : msg;
 }
 
+/**
+ * SMS de test : l'app ne detient pas la cle Brevo, c'est n8n (webhook
+ * "TBO - Test SMS (app)") qui envoie. Meme logique que le chat IA : meme
+ * serveur n8n, meme cle d'automatisation.
+ */
+function testWebhookUrl() {
+  const explicit = String(process.env.N8N_SMS_TEST_WEBHOOK_URL || '').replace(/[\r\n"']/g, '').trim();
+  if (explicit) return explicit;
+  const chat = String(process.env.N8N_CHAT_WEBHOOK_URL || '').replace(/[\r\n"']/g, '').trim();
+  return chat ? chat.replace(/\/webhook(-test)?\/[^/]+$/, '/webhook$1/tbo-sms-test') : '';
+}
+
+async function sendTestSms({ phone, sender, message }) {
+  const url = testWebhookUrl();
+  if (!url) throw new Error("l'envoi de SMS n'est pas configure sur ce serveur (N8N_CHAT_WEBHOOK_URL manquant)");
+  const key = String(process.env.AUTOMATION_API_KEY || '').replace(/[\r\n"']/g, '').trim();
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Automation-Key': key },
+    body: JSON.stringify({ phone, sender, message, unicode: !isGsm(message) }),
+    signal: AbortSignal.timeout(20000)
+  });
+  let data = null;
+  try { data = await r.json(); } catch (e) { /* reponse non JSON */ }
+  if (!r.ok) throw new Error('le service d\'envoi a repondu ' + r.status);
+  if (!data || data.ok !== true) throw new Error((data && data.error) || 'echec de l\'envoi');
+  return data;
+}
+
 module.exports = {
+  sendTestSms, testWebhookUrl,
   DEFAULT_TEMPLATE, countSegments, isGsm, stripAccents, normalizePhone, sanitizeSender,
   formatAppointmentWhen, buildMessage
 };

@@ -436,6 +436,20 @@ router.post('/impersonate', requireSuperAdmin, wrap(async (req, res) => {
  * se remet a zero tout seul). Plus de credits => l'envoi est bloque
  * et les SMS sont traces "non envoye - plus de credits".
  * ============================================================ */
+router.post('/sms/test', requireSuperAdmin, wrap(async (req, res) => {
+  const phone = require('../lib/sms').normalizePhone(req.body.to);
+  if (!phone) return res.status(400).json({ error: 'Numero de telephone invalide (ex : 06 12 34 56 78)' });
+  const smsLib = require('../lib/sms');
+  const sender = smsLib.sanitizeSender(req.body.sender, 'TheBarberOne');
+  const message = smsLib.buildMessage(String(req.body.message || '').slice(0, 480) || 'Test SMS : le rappel de rendez-vous fonctionne. {salon}', { salon: 'TheBarberOne' }, { stripAccents: true });
+  try {
+    const r = await smsLib.sendTestSms({ phone, sender, message });
+    res.json({ ok: true, sent: true, sender, message, segments: r.segments || smsLib.countSegments(message) });
+  } catch (err) {
+    res.status(400).json({ error: 'Envoi du test impossible : ' + err.message });
+  }
+}));
+
 router.get('/sms/overview', requireSuperAdmin, wrap(async (req, res) => {
   const [rows] = await pool.query(
     `SELECT s.id, s.name, s.slug,

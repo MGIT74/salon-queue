@@ -188,6 +188,35 @@ router.get('/sms', requireAdmin, wrap(async (req, res) => {
   });
 }));
 
+/**
+ * Envoi d'un SMS de test au numero saisi (comme l'email de test). Ne consomme
+ * pas les credits du salon ; limite a 5 essais par heure et par salon.
+ */
+const smsTestHits = new Map();
+router.post('/sms/test', requireAdmin, wrap(async (req, res) => {
+  const phone = sms.normalizePhone(req.body.to);
+  if (!phone) return res.status(400).json({ error: 'Numero de telephone invalide (ex : 06 12 34 56 78)' });
+  await pool.query('INSERT IGNORE INTO sms_credits (salon_id) VALUES (?)', [req.salon.id]);
+  const [[c]] = await pool.query('SELECT sms_enabled FROM sms_credits WHERE salon_id = ?', [req.salon.id]);
+  if (!c.sms_enabled) return res.status(403).json({ error: "Les SMS ne sont pas actives pour votre salon." });
+  const now = Date.now();
+  const hits = (smsTestHits.get(req.salon.id) || []).filter(t => now - t < 3600000);
+  if (hits.length >= 5) return res.status(429).json({ error: 'Trop de tests : 5 par heure maximum.' });
+  const s = await getSettings(req.salon.id);
+  const salonName = s.salon_name || req.salon.name;
+  const sender = sms.sanitizeSender(s.sms_sender, salonName);
+  const message = sms.buildMessage(s.sms_reminder_template, {
+    client_name: 'Test', date: 'demain', heure: '14h30', salon: salonName
+  }, { stripAccents: s.sms_strip_accents !== '0' });
+  try {
+    const r = await sms.sendTestSms({ phone, sender, message });
+    hits.push(now); smsTestHits.set(req.salon.id, hits);
+    res.json({ ok: true, sent: true, sender, message, segments: r.segments || sms.countSegments(message) });
+  } catch (err) {
+    res.status(400).json({ error: "Envoi du test impossible : " + err.message });
+  }
+}));
+
 /** Apercu du message (exemple) + nombre de credits qu'il coutera - meme code que l'envoi reel. */
 router.post('/sms/preview', requireAdmin, wrap(async (req, res) => {
   const s = await getSettings(req.salon.id);

@@ -314,6 +314,14 @@
       <p class="hint">Chaque salon dispose d'un solde de crédits prépayés (1 crédit = 1 SMS ; un message long en coûte plusieurs). Quand le solde est épuisé, l'envoi est bloqué : les SMS sont tracés « non envoyé — plus de crédits » dans les réglages du salon. L'envoi lui-même est fait par le workflow n8n « Rappel SMS 24h » via Brevo.</p>
       <div id="sms-salons-list"><div class="empty">Chargement…</div></div>
     </div>
+
+    <div class="card-box">
+      <h3>Envoyer un SMS de test</h3>
+      <p class="hint">Vérifie la chaîne complète (app → n8n → Brevo). Consomme 1 SMS de ton compte Brevo, pas de crédit d'un salon.</p>
+      <div class="fld"><label for="test-sms-to">Numéro de destination</label><input id="test-sms-to" type="tel" placeholder="06 12 34 56 78"></div>
+      <div class="fld"><label for="test-sms-sender">Expéditeur (3 à 11 lettres ou chiffres)</label><input id="test-sms-sender" type="text" maxlength="11" placeholder="TheBarberOne"></div>
+      <button class="btn btn-primary" onclick="sendTestSms()">Envoyer</button>
+    </div>
   </div>
 
   <div class="tab-panel" id="t-activity">
@@ -684,6 +692,16 @@ function sendTestEmail() {
   toast('Envoi en cours…');
   superApi('/api/super/test-email', { method: 'POST', body: { to: to } })
     .then(function () { toast('Email envoyé à ' + to); })
+    .catch(function (e) { toast(e.message, true); });
+}
+
+function sendTestSms() {
+  var to = document.getElementById('test-sms-to').value.trim();
+  var sender = document.getElementById('test-sms-sender').value.trim();
+  if (!to) { toast('Numéro requis', true); return; }
+  toast('Envoi en cours…');
+  superApi('/api/super/sms/test', { method: 'POST', body: { to: to, sender: sender } })
+    .then(function (r) { toast('SMS envoyé à ' + to + ' (expéditeur ' + r.sender + ')'); })
     .catch(function (e) { toast(e.message, true); });
 }
 

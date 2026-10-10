@@ -2282,6 +2282,7 @@
           <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">
             <button class="btn btn-primary" onclick="saveSmsSettings()">Enregistrer</button>
             <button class="btn btn-soft" onclick="smsResetTemplate()">Message par défaut</button>
+            <button class="btn btn-soft" onclick="testSms()">Envoyer un SMS de test</button>
           </div>
         </div>
 
@@ -8188,6 +8189,16 @@ function testSmtp() {
     toast('Envoi en cours…');
     api('/api/settings/smtp/test', { method: 'POST', body: { to: to } })
       .then(function () { toast('Email envoyé à ' + to); })
+      .catch(function (e) { toast(e.message, true); });
+  });
+}
+
+function testSms() {
+  showPrompt('', { title: 'SMS de test', placeholder: '06 12 34 56 78' }).then(function (to) {
+    if (!to) return;
+    toast('Envoi en cours…');
+    api('/api/settings/sms/test', { method: 'POST', body: { to: to } })
+      .then(function (r) { toast('SMS de test envoyé à ' + to + (r && r.sender ? ' (expéditeur ' + r.sender + ')' : '')); })
       .catch(function (e) { toast(e.message, true); });
   });
 }

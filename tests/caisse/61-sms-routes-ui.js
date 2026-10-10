@@ -16,4 +16,9 @@ check('reglages SMS editables + validation expediteur', /sms_sender/.test(st) &&
 check('super admin : overview, credits, remise a zero', /\/sms\/overview/.test(sa) && /add_credits/.test(sa) && /reset-usage/.test(sa));
 check('dashboard : accordeon SMS + apercu + etiquette non envoye', /id="sms-card"/.test(d) && /saveSmsSettings/.test(d) && /plus de crédits/.test(d));
 check('super admin : onglet SMS', /data-t="sms"/.test(s) && /id="t-sms"/.test(s) && /loadSmsOverview/.test(s));
+const lib = rd('src/lib/sms.js');
+check('SMS de test : routes salon + super admin protegees', /router\.post\('\/sms\/test', requireAdmin/.test(st) && /router\.post\('\/sms\/test', requireSuperAdmin/.test(sa));
+check('SMS de test : limite 5/heure et numero valide', /hits\.length >= 5/.test(st) && /normalizePhone\(req\.body\.to\)/.test(st));
+check('SMS de test : passe par le webhook n8n (pas de cle Brevo dans l\'app)', /tbo-sms-test/.test(lib) && !/api\.brevo\.com/.test(lib));
+check('SMS de test : boutons salon + super admin', /onclick="testSms\(\)"/.test(d) && /onclick="sendTestSms\(\)"/.test(s));
 console.log('\n' + pass + ' OK, ' + fail + ' ECHEC'); process.exit(fail ? 1 : 0);
