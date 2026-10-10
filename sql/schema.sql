@@ -1147,3 +1147,45 @@ CREATE TABLE IF NOT EXISTS salon_slug_aliases (
 SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'sales' AND column_name = 'cash_cents');
 SET @sql := IF(@c = 0, 'ALTER TABLE sales ADD COLUMN cash_cents INT NULL', 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- ============================================================
+-- SMS (rappel 24h avant le RDV) - envoi par n8n via Brevo.
+-- sms_credits : solde PREPAYE par salon, gere par le super admin
+-- (credits_granted = total accorde, credits_used = deja consomme,
+-- 1 SMS = 1 segment Brevo, un message long coute plusieurs segments).
+-- sms_log : un seul enregistrement par RDV (anti-doublon). Statuts :
+-- pending (remis a n8n), sent, failed (erreur Brevo), no_credit
+-- (non envoye : plus de credits - re-essaye tant que le RDV est a venir).
+-- ============================================================
+CREATE TABLE IF NOT EXISTS sms_credits (
+  salon_id CHAR(36) PRIMARY KEY,
+  sms_enabled TINYINT(1) NOT NULL DEFAULT 1,
+  credits_granted INT NOT NULL DEFAULT 2000,
+  credits_used INT NOT NULL DEFAULT 0,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS sms_log (
+  id CHAR(36) PRIMARY KEY,
+  salon_id CHAR(36) NOT NULL,
+  appointment_id CHAR(36) NOT NULL,
+  kind VARCHAR(20) NOT NULL DEFAULT 'reminder',
+  client_name VARCHAR(255) NULL,
+  phone VARCHAR(30) NULL,
+  sender VARCHAR(20) NULL,
+  message TEXT NULL,
+  segments INT NOT NULL DEFAULT 1,
+  attempts INT NOT NULL DEFAULT 0,
+  status VARCHAR(20) NOT NULL DEFAULT 'pending',
+  provider_message_id VARCHAR(100) NULL,
+  error VARCHAR(500) NULL,
+  scheduled_at DATETIME NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  sent_at DATETIME NULL,
+  UNIQUE KEY uq_sms_log_appt_kind (appointment_id, kind),
+  INDEX idx_sms_log_salon_created (salon_id, created_at),
+  FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE,
+  FOREIGN KEY (appointment_id) REFERENCES appointments(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

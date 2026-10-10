@@ -285,6 +285,28 @@
      écrans (export, actions...) - le bouton clair/sombre vit désormais
      uniquement dans la sidebar, aussi bien en desktop qu'en mobile. */
   .theme-btn { display: none; }
+  /* Reglages > SMS */
+  .sms-sub { border-top: 1px solid var(--sep); padding-top: 14px; margin-top: 14px; }
+  .sms-sub:first-of-type { border-top: none; margin-top: 4px; padding-top: 0; }
+  .sms-sub-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; }
+  .sms-sub-title { font-weight: 600; font-size: 15px; }
+  .sms-credits { display: flex; gap: 10px; flex-wrap: wrap; margin: 12px 0; }
+  .sms-credits .sms-tile { background: var(--fill); border-radius: 12px; padding: 10px 14px; min-width: 120px; }
+  .sms-credits .sms-tile b { display: block; font-size: 20px; font-variant-numeric: tabular-nums; }
+  .sms-credits .sms-tile span { font-size: 12px; color: var(--grey); }
+  .sms-credits .sms-tile.warn b { color: #d9480f; }
+  .sms-chips { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: -4px 0 8px; }
+  .sms-chips .chip { border: 1px solid var(--sep); background: var(--fill); color: inherit; border-radius: 999px; padding: 4px 10px; font-size: 12.5px; cursor: pointer; }
+  .sms-check { display: flex; gap: 8px; align-items: center; font-size: 13px; margin: 6px 0 10px; cursor: pointer; }
+  .sms-preview { background: var(--fill); border-radius: 14px; padding: 12px 14px; font-size: 14px; line-height: 1.45; white-space: pre-wrap; }
+  .sms-row-log { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; padding: 10px 0; border-bottom: 1px solid var(--sep); font-size: 13.5px; }
+  .sms-row-log:last-child { border-bottom: none; }
+  .sms-row-log .sub { grid-column: 1 / -1; color: var(--grey); font-size: 12.5px; }
+  .sms-badge { font-size: 11.5px; font-weight: 600; padding: 3px 9px; border-radius: 999px; white-space: nowrap; align-self: start; }
+  .sms-badge.sent { background: rgba(52,199,89,.15); color: #1f9d4a; }
+  .sms-badge.no_credit { background: rgba(255,149,0,.18); color: #c25e00; }
+  .sms-badge.failed { background: rgba(255,59,48,.15); color: #d1362b; }
+  .sms-badge.pending { background: var(--fill); color: var(--grey); }
   .sidebar-version { text-align: right; padding: 4px 14px 0; font-size: 11.5px; color: var(--grey); opacity: .8; letter-spacing: .02em; user-select: none; }
   html[data-sidebar-collapsed="1"] .sidebar-version { display: none; }
   .sidebar-logout-mobile { display: none !important; }
@@ -2217,6 +2239,56 @@
         <button class="btn btn-primary" onclick="saveSettings()">Enregistrer</button>
         <button class="btn btn-soft" onclick="testSmtp()">Envoyer un email de test</button>
       </div>
+      </div>
+    </div>
+
+    <div class="card-box" id="sms-card">
+      <h3 class="accordion-head" onclick="toggleSettingsAccordion('sms'); loadSmsSettings()">
+        SMS
+        <svg class="accordion-chevron" id="sms-chevron" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </h3>
+      <div class="accordion-body" id="sms-body" style="display:none">
+        <div id="sms-blocked" class="hint" style="display:none;color:var(--red,#d9480f);font-weight:600">Les SMS ne sont pas activés pour votre salon. Contactez-nous pour les activer.</div>
+
+        <div class="sms-sub">
+          <div class="sms-sub-head">
+            <div>
+              <div class="sms-sub-title">Rappel SMS</div>
+              <div class="hint" style="margin:2px 0 0">Un SMS est envoyé automatiquement au client environ 24 h avant son rendez-vous (pris en ligne ou saisi par vous). Pas de rappel si le rendez-vous est pris moins de 24 h à l'avance.</div>
+            </div>
+            <div class="switch" id="sms-enabled-switch" onclick="this.classList.toggle('on'); saveSmsSettings(true)"></div>
+          </div>
+
+          <div class="sms-credits" id="sms-credits"></div>
+
+          <div class="fld"><label for="sms-sender">Nom de l'expéditeur <span class="hint" style="font-weight:400">(3 à 11 lettres ou chiffres, sans espace ni accent)</span></label>
+            <input id="sms-sender" type="text" maxlength="11" placeholder="MonSalon" autocomplete="off"></div>
+
+          <div class="fld"><label for="sms-template">Message</label>
+            <textarea id="sms-template" rows="3" maxlength="480" oninput="smsPreviewSoon()"></textarea></div>
+          <div class="sms-chips">
+            <span class="hint" style="margin:0">Insérer :</span>
+            <button type="button" class="chip" onclick="smsInsert('{prenom}')">{prenom}</button>
+            <button type="button" class="chip" onclick="smsInsert('{nom}')">{nom}</button>
+            <button type="button" class="chip" onclick="smsInsert('{date}')">{date}</button>
+            <button type="button" class="chip" onclick="smsInsert('{heure}')">{heure}</button>
+            <button type="button" class="chip" onclick="smsInsert('{salon}')">{salon}</button>
+          </div>
+          <label class="sms-check"><input type="checkbox" id="sms-strip" onchange="smsPreviewSoon()"> Retirer automatiquement les accents (SMS plus courts et moins chers)</label>
+
+          <div class="sms-preview" id="sms-preview"></div>
+          <div class="hint" id="sms-preview-count"></div>
+
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">
+            <button class="btn btn-primary" onclick="saveSmsSettings()">Enregistrer</button>
+            <button class="btn btn-soft" onclick="smsResetTemplate()">Message par défaut</button>
+          </div>
+        </div>
+
+        <div class="sms-sub">
+          <div class="sms-sub-title">Derniers SMS</div>
+          <div id="sms-log"><div class="hint">Aucun SMS pour le moment.</div></div>
+        </div>
       </div>
     </div>
 
@@ -8118,6 +8190,84 @@ function testSmtp() {
       .then(function () { toast('Email envoyé à ' + to); })
       .catch(function (e) { toast(e.message, true); });
   });
+}
+
+/* ============ Reglages > SMS (rappel 24h) ============ */
+var smsDefaultTemplate = '';
+var smsPreviewTimer = null;
+
+function smsStatusLabel(st) {
+  return { sent: 'Envoyé', no_credit: 'Non envoyé — plus de crédits', failed: 'Échec d\'envoi', pending: 'En cours' }[st] || st;
+}
+
+function loadSmsSettings() {
+  Promise.all([api('/api/settings/sms'), api('/api/settings')]).then(function (res) {
+    var r = res[0], s = res[1].settings;
+    smsDefaultTemplate = r.default_template;
+    document.getElementById('sms-blocked').style.display = r.permitted ? 'none' : 'block';
+    document.getElementById('sms-enabled-switch').classList.toggle('on', s.sms_reminder_enabled === '1');
+    document.getElementById('sms-sender').value = s.sms_sender || '';
+    document.getElementById('sms-template').value = s.sms_reminder_template || r.default_template;
+    document.getElementById('sms-strip').checked = s.sms_strip_accents !== '0';
+    var low = r.credits_remaining <= Math.max(20, Math.round(r.credits_granted * 0.1));
+    document.getElementById('sms-credits').innerHTML =
+      '<div class="sms-tile' + (low ? ' warn' : '') + '"><b>' + r.credits_remaining + '</b><span>crédits restants</span></div>' +
+      '<div class="sms-tile"><b>' + r.credits_used + ' / ' + r.credits_granted + '</b><span>utilisés / accordés</span></div>' +
+      '<div class="sms-tile"><b>' + r.last_30_days.sent + '</b><span>envoyés (30 j)</span></div>' +
+      (r.last_30_days.no_credit ? '<div class="sms-tile warn"><b>' + r.last_30_days.no_credit + '</b><span>non envoyés (plus de crédits)</span></div>' : '');
+    document.getElementById('sms-log').innerHTML = r.log.length === 0
+      ? '<div class="hint">Aucun SMS pour le moment.</div>'
+      : r.log.map(function (l) {
+          return '<div class="sms-row-log"><div><b>' + esc(l.client_name || '') + '</b> · ' + esc(l.phone ? '+' + l.phone : '') +
+            ' <span class="hint">RDV ' + esc(String(l.scheduled_at || '').slice(0, 16).replace('T', ' ')) + '</span></div>' +
+            '<span class="sms-badge ' + l.status + '">' + smsStatusLabel(l.status) + (l.status === 'sent' ? ' · ' + l.segments + ' crédit' + (l.segments > 1 ? 's' : '') : '') + '</span>' +
+            '<div class="sub">' + esc(l.message || '') + (l.error ? ' — ' + esc(l.error) : '') + '</div></div>';
+        }).join('');
+    smsPreview();
+  }).catch(function (e) { toast(e.message, true); });
+}
+
+function smsInsert(token) {
+  var el = document.getElementById('sms-template');
+  var a = el.selectionStart == null ? el.value.length : el.selectionStart;
+  var b = el.selectionEnd == null ? a : el.selectionEnd;
+  el.value = el.value.slice(0, a) + token + el.value.slice(b);
+  el.focus(); el.selectionStart = el.selectionEnd = a + token.length;
+  smsPreviewSoon();
+}
+
+function smsResetTemplate() {
+  document.getElementById('sms-template').value = smsDefaultTemplate;
+  smsPreviewSoon();
+}
+
+function smsPreviewSoon() {
+  clearTimeout(smsPreviewTimer);
+  smsPreviewTimer = setTimeout(smsPreview, 250);
+}
+
+function smsPreview() {
+  api('/api/settings/sms/preview', { method: 'POST', body: {
+    template: document.getElementById('sms-template').value,
+    strip_accents: document.getElementById('sms-strip').checked
+  }}).then(function (r) {
+    document.getElementById('sms-preview').textContent = r.message;
+    document.getElementById('sms-preview-count').textContent =
+      r.length + ' caractères · ' + r.segments + ' SMS (' + r.segments + ' crédit' + (r.segments > 1 ? 's' : '') + ' par rappel)' +
+      (r.segments > 1 ? ' — un message plus court coûte moins cher' : '');
+  }).catch(function () {});
+}
+
+function saveSmsSettings(silentToggle) {
+  api('/api/settings', { method: 'PUT', body: {
+    sms_reminder_enabled: document.getElementById('sms-enabled-switch').classList.contains('on') ? '1' : '0',
+    sms_sender: document.getElementById('sms-sender').value,
+    sms_reminder_template: document.getElementById('sms-template').value,
+    sms_strip_accents: document.getElementById('sms-strip').checked ? '1' : '0'
+  }}).then(function () {
+    toast(silentToggle ? 'Rappel SMS mis à jour' : 'Réglages SMS enregistrés');
+    loadSmsSettings();
+  }).catch(function (e) { toast(e.message, true); loadSmsSettings(); });
 }
 
 /* ============ Chatbot IA ============ */

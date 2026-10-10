@@ -90,4 +90,6 @@ node tests/caisse/56-z-montants-non-coupes.js  # Z / recu : montant + devise jam
 node tests/caisse/57-compose-env-ia.js  # prod Docker : variables IA transmises au conteneur
 node tests/caisse/58-ia-base-url.js  # IA : adresse de l'instance transmise a n8n (liste blanche)
 node tests/caisse/59-ia-ventes-caisse.js  # IA : outil des ventes reelles de la caisse + register_today
+node tests/caisse/60-sms-lib.js  # SMS : telephone, segments, message, expediteur
+node tests/caisse/61-sms-routes-ui.js  # SMS : schema, routes, reglages, super admin, interface
 ```

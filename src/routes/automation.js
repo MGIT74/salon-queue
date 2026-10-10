@@ -1,7 +1,8 @@
 const express = require('express');
 const { pool, getSettings } = require('../db');
 const requireAutomationKey = require('../middleware/automationAuth');
-const { computeSlotsForBarber, nowInParis } = require('./appointments');
+const { computeSlotsForBarber, nowInParis, nowParisDatetimeString, parisLocalToUtcDate } = require('./appointments');
+const sms = require('../lib/sms');
 const { sendCustomClientEmail } = require('../lib/mailer');
 const { wrap } = require('../lib/wrap');
 const { serviceLineTransfers, applyTransfers } = require('../lib/lineAttribution');
@@ -741,5 +742,149 @@ router.get('/salons/:id/client-gifts-loyalty', requireAutomationKey, wrap(async 
     } : null
   });
 }));
+
+/* ============================================================
+ * RAPPEL SMS 24h avant le RDV (envoi fait par n8n via Brevo)
+ *
+ * 1) GET  /sms-reminders/due   : n8n demande les SMS a envoyer MAINTENANT.
+ *    L'app decide tout (salons actifs, RDV dans la fenetre des 24h,
+ *    credits, message, expediteur) ; n8n n'a plus qu'a envoyer.
+ * 2) POST /sms-reminders/result : n8n annonce envoye / echec ; seul un
+ *    envoi reussi consomme des credits (nombre de segments Brevo).
+ * ============================================================ */
+
+const SMS_PENDING_TTL_MIN = 30;   // un "pending" plus vieux est considere perdu (n8n a plante) et peut etre redonne
+const SMS_MAX_ATTEMPTS = 3;
+const SMS_WINDOW_MIN_H = 2;       // pas de rappel a moins de 2h du RDV (trop tard pour etre utile)
+const SMS_WINDOW_MAX_H = 24;
+
+function addHoursLocal(localStr, hours) {
+  const m = String(localStr).match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/);
+  const t = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]) + hours * 3600000;
+  return new Date(t).toISOString().slice(0, 19).replace('T', ' ');
+}
+
+async function getSmsCredits(salonId) {
+  await pool.query('INSERT IGNORE INTO sms_credits (salon_id) VALUES (?)', [salonId]);
+  const [[row]] = await pool.query('SELECT sms_enabled, credits_granted, credits_used FROM sms_credits WHERE salon_id = ?', [salonId]);
+  return row;
+}
+
+router.get('/sms-reminders/due', requireAutomationKey, wrap(async (req, res) => {
+  const [salons] = await pool.query('SELECT id, name FROM salons WHERE active = 1 ORDER BY created_at');
+  const items = [];
+  const skipped = { disabled_salons: 0, no_credit: 0, too_late_booking: 0, invalid_phone: 0 };
+
+  for (const salon of salons) {
+    const settings = await getSettings(salon.id);
+    if (settings.sms_reminder_enabled !== '1') { skipped.disabled_salons++; continue; }
+    const credits = await getSmsCredits(salon.id);
+    if (!credits.sms_enabled) { skipped.disabled_salons++; continue; }
+
+    const nowLocal = nowParisDatetimeString(settings.timezone);
+    const from = addHoursLocal(nowLocal, SMS_WINDOW_MIN_H);
+    const to = addHoursLocal(nowLocal, SMS_WINDOW_MAX_H);
+
+    const [appts] = await pool.query(
+      `SELECT a.id, a.client_name, a.phone, a.scheduled_at, a.created_at,
+              l.status AS log_status, l.attempts AS log_attempts,
+              (l.updated_at > DATE_SUB(NOW(), INTERVAL ? MINUTE)) AS log_recent
+       FROM appointments a
+       LEFT JOIN sms_log l ON l.appointment_id = a.id AND l.kind = 'reminder'
+       WHERE a.salon_id = ? AND a.status = 'confirmed' AND a.source <> 'walkin'
+         AND a.phone IS NOT NULL AND a.phone <> ''
+         AND a.scheduled_at > ? AND a.scheduled_at <= ?
+       ORDER BY a.scheduled_at`,
+      [SMS_PENDING_TTL_MIN, salon.id, from, to]
+    );
+
+    // Credits disponibles = accordes - consommes - SMS deja remis a n8n et pas encore confirmes.
+    const [[pend]] = await pool.query(
+      `SELECT COALESCE(SUM(segments), 0) AS n FROM sms_log
+       WHERE salon_id = ? AND status = 'pending' AND updated_at > DATE_SUB(NOW(), INTERVAL ? MINUTE)`,
+      [salon.id, SMS_PENDING_TTL_MIN]
+    );
+    let remaining = Number(credits.credits_granted) - Number(credits.credits_used) - Number(pend.n);
+
+    const senderName = sms.sanitizeSender(settings.sms_sender, settings.salon_name || salon.name);
+    const stripAcc = settings.sms_strip_accents !== '0';
+
+    for (const a of appts) {
+      if (a.log_status === 'sent') continue;
+      if (a.log_status === 'pending' && Number(a.log_recent)) continue;
+      if (a.log_status === 'failed' && Number(a.log_attempts) >= SMS_MAX_ATTEMPTS) continue;
+
+      // RDV pris moins de 24h avant l'heure : le client vient de reserver, pas de rappel (economie de credits).
+      const apptUtc = parisLocalToUtcDate(String(a.scheduled_at).slice(0, 10), String(a.scheduled_at).slice(11, 19), settings.timezone);
+      const createdUtc = Date.parse(String(a.created_at).replace(' ', 'T') + 'Z');
+      if (createdUtc > apptUtc.getTime() - SMS_WINDOW_MAX_H * 3600000) { skipped.too_late_booking++; continue; }
+
+      const phone = sms.normalizePhone(a.phone);
+      if (!phone) { skipped.invalid_phone++; continue; }
+
+      const when = sms.formatAppointmentWhen(a.scheduled_at);
+      const message = sms.buildMessage(settings.sms_reminder_template, {
+        client_name: a.client_name, date: when.date, heure: when.heure, salon: settings.salon_name || salon.name
+      }, { stripAccents: stripAcc });
+      const segments = sms.countSegments(message);
+
+      if (segments > remaining) {
+        // Plus de credits : NON envoye, mais trace (etiquette "non envoye" cote salon et super admin).
+        await pool.query(
+          `INSERT INTO sms_log (id, salon_id, appointment_id, kind, client_name, phone, sender, message, segments, status, scheduled_at)
+           VALUES (UUID(), ?, ?, 'reminder', ?, ?, ?, ?, ?, 'no_credit', ?)
+           ON DUPLICATE KEY UPDATE status = 'no_credit', message = VALUES(message), segments = VALUES(segments), phone = VALUES(phone), sender = VALUES(sender)`,
+          [salon.id, a.id, a.client_name, phone, senderName, message, segments, a.scheduled_at]
+        );
+        skipped.no_credit++;
+        continue;
+      }
+
+      remaining -= segments;
+      await pool.query(
+        `INSERT INTO sms_log (id, salon_id, appointment_id, kind, client_name, phone, sender, message, segments, status, attempts, scheduled_at)
+         VALUES (UUID(), ?, ?, 'reminder', ?, ?, ?, ?, ?, 'pending', 1, ?)
+         ON DUPLICATE KEY UPDATE status = 'pending', attempts = attempts + 1, message = VALUES(message), segments = VALUES(segments),
+                                 phone = VALUES(phone), sender = VALUES(sender), error = NULL`,
+        [salon.id, a.id, a.client_name, phone, senderName, message, segments, a.scheduled_at]
+      );
+      items.push({
+        appointment_id: a.id, salon_id: salon.id, salon_name: salon.name, client_name: a.client_name,
+        phone, sender: senderName, message, segments, unicode: !sms.isGsm(message), scheduled_at: String(a.scheduled_at)
+      });
+    }
+  }
+
+  res.json({ ok: true, count: items.length, skipped, items });
+}));
+
+router.post('/sms-reminders/result', requireAutomationKey, wrap(async (req, res) => {
+  const appointmentId = String(req.body.appointment_id || '');
+  const status = req.body.status === 'sent' ? 'sent' : 'failed';
+  const [[log]] = await pool.query(
+    "SELECT id, salon_id, segments, status FROM sms_log WHERE appointment_id = ? AND kind = 'reminder'", [appointmentId]
+  );
+  if (!log) return res.status(404).json({ error: 'Aucun SMS en attente pour ce rendez-vous' });
+  if (log.status === 'sent') return res.json({ ok: true, already: true }); // idempotent : jamais deux debits
+
+  if (status === 'sent') {
+    // Le vrai nombre de segments facture par Brevo (smsCount) fait foi s'il est fourni.
+    const used = Math.max(1, Math.min(10, Number(req.body.segments) || Number(log.segments) || 1));
+    const [r] = await pool.query(
+      "UPDATE sms_log SET status = 'sent', segments = ?, provider_message_id = ?, sent_at = NOW(), error = NULL WHERE id = ? AND status <> 'sent'",
+      [used, String(req.body.provider_message_id || '').slice(0, 100) || null, log.id]
+    );
+    if (r.affectedRows) {
+      await pool.query('INSERT IGNORE INTO sms_credits (salon_id) VALUES (?)', [log.salon_id]);
+      await pool.query('UPDATE sms_credits SET credits_used = credits_used + ? WHERE salon_id = ?', [used, log.salon_id]);
+    }
+    return res.json({ ok: true, credits_debited: used });
+  }
+
+  await pool.query("UPDATE sms_log SET status = 'failed', error = ? WHERE id = ? AND status <> 'sent'",
+    [String(req.body.error || 'Erreur inconnue').slice(0, 500), log.id]);
+  res.json({ ok: true });
+}));
+
 
 module.exports = router;

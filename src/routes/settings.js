@@ -3,6 +3,7 @@ const { pool, getSettings, setSettings, getCaisseLockedUntil, getPlatformSetting
 const { sendTest, invalidateTransport, sendAppointmentConfirmation, sendAppointmentReminder, sendAppointmentCancelledByAdmin, sendAppointmentRescheduled, sendTurnSoon, sendSalonClosureNotice } = require('../lib/mailer');
 const requireAdmin = require('../middleware/auth');
 const { logActivity } = require('../lib/activityLog');
+const sms = require('../lib/sms');
 const { wrap } = require('../lib/wrap');
 
 const router = express.Router();
@@ -10,6 +11,7 @@ const router = express.Router();
 const EDITABLE = [
   'salon_name', 'notify_before_min', 'logo_url', 'gift_tile_image_url', 'loyalty_card_image_url', 'gift_card_image_url', 'timezone',
   'smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_from',
+  'sms_reminder_enabled', 'sms_sender', 'sms_reminder_template', 'sms_strip_accents',
   'printer_connection_type', 'printer_ip', 'printer_model',
   'tpe_print_mode',
   'email_tpl_confirmation_subject', 'email_tpl_confirmation_body',
@@ -112,6 +114,21 @@ router.put('/', requireAdmin, wrap(async (req, res) => {
     if (email) patch.smtp_from = `${patch.smtp_from} <${email}>`;
   }
 
+  // Rappel SMS : interrupteurs en '0'/'1', expediteur Brevo (11 car. alphanumeriques), texte borne.
+  ['sms_reminder_enabled', 'sms_strip_accents'].forEach((k) => {
+    if (patch[k] !== undefined) patch[k] = (patch[k] === true || patch[k] === '1' || patch[k] === 1 || patch[k] === 'true') ? '1' : '0';
+  });
+  if (patch.sms_sender !== undefined) {
+    const cleaned = sms.stripAccents(String(patch.sms_sender)).replace(/[^A-Za-z0-9]/g, '').slice(0, 11);
+    if (String(patch.sms_sender).trim() && cleaned.length < 3) {
+      return res.status(400).json({ error: "Nom d'expéditeur SMS invalide (3 à 11 lettres ou chiffres, sans espace)" });
+    }
+    patch.sms_sender = cleaned;
+  }
+  if (patch.sms_reminder_template !== undefined) {
+    patch.sms_reminder_template = String(patch.sms_reminder_template).slice(0, 480);
+  }
+
   // Un SIRET mal formé ne serait détecté qu'au moment de l'impression
   // d'un ticket - vaut mieux prévenir tout de suite (14 chiffres).
   if (patch.legal_siret && !/^\d{14}$/.test(patch.legal_siret.replace(/\s/g, ''))) {
@@ -144,6 +161,41 @@ router.put('/', requireAdmin, wrap(async (req, res) => {
   }
 
   res.json({ ok: true, smtp_from: patch.smtp_from });
+}));
+
+/**
+ * SMS : etat pour l'ecran Reglages > SMS - autorisation donnee par le super
+ * admin, solde de credits, et les derniers SMS (envoye / non envoye...).
+ */
+router.get('/sms', requireAdmin, wrap(async (req, res) => {
+  await pool.query('INSERT IGNORE INTO sms_credits (salon_id) VALUES (?)', [req.salon.id]);
+  const [[c]] = await pool.query('SELECT sms_enabled, credits_granted, credits_used FROM sms_credits WHERE salon_id = ?', [req.salon.id]);
+  const [log] = await pool.query(
+    `SELECT client_name, phone, sender, message, segments, status, error, scheduled_at, sent_at, updated_at
+     FROM sms_log WHERE salon_id = ? ORDER BY updated_at DESC LIMIT 30`, [req.salon.id]);
+  const [[counts]] = await pool.query(
+    `SELECT SUM(status = 'sent') AS sent, SUM(status = 'no_credit') AS no_credit, SUM(status = 'failed') AS failed
+     FROM sms_log WHERE salon_id = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)`, [req.salon.id]);
+  res.json({
+    ok: true,
+    permitted: Boolean(c.sms_enabled),
+    credits_granted: c.credits_granted,
+    credits_used: c.credits_used,
+    credits_remaining: Math.max(0, c.credits_granted - c.credits_used),
+    last_30_days: { sent: Number(counts.sent || 0), no_credit: Number(counts.no_credit || 0), failed: Number(counts.failed || 0) },
+    default_template: sms.DEFAULT_TEMPLATE,
+    log
+  });
+}));
+
+/** Apercu du message (exemple) + nombre de credits qu'il coutera - meme code que l'envoi reel. */
+router.post('/sms/preview', requireAdmin, wrap(async (req, res) => {
+  const s = await getSettings(req.salon.id);
+  const strip = req.body.strip_accents === undefined ? s.sms_strip_accents !== '0' : Boolean(req.body.strip_accents);
+  const message = sms.buildMessage(req.body.template, {
+    client_name: 'Thomas Martin', date: 'samedi 17 octobre', heure: '14h30', salon: s.salon_name || req.salon.name
+  }, { stripAccents: strip });
+  res.json({ ok: true, message, length: [...message].length, segments: sms.countSegments(message) });
 }));
 
 router.post('/smtp/test', requireAdmin, wrap(async (req, res) => {

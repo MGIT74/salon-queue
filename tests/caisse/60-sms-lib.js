@@ -1,0 +1,27 @@
+// Rappel SMS : outils (numero, segments, message, expediteur).
+const s = require('../../src/lib/sms');
+let pass = 0, fail = 0;
+const check = (n, ok) => { (ok ? pass++ : fail++); console.log((ok ? '  OK   ' : '  ECHEC') + ' ' + n); };
+check('06 12 34 56 78 -> 33612345678', s.normalizePhone('06 12 34 56 78') === '33612345678');
+check('+33 6 12 34 56 78 -> 33612345678', s.normalizePhone('+33 6 12 34 56 78') === '33612345678');
+check('0033612345678 -> 33612345678', s.normalizePhone('0033612345678') === '33612345678');
+check('suisse +41 79 123 45 67', s.normalizePhone('+41 79 123 45 67') === '41791234567');
+check('numero trop court refuse', s.normalizePhone('0612') === null);
+check('vide refuse', s.normalizePhone('') === null && s.normalizePhone(null) === null);
+check('160 car. GSM = 1 segment', s.countSegments('a'.repeat(160)) === 1);
+check('161 car. GSM = 2 segments', s.countSegments('a'.repeat(161)) === 2);
+check('306 car. GSM = 2 segments, 307 = 3', s.countSegments('a'.repeat(306)) === 2 && s.countSegments('a'.repeat(307)) === 3);
+check('emoji -> Unicode 70 car.', s.countSegments('😀'.repeat(1) + 'a'.repeat(68)) === 1 && s.countSegments('é€😀' + 'a'.repeat(68)) === 2);
+check('accent francais courant reste GSM', s.isGsm('Bonjour é è à ù') === true);
+check('apostrophe typographique hors GSM', s.isGsm('l’heure') === false);
+check('stripAccents nettoie', s.stripAccents('Été à l’œuvre – ça') === "Ete a l'oeuvre - ca");
+check('expediteur 11 car. alphanum', s.sanitizeSender('Le Barbier & Co 2024', 'x') === 'LeBarbierCo');
+check('expediteur trop court -> repli salon', s.sanitizeSender('a', 'Chez Tony') === 'ChezTony'.slice(0, 8) || s.sanitizeSender('a', 'Chez Tony') === 'ChezTony');
+check('expediteur vide -> RDV', s.sanitizeSender('', '') === 'RDV');
+const w = s.formatAppointmentWhen('2026-10-10 14:30:00');
+check('date FR lisible', w.date === 'samedi 10 octobre' && w.heure === '14h30');
+const m = s.buildMessage(s.DEFAULT_TEMPLATE, { client_name: 'Jean Dupont', date: w.date, heure: w.heure, salon: 'Tony' }, { stripAccents: true });
+check('message par defaut rempli', m === 'Bonjour Jean, rappel de votre RDV samedi 10 octobre a 14h30 chez Tony. A demain !');
+check('variables {nom} et inconnues', s.buildMessage('{prenom} {nom} {zzz}x', { client_name: 'Jean Paul Dupont' }) === 'Jean Paul Dupont x');
+check('message par defaut = 1 segment', s.countSegments(m) === 1);
+console.log('\n' + pass + ' OK, ' + fail + ' ECHEC'); process.exit(fail ? 1 : 0);

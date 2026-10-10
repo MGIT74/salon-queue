@@ -430,6 +430,85 @@ router.post('/impersonate', requireSuperAdmin, wrap(async (req, res) => {
   res.json({ ok: true, token, slug: salon.slug });
 }));
 
+/* ============================================================
+ * SMS (rappel 24h) - credits prepayes par salon, geres ici.
+ * credits_granted = total accorde ; credits_used = consomme (rien ne
+ * se remet a zero tout seul). Plus de credits => l'envoi est bloque
+ * et les SMS sont traces "non envoye - plus de credits".
+ * ============================================================ */
+router.get('/sms/overview', requireSuperAdmin, wrap(async (req, res) => {
+  const [rows] = await pool.query(
+    `SELECT s.id, s.name, s.slug,
+            COALESCE(c.sms_enabled, 1) AS sms_enabled,
+            COALESCE(c.credits_granted, 2000) AS credits_granted,
+            COALESCE(c.credits_used, 0) AS credits_used,
+            (SELECT st.value FROM settings st WHERE st.salon_id = s.id AND st.\`key\` = 'sms_reminder_enabled') AS reminder_on,
+            (SELECT COUNT(*) FROM sms_log l WHERE l.salon_id = s.id AND l.status = 'no_credit') AS blocked_count,
+            (SELECT COUNT(*) FROM sms_log l WHERE l.salon_id = s.id AND l.status = 'failed') AS failed_count,
+            (SELECT COUNT(*) FROM sms_log l WHERE l.salon_id = s.id AND l.status = 'sent' AND l.sent_at >= DATE_FORMAT(NOW(), '%Y-%m-01')) AS sent_this_month
+     FROM salons s LEFT JOIN sms_credits c ON c.salon_id = s.id
+     WHERE s.active = 1 ORDER BY s.name`
+  );
+  const items = rows.map((r) => ({
+    id: r.id, name: r.name, slug: r.slug,
+    sms_enabled: Boolean(r.sms_enabled),
+    reminder_on: r.reminder_on === '1',
+    credits_granted: r.credits_granted,
+    credits_used: r.credits_used,
+    credits_remaining: Math.max(0, r.credits_granted - r.credits_used),
+    blocked_count: Number(r.blocked_count), failed_count: Number(r.failed_count),
+    sent_this_month: Number(r.sent_this_month)
+  }));
+  const totals = {
+    salons_count: items.length,
+    salons_reminder_on: items.filter((x) => x.reminder_on && x.sms_enabled).length,
+    credits_granted: items.reduce((a, x) => a + x.credits_granted, 0),
+    credits_used: items.reduce((a, x) => a + x.credits_used, 0),
+    credits_remaining: items.reduce((a, x) => a + x.credits_remaining, 0),
+    sent_this_month: items.reduce((a, x) => a + x.sent_this_month, 0),
+    blocked_count: items.reduce((a, x) => a + x.blocked_count, 0)
+  };
+  res.json({ ok: true, items, totals });
+}));
+
+/** Autorise/bloque les SMS d'un salon, fixe son total de credits, ou en AJOUTE (add_credits). */
+router.put('/sms/:salonId', requireSuperAdmin, wrap(async (req, res) => {
+  const salonId = req.params.salonId;
+  const [[salon]] = await pool.query('SELECT id FROM salons WHERE id = ?', [salonId]);
+  if (!salon) return res.status(404).json({ error: 'Salon introuvable' });
+  await pool.query('INSERT IGNORE INTO sms_credits (salon_id) VALUES (?)', [salonId]);
+
+  const sets = [];
+  const params = [];
+  if (req.body.sms_enabled !== undefined) { sets.push('sms_enabled = ?'); params.push(req.body.sms_enabled ? 1 : 0); }
+  if (req.body.credits_granted !== undefined) {
+    const n = Math.floor(Number(req.body.credits_granted));
+    if (!Number.isFinite(n) || n < 0 || n > 10000000) return res.status(400).json({ error: 'Nombre de crédits invalide' });
+    sets.push('credits_granted = ?'); params.push(n);
+  }
+  if (req.body.add_credits !== undefined) {
+    const n = Math.floor(Number(req.body.add_credits));
+    if (!Number.isFinite(n) || n < 1 || n > 10000000) return res.status(400).json({ error: 'Nombre de crédits à ajouter invalide' });
+    sets.push('credits_granted = credits_granted + ?'); params.push(n);
+  }
+  if (sets.length) {
+    params.push(salonId);
+    await pool.query('UPDATE sms_credits SET ' + sets.join(', ') + ' WHERE salon_id = ?', params);
+  }
+  const [[c]] = await pool.query('SELECT sms_enabled, credits_granted, credits_used FROM sms_credits WHERE salon_id = ?', [salonId]);
+  res.json({ ok: true, sms_enabled: Boolean(c.sms_enabled), credits_granted: c.credits_granted, credits_used: c.credits_used });
+}));
+
+/** Remet le compteur "consommes" a zero (ex : nouvelle periode facturee au client). */
+router.put('/sms/:salonId/reset-usage', requireSuperAdmin, wrap(async (req, res) => {
+  const [[salon]] = await pool.query('SELECT id FROM salons WHERE id = ?', [req.params.salonId]);
+  if (!salon) return res.status(404).json({ error: 'Salon introuvable' });
+  await pool.query('INSERT IGNORE INTO sms_credits (salon_id) VALUES (?)', [req.params.salonId]);
+  await pool.query('UPDATE sms_credits SET credits_used = 0 WHERE salon_id = ?', [req.params.salonId]);
+  res.json({ ok: true });
+}));
+
+
 /**
  * Vue d'ensemble de l'assistant IA pour toute l'enseigne (tous les
  * salons) - permet au super admin de voir l'usage réel avant de
