@@ -2254,7 +2254,7 @@
           <div class="sms-sub-head">
             <div>
               <div class="sms-sub-title">Rappel SMS</div>
-              <div class="hint" style="margin:2px 0 0">Un SMS est envoyé automatiquement la veille à 10 h à chaque client ayant un rendez-vous le lendemain (pris en ligne ou saisi par vous). Les SMS de test comptent dans vos crédits.</div>
+              <div class="hint" style="margin:2px 0 0">Un SMS est envoyé automatiquement la veille à 10 h à chaque client ayant un rendez-vous le lendemain (pris en ligne ou saisi par vous). Crédits remis à zéro le 1er de chaque mois (non cumulables). Les SMS de test comptent dans vos crédits.</div>
             </div>
             <div class="switch" id="sms-enabled-switch" onclick="this.classList.toggle('on'); saveSmsSettings(true)"></div>
           </div>
@@ -8224,7 +8224,7 @@ function loadSmsSettings() {
     var low = r.credits_remaining <= Math.max(20, Math.round(r.credits_granted * 0.1));
     document.getElementById('sms-credits').innerHTML =
       '<div class="sms-tile' + (low ? ' warn' : '') + '"><b>' + r.credits_remaining + '</b><span>crédits restants</span></div>' +
-      '<div class="sms-tile"><b>' + r.credits_used + ' / ' + r.credits_granted + '</b><span>utilisés / accordés</span></div>' +
+      '<div class="sms-tile"><b>' + r.credits_used + ' / ' + r.credits_granted + '</b><span>utilisés / accordés ce mois</span></div>' +
       '<div class="sms-tile"><b>' + r.last_30_days.sent + '</b><span>envoyés (30 j)</span></div>' +
       (r.last_30_days.no_credit ? '<div class="sms-tile warn"><b>' + r.last_30_days.no_credit + '</b><span>non envoyés (plus de crédits)</span></div>' : '');
     document.getElementById('sms-log').innerHTML = r.log.length === 0

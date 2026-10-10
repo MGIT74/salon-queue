@@ -311,7 +311,7 @@
     </div>
     <div class="card-box">
       <h3>SMS de rappel — crédits par salon</h3>
-      <p class="hint">Chaque salon dispose d'un solde de crédits prépayés (1 crédit = 1 SMS ; un message long en coûte plusieurs). Quand le solde est épuisé, l'envoi est bloqué : les SMS sont tracés « non envoyé — plus de crédits » dans les réglages du salon. L'envoi lui-même est fait par le workflow n8n « Rappel SMS 24h » via Brevo.</p>
+      <p class="hint">Chaque salon dispose d'une dotation de crédits PAR MOIS (1 crédit = 1 SMS ; un message long en coûte plusieurs). Elle est remise à zéro le 1er de chaque mois : les crédits non utilisés ne se cumulent pas. Quand le solde est épuisé, l'envoi est bloqué : les SMS sont tracés « non envoyé — plus de crédits » dans les réglages du salon. L'envoi lui-même est fait par le workflow n8n « Rappel SMS 24h » via Brevo.</p>
       <div id="sms-salons-list"><div class="empty">Chargement…</div></div>
     </div>
 
@@ -839,7 +839,7 @@ function loadSmsOverview() {
       ? '<div class="empty">Aucun salon</div>'
       : r.items.map(function (s) {
           var low = s.credits_remaining <= 0;
-          var meta = '<b' + (low ? ' class="sms-warn"' : '') + '>' + s.credits_remaining + '</b> restants sur ' + s.credits_granted +
+          var meta = '<b' + (low ? ' class="sms-warn"' : '') + '>' + s.credits_remaining + '</b> restants sur ' + s.credits_granted + (s.credits_bonus ? ' (dont ' + s.credits_bonus + ' bonus)' : '') + ' ce mois' +
             ' · ' + s.credits_used + ' utilisés · ' + s.sent_this_month + ' envoyés ce mois' +
             (s.reminder_on ? '' : ' · <i>rappel désactivé par le salon</i>') +
             (s.blocked_count ? '<br><span class="sms-warn">' + s.blocked_count + ' SMS non envoyé(s) — plus de crédits</span>' : '') +
@@ -850,10 +850,10 @@ function loadSmsOverview() {
             '<div class="toggle-col">Autorisé' +
               '<div class="switch' + (s.sms_enabled ? ' on' : '') + '" onclick="toggleSmsField(\'' + s.id + '\',' + (!s.sms_enabled) + ')" title="Autoriser/bloquer les SMS de ce salon"></div>' +
             '</div>' +
-            '<input type="number" min="0" class="limit-input" value="' + s.credits_granted + '" id="sms-granted-' + s.id + '" title="Total de crédits accordés">' +
+            '<input type="number" min="0" class="limit-input" value="' + s.credits_monthly + '" id="sms-granted-' + s.id + '" title="Crédits accordés PAR MOIS (remis à ce niveau le 1er de chaque mois)">' +
             '<button class="btn btn-soft" style="padding:7px 12px;font-size:12.5px" onclick="saveSmsGranted(\'' + s.id + '\')">Enregistrer</button>' +
-            '<button class="btn btn-soft" style="padding:7px 12px;font-size:12.5px" onclick="addSmsCredits(\'' + s.id + '\')" title="Ajouter des crédits au total">+ Crédits</button>' +
-            '<button class="btn btn-ghost" style="padding:7px 10px;font-size:11.5px" onclick="resetSmsUsage(\'' + s.id + '\')" title="Remettre le compteur « utilisés » à zéro">Remise à zéro</button>' +
+            '<button class="btn btn-soft" style="padding:7px 12px;font-size:12.5px" onclick="addSmsCredits(\'' + s.id + '\')" title="Ajouter des crédits valables ce mois-ci seulement">+ Bonus du mois</button>' +
+            '<button class="btn btn-ghost" style="padding:7px 10px;font-size:11.5px" onclick="resetSmsUsage(\'' + s.id + '\')" title="Remettre le compteur « utilisés » à zéro maintenant (sinon automatique le 1er du mois)">Remise à zéro</button>' +
             '</div>';
         }).join('');
   }).catch(function (e) { toast(e.message, true); });

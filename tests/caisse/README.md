@@ -92,4 +92,5 @@ node tests/caisse/58-ia-base-url.js  # IA : adresse de l'instance transmise a n8
 node tests/caisse/59-ia-ventes-caisse.js  # IA : outil des ventes reelles de la caisse + register_today
 node tests/caisse/60-sms-lib.js  # SMS : telephone, segments, message, expediteur
 node tests/caisse/61-sms-routes-ui.js  # SMS : schema, routes, reglages, super admin, interface
+node tests/caisse/62-sms-credits-mensuels.js  # SMS : dotation mensuelle remise a zero le 1er du mois
 ```

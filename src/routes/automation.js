@@ -763,11 +763,7 @@ function addHoursLocal(localStr, hours) {
   return new Date(t).toISOString().slice(0, 19).replace('T', ' ');
 }
 
-async function getSmsCredits(salonId) {
-  await pool.query('INSERT IGNORE INTO sms_credits (salon_id) VALUES (?)', [salonId]);
-  const [[row]] = await pool.query('SELECT sms_enabled, credits_granted, credits_used FROM sms_credits WHERE salon_id = ?', [salonId]);
-  return row;
-}
+const { getSmsCredits } = require('../lib/smsCredits');
 
 router.get('/sms-reminders/due', requireAutomationKey, wrap(async (req, res) => {
   const [salons] = await pool.query('SELECT id, name FROM salons WHERE active = 1 ORDER BY created_at');
@@ -872,7 +868,7 @@ router.post('/sms-reminders/result', requireAutomationKey, wrap(async (req, res)
       [used, String(req.body.provider_message_id || '').slice(0, 100) || null, log.id]
     );
     if (r.affectedRows) {
-      await pool.query('INSERT IGNORE INTO sms_credits (salon_id) VALUES (?)', [log.salon_id]);
+      await getSmsCredits(log.salon_id); // cree la ligne et applique la remise a zero mensuelle
       await pool.query('UPDATE sms_credits SET credits_used = credits_used + ? WHERE salon_id = ?', [used, log.salon_id]);
     }
     return res.json({ ok: true, credits_debited: used });

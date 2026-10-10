@@ -81,7 +81,8 @@ const suite = [
   ['58-ia-base-url.js', false, ['exit']],
   ['59-ia-ventes-caisse.js', false, ['exit']],
   ['60-sms-lib.js', false, ['exit']],
-  ['61-sms-routes-ui.js', false, ['exit']]
+  ['61-sms-routes-ui.js', false, ['exit']],
+  ['62-sms-credits-mensuels.js', false, ['exit']]
 ];
 
 let bad = 0;

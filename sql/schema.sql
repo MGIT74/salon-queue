@@ -1189,6 +1189,14 @@ CREATE TABLE IF NOT EXISTS sms_log (
   FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE,
   FOREIGN KEY (appointment_id) REFERENCES appointments(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+-- Credits SMS mensuels : dotation remise a zero le 1er du mois (credits_used et bonus), bonus ponctuel du mois.
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'sms_credits' AND column_name = 'credits_bonus');
+SET @sql := IF(@c = 0, "ALTER TABLE sms_credits ADD COLUMN credits_bonus INT NOT NULL DEFAULT 0", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'sms_credits' AND column_name = 'period_month');
+SET @sql := IF(@c = 0, "ALTER TABLE sms_credits ADD COLUMN period_month CHAR(7) NULL", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+UPDATE sms_credits SET period_month = DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+02:00'), '%Y-%m') WHERE period_month IS NULL;
 -- SMS de test : pas de RDV associe (kind = 'test'), mais ils comptent dans les credits.
 ALTER TABLE sms_log MODIFY appointment_id CHAR(36) NULL;
 -- Les anciens messages par defaut enregistres tels quels suivent a nouveau le message par defaut actuel.

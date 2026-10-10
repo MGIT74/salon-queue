@@ -4,6 +4,7 @@ const { sendTest, invalidateTransport, sendAppointmentConfirmation, sendAppointm
 const requireAdmin = require('../middleware/auth');
 const { logActivity } = require('../lib/activityLog');
 const sms = require('../lib/sms');
+const { getSmsCredits } = require('../lib/smsCredits');
 const { wrap } = require('../lib/wrap');
 
 const router = express.Router();
@@ -170,8 +171,7 @@ router.put('/', requireAdmin, wrap(async (req, res) => {
  * admin, solde de credits, et les derniers SMS (envoye / non envoye...).
  */
 router.get('/sms', requireAdmin, wrap(async (req, res) => {
-  await pool.query('INSERT IGNORE INTO sms_credits (salon_id) VALUES (?)', [req.salon.id]);
-  const [[c]] = await pool.query('SELECT sms_enabled, credits_granted, credits_used FROM sms_credits WHERE salon_id = ?', [req.salon.id]);
+  const c = await getSmsCredits(req.salon.id);
   const [log] = await pool.query(
     `SELECT kind, client_name, phone, sender, message, segments, status, error, scheduled_at, sent_at, updated_at
      FROM sms_log WHERE salon_id = ? ORDER BY updated_at DESC LIMIT 30`, [req.salon.id]);
@@ -182,6 +182,8 @@ router.get('/sms', requireAdmin, wrap(async (req, res) => {
     ok: true,
     permitted: Boolean(c.sms_enabled),
     credits_granted: c.credits_granted,
+    credits_monthly: c.credits_monthly,
+    credits_bonus: c.credits_bonus,
     credits_used: c.credits_used,
     credits_remaining: Math.max(0, c.credits_granted - c.credits_used),
     last_30_days: { sent: Number(counts.sent || 0), no_credit: Number(counts.no_credit || 0), failed: Number(counts.failed || 0) },
@@ -199,8 +201,7 @@ const smsTestHits = new Map();
 router.post('/sms/test', requireAdmin, wrap(async (req, res) => {
   const phone = sms.normalizePhone(req.body.to);
   if (!phone) return res.status(400).json({ error: 'Numero de telephone invalide (ex : 06 12 34 56 78)' });
-  await pool.query('INSERT IGNORE INTO sms_credits (salon_id) VALUES (?)', [req.salon.id]);
-  const [[c]] = await pool.query('SELECT sms_enabled, credits_granted, credits_used FROM sms_credits WHERE salon_id = ?', [req.salon.id]);
+  const c = await getSmsCredits(req.salon.id);
   if (!c.sms_enabled) return res.status(403).json({ error: "Les SMS ne sont pas actives pour votre salon." });
   const now = Date.now();
   const hits = (smsTestHits.get(req.salon.id) || []).filter(t => now - t < 3600000);
