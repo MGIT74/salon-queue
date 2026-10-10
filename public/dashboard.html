@@ -3284,22 +3284,19 @@ function loadSalonSwitcher() {
   }).catch(function () {});
 }
 
-// Change de salon depuis le sélecteur, sans recharger la page : réinitialise
-// tout l'état (file, coiffeurs, catalogue), remet l'onglet "File d'attente"
-// pour éviter tout sous-onglet qui referencerait encore l'ancien salon.
+// Change de salon depuis le sélecteur : recharge TOUTE la page sur le nouveau
+// salon (la session reste ouverte via sessionStorage, l'onglet courant est
+// conservé via le #hash). Un rechargement complet garantit qu'aucun écran
+// (caisse, RDV, réglages, SMS...) ne garde des données de l'ancien salon.
 function switchSalon(newSlug) {
-  if (newSlug === SALON_SLUG) return;
-  setSalonSlug(newSlug);
-
-  queue = []; barbers = []; services = []; extras = [];
-  expandedBarberId = null; barberDetailTab = {}; barberStatsState = {};
-  barberCapabilities = {}; barberLeaves = {};
-  me = null;
-
-  setActiveTab('queue');
-
-  loadCurrentSalonName();
-  loadCatalog().then(loadBarbers).then(refreshQueue).then(function () { toast('Salon changé'); });
+  if (!newSlug || newSlug === SALON_SLUG) return;
+  try {
+    var url = new URL(window.location.href);
+    url.searchParams.set('salon', newSlug);
+    window.location.href = url.toString(); // le ?salon= change toujours : navigation complete
+  } catch (e) {
+    window.location.reload();
+  }
 }
 
 function loadCatalog() {
