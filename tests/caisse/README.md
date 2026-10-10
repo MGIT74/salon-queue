@@ -95,4 +95,5 @@ node tests/caisse/61-sms-routes-ui.js  # SMS : schema, routes, reglages, super a
 node tests/caisse/62-sms-credits-mensuels.js  # SMS : dotation mensuelle remise a zero le 1er du mois
 node tests/caisse/63-changement-salon-recharge.js  # Dashboard : changer de salon recharge toute la page
 node tests/caisse/64-historique-clotures-admin.js  # Caisse : historique des clotures reserve a l'admin
+node tests/caisse/65-version-masquee-mobile.js  # Dashboard : version de l'app masquee en mobile
 ```
