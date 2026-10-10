@@ -10,6 +10,7 @@ check('table sms_log + statut no_credit + unicite RDV', /CREATE TABLE IF NOT EXI
 check('route /sms-reminders/due protegee par la cle', /router\.get\('\/sms-reminders\/due', requireAutomationKey/.test(a));
 check('route /sms-reminders/result protegee par la cle', /router\.post\('\/sms-reminders\/result', requireAutomationKey/.test(a));
 check('envoi bloque sans credit (no_credit)', /no_credit/.test(a) && /credits_used/.test(a));
+check('rappel quotidien : RDV de demain (date du salon)', /const tomorrow = addHoursLocal\(nowLocal, 24\)\.slice\(0, 10\)/.test(a) && !/too_late_booking/.test(a));
 check('rappel desactive par defaut (opt-in)', /sms_reminder_enabled/.test(a));
 check('reglages SMS editables + validation expediteur', /sms_sender/.test(st) && /sms_reminder_template/.test(st) && /\/sms\/preview/.test(st));
 check('super admin : overview, credits, remise a zero', /\/sms\/overview/.test(sa) && /add_credits/.test(sa) && /reset-usage/.test(sa));

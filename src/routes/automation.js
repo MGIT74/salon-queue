@@ -746,8 +746,8 @@ router.get('/salons/:id/client-gifts-loyalty', requireAutomationKey, wrap(async 
 /* ============================================================
  * RAPPEL SMS 24h avant le RDV (envoi fait par n8n via Brevo)
  *
- * 1) GET  /sms-reminders/due   : n8n demande les SMS a envoyer MAINTENANT.
- *    L'app decide tout (salons actifs, RDV dans la fenetre des 24h,
+ * 1) GET  /sms-reminders/due   : n8n (tous les jours a 10h) demande les SMS a envoyer.
+ *    L'app decide tout (salons actifs, RDV de demain,
  *    credits, message, expediteur) ; n8n n'a plus qu'a envoyer.
  * 2) POST /sms-reminders/result : n8n annonce envoye / echec ; seul un
  *    envoi reussi consomme des credits (nombre de segments Brevo).
@@ -755,8 +755,7 @@ router.get('/salons/:id/client-gifts-loyalty', requireAutomationKey, wrap(async 
 
 const SMS_PENDING_TTL_MIN = 30;   // un "pending" plus vieux est considere perdu (n8n a plante) et peut etre redonne
 const SMS_MAX_ATTEMPTS = 3;
-const SMS_WINDOW_MIN_H = 2;       // pas de rappel a moins de 2h du RDV (trop tard pour etre utile)
-const SMS_WINDOW_MAX_H = 24;
+// Envoi quotidien (n8n, tous les jours a 10h) : on rappelle les RDV de DEMAIN (date du salon).
 
 function addHoursLocal(localStr, hours) {
   const m = String(localStr).match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/);
@@ -773,7 +772,7 @@ async function getSmsCredits(salonId) {
 router.get('/sms-reminders/due', requireAutomationKey, wrap(async (req, res) => {
   const [salons] = await pool.query('SELECT id, name FROM salons WHERE active = 1 ORDER BY created_at');
   const items = [];
-  const skipped = { disabled_salons: 0, no_credit: 0, too_late_booking: 0, invalid_phone: 0 };
+  const skipped = { disabled_salons: 0, no_credit: 0, invalid_phone: 0 };
 
   for (const salon of salons) {
     const settings = await getSettings(salon.id);
@@ -782,8 +781,9 @@ router.get('/sms-reminders/due', requireAutomationKey, wrap(async (req, res) => 
     if (!credits.sms_enabled) { skipped.disabled_salons++; continue; }
 
     const nowLocal = nowParisDatetimeString(settings.timezone);
-    const from = addHoursLocal(nowLocal, SMS_WINDOW_MIN_H);
-    const to = addHoursLocal(nowLocal, SMS_WINDOW_MAX_H);
+    const tomorrow = addHoursLocal(nowLocal, 24).slice(0, 10);
+    const from = tomorrow + ' 00:00:00';
+    const to = tomorrow + ' 23:59:59';
 
     const [appts] = await pool.query(
       `SELECT a.id, a.client_name, a.phone, a.scheduled_at, a.created_at,
@@ -793,7 +793,7 @@ router.get('/sms-reminders/due', requireAutomationKey, wrap(async (req, res) => 
        LEFT JOIN sms_log l ON l.appointment_id = a.id AND l.kind = 'reminder'
        WHERE a.salon_id = ? AND a.status = 'confirmed' AND a.source <> 'walkin'
          AND a.phone IS NOT NULL AND a.phone <> ''
-         AND a.scheduled_at > ? AND a.scheduled_at <= ?
+         AND a.scheduled_at >= ? AND a.scheduled_at <= ?
        ORDER BY a.scheduled_at`,
       [SMS_PENDING_TTL_MIN, salon.id, from, to]
     );
@@ -813,11 +813,6 @@ router.get('/sms-reminders/due', requireAutomationKey, wrap(async (req, res) => 
       if (a.log_status === 'sent') continue;
       if (a.log_status === 'pending' && Number(a.log_recent)) continue;
       if (a.log_status === 'failed' && Number(a.log_attempts) >= SMS_MAX_ATTEMPTS) continue;
-
-      // RDV pris moins de 24h avant l'heure : le client vient de reserver, pas de rappel (economie de credits).
-      const apptUtc = parisLocalToUtcDate(String(a.scheduled_at).slice(0, 10), String(a.scheduled_at).slice(11, 19), settings.timezone);
-      const createdUtc = Date.parse(String(a.created_at).replace(' ', 'T') + 'Z');
-      if (createdUtc > apptUtc.getTime() - SMS_WINDOW_MAX_H * 3600000) { skipped.too_late_booking++; continue; }
 
       const phone = sms.normalizePhone(a.phone);
       if (!phone) { skipped.invalid_phone++; continue; }
