@@ -24,4 +24,8 @@ check('SMS de test : boutons salon + super admin', /onclick="testSms\(\)"/.test(
 check('SMS de test salon : trace dans l\'historique (kind test) et consomme les credits', /'test', 'Test'/.test(st) && /credits_used = credits_used \+ \?/.test(st) && /MODIFY appointment_id CHAR\(36\) NULL/.test(sql));
 check('SMS de test salon : bloque sans credit', /Plus de credits SMS/.test(st));
 check('historique : ligne marquee SMS de test', /SMS de test ·/.test(d));
+const sl = rd('src/routes/shortLinks.js'), sv = rd('server.js');
+check('lien court /c/:short redirige vers rdv.html?salon&cancel (16 hex, jeton unique)', /router\.get\('\/c\/:short'/.test(sl) && /\[0-9a-f\]\{16\}/.test(sl) && /rows\.length !== 1/.test(sl) && /app\.use\(shortLinkRoutes\)/.test(sv));
+check('rappel : coiffeur + lien dans le message', /coiffeur: a\.barber_name/.test(a) && /shortCancelLink\(publicBase, a\.cancel_token\)/.test(a) && /smsPublicBase/.test(a));
+check('interface : pastilles {coiffeur} et {lien}', /smsInsert\('\{coiffeur\}'\)/.test(d) && /smsInsert\('\{lien\}'\)/.test(d));
 console.log('\n' + pass + ' OK, ' + fail + ' ECHEC'); process.exit(fail ? 1 : 0);

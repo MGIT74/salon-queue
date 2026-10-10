@@ -28,6 +28,7 @@ const salonCalendarRoutes = require('./src/routes/salonCalendar');
 const aiChatRoutes = require('./src/routes/aiChat');
 const salonRoutes = require('./src/routes/salons');
 const automationRoutes = require('./src/routes/automation');
+const shortLinkRoutes = require('./src/routes/shortLinks');
 const ownerRoutes = require('./src/routes/owner');
 const signupRoutes = require('./src/routes/signup');
 const { signupEnabled } = require('./src/lib/config');
@@ -117,6 +118,7 @@ app.use('/api/tpe', tpeRoutes);
 // Vérification du mot de passe depuis l'écran de connexion du dashboard
 app.post('/api/login', loginRateLimiter('admin-login'), requireAdmin, (req, res) => res.json({ ok: true }));
 
+app.use(shortLinkRoutes);
 app.get('/healthz', (req, res) => res.json({ ok: true, uptime: process.uptime() }));
 
 // Raccourcis de navigation

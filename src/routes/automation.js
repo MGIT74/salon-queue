@@ -769,7 +769,17 @@ async function getSmsCredits(salonId) {
   return row;
 }
 
+// Adresse publique de CETTE instance pour le lien d'annulation (liste blanche, comme le chat IA).
+const SMS_ALLOWED_HOSTS = (process.env.AI_CHAT_ALLOWED_HOSTS || 'app.thebarberone.com,rdv.handsgraphic.com')
+  .split(',').map(h => h.trim().toLowerCase()).filter(Boolean);
+function smsPublicBase(req) {
+  const raw = String(req.get('x-forwarded-host') || req.get('host') || '').split(',')[0];
+  const host = raw.trim().toLowerCase().replace(/:\d+$/, '');
+  return SMS_ALLOWED_HOSTS.includes(host) ? 'https://' + host : '';
+}
+
 router.get('/sms-reminders/due', requireAutomationKey, wrap(async (req, res) => {
+  const publicBase = smsPublicBase(req);
   const [salons] = await pool.query('SELECT id, name FROM salons WHERE active = 1 ORDER BY created_at');
   const items = [];
   const skipped = { disabled_salons: 0, no_credit: 0, invalid_phone: 0 };
@@ -786,10 +796,11 @@ router.get('/sms-reminders/due', requireAutomationKey, wrap(async (req, res) => 
     const to = tomorrow + ' 23:59:59';
 
     const [appts] = await pool.query(
-      `SELECT a.id, a.client_name, a.phone, a.scheduled_at, a.created_at,
+      `SELECT a.id, a.client_name, a.phone, a.scheduled_at, a.created_at, a.cancel_token, b.name AS barber_name,
               l.status AS log_status, l.attempts AS log_attempts,
               (l.updated_at > DATE_SUB(NOW(), INTERVAL ? MINUTE)) AS log_recent
        FROM appointments a
+       LEFT JOIN barbers b ON b.id = a.barber_id
        LEFT JOIN sms_log l ON l.appointment_id = a.id AND l.kind = 'reminder'
        WHERE a.salon_id = ? AND a.status = 'confirmed' AND a.source <> 'walkin'
          AND a.phone IS NOT NULL AND a.phone <> ''
@@ -819,7 +830,8 @@ router.get('/sms-reminders/due', requireAutomationKey, wrap(async (req, res) => 
 
       const when = sms.formatAppointmentWhen(a.scheduled_at);
       const message = sms.buildMessage(settings.sms_reminder_template, {
-        client_name: a.client_name, date: when.date, heure: when.heure, salon: settings.salon_name || salon.name
+        client_name: a.client_name, date: when.date, heure: when.heure, salon: settings.salon_name || salon.name,
+        coiffeur: a.barber_name || '', lien: sms.shortCancelLink(publicBase, a.cancel_token)
       }, { stripAccents: stripAcc });
       const segments = sms.countSegments(message);
 

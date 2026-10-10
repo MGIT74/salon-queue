@@ -207,7 +207,8 @@ router.post('/sms/test', requireAdmin, wrap(async (req, res) => {
   const salonName = s.salon_name || req.salon.name;
   const sender = sms.sanitizeSender(s.sms_sender, salonName);
   const message = sms.buildMessage(s.sms_reminder_template, {
-    client_name: 'Test', date: 'demain', heure: '14h30', salon: salonName
+    client_name: 'Test', date: 'demain', heure: '14h30', salon: salonName,
+    coiffeur: 'Karim', lien: 'https://' + req.get('host') + '/c/a1b2c3d4e5f60718'
   }, { stripAccents: s.sms_strip_accents !== '0' });
   const planned = sms.countSegments(message);
   if (Number(c.credits_granted) - Number(c.credits_used) < planned) {
@@ -239,7 +240,8 @@ router.post('/sms/preview', requireAdmin, wrap(async (req, res) => {
   const s = await getSettings(req.salon.id);
   const strip = req.body.strip_accents === undefined ? s.sms_strip_accents !== '0' : Boolean(req.body.strip_accents);
   const message = sms.buildMessage(req.body.template, {
-    client_name: 'Thomas Martin', date: 'samedi 17 octobre', heure: '14h30', salon: s.salon_name || req.salon.name
+    client_name: 'Thomas Martin', date: 'samedi 17 octobre', heure: '14h30', salon: s.salon_name || req.salon.name,
+    coiffeur: 'Karim', lien: 'https://' + req.get('host') + '/c/a1b2c3d4e5f60718'
   }, { stripAccents: strip });
   res.json({ ok: true, message, length: [...message].length, segments: sms.countSegments(message) });
 }));
