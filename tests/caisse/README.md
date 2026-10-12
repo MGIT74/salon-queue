@@ -99,4 +99,5 @@ node tests/caisse/65-version-masquee-mobile.js  # Dashboard : version de l'app m
 node tests/caisse/66-historique-caisse-du-jour.js  # Caisse : historique du tiroir = journee en cours seulement
 node tests/caisse/67-tva-nommees-par-article.js  # TVA nommees (liste admin) choisies par article
 node tests/caisse/68-catalogue-selection-multiple.js  # Catalogue : selection multiple (TVA, prix, archiver, supprimer)
+node tests/caisse/69-catalogue-recherche.js  # Catalogue : barre de recherche
 ```

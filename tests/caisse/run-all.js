@@ -88,7 +88,8 @@ const suite = [
   ['65-version-masquee-mobile.js', false, ['exit']],
   ['66-historique-caisse-du-jour.js', false, ['exit']],
   ['67-tva-nommees-par-article.js', false, ['exit']],
-  ['68-catalogue-selection-multiple.js', false, ['exit']]
+  ['68-catalogue-selection-multiple.js', false, ['exit']],
+  ['69-catalogue-recherche.js', false, ['exit']]
 ];
 
 let bad = 0;

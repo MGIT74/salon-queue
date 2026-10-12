@@ -708,6 +708,7 @@
   html.login-icon-pending .auth-glow-icon { opacity: 0; }
   /* Poignee de deplacement des listes du catalogue (souris, doigt, stylet). touch-action:none : sans cela,
      faire glisser au doigt ferait defiler la page au lieu de deplacer l'element. */
+  .cat-filtering .drag-handle { display: none; }
   .drag-handle {
     flex: 0 0 auto; width: 30px; height: 44px; margin: -6px 0 -6px -8px; border-radius: 10px;
     display: flex; align-items: center; justify-content: center; color: var(--grey);
@@ -3927,10 +3928,45 @@ function saveQueueSheet() {
 }
 
 /* ============ Catalogue ============ */
+var catSearch = { services: '', extras: '', products: '' };
+
+function catNorm(v) {
+  return String(v || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+/** Articles visibles : filtre par nom, catégorie, code-barres ou TVA (sans tenir compte des accents ni des majuscules). */
+function catVisible(table) {
+  var q = catNorm(catSearch[table]).trim();
+  var all = catList(table);
+  if (!q) return all;
+  return all.filter(function (x) {
+    return catNorm([x.name, x.category, x.barcode, x.vat_rate_name].join(' ')).indexOf(q) !== -1;
+  });
+}
+
+function ensureCatSearch(table) {
+  if (document.getElementById(table + '-search')) return;
+  var list = document.getElementById(table + '-list');
+  if (!list) return;
+  var box = document.createElement('div');
+  box.id = table + '-search';
+  box.className = 'fld';
+  box.style.cssText = 'margin:0 0 10px';
+  box.innerHTML = '<input type="search" id="' + table + '-search-input" placeholder="Rechercher' +
+    (table === 'products' ? ' (nom, catégorie, code-barres)' : ' par nom') + '…" autocomplete="off" ' +
+    'oninput="catSearch[\'' + table + '\']=this.value;renderCatalog(\'' + table + '\')">';
+  list.parentNode.insertBefore(box, list);
+}
+
 function renderCatalog(table) {
-  var list = table === 'services' ? services : (table === 'extras' ? extras : products);
-  document.getElementById(table + '-list').innerHTML = list.length === 0
+  var full = catList(table);
+  ensureCatSearch(table);
+  var list = catVisible(table);
+  var filtering = Boolean(catNorm(catSearch[table]).trim());
+  document.getElementById(table + '-list').classList.toggle('cat-filtering', filtering);
+  document.getElementById(table + '-list').innerHTML = full.length === 0
     ? '<div class="empty">Rien pour le moment</div>'
+    : list.length === 0 ? '<div class="empty">Aucun résultat pour « ' + esc(catSearch[table]) + ' »</div>'
     : list.map(function (x) {
         var meta = table === 'products'
           ? eur(x.price_cents) + (x.stock_enabled ? ' · ' + (x.stock_quantity > 0 ? x.stock_quantity + ' en stock' : 'rupture de stock') : ' · illimité')
@@ -3973,7 +4009,7 @@ function toggleCatSel(table, id, on) {
 
 function toggleCatSelAll(table, on) {
   catSel[table] = {};
-  if (on) catList(table).forEach(function (x) { catSel[table][x.id] = true; });
+  if (on) catVisible(table).forEach(function (x) { catSel[table][x.id] = true; });
   [].slice.call(document.querySelectorAll('#' + table + '-list .cat-check')).forEach(function (c) { c.checked = on; });
   renderCatBulk(table);
 }
@@ -3992,11 +4028,12 @@ function renderCatBulk(table) {
   Object.keys(catSel[table]).forEach(function (id) { if (!all.some(function (x) { return x.id === id; })) delete catSel[table][id]; });
   var n = Object.keys(catSel[table]).length;
   if (!all.length) { bar.innerHTML = ''; return; }
-  var allOn = n === all.length;
+  var vis = catVisible(table);
+  var allOn = vis.length > 0 && vis.every(function (x) { return catSel[table][x.id]; });
   bar.innerHTML = '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 10px;padding:8px 4px">' +
     '<label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer">' +
       '<input type="checkbox" style="width:18px;height:18px" ' + (allOn ? 'checked' : '') + ' onchange="toggleCatSelAll(\'' + table + '\',this.checked)"> ' +
-      (n ? n + ' sélectionné' + (n > 1 ? 's' : '') : 'Tout sélectionner') + '</label>' +
+      (n ? n + ' sélectionné' + (n > 1 ? 's' : '') : (catSearch[table] ? 'Tout sélectionner (résultats)' : 'Tout sélectionner')) + '</label>' +
     (n ? '<button class="btn btn-soft" onclick="openCatBulkEdit(\'' + table + '\')">Modifier (TVA, prix)</button>' +
          '<button class="btn btn-ghost" onclick="catBulk(\'' + table + '\',\'archive\')">Archiver</button>' +
          '<button class="btn btn-ghost" onclick="catBulk(\'' + table + '\',\'restore\')">Réactiver</button>' +
