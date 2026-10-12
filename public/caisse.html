@@ -856,7 +856,7 @@
 <div class="history-drawer-backdrop" id="history-drawer-backdrop" onclick="if(event.target===this) closeCaisseHistory()">
   <div class="history-drawer">
     <div class="history-drawer-head">
-      <h2>Historique de caisse</h2>
+      <h2>Historique de caisse <span style="font-size:13px;font-weight:500;color:var(--grey)">· aujourd'hui</span></h2>
       <button class="x" onclick="closeCaisseHistory()">✕</button>
     </div>
     <div class="history-bubbles" id="history-bubbles"></div>
@@ -4009,7 +4009,7 @@ function selectHistoryFilter(barberId) {
 
 function loadCaisseHistory() {
   document.getElementById('history-list').innerHTML = '<p class="hint">Chargement…</p>';
-  var url = '/api/sales' + (historyFilterBarberId ? '?barber_id=' + historyFilterBarberId : '');
+  var url = '/api/sales?today=1' + (historyFilterBarberId ? '&barber_id=' + historyFilterBarberId : '');
   barberApi(url)
     .then(function (r) {
       historySalesCache = r.items;
@@ -4021,7 +4021,7 @@ function loadCaisseHistory() {
 function renderHistoryList() {
   var box = document.getElementById('history-list');
   if (!historySalesCache.length) {
-    box.innerHTML = '<p class="hint" style="text-align:center;padding:20px 0">Aucune vente trouvée</p>';
+    box.innerHTML = '<p class="hint" style="text-align:center;padding:20px 0">Aucune vente aujourd'hui</p>';
     return;
   }
   box.innerHTML = historySalesCache.map(function (s, i) {

@@ -85,7 +85,8 @@ const suite = [
   ['62-sms-credits-mensuels.js', false, ['exit']],
   ['63-changement-salon-recharge.js', false, ['exit']],
   ['64-historique-clotures-admin.js', false, ['exit']],
-  ['65-version-masquee-mobile.js', false, ['exit']]
+  ['65-version-masquee-mobile.js', false, ['exit']],
+  ['66-historique-caisse-du-jour.js', false, ['exit']]
 ];
 
 let bad = 0;

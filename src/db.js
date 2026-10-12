@@ -98,6 +98,27 @@ async function getCaisseLockedUntil(salonId, settings, conn) {
 }
 
 /**
+ * Debut de la "journee de caisse" en cours, en UTC ('YYYY-MM-DD HH:MM:SS' comme
+ * sales.created_at) : la derniere heure de reouverture de la caisse
+ * (reglage caisse_reopen_hour, heure du SALON, 00:00 par defaut) deja passee.
+ * L'historique de caisse affiche aux coiffeurs ne remonte pas avant : il se
+ * remet a zero tout seul chaque lendemain a l'ouverture de la caisse.
+ */
+function caisseDayStartUtc(settings, now) {
+  const tz = settings.timezone || 'Europe/Paris';
+  const reopen = /^\d{2}:\d{2}$/.test(settings.caisse_reopen_hour || '') ? settings.caisse_reopen_hour : '00:00';
+  const at = now || new Date();
+  const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(at);
+  let start = parisLocalToUtcDate(todayStr, reopen + ':00', tz);
+  if (at < start) {
+    const y = new Date(todayStr + 'T00:00:00Z');
+    y.setUTCDate(y.getUTCDate() - 1);
+    start = parisLocalToUtcDate(y.toISOString().slice(0, 10), reopen + ':00', tz);
+  }
+  return start.toISOString().slice(0, 19).replace('T', ' ');
+}
+
+/**
  * Convertit une date+heure exprimées en heure LOCALE de salon en le
  * vrai instant UTC correspondant - détecte automatiquement l'écart
  * avec l'UTC selon le fuseau (réglable) et la date. Même logique que
@@ -202,4 +223,4 @@ async function setPlatformSettings(obj) {
   );
 }
 
-module.exports = { pool, getSettings, setSettings, getOwnerSettings, setOwnerSettings, getPlatformSettings, setPlatformSettings, utcIso, getCaisseLockedUntil, parisLocalToUtcDate };
+module.exports = { pool, getSettings, setSettings, getOwnerSettings, setOwnerSettings, getPlatformSettings, setPlatformSettings, utcIso, getCaisseLockedUntil, caisseDayStartUtc, parisLocalToUtcDate };

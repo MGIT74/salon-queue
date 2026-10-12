@@ -1,6 +1,6 @@
 const express = require('express');
 const crypto = require('crypto');
-const { pool, utcIso, getSettings, getCaisseLockedUntil } = require('../db');
+const { pool, utcIso, getSettings, getCaisseLockedUntil, caisseDayStartUtc } = require('../db');
 const { clientKey, earnLoyaltyPoint } = require('../lib/queueMath');
 const { sendGiftConfirmation } = require('../lib/mailer');
 const requireAdmin = require('../middleware/auth');
@@ -342,6 +342,14 @@ router.get('/', requireAdminOrBarber, wrap(async (req, res) => {
     const mysqlDatetime = String(req.query.since).replace('T', ' ').replace('Z', '');
     conditions.push('s.created_at > ?');
     params.push(mysqlDatetime);
+  }
+  // Historique de caisse (tiroir de caisse.html) : SEULEMENT la journee en cours, remise a zero
+  // chaque lendemain a la reouverture de la caisse. Impose cote serveur pour un coiffeur connecte
+  // par PIN (l'admin garde l'historique complet, sauf s'il demande today=1 comme la caisse).
+  if (req.actingBarberId || req.query.today === '1') {
+    const dayStart = caisseDayStartUtc(await getSettings(req.salon.id));
+    conditions.push('s.created_at >= ?');
+    params.push(dayStart);
   }
   // Filtre "historique de caisse" : n'importe quelle vente où ce
   // coiffeur apparaît quelque part - qu'il ait fait toute la vente, OU
