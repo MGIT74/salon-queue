@@ -87,7 +87,8 @@ const suite = [
   ['64-historique-clotures-admin.js', false, ['exit']],
   ['65-version-masquee-mobile.js', false, ['exit']],
   ['66-historique-caisse-du-jour.js', false, ['exit']],
-  ['67-tva-nommees-par-article.js', false, ['exit']]
+  ['67-tva-nommees-par-article.js', false, ['exit']],
+  ['68-catalogue-selection-multiple.js', false, ['exit']]
 ];
 
 let bad = 0;

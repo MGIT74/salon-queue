@@ -252,20 +252,68 @@ router.delete('/products/:id', requireAdmin, wrap(async (req, res) => {
  *    nom et les rendez-vous seraient supprimes en cascade.
  */
 async function deleteCatalogItem(table, req, res) {
-  const [[item]] = await pool.query(`SELECT id, name FROM ${table} WHERE id = ? AND salon_id = ? AND deleted_at IS NULL`, [req.params.id, req.salon.id]);
-  if (!item) return res.status(404).json({ error: 'Élément introuvable' });
+  const r = await removeCatalogItem(table, req.salon.id, req.params.id);
+  if (!r) return res.status(404).json({ error: 'Élément introuvable' });
+  res.json({ ok: true, deleted: true, kept_for_history: r.usage.total > 0, usage: r.usage });
+}
+
+async function removeCatalogItem(table, salonId, itemId) {
+  const [[item]] = await pool.query(`SELECT id, name FROM ${table} WHERE id = ? AND salon_id = ? AND deleted_at IS NULL`, [itemId, salonId]);
+  if (!item) return null;
 
   const usage = await catalogUsage(table, item.id);
   if (usage.total === 0) {
     if (table === 'services') await pool.query('DELETE FROM barber_service_exclusions WHERE service_id = ?', [item.id]);
     if (table === 'extras') await pool.query('DELETE FROM barber_extra_exclusions WHERE extra_id = ?', [item.id]);
-    await pool.query(`DELETE FROM ${table} WHERE id = ? AND salon_id = ?`, [item.id, req.salon.id]);
+    await pool.query(`DELETE FROM ${table} WHERE id = ? AND salon_id = ?`, [item.id, salonId]);
   } else {
-    await pool.query(`UPDATE ${table} SET active = 0, deleted_at = NOW() WHERE id = ? AND salon_id = ?`, [item.id, req.salon.id]);
+    await pool.query(`UPDATE ${table} SET active = 0, deleted_at = NOW() WHERE id = ? AND salon_id = ?`, [item.id, salonId]);
   }
-  logActivity(req.salon.id, 'catalog_delete', TABLE_LABEL[table] + ' "' + item.name + '" supprimé' + (usage.total ? ' (conservé dans l\'historique)' : ''));
-  res.json({ ok: true, deleted: true, kept_for_history: usage.total > 0, usage });
+  logActivity(salonId, 'catalog_delete', TABLE_LABEL[table] + ' "' + item.name + '" supprimé' + (usage.total ? ' (conservé dans l\'historique)' : ''));
+  return { usage };
 }
+
+// Actions groupées sur une sélection : { ids, action: archive|restore|edit|delete, vat_rate_id?, price_cents? }
+['services', 'extras', 'products'].forEach((table) => {
+  router.post('/' + table + '/bulk', requireAdmin, wrap(async (req, res) => {
+    const ids = Array.isArray(req.body.ids) ? [...new Set(req.body.ids.map(String))].slice(0, 500) : [];
+    if (!ids.length) return res.status(400).json({ error: 'Aucun élément sélectionné' });
+    const action = req.body.action;
+    const salonId = req.salon.id;
+    const [owned] = await pool.query(`SELECT id, name FROM ${table} WHERE salon_id = ? AND deleted_at IS NULL AND id IN (?)`, [salonId, ids]);
+    const okIds = owned.map((r) => r.id);
+    if (!okIds.length) return res.status(404).json({ error: 'Éléments introuvables' });
+    if (action === 'archive' || action === 'restore') {
+      await pool.query(`UPDATE ${table} SET active = ? WHERE salon_id = ? AND id IN (?)`, [action === 'restore' ? 1 : 0, salonId, okIds]);
+      logActivity(salonId, action === 'restore' ? 'catalog_restore' : 'catalog_archive', okIds.length + ' ' + TABLE_LABEL[table].toLowerCase() + '(s) ' + (action === 'restore' ? 'réactivé(s)' : 'archivé(s)'));
+    } else if (action === 'edit') {
+      const sets = [], params = [];
+      if (req.body.vat_rate_id !== undefined && req.body.vat_rate_id !== '') {
+        const vatId = await normalizeVatRateId(salonId, req.body.vat_rate_id);
+        if (!vatId) return res.status(400).json({ error: 'Taux de TVA inconnu' });
+        sets.push('vat_rate_id = ?'); params.push(vatId);
+      }
+      if (req.body.price_cents !== undefined && req.body.price_cents !== null && req.body.price_cents !== '') {
+        const price = Math.round(Number(req.body.price_cents));
+        if (!Number.isFinite(price) || price < 0 || price > 10000000) return res.status(400).json({ error: 'Prix invalide' });
+        sets.push('price_cents = ?'); params.push(price);
+      }
+      if (!sets.length) return res.status(400).json({ error: 'Rien à modifier' });
+      await pool.query(`UPDATE ${table} SET ${sets.join(', ')} WHERE salon_id = ? AND id IN (?)`, params.concat([salonId, okIds]));
+      logActivity(salonId, 'catalog_edit', okIds.length + ' ' + TABLE_LABEL[table].toLowerCase() + '(s) modifié(s) en groupe');
+    } else if (action === 'delete') {
+      let kept = 0;
+      for (const id of okIds) {
+        const r = await removeCatalogItem(table, salonId, id);
+        if (r && r.usage.total > 0) kept += 1;
+      }
+      return res.json({ ok: true, count: okIds.length, kept_for_history: kept });
+    } else {
+      return res.status(400).json({ error: 'Action inconnue' });
+    }
+    res.json({ ok: true, count: okIds.length });
+  }));
+});
 
 ['services', 'extras', 'products'].forEach((table) => {
   // Combien de passages / rendez-vous utilisent cet article ? - pour prevenir AVANT de supprimer.
