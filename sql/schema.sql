@@ -1205,3 +1205,29 @@ DELETE FROM settings WHERE `key` = 'sms_reminder_template' AND value IN (
   'Bonjour {prenom}, rappel de votre RDV {date} a {heure} avec {coiffeur} chez {salon}. Annuler : {lien}',
   'Bonjour {prenom}, rappel de votre RDV {date} a {heure} avec {coiffeur} chez {salon}. Pour annuler, utilisez le lien recu par email ou dans votre compte client.'
 );
+
+
+-- TVA nommées : l'admin définit ses propres taux (nom + pourcentage) et
+-- choisit le taux de chaque article. vat_rate_id NULL = taux par défaut
+-- (le premier de la liste).
+CREATE TABLE IF NOT EXISTS vat_rates (
+  id CHAR(36) PRIMARY KEY,
+  salon_id CHAR(36) NOT NULL,
+  name VARCHAR(100) NOT NULL,
+  rate DECIMAL(5,2) NOT NULL DEFAULT 20,
+  sort_order INT NOT NULL DEFAULT 0,
+  FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'services' AND column_name = 'vat_rate_id');
+SET @sql := IF(@c = 0, "ALTER TABLE services ADD COLUMN vat_rate_id CHAR(36) NULL", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'extras' AND column_name = 'vat_rate_id');
+SET @sql := IF(@c = 0, "ALTER TABLE extras ADD COLUMN vat_rate_id CHAR(36) NULL", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'products' AND column_name = 'vat_rate_id');
+SET @sql := IF(@c = 0, "ALTER TABLE products ADD COLUMN vat_rate_id CHAR(36) NULL", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'sale_items' AND column_name = 'vat_rate');
+SET @sql := IF(@c = 0, "ALTER TABLE sale_items ADD COLUMN vat_rate DECIMAL(5,2) NULL", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;

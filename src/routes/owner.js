@@ -698,16 +698,17 @@ router.post('/caisse/close', requireAdminOrBarber, wrap(async (req, res) => {
 
       const [saleItems] = await db.query(
         periodStart
-          ? `SELECT si.item_name, si.item_type, si.quantity, si.unit_price_cents
+          ? `SELECT si.item_name, si.item_type, si.quantity, si.unit_price_cents, si.vat_rate
              FROM sale_items si JOIN sales s ON s.id = si.sale_id
              WHERE s.salon_id = ? AND s.created_at > ?`
-          : `SELECT si.item_name, si.item_type, si.quantity, si.unit_price_cents
+          : `SELECT si.item_name, si.item_type, si.quantity, si.unit_price_cents, si.vat_rate
              FROM sale_items si JOIN sales s ON s.id = si.sale_id
              WHERE s.salon_id = ?`,
         periodStart ? [req.salon.id, periodStart] : [req.salon.id]
       );
       const byItem = {};
-      const vatRateFor = (itemType) => {
+      const vatRateFor = (itemType, snap) => {
+        if (snap !== undefined && snap !== null) return Number(snap);
         const raw = itemType === 'service' ? req.salon.vat_rate_service
           : itemType === 'extra' ? req.salon.vat_rate_extra
           : req.salon.vat_rate_product;
@@ -718,7 +719,7 @@ router.post('/caisse/close', requireAdminOrBarber, wrap(async (req, res) => {
       // total TVA - demande explicitement suite a un test de cloture.
       const byVatRate = {};
       saleItems.forEach((it) => {
-        const rate = vatRateFor(it.item_type);
+        const rate = vatRateFor(it.item_type, it.vat_rate);
         const ttc = it.quantity * it.unit_price_cents;
         if (!byVatRate[rate]) byVatRate[rate] = { ttc_cents: 0 };
         byVatRate[rate].ttc_cents += ttc;

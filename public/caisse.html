@@ -939,6 +939,7 @@ function loadSalonName() {
 loadSalonName();
 var legalInfo = {};
 var vatRates = { service: 20, extra: 20, product: 20 };
+var vatByItem = {}; // 'type:id' -> taux (%), rempli depuis le catalogue
 // URL du pont local (réglages TPE du dashboard) : quand elle est définie,
 // les paiements carte sont envoyés au petit serveur du salon (même réseau
 // que le TPE) au lieu de l'API en ligne - le serveur cloud ne peut pas
@@ -2857,6 +2858,11 @@ function loadCatalog() {
     catalog.services = r[0].items;
     catalog.extras = r[1].items;
     catalog.products = r[2].items;
+    vatByItem = {};
+    ['service:services', 'extra:extras', 'product:products'].forEach(function (pair) {
+      var t = pair.split(':');
+      (catalog[t[1]] || []).forEach(function (it) { if (it.vat_rate !== undefined) vatByItem[t[0] + ':' + it.id] = Number(it.vat_rate); });
+    });
     catalogLoadedAt = Date.now();
     renderItemGrid();
   }).catch(function (e) { toast(e.message, true); });
@@ -3683,13 +3689,16 @@ function askSplitCash() {
 }
 
 /**
- * Calcule le taux de TVA applicable à un article selon sa catégorie
- * (prestation/supplément/produit) - jamais par article individuel,
- * voir Réglages > TVA.
+ * Taux de TVA d'une ligne : taux enregistré sur la vente (ticket déjà
+ * encaissé), sinon taux choisi pour l'article dans le catalogue, sinon
+ * (article supprimé) taux historique de sa catégorie.
  */
-function vatRateFor(itemType) {
-  if (itemType === 'service') return Number(vatRates.service) || 0;
-  if (itemType === 'extra') return Number(vatRates.extra) || 0;
+function vatRateFor(line) {
+  if (line && line.vat_rate !== undefined && line.vat_rate !== null) return Number(line.vat_rate) || 0;
+  if (line && vatByItem[line.item_type + ':' + line.item_id] !== undefined) return vatByItem[line.item_type + ':' + line.item_id];
+  var t = line && line.item_type;
+  if (t === 'service') return Number(vatRates.service) || 0;
+  if (t === 'extra') return Number(vatRates.extra) || 0;
   return Number(vatRates.product) || 0;
 }
 
@@ -3735,7 +3744,7 @@ function showReceipt(lines, total, method, opts) {
   if (legalInfo.vat_number) {
     var byRate = {};
     lines.forEach(function (l) {
-      var rate = vatRateFor(l.item_type);
+      var rate = vatRateFor(l);
       var ttc = l.unit_price_cents * l.quantity;
       var ht = rate > 0 ? ttc / (1 + rate / 100) : ttc;
       if (!byRate[rate]) byRate[rate] = { ht: 0, ttc: 0 };
@@ -3932,7 +3941,7 @@ function buildReceiptText(lines, total, method, o) {
   if (legalInfo.vat_number) {
     var byRate = {};
     lines.forEach(function (l) {
-      var rate = vatRateFor(l.item_type);
+      var rate = vatRateFor(l);
       var ttc = l.unit_price_cents * l.quantity;
       var ht = rate > 0 ? ttc / (1 + rate / 100) : ttc;
       if (!byRate[rate]) byRate[rate] = { ht: 0, ttc: 0 };

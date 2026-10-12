@@ -97,4 +97,5 @@ node tests/caisse/63-changement-salon-recharge.js  # Dashboard : changer de salo
 node tests/caisse/64-historique-clotures-admin.js  # Caisse : historique des clotures reserve a l'admin
 node tests/caisse/65-version-masquee-mobile.js  # Dashboard : version de l'app masquee en mobile
 node tests/caisse/66-historique-caisse-du-jour.js  # Caisse : historique du tiroir = journee en cours seulement
+node tests/caisse/67-tva-nommees-par-article.js  # TVA nommees (liste admin) choisies par article
 ```

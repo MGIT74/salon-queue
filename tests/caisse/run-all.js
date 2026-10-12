@@ -86,7 +86,8 @@ const suite = [
   ['63-changement-salon-recharge.js', false, ['exit']],
   ['64-historique-clotures-admin.js', false, ['exit']],
   ['65-version-masquee-mobile.js', false, ['exit']],
-  ['66-historique-caisse-du-jour.js', false, ['exit']]
+  ['66-historique-caisse-du-jour.js', false, ['exit']],
+  ['67-tva-nommees-par-article.js', false, ['exit']]
 ];
 
 let bad = 0;

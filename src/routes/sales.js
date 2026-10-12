@@ -1,6 +1,7 @@
 const express = require('express');
 const crypto = require('crypto');
 const { pool, utcIso, getSettings, getCaisseLockedUntil, caisseDayStartUtc } = require('../db');
+const { getVatRates, rateForItem, TABLES: VAT_TABLES } = require('../lib/vat');
 const { clientKey, earnLoyaltyPoint } = require('../lib/queueMath');
 const { sendGiftConfirmation } = require('../lib/mailer');
 const requireAdmin = require('../middleware/auth');
@@ -215,10 +216,22 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
       // 6. Vente + lignes. Le total est la somme EXACTE des lignes.
       const saleId = crypto.randomUUID();
       let total = 0;
+      // Taux de TVA "photographié" sur chaque ligne (taux de l'article au
+      // moment de la vente) pour que le ticket Z reste juste si l'admin
+      // change ensuite le taux.
+      const vatList = await getVatRates(req.salon.id);
+      const vatIdByItem = {};
+      for (const type of Object.keys(VAT_TABLES)) {
+        const ids = [...new Set(cleanItems.filter((it) => it.item_type === type && it.item_id).map((it) => it.item_id))];
+        if (!ids.length) continue;
+        const [vrows] = await db.query(`SELECT id, vat_rate_id FROM ${VAT_TABLES[type]} WHERE salon_id = ? AND id IN (?)`, [req.salon.id, ids]);
+        vrows.forEach((r) => { vatIdByItem[type + ':' + r.id] = r.vat_rate_id; });
+      }
       const itemRows = cleanItems.map((it) => {
         total += it.quantity * it.unit_price_cents;
+        it.vat_rate = rateForItem(vatList, vatIdByItem[it.item_type + ':' + it.item_id]);
         const lineBarberId = it.barber_id && validLineBarberIds.has(it.barber_id) ? it.barber_id : null;
-        return [crypto.randomUUID(), saleId, it.item_type, it.item_id, it.item_name, it.unit_price_cents, it.quantity, lineBarberId];
+        return [crypto.randomUUID(), saleId, it.item_type, it.item_id, it.item_name, it.unit_price_cents, it.quantity, lineBarberId, it.vat_rate];
       });
       // Paiement partagé : la part en espèces doit être strictement entre 0 et le total (le reste = carte).
       let cashCents = null;
@@ -233,7 +246,7 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
         [saleId, req.salon.id, barberId, payment_method, total, cashCents, ticketNumber, queue_id || null, clientRequestId]
       );
       await db.query(
-        'INSERT INTO sale_items (id, sale_id, item_type, item_id, item_name, unit_price_cents, quantity, barber_id) VALUES ?',
+        'INSERT INTO sale_items (id, sale_id, item_type, item_id, item_name, unit_price_cents, quantity, barber_id, vat_rate) VALUES ?',
         [itemRows]
       );
 

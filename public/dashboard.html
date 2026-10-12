@@ -2186,15 +2186,12 @@
       </h3>
       <div class="accordion-body" id="salon-vat-body" style="display:none">
       <p class="hint">
-        Un taux différent est possible pour chaque catégorie d'article, appliqué à tous ses articles pour le
-        calcul du détail HT/TVA sur le ticket de caisse. Laisser vide si non assujetti à la TVA.
+        Créez vos taux de TVA (donnez-leur un nom pour vous y retrouver, par exemple « Coiffure » ou « Produits »),
+        puis choisissez le taux de chaque prestation, supplément ou produit dans sa fiche. Le détail HT/TVA
+        apparaît sur le ticket de caisse et le ticket Z. Mettez 0 % si vous n'êtes pas assujetti à la TVA.
       </p>
-      <div class="fld"><label for="set-vat-service">Prestations (%)</label>
-        <input id="set-vat-service" type="number" min="0" max="100" step="0.1" placeholder="20"></div>
-      <div class="fld"><label for="set-vat-extra">Suppléments (%)</label>
-        <input id="set-vat-extra" type="number" min="0" max="100" step="0.1" placeholder="20"></div>
-      <div class="fld"><label for="set-vat-product">Produits (%)</label>
-        <input id="set-vat-product" type="number" min="0" max="100" step="0.1" placeholder="20"></div>
+      <div id="vat-rates-list"></div>
+      <button type="button" class="btn btn-ghost" style="margin-top:4px" onclick="addVatRateRow()">+ Ajouter une TVA</button>
       <button class="btn btn-primary" style="margin-top:6px" onclick="saveVatRates()">Enregistrer</button>
       </div>
     </div>
@@ -2446,6 +2443,7 @@
         <div class="fld" id="sc-dur-fld"><label for="sc-dur">Durée (minutes)</label><input id="sc-dur" type="number" min="0" value="30"></div>
         <div class="fld"><label for="sc-price" id="sc-price-label">Prix (€)</label><input id="sc-price" type="number" min="0" step="0.5" value="20"></div>
       </div>
+      <div class="fld" id="sc-vat-fld"><label for="sc-vat">TVA</label><select id="sc-vat"></select></div>
       <div class="fld" id="sc-stock-toggle-fld" style="display:none">
         <label style="display:flex;align-items:center;gap:8px;font-weight:400;cursor:pointer">
           <input type="checkbox" id="sc-stock-enabled" onchange="document.getElementById('sc-stock-qty-fld').style.display=this.checked?'block':'none'" style="width:auto">
@@ -3305,9 +3303,11 @@ function loadCatalog() {
   return Promise.all([
     api('/api/catalog/services?all=1'),
     api('/api/catalog/extras?all=1'),
-    api('/api/catalog/products?all=1')
+    api('/api/catalog/products?all=1'),
+    api('/api/settings/vat-rates').catch(function () { return { rates: vatRatesList }; })
   ]).then(function (r) {
     services = r[0].items; extras = r[1].items; products = r[2].items;
+    vatRatesList = r[3].rates || vatRatesList;
     renderCatalog('services'); renderCatalog('extras'); renderCatalog('products');
   });
 }
@@ -3922,6 +3922,7 @@ function renderCatalog(table) {
         var meta = table === 'products'
           ? eur(x.price_cents) + (x.stock_enabled ? ' · ' + (x.stock_quantity > 0 ? x.stock_quantity + ' en stock' : 'rupture de stock') : ' · illimité')
           : formatMinutes(x.duration_min) + ' · ' + (table === 'extras' ? '+ ' : '') + eur(x.price_cents);
+        if (x.vat_rate_name) meta += ' · ' + x.vat_rate_name;
         var photoStyle = x.image_url ? 'background:url(&quot;' + esc(x.image_url) + '&quot;) center/cover' : '';
         return '<div class="item' + (x.active ? '' : ' off') + '" data-id="' + x.id + '">' +
           '<span class="drag-handle" role="button" tabindex="0" aria-label="Déplacer (glisser, ou flèches haut et bas)" title="Glisser pour déplacer — l\'ordre est celui de la caisse">' + GRIP_ICON + '</span>' +
@@ -3997,6 +3998,14 @@ function openCatalogForm(table, id) {
     document.getElementById('sc-dur').value = item ? item.duration_min : (table === 'services' ? 30 : 10);
   }
 
+  var vatSel = document.getElementById('sc-vat');
+  vatSel.innerHTML = vatRatesList.map(function (v) {
+    return '<option value="' + esc(v.id) + '">' + esc(v.name) + ' (' + esc(String(v.rate)) + ' %)</option>';
+  }).join('');
+  var curVat = item && item.vat_rate_id ? item.vat_rate_id : (vatRatesList[0] ? vatRatesList[0].id : '');
+  vatSel.value = curVat;
+  document.getElementById('sc-vat-fld').style.display = vatRatesList.length ? 'block' : 'none';
+
   document.getElementById('sc-stock-toggle-fld').style.display = table === 'products' ? 'block' : 'none';
   var stockEnabled = table === 'products' && item ? Boolean(item.stock_enabled) : false;
   document.getElementById('sc-stock-enabled').checked = stockEnabled;
@@ -4017,6 +4026,8 @@ function saveCatalog() {
     name: name,
     price_cents: Math.round((Number(document.getElementById('sc-price').value) || 0) * 100)
   };
+  var vatVal = document.getElementById('sc-vat').value;
+  if (vatVal) body.vat_rate_id = vatVal;
   if (editingCat.table !== 'products') {
     body.duration_min = Number(document.getElementById('sc-dur').value) || 0;
   } else {
@@ -7670,9 +7681,7 @@ function loadSettings() {
     document.getElementById('set-legal-rcs').value = s.legal_rcs_city || '';
     document.getElementById('set-legal-naf').value = s.legal_naf_code || '';
     document.getElementById('set-legal-register').value = s.legal_register_number || '';
-    document.getElementById('set-vat-service').value = s.vat_rate_service || '';
-    document.getElementById('set-vat-extra').value = s.vat_rate_extra || '';
-    document.getElementById('set-vat-product').value = s.vat_rate_product || '';
+    loadVatRates();
     // Les modeles d'email sont dans cet onglet (Reglages) : on les remplit ICI (avant, seul l'onglet Caisse le faisait).
     fillEmailTemplates(s);
   }).catch(function (e) { toast(e.message, true); });
@@ -7701,12 +7710,67 @@ function saveLegalInfo() {
     .catch(function (e) { toast(e.message, true); });
 }
 
+/* ---- TVA nommées ---- */
+var vatRatesList = [];
+
+function loadVatRates() {
+  return api('/api/settings/vat-rates').then(function (r) {
+    vatRatesList = r.rates || [];
+    renderVatRates();
+  }).catch(function (e) { toast(e.message, true); });
+}
+
+function renderVatRates() {
+  var box = document.getElementById('vat-rates-list');
+  if (!box) return;
+  box.innerHTML = vatRatesList.map(function (v, i) {
+    return '<div class="vat-row" data-id="' + esc(v.id || '') + '" style="display:flex;gap:8px;align-items:flex-end;margin-bottom:10px;flex-wrap:wrap">' +
+      '<div class="fld" style="flex:2;min-width:140px;margin:0"><label>Nom</label>' +
+        '<input type="text" class="vat-name" maxlength="100" placeholder="Ex : Coiffure" value="' + esc(v.name || '') + '"></div>' +
+      '<div class="fld" style="flex:1;min-width:90px;margin:0"><label>Taux (%)</label>' +
+        '<input type="number" class="vat-rate" min="0" max="100" step="0.1" placeholder="20" value="' + (v.rate === '' || v.rate === undefined ? '' : esc(String(v.rate))) + '"></div>' +
+      '<button type="button" class="btn btn-ghost" style="color:var(--red)" title="Supprimer cette TVA" onclick="removeVatRateRow(' + i + ')">Supprimer</button>' +
+      (v.article_count ? '<div style="flex-basis:100%;font-size:12.5px;color:var(--grey)">' + v.article_count + ' article' + (v.article_count > 1 ? 's' : '') + '</div>' : '') +
+    '</div>';
+  }).join('');
+}
+
+function readVatRows() {
+  var rows = [].slice.call(document.querySelectorAll('#vat-rates-list .vat-row'));
+  return rows.map(function (el, i) {
+    return {
+      id: el.dataset.id || null,
+      name: el.querySelector('.vat-name').value.trim(),
+      rate: el.querySelector('.vat-rate').value,
+      article_count: (vatRatesList[i] || {}).article_count || 0
+    };
+  });
+}
+
+function addVatRateRow() {
+  vatRatesList = readVatRows();
+  vatRatesList.push({ id: null, name: '', rate: '', article_count: 0 });
+  renderVatRates();
+  var inputs = document.querySelectorAll('#vat-rates-list .vat-name');
+  if (inputs.length) inputs[inputs.length - 1].focus();
+}
+
+function removeVatRateRow(i) {
+  vatRatesList = readVatRows();
+  if (vatRatesList.length <= 1) { toast('Gardez au moins une TVA (mettez 0 % si vous n\'êtes pas assujetti)', true); return; }
+  vatRatesList.splice(i, 1);
+  renderVatRates();
+}
+
 function saveVatRates() {
-  api('/api/settings', { method: 'PUT', body: {
-    vat_rate_service: document.getElementById('set-vat-service').value,
-    vat_rate_extra: document.getElementById('set-vat-extra').value,
-    vat_rate_product: document.getElementById('set-vat-product').value
-  }}).then(function () { toast('Taux de TVA enregistrés'); })
+  var rows = readVatRows();
+  for (var i = 0; i < rows.length; i++) {
+    if (!rows[i].name) { toast('Donnez un nom à chaque TVA', true); return; }
+    if (rows[i].rate === '') { toast('Indiquez le taux de « ' + rows[i].name + ' »', true); return; }
+  }
+  api('/api/settings/vat-rates', { method: 'PUT', body: { rates: rows.map(function (r) { return { id: r.id, name: r.name, rate: r.rate }; }) } })
+    .then(function (r) { vatRatesList = r.rates || []; return loadVatRates().then(loadCatalog); })
+    .then(function () { toast('TVA enregistrées'); })
     .catch(function (e) { toast(e.message, true); });
 }
 

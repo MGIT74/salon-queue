@@ -3,6 +3,7 @@ const { pool } = require('../db');
 const requireAdmin = require('../middleware/auth');
 const { logActivity } = require('../lib/activityLog');
 const { wrap } = require('../lib/wrap');
+const { annotateItems, normalizeVatRateId } = require('../lib/vat');
 
 const router = express.Router();
 
@@ -85,7 +86,7 @@ async function uniqueId(table, base) {
       ? `SELECT * FROM ${table} WHERE salon_id = ? AND deleted_at IS NULL ORDER BY sort_order, name`
       : `SELECT * FROM ${table} WHERE salon_id = ? AND active = 1 AND deleted_at IS NULL ORDER BY sort_order, name`;
     const [rows] = await pool.query(sql, [req.salon.id]);
-    res.json({ ok: true, items: rows });
+    res.json({ ok: true, items: await annotateItems(req.salon.id, rows) });
   }));
 
   router.post('/' + table, requireAdmin, wrap(async (req, res) => {
@@ -93,10 +94,12 @@ async function uniqueId(table, base) {
     if (!name) return res.status(400).json({ error: 'Le nom est requis' });
     const id = await uniqueId(table, slugify(name));
     const { salon } = req;
+    const vatId = await normalizeVatRateId(salon.id, req.body.vat_rate_id);
+    if (vatId === false) return res.status(400).json({ error: 'Taux de TVA inconnu' });
     const rank = sort_order !== undefined && sort_order !== null && sort_order !== '' ? Number(sort_order) || 0 : await nextSortOrder(table, salon.id);
     await pool.query(
-      `INSERT INTO ${table} (id, salon_id, name, duration_min, price_cents, sort_order) VALUES (?, ?, ?, ?, ?, ?)`,
-      [id, salon.id, name, Number(duration_min) || 0, Number(price_cents) || 0, rank]
+      `INSERT INTO ${table} (id, salon_id, name, duration_min, price_cents, sort_order, vat_rate_id) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [id, salon.id, name, Number(duration_min) || 0, Number(price_cents) || 0, rank, vatId === undefined ? null : vatId]
     );
     const [[item]] = await pool.query(`SELECT * FROM ${table} WHERE id = ?`, [id]);
     logActivity(salon.id, 'catalog_create', TABLE_LABEL[table] + ' "' + name + '" créée');
@@ -117,6 +120,11 @@ async function uniqueId(table, base) {
     ['duration_min', 'price_cents', 'sort_order'].forEach((k) => {
       if (req.body[k] !== undefined) { sets.push(k + ' = ?'); params.push(Number(req.body[k]) || 0); }
     });
+    if (req.body.vat_rate_id !== undefined) {
+      const vatId = await normalizeVatRateId(req.salon.id, req.body.vat_rate_id);
+      if (vatId === false) return res.status(400).json({ error: 'Taux de TVA inconnu' });
+      sets.push('vat_rate_id = ?'); params.push(vatId);
+    }
     if (!sets.length) return res.json({ ok: true });
 
     const [[before]] = await pool.query(`SELECT name FROM ${table} WHERE id = ? AND salon_id = ?`, [req.params.id, req.salon.id]);
@@ -151,7 +159,7 @@ router.get('/products', wrap(async (req, res) => {
     ? 'SELECT * FROM products WHERE salon_id = ? AND deleted_at IS NULL ORDER BY sort_order, name'
     : 'SELECT * FROM products WHERE salon_id = ? AND active = 1 AND deleted_at IS NULL ORDER BY sort_order, name';
   const [rows] = await pool.query(sql, [req.salon.id]);
-  res.json({ ok: true, items: rows });
+  res.json({ ok: true, items: await annotateItems(req.salon.id, rows) });
 }));
 
 router.post('/products', requireAdmin, wrap(async (req, res) => {
@@ -162,11 +170,13 @@ router.post('/products', requireAdmin, wrap(async (req, res) => {
   // Vide -> NULL (jamais une chaine vide, pour laisser plusieurs produits
   // sans code coexister sous la contrainte d'unicite par salon).
   const barcode = req.body.barcode ? String(req.body.barcode).trim().slice(0, 64) || null : null;
+  const vatId = await normalizeVatRateId(req.salon.id, req.body.vat_rate_id);
+  if (vatId === false) return res.status(400).json({ error: 'Taux de TVA inconnu' });
   const id = await uniqueId('products', slugify(name));
   try {
     await pool.query(
-      'INSERT INTO products (id, salon_id, name, price_cents, category, sort_order, stock_enabled, stock_quantity, barcode) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [id, req.salon.id, name, Number(price_cents) || 0, category || null, sort_order !== undefined && sort_order !== null && sort_order !== '' ? Number(sort_order) || 0 : await nextSortOrder('products', req.salon.id), stockEnabled, stockQuantity, barcode]
+      'INSERT INTO products (id, salon_id, name, price_cents, category, sort_order, stock_enabled, stock_quantity, barcode, vat_rate_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [id, req.salon.id, name, Number(price_cents) || 0, category || null, sort_order !== undefined && sort_order !== null && sort_order !== '' ? Number(sort_order) || 0 : await nextSortOrder('products', req.salon.id), stockEnabled, stockQuantity, barcode, vatId === undefined ? null : vatId]
     );
   } catch (err) {
     if (err.code === 'ER_DUP_ENTRY') return res.status(400).json({ error: 'Ce code-barres est déjà utilisé par un autre produit' });
@@ -197,6 +207,11 @@ router.put('/products/:id', requireAdmin, wrap(async (req, res) => {
   ['price_cents', 'sort_order', 'stock_quantity'].forEach((k) => {
     if (req.body[k] !== undefined) { sets.push(k + ' = ?'); params.push(Math.max(0, Number(req.body[k]) || 0)); }
   });
+  if (req.body.vat_rate_id !== undefined) {
+    const vatId = await normalizeVatRateId(req.salon.id, req.body.vat_rate_id);
+    if (vatId === false) return res.status(400).json({ error: 'Taux de TVA inconnu' });
+    sets.push('vat_rate_id = ?'); params.push(vatId);
+  }
   if (!sets.length) return res.json({ ok: true });
 
   const [[before]] = await pool.query('SELECT name FROM products WHERE id = ? AND salon_id = ?', [req.params.id, req.salon.id]);

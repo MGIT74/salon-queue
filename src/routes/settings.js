@@ -6,6 +6,8 @@ const { logActivity } = require('../lib/activityLog');
 const sms = require('../lib/sms');
 const { getSmsCredits } = require('../lib/smsCredits');
 const { wrap } = require('../lib/wrap');
+const { getVatRates, TABLES: VAT_TABLES } = require('../lib/vat');
+const crypto = require('crypto');
 
 const router = express.Router();
 
@@ -68,6 +70,60 @@ router.post('/caisse/force-open', wrap(async (req, res) => {
   await setSettings(req.salon.id, { caisse_force_reopen_at: new Date().toISOString() });
   logActivity(req.salon.id, 'caisse_force_open', 'Caisse déverrouillée manuellement (mot de passe admin)');
   res.json({ ok: true });
+}));
+
+// ---- TVA nommées ----
+router.get('/vat-rates', requireAdmin, wrap(async (req, res) => {
+  const rates = await getVatRates(req.salon.id);
+  const usage = {};
+  for (const table of Object.values(VAT_TABLES)) {
+    const [rows] = await pool.query(`SELECT vat_rate_id, COUNT(*) AS n FROM ${table} WHERE salon_id = ? AND deleted_at IS NULL AND vat_rate_id IS NOT NULL GROUP BY vat_rate_id`, [req.salon.id]);
+    rows.forEach((r) => { usage[r.vat_rate_id] = (usage[r.vat_rate_id] || 0) + Number(r.n); });
+  }
+  res.json({ ok: true, rates: rates.map((r) => Object.assign({}, r, { article_count: usage[r.id] || 0 })) });
+}));
+
+// Remplace la liste complète : { rates: [{ id?, name, rate }] }. Les taux
+// absents de la liste sont supprimés ; leurs articles repassent sur le
+// premier taux de la liste.
+router.put('/vat-rates', requireAdmin, wrap(async (req, res) => {
+  const input = Array.isArray(req.body.rates) ? req.body.rates : null;
+  if (!input || !input.length) return res.status(400).json({ error: 'Au moins un taux de TVA est requis' });
+  if (input.length > 20) return res.status(400).json({ error: '20 taux maximum' });
+  const clean = [];
+  for (const r of input) {
+    const name = String(r.name || '').trim().slice(0, 100);
+    const rate = Number(String(r.rate).replace(',', '.'));
+    if (!name) return res.status(400).json({ error: 'Chaque TVA doit avoir un nom' });
+    if (r.rate === '' || r.rate === null || r.rate === undefined || !Number.isFinite(rate) || rate < 0 || rate > 100) {
+      return res.status(400).json({ error: 'Le taux de TVA doit être un pourcentage entre 0 et 100' });
+    }
+    clean.push({ id: typeof r.id === 'string' ? r.id : null, name, rate: Math.round(rate * 100) / 100 });
+  }
+  const existing = await getVatRates(req.salon.id);
+  const existingIds = new Set(existing.map((r) => r.id));
+  const keepIds = new Set();
+  const finalList = clean.map((r) => {
+    const id = r.id && existingIds.has(r.id) && !keepIds.has(r.id) ? r.id : crypto.randomUUID();
+    keepIds.add(id);
+    return Object.assign({}, r, { id });
+  });
+  const removed = existing.filter((r) => !keepIds.has(r.id)).map((r) => r.id);
+  for (let i = 0; i < finalList.length; i++) {
+    const r = finalList[i];
+    await pool.query(
+      'INSERT INTO vat_rates (id, salon_id, name, rate, sort_order) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE name = VALUES(name), rate = VALUES(rate), sort_order = VALUES(sort_order)',
+      [r.id, req.salon.id, r.name, r.rate, i]
+    );
+  }
+  if (removed.length) {
+    for (const table of Object.values(VAT_TABLES)) {
+      await pool.query(`UPDATE ${table} SET vat_rate_id = ? WHERE salon_id = ? AND vat_rate_id IN (?)`, [finalList[0].id, req.salon.id, removed]);
+    }
+    await pool.query('DELETE FROM vat_rates WHERE salon_id = ? AND id IN (?)', [req.salon.id, removed]);
+  }
+  logActivity(req.salon.id, 'settings_vat', 'TVA mise à jour : ' + finalList.map((r) => r.name + ' ' + r.rate + ' %').join(', '));
+  res.json({ ok: true, rates: await getVatRates(req.salon.id) });
 }));
 
 router.get('/', requireAdmin, wrap(async (req, res) => {
