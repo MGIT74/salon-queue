@@ -5,6 +5,7 @@ const requireAdmin = require('../middleware/auth');
 const requireAdminOrBarber = require('../middleware/barberAuth');
 const { clientKey } = require('../lib/queueMath');
 const { sendAppointmentConfirmation, sendAppointmentCancelledByAdmin, sendAppointmentRescheduled, sendGiftCodeRenewed } = require('../lib/mailer');
+const { activateOnFirstOnlineBooking } = require('../lib/loyalty');
 const { wrap } = require('../lib/wrap');
 
 const router = express.Router();
@@ -563,6 +564,15 @@ router.post('/', wrap(async (req, res) => {
     });
   } catch (err) {
     console.error('[rdv] envoi email de confirmation échoué:', err.message);
+  }
+
+  // Première réservation en ligne de ce client : sa carte de fidélité est activée
+  // d'office (plus besoin de le faire à la caisse). Une erreur ici ne doit jamais
+  // empêcher la réservation, déjà enregistrée.
+  try {
+    await activateOnFirstOnlineBooking(req.salon.id, { client_name, email, phone });
+  } catch (err) {
+    console.error('[fidélité] activation à la première réservation échouée:', err.message);
   }
 
   // Si c'est pour aujourd'hui, on le fait apparaître tout de suite

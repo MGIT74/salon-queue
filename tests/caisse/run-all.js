@@ -91,7 +91,8 @@ const suite = [
   ['68-catalogue-selection-multiple.js', false, ['exit']],
   ['69-catalogue-recherche.js', false, ['exit']],
   ['70-apres-cloture-ecran-depart.js', false, ['exit']],
-  ['71-categories-catalogue.js', false, ['exit']]
+  ['71-categories-catalogue.js', false, ['exit']],
+  ['72-fidelite-premiere-reservation-en-ligne.js', false, ['exit']]
 ];
 
 let bad = 0;
