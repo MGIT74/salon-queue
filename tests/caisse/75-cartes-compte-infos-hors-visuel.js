@@ -9,4 +9,5 @@ check('cadeau : montant, puces, code et bouton dans .card-info apres .card-art',
 check('aucun filtre noir sur les cartes fidelite / cadeau', !/#loyalty-section \.card\.has-bg::before/.test(h) && !/\.gift-card\.has-bg::before/.test(h));
 check('image perso appliquee sur le visuel (fidelite)', /loyaltyArt\.style\.backgroundImage/.test(h));
 check('image perso appliquee sur le visuel (cadeau)', /art\.style\.backgroundImage = 'url\("' \+ currentGiftCardImageForCards/.test(h));
+check('infos sur un fond (panneau arrondi) sous le visuel, pas flottantes', /\.card-info\s*\{[^}]*background:\s*var\(--fill\)[^}]*border-radius:\s*18px|\.card-info\s*\{[^}]*border-radius:\s*18px[^}]*background:\s*var\(--fill\)/.test(h));
 console.log('\n' + pass + ' OK, ' + fail + ' ECHEC'); process.exit(fail ? 1 : 0);
