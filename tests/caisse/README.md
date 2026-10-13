@@ -103,4 +103,5 @@ node tests/caisse/69-catalogue-recherche.js  # Catalogue : barre de recherche
 node tests/caisse/70-apres-cloture-ecran-depart.js  # Caisse : retour auto a l ecran de depart apres cloture
 node tests/caisse/71-categories-catalogue.js  # Catalogue : categories (familles) + filtre en caisse
 node tests/caisse/72-fidelite-creation-compte.js  # Fidelite : carte activee des la 1re reservation en ligne
+node tests/caisse/73-stats-coiffeur-tout-encaissement.js  # Stats coiffeur : tout l encaissement a son nom
 ```

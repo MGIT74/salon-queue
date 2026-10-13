@@ -7,7 +7,7 @@ const requireAdmin = require('../middleware/auth');
 const { loginRateLimiter } = require('../middleware/rateLimiter');
 const { logActivity } = require('../lib/activityLog');
 const { wrap } = require('../lib/wrap');
-const { serviceLineTransfers, applyTransfers } = require('../lib/lineAttribution');
+const { serviceLineTransfers, applyTransfers, salesRevenueByBarber } = require('../lib/lineAttribution');
 
 const router = express.Router();
 
@@ -335,29 +335,21 @@ router.get('/:id/stats', requireAdmin, wrap(async (req, res) => {
     [req.params.id, req.salon.id, startSql, endSql]
   );
 
-  // Produits vendus attribués à CE coiffeur (vendeur de la ligne, ou à
-  // défaut le coiffeur de toute la vente) - séparé du CA prestations
-  // car non lié au temps passé, ne doit jamais fausser le calcul de
-  // revenu potentiel par minute libre ci-dessous.
-  const [[productRow]] = await pool.query(
-    `SELECT COUNT(*) AS product_count, COALESCE(SUM(si.unit_price_cents * si.quantity), 0) AS product_revenue_cents
-     FROM sale_items si JOIN sales s ON s.id = si.sale_id
-     WHERE s.salon_id = ? AND si.item_type = 'product'
-       AND COALESCE(si.barber_id, s.barber_id) = ?
-       AND s.created_at >= ? AND s.created_at < ?`,
-    [req.salon.id, req.params.id, startSql, endSql]
-  );
+  // Chiffre d'affaires ENCAISSÉ à son nom (prestations, suppléments ET produits), ligne par ligne, depuis les
+  // ventes de la caisse - voir salesRevenueByBarber. Les passages terminés (nombre, minutes) restent ceux de la file.
+  const sold = (await salesRevenueByBarber(pool, req.salon.id, { fromSql: startSql, toSql: endSql })).get(req.params.id)
+    || { service_cents: 0, service_count: 0, product_cents: 0, product_count: 0 };
 
-  // Lignes de ticket attribuees a ce coiffeur par un AUTRE coiffeur (ou retirees de ses passages) : voir lineAttribution.js.
+  // Nombre de passages : lignes de ticket attribuees a ce coiffeur par un AUTRE coiffeur (ou retirees de ses passages) - voir lineAttribution.js.
   const adj = applyTransfers(
     new Map([[req.params.id, { name: null, count: Number(row.done_count), cents: Number(row.revenue_cents) }]]),
     await serviceLineTransfers(pool, req.salon.id, { fromSql: startSql, toSql: endSql })
   ).get(req.params.id);
   const doneCount = Math.max(0, adj.count);
-  const revenueCents = Math.max(0, adj.cents);
+  const revenueCents = sold.service_cents;
   const bookedMinutes = Number(row.booked_minutes);
-  const productCount = Number(productRow.product_count);
-  const productRevenueCents = Number(productRow.product_revenue_cents);
+  const productCount = sold.product_count;
+  const productRevenueCents = sold.product_cents;
 
   // Calcul des créneaux disponibles/libres : nécessite les dates
   // locales de salon en jours calendaires précis (start_date/end_date,

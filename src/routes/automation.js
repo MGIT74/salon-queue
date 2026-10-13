@@ -5,7 +5,7 @@ const { computeSlotsForBarber, nowInParis, nowParisDatetimeString, parisLocalToU
 const sms = require('../lib/sms');
 const { sendCustomClientEmail } = require('../lib/mailer');
 const { wrap } = require('../lib/wrap');
-const { serviceLineTransfers, applyTransfers } = require('../lib/lineAttribution');
+const { serviceLineTransfers, applyTransfers, salesRevenueByBarber } = require('../lib/lineAttribution');
 
 const router = express.Router();
 
@@ -523,58 +523,39 @@ router.get('/salons/:id/revenue', requireAutomationKey, wrap(async (req, res) =>
     [salonId, start + ' 00:00:00', end + ' 23:59:59']
   );
 
-  // Produits vendus (vendeur de la ligne, ou à défaut le coiffeur de
-  // toute la vente) - séparé des prestations ci-dessus, puis fusionné
-  // par coiffeur juste en dessous, pour ne rien compter deux fois.
-  const [byBarberProducts] = await pool.query(
-    `SELECT COALESCE(si.barber_id, s.barber_id) AS barber_id, b.name AS barber_name,
-            COUNT(*) AS product_count, COALESCE(SUM(si.unit_price_cents * si.quantity), 0) AS product_revenue_cents
-     FROM sale_items si JOIN sales s ON s.id = si.sale_id
-     LEFT JOIN barbers b ON b.id = COALESCE(si.barber_id, s.barber_id)
-     WHERE s.salon_id = ? AND si.item_type = 'product' AND s.created_at BETWEEN ? AND ?
-     GROUP BY COALESCE(si.barber_id, s.barber_id), b.name`,
-    [salonId, start + ' 00:00:00', end + ' 23:59:59']
-  );
-
-  // Prestations / suppléments attribués ligne par ligne à un autre coiffeur que celui du passage (voir lineAttribution.js).
+  // Chiffre d'affaires ENCAISSÉ au nom de chaque coiffeur (prestations + suppléments, puis produits), ligne par ligne,
+  // depuis les ventes de la caisse - passages de la file ou ventes de comptoir (voir lineAttribution.js).
+  // Le nombre de prestations reste celui de la file (avec les transferts de lignes entre coiffeurs).
   const svcMap = new Map();
   byBarberServices.forEach((r) => {
     svcMap.set(r.barber_id, { name: r.barber_name, count: Number(r.done_count), cents: Number(r.revenue_cents) });
   });
   applyTransfers(svcMap, await serviceLineTransfers(pool, salonId, { fromSql: start + ' 00:00:00', toInclusiveSql: end + ' 23:59:59' }));
+  const soldMap = await salesRevenueByBarber(pool, salonId, { fromSql: start + ' 00:00:00', toInclusiveSql: end + ' 23:59:59' });
 
   const byBarberMap = new Map();
-  svcMap.forEach((v, barberId) => {
+  const allIds = new Set([...svcMap.keys(), ...soldMap.keys()]);
+  allIds.forEach((barberId) => {
+    const q = svcMap.get(barberId);
+    const sold = soldMap.get(barberId);
     byBarberMap.set(barberId, {
-      barber_name: v.name || 'Non assigné',
-      services_count: v.count,
-      service_revenue_cents: v.cents,
-      product_count: 0,
-      product_revenue_cents: 0
+      barber_name: (q && q.name) || (sold && sold.name) || 'Non assigné',
+      services_count: q ? q.count : 0,
+      service_revenue_cents: sold ? sold.service_cents : 0,
+      product_count: sold ? sold.product_count : 0,
+      product_revenue_cents: sold ? sold.product_cents : 0
     });
-  });
-  byBarberProducts.forEach((r) => {
-    const entry = byBarberMap.get(r.barber_id) || {
-      barber_name: r.barber_name || 'Non assigné',
-      services_count: 0, service_revenue_cents: 0,
-      product_count: 0, product_revenue_cents: 0
-    };
-    entry.product_count = Number(r.product_count);
-    entry.product_revenue_cents = Number(r.product_revenue_cents);
-    byBarberMap.set(r.barber_id, entry);
   });
 
   const byBarber = [...byBarberMap.values()].sort((a, b) =>
     (b.service_revenue_cents + b.product_revenue_cents) - (a.service_revenue_cents + a.product_revenue_cents)
   );
 
-  const totalProductRevenueCents = byBarberProducts.reduce((sum, r) => sum + Number(r.product_revenue_cents), 0);
-
   res.json({
     ok: true,
     start,
     end,
-    total_revenue_euros: (Number(totalRow.revenue_cents) + totalProductRevenueCents) / 100,
+    total_revenue_euros: ([...soldMap.values()].reduce((sum, v) => sum + v.service_cents + v.product_cents, 0)) / 100,
     total_services: Number(totalRow.done_count),
     by_barber: byBarber.map((r) => ({
       barber_name: r.barber_name,

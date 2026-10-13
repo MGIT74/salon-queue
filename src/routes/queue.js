@@ -2,7 +2,7 @@ const express = require('express');
 const crypto = require('crypto');
 const { pool, utcIso, getSettings } = require('../db');
 const { loadQueue, recompute, clientKey } = require('../lib/queueMath');
-const { serviceLineTransfers, applyTransfers } = require('../lib/lineAttribution');
+const { serviceLineTransfers, applyTransfers, salesRevenueByBarber } = require('../lib/lineAttribution');
 const { promoteTodayAppointments, nowParisDatetimeString } = require('./appointments');
 const requireAdmin = require('../middleware/auth');
 const { verifyOwnerPassword } = require('../middleware/auth');
@@ -602,9 +602,22 @@ router.get('/stats/week', requireAdmin, wrap(async (req, res) => {
   applyTransfers(revMap, await serviceLineTransfers(pool, req.salon.id, { sinceToday: true }));
   const [photoRows] = await pool.query('SELECT id, name, photo_url FROM barbers WHERE salon_id = ?', [req.salon.id]);
   const photoById = Object.fromEntries(photoRows.map((b) => [b.id, b]));
-  const byRevenue = [...revMap.entries()]
-    .filter(([id]) => id && photoById[id])
-    .map(([id, v]) => ({ id, name: photoById[id].name, photo_url: photoById[id].photo_url, revenue_cents: Math.max(0, v.cents), done_count: Math.max(0, v.count) }))
+  // Classement par chiffre d'affaires ENCAISSÉ au nom de chaque coiffeur : prestations + suppléments + produits,
+  // ligne par ligne, depuis les ventes de la caisse (passages de la file ou ventes de comptoir). Le nombre de
+  // passages reste celui de la file.
+  const soldMap = await salesRevenueByBarber(pool, req.salon.id, { sinceToday: true });
+  const ids = new Set([...revMap.keys(), ...soldMap.keys()]);
+  const byRevenue = [...ids]
+    .filter((id) => id && photoById[id])
+    .map((id) => {
+      const sold = soldMap.get(id);
+      const q = revMap.get(id);
+      return {
+        id, name: photoById[id].name, photo_url: photoById[id].photo_url,
+        revenue_cents: sold ? sold.service_cents + sold.product_cents : 0,
+        done_count: Math.max(0, q ? q.count : 0)
+      };
+    })
     .filter((r) => r.done_count > 0 || r.revenue_cents > 0)
     .sort((a, b) => b.revenue_cents - a.revenue_cents)
     .slice(0, 3);

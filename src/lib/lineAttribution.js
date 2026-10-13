@@ -66,4 +66,45 @@ function applyTransfers(map, transfers) {
   return map;
 }
 
-module.exports = { serviceLineTransfers, applyTransfers };
+/**
+ * Chiffre d'affaires ENCAISSÉ par coiffeur, ligne par ligne, à partir des ventes de la caisse (sales / sale_items) :
+ * prestations + suppléments + produits, tout ce qui a été encaissé au nom du coiffeur - qu'il soit lié à un passage
+ * de la file ou non (vente de comptoir). Une ligne appartient à son vendeur (sale_items.barber_id), à défaut au coiffeur
+ * de toute la vente (sales.barber_id). Prix réellement encaissé (remises, prix modifiés à la caisse comprises).
+ *
+ * @returns Map barberId (ou null) -> { name, service_count, service_cents, product_count, product_cents }
+ */
+async function salesRevenueByBarber(db, salonId, range) {
+  const params = [salonId];
+  let when;
+  if (range && range.sinceToday) {
+    when = 's.created_at >= CURDATE()';
+  } else {
+    when = 's.created_at >= ?';
+    params.push(range.fromSql);
+    if (range.toSql) { when += ' AND s.created_at < ?'; params.push(range.toSql); }
+    if (range.toInclusiveSql) { when += ' AND s.created_at <= ?'; params.push(range.toInclusiveSql); }
+  }
+  const [rows] = await db.query(
+    `SELECT COALESCE(si.barber_id, s.barber_id) AS barber_id, b.name AS barber_name,
+            COALESCE(SUM(CASE WHEN si.item_type IN ('service', 'extra') THEN si.unit_price_cents * si.quantity ELSE 0 END), 0) AS service_cents,
+            COALESCE(SUM(CASE WHEN si.item_type = 'service' THEN si.quantity ELSE 0 END), 0) AS service_count,
+            COALESCE(SUM(CASE WHEN si.item_type = 'product' THEN si.unit_price_cents * si.quantity ELSE 0 END), 0) AS product_cents,
+            COALESCE(SUM(CASE WHEN si.item_type = 'product' THEN si.quantity ELSE 0 END), 0) AS product_count
+     FROM sale_items si
+     JOIN sales s ON s.id = si.sale_id
+     LEFT JOIN barbers b ON b.id = COALESCE(si.barber_id, s.barber_id)
+     WHERE s.salon_id = ? AND ${when}
+     GROUP BY COALESCE(si.barber_id, s.barber_id), b.name`,
+    params
+  );
+  const map = new Map();
+  rows.forEach((r) => map.set(r.barber_id || null, {
+    name: r.barber_name || null,
+    service_count: Number(r.service_count), service_cents: Number(r.service_cents),
+    product_count: Number(r.product_count), product_cents: Number(r.product_cents)
+  }));
+  return map;
+}
+
+module.exports = { serviceLineTransfers, applyTransfers, salesRevenueByBarber };

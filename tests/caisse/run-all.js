@@ -92,7 +92,8 @@ const suite = [
   ['69-catalogue-recherche.js', false, ['exit']],
   ['70-apres-cloture-ecran-depart.js', false, ['exit']],
   ['71-categories-catalogue.js', false, ['exit']],
-  ['72-fidelite-creation-compte.js', false, ['exit']]
+  ['72-fidelite-creation-compte.js', false, ['exit']],
+  ['73-stats-coiffeur-tout-encaissement.js', false, ['exit']]
 ];
 
 let bad = 0;
