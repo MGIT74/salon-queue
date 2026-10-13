@@ -2627,7 +2627,13 @@ function startCaisseClosing() {
       ).then(function (ok2) {
         if (!ok2) return;
         barberApi('/api/owner/caisse/close', { method: 'POST', body: { starting_cash_cents: floatCents, closed_by_barber_id: clotureVerifiedBarber ? clotureVerifiedBarber.id : null } })
-          .then(function (r2) { printZTicket(r2.id); loadClotureTab(); })
+          .then(function (r2) {
+            // La journée est close : dès que le ticket Z est fermé, la caisse revient d'elle-même
+            // à l'écran de départ (voir closeZTicket), sans rafraîchir la page à la main.
+            postCloseReset = true;
+            printZTicket(r2.id);
+            loadClotureTab();
+          })
           .catch(function (e) { toast(e.message, true); });
       });
     });
@@ -2723,8 +2729,52 @@ function printZTicket(id) {
   }).catch(function (e) { toast(e.message, true); });
 }
 
+var postCloseReset = false;
+
 function closeZTicket() {
   document.getElementById('z-overlay').classList.remove('on');
+  if (postCloseReset) { postCloseReset = false; resetAfterClosing(); }
+}
+
+/**
+ * Après une clôture : on quitte la session (le PIN n'est plus valable pour la nouvelle journée) puis on
+ * affiche tout de suite le bon écran, comme après un rafraîchissement :
+ *  - heure de réouverture pas encore atteinte -> « Caisse fermée · Réouverture prévue le … » ;
+ *  - heure de réouverture déjà atteinte (ex. clôture à 8 h, réouverture à 6 h) -> saisie du code PIN.
+ */
+function resetAfterClosing() {
+  logout();
+  showLoginOrLocked();
+}
+
+// Écran « Caisse fermée » laissé affiché : dès que l'heure de réouverture est atteinte, il laisse la place
+// au code PIN tout seul (plus besoin de rafraîchir).
+setInterval(function () {
+  var locked = document.getElementById('login-card-locked');
+  if (locked && locked.style.display === 'block' && document.getElementById('login-screen').style.display !== 'none') showLoginOrLocked();
+}, 30000);
+
+function showLoginOrLocked() {
+  var headers = {};
+  if (SALON_SLUG) headers['X-Salon-Slug'] = SALON_SLUG;
+  fetch('/api/settings/public', { headers: headers })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      var locked = Boolean(d.caisse_locked_until);
+      if (locked) {
+        var when = new Date(d.caisse_locked_until).toLocaleString('fr-FR', {
+          weekday: 'long', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
+        });
+        document.getElementById('locked-reopen-text').textContent = 'Réouverture prévue le ' + when + '.';
+      }
+      document.getElementById('login-card-normal').style.display = locked ? 'none' : '';
+      document.getElementById('login-card-locked').style.display = locked ? 'block' : 'none';
+    })
+    .catch(function () {
+      // Réseau coupé : on garde l'écran du code PIN (le serveur refusera de toute façon une caisse fermée).
+      document.getElementById('login-card-normal').style.display = '';
+      document.getElementById('login-card-locked').style.display = 'none';
+    });
 }
 
 function loadClotureTab() {
