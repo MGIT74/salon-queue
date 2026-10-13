@@ -92,21 +92,24 @@
   .card .big { font-size: 28px; font-weight: 700; letter-spacing: -.02em; }
   .card .lbl { font-size: 13px; color: var(--grey); margin-top: 2px; }
 
-  /* Carte fidélité en mise en page "vraie carte" : logo à gauche,
-     points à droite (comme une carte de fidélité/membre physique). */
-  #loyalty-section .card { position: relative; overflow: hidden; }
-  #loyalty-section .card-top-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
-  #loyalty-section .card-logo {
-    width: 44px; height: 44px; border-radius: 12px; background: var(--card); flex-shrink: 0;
+  /* Cartes fidélité et cadeau : le visuel (image du salon ou dégradé) reste
+     PROPRE, sans texte ni filtre sombre par-dessus ; toutes les infos
+     (logo, points / montant, cadeaux, code, bouton) sont écrites dessous. */
+  .card-art {
+    position: relative; overflow: hidden; border-radius: 18px; aspect-ratio: 9 / 4;
+    background: linear-gradient(135deg, #0a84ff, #5e5ce6); background-size: cover; background-position: center;
+  }
+  .gift-card .card-art { background-image: linear-gradient(135deg, #7c3aed, #db2777); }
+  .card-info { padding: 12px 4px 0; color: var(--ink); }
+  .card-info .card-top-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+  .card-info .card-logo {
+    width: 44px; height: 44px; border-radius: 12px; background: var(--fill); flex-shrink: 0;
     background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center;
   }
-  #loyalty-section .card-points-block { text-align: right; }
-  /* Même taille de texte et même espacement que la carte cadeau
-     (.gift-card .big / .lbl ci-dessous), pour que les deux cartes
-     paraissent de la même famille visuelle malgré des couleurs différentes. */
-  #loyalty-section .card { margin-bottom: 12px; }
-  #loyalty-section .card .big { font-size: 24px; }
-  #loyalty-section .card .lbl { font-size: 12.5px; }
+  .card-info .card-points-block { text-align: right; }
+  .card-info .big { font-size: 24px; font-weight: 700; letter-spacing: -.02em; }
+  .card-info .lbl { font-size: 12.5px; color: var(--grey); margin-top: 2px; }
+  #loyalty-section .card { background: none; padding: 0; border-radius: 0; margin-bottom: 12px; }
 
   /* Léger effet d'éclat qui balaie la carte une fois au chargement -
      purement décoratif, s'arrête de lui-même (animation non bouclée). */
@@ -124,74 +127,33 @@
     .card-shine { display: none; }
   }
 
-  /* Carte fidélité avec image de fond personnalisée (Réglages > Marketing)
-     - dégradé sombre superposé pour garder le texte blanc lisible peu
-     importe les couleurs de la photo choisie. */
-  #loyalty-section .card.has-bg {
-    position: relative; background-size: cover; background-position: center;
-    color: #fff; overflow: hidden;
-  }
-  #loyalty-section .card.has-bg::before {
-    content: ''; position: absolute; inset: 0;
-    background: linear-gradient(135deg, rgba(0,0,0,.6), rgba(0,0,0,.25));
-  }
-  #loyalty-section .card.has-bg > * { position: relative; z-index: 1; }
-  #loyalty-section .card.has-bg .lbl { color: rgba(255,255,255,.85); }
-  #loyalty-section .card.has-bg .card-logo { background-color: rgba(255,255,255,.15); }
-
   /* Cartes cadeaux (compte client) - même esprit "vraie carte" que la
      fidélité (logo à gauche, montant à droite, effet d'éclat), mais
      dégradé propre pour bien les distinguer visuellement. */
-  .gift-card {
-    position: relative; overflow: hidden; border-radius: 18px; padding: 18px; margin-bottom: 12px;
-    background: linear-gradient(135deg, #7c3aed, #db2777); color: #fff;
-  }
-  .gift-card .card-top-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
-  .gift-card .card-logo {
-    width: 44px; height: 44px; border-radius: 12px; background: rgba(255,255,255,.18); flex-shrink: 0;
-    background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center;
-  }
-  .gift-card .card-points-block { text-align: right; }
-  .gift-card .big { font-size: 24px; font-weight: 700; letter-spacing: -.02em; }
-  .gift-card .lbl { font-size: 12.5px; color: rgba(255,255,255,.85); margin-top: 2px; }
+  .gift-card { margin-bottom: 18px; }
   .gift-card .gift-code {
     margin-top: 14px; font-family: 'Courier New', monospace; font-size: 15px; font-weight: 700;
-    letter-spacing: .12em; background: rgba(255,255,255,.15); border-radius: 8px; padding: 8px 12px;
-    text-align: center; color: rgba(255,255,255,.85);
+    letter-spacing: .12em; background: var(--fill); border-radius: 8px; padding: 8px 12px;
+    text-align: center; color: var(--ink);
   }
   .gift-card .gift-use-btn {
-    display: block; width: 100%; margin-top: 10px; background: #fff; color: #7c3aed; border: none;
+    display: block; width: 100%; margin-top: 10px; background: var(--accent); color: #fff; border: none;
     border-radius: 10px; padding: 11px; font-family: inherit; font-size: 14.5px; font-weight: 700; cursor: pointer;
   }
   .gift-card .gift-use-btn:active { transform: scale(.98); }
   .gift-card .gift-walkin-note {
     display: flex; align-items: center; justify-content: center; gap: 8px; text-align: center;
-    margin-top: 10px; background: rgba(255,255,255,.15); color: #fff;
+    margin-top: 10px; background: var(--fill); color: var(--ink);
     border-radius: 10px; padding: 11px; font-size: 13px; font-weight: 600; line-height: 1.35;
   }
   .gift-card .gift-walkin-note svg { flex-shrink: 0; }
-  .gift-card.used {
-    background: var(--fill); color: var(--grey); filter: grayscale(1); opacity: .7;
-  }
-  .gift-card.used .lbl, .gift-card.used .gift-code { color: var(--grey); }
-  .gift-card.used .card-logo { background: var(--card); }
+  .gift-card.used { filter: grayscale(1); opacity: .7; }
   .gift-card .used-badge { font-size: 11.5px; margin-top: 8px; text-align: center; }
-  .gift-items { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
+  .gift-items { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 0; }
   .gift-item-chip {
-    font-size: 11.5px; font-weight: 600; background: rgba(255,255,255,.18);
+    font-size: 11.5px; font-weight: 600; background: var(--fill);
     border-radius: 999px; padding: 4px 10px;
   }
-  .gift-card.used .gift-item-chip { background: var(--card); }
-
-  /* Carte cadeau avec image de fond personnalisée (Réglages > Marketing)
-     - dégradé sombre superposé par-dessus la photo, même principe que la
-     carte de fidélité, pour garder le texte blanc toujours lisible. */
-  .gift-card.has-bg { background-size: cover; background-position: center; }
-  .gift-card.has-bg::before {
-    content: ''; position: absolute; inset: 0;
-    background: linear-gradient(135deg, rgba(0,0,0,.55), rgba(0,0,0,.25));
-  }
-  .gift-card.has-bg > * { position: relative; z-index: 1; }
   .gift-badge { display: inline-block; margin-top: 10px; background: var(--orange, #f97316);
                 color: #fff; font-size: 13px; font-weight: 600; padding: 5px 12px; border-radius: 999px; }
 
@@ -446,15 +408,17 @@
     <div id="loyalty-section">
       <div class="eyebrow">Fidélité</div>
       <div class="card">
-        <div class="card-shine"></div>
-        <div class="card-top-row">
-          <div class="card-logo" id="loyalty-card-logo"></div>
-          <div class="card-points-block">
-            <div class="big" id="loyalty-points">0</div>
-            <div class="lbl">points de fidélité</div>
+        <div class="card-art" id="loyalty-card-art"><div class="card-shine"></div></div>
+        <div class="card-info">
+          <div class="card-top-row">
+            <div class="card-logo" id="loyalty-card-logo"></div>
+            <div class="card-points-block">
+              <div class="big" id="loyalty-points">0</div>
+              <div class="lbl">points de fidélité</div>
+            </div>
           </div>
+          <div id="loyalty-gift"></div>
         </div>
-        <div id="loyalty-gift"></div>
       </div>
     </div>
     <div id="loyalty-inactive-msg" class="msg" style="display:none">
@@ -974,7 +938,8 @@ function renderGiftCards(giftCards) {
         }).join('') + '</div>'
       : '';
     return '<div class="gift-card">' +
-      '<div class="card-shine"></div>' +
+      '<div class="card-art"><div class="card-shine"></div></div>' +
+      '<div class="card-info">' +
       '<div class="card-top-row">' +
         '<div class="card-logo" id="gift-card-logo-' + g.id + '">🎁</div>' +
         '<div class="card-points-block">' +
@@ -987,6 +952,7 @@ function renderGiftCards(giftCards) {
       (g.pending
         ? '<div class="gift-walkin-note"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>Un rendez-vous est déjà en attente avec ce cadeau</div>'
         : '<button class="gift-use-btn" onclick="useGiftFromAccount(this, \'' + esc(g.code) + '\')">Utiliser ce cadeau</button>') +
+      '</div>' +
     '</div>';
   }).join('');
 
@@ -1008,9 +974,9 @@ var currentGiftCardImageForCards = '';
  */
 function applyGiftCardDesign() {
   document.querySelectorAll('.gift-card:not(.used)').forEach(function (card) {
-    if (currentGiftCardImageForCards) {
-      card.classList.add('has-bg');
-      card.style.backgroundImage = 'url("' + currentGiftCardImageForCards + '")';
+    var art = card.querySelector('.card-art');
+    if (art && currentGiftCardImageForCards) {
+      art.style.backgroundImage = 'url("' + currentGiftCardImageForCards + '")';
     }
     var logo = card.querySelector('.card-logo');
     if (logo && currentSalonLogoForCards) {
@@ -1559,10 +1525,9 @@ function guardMissingSalon() {
             glowIcon.innerHTML = '';
           }
         }
-        var loyaltyCard = document.querySelector('#loyalty-section .card');
-        if (loyaltyCard && d.loyalty_card_image_url) {
-          loyaltyCard.classList.add('has-bg');
-          loyaltyCard.style.backgroundImage = 'url("' + d.loyalty_card_image_url + '")';
+        var loyaltyArt = document.getElementById('loyalty-card-art');
+        if (loyaltyArt && d.loyalty_card_image_url) {
+          loyaltyArt.style.backgroundImage = 'url("' + d.loyalty_card_image_url + '")';
         }
         var loyaltyLogo = document.getElementById('loyalty-card-logo');
         if (loyaltyLogo && d.logo_url) {

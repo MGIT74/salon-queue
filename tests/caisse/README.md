@@ -105,4 +105,5 @@ node tests/caisse/71-categories-catalogue.js  # Catalogue : categories (familles
 node tests/caisse/72-fidelite-creation-compte.js  # Fidelite : carte activee des la 1re reservation en ligne
 node tests/caisse/73-stats-coiffeur-tout-encaissement.js  # Stats coiffeur : tout l encaissement a son nom
 node tests/caisse/74-timeline-heure-sur-bloc.js  # Timeline : heure du rdv sur le bloc
+node tests/caisse/75-cartes-compte-infos-hors-visuel.js  # Compte client : infos hors du visuel des cartes
 ```
