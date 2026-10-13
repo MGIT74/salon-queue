@@ -10,4 +10,7 @@ check('bloc : span tb-time avant le nom', /<span class="tb-time">' \+ esc\(time\
 check('CSS .tb-time presente', /\.timeline-block \.tb-time\s*\{/.test(html));
 check('CSS .tb-name tronque proprement', /\.timeline-block \.tb-name\s*\{[^}]*text-overflow:\s*ellipsis/.test(html));
 check('bloc en colonne (heure au-dessus du nom)', /\.timeline-block\s*\{[^}]*flex-direction:\s*column/.test(html));
+const cx = fs.readFileSync(path.join(__dirname, '../../public/caisse.html'), 'utf8');
+check('caisse (Agenda) : heure sur le bloc, au-dessus du nom', /<span class="tb-time">' \+ esc\(it\.timeLabel\) \+ '<\/span><span class="tb-name">' \+ esc\(it\.clientName\)/.test(cx));
+check('caisse : CSS tb-time + bloc en colonne', /\.timeline-block \.tb-time\s*\{/.test(cx) && /\.timeline-block\s*\{[^}]*flex-direction:\s*column/.test(cx));
 console.log('\n' + pass + ' OK, ' + fail + ' ECHEC'); process.exit(fail ? 1 : 0);
