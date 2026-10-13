@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const { pool, getSettings } = require('../db');
 const { hashPassword, verifyPassword } = require('../lib/password');
 const { sendClientVerificationEmail, sendClientPasswordReset } = require('../lib/mailer');
+const { activateOnAccountCreation } = require('../lib/loyalty');
 const { clientKey } = require('../lib/queueMath');
 const { loginRateLimiter, signupRateLimiter } = require('../middleware/rateLimiter');
 const { nowParisDatetimeString } = require('./appointments');
@@ -74,6 +75,14 @@ router.post('/signup', signupRateLimiter('client-signup'), wrap(async (req, res)
   } catch (err) {
     emailSent = false;
     console.error('[client signup] envoi email échoué:', err.message);
+  }
+
+  // Carte de fidélité créée et activée d'office avec le compte (plus besoin de la
+  // faire activer à la caisse). Une erreur ici ne doit jamais faire échouer l'inscription.
+  try {
+    await activateOnAccountCreation(salonId, { client_name: name, email, phone });
+  } catch (err) {
+    console.error('[fidélité] activation à la création du compte échouée:', err.message);
   }
 
   res.json({ ok: true, needs_email_verification: true, email_sent: emailSent });

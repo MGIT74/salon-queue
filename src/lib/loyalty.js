@@ -1,12 +1,11 @@
 'use strict';
 
-// Fidélité : activation automatique à la PREMIÈRE réservation en ligne.
+// Fidélité : activation automatique à la CRÉATION DU COMPTE client en ligne.
 // Avant, la carte n'était activée qu'à la caisse, à la demande du coiffeur.
-// Désormais un client qui réserve en ligne pour la première fois (aucun
-// compte fidélité chez ce salon) reçoit sa carte tout de suite, avec l'email
-// d'activation habituel.
+// Désormais un client qui crée son compte (page de réservation) reçoit sa
+// carte tout de suite, avec l'email d'activation habituel.
 //
-// Ne touche JAMAIS à un compte déjà existant : un client dont la carte a été
+// Ne touche JAMAIS à une carte déjà existante : un client dont la carte a été
 // désactivée par l'admin (points conservés) n'est pas réactivé de force.
 
 const { pool, getOwnerSettings } = require('../db');
@@ -17,7 +16,7 @@ const { logActivity } = require('./activityLog');
 /**
  * @returns {Promise<boolean>} true si une carte vient d'être créée et activée.
  */
-async function activateOnFirstOnlineBooking(salonId, { client_name, email, phone }) {
+async function activateOnAccountCreation(salonId, { client_name, email, phone }) {
   const name = String(client_name || '').trim();
   const mail = String(email || '').trim();
   if (!name || !mail) return false;
@@ -40,12 +39,12 @@ async function activateOnFirstOnlineBooking(salonId, { client_name, email, phone
       [salon.owner_id, salonId, key, name, mail]
     );
   } catch (err) {
-    // Deux réservations simultanées du même client : la seconde trouve la carte déjà créée.
+    // Deux inscriptions simultanées du même client : la seconde trouve la carte déjà créée.
     if (err && err.code === 'ER_DUP_ENTRY') return false;
     throw err;
   }
 
-  logActivity(salonId, 'loyalty_activate', 'Carte de fidélité activée automatiquement (première réservation en ligne) : ' + name);
+  logActivity(salonId, 'loyalty_activate', 'Carte de fidélité activée automatiquement (création du compte client) : ' + name);
 
   try {
     const settings = await getOwnerSettings(salon.owner_id);
@@ -57,4 +56,4 @@ async function activateOnFirstOnlineBooking(salonId, { client_name, email, phone
   return true;
 }
 
-module.exports = { activateOnFirstOnlineBooking };
+module.exports = { activateOnAccountCreation };
