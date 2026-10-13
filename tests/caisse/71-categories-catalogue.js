@@ -15,7 +15,7 @@ check('API : category_id accepte a la creation, modification et en groupe', (cat
 check('API : categorie d\'un autre type/salon refusee', /kind = \?'/.test(cat) && /Catégorie inconnue/.test(cat));
 check('automation : produits -> nom de la categorie', /COALESCE\(c\.name, p\.category\) AS category/.test(auto));
 check('dashboard : pastilles de filtre + gerer les categories', /renderCatChips/.test(dash) && /\+ Créer des catégories/.test(dash) && /Gérer les catégories/.test(dash));
-check('dashboard : fenetre de gestion des categories', /id="sheet-catcats"/.test(dash) && /saveCatManager/.test(dash));
+check('dashboard : fenetre de gestion des categories (champ style .fld)', /id="sheet-catcats"/.test(dash) && /saveCatManager/.test(dash) && /class="fld" style="flex:1;margin:0"><input type="text" class="cm-name"/.test(dash));
 check('dashboard : menu Categorie dans la fiche article et en modification groupee', /id="sc-cat"/.test(dash) && /id="cb-cat"/.test(dash) && /body\.category_id = document\.getElementById\('sc-cat'\)\.value/.test(dash));
 check('dashboard : la recherche couvre aussi la categorie', /catName\(table, x\.category_id\), x\.barcode/.test(dash));
 check('caisse : pastilles de categories au-dessus de la grille', /id="item-cats"/.test(caisse) && /function renderItemCats\(\)/.test(caisse) && /renderItemCats\(\);\s*var items = catalog\[currentCat\]/.test(caisse));
