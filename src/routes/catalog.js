@@ -3,6 +3,7 @@ const { pool } = require('../db');
 const requireAdmin = require('../middleware/auth');
 const { logActivity } = require('../lib/activityLog');
 const { wrap } = require('../lib/wrap');
+const crypto = require('crypto');
 const { annotateItems, normalizeVatRateId } = require('../lib/vat');
 
 const router = express.Router();
@@ -23,6 +24,67 @@ const SAFE_IMAGE_URL = /^(data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=]
 function isSafeImageUrl(url) {
   return typeof url === 'string' && SAFE_IMAGE_URL.test(url);
 }
+
+
+// ---- Catégories (familles d'articles) ----
+const KINDS = ['services', 'extras', 'products'];
+
+/** '' -> null ; id d'une catégorie de CE type et CE salon -> id ; sinon false. */
+async function normalizeCategoryId(salonId, kind, value) {
+  if (value === undefined) return undefined;
+  if (value === null || value === '') return null;
+  const [[row]] = await pool.query('SELECT id FROM catalog_categories WHERE id = ? AND salon_id = ? AND kind = ?', [String(value), salonId, kind]);
+  return row ? row.id : false;
+}
+
+// Liste (publique comme le catalogue : la caisse et la borne en ont besoin)
+router.get('/categories', wrap(async (req, res) => {
+  const [rows] = await pool.query('SELECT id, kind, name, sort_order FROM catalog_categories WHERE salon_id = ? ORDER BY sort_order, name', [req.salon.id]);
+  const out = { services: [], extras: [], products: [] };
+  rows.forEach((r) => { if (out[r.kind]) out[r.kind].push({ id: r.id, name: r.name }); });
+  res.json({ ok: true, categories: out });
+}));
+
+// Remplace la liste d'un type : { categories: [{ id?, name }] }. Une catégorie retirée
+// de la liste est supprimée ; ses articles repassent « sans catégorie ».
+router.put('/categories/:kind', requireAdmin, wrap(async (req, res) => {
+  const kind = req.params.kind;
+  if (!KINDS.includes(kind)) return res.status(404).json({ error: 'Type inconnu' });
+  const input = Array.isArray(req.body.categories) ? req.body.categories : null;
+  if (!input) return res.status(400).json({ error: 'Liste invalide' });
+  if (input.length > 50) return res.status(400).json({ error: '50 catégories maximum' });
+  const names = new Set();
+  const clean = [];
+  for (const c of input) {
+    const name = String(c.name || '').trim().slice(0, 100);
+    if (!name) return res.status(400).json({ error: 'Chaque catégorie doit avoir un nom' });
+    const key = name.toLowerCase();
+    if (names.has(key)) return res.status(400).json({ error: 'Deux catégories portent le même nom : « ' + name + ' »' });
+    names.add(key);
+    clean.push({ id: typeof c.id === 'string' ? c.id : null, name });
+  }
+  const [existing] = await pool.query('SELECT id FROM catalog_categories WHERE salon_id = ? AND kind = ?', [req.salon.id, kind]);
+  const existingIds = new Set(existing.map((r) => r.id));
+  const keep = new Set();
+  const finalList = clean.map((c) => {
+    const id = c.id && existingIds.has(c.id) && !keep.has(c.id) ? c.id : crypto.randomUUID();
+    keep.add(id);
+    return { id, name: c.name };
+  });
+  for (let i = 0; i < finalList.length; i++) {
+    await pool.query(
+      'INSERT INTO catalog_categories (id, salon_id, kind, name, sort_order) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE name = VALUES(name), sort_order = VALUES(sort_order)',
+      [finalList[i].id, req.salon.id, kind, finalList[i].name, i]
+    );
+  }
+  const removed = existing.map((r) => r.id).filter((id) => !keep.has(id));
+  if (removed.length) {
+    await pool.query(`UPDATE ${kind} SET category_id = NULL WHERE salon_id = ? AND category_id IN (?)`, [req.salon.id, removed]);
+    await pool.query('DELETE FROM catalog_categories WHERE salon_id = ? AND kind = ? AND id IN (?)', [req.salon.id, kind, removed]);
+  }
+  logActivity(req.salon.id, 'catalog_categories', 'Catégories (' + TABLE_LABEL[kind].toLowerCase() + 's) : ' + (finalList.map((c) => c.name).join(', ') || 'aucune'));
+  res.json({ ok: true, categories: finalList });
+}));
 
 function slugify(str) {
   return String(str)
@@ -96,11 +158,14 @@ async function uniqueId(table, base) {
     const { salon } = req;
     const vatId = await normalizeVatRateId(salon.id, req.body.vat_rate_id);
     if (vatId === false) return res.status(400).json({ error: 'Taux de TVA inconnu' });
+    const catId = await normalizeCategoryId(salon.id, table, req.body.category_id);
+    if (catId === false) return res.status(400).json({ error: 'Catégorie inconnue' });
     const rank = sort_order !== undefined && sort_order !== null && sort_order !== '' ? Number(sort_order) || 0 : await nextSortOrder(table, salon.id);
     await pool.query(
       `INSERT INTO ${table} (id, salon_id, name, duration_min, price_cents, sort_order, vat_rate_id) VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [id, salon.id, name, Number(duration_min) || 0, Number(price_cents) || 0, rank, vatId === undefined ? null : vatId]
     );
+    if (catId) await pool.query(`UPDATE ${table} SET category_id = ? WHERE id = ?`, [catId, id]);
     const [[item]] = await pool.query(`SELECT * FROM ${table} WHERE id = ?`, [id]);
     logActivity(salon.id, 'catalog_create', TABLE_LABEL[table] + ' "' + name + '" créée');
     res.json({ ok: true, item });
@@ -124,6 +189,11 @@ async function uniqueId(table, base) {
       const vatId = await normalizeVatRateId(req.salon.id, req.body.vat_rate_id);
       if (vatId === false) return res.status(400).json({ error: 'Taux de TVA inconnu' });
       sets.push('vat_rate_id = ?'); params.push(vatId);
+    }
+    if (req.body.category_id !== undefined) {
+      const catId = await normalizeCategoryId(req.salon.id, table, req.body.category_id);
+      if (catId === false) return res.status(400).json({ error: 'Catégorie inconnue' });
+      sets.push('category_id = ?'); params.push(catId);
     }
     if (!sets.length) return res.json({ ok: true });
 
@@ -172,6 +242,8 @@ router.post('/products', requireAdmin, wrap(async (req, res) => {
   const barcode = req.body.barcode ? String(req.body.barcode).trim().slice(0, 64) || null : null;
   const vatId = await normalizeVatRateId(req.salon.id, req.body.vat_rate_id);
   if (vatId === false) return res.status(400).json({ error: 'Taux de TVA inconnu' });
+  const catId = await normalizeCategoryId(req.salon.id, 'products', req.body.category_id);
+  if (catId === false) return res.status(400).json({ error: 'Catégorie inconnue' });
   const id = await uniqueId('products', slugify(name));
   try {
     await pool.query(
@@ -182,6 +254,7 @@ router.post('/products', requireAdmin, wrap(async (req, res) => {
     if (err.code === 'ER_DUP_ENTRY') return res.status(400).json({ error: 'Ce code-barres est déjà utilisé par un autre produit' });
     throw err;
   }
+  if (catId) await pool.query('UPDATE products SET category_id = ? WHERE id = ?', [catId, id]);
   const [[item]] = await pool.query('SELECT * FROM products WHERE id = ?', [id]);
   logActivity(req.salon.id, 'catalog_create', 'Produit "' + name + '" créé');
   res.json({ ok: true, item });
@@ -211,6 +284,11 @@ router.put('/products/:id', requireAdmin, wrap(async (req, res) => {
     const vatId = await normalizeVatRateId(req.salon.id, req.body.vat_rate_id);
     if (vatId === false) return res.status(400).json({ error: 'Taux de TVA inconnu' });
     sets.push('vat_rate_id = ?'); params.push(vatId);
+  }
+  if (req.body.category_id !== undefined) {
+    const catId = await normalizeCategoryId(req.salon.id, 'products', req.body.category_id);
+    if (catId === false) return res.status(400).json({ error: 'Catégorie inconnue' });
+    sets.push('category_id = ?'); params.push(catId);
   }
   if (!sets.length) return res.json({ ok: true });
 
@@ -292,6 +370,12 @@ async function removeCatalogItem(table, salonId, itemId) {
         const vatId = await normalizeVatRateId(salonId, req.body.vat_rate_id);
         if (!vatId) return res.status(400).json({ error: 'Taux de TVA inconnu' });
         sets.push('vat_rate_id = ?'); params.push(vatId);
+      }
+      if (req.body.category_id !== undefined) {
+        // '__none' = retirer la catégorie ; autre valeur = une catégorie existante de ce type.
+        const catId = req.body.category_id === '__none' ? null : await normalizeCategoryId(salonId, table, req.body.category_id);
+        if (catId === false || catId === undefined) return res.status(400).json({ error: 'Catégorie inconnue' });
+        sets.push('category_id = ?'); params.push(catId);
       }
       if (req.body.price_cents !== undefined && req.body.price_cents !== null && req.body.price_cents !== '') {
         const price = Math.round(Number(req.body.price_cents));

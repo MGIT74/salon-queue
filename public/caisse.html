@@ -715,6 +715,7 @@
           <button data-cat="extras">Suppléments</button>
           <button data-cat="products">Produits</button>
         </div>
+        <div id="item-cats" style="display:none;gap:8px;flex-wrap:wrap;margin:0 0 10px"></div>
         <div class="item-grid" id="item-grid"></div>
       </div>
 
@@ -2903,8 +2904,10 @@ function loadCatalog() {
   Promise.all([
     barberApi('/api/catalog/services'),
     barberApi('/api/catalog/extras'),
-    barberApi('/api/catalog/products')
+    barberApi('/api/catalog/products'),
+    barberApi('/api/catalog/categories').catch(function () { return { categories: catalogCategories }; })
   ]).then(function (r) {
+    catalogCategories = r[3].categories || catalogCategories;
     catalog.services = r[0].items;
     catalog.extras = r[1].items;
     catalog.products = r[2].items;
@@ -3179,8 +3182,44 @@ function iconForItem(name) {
   return currentCat === 'products' ? '🛍️' : '✂️';
 }
 
+// Familles d'articles (créées dans l'administration) : une rangée de pastilles au-dessus de la grille,
+// seulement si le type affiché (prestations, suppléments, produits) a des catégories.
+var catalogCategories = { services: [], extras: [], products: [] };
+var caisseCatFilter = { services: '', extras: '', products: '' };
+
+function renderItemCats() {
+  var box = document.getElementById('item-cats');
+  if (!box) return;
+  var cats = catalogCategories[currentCat] || [];
+  var all = catalog[currentCat] || [];
+  if (!cats.length) { box.style.display = 'none'; box.innerHTML = ''; caisseCatFilter[currentCat] = ''; return; }
+  var f = caisseCatFilter[currentCat];
+  if (f && f !== '__none' && !cats.some(function (c) { return c.id === f; })) f = caisseCatFilter[currentCat] = '';
+  var chip = function (value, label, n) {
+    return '<button type="button" class="' + (f === value ? 'on' : '') + '" data-catid="' + esc(value) + '" ' +
+      'style="padding:7px 16px;border-radius:999px;border:1px solid var(--line, #d8d8d8);background:' + (f === value ? 'var(--ink, #111)' : 'var(--card, #fff)') + ';color:' + (f === value ? '#fff' : 'inherit') + ';font:inherit;font-size:14px;cursor:pointer">' +
+      esc(label) + ' <span style="opacity:.6">' + n + '</span></button>';
+  };
+  var html = chip('', 'Toutes', all.length);
+  cats.forEach(function (c) { html += chip(c.id, c.name, all.filter(function (x) { return x.category_id === c.id; }).length); });
+  var none = all.filter(function (x) { return !x.category_id; }).length;
+  if (none) html += chip('__none', 'Sans catégorie', none);
+  box.innerHTML = html;
+  box.style.display = 'flex';
+  [].forEach.call(box.querySelectorAll('button'), function (b) {
+    b.onclick = function () {
+      var v = b.getAttribute('data-catid');
+      caisseCatFilter[currentCat] = caisseCatFilter[currentCat] === v ? '' : v;
+      renderItemGrid();
+    };
+  });
+}
+
 function renderItemGrid() {
+  renderItemCats();
   var items = catalog[currentCat] || [];
+  var cf = caisseCatFilter[currentCat];
+  if (cf) items = items.filter(function (x) { return cf === '__none' ? !x.category_id : x.category_id === cf; });
   var typeSingular = currentCat === 'services' ? 'service' : (currentCat === 'extras' ? 'extra' : 'product');
   var grid = document.getElementById('item-grid');
   if (items.length === 0) { grid.innerHTML = '<div class="empty">Rien à afficher ici</div>'; return; }

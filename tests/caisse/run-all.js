@@ -90,7 +90,8 @@ const suite = [
   ['67-tva-nommees-par-article.js', false, ['exit']],
   ['68-catalogue-selection-multiple.js', false, ['exit']],
   ['69-catalogue-recherche.js', false, ['exit']],
-  ['70-apres-cloture-ecran-depart.js', false, ['exit']]
+  ['70-apres-cloture-ecran-depart.js', false, ['exit']],
+  ['71-categories-catalogue.js', false, ['exit']]
 ];
 
 let bad = 0;

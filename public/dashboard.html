@@ -2444,6 +2444,7 @@
         <div class="fld" id="sc-dur-fld"><label for="sc-dur">Durée (minutes)</label><input id="sc-dur" type="number" min="0" value="30"></div>
         <div class="fld"><label for="sc-price" id="sc-price-label">Prix (€)</label><input id="sc-price" type="number" min="0" step="0.5" value="20"></div>
       </div>
+      <div class="fld" id="sc-cat-fld"><label for="sc-cat">Catégorie</label><select id="sc-cat"></select></div>
       <div class="fld" id="sc-vat-fld"><label for="sc-vat">TVA</label><select id="sc-vat"></select></div>
       <div class="fld" id="sc-stock-toggle-fld" style="display:none">
         <label style="display:flex;align-items:center;gap:8px;font-weight:400;cursor:pointer">
@@ -2463,11 +2464,25 @@
   </div>
 </div>
 
+<div class="backdrop" id="sheet-catcats" onclick="if(event.target===this) closeSheet('sheet-catcats')">
+  <div class="sheet">
+    <div class="sheet-head"><h2 id="cm-title">Catégories</h2>
+      <button class="x" onclick="closeSheet('sheet-catcats')">✕</button></div>
+    <div class="sheet-body">
+      <p class="hint" style="margin-top:0">Regroupez les articles d'une même famille (par exemple « Coupes », « Barbe », « Soins »). Supprimer une catégorie ne supprime pas ses articles : ils passent « sans catégorie ».</p>
+      <div id="cm-list"></div>
+      <button type="button" class="btn btn-ghost" onclick="addCatManagerRow()">+ Ajouter une catégorie</button>
+    </div>
+    <div class="sheet-foot"><button class="btn btn-primary" onclick="saveCatManager()">Enregistrer</button></div>
+  </div>
+</div>
+
 <div class="backdrop" id="sheet-catbulk" onclick="if(event.target===this) closeSheet('sheet-catbulk')">
   <div class="sheet">
     <div class="sheet-head"><h2 id="cb-title">Modifier la sélection</h2>
       <button class="x" onclick="closeSheet('sheet-catbulk')">✕</button></div>
     <div class="sheet-body">
+      <div class="fld"><label for="cb-cat">Catégorie</label><select id="cb-cat"></select></div>
       <div class="fld"><label for="cb-vat">TVA</label><select id="cb-vat"></select></div>
       <div class="fld"><label for="cb-price" id="cb-price-label">Nouveau prix</label><input id="cb-price" type="number" min="0" step="0.5" placeholder="Inchangé"></div>
       <p class="hint" style="margin-top:4px">S'applique à tous les éléments cochés.</p>
@@ -3318,8 +3333,10 @@ function loadCatalog() {
     api('/api/catalog/services?all=1'),
     api('/api/catalog/extras?all=1'),
     api('/api/catalog/products?all=1'),
-    api('/api/settings/vat-rates').catch(function () { return { rates: vatRatesList }; })
+    api('/api/settings/vat-rates').catch(function () { return { rates: vatRatesList }; }),
+    api('/api/catalog/categories').catch(function () { return { categories: catCategories }; })
   ]).then(function (r) {
+    catCategories = r[4].categories || catCategories;
     services = r[0].items; extras = r[1].items; products = r[2].items;
     vatRatesList = r[3].rates || vatRatesList;
     renderCatalog('services'); renderCatalog('extras'); renderCatalog('products');
@@ -3929,6 +3946,13 @@ function saveQueueSheet() {
 
 /* ============ Catalogue ============ */
 var catSearch = { services: '', extras: '', products: '' };
+var catCategories = { services: [], extras: [], products: [] };   // familles d'articles, par type
+var catFilter = { services: '', extras: '', products: '' };       // '' = toutes, '__none' = sans catégorie, sinon id
+
+function catName(table, id) {
+  var c = (catCategories[table] || []).find(function (x) { return x.id === id; });
+  return c ? c.name : '';
+}
 
 function catNorm(v) {
   return String(v || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -3937,10 +3961,14 @@ function catNorm(v) {
 /** Articles visibles : filtre par nom, catégorie, code-barres ou TVA (sans tenir compte des accents ni des majuscules). */
 function catVisible(table) {
   var q = catNorm(catSearch[table]).trim();
-  var all = catList(table);
+  var f = catFilter[table];
+  var all = catList(table).filter(function (x) {
+    if (!f) return true;
+    return f === '__none' ? !x.category_id : x.category_id === f;
+  });
   if (!q) return all;
   return all.filter(function (x) {
-    return catNorm([x.name, x.category, x.barcode, x.vat_rate_name].join(' ')).indexOf(q) !== -1;
+    return catNorm([x.name, catName(table, x.category_id), x.barcode, x.vat_rate_name].join(' ')).indexOf(q) !== -1;
   });
 }
 
@@ -3962,15 +3990,16 @@ function renderCatalog(table) {
   var full = catList(table);
   ensureCatSearch(table);
   var list = catVisible(table);
-  var filtering = Boolean(catNorm(catSearch[table]).trim());
+  var filtering = Boolean(catNorm(catSearch[table]).trim()) || Boolean(catFilter[table]);
   document.getElementById(table + '-list').classList.toggle('cat-filtering', filtering);
   document.getElementById(table + '-list').innerHTML = full.length === 0
     ? '<div class="empty">Rien pour le moment</div>'
-    : list.length === 0 ? '<div class="empty">Aucun résultat pour « ' + esc(catSearch[table]) + ' »</div>'
+    : list.length === 0 ? '<div class="empty">Aucun résultat' + (catSearch[table] ? ' pour « ' + esc(catSearch[table]) + ' »' : '') + '</div>'
     : list.map(function (x) {
         var meta = table === 'products'
           ? eur(x.price_cents) + (x.stock_enabled ? ' · ' + (x.stock_quantity > 0 ? x.stock_quantity + ' en stock' : 'rupture de stock') : ' · illimité')
           : formatMinutes(x.duration_min) + ' · ' + (table === 'extras' ? '+ ' : '') + eur(x.price_cents);
+        if (x.category_id && catName(table, x.category_id)) meta += ' · ' + catName(table, x.category_id);
         if (x.vat_rate_name) meta += ' · ' + x.vat_rate_name;
         var photoStyle = x.image_url ? 'background:url(&quot;' + esc(x.image_url) + '&quot;) center/cover' : '';
         return '<div class="item' + (x.active ? '' : ' off') + '" data-id="' + x.id + '">' +
@@ -3994,10 +4023,104 @@ function renderCatalog(table) {
           '</div></div>';
       }).join('');
   initCatalogSort(table);
+  renderCatChips(table);
   renderCatBulk(table);
 }
 
+/* ---- Catégories (familles d'articles) ---- */
+function renderCatChips(table) {
+  var list = document.getElementById(table + '-list');
+  if (!list) return;
+  var box = document.getElementById(table + '-chips');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = table + '-chips';
+    box.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 10px';
+    var anchor = document.getElementById(table + '-search');
+    list.parentNode.insertBefore(box, anchor ? anchor.nextSibling : list);
+  }
+  var cats = catCategories[table] || [];
+  var items = catList(table);
+  var chip = function (value, label, n) {
+    var on = catFilter[table] === value;
+    return '<button type="button" class="btn ' + (on ? 'btn-primary' : 'btn-soft') + '" style="padding:6px 14px;font-size:13.5px;border-radius:999px" ' +
+      'onclick="setCatFilter(\'' + table + '\',\'' + value + '\')">' + esc(label) + ' <span style="opacity:.65">' + n + '</span></button>';
+  };
+  var html = '';
+  if (cats.length) {
+    html += chip('', 'Toutes', items.length);
+    cats.forEach(function (c) { html += chip(c.id, c.name, items.filter(function (x) { return x.category_id === c.id; }).length); });
+    var none = items.filter(function (x) { return !x.category_id; }).length;
+    if (none) html += chip('__none', 'Sans catégorie', none);
+  }
+  html += '<button type="button" class="btn btn-ghost" style="padding:6px 14px;font-size:13.5px" onclick="openCatManager(\'' + table + '\')">' +
+    (cats.length ? 'Gérer les catégories' : '+ Créer des catégories') + '</button>';
+  box.innerHTML = html;
+}
+
+function setCatFilter(table, value) {
+  catFilter[table] = catFilter[table] === value ? '' : value;
+  renderCatalog(table);
+}
+
+var catManagerTable = null, catManagerRows = [];
+
+function openCatManager(table) {
+  catManagerTable = table;
+  catManagerRows = (catCategories[table] || []).map(function (c) { return { id: c.id, name: c.name }; });
+  if (!catManagerRows.length) catManagerRows.push({ id: null, name: '' });
+  var label = table === 'services' ? 'prestations' : (table === 'extras' ? 'suppléments' : 'produits');
+  document.getElementById('cm-title').textContent = 'Catégories des ' + label;
+  renderCatManager();
+  document.getElementById('sheet-catcats').classList.add('on');
+  _lockBodyScroll();
+}
+
+function renderCatManager() {
+  document.getElementById('cm-list').innerHTML = catManagerRows.map(function (c, i) {
+    return '<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">' +
+      '<input type="text" class="cm-name" maxlength="100" placeholder="Ex : Coupes, Barbe, Soins…" value="' + esc(c.name) + '" style="flex:1" onkeydown="if(event.key===\'Enter\'){event.preventDefault();addCatManagerRow();}">' +
+      '<button type="button" class="btn btn-ghost" style="color:var(--red)" onclick="removeCatManagerRow(' + i + ')">Supprimer</button></div>';
+  }).join('');
+}
+
+function readCatManager() {
+  var inputs = [].slice.call(document.querySelectorAll('#cm-list .cm-name'));
+  return inputs.map(function (el, i) { return { id: (catManagerRows[i] || {}).id || null, name: el.value.trim() }; });
+}
+
+function addCatManagerRow() {
+  catManagerRows = readCatManager();
+  catManagerRows.push({ id: null, name: '' });
+  renderCatManager();
+  var inputs = document.querySelectorAll('#cm-list .cm-name');
+  inputs[inputs.length - 1].focus();
+}
+
+function removeCatManagerRow(i) {
+  catManagerRows = readCatManager();
+  catManagerRows.splice(i, 1);
+  renderCatManager();
+}
+
+function saveCatManager() {
+  var table = catManagerTable;
+  var rows = readCatManager().filter(function (r) { return r.name || r.id; });
+  for (var i = 0; i < rows.length; i++) {
+    if (!rows[i].name) { toast('Donnez un nom à chaque catégorie', true); return; }
+  }
+  api('/api/catalog/categories/' + table, { method: 'PUT', body: { categories: rows } })
+    .then(function () {
+      if (catFilter[table] && catFilter[table] !== '__none' && !rows.some(function (r) { return r.id === catFilter[table]; })) catFilter[table] = '';
+      closeSheet('sheet-catcats');
+      return loadCatalog();
+    })
+    .then(function () { toast('Catégories enregistrées'); })
+    .catch(function (e) { toast(e.message, true); });
+}
+
 /* ---- Sélection multiple (prestations, suppléments, produits) ---- */
+
 var catSel = { services: {}, extras: {}, products: {} };
 
 function catList(table) { return table === 'services' ? services : (table === 'extras' ? extras : products); }
@@ -4034,7 +4157,7 @@ function renderCatBulk(table) {
     '<label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer">' +
       '<input type="checkbox" style="width:18px;height:18px" ' + (allOn ? 'checked' : '') + ' onchange="toggleCatSelAll(\'' + table + '\',this.checked)"> ' +
       (n ? n + ' sélectionné' + (n > 1 ? 's' : '') : (catSearch[table] ? 'Tout sélectionner (résultats)' : 'Tout sélectionner')) + '</label>' +
-    (n ? '<button class="btn btn-soft" onclick="openCatBulkEdit(\'' + table + '\')">Modifier (TVA, prix)</button>' +
+    (n ? '<button class="btn btn-soft" onclick="openCatBulkEdit(\'' + table + '\')">Modifier (catégorie, TVA, prix)</button>' +
          '<button class="btn btn-ghost" onclick="catBulk(\'' + table + '\',\'archive\')">Archiver</button>' +
          '<button class="btn btn-ghost" onclick="catBulk(\'' + table + '\',\'restore\')">Réactiver</button>' +
          '<button class="btn btn-ghost btn-delete" onclick="catBulk(\'' + table + '\',\'delete\')">Supprimer</button>' : '') +
@@ -4069,6 +4192,9 @@ function openCatBulkEdit(table) {
   document.getElementById('cb-vat').innerHTML = '<option value="">— Ne pas changer —</option>' + vatRatesList.map(function (v) {
     return '<option value="' + esc(v.id) + '">' + esc(v.name) + ' (' + esc(String(v.rate)) + ' %)</option>';
   }).join('');
+  document.getElementById('cb-cat').innerHTML = '<option value="">— Ne pas changer —</option><option value="__none">Sans catégorie</option>' + (catCategories[table] || []).map(function (c) {
+    return '<option value="' + esc(c.id) + '">' + esc(c.name) + '</option>';
+  }).join('');
   document.getElementById('cb-price').value = '';
   document.getElementById('cb-price-label').textContent = 'Nouveau prix (' + (CURRENCY === 'CHF' ? 'CHF' : '€') + ') — vide = ne pas changer';
   document.getElementById('sheet-catbulk').classList.add('on');
@@ -4080,9 +4206,11 @@ function saveCatBulkEdit() {
   var body = { ids: catSelIds(table), action: 'edit' };
   var vat = document.getElementById('cb-vat').value;
   var price = document.getElementById('cb-price').value.trim();
+  var cat = document.getElementById('cb-cat').value;
+  if (cat) body.category_id = cat;
   if (vat) body.vat_rate_id = vat;
   if (price !== '') body.price_cents = Math.round(Number(price.replace(',', '.')) * 100);
-  if (!vat && price === '') { toast('Choisissez une TVA ou un prix à appliquer', true); return; }
+  if (!vat && !cat && price === '') { toast('Choisissez une catégorie, une TVA ou un prix à appliquer', true); return; }
   api('/api/catalog/' + table + '/bulk', { method: 'POST', body: body })
     .then(function () { closeSheet('sheet-catbulk'); catSel[table] = {}; return loadCatalog(); })
     .then(function () { toast('Modifié'); })
@@ -4141,6 +4269,11 @@ function openCatalogForm(table, id) {
     document.getElementById('sc-dur').value = item ? item.duration_min : (table === 'services' ? 30 : 10);
   }
 
+  var catSel2 = document.getElementById('sc-cat');
+  catSel2.innerHTML = '<option value="">— Sans catégorie —</option>' + (catCategories[table] || []).map(function (c) {
+    return '<option value="' + esc(c.id) + '">' + esc(c.name) + '</option>';
+  }).join('');
+  catSel2.value = item && item.category_id ? item.category_id : (catFilter[table] && catFilter[table] !== '__none' ? catFilter[table] : '');
   var vatSel = document.getElementById('sc-vat');
   vatSel.innerHTML = vatRatesList.map(function (v) {
     return '<option value="' + esc(v.id) + '">' + esc(v.name) + ' (' + esc(String(v.rate)) + ' %)</option>';
@@ -4169,6 +4302,7 @@ function saveCatalog() {
     name: name,
     price_cents: Math.round((Number(document.getElementById('sc-price').value) || 0) * 100)
   };
+  body.category_id = document.getElementById('sc-cat').value;
   var vatVal = document.getElementById('sc-vat').value;
   if (vatVal) body.vat_rate_id = vatVal;
   if (editingCat.table !== 'products') {

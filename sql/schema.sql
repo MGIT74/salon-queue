@@ -1231,3 +1231,36 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'sale_items' AND column_name = 'vat_rate');
 SET @sql := IF(@c = 0, "ALTER TABLE sale_items ADD COLUMN vat_rate DECIMAL(5,2) NULL", 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+
+-- Catégories du catalogue (familles d'articles) : une liste par type
+-- (services, extras, products), gérée par l'admin. Un article pointe vers
+-- sa catégorie (category_id), NULL = sans catégorie.
+CREATE TABLE IF NOT EXISTS catalog_categories (
+  id CHAR(36) PRIMARY KEY,
+  salon_id CHAR(36) NOT NULL,
+  kind VARCHAR(20) NOT NULL,
+  name VARCHAR(100) NOT NULL,
+  sort_order INT NOT NULL DEFAULT 0,
+  FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'services' AND column_name = 'category_id');
+SET @sql := IF(@c = 0, "ALTER TABLE services ADD COLUMN category_id CHAR(36) NULL", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'extras' AND column_name = 'category_id');
+SET @sql := IF(@c = 0, "ALTER TABLE extras ADD COLUMN category_id CHAR(36) NULL", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'products' AND column_name = 'category_id');
+SET @sql := IF(@c = 0, "ALTER TABLE products ADD COLUMN category_id CHAR(36) NULL", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Reprise de l'ancien texte libre products.category : une catégorie par
+-- valeur distincte (rejouable : rien n'est recréé si elle existe déjà).
+INSERT INTO catalog_categories (id, salon_id, kind, name, sort_order)
+SELECT UUID(), t.salon_id, 'products', t.cat, 0
+FROM (SELECT DISTINCT salon_id, TRIM(category) AS cat FROM products WHERE category IS NOT NULL AND TRIM(category) <> '') t
+WHERE NOT EXISTS (SELECT 1 FROM catalog_categories c WHERE c.salon_id = t.salon_id AND c.kind = 'products' AND c.name = t.cat);
+UPDATE products p JOIN catalog_categories c ON c.salon_id = p.salon_id AND c.kind = 'products' AND c.name = TRIM(p.category)
+SET p.category_id = c.id
+WHERE p.category_id IS NULL AND p.category IS NOT NULL AND TRIM(p.category) <> '';

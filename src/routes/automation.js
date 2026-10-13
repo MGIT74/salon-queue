@@ -334,7 +334,7 @@ router.get('/salons/:id/prices', requireAutomationKey, wrap(async (req, res) => 
   const [services, extras, products] = await Promise.all([
     pool.query('SELECT name, duration_min, price_cents FROM services WHERE salon_id = ? AND active = 1 ORDER BY sort_order', [salonId]),
     pool.query('SELECT name, duration_min, price_cents FROM extras WHERE salon_id = ? AND active = 1 ORDER BY sort_order', [salonId]),
-    pool.query('SELECT name, category, price_cents, stock_enabled, stock_quantity FROM products WHERE salon_id = ? AND active = 1 ORDER BY sort_order', [salonId])
+    pool.query('SELECT p.name, COALESCE(c.name, p.category) AS category, p.price_cents, p.stock_enabled, p.stock_quantity FROM products p LEFT JOIN catalog_categories c ON c.id = p.category_id WHERE p.salon_id = ? AND p.active = 1 ORDER BY p.sort_order', [salonId])
   ]);
 
   const fmt = (rows) => rows[0].map((r) => Object.assign({}, r, { price_euros: r.price_cents / 100 }));

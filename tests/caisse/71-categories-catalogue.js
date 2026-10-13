@@ -1,0 +1,23 @@
+// Categories (familles d'articles) pour prestations, supplements et produits : gestion admin, choix par article, filtre en caisse.
+const fs = require('fs'), path = require('path');
+const rd = (p) => fs.readFileSync(path.join(__dirname, '../..', p), 'utf8');
+const schema = rd('sql/schema.sql'), cat = rd('src/routes/catalog.js'), dash = rd('public/dashboard.html'), caisse = rd('public/caisse.html'), auto = rd('src/routes/automation.js');
+let pass = 0, fail = 0;
+const check = (n, ok) => { (ok ? pass++ : fail++); console.log((ok ? '  OK   ' : '  ECHEC') + ' ' + n); };
+check('schema : table catalog_categories (type, nom, ordre)', /CREATE TABLE IF NOT EXISTS catalog_categories[\s\S]{0,300}kind VARCHAR\(20\)[\s\S]{0,100}name VARCHAR\(100\)/.test(schema));
+['services', 'extras', 'products'].forEach((t) => check('schema : ' + t + '.category_id', new RegExp("table_name = '" + t + "' AND column_name = 'category_id'").test(schema)));
+check('migration : ancien texte products.category repris en categories', /INSERT INTO catalog_categories[\s\S]{0,400}FROM products/.test(schema) && /SET p\.category_id = c\.id/.test(schema));
+check('API : GET /categories (3 types)', /router\.get\('\/categories'/.test(cat));
+check('API : PUT /categories/:kind reserve a l\'admin', /router\.put\('\/categories\/:kind', requireAdmin/.test(cat));
+check('API : nom obligatoire, doublons refuses', /Chaque catégorie doit avoir un nom/.test(cat) && /même nom/.test(cat));
+check('API : supprimer une categorie -> articles « sans categorie »', /SET category_id = NULL WHERE salon_id = \? AND category_id IN/.test(cat));
+check('API : category_id accepte a la creation, modification et en groupe', (cat.match(/normalizeCategoryId/g) || []).length >= 6 && /'__none'/.test(cat));
+check('API : categorie d\'un autre type/salon refusee', /kind = \?'/.test(cat) && /Catégorie inconnue/.test(cat));
+check('automation : produits -> nom de la categorie', /COALESCE\(c\.name, p\.category\) AS category/.test(auto));
+check('dashboard : pastilles de filtre + gerer les categories', /renderCatChips/.test(dash) && /\+ Créer des catégories/.test(dash) && /Gérer les catégories/.test(dash));
+check('dashboard : fenetre de gestion des categories', /id="sheet-catcats"/.test(dash) && /saveCatManager/.test(dash));
+check('dashboard : menu Categorie dans la fiche article et en modification groupee', /id="sc-cat"/.test(dash) && /id="cb-cat"/.test(dash) && /body\.category_id = document\.getElementById\('sc-cat'\)\.value/.test(dash));
+check('dashboard : la recherche couvre aussi la categorie', /catName\(table, x\.category_id\), x\.barcode/.test(dash));
+check('caisse : pastilles de categories au-dessus de la grille', /id="item-cats"/.test(caisse) && /function renderItemCats\(\)/.test(caisse) && /renderItemCats\(\);\s*var items = catalog\[currentCat\]/.test(caisse));
+check('caisse : filtre applique a la grille', /x\.category_id === cf/.test(caisse));
+console.log('\n' + pass + ' OK, ' + fail + ' ECHEC'); process.exit(fail ? 1 : 0);

@@ -5,9 +5,9 @@ let pass = 0, fail = 0;
 const check = (n, ok) => { (ok ? pass++ : fail++); console.log((ok ? '  OK   ' : '  ECHEC') + ' ' + n); };
 check('recherche creee pour chaque liste (renderCatalog -> ensureCatSearch)', /function renderCatalog\(table\) \{\s*var full = catList\(table\);\s*ensureCatSearch\(table\)/.test(dash));
 check('champ de recherche sur la saisie', /type="search"/.test(dash) && /catSearch\[\\'' \+ table \+ '\\'\]=this\.value/.test(dash));
-check('filtre : nom, categorie, code-barres, TVA', /\[x\.name, x\.category, x\.barcode, x\.vat_rate_name\]/.test(dash));
+check('filtre : nom, categorie, code-barres, TVA', /\[x\.name, catName\(table, x\.category_id\), x\.barcode, x\.vat_rate_name\]/.test(dash));
 check('accents et majuscules ignores', /normalize\('NFD'\)/.test(dash));
-check('message "Aucun resultat"', /Aucun résultat pour/.test(dash));
+check('message "Aucun resultat"', /Aucun résultat/.test(dash));
 check('glisser-deposer masque pendant une recherche (ordre jamais enregistre sur une liste partielle)', /\.cat-filtering \.drag-handle \{ display: none; \}/.test(dash));
 check('tout selectionner = resultats affiches', /catVisible\(table\)\.forEach/.test(dash));
 // comportement du filtre

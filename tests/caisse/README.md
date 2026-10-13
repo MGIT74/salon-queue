@@ -101,4 +101,5 @@ node tests/caisse/67-tva-nommees-par-article.js  # TVA nommees (liste admin) cho
 node tests/caisse/68-catalogue-selection-multiple.js  # Catalogue : selection multiple (TVA, prix, archiver, supprimer)
 node tests/caisse/69-catalogue-recherche.js  # Catalogue : barre de recherche
 node tests/caisse/70-apres-cloture-ecran-depart.js  # Caisse : retour auto a l ecran de depart apres cloture
+node tests/caisse/71-categories-catalogue.js  # Catalogue : categories (familles) + filtre en caisse
 ```
