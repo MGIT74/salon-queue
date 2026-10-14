@@ -12,4 +12,5 @@ check('onglets existants conserves (Horaires, Prestations, Statistiques, Congés
 check('profil a droite : photo avec anneau, puces d\'etat, actions (renommer, photo, code, desactiver)', /class="bp-ring"/.test(dash) && /renameBarber\(/.test(dash) && /setBarberPin\(/.test(dash) && /archiveBarber\(/.test(dash));
 check('tout en bas : rangee des cartes de chaque coiffeur pour naviguer (courant surligne)', /class="bp-others"/.test(dash) && /barberCardHtml\(b, b\.id === cur\.id\)/.test(dash) && /\.bc\.cur \{/.test(dash));
 check('mobile : une colonne', /@media \(max-width: 980px\) \{\s*\.bp-layout \{ grid-template-columns: minmax\(0, 1fr\); \}/.test(dash));
+check('onglet rempli apres CHAQUE rendu (jamais bloque sur « Chargement… » apres un conge enregistre)', /populateBarberTab\(cur\.id\);\n\}/.test(dash) && /if \(barberLeaves\[id\]\) renderLeavesList\(id\); else loadBarberLeaves\(id\)/.test(dash));
 console.log('\n' + pass + ' OK, ' + fail + ' ECHEC'); process.exit(fail ? 1 : 0);

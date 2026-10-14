@@ -4703,20 +4703,28 @@ function renderBarbers() {
       '<h2 class="bp-title">' + esc(cur.name) + '</h2></div>' +
     renderBarberDetail(cur) + others;
   paintBarberKpis(cur.id);
+  populateBarberTab(cur.id);
+}
+
+// Remplit l'onglet affiché (Congés, Statistiques, Prestations) APRÈS chaque rendu de la fiche : renderBarbers() est aussi
+// rappelé ailleurs (rechargement des coiffeurs, fermeture de la bulle des congés...) et l'onglet ne doit jamais rester sur « Chargement… ».
+function populateBarberTab(id) {
+  var tab = barberDetailTab[id] || 'horaires';
+  if (tab === 'conges') { if (barberLeaves[id]) renderLeavesList(id); else loadBarberLeaves(id); }
+  else if (tab === 'stats') loadBarberStats(id);
+  else if (tab === 'prestations') loadBarberCapabilities(id);
 }
 
 function toggleBarberExpand(id) {
   // Ouvre la fiche de ce coiffeur (depuis la liste ou depuis la rangée du bas).
   expandedBarberId = id;
+  delete barberLeaves[id];   // congés relus à l'ouverture
   if (!barberDetailTab[id]) barberDetailTab[id] = 'horaires';
   if (!barberStatsState[id]) barberStatsState[id] = { period: 'day', offset: 0 };
   renderBarbers();
   var t = document.getElementById('t-barbers');
   if (t && t.scrollIntoView) t.scrollIntoView({ block: 'start' });
   loadBarberKpis(id);
-  if (barberDetailTab[id] === 'stats') loadBarberStats(id);
-  if (barberDetailTab[id] === 'conges') loadBarberLeaves(id);
-  if (barberDetailTab[id] === 'prestations') loadBarberCapabilities(id);
 }
 
 function closeBarber() {
@@ -4751,9 +4759,6 @@ function paintBarberKpis(id) {
 function switchBarberTab(id, tab) {
   barberDetailTab[id] = tab;
   renderBarbers();
-  if (tab === 'stats') loadBarberStats(id);
-  if (tab === 'conges') loadBarberLeaves(id);
-  if (tab === 'prestations') loadBarberCapabilities(id);
 }
 
 function renderBarberDetail(b) {
