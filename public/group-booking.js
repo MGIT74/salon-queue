@@ -238,6 +238,7 @@
         var pills = '<button type="button" class="gb-pill who" data-act="pill-who" data-uid="' + p.uid + '" title="Modifier"><i>' + esc(who.charAt(0).toUpperCase()) + '</i>' + esc(who) + '</button>' +
           (b ? '<button type="button" class="gb-pill" data-act="pill-barber" data-uid="' + p.uid + '" title="Changer de coiffeur">✂ ' + esc(b) + ' ▾</button>' : '') +
           (p.slot ? '<button type="button" class="gb-pill" data-act="pill-date" data-uid="' + p.uid + '" title="Changer la date ou l\'heure">🗓 ' + esc(fmtDate(p.date)) + ' · <b>' + esc(p.slot.time) + '</b></button>' : '') +
+          (s ? '<span class="gb-pill dur" title="Durée estimée">⏱ ' + esc(fmtMin(personDuration(p, cfg.services, cfg.extras))) + '</span>' : '') +
           '<button type="button" class="gb-pill-x" data-act="rm" data-uid="' + p.uid + '" title="Retirer ' + esc(who) + '" aria-label="Retirer ' + esc(who) + '">✕</button>' + menu;
         var rows = '';
         function row(k, n, meta, price) { rows += '<div class="recap-row"><span class="recap-k">' + k + '</span><span class="recap-n">' + esc(n) + (meta ? ' <em>' + esc(meta) + '</em>' : '') + '</span><span class="recap-p">' + price + '</span></div>'; }

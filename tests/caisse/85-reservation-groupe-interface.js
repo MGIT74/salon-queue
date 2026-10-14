@@ -68,6 +68,7 @@ let JSDOM; try { ({ JSDOM } = require('jsdom')); } catch (e) { console.log('jsdo
     assert(calls.some((u) => /held=b1%7C/.test(u)), 'held envoyé'); ok('ses créneaux tiennent compte de la 1re personne (held)');
     assert(m.querySelector('.gb-chip.sugg'), 'raccourci'); ok('raccourci « à la suite » affiché');
     assert(m.querySelectorAll('.gb-pills').length === 2 && m.querySelector('[data-act=pill-barber]') && m.querySelector('[data-act=rm]')); ok('pastilles cliquables et croix de retrait dans la colonne de droite');
+    assert(m.querySelectorAll('.gb-pill.dur').length === 2 && /40 min|30 min|15 min/.test(m.querySelector('.gb-pill.dur').textContent)); ok('durée estimée affichée pour chaque personne (pastille)');
     clickEl('.gb-chip.sugg[data-act=sugg]'); clickEl('[data-act=next]');
     assert(/plusieurs personnes/.test(eyebrow()) && m.querySelectorAll('.gb-row').length === 2); ok('récapitulatif des 2 personnes');
     const pills = m.querySelectorAll('[data-act=pill-barber]'); click(pills[pills.length - 1]);
