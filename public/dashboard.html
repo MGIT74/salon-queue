@@ -1191,14 +1191,7 @@
   @media (max-width: 980px) { .bp-stats .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .bp-stats .stat-tile.wide { grid-column: 1 / -1; } }
   .bp-layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 18px; align-items: start; }
   .bp-main { min-width: 0; }
-  .bp-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-bottom: 16px; }
-  .bp-kpi { --k: var(--blue); --kb: rgba(var(--accent-rgb), .12); background: var(--card); border-radius: 18px; padding: 16px 18px 14px; box-shadow: var(--shadow);
             border-bottom: 3px solid var(--k); display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0; }
-  .bp-kpi.k-green { --k: var(--green); --kb: rgba(52,199,89,.14); }
-  .bp-kpi.k-orange { --k: var(--orange); --kb: rgba(255,149,0,.15); }
-  .bp-kpi .v { font-size: 28px; font-weight: 700; letter-spacing: -.03em; color: var(--k); line-height: 1.1; }
-  .bp-kpi .l { font-size: 13px; color: var(--grey); margin-top: 6px; }
-  .bp-kpi .ic { width: 46px; height: 46px; border-radius: 12px; background: var(--kb); color: var(--k); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .bp-panel { background: var(--card); border-radius: 18px; padding: 18px; box-shadow: var(--shadow); }
   .bp-profile { background: var(--card); border-radius: 18px; padding: 24px 18px 18px; box-shadow: var(--shadow); text-align: center; }
   .bp-ring { --rc: var(--accent); width: 100px; height: 100px; border-radius: 50%; padding: 4px; margin: 0 auto 14px; box-sizing: border-box;
@@ -1225,9 +1218,7 @@
     .bp-profile .quick-action { padding: 10px 12px; font-size: 13.5px; }
   }
   @media (max-width: 640px) {
-    .bp-kpis { grid-template-columns: 1fr; gap: 10px; }
-    .bp-kpi .v { font-size: 24px; }
-    .bp-panel { padding: 14px; }
+        .bp-panel { padding: 14px; }
     .bp-others-row .bc { flex-basis: 240px; }
   }
 
@@ -4656,7 +4647,6 @@ function leaveBadgeHtml(b) {
     'En congé' + until + '</span>';
 }
 
-var barberKpis = {};        // { [barberId]: { done, revenue, occ } }  (aujourd'hui)
 
 // Pastilles d'état d'un coiffeur (mode de prise de RDV, inactif, congé...).
 function barberStatusChips(b) {
@@ -4711,7 +4701,6 @@ function renderBarbers() {
       '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>Retour</button>' +
       '<h2 class="bp-title">' + esc(cur.name) + '</h2></div>' +
     renderBarberDetail(cur) + others;
-  paintBarberKpis(cur.id);
   populateBarberTab(cur.id);
 }
 
@@ -4733,7 +4722,6 @@ function toggleBarberExpand(id) {
   renderBarbers();
   var t = document.getElementById('t-barbers');
   if (t && t.scrollIntoView) t.scrollIntoView({ block: 'start' });
-  loadBarberKpis(id);
 }
 
 function closeBarber() {
@@ -4741,28 +4729,6 @@ function closeBarber() {
   renderBarbers();
   var t = document.getElementById('t-barbers');
   if (t && t.scrollIntoView) t.scrollIntoView({ block: 'start' });
-}
-
-// Résumé « aujourd'hui » en haut d'une fiche (coupes terminées, encaissé, occupation).
-function loadBarberKpis(id) {
-  var range = periodRange('day', 0, {});
-  var endInclusive = new Date(range.end);
-  endInclusive.setDate(endInclusive.getDate() - 1);
-  var qs = 'start=' + range.start.toISOString() + '&end=' + range.end.toISOString() +
-    '&start_date=' + localDateStr(range.start) + '&end_date=' + localDateStr(endInclusive);
-  api('/api/barbers/' + id + '/stats?' + qs).then(function (r) {
-    barberKpis[id] = { done: r.done_count, revenue: r.revenue_cents, occ: r.availability ? r.availability.occupancy_pct : null };
-    paintBarberKpis(id);
-  }).catch(function () {});
-}
-
-function paintBarberKpis(id) {
-  var k = barberKpis[id];
-  if (!k) return;
-  var set = function (key, v) { var el = document.getElementById('bp-kpi-' + key + '-' + id); if (el) el.textContent = v; };
-  set('done', k.done);
-  set('rev', eur(k.revenue));
-  set('occ', k.occ === null ? '—' : k.occ + ' %');
 }
 
 function switchBarberTab(id, tab) {
@@ -4810,15 +4776,6 @@ function renderBarberDetail(b) {
           '</button>') +
     '</div>';
 
-  var kpis = '<div class="bp-kpis">' +
-    '<div class="bp-kpi k-green"><div><div class="v" id="bp-kpi-done-' + b.id + '">—</div><div class="l">Coupes aujourd\'hui</div></div>' +
-      '<div class="ic"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4 8.1 15.9M14.5 14.5 20 20M8.1 8.1 12 12"/></svg></div></div>' +
-    '<div class="bp-kpi k-blue"><div><div class="v" id="bp-kpi-rev-' + b.id + '">—</div><div class="l">Encaissé aujourd\'hui</div></div>' +
-      '<div class="ic"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="13" rx="2.5"/><path d="M2 11h20"/></svg></div></div>' +
-    '<div class="bp-kpi k-orange"><div><div class="v" id="bp-kpi-occ-' + b.id + '">—</div><div class="l">Occupation aujourd\'hui</div></div>' +
-      '<div class="ic"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg></div></div>' +
-    '</div>';
-
   var tabs = '<div class="subtabs">' +
     '<button class="' + (tab === 'horaires' ? 'on' : '') + '" onclick="switchBarberTab(\'' + b.id + '\',\'horaires\')">Horaires</button>' +
     '<button class="' + (tab === 'prestations' ? 'on' : '') + '" onclick="switchBarberTab(\'' + b.id + '\',\'prestations\')">Prestations</button>' +
@@ -4834,7 +4791,7 @@ function renderBarberDetail(b) {
     '</div></aside>';
 
   return '<div class="bp-stats">' + renderStatsTab(b) + '</div>' +
-    '<div class="bp-layout"><div class="bp-main">' + kpis +
+    '<div class="bp-layout"><div class="bp-main">' +
     '<div class="bp-panel">' + tabs + '<div>' + body + '</div></div></div>' + profile + '</div>';
 }
 
