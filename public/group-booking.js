@@ -77,7 +77,12 @@
   function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 
   var STYLE = '' +
-    '.gb-recap-person{margin-bottom:12px;opacity:.75}.gb-recap-person.on{opacity:1}.gb-recap-person .recap-ctx{margin-bottom:6px}' +
+    '.gb-recap-person{margin-bottom:16px;opacity:.8}.gb-recap-person.on{opacity:1}' +
+    '.gb-pills{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}' +
+    '.gb-pill{display:inline-flex;align-items:center;gap:6px;background:var(--fill);color:var(--ink);border-radius:999px;padding:5px 11px;font-size:13px;font-weight:500;line-height:1.3}' +
+    '.gb-pill b{font-weight:700}' +
+    '.gb-pill.who{background:var(--blue);color:#fff;font-weight:600;padding-left:5px}' +
+    '.gb-pill.who i{font-style:normal;width:20px;height:20px;border-radius:50%;background:rgba(255,255,255,.25);display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700}' +
     '.gb-rows{display:flex;flex-direction:column;gap:10px;margin-bottom:14px}' +
     '.gb-row{display:flex;align-items:center;gap:12px;background:var(--fill);border-radius:16px;padding:12px 14px}' +
     '.gb-av{width:38px;height:38px;border-radius:50%;background:var(--blue-soft);color:var(--blue);font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}' +
@@ -196,7 +201,9 @@
       people.forEach(function (p) {
         var s = byId(cfg.services, p.serviceId), who = label(p) + (p.isSelf ? '' : '');
         var b = p.slot ? barberName(p.slot.barberId) : (p.pref ? barberName(p.pref) : '');
-        var ctx = [esc(who)]; if (b) ctx.push(esc(b)); if (p.slot) ctx.push(esc(fmtDate(p.date)) + ' à ' + esc(p.slot.time));
+        var pills = '<span class="gb-pill who"><i>' + esc(who.charAt(0).toUpperCase()) + '</i>' + esc(who) + '</span>' +
+          (b ? '<span class="gb-pill">✂ ' + esc(b) + '</span>' : '') +
+          (p.slot ? '<span class="gb-pill">🗓 ' + esc(fmtDate(p.date)) + ' · <b>' + esc(p.slot.time) + '</b></span>' : '');
         var rows = '';
         function row(k, n, meta, price) { rows += '<div class="recap-row"><span class="recap-k">' + k + '</span><span class="recap-n">' + esc(n) + (meta ? ' <em>' + esc(meta) + '</em>' : '') + '</span><span class="recap-p">' + price + '</span></div>'; }
         if (s) {
@@ -204,7 +211,7 @@
           (p.extraIds || []).forEach(function (id) { var x = byId(cfg.extras, id); if (x) row('Supplément', x.name, Number(x.duration_min) > 0 ? '+' + fmtMin(x.duration_min) : '', '+' + eur(Number(x.price_cents) || 0)); });
         }
         cents += personPrice(p, cfg.services, cfg.extras);
-        html += '<div class="gb-recap-person' + (p === cur && view !== 'recap' ? ' on' : '') + '"><div class="recap-ctx"><strong>' + ctx[0] + '</strong>' + (ctx.length > 1 ? ' · ' + ctx.slice(1).join(' · ') : '') + '</div>' +
+        html += '<div class="gb-recap-person' + (p === cur && view !== 'recap' ? ' on' : '') + '"><div class="gb-pills">' + pills + '</div>' +
           (rows ? '<div class="recap-list">' + rows + '</div>' : '') + '</div>';
       });
       return html + '<div class="recap-total"><span>Total · ' + people.length + ' personne' + (people.length > 1 ? 's' : '') + '</span><span><strong>' + eur(cents) + '</strong></span></div>';
