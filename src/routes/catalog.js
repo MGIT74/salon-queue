@@ -244,6 +244,7 @@ router.post('/products', requireAdmin, wrap(async (req, res) => {
   if (vatId === false) return res.status(400).json({ error: 'Taux de TVA inconnu' });
   const catId = await normalizeCategoryId(req.salon.id, 'products', req.body.category_id);
   if (catId === false) return res.status(400).json({ error: 'Catégorie inconnue' });
+  const onlineBookable = req.body.online_bookable === undefined ? 1 : (req.body.online_bookable ? 1 : 0);
   const id = await uniqueId('products', slugify(name));
   try {
     await pool.query(
@@ -255,6 +256,7 @@ router.post('/products', requireAdmin, wrap(async (req, res) => {
     throw err;
   }
   if (catId) await pool.query('UPDATE products SET category_id = ? WHERE id = ?', [catId, id]);
+  if (!onlineBookable) await pool.query('UPDATE products SET online_bookable = 0 WHERE id = ?', [id]);
   const [[item]] = await pool.query('SELECT * FROM products WHERE id = ?', [id]);
   logActivity(req.salon.id, 'catalog_create', 'Produit "' + name + '" créé');
   res.json({ ok: true, item });
@@ -273,6 +275,7 @@ router.put('/products/:id', requireAdmin, wrap(async (req, res) => {
     sets.push('image_url = ?'); params.push(req.body.image_url || null);
   }
   if (req.body.stock_enabled !== undefined) { sets.push('stock_enabled = ?'); params.push(req.body.stock_enabled ? 1 : 0); }
+  if (req.body.online_bookable !== undefined) { sets.push('online_bookable = ?'); params.push(req.body.online_bookable ? 1 : 0); }
   if (req.body.barcode !== undefined) {
     const barcode = req.body.barcode ? String(req.body.barcode).trim().slice(0, 64) || null : null;
     sets.push('barcode = ?'); params.push(barcode);
@@ -381,6 +384,10 @@ async function removeCatalogItem(table, salonId, itemId) {
         const price = Math.round(Number(req.body.price_cents));
         if (!Number.isFinite(price) || price < 0 || price > 10000000) return res.status(400).json({ error: 'Prix invalide' });
         sets.push('price_cents = ?'); params.push(price);
+      }
+      // Produits seulement : proposé à la réservation en ligne (true) ou vendu uniquement en caisse (false).
+      if (table === 'products' && req.body.online_bookable !== undefined && req.body.online_bookable !== null && req.body.online_bookable !== '') {
+        sets.push('online_bookable = ?'); params.push(req.body.online_bookable ? 1 : 0);
       }
       if (!sets.length) return res.status(400).json({ error: 'Rien à modifier' });
       await pool.query(`UPDATE ${table} SET ${sets.join(', ')} WHERE salon_id = ? AND id IN (?)`, params.concat([salonId, okIds]));

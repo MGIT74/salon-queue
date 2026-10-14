@@ -1067,7 +1067,7 @@ function goBook(afterLoad) {
   ]).then(function (r) {
     bookServices = r[0].items;
     bookExtras = r[1].items;
-    bookProducts = r[2].items;
+    bookProducts = r[2].items.filter(function (p) { return p.online_bookable !== 0; }); // « caisse seulement » : jamais proposé en ligne
     bookBarbers = r[3].items.filter(function (b) { return b.accepts_appointments && hasBookableSchedule(b) && !isOnLeaveOn(b); });
     bookCatalogLoaded = true;
     renderBookBarberGrid();

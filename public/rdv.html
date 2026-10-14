@@ -401,7 +401,7 @@ function loadCatalog() {
   ]).then(function (r) {
     services = r[0].items;
     extras = r[1].items;
-    products = r[2].items;
+    products = r[2].items.filter(function (p) { return p.online_bookable !== 0; }); // « caisse seulement » : jamais proposé en ligne
     barbers = r[3].items.filter(function (b) { return b.accepts_appointments && hasBookableSchedule(b) && !isOnLeaveOn(b); });
     var salonName = r[4].salon_name;
     CURRENCY = r[4].currency || 'EUR';

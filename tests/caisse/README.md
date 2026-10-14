@@ -106,4 +106,5 @@ node tests/caisse/72-fidelite-creation-compte.js  # Fidelite : carte activee des
 node tests/caisse/73-stats-coiffeur-tout-encaissement.js  # Stats coiffeur : tout l encaissement a son nom
 node tests/caisse/74-timeline-heure-sur-bloc.js  # Timeline : heure du rdv sur le bloc
 node tests/caisse/75-cartes-compte-infos-hors-visuel.js  # Compte client : infos hors du visuel des cartes
+node tests/caisse/76-produit-caisse-seulement.js  # Produit caisse seulement (pas en ligne)
 ```

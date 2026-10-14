@@ -760,6 +760,11 @@ SET @p1 := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema =
 SET @sql := IF(@p1 = 0, 'ALTER TABLE products ADD COLUMN stock_enabled TINYINT(1) NOT NULL DEFAULT 0', 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
+-- Produit proposé (ou non) à la réservation en ligne : 0 = vendu uniquement en caisse.
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'products' AND column_name = 'online_bookable');
+SET @sql := IF(@c = 0, 'ALTER TABLE products ADD COLUMN online_bookable TINYINT(1) NOT NULL DEFAULT 1', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
 SET @p2 := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'products' AND column_name = 'stock_quantity');
 SET @sql := IF(@p2 = 0, 'ALTER TABLE products ADD COLUMN stock_quantity INT NOT NULL DEFAULT 0', 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;

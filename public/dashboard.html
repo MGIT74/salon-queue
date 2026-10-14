@@ -2457,6 +2457,13 @@
         </label>
         <p class="hint" style="margin-top:4px">Décoché : le produit est illimité, toujours disponible à la vente.</p>
       </div>
+      <div class="fld" id="sc-online-fld" style="display:none">
+        <label style="display:flex;align-items:center;gap:8px;font-weight:400;cursor:pointer">
+          <input type="checkbox" id="sc-online" style="width:auto" checked>
+          Proposer à la réservation en ligne
+        </label>
+        <p class="hint" style="margin-top:4px">Décoché : le produit est vendu uniquement en caisse, les clients ne le voient pas en prenant rendez-vous.</p>
+      </div>
       <div class="fld" id="sc-stock-qty-fld" style="display:none"><label for="sc-stock-qty">Quantité en stock</label><input id="sc-stock-qty" type="number" min="0" value="0"></div>
       <div class="fld" id="sc-barcode-fld" style="display:none">
         <label for="sc-barcode">Code-barres</label>
@@ -2488,6 +2495,7 @@
     <div class="sheet-body">
       <div class="fld"><label for="cb-cat">Catégorie</label><select id="cb-cat"></select></div>
       <div class="fld"><label for="cb-vat">TVA</label><select id="cb-vat"></select></div>
+      <div class="fld" id="cb-online-fld" style="display:none"><label for="cb-online">Réservation en ligne</label><select id="cb-online"><option value="">— Ne pas changer —</option><option value="1">Proposé en ligne</option><option value="0">Caisse seulement</option></select></div>
       <div class="fld"><label for="cb-price" id="cb-price-label">Nouveau prix</label><input id="cb-price" type="number" min="0" step="0.5" placeholder="Inchangé"></div>
       <p class="hint" style="margin-top:4px">S'applique à tous les éléments cochés.</p>
     </div>
@@ -4005,6 +4013,7 @@ function renderCatalog(table) {
           : formatMinutes(x.duration_min) + ' · ' + (table === 'extras' ? '+ ' : '') + eur(x.price_cents);
         if (x.category_id && catName(table, x.category_id)) meta += ' · ' + catName(table, x.category_id);
         if (x.vat_rate_name) meta += ' · ' + x.vat_rate_name;
+        if (table === 'products' && x.online_bookable === 0) meta += ' · caisse seulement';
         var photoStyle = x.image_url ? 'background:url(&quot;' + esc(x.image_url) + '&quot;) center/cover' : '';
         return '<div class="item' + (x.active ? '' : ' off') + '" data-id="' + x.id + '">' +
           '<input type="checkbox" class="cat-check" aria-label="Sélectionner ' + esc(x.name) + '"' + (catSel[table][x.id] ? ' checked' : '') + ' onchange="toggleCatSel(\'' + table + '\',\'' + x.id + '\',this.checked)" style="width:18px;height:18px;flex-shrink:0;cursor:pointer">' +
@@ -4202,6 +4211,8 @@ function openCatBulkEdit(table) {
     return '<option value="' + esc(c.id) + '">' + esc(c.name) + '</option>';
   }).join('');
   document.getElementById('cb-price').value = '';
+  document.getElementById('cb-online-fld').style.display = table === 'products' ? 'block' : 'none';
+  document.getElementById('cb-online').value = '';
   document.getElementById('cb-price-label').textContent = 'Nouveau prix (' + (CURRENCY === 'CHF' ? 'CHF' : '€') + ') — vide = ne pas changer';
   document.getElementById('sheet-catbulk').classList.add('on');
   _lockBodyScroll();
@@ -4215,8 +4226,10 @@ function saveCatBulkEdit() {
   var cat = document.getElementById('cb-cat').value;
   if (cat) body.category_id = cat;
   if (vat) body.vat_rate_id = vat;
+  var online = table === 'products' ? document.getElementById('cb-online').value : '';
+  if (online !== '') body.online_bookable = online === '1';
   if (price !== '') body.price_cents = Math.round(Number(price.replace(',', '.')) * 100);
-  if (!vat && !cat && price === '') { toast('Choisissez une catégorie, une TVA ou un prix à appliquer', true); return; }
+  if (!vat && !cat && price === '' && online === '') { toast('Choisissez une catégorie, une TVA, un prix ou la réservation en ligne à appliquer', true); return; }
   api('/api/catalog/' + table + '/bulk', { method: 'POST', body: body })
     .then(function () { closeSheet('sheet-catbulk'); catSel[table] = {}; return loadCatalog(); })
     .then(function () { toast('Modifié'); })
@@ -4294,6 +4307,8 @@ function openCatalogForm(table, id) {
   document.getElementById('sc-stock-qty-fld').style.display = table === 'products' && stockEnabled ? 'block' : 'none';
   document.getElementById('sc-stock-qty').value = item ? (item.stock_quantity || 0) : 0;
 
+  document.getElementById('sc-online-fld').style.display = table === 'products' ? 'block' : 'none';
+  document.getElementById('sc-online').checked = !(table === 'products' && item && item.online_bookable === 0);
   document.getElementById('sc-barcode-fld').style.display = table === 'products' ? 'block' : 'none';
   document.getElementById('sc-barcode').value = (table === 'products' && item && item.barcode) ? item.barcode : '';
 
@@ -4316,6 +4331,7 @@ function saveCatalog() {
   } else {
     body.stock_enabled = document.getElementById('sc-stock-enabled').checked;
     body.stock_quantity = Number(document.getElementById('sc-stock-qty').value) || 0;
+    body.online_bookable = document.getElementById('sc-online').checked;
     body.barcode = document.getElementById('sc-barcode').value.trim();
   }
   var p = editingCat.id

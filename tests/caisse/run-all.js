@@ -95,7 +95,8 @@ const suite = [
   ['72-fidelite-creation-compte.js', false, ['exit']],
   ['73-stats-coiffeur-tout-encaissement.js', false, ['exit']],
   ['74-timeline-heure-sur-bloc.js', false, ['exit']],
-  ['75-cartes-compte-infos-hors-visuel.js', false, ['exit']]
+  ['75-cartes-compte-infos-hors-visuel.js', false, ['exit']],
+  ['76-produit-caisse-seulement.js', false, ['exit']]
 ];
 
 let bad = 0;

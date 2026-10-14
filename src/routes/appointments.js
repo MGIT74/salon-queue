@@ -434,7 +434,7 @@ router.post('/', wrap(async (req, res) => {
   if (rawProducts.length) {
     const productIds = rawProducts.map((p) => p && p.id).filter(Boolean);
     const [rows] = productIds.length
-      ? await pool.query('SELECT id FROM products WHERE id IN (?) AND salon_id = ?', [productIds, req.salon.id])
+      ? await pool.query('SELECT id FROM products WHERE id IN (?) AND salon_id = ? AND online_bookable = 1', [productIds, req.salon.id])
       : [[]];
     const validIds = new Set(rows.map((r) => r.id));
     productSelections = rawProducts
