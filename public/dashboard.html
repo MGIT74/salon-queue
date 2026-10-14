@@ -6757,6 +6757,15 @@ function getSelectedRdv() {
 
 var RDV_STATUS_LABEL = { confirmed: 'Confirmé', completed: 'Terminé', no_show: 'Absent', cancelled: 'Annulé' };
 
+/* Cellule CSV sûre : un nom saisi sur la réservation publique comme =HYPERLINK(...) ne doit jamais devenir
+   une formule active quand l'export est ouvert dans Excel / LibreOffice (« injection de formule CSV »).
+   Un numéro de téléphone (+33 6 ...) reste intact. */
+function csvCell(v) {
+  v = String(v == null ? '' : v);
+  if (/^[=+\-@\t\r]/.test(v) && !/^\+?[\d\s().\-]+$/.test(v)) v = "'" + v;
+  return '"' + v.replace(/"/g, '""') + '"';
+}
+
 function exportRdvCsv() {
   var rows = getSelectedRdv();
   if (!rows.length) return;
@@ -6769,7 +6778,7 @@ function exportRdvCsv() {
       a.client_name, a.email || '', a.phone || '', a.service_name || '',
       a.barber_name || 'Premier disponible', when, RDV_STATUS_LABEL[a.display_status] || a.display_status
     ];
-    lines.push(vals.map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(';'));
+    lines.push(vals.map(csvCell).join(';'));
   });
 
   var blob = new Blob(['\uFEFF' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
@@ -7494,7 +7503,7 @@ function exportClientsCsv() {
       when, c.total_price_cents ? (c.total_price_cents / 100).toFixed(2) : '',
       STATUS_LABEL[c.status] || c.status, (c.note || '').replace(/[\r\n;]+/g, ' ')
     ];
-    lines.push(vals.map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(';'));
+    lines.push(vals.map(csvCell).join(';'));
   });
 
   var blob = new Blob(['\uFEFF' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });

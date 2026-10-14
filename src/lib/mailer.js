@@ -33,6 +33,18 @@ function invalidateTransport(salonId) {
  * valeurs réelles - jamais utilisé si le modèle est vide (le
  * comportement par défaut, codé en dur, reste alors inchangé).
  */
+// Échappement HTML de toute valeur insérée dans la version HTML d'un email : un nom de client (saisi par
+// n'importe qui sur la page de réservation publique) ne doit jamais pouvoir injecter un lien ou du HTML dans
+// un email envoyé au nom du salon.
+function h(v) {
+  return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function escTokens(tokens) {
+  const out = {};
+  Object.keys(tokens).forEach((k) => { out[k] = h(tokens[k]); });
+  return out;
+}
+
 function applyTemplate(customText, tokens) {
   let out = customText;
   Object.keys(tokens).forEach((k) => {
@@ -47,6 +59,7 @@ async function sendTurnSoon(salonId, to, name, waitMin) {
   const tokens = { client_name: name, wait_min: waitMin, salon };
   const customSubject = s.email_tpl_turn_soon_subject ? applyTemplate(s.email_tpl_turn_soon_subject, tokens) : '';
   const customBody = s.email_tpl_turn_soon_body ? applyTemplate(s.email_tpl_turn_soon_body, tokens) : '';
+  const customBodyHtml = s.email_tpl_turn_soon_body ? applyTemplate(s.email_tpl_turn_soon_body, escTokens(tokens)) : '';
 
   await tx.sendMail({
     from,
@@ -56,11 +69,11 @@ async function sendTurnSoon(salonId, to, name, waitMin) {
       (`Bonjour ${name},\n\nVotre tour est estimé dans environ ${waitMin} minutes.\n` +
        `Merci de revenir vers le salon d'ici là.\n\n${salon}`),
     html: customBody
-      ? customBody.replace(/\n/g, '<br>')
-      : (`<p>Bonjour ${name},</p>` +
-         `<p>Votre tour est estimé dans environ <strong>${waitMin} minutes</strong>.</p>` +
+      ? customBodyHtml.replace(/\n/g, '<br>')
+      : (`<p>Bonjour ${h(name)},</p>` +
+         `<p>Votre tour est estimé dans environ <strong>${h(waitMin)} minutes</strong>.</p>` +
          `<p>Merci de revenir vers le salon d'ici là.</p>` +
-         `<p>${salon}</p>`)
+         `<p>${h(salon)}</p>`)
   });
 }
 
@@ -76,6 +89,7 @@ async function sendAppointmentReminder(salonId, to, info) {
   const tokens = { client_name: info.clientName, service_name: info.serviceName, when: info.when, salon };
   const customSubject = s.email_tpl_reminder_subject ? applyTemplate(s.email_tpl_reminder_subject, tokens) : '';
   const customBody = s.email_tpl_reminder_body ? applyTemplate(s.email_tpl_reminder_body, tokens) : '';
+  const customBodyHtml = s.email_tpl_reminder_body ? applyTemplate(s.email_tpl_reminder_body, escTokens(tokens)) : '';
 
   await tx.sendMail({
     from,
@@ -83,10 +97,10 @@ async function sendAppointmentReminder(salonId, to, info) {
     subject: customSubject || `Rappel — votre rendez-vous chez ${salon}`,
     text: customBody || `Bonjour ${info.clientName},\n\nPetit rappel : votre rendez-vous (${info.serviceName}) est prévu ${info.when}.\n\n${salon}`,
     html: customBody
-      ? customBody.replace(/\n/g, '<br>')
-      : (`<p>Bonjour ${info.clientName},</p>` +
-         `<p>Petit rappel : votre rendez-vous (<strong>${info.serviceName}</strong>) est prévu <strong>${info.when}</strong>.</p>` +
-         `<p>${salon}</p>`)
+      ? customBodyHtml.replace(/\n/g, '<br>')
+      : (`<p>Bonjour ${h(info.clientName)},</p>` +
+         `<p>Petit rappel : votre rendez-vous (<strong>${h(info.serviceName)}</strong>) est prévu <strong>${h(info.when)}</strong>.</p>` +
+         `<p>${h(salon)}</p>`)
   });
 }
 
@@ -101,12 +115,12 @@ async function sendLoyaltyActivation(salonId, to, info) {
           `À chaque passage réglé, vous gagnez 1 point. Tous les ${info.threshold} points, ` +
           `vous obtenez une récompense (réduction sur une prestation ou un produit), ` +
           `utilisable dès votre prochaine visite.\n\n${salon}`,
-    html: `<p>Bonjour ${info.clientName},</p>` +
-          `<p>Votre carte de fidélité chez ${salon} vient d'être activée !</p>` +
-          `<p>À chaque passage réglé, vous gagnez 1 point. Tous les <strong>${info.threshold} points</strong>, ` +
+    html: `<p>Bonjour ${h(info.clientName)},</p>` +
+          `<p>Votre carte de fidélité chez ${h(salon)} vient d'être activée !</p>` +
+          `<p>À chaque passage réglé, vous gagnez 1 point. Tous les <strong>${h(info.threshold)} points</strong>, ` +
           `vous obtenez une récompense (réduction sur une prestation ou un produit), ` +
           `utilisable dès votre prochaine visite.</p>` +
-          `<p>${salon}</p>`
+          `<p>${h(salon)}</p>`
   });
 }
 
@@ -123,13 +137,13 @@ async function sendGiftConfirmation(salonId, to, info) {
           `Votre code : ${info.code}\n\n` +
           `Présentez-vous en salon et indiquez ce code à l'accueil ou saisissez-le sur la borne ` +
           `("Utiliser un cadeau") pour en profiter.\n\n${salon}`,
-    html: `<p>Bonjour ${info.recipientName},</p>` +
-          `<p>Un cadeau de <strong>${info.amountEur}</strong> vous a été offert chez ${salon} !</p>` +
-          `<p>Contenu : ${itemsList}</p>` +
-          `<p style="font-size:20px;font-weight:700;letter-spacing:2px">${info.code}</p>` +
+    html: `<p>Bonjour ${h(info.recipientName)},</p>` +
+          `<p>Un cadeau de <strong>${h(info.amountEur)}</strong> vous a été offert chez ${h(salon)} !</p>` +
+          `<p>Contenu : ${h(itemsList)}</p>` +
+          `<p style="font-size:20px;font-weight:700;letter-spacing:2px">${h(info.code)}</p>` +
           `<p>Présentez-vous en salon et indiquez ce code à l'accueil, ou saisissez-le sur la borne ` +
           `(« Utiliser un cadeau ») pour en profiter.</p>` +
-          `<p>${salon}</p>`
+          `<p>${h(salon)}</p>`
   });
 }
 
@@ -150,12 +164,12 @@ async function sendGiftCodeRenewed(salonId, to, info) {
           `Votre ancien code n'est plus valable. Voici votre nouveau code, à utiliser pour reprendre un rendez-vous quand vous le souhaitez :\n\n` +
           `Contenu : ${itemsList}\n\n` +
           `Nouveau code : ${info.code}\n\n${salon}`,
-    html: `<p>Bonjour ${info.recipientName},</p>` +
-          `<p>Le rendez-vous que vous aviez pris avec votre cadeau de <strong>${info.amountEur}</strong> chez ${salon} a été annulé.</p>` +
+    html: `<p>Bonjour ${h(info.recipientName)},</p>` +
+          `<p>Le rendez-vous que vous aviez pris avec votre cadeau de <strong>${h(info.amountEur)}</strong> chez ${h(salon)} a été annulé.</p>` +
           `<p>Votre ancien code n'est plus valable. Voici votre nouveau code, à utiliser pour reprendre un rendez-vous quand vous le souhaitez :</p>` +
-          `<p>Contenu : ${itemsList}</p>` +
-          `<p style="font-size:20px;font-weight:700;letter-spacing:2px">${info.code}</p>` +
-          `<p>${salon}</p>`
+          `<p>Contenu : ${h(itemsList)}</p>` +
+          `<p style="font-size:20px;font-weight:700;letter-spacing:2px">${h(info.code)}</p>` +
+          `<p>${h(salon)}</p>`
   });
 }
 
@@ -179,6 +193,7 @@ async function sendAppointmentConfirmation(salonId, to, info) {
   };
   const customSubject = s.email_tpl_confirmation_subject ? applyTemplate(s.email_tpl_confirmation_subject, tokens) : '';
   const customBody = s.email_tpl_confirmation_body ? applyTemplate(s.email_tpl_confirmation_body, tokens) : '';
+  const customBodyHtml = s.email_tpl_confirmation_body ? applyTemplate(s.email_tpl_confirmation_body, escTokens(tokens)) : '';
 
   await tx.sendMail({
     from,
@@ -191,13 +206,13 @@ async function sendAppointmentConfirmation(salonId, to, info) {
        (info.giftNote ? `\n🎁 ${info.giftNote}\n` : '') +
        `\nBesoin d'annuler ? ${info.cancelUrl}\n\n${salon}`),
     html: customBody
-      ? customBody.replace(/\n/g, '<br>')
-      : (`<p>Bonjour ${info.clientName},</p>` +
-         `<p>Votre rendez-vous chez ${salon} est confirmé :</p>` +
-         `<p><strong>${info.when}</strong><br>${info.serviceName}${info.barberName ? ' avec ' + info.barberName : ''}</p>` +
-         (info.giftNote ? `<p>🎁 ${info.giftNote}</p>` : '') +
-         `<p><a href="${info.cancelUrl}">Annuler ce rendez-vous</a></p>` +
-         `<p>${salon}</p>`)
+      ? customBodyHtml.replace(/\n/g, '<br>')
+      : (`<p>Bonjour ${h(info.clientName)},</p>` +
+         `<p>Votre rendez-vous chez ${h(salon)} est confirmé :</p>` +
+         `<p><strong>${h(info.when)}</strong><br>${h(info.serviceName)}${h(info.barberName ? ' avec ' + info.barberName : '')}</p>` +
+         (info.giftNote ? `<p>🎁 ${h(info.giftNote)}</p>` : '') +
+         `<p><a href="${h(info.cancelUrl)}">Annuler ce rendez-vous</a></p>` +
+         `<p>${h(salon)}</p>`)
   });
 }
 
@@ -247,6 +262,7 @@ async function sendAppointmentCancelledByAdmin(salonId, to, info) {
   };
   const customSubject = s.email_tpl_cancelled_subject ? applyTemplate(s.email_tpl_cancelled_subject, tokens) : '';
   const customBody = s.email_tpl_cancelled_body ? applyTemplate(s.email_tpl_cancelled_body, tokens) : '';
+  const customBodyHtml = s.email_tpl_cancelled_body ? applyTemplate(s.email_tpl_cancelled_body, escTokens(tokens)) : '';
 
   await tx.sendMail({
     from,
@@ -259,13 +275,13 @@ async function sendAppointmentCancelledByAdmin(salonId, to, info) {
        `${defaultReasonText}\n\n` +
        `Toutes nos excuses pour la gêne occasionnée.\n\n${salon}`),
     html: customBody
-      ? customBody.replace(/\n/g, '<br>')
-      : (`<p>Bonjour ${info.clientName},</p>` +
-         `<p>Nous sommes désolés de vous informer que votre rendez-vous du <strong>${info.when}</strong> ` +
-         `(${info.serviceName}) chez ${salon} a dû être annulé.</p>` +
-         `<p>${defaultReasonText.replace(/\n/g, '<br>')}</p>` +
+      ? customBodyHtml.replace(/\n/g, '<br>')
+      : (`<p>Bonjour ${h(info.clientName)},</p>` +
+         `<p>Nous sommes désolés de vous informer que votre rendez-vous du <strong>${h(info.when)}</strong> ` +
+         `(${h(info.serviceName)}) chez ${h(salon)} a dû être annulé.</p>` +
+         `<p>${h(defaultReasonText).replace(/\n/g, '<br>')}</p>` +
          `<p>Toutes nos excuses pour la gêne occasionnée.</p>` +
-         `<p>${salon}</p>`)
+         `<p>${h(salon)}</p>`)
   });
 }
 
@@ -282,6 +298,7 @@ async function sendAppointmentRescheduled(salonId, to, info) {
   };
   const customSubject = s.email_tpl_rescheduled_subject ? applyTemplate(s.email_tpl_rescheduled_subject, tokens) : '';
   const customBody = s.email_tpl_rescheduled_body ? applyTemplate(s.email_tpl_rescheduled_body, tokens) : '';
+  const customBodyHtml = s.email_tpl_rescheduled_body ? applyTemplate(s.email_tpl_rescheduled_body, escTokens(tokens)) : '';
 
   await tx.sendMail({
     from,
@@ -293,12 +310,12 @@ async function sendAppointmentRescheduled(salonId, to, info) {
        `Nouvel horaire : ${info.when} — ${info.serviceName}${info.barberName ? ' avec ' + info.barberName : ''}\n\n` +
        `Besoin d'annuler ? ${info.cancelUrl}\n\n${salon}`),
     html: customBody
-      ? customBody.replace(/\n/g, '<br>')
-      : (`<p>Bonjour ${info.clientName},</p>` +
-         `<p>Votre rendez-vous chez ${salon} a été modifié.</p>` +
-         `<p>Nouvel horaire :<br><strong>${info.when}</strong><br>${info.serviceName}${info.barberName ? ' avec ' + info.barberName : ''}</p>` +
-         `<p><a href="${info.cancelUrl}">Annuler ce rendez-vous</a></p>` +
-         `<p>${salon}</p>`)
+      ? customBodyHtml.replace(/\n/g, '<br>')
+      : (`<p>Bonjour ${h(info.clientName)},</p>` +
+         `<p>Votre rendez-vous chez ${h(salon)} a été modifié.</p>` +
+         `<p>Nouvel horaire :<br><strong>${h(info.when)}</strong><br>${h(info.serviceName)}${h(info.barberName ? ' avec ' + info.barberName : '')}</p>` +
+         `<p><a href="${h(info.cancelUrl)}">Annuler ce rendez-vous</a></p>` +
+         `<p>${h(salon)}</p>`)
   });
 }
 
@@ -312,8 +329,8 @@ async function sendClientVerificationEmail(salonId, to, verifyUrl) {
           `chez ${salon} (valable 24 heures) :\n\n${verifyUrl}\n\n` +
           `Si vous n'êtes pas à l'origine de cette inscription, ignorez simplement cet email.`,
     html: `<p>Bienvenue ! Cliquez sur ce lien pour confirmer votre adresse email et activer votre compte ` +
-          `chez ${salon} (valable 24 heures) :</p>` +
-          `<p><a href="${verifyUrl}">${verifyUrl}</a></p>` +
+          `chez ${h(salon)} (valable 24 heures) :</p>` +
+          `<p><a href="${h(verifyUrl)}">${h(verifyUrl)}</a></p>` +
           `<p>Si vous n'êtes pas à l'origine de cette inscription, ignorez simplement cet email.</p>`
   });
 }
@@ -327,7 +344,7 @@ async function sendClientPasswordReset(salonId, to, resetUrl) {
     text: `Cliquez sur ce lien pour choisir un nouveau mot de passe (valable 1 heure) :\n\n${resetUrl}\n\n` +
           `Si vous n'êtes pas à l'origine de cette demande, ignorez simplement cet email.`,
     html: `<p>Cliquez sur ce lien pour choisir un nouveau mot de passe (valable 1 heure) :</p>` +
-          `<p><a href="${resetUrl}">${resetUrl}</a></p>` +
+          `<p><a href="${h(resetUrl)}">${h(resetUrl)}</a></p>` +
           `<p>Si vous n'êtes pas à l'origine de cette demande, ignorez simplement cet email.</p>`
   });
 }
@@ -367,9 +384,9 @@ async function sendSalonClosureNotice(salonId, to, info) {
     to,
     subject: customSubject || `Fermeture exceptionnelle — ${salon}`,
     text: `Bonjour ${info.clientName},\n\n${bodyText}\n\n${salon}`,
-    html: `<p>Bonjour ${info.clientName},</p>` +
-          `<p>${bodyText.replace(/\n/g, '<br>')}</p>` +
-          `<p>${salon}</p>`
+    html: `<p>Bonjour ${h(info.clientName)},</p>` +
+          `<p>${h(bodyText).replace(/\n/g, '<br>')}</p>` +
+          `<p>${h(salon)}</p>`
   });
 }
 
@@ -385,7 +402,7 @@ async function sendCustomClientEmail(salonId, to, clientName, subject, message) 
     to,
     subject,
     text: `Bonjour ${clientName},\n\n${message}\n\n${salon}`,
-    html: `<p>Bonjour ${clientName},</p><p>${String(message).replace(/\n/g, '<br>')}</p><p>${salon}</p>`
+    html: `<p>Bonjour ${h(clientName)},</p><p>${h(message).replace(/\n/g, '<br>')}</p><p>${h(salon)}</p>`
   });
 }
 

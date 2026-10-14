@@ -25,4 +25,4 @@ function signupEnabled() {
   return !FALSE_VALUES.includes(readEnv('SIGNUP_ENABLED').toLowerCase());
 }
 
-module.exports = { signupEnabled };
+module.exports = { signupEnabled, readEnv };

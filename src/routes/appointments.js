@@ -1,4 +1,12 @@
 const express = require('express');
+const { safeBaseUrl } = require('../lib/safeUrl');
+const { withBookingLock } = require('../lib/bookingLock');
+const { signupRateLimiter } = require('../middleware/rateLimiter');
+
+// Réservation en ligne publique : sans limite, un script pouvait remplir l'agenda de faux RDV et faire
+// envoyer des centaines d'emails de confirmation (au nom du salon) à n'importe quelle adresse.
+// 30 réservations par heure et par adresse IP, largement au-dessus d'un usage normal (une famille).
+const bookingRateLimiter = signupRateLimiter('rdv-booking', { max: 30, windowMs: 60 * 60 * 1000, blockMs: 30 * 60 * 1000 });
 const crypto = require('crypto');
 const { pool, utcIso, getSettings } = require('../db');
 const requireAdmin = require('../middleware/auth');
@@ -366,7 +374,9 @@ async function buildApptItems(salonId, rows) {
         created_at: utcIso(r.created_at),
         display_status: displayStatus,
         note: noteByKey[clientKey(r)] || '',
-        duration_min: (r.service_duration_min || 0) + Number(r.extras_duration_min || 0)
+        duration_min: (r.service_duration_min || 0) + Number(r.extras_duration_min || 0),
+        // Le jeton d'annulation est le secret du lien envoyé AU CLIENT par email : jamais renvoyé au salon.
+        cancel_token: undefined
       });
   });
 }
@@ -456,7 +466,7 @@ router.get('/lookup', requireAdminOrBarber, wrap(async (req, res) => {
  * Création d'un rendez-vous — public, comme le check-in kiosk. Si
  * pour AUJOURD'HUI, promeut immédiatement en entrée de file.
  */
-router.post('/', wrap(async (req, res) => {
+router.post('/', bookingRateLimiter, wrap(withBookingLock(async (req, res) => {
   const { client_name, email, phone, service_id, barber_id, extras, date, time, gift_id } = req.body;
   const clientNote = req.body.client_note ? String(req.body.client_note).slice(0, 500) : null;
   if (!client_name) return res.status(400).json({ error: 'Le nom est requis' });
@@ -588,7 +598,7 @@ router.post('/', wrap(async (req, res) => {
   // cancel finissait noyé dans la valeur de salon, rendant le lien
   // d'annulation inopérant). On ajoute juste le paramètre cancel, avec
   // le bon séparateur selon qu'un ?salon= est déjà présent ou non.
-  const baseUrl = String(req.body.base_url || '').replace(/\/$/, '');
+  const baseUrl = safeBaseUrl(req, req.body.base_url);
   const cancelUrl = baseUrl + (baseUrl.includes('?') ? '&' : '?') + 'cancel=' + cancelToken;
 
   try {
@@ -612,7 +622,7 @@ router.post('/', wrap(async (req, res) => {
   }
 
   res.json({ ok: true, id });
-}));
+})));
 
 /**
  * Reservation a PLUSIEURS (un parent + ses enfants...) : une seule demande, un rendez-vous par personne,
@@ -622,7 +632,7 @@ router.post('/', wrap(async (req, res) => {
  * deja poses pour les precedentes (deux personnes ne peuvent pas se chevaucher chez le meme coiffeur).
  * Le rendez-vous reste au nom d'email/telephone du client qui reserve (annulation, fidelite).
  */
-router.post('/group', wrap(async (req, res) => {
+router.post('/group', bookingRateLimiter, wrap(withBookingLock(async (req, res) => {
   const { client_name, email, phone } = req.body;
   if (!email) return res.status(400).json({ error: "L'email est requis pour la confirmation" });
   if (!client_name) return res.status(400).json({ error: 'Le nom est requis' });
@@ -694,7 +704,7 @@ router.post('/group', wrap(async (req, res) => {
   }
 
   // Tout est enregistre : mail unique, puis mise en file immediate des passages d'AUJOURD'HUI.
-  const baseUrl = String(req.body.base_url || '').replace(/\/$/, '');
+  const baseUrl = safeBaseUrl(req, req.body.base_url);
   const cancelLink = (token, all) => baseUrl + (baseUrl.includes('?') ? '&' : '?') + 'cancel=' + token + (all ? '&all=1' : '');
   const barberIds = Array.from(new Set(created.map((c) => c.barberId).filter(Boolean)));
   const nameById = {};
@@ -724,7 +734,7 @@ router.post('/group', wrap(async (req, res) => {
     ok: true, group_id: groupId,
     appointments: created.map((c) => ({ id: c.id, name: c.person.name, scheduled_at: c.scheduledAt, service_name: c.serviceName, barber_name: nameById[c.barberId] || null }))
   });
-}));
+})));
 
 /**
  * Annule TOUS les rendez-vous encore a venir du groupe auquel appartient ce lien (bouton « Annuler tout »
@@ -767,7 +777,7 @@ router.post('/cancel-group', wrap(async (req, res) => {
  * est TOUJOURS requis explicitement (pas de "premier disponible"
  * automatique comme pour le grand public).
  */
-router.post('/admin-create', requireAdminOrBarber, wrap(async (req, res) => {
+router.post('/admin-create', requireAdminOrBarber, wrap(withBookingLock(async (req, res) => {
   const { client_name, email, phone, service_id, extras, date, time } = req.body;
   // Un coiffeur connecté (PIN) ne peut créer un RDV que pour le coiffeur
   // actif (lui-même par défaut, ou celui désigné par bulle depuis la
@@ -852,7 +862,7 @@ router.post('/admin-create', requireAdminOrBarber, wrap(async (req, res) => {
     const when = new Date(scheduledAt.replace(' ', 'T')).toLocaleString('fr-FR', {
       weekday: 'long', day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit'
     });
-    const baseUrl = String(req.body.base_url || '').replace(/\/$/, '');
+    const baseUrl = safeBaseUrl(req, req.body.base_url);
     const cancelUrl = baseUrl + (baseUrl.includes('?') ? '&' : '?') + 'cancel=' + cancelToken;
     try {
       await sendAppointmentConfirmation(req.salon.id, email, {
@@ -875,7 +885,7 @@ router.post('/admin-create', requireAdminOrBarber, wrap(async (req, res) => {
   }
 
   res.json({ ok: true, id });
-}));
+})));
 
 /**
  * Import de rendez-vous en lot (depuis un export CSV, ex. Bookly) - admin
@@ -1050,7 +1060,7 @@ router.post('/:id/admin-cancel', requireAdminOrBarber, wrap(async (req, res) => 
  * et éventuellement nouveau coiffeur) - le client reçoit un email de
  * confirmation avec le nouvel horaire.
  */
-router.put('/:id/reschedule', requireAdminOrBarber, wrap(async (req, res) => {
+router.put('/:id/reschedule', requireAdminOrBarber, wrap(withBookingLock(async (req, res) => {
   const { date, time, barber_id } = req.body;
   if (!date || !time) return res.status(400).json({ error: 'Date et créneau requis' });
 
@@ -1138,7 +1148,7 @@ router.put('/:id/reschedule', requireAdminOrBarber, wrap(async (req, res) => {
         weekday: 'long', day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit'
       });
       const [[barber]] = await pool.query('SELECT name FROM barbers WHERE id = ?', [finalBarberId]);
-      const baseUrl = String(req.body.base_url || '').replace(/\/$/, '');
+      const baseUrl = safeBaseUrl(req, req.body.base_url);
       const cancelUrl = baseUrl + (baseUrl.includes('?') ? '&' : '?') + 'cancel=' + appt.cancel_token;
       await sendAppointmentRescheduled(req.salon.id, appt.email, {
         clientName: appt.client_name, when,
@@ -1152,7 +1162,7 @@ router.put('/:id/reschedule', requireAdminOrBarber, wrap(async (req, res) => {
   }
 
   res.json({ ok: true });
-}));
+})));
 
 /**
  * Promeut une entrée d'appointment en vraie ligne de file — checkin_at

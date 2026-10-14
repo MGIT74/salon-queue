@@ -1,5 +1,6 @@
 // Reservation a plusieurs : logique pure (lib/groupBooking) + route /api/appointments/group avec une base simulee en memoire
 // (aucune base ni dependance reelle : express, mysql2, nodemailer sont remplaces).
+process.env.PUBLIC_HOSTS = 'salon.test';
 const Module = require('module'), path = require('path');
 let pass = 0, fail = 0;
 const check = (n, ok, extra) => { (ok ? pass++ : fail++); console.log((ok ? '  OK   ' : '  ECHEC') + ' ' + n + (ok || extra === undefined ? '' : '  -> ' + JSON.stringify(extra))); };
@@ -59,7 +60,7 @@ const fakeExpress = () => ({}); fakeExpress.Router = () => fakeRouter;
 const realLoad = Module._load;
 Module._load = function (request, parent, isMain) {
   if (request === 'express') return fakeExpress;
-  if (/(^|\/)db$/.test(request)) return { pool: { query: async (s, p) => fakeQuery(s, p) }, utcIso: (x) => x, getSettings: async () => settings };
+  if (/(^|\/)db$/.test(request)) return { pool: { query: async (s, p) => fakeQuery(s, p), getConnection: async () => ({ query: async () => [[{ ok: 1 }]], release() {} }) }, utcIso: (x) => x, getSettings: async () => settings };
   if (/middleware\/(auth|barberAuth)$/.test(request)) return (q, r, nx) => nx();
   if (/lib\/mailer$/.test(request)) return new Proxy({}, { get: (t, k) => async (salonId, to, info) => { if (k === 'sendGroupAppointmentConfirmation') state.mails.push({ to, info }); } });
   return realLoad.apply(this, arguments);

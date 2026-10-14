@@ -1,4 +1,5 @@
 const express = require('express');
+const { safeBaseUrl } = require('../lib/safeUrl');
 const crypto = require('crypto');
 const { pool } = require('../db');
 const { slugTaken } = require('../lib/slugs');
@@ -127,7 +128,7 @@ router.post('/', requireSignupEnabled, signupRateLimiter('signup'), wrap(async (
   await pool.query('INSERT INTO settings (salon_id, `key`, value) VALUES ?', [settingsRows]);
 
   try {
-    const verifyUrl = String(req.body.base_url || '').replace(/\/$/, '') + '/verify-email.html?token=' + verifyToken;
+    const verifyUrl = safeBaseUrl(req, req.body.base_url) + '/verify-email.html?token=' + verifyToken;
     await sendVerificationEmail(email, verifyUrl);
   } catch (err) {
     // Ne bloque jamais la création du compte si l'email échoue (ex. SMTP
@@ -159,7 +160,7 @@ router.post('/forgot-password', signupRateLimiter('signup-forgot'), wrap(async (
         'UPDATE owners SET reset_token = ?, reset_token_expires = ? WHERE id = ?',
         [token, expires, owner.id]
       );
-      const resetUrl = String(req.body.base_url || '').replace(/\/$/, '') + '/reset-password.html?token=' + token;
+      const resetUrl = safeBaseUrl(req, req.body.base_url) + '/reset-password.html?token=' + token;
       await sendPasswordReset(email, resetUrl);
     }
   } catch (err) {
@@ -231,7 +232,7 @@ router.post('/resend-verification', signupRateLimiter('signup-resend'), wrap(asy
         'UPDATE owners SET verify_token = ?, verify_token_expires = ? WHERE id = ?',
         [verifyToken, verifyExpires, owner.id]
       );
-      const verifyUrl = String(req.body.base_url || '').replace(/\/$/, '') + '/verify-email.html?token=' + verifyToken;
+      const verifyUrl = safeBaseUrl(req, req.body.base_url) + '/verify-email.html?token=' + verifyToken;
       await sendVerificationEmail(email, verifyUrl);
     }
   } catch (err) {

@@ -1,4 +1,5 @@
 const express = require('express');
+const { safeBaseUrl } = require('../lib/safeUrl');
 const crypto = require('crypto');
 const { pool, getSettings } = require('../db');
 const { hashPassword, verifyPassword } = require('../lib/password');
@@ -70,7 +71,7 @@ router.post('/signup', signupRateLimiter('client-signup'), wrap(async (req, res)
   // "un email vient de vous etre envoye" alors qu'il n'arrivera jamais, et le client restait bloque sans comprendre.
   let emailSent = true;
   try {
-    const verifyUrl = appendParam(req.body.base_url, 'verify', verifyToken);
+    const verifyUrl = appendParam(safeBaseUrl(req, req.body.base_url), 'verify', verifyToken);
     await sendClientVerificationEmail(req.salon.id, email, verifyUrl);
   } catch (err) {
     emailSent = false;
@@ -114,7 +115,7 @@ router.post('/resend-verification', signupRateLimiter('client-resend'), wrap(asy
       const verifyToken = crypto.randomBytes(32).toString('hex');
       const verifyExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
       await pool.query('UPDATE clients SET verify_token = ?, verify_token_expires = ? WHERE id = ?', [verifyToken, verifyExpires, client.id]);
-      const verifyUrl = appendParam(req.body.base_url, 'verify', verifyToken);
+      const verifyUrl = appendParam(safeBaseUrl(req, req.body.base_url), 'verify', verifyToken);
       await sendClientVerificationEmail(req.salon.id, email, verifyUrl);
     }
   } catch (err) {
@@ -162,7 +163,7 @@ router.post('/forgot-password', signupRateLimiter('client-forgot'), wrap(async (
       const token = crypto.randomBytes(32).toString('hex');
       const expires = new Date(Date.now() + 60 * 60 * 1000);
       await pool.query('UPDATE clients SET reset_token = ?, reset_token_expires = ? WHERE id = ?', [token, expires, client.id]);
-      const resetUrl = appendParam(req.body.base_url, 'reset', token);
+      const resetUrl = appendParam(safeBaseUrl(req, req.body.base_url), 'reset', token);
       await sendClientPasswordReset(req.salon.id, email, resetUrl);
     }
   } catch (err) {
@@ -179,6 +180,8 @@ router.post('/reset-password', wrap(async (req, res) => {
   if (!client) return res.status(400).json({ error: 'Ce lien est invalide ou a expiré. Refaites une demande.' });
   const passwordHash = await hashPassword(password);
   await pool.query('UPDATE clients SET password_hash = ?, reset_token = NULL, reset_token_expires = NULL WHERE id = ?', [passwordHash, client.id]);
+  // Nouveau mot de passe : toutes les sessions ouvertes avec l'ancien (ex. un téléphone perdu) sont fermées.
+  await pool.query('DELETE FROM client_sessions WHERE client_id = ?', [client.id]);
   res.json({ ok: true });
 }));
 
@@ -331,7 +334,7 @@ router.put('/me', requireClient, wrap(async (req, res) => {
     params.push(email, verifyToken, verifyExpires);
 
     try {
-      const verifyUrl = appendParam(req.body.base_url, 'verify', verifyToken);
+      const verifyUrl = appendParam(safeBaseUrl(req, req.body.base_url), 'verify', verifyToken);
       await sendClientVerificationEmail(req.clientAccount.salon_id, email, verifyUrl);
     } catch (err) {
       console.error('[client email change] envoi email échoué:', err.message);

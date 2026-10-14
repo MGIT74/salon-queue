@@ -1,4 +1,5 @@
 const express = require('express');
+const { safeBaseUrl } = require('../lib/safeUrl');
 const crypto = require('crypto');
 const { pool, getPlatformSettings, setPlatformSettings } = require('../db');
 const { slugTaken } = require('../lib/slugs');
@@ -177,7 +178,7 @@ router.post('/salons', requireSuperAdmin, wrap(async (req, res) => {
 
   if (email && verifyToken) {
     try {
-      const verifyUrl = String(req.body.base_url || '').replace(/\/$/, '') + '/verify-email.html?token=' + verifyToken;
+      const verifyUrl = safeBaseUrl(req, req.body.base_url) + '/verify-email.html?token=' + verifyToken;
       await sendVerificationEmail(email, verifyUrl);
     } catch (err) {
       // N'empêche jamais la création du compte si l'envoi échoue.

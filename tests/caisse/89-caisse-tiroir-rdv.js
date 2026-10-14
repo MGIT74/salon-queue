@@ -127,7 +127,7 @@ let JSDOM = null; try { JSDOM = require('jsdom').JSDOM; } catch (_) { /* absent 
   const real = Module._load;
   Module._load = function (request) {
     if (request === 'express') return fx;
-    if (/(^|\/)db$/.test(request)) return { pool: { query: async (s, p) => fq(s, p) }, utcIso: (x) => x, getSettings: async () => ({ timezone: 'Europe/Paris' }) };
+    if (/(^|\/)db$/.test(request)) return { pool: { query: async (s, p) => fq(s, p), getConnection: async () => ({ query: async () => [[{ ok: 1 }]], release() {} }) }, utcIso: (x) => x, getSettings: async () => ({ timezone: 'Europe/Paris' }) };
     if (/middleware\/auth$/.test(request)) return mwAdmin;
     if (/middleware\/barberAuth$/.test(request)) return mwBarber;
     if (/lib\/mailer$/.test(request)) return new Proxy({}, { get: () => async () => {} });

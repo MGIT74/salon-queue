@@ -31,7 +31,7 @@
     var idleMs = opts.idleMs || 15000;
     var running = false;
     var id = setInterval(function () {
-      if (running || document.hidden) return;
+      if (running || document.hidden || (typeof navigator !== 'undefined' && navigator.onLine === false)) return;
       if (Date.now() - lastTouch < idleMs) return;
       if (opts.busy && opts.busy()) return;
       var ae = document.activeElement;
