@@ -111,4 +111,5 @@ node tests/caisse/77-icone-cadeau-partout.js  # Image de la tuile cadeau partout
 node tests/caisse/78-fidelite-sans-badge-cadeau.js  # Fidélité sans badge cadeau
 node tests/caisse/79-conges-calendrier-lib.js  # Congés : jours <-> plages, répétition annuelle
 node tests/caisse/80-conges-calendrier-annuel.js  # Congés : calendrier annuel (glisser, bulle)
+node tests/caisse/81-fiche-coiffeur-page.js  # Fiche coiffeur en page + cartes
 ```

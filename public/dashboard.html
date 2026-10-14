@@ -1150,6 +1150,78 @@
   .barber-chevron { color: var(--grey); flex-shrink: 0; transition: transform .18s ease; }
   .barber-chevron.open { transform: rotate(180deg); }
 
+
+  /* Fiche coiffeur en « page » : retour, résumé du jour, onglets, profil à droite, autres coiffeurs en bas */
+  .bc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 14px; }
+  .bc { background: var(--card); border-radius: 18px; padding: 16px 18px; box-shadow: var(--shadow); cursor: pointer;
+        transition: transform .15s ease, box-shadow .15s ease; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .bc:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+  .bc.cur { box-shadow: 0 0 0 2px var(--accent), var(--shadow); }
+  .bc.inactive .bc-av { opacity: .55; }
+  .bc-top { display: flex; align-items: center; gap: 12px; }
+  .bc-av, .bp-av { border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+                   font-weight: 600; color: var(--grey); background: var(--fill) center/cover no-repeat; }
+  .bc-av { width: 52px; height: 52px; font-size: 19px; }
+  .bc-info { flex: 1; min-width: 0; }
+  .bc-name { font-size: 16px; font-weight: 600; letter-spacing: -.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bc-sub { font-size: 12.5px; color: var(--grey); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bc-go { color: var(--grey); flex-shrink: 0; }
+  .bc-chips, .bp-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .bc-chips .leave-badge, .bp-chips .leave-badge { margin-left: 0; }
+  .bc-chip { font-size: 11.5px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: var(--fill); color: var(--grey); white-space: nowrap; }
+  .bc-chip.blue { background: rgba(var(--accent-rgb), .13); color: var(--blue); }
+  .bc-chip.orange { background: rgba(255,149,0,.15); color: var(--orange); }
+  .bc-chip.red { background: rgba(255,59,48,.13); color: var(--red); }
+  .bc-chip.green { background: rgba(52,199,89,.15); color: var(--green); }
+  .bc-chip.off { background: rgba(127,127,127,.2); color: var(--grey); }
+
+  .bp-top { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; flex-wrap: wrap; }
+  .bp-back { display: inline-flex; align-items: center; gap: 6px; background: var(--card); border: 1px solid var(--sep); border-radius: 999px;
+             padding: 9px 16px 9px 12px; font-family: inherit; font-size: 14px; font-weight: 600; color: var(--ink); cursor: pointer; box-shadow: var(--shadow); }
+  .bp-back:hover { background: var(--fill); }
+  .bp-title { font-size: 21px; font-weight: 600; letter-spacing: -.03em; margin: 0; }
+  .bp-layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 18px; align-items: start; }
+  .bp-main { min-width: 0; }
+  .bp-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-bottom: 16px; }
+  .bp-kpi { --k: var(--blue); --kb: rgba(var(--accent-rgb), .12); background: var(--card); border-radius: 18px; padding: 16px 18px 14px; box-shadow: var(--shadow);
+            border-bottom: 3px solid var(--k); display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0; }
+  .bp-kpi.k-green { --k: var(--green); --kb: rgba(52,199,89,.14); }
+  .bp-kpi.k-orange { --k: var(--orange); --kb: rgba(255,149,0,.15); }
+  .bp-kpi .v { font-size: 28px; font-weight: 700; letter-spacing: -.03em; color: var(--k); line-height: 1.1; }
+  .bp-kpi .l { font-size: 13px; color: var(--grey); margin-top: 6px; }
+  .bp-kpi .ic { width: 46px; height: 46px; border-radius: 12px; background: var(--kb); color: var(--k); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .bp-panel { background: var(--card); border-radius: 18px; padding: 18px; box-shadow: var(--shadow); }
+  .bp-profile { background: var(--card); border-radius: 18px; padding: 24px 18px 18px; box-shadow: var(--shadow); text-align: center; }
+  .bp-ring { --rc: var(--accent); width: 100px; height: 100px; border-radius: 50%; padding: 4px; margin: 0 auto 14px; box-sizing: border-box;
+             background: conic-gradient(from 210deg, var(--rc), #a855f7 55%, var(--rc)); }
+  .bp-ring .bp-av { width: 100%; height: 100%; font-size: 34px; border: 3px solid var(--card); box-sizing: border-box; }
+  .bp-name { font-size: 18px; font-weight: 600; letter-spacing: -.02em; }
+  .bp-role { font-size: 13px; color: var(--grey); margin: 2px 0 12px; }
+  .bp-chips { justify-content: center; }
+  .bp-sep { height: 1px; background: var(--sep); margin: 16px -18px 14px; }
+  .bp-profile .barber-quick-actions { grid-template-columns: 1fr; gap: 6px; margin: 0; text-align: left; }
+  .bp-profile .barber-quick-actions > button:last-of-type:nth-of-type(odd) { grid-column: auto; }
+  .bp-profile .quick-action { flex-direction: row; justify-content: flex-start; gap: 10px; padding: 11px 14px; font-size: 14px; border-radius: 12px; }
+  .bp-others { margin-top: 28px; }
+  .bp-others-head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .bp-others-head h3 { margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -.02em; }
+  .bp-others-head span { font-size: 12px; font-weight: 700; color: var(--grey); background: var(--fill); border-radius: 999px; padding: 2px 9px; }
+  .bp-others-row { display: flex; gap: 14px; overflow-x: auto; padding: 4px 2px 14px; scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; }
+  .bp-others-row .bc { flex: 0 0 280px; scroll-snap-align: start; }
+  @media (max-width: 980px) {
+    .bp-layout { grid-template-columns: minmax(0, 1fr); }
+    .bp-side { order: -1; }
+    .bp-profile .barber-quick-actions { grid-template-columns: 1fr 1fr; }
+    .bp-profile .barber-quick-actions > button:last-of-type:nth-of-type(odd) { grid-column: 1 / -1; }
+    .bp-profile .quick-action { padding: 10px 12px; font-size: 13.5px; }
+  }
+  @media (max-width: 640px) {
+    .bp-kpis { grid-template-columns: 1fr; gap: 10px; }
+    .bp-kpi .v { font-size: 24px; }
+    .bp-panel { padding: 14px; }
+    .bp-others-row .bc { flex-basis: 240px; }
+  }
+
   .barber-detail { border-top: 1px solid var(--sep); padding: 18px; }
   .subtabs { display: flex; gap: 4px; background: var(--fill); border-radius: 999px; padding: 4px; margin-bottom: 18px;
              overflow-x: auto; -webkit-overflow-scrolling: touch; }
@@ -1986,7 +2058,7 @@
 
   <!-- ===== Onglet coiffeurs ===== -->
   <div class="tab-panel" id="t-barbers">
-    <div class="admin-head">
+    <div class="admin-head" id="barbers-head">
       <h2>Coiffeurs et horaires</h2>
       <div style="display:flex;gap:8px">
         <button class="btn btn-primary" onclick="openAddBarberChoice()">+ Ajouter un coiffeur</button>
@@ -4575,40 +4647,105 @@ function leaveBadgeHtml(b) {
     'En congé' + until + '</span>';
 }
 
+var barberKpis = {};        // { [barberId]: { done, revenue, occ } }  (aujourd'hui)
+
+// Pastilles d'état d'un coiffeur (mode de prise de RDV, inactif, congé...).
+function barberStatusChips(b) {
+  var chips = '';
+  if (!b.active) chips += '<span class="bc-chip off">Inactif</span>';
+  if (b.kiosk_hidden && b.accepts_appointments) chips += '<span class="bc-chip blue">RDV uniquement</span>';
+  else if (!b.kiosk_hidden && !b.accepts_appointments) chips += '<span class="bc-chip orange">Sans RDV uniquement</span>';
+  else if (b.kiosk_hidden && !b.accepts_appointments) chips += '<span class="bc-chip red">Masqué partout</span>';
+  else chips += '<span class="bc-chip green">RDV + sans RDV</span>';
+  chips += '<span class="bc-chip">' + (b.has_pin ? 'Code PIN' : 'Sans code') + '</span>';
+  return chips;
+}
+
+function barberAvatarHtml(b, cls) {
+  var photoStyle = b.photo_url ? 'background-image:url(&quot;' + esc(b.photo_url) + '&quot;)' : '';
+  return '<div class="' + cls + '" style="' + photoStyle + '">' + (b.photo_url ? '' : esc(b.name.charAt(0).toUpperCase())) + '</div>';
+}
+
+// Carte d'un coiffeur (liste des coiffeurs ET rangée de navigation en bas d'une fiche).
+function barberCardHtml(b, current) {
+  return '<div class="bc' + (current ? ' cur' : '') + (b.active ? '' : ' inactive') + '" data-barber="' + b.id + '" onclick="toggleBarberExpand(\'' + b.id + '\')">' +
+    '<div class="bc-top">' + barberAvatarHtml(b, 'bc-av') +
+      '<div class="bc-info"><div class="bc-name">' + esc(b.name) + '</div>' +
+      '<div class="bc-sub">' + (currentSalonName ? esc(currentSalonName) : 'Coiffeur') + '</div></div>' +
+      '<svg class="bc-go" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>' +
+    '</div>' +
+    '<div class="bc-chips">' + leaveBadgeHtml(b) + barberStatusChips(b) + '</div>' +
+    '</div>';
+}
+
 function renderBarbers() {
-  document.getElementById('barbers-list').innerHTML = barbers.length === 0
-    ? '<div class="empty">Aucun coiffeur. Ajoutez-en un pour que la file fonctionne.</div>'
-    : barbers.map(function (b) {
-        var open = expandedBarberId === b.id;
-        var photoStyle = b.photo_url ? 'background:url(&quot;' + esc(b.photo_url) + '&quot;) center/cover' : '';
-        return '<div class="barber-card" data-barber="' + b.id + '">' +
-          '<div class="barber-head" onclick="toggleBarberExpand(\'' + b.id + '\')">' +
-          '<div class="barber-avatar" style="' + photoStyle + '">' + (b.photo_url ? '' : esc(b.name.charAt(0).toUpperCase())) + '</div>' +
-          '<div class="barber-head-info">' +
-          '<div class="name">' + esc(b.name) + (b.active ? '' : ' · inactif') + leaveBadgeHtml(b) + '</div>' +
-          '<div class="sub">' + (currentSalonName ? esc(currentSalonName) + ' · ' : '') + (b.has_pin ? 'Code PIN configuré' : 'Aucun code PIN') +
-          ' · ' + (b.kiosk_hidden && b.accepts_appointments
-            ? '<span style="color:var(--blue)">RDV uniquement</span>'
-            : (!b.kiosk_hidden && !b.accepts_appointments
-                ? '<span style="color:var(--orange, #f97316)">Sans RDV uniquement</span>'
-                : '<span style="color:var(--red)">Masqué partout (aucun mode choisi)</span>')) +
-          '</div>' +
-          '</div>' +
-          '<svg class="barber-chevron' + (open ? ' open' : '') + '" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>' +
-          '</div>' +
-          (open ? renderBarberDetail(b) : '') +
-          '</div>';
-      }).join('');
+  var host = document.getElementById('barbers-list');
+  var head = document.getElementById('barbers-head');
+  var cur = expandedBarberId && barbers.filter(function (x) { return x.id === expandedBarberId; })[0];
+  if (expandedBarberId && !cur) expandedBarberId = null;
+  if (head) head.style.display = cur ? 'none' : '';
+
+  if (!cur) {
+    host.innerHTML = barbers.length === 0
+      ? '<div class="empty">Aucun coiffeur. Ajoutez-en un pour que la file fonctionne.</div>'
+      : '<div class="bc-grid">' + barbers.map(function (b) { return barberCardHtml(b, false); }).join('') + '</div>';
+    return;
+  }
+
+  // Fiche d'un coiffeur = une « page » : retour, résumé du jour, onglets, profil à droite, et tout en bas les autres coiffeurs.
+  var others = barbers.length > 1
+    ? '<div class="bp-others"><div class="bp-others-head"><h3>Coiffeurs</h3><span>' + barbers.length + '</span></div>' +
+      '<div class="bp-others-row">' + barbers.map(function (b) { return barberCardHtml(b, b.id === cur.id); }).join('') + '</div></div>'
+    : '';
+  host.innerHTML =
+    '<div class="bp-top"><button type="button" class="bp-back" onclick="closeBarber()">' +
+      '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>Retour</button>' +
+      '<h2 class="bp-title">' + esc(cur.name) + '</h2></div>' +
+    renderBarberDetail(cur) + others;
+  paintBarberKpis(cur.id);
 }
 
 function toggleBarberExpand(id) {
-  expandedBarberId = expandedBarberId === id ? null : id;
-  if (expandedBarberId && !barberDetailTab[expandedBarberId]) barberDetailTab[expandedBarberId] = 'horaires';
-  if (expandedBarberId && !barberStatsState[expandedBarberId]) barberStatsState[expandedBarberId] = { period: 'day', offset: 0 };
+  // Ouvre la fiche de ce coiffeur (depuis la liste ou depuis la rangée du bas).
+  expandedBarberId = id;
+  if (!barberDetailTab[id]) barberDetailTab[id] = 'horaires';
+  if (!barberStatsState[id]) barberStatsState[id] = { period: 'day', offset: 0 };
   renderBarbers();
-  if (expandedBarberId && barberDetailTab[expandedBarberId] === 'stats') loadBarberStats(expandedBarberId);
-  if (expandedBarberId && barberDetailTab[expandedBarberId] === 'conges') loadBarberLeaves(expandedBarberId);
-  if (expandedBarberId && barberDetailTab[expandedBarberId] === 'prestations') loadBarberCapabilities(expandedBarberId);
+  var t = document.getElementById('t-barbers');
+  if (t && t.scrollIntoView) t.scrollIntoView({ block: 'start' });
+  loadBarberKpis(id);
+  if (barberDetailTab[id] === 'stats') loadBarberStats(id);
+  if (barberDetailTab[id] === 'conges') loadBarberLeaves(id);
+  if (barberDetailTab[id] === 'prestations') loadBarberCapabilities(id);
+}
+
+function closeBarber() {
+  expandedBarberId = null;
+  renderBarbers();
+  var t = document.getElementById('t-barbers');
+  if (t && t.scrollIntoView) t.scrollIntoView({ block: 'start' });
+}
+
+// Résumé « aujourd'hui » en haut d'une fiche (coupes terminées, encaissé, occupation).
+function loadBarberKpis(id) {
+  var range = periodRange('day', 0, {});
+  var endInclusive = new Date(range.end);
+  endInclusive.setDate(endInclusive.getDate() - 1);
+  var qs = 'start=' + range.start.toISOString() + '&end=' + range.end.toISOString() +
+    '&start_date=' + localDateStr(range.start) + '&end_date=' + localDateStr(endInclusive);
+  api('/api/barbers/' + id + '/stats?' + qs).then(function (r) {
+    barberKpis[id] = { done: r.done_count, revenue: r.revenue_cents, occ: r.availability ? r.availability.occupancy_pct : null };
+    paintBarberKpis(id);
+  }).catch(function () {});
+}
+
+function paintBarberKpis(id) {
+  var k = barberKpis[id];
+  if (!k) return;
+  var set = function (key, v) { var el = document.getElementById('bp-kpi-' + key + '-' + id); if (el) el.textContent = v; };
+  set('done', k.done);
+  set('rev', eur(k.revenue));
+  set('occ', k.occ === null ? '—' : k.occ + ' %');
 }
 
 function switchBarberTab(id, tab) {
@@ -4626,9 +4763,9 @@ function renderBarberDetail(b) {
     tab === 'stats' ? renderStatsTab(b) :
     tab === 'prestations' ? renderCapabilitiesTab(b) :
     renderLeavesTab(b);
+  var color = b.color || stableColorForId(b.id);
 
-  return '<div class="barber-detail">' +
-    '<div class="barber-quick-actions">' +
+  var actions = '<div class="barber-quick-actions">' +
       '<button class="quick-action" onclick="event.stopPropagation();renameBarber(\'' + b.id + '\')">' +
         '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>' +
         '<span>Renommer</span>' +
@@ -4657,15 +4794,34 @@ function renderBarberDetail(b) {
             '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m9 12 2 2 4-4"/></svg>' +
             '<span>Réactiver</span>' +
           '</button>') +
-    '</div>' +
-    '<div class="subtabs" onclick="event.stopPropagation()">' +
+    '</div>';
+
+  var kpis = '<div class="bp-kpis">' +
+    '<div class="bp-kpi k-green"><div><div class="v" id="bp-kpi-done-' + b.id + '">—</div><div class="l">Coupes aujourd\'hui</div></div>' +
+      '<div class="ic"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4 8.1 15.9M14.5 14.5 20 20M8.1 8.1 12 12"/></svg></div></div>' +
+    '<div class="bp-kpi k-blue"><div><div class="v" id="bp-kpi-rev-' + b.id + '">—</div><div class="l">Encaissé aujourd\'hui</div></div>' +
+      '<div class="ic"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="13" rx="2.5"/><path d="M2 11h20"/></svg></div></div>' +
+    '<div class="bp-kpi k-orange"><div><div class="v" id="bp-kpi-occ-' + b.id + '">—</div><div class="l">Occupation aujourd\'hui</div></div>' +
+      '<div class="ic"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg></div></div>' +
+    '</div>';
+
+  var tabs = '<div class="subtabs">' +
     '<button class="' + (tab === 'horaires' ? 'on' : '') + '" onclick="switchBarberTab(\'' + b.id + '\',\'horaires\')">Horaires</button>' +
     '<button class="' + (tab === 'prestations' ? 'on' : '') + '" onclick="switchBarberTab(\'' + b.id + '\',\'prestations\')">Prestations</button>' +
     '<button class="' + (tab === 'stats' ? 'on' : '') + '" onclick="switchBarberTab(\'' + b.id + '\',\'stats\')">Statistiques</button>' +
     '<button class="' + (tab === 'conges' ? 'on' : '') + '" onclick="switchBarberTab(\'' + b.id + '\',\'conges\')">Congés</button>' +
-    '</div>' +
-    '<div onclick="event.stopPropagation()">' + body + '</div>' +
     '</div>';
+
+  var profile = '<aside class="bp-side"><div class="bp-profile">' +
+    '<div class="bp-ring" style="--rc:' + esc(color) + '">' + barberAvatarHtml(b, 'bp-av') + '</div>' +
+    '<div class="bp-name">' + esc(b.name) + '</div>' +
+    '<div class="bp-role">' + (currentSalonName ? esc(currentSalonName) : 'Coiffeur') + '</div>' +
+    '<div class="bp-chips">' + leaveBadgeHtml(b) + barberStatusChips(b) + '</div>' +
+    '<div class="bp-sep"></div>' + actions +
+    '</div></aside>';
+
+  return '<div class="bp-layout"><div class="bp-main">' + kpis +
+    '<div class="bp-panel">' + tabs + '<div>' + body + '</div></div></div>' + profile + '</div>';
 }
 
 function renderScheduleTab(b) {

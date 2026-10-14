@@ -41,7 +41,7 @@ const fin = new Date(t.getTime() + 3 * 864e5);
 const html = c2.leaveBadgeHtml({ on_leave_today: true, leaves: [{ start_date: ymd(t), end_date: ymd(fin) }] });
 check('en conge : etiquette "En conge" avec la date de retour (jj/mm)', /leave-badge/.test(html) && /En congé · jusqu'au \d\d\/\d\d/.test(html) && html.indexOf(String(ymd(fin)).slice(8, 10) + '/' + String(ymd(fin)).slice(5, 7)) > -1);
 check('pas en conge : aucune etiquette', c2.leaveBadgeHtml({ on_leave_today: false, leaves: [] }) === '');
-check('la liste des coiffeurs affiche l\'etiquette a cote du nom', /esc\(b\.name\) \+ \(b\.active \? '' : ' · inactif'\) \+ leaveBadgeHtml\(b\)/.test(dash));
+check('chaque carte de coiffeur (et la fiche) affiche l\'etiquette de conge', /'<div class="bc-chips">' \+ leaveBadgeHtml\(b\)/.test(dash) && /'<div class="bp-chips">' \+ leaveBadgeHtml\(b\)/.test(dash));
 c2.barbers = [{ active: 1, on_leave_today: true }, { active: 1, on_leave_today: false }, { active: 0, on_leave_today: true }, { active: 1, on_leave_today: true }];
 vm.runInContext('updateLeaveKpi()', c2);
 check('dashboard : le carre compte les coiffeurs ACTIFS en conge (2, pas l\'inactif)', el['dash-kpi-leave'].textContent === 2);
@@ -49,7 +49,7 @@ c2.barbers = [{ active: 1, on_leave_today: false }];
 vm.runInContext('updateLeaveKpi()', c2);
 check('aucun conge : 0 et carre neutre (non rouge)', el['dash-kpi-leave'].textContent === 0 && el['dash-kpi-leave-box'].none === true);
 check('le carre est dans l\'en-tete du dashboard, avec une icone', /id="dash-kpi-leave-box"[\s\S]{0,400}<svg[\s\S]{0,600}id="dash-kpi-leave"/.test(dash));
-check('ajout / suppression d\'un conge : liste et carre se rafraichissent aussitot', (dash.match(/return loadBarbers\(\)\.then\(function \(\) \{ return loadBarberLeaves/g) || []).length === 2);
+check('calendrier des conges : liste et carre se rafraichissent a la fermeture de la bulle (apres un changement)', /if \(st\.dirty\) \{ st\.dirty = false; loadBarbers\(\); \}/.test(dash));
 
 console.log('\n' + pass + ' OK, ' + fail + ' ECHEC');
 process.exit(fail ? 1 : 0);
