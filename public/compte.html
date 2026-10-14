@@ -460,9 +460,10 @@
     <div class="eyebrow">Mes proches</div>
     <p style="color:var(--grey);font-size:13.5px;margin:-6px 0 12px">Enfants, amis… : enregistrez leur prénom pour les ajouter en un clic quand vous réservez à plusieurs.</p>
     <div id="relatives-list"></div>
-    <div style="display:flex;gap:8px;margin-bottom:6px">
-      <input id="rel-new" type="text" maxlength="60" placeholder="Prénom" style="flex:1;min-width:0" onkeydown="if(event.key==='Enter')addRelative()">
-      <button class="go" style="width:auto;margin:0;padding:10px 18px" onclick="addRelative()">Ajouter</button>
+    <div class="rel-add">
+      <span class="rel-av"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span>
+      <input id="rel-new" type="text" maxlength="60" placeholder="Ajouter un prénom" autocomplete="off" oninput="document.getElementById('rel-add-btn').disabled=!this.value.trim()" onkeydown="if(event.key==='Enter')addRelative()">
+      <button id="rel-add-btn" disabled onclick="addRelative()">Ajouter</button>
     </div>
     <div class="err" id="rel-err"></div>
 
@@ -648,7 +649,21 @@
 <script src="/group-booking.js?v=10"></script>
 <style>
 .gb-done{padding:10px 0;border-bottom:1px solid var(--sep)}.gb-done:last-child{border:none}.gb-done b{display:block}.gb-done span{color:var(--grey);font-size:14px}
-.rel-row{display:flex;align-items:center;gap:8px;margin-bottom:8px}.rel-row input{flex:1;min-width:0}.rel-row button{border:none;background:var(--fill);color:var(--grey);border-radius:10px;padding:9px 12px;font-family:inherit;cursor:pointer}.rel-row button.del:hover{color:#ff3b30}
+#relatives-list{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
+.rel-card{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--sep);border-radius:16px;padding:8px 8px 8px 10px;transition:border-color .15s}
+.rel-card:focus-within{border-color:var(--blue)}
+.rel-av{width:38px;height:38px;border-radius:50%;background:var(--blue-soft);color:var(--blue);font-weight:700;font-size:15px;display:flex;align-items:center;justify-content:center;flex:none}
+.rel-card input{flex:1;min-width:0;border:none;background:transparent;color:var(--ink);font-family:inherit;font-size:16px;font-weight:600;padding:8px 2px;outline:none}
+.rel-ico{border:none;background:none;color:var(--grey);width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none;transition:background .15s,color .15s}
+.rel-ico:hover{background:var(--fill);color:#ff3b30}
+.rel-empty{color:var(--grey);font-size:13.5px;padding:2px 2px 4px}
+.rel-add{display:flex;align-items:center;gap:12px;background:var(--fill);border:1.5px dashed var(--sep);border-radius:16px;padding:8px 8px 8px 10px;transition:border-color .15s,background .15s}
+.rel-add:focus-within{border-color:var(--blue);border-style:solid;background:var(--card)}
+.rel-add .rel-av{background:transparent;border:1.5px dashed var(--grey);color:var(--grey)}
+.rel-add input{flex:1;min-width:0;border:none;background:transparent;color:var(--ink);font-family:inherit;font-size:16px;padding:8px 2px;outline:none}
+.rel-add input::placeholder{color:var(--grey);opacity:.7}
+.rel-add button{border:none;background:var(--blue);color:#fff;font-family:inherit;font-size:14.5px;font-weight:600;border-radius:12px;padding:10px 18px;cursor:pointer;flex:none}
+.rel-add button:disabled{opacity:.4;cursor:default}
 </style>
 <script>
 mountThemeButton();
@@ -953,17 +968,19 @@ function setRelatives(list) {
   myRelatives = list;
   if (bookGroupCtl) bookGroupCtl.setRelatives(myRelatives);
   var box = document.getElementById('relatives-list'); if (!box) return;
-  box.innerHTML = list.map(function (r) {
-    return '<div class="rel-row" data-id="' + esc(r.id) + '"><input type="text" maxlength="60" value="' + esc(r.name) + '" onchange="renameRelative(\'' + esc(r.id) + '\', this)">' +
-      '<button class="del" title="Supprimer" onclick="deleteRelative(\'' + esc(r.id) + '\')"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>';
-  }).join('');
+  box.innerHTML = list.length ? list.map(function (r) {
+    var id = esc(r.id);
+    return '<div class="rel-card" data-id="' + id + '"><span class="rel-av">' + esc(String(r.name).charAt(0).toUpperCase()) + '</span>' +
+      '<input type="text" maxlength="60" value="' + esc(r.name) + '" aria-label="Prénom" onchange="renameRelative(\'' + id + '\', this)">' +
+      '<button class="rel-ico" title="Supprimer" aria-label="Supprimer" onclick="deleteRelative(\'' + id + '\')"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button></div>';
+  }).join('') : '<div class="rel-empty">Aucun proche enregistré pour le moment.</div>';
 }
 function addRelative() {
   var inp = document.getElementById('rel-new'), name = inp.value.trim(), err = document.getElementById('rel-err');
   err.textContent = ''; if (!name) return;
   api('/api/client-auth/relatives', { method: 'POST', body: { name: name } }).then(function (r) {
     if (!myRelatives.some(function (x) { return x.id === r.item.id; })) myRelatives.push(r.item);
-    inp.value = ''; setRelatives(myRelatives);
+    inp.value = ''; document.getElementById('rel-add-btn').disabled = true; setRelatives(myRelatives);
   }).catch(function (e) { err.textContent = e.message; });
 }
 function renameRelative(id, input) {
