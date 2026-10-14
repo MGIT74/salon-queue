@@ -534,7 +534,7 @@ router.post('/loyalty-accounts/activate', requireAdminOrBarber, wrap(async (req,
  * précis, identifié par ses coordonnées — pour le tiroir "fiche
  * client" du dashboard admin.
  */
-router.get('/client-marketing', requireAdmin, wrap(async (req, res) => {
+router.get('/client-marketing', requireAdminOrBarber, wrap(async (req, res) => {
   const email = String(req.query.email || '').trim();
   const phone = String(req.query.phone || '').trim();
   const name = String(req.query.name || '').trim();

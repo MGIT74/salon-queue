@@ -448,6 +448,10 @@
   .appt-drawer-head h2 { font-size: 21px; margin: 0; letter-spacing: -.02em; }
   .appt-drawer .x { background: var(--fill); border: none; width: 32px; height: 32px; border-radius: 50%; color: var(--grey); font-size: 15px; cursor: pointer; flex-shrink: 0; }
   .appt-drawer-section { margin-bottom: 22px; }
+  .ad-visit-row { background: var(--fill); border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; }
+  .ad-visit-row .ad-visit-date { font-size: 13.5px; font-weight: 600; }
+  .ad-visit-row .ad-visit-meta { font-size: 12.5px; color: var(--grey); margin-top: 2px; }
+  .ad-visit-count { font-size: 13.5px; color: var(--grey); margin-bottom: 12px; }
   .appt-drawer-section h3 { font-size: 13px; font-weight: 600; color: var(--grey); text-transform: uppercase; letter-spacing: .04em; margin: 0 0 10px; }
   .appt-drawer textarea, .appt-drawer .fld input { width: 100%; box-sizing: border-box; padding: 11px 13px; border: 1px solid var(--sep); border-radius: 10px; background: var(--card); color: var(--ink); font-family: inherit; font-size: 14.5px; }
   .appt-drawer textarea { resize: vertical; }
@@ -918,9 +922,18 @@
         <button class="btn btn-ghost" onclick="adToggleEdit()">Annuler</button>
       </div>
     </div>
+    <div class="appt-drawer-section" id="ad-marketing-section" style="display:none">
+      <h3>Marketing</h3>
+      <div id="ad-marketing-content"></div>
+    </div>
     <div class="appt-drawer-section">
       <h3>Note interne</h3>
       <div id="ad-note-box"></div>
+    </div>
+    <div class="appt-drawer-section">
+      <h3>Historique des passages</h3>
+      <div class="ad-visit-count" id="ad-visit-count"></div>
+      <div id="ad-visits"></div>
     </div>
   </div>
 </div>
@@ -2333,6 +2346,68 @@ function adRenderInfo() {
     (a.client_note ? '<div class="detail-row" style="flex-direction:column;align-items:flex-start;gap:2px"><span class="detail-label">📝 Note du client (RDV)</span><span class="detail-value" style="font-weight:400">' + esc(a.client_note) + '</span></div>' : '');
 }
 
+
+var AD_STATUS_LABEL = { waiting: 'En attente', in_progress: 'En cours', done: 'Terminé', cancelled: 'Absent / annulé' };
+var AD_STATUS_COLOR = { waiting: 'var(--grey)', in_progress: 'var(--blue)', done: 'var(--green)', cancelled: 'var(--red)' };
+
+function adRenderMarketing(r) {
+  var parts = [];
+  if (r.loyalty && r.loyalty.activated) {
+    parts.push('<div class="detail-row"><span class="detail-label">⭐ Fidélité</span><span class="detail-value">' +
+      r.loyalty.points + ' point' + (r.loyalty.points > 1 ? 's' : '') +
+      (r.loyalty.rewards_available > 0 ? ' · ' + r.loyalty.rewards_available + ' récompense' + (r.loyalty.rewards_available > 1 ? 's' : '') + ' disponible' + (r.loyalty.rewards_available > 1 ? 's' : '') : '') +
+      '</span></div>');
+  } else {
+    parts.push('<div class="hint" style="margin:0 0 4px">Carte de fidélité non activée</div>');
+  }
+  (r.gifts || []).forEach(function (g) {
+    var itemsList = (g.items || []).map(function (it) { return it.quantity + ' × ' + it.item_name; }).join(', ');
+    parts.push('<div class="detail-row" style="flex-direction:column;align-items:flex-start;gap:2px">' +
+      '<span class="detail-label" style="color:' + (g.used_at ? 'var(--grey)' : 'var(--green)') + '">' + (g.used_at ? '🎁 Cadeau utilisé' : '🎁 Cadeau disponible') + ' (' + eur(g.amount_cents) + ')</span>' +
+      '<span class="detail-value" style="font-weight:400">' + esc(itemsList) + '</span></div>');
+  });
+  document.getElementById('ad-marketing-content').innerHTML = parts.join('');
+  document.getElementById('ad-marketing-section').style.display = 'block';
+}
+
+function adSourceIcon(v) {
+  var walkin = v.source === 'walkin';
+  return '<span title="' + (walkin ? 'Sans RDV (passage au salon)' : 'RDV en ligne') + '" style="display:inline-flex;vertical-align:middle;color:var(--blue);margin-right:4px">' + (walkin ? '🚶' : '📅') + '</span>';
+}
+
+function adRenderVisits(items) {
+  document.getElementById('ad-visit-count').textContent = items.length + (items.length > 1 ? ' passages au total' : ' passage au total');
+  document.getElementById('ad-visits').innerHTML = items.length === 0
+    ? '<div class="empty">Aucun passage enregistré</div>'
+    : items.slice(0, 4).map(function (v) {
+        var when = new Date(v.checkin_at).toLocaleString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+        var mins = (v.start_at && v.end_at) ? Math.round((new Date(v.end_at) - new Date(v.start_at)) / 60000) : 0;
+        return '<div class="ad-visit-row"><div class="ad-visit-date">' + adSourceIcon(v) + when + '</div>' +
+          '<div class="ad-visit-meta">' + esc(v.service_name || 'Prestation') +
+          (v.total_price_cents ? ' · ' + eur(v.total_price_cents) : '') +
+          ' · <span style="color:' + (AD_STATUS_COLOR[v.status] || 'var(--grey)') + '">' + esc(AD_STATUS_LABEL[v.status] || v.status) + '</span>' +
+          (mins > 0 ? ' · ' + formatMinutes(mins) : '') + '</div></div>';
+      }).join('');
+}
+
+/** Charge fidélité/cadeaux + historique des passages du client du tiroir (comme dans le dashboard). */
+function adLoadDetails(a, queueId) {
+  var token = a.id;
+  document.getElementById('ad-marketing-section').style.display = 'none';
+  document.getElementById('ad-visit-count').textContent = '';
+  document.getElementById('ad-visits').innerHTML = '<div class="hint" style="margin:0">Chargement…</div>';
+  var qs = 'email=' + encodeURIComponent(a.email || '') + '&phone=' + encodeURIComponent(a.phone || '') + '&name=' + encodeURIComponent(a.client_name || '');
+  barberApi('/api/owner/client-marketing?' + qs).then(function (r) {
+    if (adAppt && adAppt.id === token) adRenderMarketing(r);
+  }).catch(function () {});
+  var url = queueId ? '/api/queue/' + queueId + '/client-history' : '/api/queue/client-history-by-contact?' + qs;
+  barberApi(url).then(function (r) {
+    if (adAppt && adAppt.id === token) adRenderVisits(r.items || []);
+  }).catch(function (e) {
+    document.getElementById('ad-visits').innerHTML = '<div class="empty">Historique indisponible</div>';
+  });
+}
+
 function openApptDrawer(a) {
   adAppt = a;
   adQueueId = a.promoted_queue_id || null;
@@ -2350,6 +2425,7 @@ function openApptDrawer(a) {
   } else {
     noteBox.innerHTML = '<p class="hint" style="margin:0">Pas encore modifiable — ce RDV entrera dans la file le jour même.</p>';
   }
+  adLoadDetails(a, adQueueId);
   document.getElementById('appt-drawer-backdrop').classList.add('on');
   _lockBodyScroll();
 }

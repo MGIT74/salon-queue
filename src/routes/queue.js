@@ -850,7 +850,7 @@ router.put('/:id/note', requireAdminOrBarber, wrap(async (req, res) => {
  * par sa clé de rapprochement — combien de fois il est venu, quand,
  * pour quelle prestation.
  */
-router.get('/:id/client-history', requireAdmin, wrap(async (req, res) => {
+router.get('/:id/client-history', requireAdminOrBarber, wrap(async (req, res) => {
   const [[row]] = await pool.query(
     'SELECT client_name, email, phone FROM queue WHERE id = ? AND salon_id = ?',
     [req.params.id, req.salon.id]
@@ -893,7 +893,7 @@ router.get('/:id/client-history', requireAdmin, wrap(async (req, res) => {
  * utilise pour un RDV pas encore promu en file (RDV futur), qui n'a
  * donc pas encore d'entree de file existante a interroger.
  */
-router.get('/client-history-by-contact', requireAdmin, wrap(async (req, res) => {
+router.get('/client-history-by-contact', requireAdminOrBarber, wrap(async (req, res) => {
   const key = clientKey({ email: req.query.email, phone: req.query.phone, client_name: req.query.name });
   if (!key) return res.json({ ok: true, items: [] });
 

@@ -23,6 +23,7 @@ let JSDOM = null; try { JSDOM = require('jsdom').JSDOM; } catch (_) { /* absent 
     w.calMonthCache = { '2026-10': [] }; w.calBooted = true; w.loadAgendaPeriod = () => calls.push(['loadAgenda']);
     w.renderNext = () => calls.push(['renderNext']); w.renderActive = () => {};
     w.toggleNextDetail = (id) => calls.push(['toggle', id]);
+    w.eur = (c) => (c / 100).toFixed(2) + ' €'; w.formatMinutes = (m) => m + ' min';
     w.hasBookableSchedule = () => true; w.isOnLeaveOn = () => false;
     w.queue = [{ id: 'q-rdv', is_appointment: 1 }, { id: 'q-walk', is_appointment: 0 }];
     w.allBarbers = [{ id: 'b1', name: 'Thomas', accepts_appointments: 1, active: 1 }, { id: 'b2', name: 'Ibrahim', accepts_appointments: 1, active: 1 }];
@@ -31,6 +32,8 @@ let JSDOM = null; try { JSDOM = require('jsdom').JSDOM; } catch (_) { /* absent 
     w.showConfirm = () => Promise.resolve(true); w.showPrompt = () => Promise.resolve(true);
     w.barberApi = (url, o) => {
       calls.push(['api', (o && o.method) || 'GET', url, o && o.body, o && o.actingAs]);
+      if (/client-marketing/.test(url)) return Promise.resolve({ loyalty: { activated: true, points: 7, rewards_available: 1 }, gifts: [{ amount_cents: 1500, used_at: null, items: [{ quantity: 1, item_name: 'Barbe' }] }] });
+      if (/client-history/.test(url)) return Promise.resolve({ items: [1, 2, 3, 4, 5].map((i) => ({ id: 'h' + i, checkin_at: '2026-09-0' + i + 'T10:00:00Z', service_name: 'Coupe', total_price_cents: 2500, status: 'done', source: i % 2 ? 'online' : 'walkin', start_at: '2026-09-0' + i + 'T10:00:00Z', end_at: '2026-09-0' + i + 'T10:30:00Z' })) });
       if (/availability/.test(url)) return Promise.resolve({ slots: [{ time: '10:00' }, { time: '15:30' }] });
       if (/lookup/.test(url)) return Promise.resolve({ item: Object.assign({}, APPT, { promoted_queue_id: 'q-rdv' }) });
       if (/api\/queue\?/.test(url)) return Promise.resolve({ queue: [] });
@@ -47,6 +50,9 @@ let JSDOM = null; try { JSDOM = require('jsdom').JSDOM; } catch (_) { /* absent 
     check('clic sur un RDV a venir : le tiroir s\'ouvre avec le nom, le statut et les details', drawer() && $('ad-name').textContent === 'Tom' && /Confirmé/.test($('ad-badge').textContent) && /Coupe/.test($('ad-info').textContent) && /Thomas/.test($('ad-info').textContent));
     check('Deplacer + Annuler le RDV visibles', $('ad-actions').style.display === 'flex');
     check('RDV pas encore dans la file : pas de crayon, note non modifiable', $('ad-edit-btn').style.display === 'none' && /entrera dans la file/.test($('ad-note-box').textContent));
+    await tick();
+    check('Tiroir : fidelite + cadeau affiches (comme l\'admin)', $('ad-marketing-section').style.display === 'block' && /7 points/.test($('ad-marketing-content').textContent) && /1 récompense/.test($('ad-marketing-content').textContent) && /Cadeau disponible/.test($('ad-marketing-content').textContent));
+    check('Tiroir : historique (RDV futur -> par contact), 5 passages dont 4 affiches', /5 passages au total/.test($('ad-visit-count').textContent) && $('ad-visits').querySelectorAll('.ad-visit-row').length === 4 && calls.some((c) => c[0] === 'api' && /client-history-by-contact\?/.test(c[2])));
     w.closeApptDrawer();
     check('✕ ferme le tiroir', !drawer());
 
@@ -132,6 +138,7 @@ let JSDOM = null; try { JSDOM = require('jsdom').JSDOM; } catch (_) { /* absent 
     const fns = handlers[key]; const res = { statusCode: 200, status(c) { this.statusCode = c; return this; }, json(b) { this.body = b; resolve(this); } };
     let i = 0; const next = (er) => { if (er) return reject(er); const f = fns[i++]; if (f) Promise.resolve(f(Object.assign({ body: {}, query: {}, salon: { id: 'S' } }, req), res, next)).catch(reject); }; next();
   });
+  check('routes historique + fidelite ouvertes au coiffeur', /router\.get\('\/:id\/client-history', requireAdminOrBarber/.test(fs.readFileSync(__dirname + '/../../src/routes/queue.js', 'utf8')) && /router\.get\('\/client-history-by-contact', requireAdminOrBarber/.test(fs.readFileSync(__dirname + '/../../src/routes/queue.js', 'utf8')) && /router\.get\('\/client-marketing', requireAdminOrBarber/.test(fs.readFileSync(__dirname + '/../../src/routes/owner.js', 'utf8')));
   check('/reschedule : ouvert au coiffeur (plus reserve a l\'admin)', handlers['put /:id/reschedule'][0] === mwBarber);
   let r = await call('put /:id/reschedule', { params: { id: 'a1' }, body: { date: '2026-10-21', time: '10:00' }, actingBarberId: 'b2' });
   check('/reschedule : un coiffeur ne deplace pas le RDV d\'un autre (403)', r.statusCode === 403 && /pas le RDV/.test(r.body.error), r.body);
