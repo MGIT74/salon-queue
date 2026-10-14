@@ -522,6 +522,7 @@ input[type="date"] { -webkit-appearance: none; appearance: none; }
 .svc-card.has-photo { padding: 0; overflow: hidden; gap: 0; justify-content: flex-start; align-items: stretch; }
 .svc-card.has-photo .barber-photo { display: block; width: 100%; aspect-ratio: 1 / 1; background-color: #fff; background-size: contain; background-repeat: no-repeat; background-position: center; }
 .svc-card.has-photo .name { padding: 10px 8px 12px; }
+.svc-card.gift-tile.has-photo .barber-photo { background-size: cover; background-color: #8a5a00; }
 
 /* ===== Page de reservation publique (rdv.html) : 3 zones sur ordinateur, inchangee sur mobile ===== */
 .page-flow .panel.flow > .flow-top, .page-flow .panel.flow > .flow-body, .page-flow .panel.flow > .step-bar.own-bar { display: contents; }

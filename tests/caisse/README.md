@@ -107,4 +107,5 @@ node tests/caisse/73-stats-coiffeur-tout-encaissement.js  # Stats coiffeur : tou
 node tests/caisse/74-timeline-heure-sur-bloc.js  # Timeline : heure du rdv sur le bloc
 node tests/caisse/75-cartes-compte-infos-hors-visuel.js  # Compte client : infos hors du visuel des cartes
 node tests/caisse/76-produit-caisse-seulement.js  # Produit caisse seulement (pas en ligne)
+node tests/caisse/77-icone-cadeau-partout.js  # Image de la tuile cadeau partout
 ```

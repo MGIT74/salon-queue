@@ -18,7 +18,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Prendre rendez-vous</title>
-<link rel="stylesheet" href="/app.css?v=19">
+<link rel="stylesheet" href="/app.css?v=20">
 <script>
   // Adresse SANS ?salon=... : on masque la page le temps de savoir si la plateforme heberge plusieurs salons
   // (voir guardMissingSalon) - pour ne jamais montrer, meme une fraction de seconde, un formulaire sans salon.
@@ -294,7 +294,7 @@
   </section>
 </div>
 
-<script src="/app.js?v=15"></script>
+<script src="/app.js?v=16"></script>
 <script>
 mountThemeButton();
 vitrinePageFlow(document.querySelector('.wrap'), ['p-service', 'p-extras', 'p-products', 'p-datetime', 'p-contact']);
@@ -387,6 +387,7 @@ function iconForItem(name) {
 
 var services = [], extras = [], barbers = [], products = [];
 var giftCardImageUrl = '';
+var giftTileImageUrl = '';
 var selBarber = null, selService = null, selExtras = [], selProducts = [], selDate = null, selSlot = null;
 var activeGift = null;
 
@@ -406,6 +407,7 @@ function loadCatalog() {
     var salonName = r[4].salon_name;
     CURRENCY = r[4].currency || 'EUR';
     giftCardImageUrl = r[4].gift_card_image_url || '';
+    giftTileImageUrl = r[4].gift_tile_image_url || '';
     applyAccentColor(r[4].accent_color);
     document.title = 'Rendez-vous — ' + salonName;
     document.getElementById('salon-mark').textContent = salonName.toUpperCase();
@@ -426,8 +428,7 @@ function loadCatalog() {
 }
 
 function renderBarberGrid() {
-  var giftTile = '<button class="svc-card gift-tile" onclick="openGiftCodeScreen()">' +
-    '<span class="icon">🎁</span><span class="name">Utiliser un cadeau</span></button>';
+  var giftTile = giftTileHtml(giftTileImageUrl, 'openGiftCodeScreen()');
 
   document.getElementById('barber-grid').innerHTML = giftTile + barbers.map(function (b) {
     return barberTileHtml(b, selBarber === b.id, "selectBarber(this, '" + b.id + "')");

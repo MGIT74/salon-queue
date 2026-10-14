@@ -1038,6 +1038,15 @@ function barberTileHtml(b, selected, onclick) {
     '<span class="name">' + esc(b.name) + '</span></button>';
 }
 
+/* Tuile « Utiliser un cadeau » des pages de reservation (rdv.html et compte.html) : l'image choisie dans
+   Reglages > Marketing (la meme que sur la borne) la remplit, sinon l'icone cadeau par defaut. */
+function giftTileHtml(imageUrl, onclick) {
+  return '<button class="svc-card gift-tile' + (imageUrl ? ' has-photo' : '') + '" onclick="' + onclick + '">' +
+    (imageUrl ? '<span class="barber-photo" style="background-image:url(&quot;' + esc(imageUrl) + '&quot;)"></span>'
+              : '<span class="icon">🎁</span>') +
+    '<span class="name">Utiliser un cadeau</span></button>';
+}
+
 /* Page de reservation publique (rdv.html) : meme decoupage en 3 zones que les fenetres d'ajout de RDV (vitrineFlow).
    En haut : retour + titre de l'etape. Au milieu : la liste, qui defile. En bas : recapitulatif detaille + bouton, fixes.
    Le decoupage ne change rien sur mobile (display: contents, voir app.css) : seul le bureau (>= 900px) passe en 3 zones. */

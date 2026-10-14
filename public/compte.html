@@ -29,7 +29,7 @@
   html.auth-checking #p-login { display: none !important; }
   html.auth-checking #auth-layout { display: none !important; }
 </style>
-<link rel="stylesheet" href="/app.css?v=19">
+<link rel="stylesheet" href="/app.css?v=20">
 <script>
   // Applique tout de suite la couleur du salon si on l'a déjà vue lors
   // d'une visite précédente (cache localStorage par salon), plutôt que
@@ -616,7 +616,7 @@
 
 </div>
 
-<script src="/app.js?v=15"></script>
+<script src="/app.js?v=16"></script>
 <script>
 mountThemeButton();
 var SALON_SLUG = (function () {
@@ -1012,7 +1012,7 @@ function rebook(salonSlug, serviceId, barberId) {
 /* ---------- Réservation intégrée ---------- */
 var bookCatalogLoaded = false;
 var bookSalonSlug = SALON_SLUG;
-var bookServices = [], bookExtras = [], bookBarbers = [], bookProducts = [];
+var bookServices = [], bookExtras = [], bookBarbers = [], bookProducts = [], bookGiftTileImage = '';
 var selBookBarber = null, selBookService = null, selBookExtras = [], selBookProducts = [], selBookDate = null, selBookSlot = null;
 var activeBookGift = null;
 
@@ -1063,8 +1063,10 @@ function goBook(afterLoad) {
     apiForBooking('/api/catalog/services'),
     apiForBooking('/api/catalog/extras'),
     apiForBooking('/api/catalog/products'),
-    apiForBooking('/api/barbers')
+    apiForBooking('/api/barbers'),
+    apiForBooking('/api/settings/public').catch(function () { return {}; })
   ]).then(function (r) {
+    bookGiftTileImage = (r[4] && r[4].gift_tile_image_url) || '';
     bookServices = r[0].items;
     bookExtras = r[1].items;
     bookProducts = r[2].items.filter(function (p) { return p.online_bookable !== 0; }); // « caisse seulement » : jamais proposé en ligne
@@ -1077,8 +1079,7 @@ function goBook(afterLoad) {
 }
 
 function renderBookBarberGrid() {
-  var giftTile = '<button class="svc-card gift-tile" onclick="openBookGiftCodeScreen()">' +
-    '<span class="icon">🎁</span><span class="name">Utiliser un cadeau</span></button>';
+  var giftTile = giftTileHtml(bookGiftTileImage, 'openBookGiftCodeScreen()');
 
   document.getElementById('bk-barber-grid').innerHTML = giftTile + bookBarbers.map(function (b) {
     return barberTileHtml(b, selBookBarber === b.id, "selectBookBarber(this, '" + b.id + "')");
