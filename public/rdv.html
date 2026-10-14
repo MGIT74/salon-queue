@@ -193,8 +193,6 @@
   </section>
 
   <section class="panel" id="p-group">
-    <button class="back" onclick="show('p-barber')">‹ Retour</button>
-    <div class="eyebrow">Réserver pour plusieurs personnes</div>
     <div id="group-mount"></div>
   </section>
 
@@ -324,7 +322,7 @@
 </div>
 
 <script src="/app.js?v=17"></script>
-<script src="/group-booking.js?v=1"></script>
+<script src="/group-booking.js?v=2"></script>
 <style>
 .group-entry{display:flex;align-items:center;gap:14px;width:100%;margin-top:18px;padding:16px;border:1px dashed var(--blue);background:var(--blue-soft);color:var(--blue);border-radius:18px;font-family:inherit;text-align:left;cursor:pointer}
 .group-entry span{display:flex;flex-direction:column;gap:3px}.group-entry b{font-size:15px;color:var(--ink)}.group-entry small{font-size:13px;color:var(--grey)}
@@ -797,7 +795,7 @@ function openGroupBooking() {
     groupCtl = GroupBooking.create({
       mount: document.getElementById('group-mount'), api: api,
       services: services, extras: extras, barbers: barbers, relatives: [],
-      eur: eur, toast: toast, continueLabel: 'Continuer',
+      eur: eur, toast: toast, continueLabel: 'Continuer', onExit: function () { show('p-barber'); },
       onContinue: function (people, payload) {
         groupPeople = people; groupPayload = payload;
         var self = people[0];

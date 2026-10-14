@@ -495,8 +495,6 @@
   </section>
 
   <section class="panel" id="p-book-group">
-    <button class="back" onclick="show('p-book-barber')">‹ Retour</button>
-    <div class="eyebrow">Réserver pour plusieurs personnes</div>
     <div id="bk-group-mount"></div>
   </section>
 
@@ -649,7 +647,7 @@
 </div>
 
 <script src="/app.js?v=17"></script>
-<script src="/group-booking.js?v=1"></script>
+<script src="/group-booking.js?v=2"></script>
 <style>
 .group-entry{display:flex;align-items:center;gap:14px;width:100%;margin-top:18px;padding:16px;border:1px dashed var(--blue);background:var(--blue-soft);color:var(--blue);border-radius:18px;font-family:inherit;text-align:left;cursor:pointer}
 .group-entry span{display:flex;flex-direction:column;gap:3px}.group-entry b{font-size:15px;color:var(--ink)}.group-entry small{font-size:13px;color:var(--grey)}
@@ -992,7 +990,7 @@ function openBookGroup() {
     bookGroupCtl = GroupBooking.create({
       mount: document.getElementById('bk-group-mount'), api: apiForBooking,
       services: bookServices, extras: bookExtras, barbers: bookBarbers, relatives: myRelatives,
-      eur: eur, toast: toast, continueLabel: 'Continuer',
+      eur: eur, toast: toast, continueLabel: 'Continuer', onExit: function () { show('p-book-barber'); },
       createRelative: function (name) {
         return api('/api/client-auth/relatives', { method: 'POST', body: { name: name } }).then(function (r) {
           if (!myRelatives.some(function (x) { return x.id === r.item.id; })) myRelatives.push(r.item);
