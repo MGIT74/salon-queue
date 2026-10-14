@@ -98,7 +98,9 @@ const suite = [
   ['75-cartes-compte-infos-hors-visuel.js', false, ['exit']],
   ['76-produit-caisse-seulement.js', false, ['exit']],
   ['77-icone-cadeau-partout.js', false, ['exit']],
-  ['78-fidelite-sans-badge-cadeau.js', false, ['exit']]
+  ['78-fidelite-sans-badge-cadeau.js', false, ['exit']],
+  ['79-conges-calendrier-lib.js', false, ['exit']],
+  ['80-conges-calendrier-annuel.js', false, ['exit']]
 ];
 
 let bad = 0;

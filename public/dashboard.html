@@ -1186,8 +1186,33 @@
                background: var(--fill); border-radius: 12px; padding: 13px 15px; margin-bottom: 8px; }
   .leave-dates { font-size: 14px; font-weight: 600; }
   .leave-note { font-size: 12.5px; color: var(--grey); margin-top: 2px; }
-  .leave-form { display: flex; gap: 10px; align-items: flex-end; margin-bottom: 18px; flex-wrap: wrap; }
-  .leave-form .fld { margin-bottom: 0; flex: 1; min-width: 130px; }
+  /* Calendrier annuel des congés */
+  .lv-year { position: relative; user-select: none; -webkit-user-select: none; }
+  .lv-nav { display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; width: fit-content; border: 1px solid var(--sep); border-radius: 10px; overflow: hidden; background: var(--card); }
+  .lv-nbtn { width: 52px; height: 38px; border: none; background: none; font-size: 22px; line-height: 1; cursor: pointer; color: var(--ink); font-family: inherit; }
+  .lv-nbtn:hover { background: var(--fill); }
+  .lv-ny { min-width: 96px; text-align: center; font-size: 18px; font-weight: 600; color: var(--grey); border-left: 1px solid var(--sep); border-right: 1px solid var(--sep); line-height: 38px; }
+  .lv-months { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 22px 18px; }
+  .lv-mname { text-align: center; font-weight: 700; font-size: 15px; margin-bottom: 8px; text-transform: lowercase; }
+  .lv-dow, .lv-grid { display: grid; grid-template-columns: repeat(7, 1fr); }
+  .lv-dow { background: var(--fill); border-radius: 6px 6px 0 0; }
+  .lv-dow span { text-align: center; font-size: 11px; color: var(--grey); padding: 7px 0; }
+  .lv-blank { height: 34px; }
+  .lv-day { height: 34px; border: none; background: var(--card); box-shadow: inset 0 0 0 .5px var(--sep); font-family: inherit; font-size: 13px; color: var(--ink); cursor: pointer; padding: 0; font-variant-numeric: tabular-nums; }
+  .lv-day:hover { background: var(--fill); }
+  .lv-day.today { font-weight: 800; color: var(--accent); }
+  .lv-day.off { background: #ffc107; color: #fff; font-weight: 600; box-shadow: inset 0 0 0 .5px rgba(255,255,255,.55); }
+  .lv-day.sel, .lv-day.off.sel { background: var(--accent); color: #fff; }
+  .lv-sum { text-align: center; color: var(--grey); font-size: 13px; margin-top: 18px; }
+  .lv-bubble { position: absolute; z-index: 20; width: 300px; max-width: 100%; box-sizing: border-box; background: var(--card); color: var(--ink); border: 1px solid var(--sep); border-radius: 12px; padding: 14px 16px 12px; box-shadow: 0 10px 32px rgba(0,0,0,.18); }
+  .lv-bubble::before { content: ''; position: absolute; top: -7px; left: var(--arrow-x, 50%); width: 12px; height: 12px; margin-left: -6px; background: var(--card); border-left: 1px solid var(--sep); border-top: 1px solid var(--sep); transform: rotate(45deg); }
+  .lv-chk { display: flex; align-items: center; gap: 9px; font-size: 15px; cursor: pointer; margin: 0; font-weight: 400; }
+  .lv-chk input { width: 18px; height: 18px; margin: 0; flex-shrink: 0; cursor: pointer; }
+  .lv-chk.lv-sub { margin: 10px 0 0 26px; font-size: 14px; }
+  .lv-chk.dis { color: var(--grey); cursor: default; }
+  .lv-chk.dis input { cursor: default; }
+  .lv-foot .btn { border: 1px solid var(--sep); color: var(--ink); background: var(--card); }
+  .lv-foot { display: flex; justify-content: flex-end; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--sep); }
   .switch { position: relative; width: 46px; height: 28px; background: var(--sep);
             border-radius: 999px; cursor: pointer; flex-shrink: 0;
             transition: background .2s ease, transform .15s cubic-bezier(.34,1.56,.64,1); }
@@ -4741,14 +4766,8 @@ function renderStatsTab(b) {
 }
 
 function renderLeavesTab(b) {
-  var today = new Date().toISOString().slice(0, 10);
-  return '<div class="leave-form">' +
-    '<div class="fld"><label>Du</label><input type="date" id="leave-start-' + b.id + '" value="' + today + '"></div>' +
-    '<div class="fld"><label>Au</label><input type="date" id="leave-end-' + b.id + '" value="' + today + '"></div>' +
-    '<div class="fld" style="flex:2"><label>Motif (optionnel)</label><input type="text" id="leave-note-' + b.id + '" placeholder="Congés, formation…"></div>' +
-    '<button class="btn btn-primary" onclick="addLeave(\'' + b.id + '\')">Ajouter</button>' +
-    '</div>' +
-    '<div id="leaves-list-' + b.id + '"><div class="empty">Chargement…</div></div>';
+  return '<p class="hint" style="margin:0 0 12px">Cliquez sur un jour, ou <strong>glissez la souris</strong> sur plusieurs jours, puis cochez « En congé ». Les jours en congé ne sont plus proposés à la réservation.</p>' +
+    '<div class="lv-year" id="leaves-list-' + b.id + '"><div class="empty">Chargement…</div></div>';
 }
 
 function renderCapabilitiesTab(b) {
@@ -4992,41 +5011,165 @@ function loadBarberLeaves(id) {
   }).catch(function (e) { toast(e.message, true); });
 }
 
-function renderLeavesList(id) {
-  var list = document.getElementById('leaves-list-' + id);
-  if (!list) return;
-  var items = barberLeaves[id] || [];
-  list.innerHTML = items.length === 0
-    ? '<div class="empty">Aucun congé enregistré</div>'
-    : items.map(function (l) {
-        var start = new Date(l.start_date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
-        var end = new Date(l.end_date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
-        return '<div class="leave-row">' +
-          '<div><div class="leave-dates">' + start + (l.start_date !== l.end_date ? ' → ' + end : '') + '</div>' +
-          (l.note ? '<div class="leave-note">' + esc(l.note) + '</div>' : '') + '</div>' +
-          '<button class="btn btn-ghost" onclick="deleteLeave(\'' + id + '\',\'' + l.id + '\')">Supprimer</button>' +
-          '</div>';
-      }).join('');
-}
+/* ---------- Calendrier annuel des congés ----------
+   Une année entière à l'écran ; clic ou glissé de souris sur des jours -> une petite bulle (« En congé »,
+   « Répéter chaque année », Fermer). La base garde des plages ; le serveur fait la conversion jour <-> plage. */
+var lvState = {};  // { [barberId]: { year, sel: [dates], dragging, anchor, dirty } }
+var LV_MONTHS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+var LV_DOW = ['lun', 'mar', 'mer', 'jeu', 'ven', 'sam', 'dim'];
 
-function addLeave(id) {
-  var start = document.getElementById('leave-start-' + id).value;
-  var end = document.getElementById('leave-end-' + id).value;
-  var note = document.getElementById('leave-note-' + id).value.trim();
-  if (!start || !end) { toast('Dates requises', true); return; }
+function lvIso(y, m, d) { return y + '-' + (m < 9 ? '0' : '') + (m + 1) + '-' + (d < 10 ? '0' : '') + d; }
+function lvAddDays(iso, n) { var t = new Date(iso + 'T00:00:00Z'); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); }
 
-  api('/api/barbers/' + id + '/leaves', { method: 'POST', body: { start_date: start, end_date: end, note: note } })
-    .then(function () { toast('Congé ajouté'); return loadBarbers().then(function () { return loadBarberLeaves(id); }); })
-    .catch(function (e) { toast(e.message, true); });
-}
-
-function deleteLeave(barberId, leaveId) {
-  showConfirm('Supprimer ce congé ?', { title: 'Supprimer' }).then(function (ok) {
-    if (!ok) return;
-    api('/api/barbers/' + barberId + '/leaves/' + leaveId, { method: 'DELETE' })
-      .then(function () { toast('Supprimé'); return loadBarbers().then(function () { return loadBarberLeaves(barberId); }); })
-      .catch(function (e) { toast(e.message, true); });
+// Map jour -> { repeat, note } pour les congés d'un coiffeur
+function lvDayMap(id) {
+  var map = {};
+  (barberLeaves[id] || []).forEach(function (l) {
+    var d = String(l.start_date).slice(0, 10), end = String(l.end_date).slice(0, 10), n = 0;
+    while (d <= end && n++ < 6000) { map[d] = { repeat: Boolean(Number(l.repeat_yearly)), note: l.note || '' }; d = lvAddDays(d, 1); }
   });
+  return map;
+}
+
+function lvState_(id) {
+  if (!lvState[id]) lvState[id] = { year: new Date().getFullYear(), sel: [], dragging: false, anchor: null, dirty: false };
+  return lvState[id];
+}
+
+function renderLeavesList(id) {
+  var box = document.getElementById('leaves-list-' + id);
+  if (!box) return;
+  var st = lvState_(id), map = lvDayMap(id), todayIso = new Date().toISOString().slice(0, 10);
+  var sel = {}; st.sel.forEach(function (d) { sel[d] = 1; });
+  var count = 0;
+  var months = LV_MONTHS.map(function (name, m) {
+    var first = new Date(Date.UTC(st.year, m, 1)).getUTCDay();      // 0 = dimanche
+    var lead = (first + 6) % 7;                                       // semaine commençant le lundi
+    var nDays = new Date(Date.UTC(st.year, m + 1, 0)).getUTCDate();
+    var cells = '';
+    for (var i = 0; i < lead; i++) cells += '<span class="lv-blank"></span>';
+    for (var d = 1; d <= nDays; d++) {
+      var iso = lvIso(st.year, m, d), info = map[iso];
+      if (info) count++;
+      var cls = 'lv-day' + (info ? ' off' : '') + (sel[iso] ? ' sel' : '') + (iso === todayIso ? ' today' : '');
+      cells += '<button type="button" class="' + cls + '" data-d="' + iso + '"' + (info && info.note ? ' title="' + esc(info.note) + '"' : '') + '>' + d + '</button>';
+    }
+    return '<div class="lv-month"><div class="lv-mname">' + name + '</div>' +
+      '<div class="lv-dow">' + LV_DOW.map(function (x) { return '<span>' + x + '</span>'; }).join('') + '</div>' +
+      '<div class="lv-grid">' + cells + '</div></div>';
+  }).join('');
+  box.innerHTML =
+    '<div class="lv-nav"><button type="button" class="lv-nbtn" data-nav="-1" aria-label="Année précédente">‹</button>' +
+    '<span class="lv-ny">' + st.year + '</span>' +
+    '<button type="button" class="lv-nbtn" data-nav="1" aria-label="Année suivante">›</button></div>' +
+    '<div class="lv-months">' + months + '</div>' +
+    '<div class="lv-sum">' + (count ? count + ' jour' + (count > 1 ? 's' : '') + ' de congé en ' + st.year : 'Aucun congé en ' + st.year) + '</div>' +
+    '<div class="lv-bubble" id="lv-bubble-' + id + '" style="display:none"></div>';
+  lvBind(id, box);
+  if (st.sel.length && !st.dragging) lvShowBubble(id);
+}
+
+function lvBind(id, box) {
+  var st = lvState_(id);
+  box.onclick = function (e) {
+    var n = e.target.closest('[data-nav]');
+    if (n) { lvClose(id); st.year += Number(n.getAttribute('data-nav')); renderLeavesList(id); }
+  };
+  box.onmousedown = function (e) {
+    if (e.button !== 0) return;
+    if (e.target.closest('.lv-bubble')) return;
+    var cell = e.target.closest('.lv-day');
+    if (!cell) return;
+    e.preventDefault();
+    st.dragging = true; st.anchor = cell.getAttribute('data-d'); st.sel = [st.anchor];
+    lvPaintSel(id, box);
+    lvHideBubble(id);
+  };
+  box.onmouseover = function (e) {
+    if (!st.dragging) return;
+    var cell = e.target.closest('.lv-day');
+    if (!cell) return;
+    var a = st.anchor, b = cell.getAttribute('data-d');
+    if (b < a) { var t = a; a = b; b = t; }
+    var out = [], d = a, n = 0;
+    while (d <= b && n++ < 400) { out.push(d); d = lvAddDays(d, 1); }
+    st.sel = out;
+    lvPaintSel(id, box);
+  };
+}
+
+function lvPaintSel(id, box) {
+  var st = lvState_(id), sel = {};
+  st.sel.forEach(function (d) { sel[d] = 1; });
+  box.querySelectorAll('.lv-day').forEach(function (c) { c.classList.toggle('sel', Boolean(sel[c.getAttribute('data-d')])); });
+}
+
+// Fin du glissé (relâchement n'importe où) : la bulle s'ouvre sur la sélection.
+document.addEventListener('mouseup', function () {
+  Object.keys(lvState).forEach(function (id) {
+    var st = lvState[id];
+    if (!st.dragging) return;
+    st.dragging = false;
+    if (st.sel.length) lvShowBubble(id);
+  });
+});
+// Clic en dehors du calendrier / de la bulle : on ferme.
+document.addEventListener('mousedown', function (e) {
+  Object.keys(lvState).forEach(function (id) {
+    var st = lvState[id], box = document.getElementById('leaves-list-' + id);
+    if (!box || !st.sel.length || st.dragging) return;
+    if (!e.target.closest('.lv-day') && !e.target.closest('.lv-bubble')) lvClose(id);
+  });
+});
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Escape') return;
+  Object.keys(lvState).forEach(function (id) { if (lvState[id].sel.length) lvClose(id); });
+});
+
+function lvHideBubble(id) { var b = document.getElementById('lv-bubble-' + id); if (b) b.style.display = 'none'; }
+
+function lvShowBubble(id) {
+  var st = lvState_(id), box = document.getElementById('leaves-list-' + id), bub = document.getElementById('lv-bubble-' + id);
+  if (!box || !bub || !st.sel.length) return;
+  var map = lvDayMap(id);
+  var allOff = st.sel.every(function (d) { return map[d]; });
+  var allRepeat = allOff && st.sel.every(function (d) { return map[d].repeat; });
+  var n = st.sel.length;
+  bub.innerHTML =
+    '<label class="lv-chk"><input type="checkbox" id="lv-on-' + id + '"' + (allOff ? ' checked' : '') + ' onchange="lvApply(\'' + id + '\')"> ' +
+      (n === 1 ? 'En congé ce jour' : 'En congé ces ' + n + ' jours') + '</label>' +
+    '<label class="lv-chk lv-sub' + (allOff ? '' : ' dis') + '"><input type="checkbox" id="lv-rep-' + id + '"' + (allRepeat ? ' checked' : '') + (allOff ? '' : ' disabled') + ' onchange="lvApply(\'' + id + '\')"> Répéter chaque année</label>' +
+    '<div class="lv-foot"><button type="button" class="btn btn-ghost" onclick="lvClose(\'' + id + '\')">Fermer</button></div>';
+  bub.style.display = 'block';
+  // Ancrage sous le dernier jour sélectionné
+  var last = box.querySelector('.lv-day[data-d="' + st.sel[st.sel.length - 1] + '"]') || box.querySelector('.lv-day.sel');
+  if (!last) return;
+  var br = box.getBoundingClientRect(), cr = last.getBoundingClientRect();
+  var w = bub.offsetWidth, left = cr.left - br.left + cr.width / 2 - w / 2;
+  left = Math.max(0, Math.min(left, br.width - w));
+  bub.style.left = left + 'px';
+  bub.style.top = (cr.bottom - br.top + 10) + 'px';
+  bub.style.setProperty('--arrow-x', Math.max(14, Math.min(w - 14, cr.left - br.left + cr.width / 2 - left)) + 'px');
+}
+
+function lvApply(id) {
+  var st = lvState_(id);
+  var on = document.getElementById('lv-on-' + id).checked;
+  var repEl = document.getElementById('lv-rep-' + id);
+  var rep = on && repEl.checked;
+  api('/api/barbers/' + id + '/leaves/days', { method: 'POST', body: { dates: st.sel, on: on, repeat: rep } })
+    .then(function (r) { barberLeaves[id] = r.items; st.dirty = true; renderLeavesList(id); })
+    .catch(function (e) { toast(e.message, true); renderLeavesList(id); });
+}
+
+function lvClose(id) {
+  var st = lvState_(id);
+  st.sel = []; st.dragging = false;
+  lvHideBubble(id);
+  var box = document.getElementById('leaves-list-' + id);
+  if (box) lvPaintSel(id, box);
+  // Le badge « En congé » et le compteur du tableau de bord ne se rafraîchissent qu'à la fermeture (la bulle reste stable).
+  if (st.dirty) { st.dirty = false; loadBarbers(); }
 }
 
 // Redimensionne l'image côté navigateur avant envoi (évite de stocker des

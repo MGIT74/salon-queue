@@ -8,6 +8,7 @@ const { loginRateLimiter } = require('../middleware/rateLimiter');
 const { logActivity } = require('../lib/activityLog');
 const { wrap } = require('../lib/wrap');
 const { serviceLineTransfers, applyTransfers, salesRevenueByBarber } = require('../lib/lineAttribution');
+const leaveDays = require('../lib/leaveDays');
 
 const router = express.Router();
 
@@ -438,7 +439,7 @@ router.get('/:id/stats', requireAdmin, wrap(async (req, res) => {
  */
 router.get('/:id/leaves', requireAdmin, wrap(async (req, res) => {
   const [rows] = await pool.query(
-    `SELECT bl.id, bl.start_date, bl.end_date, bl.note
+    `SELECT bl.id, bl.start_date, bl.end_date, bl.note, bl.repeat_yearly
      FROM barber_leaves bl JOIN barbers b ON b.id = bl.barber_id
      WHERE bl.barber_id = ? AND b.salon_id = ? ORDER BY bl.start_date DESC`,
     [req.params.id, req.salon.id]
@@ -463,6 +464,33 @@ router.post('/:id/leaves', requireAdmin, wrap(async (req, res) => {
     [id, req.params.id, start_date, end_date, note || null]
   );
   res.json({ ok: true, item: { id, start_date, end_date, note: note || null } });
+}));
+
+// Calendrier annuel : { dates: ['2026-02-28', ...], on: true|false, repeat: true|false } - coche / decoche des JOURS.
+// La base reste en plages ; on relit tout, on applique, on recompresse (dans une transaction).
+router.post('/:id/leaves/days', requireAdmin, wrap(async (req, res) => {
+  const dates = Array.isArray(req.body.dates) ? req.body.dates.map(String) : [];
+  if (!dates.length || dates.length > 500 || !dates.every(leaveDays.isDate)) return res.status(400).json({ error: 'Jours invalides' });
+  const [[owned]] = await pool.query('SELECT id FROM barbers WHERE id = ? AND salon_id = ?', [req.params.id, req.salon.id]);
+  if (!owned) return res.status(404).json({ error: 'Coiffeur introuvable' });
+  const on = Boolean(req.body.on), repeat = on && Boolean(req.body.repeat);
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [rows] = await conn.query('SELECT start_date, end_date, note, repeat_yearly FROM barber_leaves WHERE barber_id = ? FOR UPDATE', [req.params.id]);
+    const map = leaveDays.applyDays(leaveDays.expand(rows), dates, on, repeat, new Date().getUTCFullYear());
+    const ranges = leaveDays.compress(map);
+    await conn.query('DELETE FROM barber_leaves WHERE barber_id = ?', [req.params.id]);
+    const items = [];
+    for (const r of ranges) {
+      const id = crypto.randomUUID();
+      await conn.query('INSERT INTO barber_leaves (id, barber_id, start_date, end_date, note, repeat_yearly) VALUES (?, ?, ?, ?, ?, ?)',
+        [id, req.params.id, r.start_date, r.end_date, r.note, r.repeat_yearly ? 1 : 0]);
+      items.push({ id, start_date: r.start_date, end_date: r.end_date, note: r.note, repeat_yearly: r.repeat_yearly ? 1 : 0 });
+    }
+    await conn.commit();
+    res.json({ ok: true, items: items.reverse() });
+  } catch (e) { await conn.rollback(); throw e; } finally { conn.release(); }
 }));
 
 router.delete('/:id/leaves/:leaveId', requireAdmin, wrap(async (req, res) => {

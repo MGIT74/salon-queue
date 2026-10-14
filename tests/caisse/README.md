@@ -109,4 +109,6 @@ node tests/caisse/75-cartes-compte-infos-hors-visuel.js  # Compte client : infos
 node tests/caisse/76-produit-caisse-seulement.js  # Produit caisse seulement (pas en ligne)
 node tests/caisse/77-icone-cadeau-partout.js  # Image de la tuile cadeau partout
 node tests/caisse/78-fidelite-sans-badge-cadeau.js  # Fidélité sans badge cadeau
+node tests/caisse/79-conges-calendrier-lib.js  # Congés : jours <-> plages, répétition annuelle
+node tests/caisse/80-conges-calendrier-annuel.js  # Congés : calendrier annuel (glisser, bulle)
 ```

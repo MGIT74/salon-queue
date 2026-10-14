@@ -87,6 +87,11 @@ CREATE TABLE IF NOT EXISTS barber_leaves (
   FOREIGN KEY (barber_id) REFERENCES barbers(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Congé qui se répète chaque année (calendrier annuel des congés).
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'barber_leaves' AND column_name = 'repeat_yearly');
+SET @sql := IF(@c = 0, 'ALTER TABLE barber_leaves ADD COLUMN repeat_yearly TINYINT(1) NOT NULL DEFAULT 0', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
 -- Par défaut, un coiffeur fait TOUTES les prestations/suppléments du
 -- salon. Ces tables ne listent que les EXCLUSIONS explicites (opt-out),
 -- pour qu'un nouveau coiffeur ne se retrouve jamais "sans rien à faire"
