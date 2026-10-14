@@ -5047,15 +5047,17 @@ function renderLeavesList(id) {
     var lead = (first + 6) % 7;                                       // semaine commençant le lundi
     var nDays = new Date(Date.UTC(st.year, m + 1, 0)).getUTCDate();
     var cells = '';
-    for (var i = 0; i < lead; i++) cells += '<span class="lv-blank"></span>';
+    for (var i = 0; i < lead; i++) cells += '<span class="lv-blank" data-edge="first"></span>';
     for (var d = 1; d <= nDays; d++) {
       var iso = lvIso(st.year, m, d), info = map[iso];
       if (info) count++;
       var cls = 'lv-day' + (info ? ' off' : '') + (sel[iso] ? ' sel' : '') + (iso === todayIso ? ' today' : '');
       cells += '<button type="button" class="' + cls + '" data-d="' + iso + '"' + (info && info.note ? ' title="' + esc(info.note) + '"' : '') + '>' + d + '</button>';
     }
-    return '<div class="lv-month"><div class="lv-mname">' + name + '</div>' +
-      '<div class="lv-dow">' + LV_DOW.map(function (x) { return '<span>' + x + '</span>'; }).join('') + '</div>' +
+    var tail = (7 - ((lead + nDays) % 7)) % 7;
+    for (var t = 0; t < tail; t++) cells += '<span class="lv-blank" data-edge="last"></span>';
+    return '<div class="lv-month" data-first="' + lvIso(st.year, m, 1) + '" data-last="' + lvIso(st.year, m, nDays) + '"><div class="lv-mname" data-edge="first">' + name + '</div>' +
+      '<div class="lv-dow" data-edge="first">' + LV_DOW.map(function (x) { return '<span>' + x + '</span>'; }).join('') + '</div>' +
       '<div class="lv-grid">' + cells + '</div></div>';
   }).join('');
   box.innerHTML =
@@ -5087,15 +5089,27 @@ function lvBind(id, box) {
   };
   box.onmouseover = function (e) {
     if (!st.dragging) return;
-    var cell = e.target.closest('.lv-day');
-    if (!cell) return;
-    var a = st.anchor, b = cell.getAttribute('data-d');
+    var b = lvDateUnder(e.target);
+    if (!b) return;
+    var a = st.anchor;
     if (b < a) { var t = a; a = b; b = t; }
     var out = [], d = a, n = 0;
     while (d <= b && n++ < 400) { out.push(d); d = lvAddDays(d, 1); }
     st.sel = out;
     lvPaintSel(id, box);
   };
+}
+
+// Jour « sous la souris » : un vrai jour, ou - pour une case vide / l'en-tête du mois - le jour le plus proche de ce mois,
+// pour que le glissé (surtout vertical) ne s'arrête jamais court quand le pointeur passe sur du vide.
+function lvDateUnder(el) {
+  var day = el.closest('.lv-day');
+  if (day) return day.getAttribute('data-d');
+  var month = el.closest('.lv-month');
+  if (!month) return null;
+  var edge = el.closest('[data-edge]');
+  if (!edge) return null;
+  return month.getAttribute(edge.getAttribute('data-edge') === 'last' ? 'data-last' : 'data-first');
 }
 
 function lvPaintSel(id, box) {
