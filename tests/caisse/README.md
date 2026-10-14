@@ -119,4 +119,5 @@ node tests/caisse/85-reservation-groupe-interface.js  # Reservation a plusieurs 
 node tests/caisse/86-import-csv-clients.js  # Import CSV clients : lecture du fichier + route en lot (base simulee)
 node tests/caisse/87-import-rdv.js  # Import de RDV (CSV type Bookly) : lecture, rapprochement coiffeurs/prestations, route (base simulee)
 node tests/caisse/88-selecteur-periode.js  # Selecteur de periode Du/Au (raccourcis, calendrier a deux mois, compatibilite champs d'origine)
+node tests/caisse/89-caisse-tiroir-rdv.js  # Caisse : tiroir client d'un RDV (modifier, deplacer, annuler, note) + routes /lookup et /reschedule coiffeur
 ```

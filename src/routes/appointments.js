@@ -337,6 +337,40 @@ router.get('/availability', wrap(async (req, res) => {
  * Liste des rendez-vous à venir (admin) — pour une future vue
  * "Rendez-vous du jour" dans le dashboard.
  */
+/**
+ * Met en forme des lignes `appointments` pour l'interface : statut affiché,
+ * durée totale, note interne du client (client_notes, rattachée par
+ * clientKey() - jamais jointe en SQL direct car ce n'est pas une colonne
+ * stricte), même pattern que /api/queue/history.
+ */
+async function buildApptItems(salonId, rows) {
+  const [notes] = await pool.query('SELECT client_key, note FROM client_notes WHERE salon_id = ?', [salonId]);
+  const noteByKey = Object.fromEntries(notes.map((n) => [n.client_key, n.note]));
+  return rows.map((r) => {
+      // Statut affiche : annule reste annule ; termine si la coupe
+      // promue en file est marquee "done" ; sinon confirme (a venir,
+      // ou en cours d'attente/de coupe le jour meme).
+      let displayStatus = 'confirmed';
+      if (r.status === 'cancelled') displayStatus = 'cancelled';
+      else if (r.queue_status === 'done') displayStatus = 'completed';
+      else if (r.queue_status === 'cancelled') displayStatus = 'no_show';
+
+      return Object.assign({}, r, {
+        // scheduled_at reste une chaîne locale de SALON (Europe/Paris)
+        // brute, JAMAIS passée par utcIso() - contrairement à
+        // created_at (vraie UTC), lui étiqueter 'Z' comme si c'était de
+        // l'UTC décale l'heure réelle de 1 à 2h (été/hiver), ce qui
+        // faisait apparaître un RDV déjà terminé comme "encore à venir"
+        // pendant ce délai (bouton Annuler resté actif à tort).
+        scheduled_at: r.scheduled_at,
+        created_at: utcIso(r.created_at),
+        display_status: displayStatus,
+        note: noteByKey[clientKey(r)] || '',
+        duration_min: (r.service_duration_min || 0) + Number(r.extras_duration_min || 0)
+      });
+  });
+}
+
 router.get('/', requireAdminOrBarber, wrap(async (req, res) => {
   const conditions = ['a.salon_id = ?'];
   const params = [req.salon.id];
@@ -387,38 +421,35 @@ router.get('/', requireAdminOrBarber, wrap(async (req, res) => {
     params
   );
 
-  // Note interne (client_notes, staff) - jamais jointe en SQL direct
-  // car rattachée par clientKey() (email > téléphone > nom), pas par
-  // colonne stricte. Même pattern que /api/queue/history.
-  const [notes] = await pool.query('SELECT client_key, note FROM client_notes WHERE salon_id = ?', [req.salon.id]);
-  const noteByKey = Object.fromEntries(notes.map((n) => [n.client_key, n.note]));
+  res.json({ ok: true, items: await buildApptItems(req.salon.id, rows) });
+}));
 
-  res.json({
-    ok: true,
-    items: rows.map((r) => {
-      // Statut affiche : annule reste annule ; termine si la coupe
-      // promue en file est marquee "done" ; sinon confirme (a venir,
-      // ou en cours d'attente/de coupe le jour meme).
-      let displayStatus = 'confirmed';
-      if (r.status === 'cancelled') displayStatus = 'cancelled';
-      else if (r.queue_status === 'done') displayStatus = 'completed';
-      else if (r.queue_status === 'cancelled') displayStatus = 'no_show';
-
-      return Object.assign({}, r, {
-        // scheduled_at reste une chaîne locale de SALON (Europe/Paris)
-        // brute, JAMAIS passée par utcIso() - contrairement à
-        // created_at (vraie UTC), lui étiqueter 'Z' comme si c'était de
-        // l'UTC décale l'heure réelle de 1 à 2h (été/hiver), ce qui
-        // faisait apparaître un RDV déjà terminé comme "encore à venir"
-        // pendant ce délai (bouton Annuler resté actif à tort).
-        scheduled_at: r.scheduled_at,
-        created_at: utcIso(r.created_at),
-        display_status: displayStatus,
-        note: noteByKey[clientKey(r)] || '',
-        duration_min: (r.service_duration_min || 0) + Number(r.extras_duration_min || 0)
-      });
-    })
-  });
+/**
+ * Un seul RDV (même forme qu'un élément de la liste ci-dessus), retrouvé par
+ * son id OU par la ligne de file à laquelle il a été promu - utilisé par le
+ * tiroir client de la caisse (clic sur un RDV de la frise ou des suivants).
+ */
+router.get('/lookup', requireAdminOrBarber, wrap(async (req, res) => {
+  const id = String(req.query.id || ''), queueId = String(req.query.queue_id || '');
+  if (!id && !queueId) return res.status(400).json({ error: 'id ou queue_id requis' });
+  const [rows] = await pool.query(
+    `SELECT a.*, s.name AS service_name, s.duration_min AS service_duration_min, b.name AS barber_name,
+            q.status AS queue_status,
+            COALESCE((
+              SELECT SUM(e.duration_min) FROM appointment_extras ae
+              JOIN extras e ON e.id = ae.extra_id
+              WHERE ae.appointment_id = a.id
+            ), 0) AS extras_duration_min
+     FROM appointments a
+     LEFT JOIN services s ON s.id = a.service_id
+     LEFT JOIN barbers b ON b.id = a.barber_id
+     LEFT JOIN queue q ON q.id = a.promoted_queue_id
+     WHERE a.salon_id = ? AND (a.id = ? OR a.promoted_queue_id = ?) LIMIT 1`,
+    [req.salon.id, id, queueId]
+  );
+  if (!rows.length) return res.status(404).json({ error: 'Rendez-vous introuvable' });
+  const [item] = await buildApptItems(req.salon.id, rows);
+  res.json({ ok: true, item });
 }));
 
 /**
@@ -1019,7 +1050,7 @@ router.post('/:id/admin-cancel', requireAdminOrBarber, wrap(async (req, res) => 
  * et éventuellement nouveau coiffeur) - le client reçoit un email de
  * confirmation avec le nouvel horaire.
  */
-router.put('/:id/reschedule', requireAdmin, wrap(async (req, res) => {
+router.put('/:id/reschedule', requireAdminOrBarber, wrap(async (req, res) => {
   const { date, time, barber_id } = req.body;
   if (!date || !time) return res.status(400).json({ error: 'Date et créneau requis' });
 
@@ -1031,6 +1062,14 @@ router.put('/:id/reschedule', requireAdmin, wrap(async (req, res) => {
   );
   if (!appt) return res.status(404).json({ error: 'Rendez-vous introuvable' });
   if (appt.status === 'cancelled') return res.status(409).json({ error: 'Ce rendez-vous est annulé, impossible de le modifier.' });
+
+  // Un coiffeur (session PIN, pas admin) ne peut déplacer que le RDV du
+  // coiffeur actif (lui-même, ou celui désigné par bulle depuis la caisse
+  // partagée) - même règle que l'annulation. Il peut en revanche le confier
+  // à un autre coiffeur (barber_id), si ce dernier a le créneau libre.
+  if (req.actingBarberId && appt.barber_id && appt.barber_id !== req.actingBarberId) {
+    return res.status(403).json({ error: "Ce n'est pas le RDV de ce coiffeur." });
+  }
 
   const finalBarberId = barber_id || appt.barber_id;
   if (!finalBarberId) return res.status(400).json({ error: 'Le coiffeur est requis' });
