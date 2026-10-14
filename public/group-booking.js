@@ -74,10 +74,24 @@
     });
   }
 
+  // Icones minimalistes (traits fins, couleur du texte) : jamais d'emoji.
+  var IC = {
+    scissors: '<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4 8.1 15.9M14.5 14.5 20 20M8.1 8.1 12 12"/>',
+    calendar: '<rect x="3" y="4" width="18" height="18" rx="3"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+    clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    x: '<path d="M18 6 6 18M6 6l12 12"/>',
+    chev: '<path d="m6 9 6 6 6-6"/>',
+    next: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+    same: '<path d="M5 9h14M5 15h14"/>'
+  };
+  function ic(n) { return '<svg class="gb-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + IC[n] + '</svg>'; }
+
   function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 
   var STYLE = '' +
     '.gb-recap-person{margin-bottom:16px;opacity:.8}.gb-recap-person.on{opacity:1}' +
+    '.gb-ic{width:14px;height:14px;flex:none}.gb-pill-x .gb-ic{width:12px;height:12px}.gb-who .gb-ic{width:13px;height:13px;margin-left:2px;opacity:.7}' +
+    '.gb-chip.sugg{display:inline-flex;align-items:center;gap:7px}.gb-mini.x{display:inline-flex;align-items:center}.gb-pill-x{display:flex;align-items:center;justify-content:center}' +
     '.gb-pills{position:relative;padding-right:34px}' +
     '.gb-pill-x{position:absolute;right:0;top:0;border:none;background:var(--fill);color:var(--grey);width:26px;height:26px;border-radius:50%;font-size:12px;cursor:pointer;font-family:inherit;flex:none}.gb-pill-x:hover{color:#fff;background:#ff3b30}' +
     'button.gb-pill{border:none;font-family:inherit;cursor:pointer}button.gb-pill:hover{filter:brightness(1.25)}' +
@@ -236,10 +250,10 @@
         if (menuFor === p.uid) menu = '<div class="gb-menu">' + cfg.barbers.map(function (bb) {
           return '<button type="button" data-act="set-barber" data-uid="' + p.uid + '" data-id="' + esc(bb.id) + '"' + (String(bb.id) === String(p.slot ? p.slot.barberId : p.pref) ? ' class="on"' : '') + '>' + esc(bb.name) + '</button>'; }).join('') + '</div>';
         var pills = '<button type="button" class="gb-pill who" data-act="pill-who" data-uid="' + p.uid + '" title="Modifier"><i>' + esc(who.charAt(0).toUpperCase()) + '</i>' + esc(who) + '</button>' +
-          (b ? '<button type="button" class="gb-pill" data-act="pill-barber" data-uid="' + p.uid + '" title="Changer de coiffeur">✂ ' + esc(b) + ' ▾</button>' : '') +
-          (p.slot ? '<button type="button" class="gb-pill" data-act="pill-date" data-uid="' + p.uid + '" title="Changer la date ou l\'heure">🗓 ' + esc(fmtDate(p.date)) + ' · <b>' + esc(p.slot.time) + '</b></button>' : '') +
-          (s ? '<span class="gb-pill dur" title="Durée estimée">⏱ ' + esc(fmtMin(personDuration(p, cfg.services, cfg.extras))) + '</span>' : '') +
-          '<button type="button" class="gb-pill-x" data-act="rm" data-uid="' + p.uid + '" title="Retirer ' + esc(who) + '" aria-label="Retirer ' + esc(who) + '">✕</button>' + menu;
+          (b ? '<button type="button" class="gb-pill" data-act="pill-barber" data-uid="' + p.uid + '" title="Changer de coiffeur">' + ic('scissors') + esc(b) + ic('chev') + '</button>' : '') +
+          (p.slot ? '<button type="button" class="gb-pill" data-act="pill-date" data-uid="' + p.uid + '" title="Changer la date ou l\'heure">' + ic('calendar') + esc(fmtDate(p.date)) + ' · <b>' + esc(p.slot.time) + '</b></button>' : '') +
+          (s ? '<span class="gb-pill dur" title="Durée estimée">' + ic('clock') + esc(fmtMin(personDuration(p, cfg.services, cfg.extras))) + '</span>' : '') +
+          '<button type="button" class="gb-pill-x" data-act="rm" data-uid="' + p.uid + '" title="Retirer ' + esc(who) + '" aria-label="Retirer ' + esc(who) + '">' + ic('x') + '</button>' + menu;
         var rows = '';
         function row(k, n, meta, price) { rows += '<div class="recap-row"><span class="recap-k">' + k + '</span><span class="recap-n">' + esc(n) + (meta ? ' <em>' + esc(meta) + '</em>' : '') + '</span><span class="recap-p">' + price + '</span></div>'; }
         if (s) {
@@ -257,7 +271,7 @@
       if (view === 'who') {
         var chips = '<button type="button" class="gb-who' + (wsel.self ? ' on' : '') + '" data-act="who-self"><i>M</i>Moi</button>';
         (cfg.relatives || []).forEach(function (r) { chips += '<button type="button" class="gb-who' + (wsel.rels[r.id] ? ' on' : '') + '" data-act="who-rel" data-id="' + esc(r.id) + '"><i>' + esc(String(r.name).charAt(0).toUpperCase()) + '</i>' + esc(r.name) + '</button>'; });
-        wsel.extra.forEach(function (x, i) { chips += '<button type="button" class="gb-who on" data-act="who-del" data-i="' + i + '" title="Retirer"><i>' + esc(x.name.charAt(0).toUpperCase()) + '</i>' + esc(x.name) + ' ✕</button>'; });
+        wsel.extra.forEach(function (x, i) { chips += '<button type="button" class="gb-who on" data-act="who-del" data-i="' + i + '" title="Retirer"><i>' + esc(x.name.charAt(0).toUpperCase()) + '</i>' + esc(x.name) + ic('x') + '</button>'; });
         var n = whoCount();
         return { top: back() + '<div class="eyebrow">Qui vient au salon ?</div><p class="step-sub">Cochez les personnes à inscrire. Vous n\'êtes pas obligé de réserver pour vous.</p>',
           body: '<div class="gb-whos">' + chips + '</div>' +
@@ -275,7 +289,7 @@
           var line = complete(p) ? esc(s.name) + (barberName(p.slot.barberId) ? ' · ' + esc(barberName(p.slot.barberId)) : '') + '<br>' + esc(fmtDate(p.date)) + ' à ' + esc(p.slot.time) : '<span class="todo">À compléter</span>';
           body += '<div class="gb-row" data-i="' + i + '"><span class="gb-av">' + esc(label(p).charAt(0).toUpperCase()) + '</span><div class="gb-info"><b>' + esc(label(p)) + '</b><span>' + line + '</span></div>' +
             '<button type="button" class="gb-mini" data-act="edit">' + (complete(p) ? 'Modifier' : 'Compléter') + '</button>' +
-            '<button type="button" class="gb-mini x" data-act="remove" aria-label="Retirer">✕</button>' + '</div>';
+            '<button type="button" class="gb-mini x" data-act="remove" aria-label="Retirer">' + ic('x') + '</button>' + '</div>';
         });
         body += '</div>';
         if (people.length < MAX_PEOPLE) {
@@ -303,7 +317,7 @@
       var morning = (p.slots || []).filter(function (s) { return s.time < '12:00'; }), aft = (p.slots || []).filter(function (s) { return s.time >= '12:00'; });
       var body2 = '<div class="fld"><label for="gb-date">Date</label><input id="gb-date" type="date" min="' + today() + '" value="' + esc(p.date) + '"></div>';
       if (p.suggestions && p.suggestions.length) body2 += '<div class="gb-chips">' + p.suggestions.map(function (sg) {
-        return '<button type="button" class="gb-chip sugg" data-act="sugg" data-time="' + esc(sg.time) + '" data-barber="' + esc(sg.barberId) + '">' + (sg.kind === 'after' ? '⏩ À la suite de ' : '⏱ En même temps que ') + esc(sg.name) + ' · ' + esc(sg.time) + (barberName(sg.barberId) ? ' · ' + esc(barberName(sg.barberId)) : '') + '</button>'; }).join('') + '</div>';
+        return '<button type="button" class="gb-chip sugg" data-act="sugg" data-time="' + esc(sg.time) + '" data-barber="' + esc(sg.barberId) + '">' + (sg.kind === 'after' ? ic('next') + 'À la suite de ' : ic('same') + 'En même temps que ') + esc(sg.name) + ' · ' + esc(sg.time) + (barberName(sg.barberId) ? ' · ' + esc(barberName(sg.barberId)) : '') + '</button>'; }).join('') + '</div>';
       body2 += '<div class="eyebrow" style="margin-top:20px">Créneaux disponibles</div>';
       if (morning.length && aft.length) body2 += '<div class="half-toggle" style="margin-bottom:14px"><button type="button" class="' + (p.half === 'morning' ? 'sel' : '') + '" data-act="half" data-half="morning">Matin</button><button type="button" class="' + (p.half === 'afternoon' ? 'sel' : '') + '" data-act="half" data-half="afternoon">Après-midi</button></div>';
       var list = (morning.length && aft.length) ? (p.half === 'morning' ? morning : aft) : (p.slots || []);

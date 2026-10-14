@@ -649,7 +649,7 @@
 </div>
 
 <script src="/app.js?v=17"></script>
-<script src="/group-booking.js?v=8"></script>
+<script src="/group-booking.js?v=9"></script>
 <style>
 .group-entry{display:flex;align-items:center;gap:14px;width:100%;margin-top:18px;padding:16px;border:1px dashed var(--blue);background:var(--blue-soft);color:var(--blue);border-radius:18px;font-family:inherit;text-align:left;cursor:pointer}
 .group-entry span{display:flex;flex-direction:column;gap:3px}.group-entry b{font-size:15px;color:var(--ink)}.group-entry small{font-size:13px;color:var(--grey)}
@@ -961,7 +961,7 @@ function setRelatives(list) {
   var box = document.getElementById('relatives-list'); if (!box) return;
   box.innerHTML = list.map(function (r) {
     return '<div class="rel-row" data-id="' + esc(r.id) + '"><input type="text" maxlength="60" value="' + esc(r.name) + '" onchange="renameRelative(\'' + esc(r.id) + '\', this)">' +
-      '<button class="del" title="Supprimer" onclick="deleteRelative(\'' + esc(r.id) + '\')">✕</button></div>';
+      '<button class="del" title="Supprimer" onclick="deleteRelative(\'' + esc(r.id) + '\')"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>';
   }).join('');
 }
 function addRelative() {
