@@ -186,10 +186,6 @@
   <section class="panel on" id="p-barber">
     <div class="eyebrow" id="barber-eyebrow">Choisissez votre coiffeur</div>
     <div class="svc-grid" id="barber-grid"></div>
-    <button type="button" class="group-entry" id="group-entry" onclick="openGroupBooking()" style="display:none">
-      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M17 14.2c2.4.2 4 2 4 5.8"/></svg>
-      <span><b>Réserver pour plusieurs personnes</b><small>Vous et vos enfants, ou des amis : chacun son horaire, à la suite ou en même temps.</small></span>
-    </button>
   </section>
 
   <section class="panel flow" id="p-group">
@@ -324,10 +320,8 @@
 </div>
 
 <script src="/app.js?v=17"></script>
-<script src="/group-booking.js?v=9"></script>
+<script src="/group-booking.js?v=10"></script>
 <style>
-.group-entry{display:flex;align-items:center;gap:14px;width:100%;margin-top:18px;padding:16px;border:1px dashed var(--blue);background:var(--blue-soft);color:var(--blue);border-radius:18px;font-family:inherit;text-align:left;cursor:pointer}
-.group-entry span{display:flex;flex-direction:column;gap:3px}.group-entry b{font-size:15px;color:var(--ink)}.group-entry small{font-size:13px;color:var(--grey)}
 .gb-done{padding:10px 0;border-bottom:1px solid var(--sep)}.gb-done:last-child{border:none}.gb-done b{display:block}.gb-done span{color:var(--grey);font-size:14px}
 </style>
 <script>
@@ -448,7 +442,6 @@ function loadCatalog() {
     document.getElementById('salon-mark').textContent = salonName.toUpperCase();
     renderBarberGrid();
     renderServiceGrid();
-    document.getElementById('group-entry').style.display = barbers.length ? '' : 'none';
 
     // Pré-remplissage depuis "Réserver à nouveau" (compte.html) : la
     // prestation de la dernière visite est déjà sélectionnée, le client
@@ -469,6 +462,7 @@ function renderBarberGrid() {
   document.getElementById('barber-grid').innerHTML = giftTile + barbers.map(function (b) {
     return barberTileHtml(b, selBarber === b.id, "selectBarber(this, '" + b.id + "')");
   }).join('');
+  if (barbers.length) document.getElementById('barber-grid').insertAdjacentHTML('beforeend', GroupBooking.tileHtml('openGroupBooking()'));
 
   if (barbers.length === 0) {
     document.getElementById('barber-grid').innerHTML = giftTile + '<div class="empty">Aucun coiffeur ne prend de RDV en ligne pour le moment — présentez-vous directement au salon.</div>';

@@ -488,10 +488,6 @@
   <section class="panel" id="p-book-barber">
     <div class="eyebrow" id="bk-barber-eyebrow">Choisissez votre coiffeur</div>
     <div class="svc-grid" id="bk-barber-grid"></div>
-    <button type="button" class="group-entry" id="bk-group-entry" onclick="openBookGroup()" style="display:none">
-      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M17 14.2c2.4.2 4 2 4 5.8"/></svg>
-      <span><b>Réserver pour plusieurs personnes</b><small>Vous et vos proches : chacun son horaire, à la suite ou en même temps.</small></span>
-    </button>
   </section>
 
   <section class="panel flow" id="p-book-group">
@@ -649,10 +645,8 @@
 </div>
 
 <script src="/app.js?v=17"></script>
-<script src="/group-booking.js?v=9"></script>
+<script src="/group-booking.js?v=10"></script>
 <style>
-.group-entry{display:flex;align-items:center;gap:14px;width:100%;margin-top:18px;padding:16px;border:1px dashed var(--blue);background:var(--blue-soft);color:var(--blue);border-radius:18px;font-family:inherit;text-align:left;cursor:pointer}
-.group-entry span{display:flex;flex-direction:column;gap:3px}.group-entry b{font-size:15px;color:var(--ink)}.group-entry small{font-size:13px;color:var(--grey)}
 .gb-done{padding:10px 0;border-bottom:1px solid var(--sep)}.gb-done:last-child{border:none}.gb-done b{display:block}.gb-done span{color:var(--grey);font-size:14px}
 .rel-row{display:flex;align-items:center;gap:8px;margin-bottom:8px}.rel-row input{flex:1;min-width:0}.rel-row button{border:none;background:var(--fill);color:var(--grey);border-radius:10px;padding:9px 12px;font-family:inherit;cursor:pointer}.rel-row button.del:hover{color:#ff3b30}
 </style>
@@ -1193,7 +1187,6 @@ function goBook(afterLoad) {
     bookCatalogLoaded = true;
     renderBookBarberGrid();
     renderBookServiceGrid();
-    document.getElementById('bk-group-entry').style.display = bookBarbers.length ? '' : 'none';
     bookGroupCtl = null;   // catalogue (re)charge : le module se reconstruit au prochain usage
     finish();
   }).catch(function (e) { toast(e.message, true); });
@@ -1205,6 +1198,7 @@ function renderBookBarberGrid() {
   document.getElementById('bk-barber-grid').innerHTML = giftTile + bookBarbers.map(function (b) {
     return barberTileHtml(b, selBookBarber === b.id, "selectBookBarber(this, '" + b.id + "')");
   }).join('');
+  if (bookBarbers.length) document.getElementById('bk-barber-grid').insertAdjacentHTML('beforeend', GroupBooking.tileHtml('openBookGroup()'));
   if (bookBarbers.length === 0) {
     document.getElementById('bk-barber-grid').innerHTML = giftTile + '<div class="empty">Aucun coiffeur ne prend de RDV en ligne pour le moment — présentez-vous directement au salon.</div>';
   }

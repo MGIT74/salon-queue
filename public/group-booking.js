@@ -443,5 +443,12 @@
     };
   }
 
-  return { MAX_PEOPLE: MAX_PEOPLE, personDuration: personDuration, personPrice: personPrice, heldParam: heldParam, computeSuggestions: computeSuggestions, buildPayload: buildPayload, create: create };
+  /** Tuile « plusieurs personnes » des grilles de coiffeurs (meme habillage que « Utiliser un cadeau »). */
+  function tileHtml(onclick) {
+    return '<button type="button" class="svc-card barber-tile group-tile" onclick="' + onclick + '">' +
+      '<span class="icon"><svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M17.5 14.2c2.3.3 3.5 2.2 3.5 5.8"/></svg></span>' +
+      '<span class="name">Plusieurs personnes</span><span class="meta">Enfants, amis…</span></button>';
+  }
+
+  return { tileHtml: tileHtml, MAX_PEOPLE: MAX_PEOPLE, personDuration: personDuration, personPrice: personPrice, heldParam: heldParam, computeSuggestions: computeSuggestions, buildPayload: buildPayload, create: create };
 });
