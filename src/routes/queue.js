@@ -1,7 +1,7 @@
 const express = require('express');
 const { thresholdsForSalon, rewardsFor } = require('../lib/loyaltyRules');
 const crypto = require('crypto');
-const { pool, utcIso, getSettings } = require('../db');
+const { pool, utcIso, getSettings, parisLocalToUtcDate } = require('../db');
 const { loadQueue, recompute, clientKey } = require('../lib/queueMath');
 const { serviceLineTransfers, applyTransfers, salesRevenueByBarber } = require('../lib/lineAttribution');
 const { promoteTodayAppointments, nowParisDatetimeString } = require('./appointments');
@@ -645,13 +645,34 @@ router.put('/:id', requireAdminOrBarber, wrap(async (req, res) => {
 }));
 
 // --- Chiffre d'affaires du jour -------------------------------------------
+/**
+ * Jours du SALON (fuseau réglé), pas jours UTC : CURDATE() de la base coupait la journée à 2h du matin
+ * (heure de Paris), et l'« encaissé aujourd'hui » ne correspondait pas au Z. Renvoie le début (UTC, format
+ * des colonnes created_at / end_at) du jour du salon décalé de `offset` jours, et la date du salon.
+ */
+async function salonDays(salonId) {
+  const tz = (await getSettings(salonId)).timezone || 'Europe/Paris';
+  const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' });
+  const today = fmt.format(new Date());
+  const shift = (n) => { const d = new Date(today + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+  const startSql = (n) => parisLocalToUtcDate(shift(n), '00:00:00', tz).toISOString().slice(0, 19).replace('T', ' ');
+  const dayOf = (utcSql) => fmt.format(new Date(String(utcSql).replace(' ', 'T') + 'Z'));
+  return { tz, today, shift, startSql, dayOf };
+}
+
+// Encaissé aujourd'hui = TOUTES les ventes de la caisse du jour (passages, tickets de comptoir, produits,
+// cadeaux vendus) - exactement ce que compte le ticket Z - et plus seulement les passages de la file.
 router.get('/stats/today', requireAdmin, wrap(async (req, res) => {
-  const [[row]] = await pool.query(
-    `SELECT COUNT(*) AS done_count, COALESCE(SUM(total_price_cents), 0) AS revenue_cents
-     FROM queue WHERE salon_id = ? AND status = 'done' AND end_at >= CURDATE()`,
-    [req.salon.id]
+  const d = await salonDays(req.salon.id);
+  const [[sold]] = await pool.query(
+    'SELECT COALESCE(SUM(total_price_cents), 0) AS revenue_cents, COUNT(*) AS sales_count FROM sales WHERE salon_id = ? AND created_at >= ?',
+    [req.salon.id, d.startSql(0)]
   );
-  res.json({ ok: true, done: Number(row.done_count), revenue_cents: Number(row.revenue_cents) });
+  const [[row]] = await pool.query(
+    "SELECT COUNT(*) AS done_count FROM queue WHERE salon_id = ? AND status = 'done' AND end_at >= ?",
+    [req.salon.id, d.startSql(0)]
+  );
+  res.json({ ok: true, done: Number(row.done_count), revenue_cents: Number(sold.revenue_cents), sales_count: Number(sold.sales_count) });
 }));
 
 /**
@@ -662,43 +683,34 @@ router.get('/stats/today', requireAdmin, wrap(async (req, res) => {
  * rapide de la page d'accueil.
  */
 router.get('/stats/week', requireAdmin, wrap(async (req, res) => {
-  const [rows] = await pool.query(
-    `SELECT DATE(end_at) AS day, COUNT(*) AS done_count, COALESCE(SUM(total_price_cents), 0) AS revenue_cents
-     FROM queue
-     WHERE salon_id = ? AND status = 'done' AND end_at >= (CURDATE() - INTERVAL 6 DAY)
-     GROUP BY DATE(end_at)`,
-    [req.salon.id]
-  );
-  var byDay = {};
-  rows.forEach(function (r) {
-    var key = r.day instanceof Date ? r.day.toISOString().slice(0, 10) : String(r.day).slice(0, 10);
-    byDay[key] = { revenue_cents: Number(r.revenue_cents), done_count: Number(r.done_count) };
-  });
-  var days = [];
-  for (var i = 6; i >= 0; i--) {
-    var d = new Date();
-    d.setDate(d.getDate() - i);
-    var key = d.toISOString().slice(0, 10);
-    days.push(Object.assign({ date: key, revenue_cents: 0, done_count: 0 }, byDay[key] || {}));
-  }
+  // CA par jour (7 derniers jours du salon) = toutes les ventes de la caisse ; passages = file d'attente.
+  const sd = await salonDays(req.salon.id);
+  const todaySql = sd.startSql(0);
+  const byDay = {};
+  for (let i = 6; i >= 0; i--) byDay[sd.shift(-i)] = { date: sd.shift(-i), revenue_cents: 0, done_count: 0 };
+  const [saleRows] = await pool.query('SELECT created_at, total_price_cents FROM sales WHERE salon_id = ? AND created_at >= ?', [req.salon.id, sd.startSql(-6)]);
+  saleRows.forEach((r) => { const k = sd.dayOf(r.created_at); if (byDay[k]) byDay[k].revenue_cents += Number(r.total_price_cents) || 0; });
+  const [doneRows] = await pool.query("SELECT end_at FROM queue WHERE salon_id = ? AND status = 'done' AND end_at >= ?", [req.salon.id, sd.startSql(-6)]);
+  doneRows.forEach((r) => { const k = sd.dayOf(r.end_at); if (byDay[k]) byDay[k].done_count += 1; });
+  const days = Object.values(byDay);
 
   const [byRevenueAll] = await pool.query(
     `SELECT b.id, b.name, b.photo_url, COALESCE(SUM(q.total_price_cents), 0) AS revenue_cents, COUNT(*) AS done_count
      FROM queue q JOIN barbers b ON b.id = q.barber_id
-     WHERE q.salon_id = ? AND q.status = 'done' AND q.end_at >= CURDATE()
+     WHERE q.salon_id = ? AND q.status = 'done' AND q.end_at >= ?
      GROUP BY b.id ORDER BY revenue_cents DESC`,
-    [req.salon.id]
+    [req.salon.id, todaySql]
   );
   // Lignes de ticket attribuees a un autre coiffeur que celui du passage (voir lineAttribution.js), puis top 3.
   const revMap = new Map();
   byRevenueAll.forEach((r) => revMap.set(r.id, { name: r.name, photo_url: r.photo_url, count: Number(r.done_count), cents: Number(r.revenue_cents) }));
-  applyTransfers(revMap, await serviceLineTransfers(pool, req.salon.id, { sinceToday: true }));
+  applyTransfers(revMap, await serviceLineTransfers(pool, req.salon.id, { fromSql: todaySql }));
   const [photoRows] = await pool.query('SELECT id, name, photo_url FROM barbers WHERE salon_id = ?', [req.salon.id]);
   const photoById = Object.fromEntries(photoRows.map((b) => [b.id, b]));
   // Classement par chiffre d'affaires ENCAISSÉ au nom de chaque coiffeur : prestations + suppléments + produits,
   // ligne par ligne, depuis les ventes de la caisse (passages de la file ou ventes de comptoir). Le nombre de
   // passages reste celui de la file.
-  const soldMap = await salesRevenueByBarber(pool, req.salon.id, { sinceToday: true });
+  const soldMap = await salesRevenueByBarber(pool, req.salon.id, { fromSql: todaySql });
   const ids = new Set([...revMap.keys(), ...soldMap.keys()]);
   const byRevenue = [...ids]
     .filter((id) => id && photoById[id])
@@ -721,9 +733,9 @@ router.get('/stats/week', requireAdmin, wrap(async (req, res) => {
   const [bySpeed] = await pool.query(
     `SELECT b.id, b.name, b.photo_url, AVG(TIMESTAMPDIFF(MINUTE, q.start_at, q.end_at)) AS avg_minutes, COUNT(*) AS done_count
      FROM queue q JOIN barbers b ON b.id = q.barber_id
-     WHERE q.salon_id = ? AND q.status = 'done' AND q.end_at >= CURDATE() AND q.start_at IS NOT NULL
+     WHERE q.salon_id = ? AND q.status = 'done' AND q.end_at >= ? AND q.start_at IS NOT NULL
      GROUP BY b.id ORDER BY avg_minutes ASC LIMIT 3`,
-    [req.salon.id]
+    [req.salon.id, todaySql]
   );
 
   // Ventes de produits : attribuees a sale_items.barber_id (qui coiffeur a
@@ -736,9 +748,9 @@ router.get('/stats/week', requireAdmin, wrap(async (req, res) => {
      FROM sale_items si
      JOIN sales s ON s.id = si.sale_id
      JOIN barbers b ON b.id = COALESCE(si.barber_id, s.barber_id)
-     WHERE s.salon_id = ? AND si.item_type = 'product' AND s.created_at >= CURDATE()
+     WHERE s.salon_id = ? AND si.item_type = 'product' AND s.created_at >= ?
      GROUP BY b.id ORDER BY product_revenue_cents DESC LIMIT 3`,
-    [req.salon.id]
+    [req.salon.id, todaySql]
   );
 
   res.json({

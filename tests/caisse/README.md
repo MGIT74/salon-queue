@@ -125,4 +125,5 @@ node tests/caisse/91-audit-securite.js  # Audit securite : liens d'email (base_u
 node tests/caisse/92-encaissement-avance.js  # Encaissement a l'avance (serveur + base) : garde sa place, deja paye, reste a payer apres supplement
 node tests/caisse/93-fidelite-deux-paliers.js  # Fidelite a deux paliers (prestation / produit), deduction a l'utilisation, reconversion des anciennes recompenses
 node tests/caisse/94-horaires-caisse.js  # Horaires de caisse : ouverture / fermeture automatique (interrupteurs), cloture Z en attente reservee a l'admin
+node tests/caisse/95-stats-dashboard-ventes.js  # Dashboard : encaisse du jour et CA de la semaine = toutes les ventes de la caisse, par jour du salon
 ```

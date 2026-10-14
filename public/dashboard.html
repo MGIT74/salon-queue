@@ -3351,8 +3351,8 @@ function loadDashboardTab() {
     var maxRevenue = Math.max.apply(null, r.days.map(function (d) { return d.revenue_cents; }).concat([1]));
     var totalWeek = r.days.reduce(function (a, d) { return a + d.revenue_cents; }, 0);
     document.getElementById('dash-week-total').textContent = eur(totalWeek);
-    document.getElementById('dash-week-bars').innerHTML = r.days.map(function (d) {
-      var isToday = d.date === new Date().toISOString().slice(0, 10);
+    document.getElementById('dash-week-bars').innerHTML = r.days.map(function (d, i) {
+      var isToday = i === r.days.length - 1; // le serveur renvoie les 7 jours du SALON, aujourd'hui en dernier
       var h = Math.max(6, Math.round((d.revenue_cents / maxRevenue) * 62));
       var label = WEEKDAY_LABELS_SHORT[new Date(d.date + 'T00:00:00').getDay()].charAt(0).toUpperCase();
       return '<div class="dash-bar-col" title="' + eur(d.revenue_cents) + '">' +
