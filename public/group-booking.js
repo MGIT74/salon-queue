@@ -245,8 +245,8 @@
           (cfg.createRelative ? '<label class="gb-save"><input type="checkbox" data-act="save"' + (p.saveRelative ? ' checked' : '') + '> Ajouter ce prénom à « Mes proches »</label>' : ''),
         go: goBtn('Suivant', !String(p.name || '').trim()) };
       if (view === 'barber') return { top: back() + '<div class="eyebrow">' + who + 'Choisissez le coiffeur</div>',
-        body: '<div class="svc-grid"><button type="button" class="svc-card barber-tile' + (!p.pref ? ' sel' : '') + '" data-pick="barber" data-id=""><span class="icon">★</span><span class="name">Premier disponible</span></button>' +
-          cfg.barbers.map(function (b) { return barberCard(b, String(p.pref) === String(b.id)).replace('<button', '<button data-pick="barber"'); }).join('') + '</div>', go: goBtn('Suivant', false) };
+        body: '<div class="svc-grid">' +
+          cfg.barbers.map(function (b) { return barberCard(b, String(p.pref) === String(b.id)).replace('<button', '<button data-pick="barber"'); }).join('') + '</div>', go: goBtn('Suivant', !p.pref) };
       if (view === 'service') return { top: back() + '<div class="eyebrow">' + who + 'Prestation</div>',
         body: '<div class="item-grid">' + cfg.services.map(function (it) { return itemCard('services', it, String(p.serviceId) === String(it.id)).replace('<button', '<button data-pick="service"'); }).join('') + '</div>',
         go: goBtn('Suivant', !p.serviceId) };

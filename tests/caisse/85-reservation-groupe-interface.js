@@ -49,7 +49,7 @@ let JSDOM; try { ({ JSDOM } = require('jsdom')); } catch (e) { console.log('jsdo
     const clickEl = (sel) => { const e = m.querySelector(sel); assert(e, 'introuvable : ' + sel); click(e); };
     const eyebrow = () => (m.querySelector('.eyebrow') || {}).textContent || '';
     assert(/Choisissez le coiffeur/.test(eyebrow())); ok('on démarre comme la réservation normale : étape coiffeur');
-    clickEl('[data-pick=barber][data-id=""]'); clickEl('[data-act=next]');
+    assert(!m.querySelector('[data-pick=barber][data-id=""]'), 'plus de premier disponible'); assert(m.querySelector('[data-act=next]').disabled); clickEl('[data-pick=barber][data-barber-id="b1"], [data-pick=barber][data-id="b1"]'); clickEl('[data-act=next]');
     assert(/Prestation/.test(eyebrow())); ok('coiffeur → prestation (une étape par écran)');
     clickEl('[data-pick=service][data-id=s1]'); clickEl('[data-act=next]');
     assert(/Suppléments/.test(eyebrow())); clickEl('[data-act=next]');
