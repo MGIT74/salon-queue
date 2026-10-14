@@ -111,7 +111,8 @@ const suite = [
   ['88-selecteur-periode.js', false, ['exit']],
   ['89-caisse-tiroir-rdv.js', false, ['exit']],
   ['90-actualisation-discrete.js', false, ['exit']],
-  ['91-audit-securite.js', false, ['exit']]
+  ['91-audit-securite.js', false, ['exit']],
+  ['92-encaissement-avance.js', true, ['exit']]
 ];
 
 let bad = 0;

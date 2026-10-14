@@ -59,7 +59,9 @@ async function loadQueue(salonId, statuses, onlyUnpaid) {
   const [[rows], [services], [extras], [links], [notes], [svcPrices], [extPrices], [gifts], [loyaltyRows], [prodLinks], [allProducts]] = await Promise.all([
     pool.query(
       `SELECT * FROM queue WHERE salon_id = ? AND status IN (${statusPlaceholders})` +
-      (onlyUnpaid ? ' AND paid_at IS NULL' : '') +
+      // 'pending' : pas encore encaissé, OU réglé d'avance avec un éventuel reste à payer pas encore traité.
+      (onlyUnpaid === 'pending' ? ' AND (paid_at IS NULL OR (prepaid_at IS NOT NULL AND balance_paid_at IS NULL))'
+        : (onlyUnpaid ? ' AND paid_at IS NULL' : '')) +
       ' ORDER BY checkin_at',
       [salonId, ...statuses]
     ),

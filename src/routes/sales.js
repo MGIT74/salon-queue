@@ -144,22 +144,42 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
       // déjà réglé. Le marquage "payé" est atomique (WHERE paid_at IS NULL)
       // ET annulé automatiquement si la suite échoue (transaction).
       let queueRow = null;
+      let balanceSale = false;
       if (queue_id) {
         const [[row]] = await db.query(
-          'SELECT barber_id, status, paid_at, client_name, email, phone FROM queue WHERE id = ? AND salon_id = ? FOR UPDATE',
+          'SELECT barber_id, status, paid_at, prepaid_at, balance_paid_at, gift_card_id, client_name, email, phone FROM queue WHERE id = ? AND salon_id = ? FOR UPDATE',
           [queue_id, req.salon.id]
         );
         if (!row) throw new HttpError(404, 'Client introuvable');
-        if (req.actingBarberId && row.barber_id !== req.actingBarberId) {
+        // Encaissement à l'avance : le client est encore dans la file (en attente ou en cours).
+        const advance = row.status === 'waiting' || row.status === 'in_progress';
+        // Un client pas encore attribué peut être réglé d'avance par n'importe quel coiffeur.
+        if (req.actingBarberId && row.barber_id !== req.actingBarberId && !(advance && !row.barber_id)) {
           throw new HttpError(403, "Ce n'est pas votre client.");
         }
-        if (row.paid_at) throw new HttpError(409, 'Ce client a déjà été encaissé.');
-        const [markResult] = await db.query(
-          'UPDATE queue SET paid_at = NOW() WHERE id = ? AND salon_id = ? AND paid_at IS NULL',
-          [queue_id, req.salon.id]
-        );
-        if (markResult.affectedRows === 0) {
-          throw new HttpError(409, 'Ce client vient d\'être encaissé (probablement par un autre appareil).');
+        if (row.status === 'cancelled') throw new HttpError(409, 'Ce client a été annulé, impossible de l\'encaisser.');
+
+        if (req.body.balance) {
+          // Reste à payer après un paiement d'avance (supplément ajouté pendant la coupe).
+          if (!row.prepaid_at || row.status !== 'done') throw new HttpError(409, 'Aucun reste à payer pour ce client.');
+          const [markBalance] = await db.query(
+            'UPDATE queue SET balance_paid_at = NOW() WHERE id = ? AND salon_id = ? AND balance_paid_at IS NULL',
+            [queue_id, req.salon.id]
+          );
+          if (markBalance.affectedRows === 0) throw new HttpError(409, 'Le reste à payer de ce client a déjà été encaissé.');
+          balanceSale = true;
+        } else {
+          if (row.paid_at) throw new HttpError(409, row.prepaid_at ? 'Ce client a déjà payé d\'avance.' : 'Ce client a déjà été encaissé.');
+          if (advance && row.gift_card_id) {
+            throw new HttpError(409, 'Ce client vient avec un cadeau : il sera réglé par le cadeau à la fin de sa prestation.');
+          }
+          const [markResult] = await db.query(
+            'UPDATE queue SET paid_at = NOW(), prepaid_at = ' + (advance ? 'NOW()' : 'NULL') + ' WHERE id = ? AND salon_id = ? AND paid_at IS NULL',
+            [queue_id, req.salon.id]
+          );
+          if (markResult.affectedRows === 0) {
+            throw new HttpError(409, 'Ce client vient d\'être encaissé (probablement par un autre appareil).');
+          }
         }
         queueRow = row;
       }
@@ -277,7 +297,7 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
       return {
         duplicate: false,
         sale: { id: saleId, total_price_cents: total, payment_method, cash_cents: cashCents, barber_id: barberId, ticket_number: ticketNumber },
-        queueRow, giftInfo
+        queueRow, giftInfo, balanceSale
       };
     });
   } catch (err) {
@@ -299,7 +319,8 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
   }
 
   // ---- Après validation de la transaction : effets secondaires ----
-  if (outcome.queueRow) {
+  // Le reste à payer d'un client déjà réglé d'avance ne redonne pas de point (un passage = un point).
+  if (outcome.queueRow && !outcome.balanceSale) {
     // Ce passage vient d'être réellement payé : +1 point de fidélité.
     await earnLoyaltyPoint(req.salon.id, outcome.queueRow);
     // Une récompense de fidélité était appliquée à ce ticket (gagnée à

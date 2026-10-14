@@ -3906,6 +3906,7 @@ function renderQueue() {
           '<div class="pos">' + (q.position || i + 1) + '</div><div style="min-width:0">' +
           '<div class="name">' + esc(q.client_name) + '</div>' +
           '<div class="assigned">' + esc(b ? b.name : 'Premier disponible') + '</div>' +
+          (q.paid_at ? '<div class="assigned" style="color:var(--green);font-weight:600">✓ Déjà payé</div>' : '') +
           chipsHtml(q) + '</div></div><div class="row-meta">' +
           '<div class="dur">' + formatMinutes(q.total_duration_min) + '</div>' +
           '<div class="price">' + eur(q.total_price_cents) + '</div>' +
@@ -3925,7 +3926,8 @@ function renderQueue() {
         return '<div class="active-card-simple">' +
           '<span class="dot-live"></span>' +
           '<div><div class="name">' + esc(b ? b.name : '—') + ' — ' + esc(q.client_name) + '</div>' +
-          '<div class="assigned">' + esc(q.service.name) + (q.extras.length ? ' + ' + q.extras.length + ' supp.' : '') + '</div></div>' +
+          '<div class="assigned">' + esc(q.service.name) + (q.extras.length ? ' + ' + q.extras.length + ' supp.' : '') +
+          (q.paid_at ? ' · <span style="color:var(--green);font-weight:600">✓ Déjà payé</span>' : '') + '</div></div>' +
           '</div>';
       }).join('');
 }
@@ -4024,7 +4026,9 @@ function finishCut(id) {
 }
 
 function cancelCut(id) {
-  showConfirm('Marquer ce client comme absent ?', { title: 'Client absent', danger: true }).then(function (ok) {
+  var q = queue.find(function (x) { return x.id === id; });
+  var paidWarn = q && q.paid_at ? ' Attention : il a déjà payé d\'avance, le remboursement n\'est pas automatique.' : '';
+  showConfirm('Marquer ce client comme absent ?' + paidWarn, { title: 'Client absent', danger: true }).then(function (ok) {
     if (!ok) return;
     api('/api/queue/' + id + '/cancel', { method: 'POST', body: {} })
       .then(refreshQueue).catch(function (e) { toast(e.message, true); });

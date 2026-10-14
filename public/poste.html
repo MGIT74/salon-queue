@@ -580,6 +580,7 @@ function renderActive(force) {
       (cur.is_appointment
         ? '<div class="hint" style="color:var(--blue);margin:-4px 0 6px">📅 Rendez-vous</div>'
         : '') +
+      (cur.paid_at ? '<div class="hint" style="color:var(--green);font-weight:600;margin:-2px 0 6px">✓ Déjà payé — un supplément ajouté sera à régler à la fin</div>' : '') +
       chipsHtml(cur) +
       '<div class="big-timer' + (t.over ? ' over' : '') + '" id="active-timer-value">' + t.text + '</div>' +
       '<div class="timer-sub' + (t.over ? ' over' : '') + '" id="active-timer-sub">' + t.label + ' · prévu ' + formatMinutes(cur.total_duration_min) + ' · ' + eur(cur.total_price_cents) + '</div>' +
@@ -693,6 +694,7 @@ function renderNext() {
           '<div class="name">' + esc(q.client_name) + '</div>' +
           '<div class="meta">' + esc(detail) + '</div>' +
           appointmentBadge +
+          (q.paid_at ? '<div class="meta" style="color:var(--green);font-weight:600">✓ Déjà payé</div>' : '') +
           (q.gift_card ? giftBadgeHtml(q.gift_card) : '') +
           ((locked || isAppointmentNotYet) ? '<div class="lock-note' + (prepAlert ? ' prep-alert-note' : '') + '">' + lockNote + '</div>' : '') +
         '</div>' +
@@ -766,7 +768,8 @@ function saveNextNote(id) {
 function cancelMine(id) {
   var q = queue.find(function (x) { return x.id === id; });
   var name = q ? q.client_name : 'ce client';
-  showConfirm('Marquer ' + name + ' comme absent ? Il sera retiré de la file.', { title: 'Client absent', danger: true, confirmLabel: 'Marquer absent' })
+  var paidWarn = q && q.paid_at ? ' Attention : il a déjà payé d\'avance, le remboursement n\'est pas automatique.' : '';
+  showConfirm('Marquer ' + name + ' comme absent ? Il sera retiré de la file.' + paidWarn, { title: 'Client absent', danger: true, confirmLabel: 'Marquer absent' })
     .then(function (ok) {
       if (!ok) return;
       barberApi('/api/queue/' + id + '/cancel', { method: 'POST', body: {} })

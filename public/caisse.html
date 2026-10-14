@@ -448,6 +448,10 @@
   .appt-drawer-head h2 { font-size: 21px; margin: 0; letter-spacing: -.02em; }
   .appt-drawer .x { background: var(--fill); border: none; width: 32px; height: 32px; border-radius: 50%; color: var(--grey); font-size: 15px; cursor: pointer; flex-shrink: 0; }
   .appt-drawer-section { margin-bottom: 22px; }
+  .ticket-mode { margin: 10px 0 0; padding: 8px 12px; border-radius: 10px; background: var(--fill); color: var(--green); font-size: 13px; font-weight: 600; }
+  .advance-pick { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; text-align: left; padding: 12px 14px; margin-bottom: 8px; border-radius: 12px; border: 1px solid var(--sep); background: var(--card); color: var(--ink); font: inherit; cursor: pointer; }
+  .advance-pick .meta { font-size: 13px; color: var(--grey); margin-top: 2px; }
+  .advance-pick:disabled { opacity: .55; cursor: not-allowed; }
   .ad-visit-row { background: var(--fill); border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; }
   .ad-visit-row .ad-visit-date { font-size: 13.5px; font-weight: 600; }
   .ad-visit-row .ad-visit-meta { font-size: 12.5px; color: var(--grey); margin-top: 2px; }
@@ -754,6 +758,7 @@
       <div class="pending-section">
         <div class="section-label" id="pending-label" style="display:none;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--grey);margin:22px 0 10px 2px">En attente d'encaissement</div>
         <div class="pending-list" id="pending-list"></div>
+        <button type="button" class="btn btn-soft advance-btn" id="advance-btn" onclick="openAdvancePicker()" style="margin-top:12px">Encaisser à l'avance un client de la file</button>
       </div>
 
       <div class="ticket-panel">
@@ -763,6 +768,7 @@
             <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>
           </button>
         </div>
+        <div id="ticket-mode" class="ticket-mode" style="display:none"></div>
         <div class="ticket-lines" id="ticket-lines"><div class="empty">Aucun article sélectionné</div></div>
         <div class="ticket-total"><span class="label">Total</span><span class="amount" id="ticket-total">0,00 €</span></div>
 
@@ -977,6 +983,9 @@ var allBarbers = [];
 var catalog = { services: [], extras: [], products: [] };
 var ticket = []; // { item_type, item_id, item_name, unit_price_cents, quantity }
 var ticketQueueId = null; // coupe d'origine si le ticket vient d'un encaissement en attente
+// 'advance' : client encore dans la file, réglé avant sa coupe ; 'balance' : reste à payer (supplément ajouté après un paiement d'avance).
+var ticketMode = null;
+var ticketModeName = '';
 var ticketDrafts = {}; // { [barberId]: { ticket, ticketQueueId, loyaltyDiscount, loyaltyRewardsAvailable } } - brouillon du ticket en cours de chaque coiffeur, gardé le temps de la session tablette (en mémoire, pas côté serveur)
 var loyaltyRewardsAvailable = 0; // récompenses dispo pour le client du ticket en cours
 var loyaltyDiscount = null; // { index, originalPrice, type } si une réduction fidélité est appliquée
@@ -1437,6 +1446,8 @@ function saveTicketDraft(barberId) {
   ticketDrafts[barberId] = {
     ticket: ticket,
     ticketQueueId: ticketQueueId,
+    ticketMode: ticketMode,
+    ticketModeName: ticketModeName,
     loyaltyDiscount: loyaltyDiscount,
     loyaltyRewardsAvailable: loyaltyRewardsAvailable
   };
@@ -1450,6 +1461,8 @@ function loadTicketDraft(barberId) {
   var draft = barberId ? ticketDrafts[barberId] : null;
   ticket = draft ? draft.ticket : [];
   ticketQueueId = draft ? draft.ticketQueueId : null;
+  ticketMode = draft ? (draft.ticketMode || null) : null;
+  ticketModeName = draft ? (draft.ticketModeName || '') : '';
   loyaltyDiscount = draft ? draft.loyaltyDiscount : null;
   loyaltyRewardsAvailable = draft ? draft.loyaltyRewardsAvailable : 0;
 }
@@ -1627,6 +1640,7 @@ function renderActive(force) {
       (cur.is_appointment
         ? '<div class="hint" style="color:var(--blue);margin:-4px 0 6px">📅 Rendez-vous</div>'
         : '') +
+      (cur.paid_at ? '<div class="hint" style="color:var(--green);font-weight:600;margin:-2px 0 6px">✓ Déjà payé — un supplément ajouté sera à régler à la fin</div>' : '') +
       chipsHtml(cur) +
       '<div class="big-timer' + (t.over ? ' over' : '') + '" id="active-timer-value">' + t.text + '</div>' +
       '<div class="timer-sub' + (t.over ? ' over' : '') + '" id="active-timer-sub">' + t.label + ' · prévu ' + formatMinutes(cur.total_duration_min) + ' · ' + eur(cur.total_price_cents) + '</div>' +
@@ -1743,6 +1757,7 @@ function renderNext() {
           '<div class="name">' + esc(q.client_name) + '</div>' +
           '<div class="meta">' + esc(detail) + '</div>' +
           appointmentBadge +
+          paidBadgeHtml(q) +
           (q.gift_card ? giftBadgeHtml(q.gift_card) : '') +
           ((locked || isAppointmentNotYet) ? '<div class="lock-note' + (prepAlert ? ' prep-alert-note' : '') + '">' + lockNote + '</div>' : '') +
         '</div>' +
@@ -1766,6 +1781,11 @@ function renderNext() {
       '</div>' +
     '</div>';
   }).join('');
+}
+
+/** Client déjà réglé (encaissé à l'avance) : le coiffeur le voit dans la liste, son tour ne change pas. */
+function paidBadgeHtml(q) {
+  return q && q.paid_at ? '<div class="meta paid-badge" style="color:var(--green);font-weight:600">✓ Déjà payé</div>' : '';
 }
 
 function giftBadgeHtml(gift) {
@@ -1806,7 +1826,8 @@ function saveNextNote(id) {
 function cancelMine(id) {
   var q = queue.find(function (x) { return x.id === id; });
   var name = q ? q.client_name : 'ce client';
-  showConfirm('Marquer ' + name + ' comme absent ? Il sera retiré de la file.', { title: 'Client absent', danger: true, confirmLabel: 'Marquer absent' })
+  var paidWarn = q && q.paid_at ? ' Attention : il a déjà payé d\'avance, le remboursement n\'est pas automatique.' : '';
+  showConfirm('Marquer ' + name + ' comme absent ? Il sera retiré de la file.' + paidWarn, { title: 'Client absent', danger: true, confirmLabel: 'Marquer absent' })
     .then(function (ok) {
       if (!ok) return;
       barberApi('/api/queue/' + id + '/cancel', { method: 'POST', body: {} })
@@ -3349,12 +3370,25 @@ function renderPendingList() {
         '<div class="meta">' + esc(detail) + '</div>' +
         '<div class="lock-note">Mis de côté</div></div>' +
         '<div class="pending-actions">' +
-          '<span class="amount">' + eur(q.total_price_cents) + '</span>' +
+          '<span class="amount">' + eur(q.prepaid ? q.balance_due_cents : q.total_price_cents) + '</span>' +
           '<button class="btn btn-soft" onclick="event.stopPropagation();toggleDeferPayment(\'' + q.id + '\')">Reprendre</button>' +
         '</div></div>';
     }
 
     var isActive = i === firstActiveIndex;
+    if (q.prepaid) {
+      var addedNames = (q.balance_lines || []).map(function (l) { return l.item_name; }).join(', ');
+      return '<div class="pending-card' + (isActive ? '' : ' locked') + '"' +
+        (isActive ? ' onclick="useBalanceForTicket(\'' + q.id + '\')"' : '') + '>' +
+        '<div><div class="name">' + esc(q.client_name) + '</div>' +
+        '<div class="meta">' + esc(detail) + '</div>' +
+        '<div class="lock-note" style="color:var(--green)">✓ Payé d\'avance — reste à payer : ' + esc(addedNames) + '</div>' +
+        (isActive ? '' : '<div class="lock-note">En attente de son tour</div>') + '</div>' +
+        '<div class="pending-actions">' +
+          '<span class="amount">' + eur(q.balance_due_cents) + '</span>' +
+          (isActive ? '<button class="btn btn-ghost" onclick="event.stopPropagation();toggleDeferPayment(\'' + q.id + '\')">Mettre de côté</button>' : '') +
+        '</div></div>';
+    }
     var giftNote = '';
     if (q.gift_card) {
       var giftItemsList = (q.gift_card.items || []).map(function (it) {
@@ -3481,10 +3515,87 @@ function usePendingForTicket(queueId) {
     ticket.push({ item_type: 'product', item_id: p.id, item_name: p.name, unit_price_cents: p.price_cents, quantity: p.quantity });
   });
   ticketQueueId = queueId;
+  ticketMode = null;
   loyaltyRewardsAvailable = q.loyalty_rewards_available || 0;
   loyaltyDiscount = null;
   renderTicket();
   toast('Ticket de ' + q.client_name + ' chargé — choisissez le paiement');
+}
+
+/* ---------- Encaissement à l'avance ----------
+   Un client encore dans la file (en attente ou en cours) peut payer AVANT sa coupe : la vente est
+   enregistrée tout de suite, il garde sa place et le Timer affiche « Déjà payé ». Si un supplément est
+   ajouté ensuite, le reste à payer réapparaît dans « En attente d'encaissement » à la fin de la coupe. */
+function advanceCandidates() {
+  return (queue || []).filter(function (q) {
+    return (q.status === 'waiting' || q.status === 'in_progress') && !q.paid_at &&
+      (!activeBarberId || !q.barber_id || q.barber_id === activeBarberId);
+  }).sort(function (a, b) {
+    if (a.status !== b.status) return a.status === 'in_progress' ? -1 : 1;
+    return new Date(a.checkin_at) - new Date(b.checkin_at);
+  });
+}
+
+function openAdvancePicker() {
+  if (ticket.length) { toast('Videz ou encaissez d\'abord le ticket en cours.', true); return; }
+  barberApi('/api/queue').then(function (r) {
+    queue = r.queue || [];
+    var list = advanceCandidates();
+    var html = '<div class="modal-title">Encaisser à l\'avance</div>' +
+      '<p class="hint" style="margin:0 0 12px">Le client paie maintenant et garde sa place dans la file.</p>' +
+      (list.length ? list.map(function (q) {
+        var detail = q.service.name + (q.extras.length ? ' + ' + q.extras.map(function (x) { return x.name; }).join(', ') : '');
+        var withGift = Boolean(q.gift_card && q.gift_card.explicit);
+        return '<button type="button" class="advance-pick" data-id="' + esc(q.id) + '"' + (withGift ? ' disabled' : '') + '>' +
+          '<span><span style="font-weight:600">' + esc(q.client_name) + '</span>' +
+          '<span class="meta" style="display:block">' + esc(detail) + ' · ' + (q.status === 'in_progress' ? 'en cours' : 'en attente') +
+          (withGift ? ' · 🎁 réglé par son cadeau à la fin' : '') + '</span></span>' +
+          '<span style="font-weight:700">' + eur(q.total_price_cents) + '</span></button>';
+      }).join('') : '<div class="empty">Personne dans la file pour ce coiffeur.</div>') +
+      '<div class="modal-actions"><button class="btn btn-soft" id="advance-close">Fermer</button></div>';
+    var overlay = _buildModal(html);
+    overlay.querySelector('#advance-close').onclick = function () { _closeModal(overlay); };
+    Array.prototype.forEach.call(overlay.querySelectorAll('.advance-pick'), function (b) {
+      b.onclick = function () { _closeModal(overlay); useAdvanceForTicket(b.getAttribute('data-id')); };
+    });
+  }).catch(function (e) { toast(e.message, true); });
+}
+
+function useAdvanceForTicket(queueId) {
+  var q = (queue || []).find(function (x) { return x.id === queueId; });
+  if (!q) return;
+  var doneBy = q.barber_id || activeBarberId || null;
+  ticket = [{ item_type: 'service', item_id: q.service.id, item_name: q.service.name, unit_price_cents: q.service.price_cents, quantity: 1, barber_id: doneBy }];
+  q.extras.forEach(function (e) {
+    ticket.push({ item_type: 'extra', item_id: e.id, item_name: e.name, unit_price_cents: e.price_cents, quantity: 1, barber_id: doneBy });
+  });
+  (q.products || []).forEach(function (p) {
+    ticket.push({ item_type: 'product', item_id: p.id, item_name: p.name, unit_price_cents: p.price_cents, quantity: p.quantity });
+  });
+  ticketQueueId = queueId;
+  ticketMode = 'advance';
+  ticketModeName = q.client_name;
+  loyaltyRewardsAvailable = q.loyalty_rewards_available || 0;
+  loyaltyDiscount = null;
+  renderTicket();
+  toast('Ticket de ' + q.client_name + ' chargé (paiement d\'avance) — choisissez le paiement');
+}
+
+/** Reste à payer après un paiement d'avance : uniquement ce qui a été ajouté depuis (supplément...). */
+function useBalanceForTicket(queueId) {
+  var q = pendingPayments.find(function (x) { return x.id === queueId; });
+  if (!q || !q.prepaid) return;
+  var doneBy = q.barber_id || activeBarberId || null;
+  ticket = (q.balance_lines || []).map(function (l) {
+    return { item_type: l.item_type, item_id: l.item_id, item_name: l.item_name, unit_price_cents: l.unit_price_cents, quantity: l.quantity, barber_id: doneBy };
+  });
+  ticketQueueId = queueId;
+  ticketMode = 'balance';
+  ticketModeName = q.client_name;
+  loyaltyRewardsAvailable = 0;
+  loyaltyDiscount = null;
+  renderTicket();
+  toast('Reste à payer de ' + q.client_name + ' chargé — choisissez le paiement');
 }
 
 // Icône par défaut selon des mots-clés dans le nom (même mapping que
@@ -3604,7 +3715,7 @@ function addToTicket(itemType, itemId, itemName, unitPriceCents, opts) {
 function changeQty(index, delta) {
   ticket[index].quantity += delta;
   if (ticket[index].quantity <= 0) ticket.splice(index, 1);
-  if (!ticket.length) ticketQueueId = null;
+  if (!ticket.length) { ticketQueueId = null; ticketMode = null; }
   renderTicket();
 }
 
@@ -3612,6 +3723,7 @@ function clearTicket() {
   if (!ticket.length) return;
   ticket = [];
   ticketQueueId = null;
+  ticketMode = null;
   renderTicket();
 }
 
@@ -3635,6 +3747,14 @@ function renderTicket(justAddedIndex) {
           '</div>';
       }).join('');
 
+  var modeEl = document.getElementById('ticket-mode');
+  if (modeEl) {
+    var showMode = ticket.length && ticketQueueId && ticketMode;
+    modeEl.style.display = showMode ? 'block' : 'none';
+    modeEl.textContent = !showMode ? '' : (ticketMode === 'advance'
+      ? 'Paiement d\'avance — ' + ticketModeName + ' (garde sa place dans la file)'
+      : 'Reste à payer — ' + ticketModeName + ' (déjà réglé d\'avance)');
+  }
   var total = ticketTotal();
   document.getElementById('ticket-total').textContent = eur(total);
   ['especes', 'cb', 'partage'].forEach(function (m) {
@@ -3812,7 +3932,7 @@ function pay(method, cashCents) {
   var soldTicket = ticket.slice();
   var linkedQueueId = ticketQueueId;
   var usedLoyalty = Boolean(loyaltyDiscount);
-  var saleCtx = { method: method, cashCents: method === 'partage' ? cashCents : null, chargeCents: method === 'partage' ? total - cashCents : total, total: total, soldTicket: soldTicket, linkedQueueId: linkedQueueId, gift: gift, usedLoyalty: usedLoyalty, requestId: newRequestId() };
+  var saleCtx = { method: method, cashCents: method === 'partage' ? cashCents : null, chargeCents: method === 'partage' ? total - cashCents : total, total: total, soldTicket: soldTicket, linkedQueueId: linkedQueueId, gift: gift, usedLoyalty: usedLoyalty, requestId: newRequestId(), ticketMode: ticketMode, ticketModeName: ticketModeName };
 
   if (method === 'cb') {
     startTpePayment(saleCtx);
@@ -3938,6 +4058,7 @@ function finalizeSale(saleCtx) {
     method: 'POST',
     body: {
       payment_method: saleCtx.method, cash_cents: saleCtx.cashCents != null ? saleCtx.cashCents : undefined, items: saleCtx.soldTicket, queue_id: saleCtx.linkedQueueId,
+      balance: saleCtx.ticketMode === 'balance' ? true : undefined,
       gift: saleCtx.gift, loyalty_redeem: saleCtx.usedLoyalty, client_request_id: saleCtx.requestId
     }
   }).then(function (r) {
@@ -3965,8 +4086,13 @@ function finalizeSale(saleCtx) {
     if (saleCtx.method === 'especes' && !tpeBridgeUrl) {
       setTimeout(function () { window.print(); }, 150);
     }
+    if (saleCtx.ticketMode === 'advance') {
+      toast('✓ ' + (saleCtx.ticketModeName || 'Client') + ' a payé d\'avance — il garde sa place dans la file');
+      if (typeof refreshTimer === 'function') refreshTimer();
+    }
     ticket = [];
     ticketQueueId = null;
+    ticketMode = null;
     loyaltyRewardsAvailable = 0;
     loyaltyDiscount = null;
     document.getElementById('gift-checkbox').checked = false;

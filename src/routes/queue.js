@@ -102,8 +102,52 @@ router.get('/', wrap(async (req, res) => {
  * côté" (client parti chercher sa carte, urgence...) sont relégués à la
  * fin de la liste, pour ne jamais bloquer les suivants.
  */
+/**
+ * Client réglé d'AVANCE puis coupe terminée : on compare ce qui est fait (prestation + suppléments actuels)
+ * à ce qui a déjà été encaissé (lignes prestation/supplément des ventes rattachées à ce passage).
+ * - rien de plus : le passage est soldé (balance_paid_at posé), il disparaît de la liste ;
+ * - un supplément ajouté entre-temps : le passage reste dans la liste avec balance_lines (le reste à payer).
+ */
+async function withPrepaidBalance(rows) {
+  const prepaid = rows.filter((r) => r.prepaid_at);
+  if (!prepaid.length) return rows;
+  const [paidLines] = await pool.query(
+    `SELECT s.queue_id, si.item_type, si.item_id, si.unit_price_cents, si.quantity FROM sales s
+     JOIN sale_items si ON si.sale_id = s.id
+     WHERE s.queue_id IN (?) AND si.item_type IN ('service', 'extra')`,
+    [prepaid.map((r) => r.id)]
+  );
+  const settled = [];
+  const out = rows.map((r) => {
+    if (!r.prepaid_at) return r;
+    const mine = paidLines.filter((l) => l.queue_id === r.id);
+    const lines = [];
+    const paidServiceIds = mine.filter((l) => l.item_type === 'service').map((l) => l.item_id);
+    if (r.service && r.service.id && !paidServiceIds.includes(r.service.id)) {
+      // Prestation changée après le paiement : seule la différence (si plus chère) reste due.
+      const paidSvc = mine.filter((l) => l.item_type === 'service').reduce((a, l) => a + l.unit_price_cents * l.quantity, 0);
+      const diff = (r.service.price_cents || 0) - paidSvc;
+      if (diff > 0) lines.push({ item_type: 'service', item_id: r.service.id, item_name: r.service.name + ' (complément)', unit_price_cents: diff, quantity: 1 });
+    }
+    const paidExtraCount = {};
+    mine.filter((l) => l.item_type === 'extra').forEach((l) => { paidExtraCount[l.item_id] = (paidExtraCount[l.item_id] || 0) + l.quantity; });
+    (r.extras || []).forEach((e) => {
+      if (paidExtraCount[e.id] > 0) { paidExtraCount[e.id]--; return; }
+      lines.push({ item_type: 'extra', item_id: e.id, item_name: e.name, unit_price_cents: e.price_cents || 0, quantity: 1 });
+    });
+    const due = lines.reduce((a, l) => a + l.unit_price_cents * l.quantity, 0);
+    if (due <= 0) { settled.push(r.id); return null; }
+    return Object.assign({}, r, { prepaid: true, balance_lines: lines, balance_due_cents: due });
+  }).filter(Boolean);
+  if (settled.length) {
+    await pool.query('UPDATE queue SET balance_paid_at = NOW() WHERE id IN (?) AND balance_paid_at IS NULL', [settled]);
+  }
+  return out;
+}
+
 router.get('/pending-payment', requireAdminOrBarber, wrap(async (req, res) => {
-  let rows = await loadQueue(req.salon.id, ['done'], true);
+  let rows = await loadQueue(req.salon.id, ['done'], 'pending');
+  rows = await withPrepaidBalance(rows);
   if (req.actingBarberId) rows = rows.filter((r) => r.barber_id === req.actingBarberId);
   rows = await attachGiftInfo(rows, req.salon.id);
 
@@ -142,14 +186,14 @@ router.get('/pending-payment', requireAdminOrBarber, wrap(async (req, res) => {
  */
 router.post('/:id/defer-payment', requireAdminOrBarber, wrap(async (req, res) => {
   const [[row]] = await pool.query(
-    'SELECT barber_id, status, paid_at, payment_deferred_at FROM queue WHERE id = ? AND salon_id = ?',
+    'SELECT barber_id, status, paid_at, prepaid_at, balance_paid_at, payment_deferred_at FROM queue WHERE id = ? AND salon_id = ?',
     [req.params.id, req.salon.id]
   );
   if (!row) return res.status(404).json({ error: 'Client introuvable' });
   if (req.actingBarberId && row.barber_id && row.barber_id !== req.actingBarberId) {
     return res.status(403).json({ error: "Ce n'est pas votre client." });
   }
-  if (row.paid_at) return res.status(409).json({ error: 'Ce client a déjà été encaissé.' });
+  if (row.paid_at && !(row.prepaid_at && !row.balance_paid_at)) return res.status(409).json({ error: 'Ce client a déjà été encaissé.' });
 
   const newValue = row.payment_deferred_at ? null : new Date();
   await pool.query('UPDATE queue SET payment_deferred_at = ? WHERE id = ?', [newValue, req.params.id]);

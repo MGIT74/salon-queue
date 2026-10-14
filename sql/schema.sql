@@ -1302,3 +1302,15 @@ CREATE TABLE IF NOT EXISTS client_relatives (
 SET @idx := (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'client_relatives' AND index_name = 'idx_client_relatives_client');
 SET @sql := IF(@idx = 0, 'CREATE INDEX idx_client_relatives_client ON client_relatives(client_id)', 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Encaissement A L'AVANCE : un client de la file (en attente ou en cours) peut regler avant sa coupe.
+-- prepaid_at = moment de ce reglement anticipe (paid_at est pose en meme temps, donc il n'apparait
+-- plus dans "En attente d'encaissement"). Si un supplement est ajoute ensuite, le RESTE A PAYER
+-- reapparait a la fin de la coupe ; balance_paid_at = moment ou ce reste a ete regle (ou constate nul).
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'queue' AND column_name = 'prepaid_at');
+SET @sql := IF(@c = 0, "ALTER TABLE queue ADD COLUMN prepaid_at DATETIME NULL", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'queue' AND column_name = 'balance_paid_at');
+SET @sql := IF(@c = 0, "ALTER TABLE queue ADD COLUMN balance_paid_at DATETIME NULL", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
