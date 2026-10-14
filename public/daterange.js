@@ -203,8 +203,17 @@
     btn.type = 'button'; btn.className = 'dr-btn'; btn.setAttribute('aria-haspopup', 'dialog'); btn.setAttribute('aria-expanded', 'false');
     inst.btn = btn;
     function refresh() { btn.innerHTML = ICON + '<span>' + label(from.value, to.value) + '</span>'; }
+    // Dans une grille de champs, le bouton prend la place d'un champ avec son propre libellé « Période » :
+    // même ligne de base que les autres filtres (Statut, Coiffeur...), mêmes marges.
     var host = fldF || from;
-    host.parentNode.insertBefore(btn, host);
+    if (fldF) {
+      var wrap = document.createElement('div');
+      wrap.className = 'fld dr-fld';
+      var st0 = fldF.getAttribute('style'); if (st0) wrap.setAttribute('style', st0.replace(/display\s*:\s*none;?/, ''));
+      var lab = document.createElement('label'); lab.textContent = 'Période';
+      wrap.appendChild(lab); wrap.appendChild(btn);
+      host.parentNode.insertBefore(wrap, host);
+    } else host.parentNode.insertBefore(btn, host);
     [[from, fldF], [to, fldT]].forEach(function (x) {
       x[0]._dr = inst;
       if (x[1]) x[1].style.display = 'none'; else x[0].style.display = 'none';

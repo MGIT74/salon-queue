@@ -681,3 +681,10 @@ body .tfx > button { transition: color .25s ease, transform .1s ease; }
   .dr-sum { display: none; }
   .dr-apply, .dr-cancel { flex: 1; padding: 13px; }
 }
+
+/* Le bouton de période dans une grille de champs : même gabarit que les champs voisins (libellé « Période » + boîte pleine largeur) */
+.fld .dr-btn { display: flex; width: 100%; justify-content: flex-start; padding: 14px 15px; border: 1px solid var(--sep); border-radius: 12px; background: var(--card); font-size: 16px; font-weight: 400; box-shadow: none !important; }
+.fld .dr-btn:hover { background: var(--fill); }
+.fld .dr-btn[aria-expanded="true"] { outline: 2px solid var(--accent); outline-offset: -2px; }
+.clients-toolbar .fld .dr-btn { padding: 9px 12px; font-size: 13.5px; border-radius: 10px; width: auto; }
+.stats-range-picker .fld .dr-btn { padding: 9px 12px; font-size: 14px; }

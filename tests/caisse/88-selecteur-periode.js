@@ -29,6 +29,7 @@ check('libelles', DR.label('', '') === 'Toutes les dates' && DR.label('2026-10-0
 const doc = w.document, a = doc.getElementById('a'), b = doc.getElementById('b');
 const btn = doc.querySelector('.dr-btn');
 check('un bouton remplace les deux champs (caches), libelle affiche', !!btn && a.parentNode.style.display === 'none' && b.parentNode.style.display === 'none' && /1 oct\. → 31 oct\. 2026/.test(btn.textContent));
+check('bouton range dans un champ "Période" (meme gabarit que Statut / Coiffeur)', !!btn.parentNode.classList.contains('fld') && /Période/.test(btn.parentNode.textContent.slice(0, 8)));
 let fired = 0; b.addEventListener('change', () => fired++); a.addEventListener('change', () => fired += 100);
 btn.click();
 const pop = () => doc.querySelector('.dr-pop');
