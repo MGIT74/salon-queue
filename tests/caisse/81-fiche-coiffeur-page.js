@@ -8,9 +8,10 @@ check('clic sur une carte : ouvre la fiche (toggleBarberExpand = ouvrir)', /oncl
 check('bouton Retour vers la liste', /class="bp-back" onclick="closeBarber\(\)"/.test(dash) && /function closeBarber\(\)/.test(dash));
 check('titre « Coiffeurs et horaires » + Ajouter masques quand une fiche est ouverte', /id="barbers-head"/.test(dash) && /head\.style\.display = cur \? 'none' : ''/.test(dash));
 check('resume du jour : coupes, encaisse, occupation (API stats existante)', /bp-kpi-done-/.test(dash) && /bp-kpi-rev-/.test(dash) && /bp-kpi-occ-/.test(dash) && /function loadBarberKpis\(id\)/.test(dash));
-check('onglets existants conserves (Horaires, Prestations, Statistiques, Congés)', ['horaires', 'prestations', 'stats', 'conges'].every((t) => new RegExp("switchBarberTab\\(\\\\'' \\+ b\\.id \\+ '\\\\',\\\\'" + t + "\\\\'\\)").test(dash)));
+check('onglets conserves (Horaires, Prestations, Congés) ; Statistiques = bloc pleine largeur au-dessus, plus un onglet', ['horaires', 'prestations', 'conges'].every((t) => new RegExp("switchBarberTab\\(\\\\'' \\+ b\\.id \\+ '\\\\',\\\\'" + t + "\\\\'\\)").test(dash)));
 check('profil a droite : photo avec anneau, puces d\'etat, actions (renommer, photo, code, desactiver)', /class="bp-ring"/.test(dash) && /renameBarber\(/.test(dash) && /setBarberPin\(/.test(dash) && /archiveBarber\(/.test(dash));
 check('tout en bas : rangee des cartes de chaque coiffeur pour naviguer (courant surligne)', /class="bp-others"/.test(dash) && /barberCardHtml\(b, b\.id === cur\.id\)/.test(dash) && /\.bc\.cur \{/.test(dash));
 check('mobile : une colonne', /@media \(max-width: 980px\) \{\s*\.bp-layout \{ grid-template-columns: minmax\(0, 1fr\); \}/.test(dash));
 check('onglet rempli apres CHAQUE rendu (jamais bloque sur « Chargement… » apres un conge enregistre)', /populateBarberTab\(cur\.id\);\n\}/.test(dash) && /if \(barberLeaves\[id\]\) renderLeavesList\(id\); else loadBarberLeaves\(id\)/.test(dash));
+check('statistiques : bloc pleine largeur au-dessus de la fiche, charge a chaque rendu', /<div class="bp-stats">' \+ renderStatsTab\(b\)/.test(dash) && !/switchBarberTab\(\\'' \+ b\.id \+ '\\',\\'stats\\'\)/.test(dash) && /loadBarberStats\(id\);   \/\/ le bloc/.test(dash) && /\.bp-stats \.stats-grid \{ grid-template-columns: repeat\(5/.test(dash));
 console.log('\n' + pass + ' OK, ' + fail + ' ECHEC'); process.exit(fail ? 1 : 0);
