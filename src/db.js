@@ -61,7 +61,7 @@ function utcIso(v) {
 // quand on est déjà dans une section verrouillée (voir lib/cashLock.js), sinon
 // une requête supplémentaire sur le pool peut se bloquer si toutes les
 // connexions sont prises par des requêtes en attente du même verrou.
-async function legacyLockedUntil(salonId, settings, conn) {
+async function getCaisseLockedUntil(salonId, settings, conn) {
   const [[lastClosing]] = await (conn || pool).query(
     'SELECT period_end FROM cash_closings WHERE salon_id = ? ORDER BY period_end DESC LIMIT 1',
     [salonId]
@@ -98,91 +98,6 @@ async function legacyLockedUntil(salonId, settings, conn) {
 }
 
 /**
- * Horaires de la caisse (Dashboard > Caisse > Réglages) : une heure d'OUVERTURE et une heure de FERMETURE
- * AUTOMATIQUE, chacune activable. Tant qu'aucun de ces réglages n'a été enregistré, l'ancien fonctionnement
- * (fermée après une clôture jusqu'au lendemain à caisse_reopen_hour) continue de s'appliquer.
- */
-function caisseSchedule(settings) {
-  const hhmm = (v, d) => (/^\d{2}:\d{2}$/.test(v || '') ? v : d);
-  const toMin = (v) => Number(v.slice(0, 2)) * 60 + Number(v.slice(3, 5));
-  const configured = settings.caisse_open_enabled !== undefined || settings.caisse_close_enabled !== undefined;
-  const openHour = hhmm(settings.caisse_open_hour, '09:00');
-  const closeHour = hhmm(settings.caisse_close_hour, '20:00');
-  return {
-    configured,
-    openEnabled: String(settings.caisse_open_enabled) === '1',
-    openHour, openMin: toMin(openHour),
-    closeEnabled: String(settings.caisse_close_enabled) === '1',
-    closeHour, closeMin: toMin(closeHour)
-  };
-}
-
-const salonDateStr = (d, tz) => new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
-const shiftDay = (dateStr, n) => { const x = new Date(dateStr + 'T00:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
-const fmtHm = (hhmm) => hhmm.replace(':', 'h');
-
-/**
- * État de verrouillage de la caisse : null si on peut encaisser, sinon { reason, until (Date|null), message }.
- *  - 'z_pending'   : fermeture automatique passée avec des ventes pas encore clôturées -> fermée jusqu'à ce que
- *                    l'ADMIN fasse la clôture Z (aucune réouverture automatique, même le lendemain) ;
- *  - 'closed'      : fermeture automatique passée (rien à clôturer ou Z déjà faite) -> jusqu'à la prochaine ouverture ;
- *  - 'before_open' : avant l'heure d'ouverture du jour.
- * « Forcer l'ouverture » (mot de passe admin) lève le verrou en cours.
- */
-async function getCaisseLock(salonId, settings, conn) {
-  const sch = caisseSchedule(settings);
-  if (!sch.configured) {
-    const until = await legacyLockedUntil(salonId, settings, conn);
-    return until ? { reason: 'closed', until: new Date(until), message: 'Caisse fermée suite à la clôture.' } : null;
-  }
-  const db = conn || pool;
-  const tz = settings.timezone || 'Europe/Paris';
-  const now = new Date();
-  const today = salonDateStr(now, tz);
-  const nowLocal = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(now);
-  const nowMin = Number(nowLocal.slice(0, 2)) * 60 + Number(nowLocal.slice(3, 5));
-  const forcedAt = settings.caisse_force_reopen_at ? new Date(settings.caisse_force_reopen_at) : null;
-  const forcedAfter = (d) => forcedAt && !Number.isNaN(forcedAt.getTime()) && forcedAt > d;
-  const nextOpen = (dateStr) => sch.openEnabled ? parisLocalToUtcDate(dateStr, sch.openHour + ':00', tz) : parisLocalToUtcDate(dateStr, '00:00:00', tz);
-
-  if (sch.closeEnabled) {
-    const closeDay = nowMin >= sch.closeMin ? today : shiftDay(today, -1);
-    const lastClose = parisLocalToUtcDate(closeDay, sch.closeHour + ':00', tz);  // dernière fermeture automatique passée
-    if (!forcedAfter(lastClose)) {
-      const [[z]] = await db.query('SELECT MAX(period_end) AS last FROM cash_closings WHERE salon_id = ?', [salonId]);
-      const lastZ = z && z.last ? String(z.last).replace(' ', 'T') + 'Z' : null;
-      const lastZSql = lastZ ? lastZ.slice(0, 19).replace('T', ' ') : '1970-01-01 00:00:00';
-      const [[pending]] = await db.query(
-        'SELECT COUNT(*) AS n FROM sales WHERE salon_id = ? AND created_at > ? AND created_at <= ?',
-        [salonId, lastZSql, lastClose.toISOString().slice(0, 19).replace('T', ' ')]
-      );
-      if (Number(pending.n) > 0) {
-        return { reason: 'z_pending', until: null,
-          message: 'Caisse fermée depuis ' + fmtHm(sch.closeHour) + ' : la clôture Z doit être faite par l\'administrateur avant de pouvoir encaisser à nouveau.' };
-      }
-      if (nowMin >= sch.closeMin) {
-        const until = nextOpen(shiftDay(today, 1));
-        return { reason: 'closed', until, message: 'Caisse fermée depuis ' + fmtHm(sch.closeHour) + '.' };
-      }
-    }
-  }
-  if (sch.openEnabled && nowMin < sch.openMin) {
-    const until = parisLocalToUtcDate(today, sch.openHour + ':00', tz);
-    if (!forcedAfter(parisLocalToUtcDate(today, '00:00:00', tz))) {
-      return { reason: 'before_open', until, message: 'La caisse ouvre à ' + fmtHm(sch.openHour) + '.' };
-    }
-  }
-  return null;
-}
-
-/** Compatibilité : date de réouverture (ISO), 'z_pending' quand seule une clôture admin la rouvrira, ou null. */
-async function getCaisseLockedUntil(salonId, settings, conn) {
-  const lock = await getCaisseLock(salonId, settings, conn);
-  if (!lock) return null;
-  return lock.until ? lock.until.toISOString() : 'z_pending';
-}
-
-/**
  * Debut de la "journee de caisse" en cours, en UTC ('YYYY-MM-DD HH:MM:SS' comme
  * sales.created_at) : la derniere heure de reouverture de la caisse
  * (reglage caisse_reopen_hour, heure du SALON, 00:00 par defaut) deja passee.
@@ -191,10 +106,7 @@ async function getCaisseLockedUntil(salonId, settings, conn) {
  */
 function caisseDayStartUtc(settings, now) {
   const tz = settings.timezone || 'Europe/Paris';
-  const sch = caisseSchedule(settings);
-  const reopen = sch.configured
-    ? (sch.openEnabled ? sch.openHour : '00:00')
-    : (/^\d{2}:\d{2}$/.test(settings.caisse_reopen_hour || '') ? settings.caisse_reopen_hour : '00:00');
+  const reopen = /^\d{2}:\d{2}$/.test(settings.caisse_reopen_hour || '') ? settings.caisse_reopen_hour : '00:00';
   const at = now || new Date();
   const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(at);
   let start = parisLocalToUtcDate(todayStr, reopen + ':00', tz);
@@ -311,4 +223,4 @@ async function setPlatformSettings(obj) {
   );
 }
 
-module.exports = { pool, getSettings, setSettings, getOwnerSettings, setOwnerSettings, getPlatformSettings, setPlatformSettings, utcIso, getCaisseLockedUntil, getCaisseLock, caisseSchedule, caisseDayStartUtc, parisLocalToUtcDate };
+module.exports = { pool, getSettings, setSettings, getOwnerSettings, setOwnerSettings, getPlatformSettings, setPlatformSettings, utcIso, getCaisseLockedUntil, caisseDayStartUtc, parisLocalToUtcDate };

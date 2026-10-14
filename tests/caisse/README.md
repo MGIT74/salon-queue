@@ -124,5 +124,4 @@ node tests/caisse/90-actualisation-discrete.js  # Actualisation discrete 15 s (c
 node tests/caisse/91-audit-securite.js  # Audit securite : liens d'email (base_url), echappement HTML des emails, CSV, verrou de reservation, limite publique
 node tests/caisse/92-encaissement-avance.js  # Encaissement a l'avance (serveur + base) : garde sa place, deja paye, reste a payer apres supplement
 node tests/caisse/93-fidelite-deux-paliers.js  # Fidelite a deux paliers (prestation / produit), deduction a l'utilisation, reconversion des anciennes recompenses
-node tests/caisse/94-horaires-caisse.js  # Horaires de caisse : ouverture / fermeture automatique (interrupteurs), cloture Z en attente reservee a l'admin
 ```

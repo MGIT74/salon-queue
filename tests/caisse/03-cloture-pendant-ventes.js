@@ -17,7 +17,7 @@ const sale = () => api('POST','/api/sales',{ payment_method:'especes', items:[{i
     const pending = [];
     for (let i = 0; i < 40; i++) {
       pending.push(sale());
-      if (i === 12) pending.push(api('POST','/api/owner/caisse/close',{ starting_cash_cents: 0 }, Object.assign({}, H, { 'X-Admin-Password': 'adminpw' })));
+      if (i === 12) pending.push(api('POST','/api/owner/caisse/close',{ starting_cash_cents: 0 }));
       await new Promise(r => setTimeout(r, 4));
     }
     const out = await Promise.all(pending);

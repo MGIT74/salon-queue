@@ -895,8 +895,7 @@
     <svg class="ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2.5"/><path d="M2 10h20"/><path d="M6 15h4"/></svg>
     Caisse
   </button>
-  <!-- Clôture Z : réservée à l'administrateur (Dashboard > Caisse), plus depuis la tablette. -->
-  <button id="nav-cloture" onclick="switchCaisseTab('cloture')" style="display:none">
+  <button id="nav-cloture" onclick="switchCaisseTab('cloture')">
     <svg class="ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
     Clôture
   </button>
@@ -1282,6 +1281,7 @@ function showApp() {
   pollConnection();
   setConnPollInterval(15000);
   loadMarketingSettings();
+  loadInactivitySetting();
   focusScanCatcher();
   clearInterval(pendingPaymentsInterval);
   pendingPaymentsInterval = setInterval(loadPendingPayments, 5000);
@@ -1509,16 +1509,6 @@ function selectActiveBarber(barberId) {
  * L'Agenda n'est volontairement PAS concerné : aucune bulle sélectionnée
  * y est un mode à part entière ("Tous les coiffeurs"), pas une erreur.
  */
-/** Texte de l'écran « Caisse fermée » : raison (ouverture, fermeture automatique, clôture Z en attente) + réouverture prévue. */
-function caisseLockText(d) {
-  var msg = d.caisse_lock_message || 'Caisse fermée.';
-  if (d.caisse_locked_until && d.caisse_locked_until !== 'z_pending' && d.caisse_lock_reason !== 'before_open') {
-    var when = new Date(d.caisse_locked_until).toLocaleString('fr-FR', { weekday: 'long', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
-    msg += ' Réouverture prévue le ' + when + '.';
-  }
-  return msg;
-}
-
 function refreshCaisseLockState() {
   var headers = {};
   if (SALON_SLUG) headers['X-Salon-Slug'] = SALON_SLUG;
@@ -1527,12 +1517,11 @@ function refreshCaisseLockState() {
     .then(function (d) {
       var panel = document.getElementById('panel-caisse');
       if (d.caisse_locked_until) {
-        document.getElementById('caisse-closed-reopen-text').textContent = caisseLockText(d);
+        var when = new Date(d.caisse_locked_until).toLocaleString('fr-FR', {
+          weekday: 'long', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
+        });
+        document.getElementById('caisse-closed-reopen-text').textContent = 'Réouverture prévue le ' + when + '.';
         panel.classList.add('day-closed');
-        // Caisse fermée (fermeture automatique, Z en attente, avant l'ouverture) : la session du coiffeur se
-        // termine et la tablette revient à l'écran « Caisse fermée ». À l'ouverture, il faudra donc TOUJOURS
-        // retaper un code PIN (comme avant, quand le Z fait sur la tablette ramenait à l'écran de départ).
-        if (me && !paymentInFlight) { logout(); showLoginOrLocked(); }
       } else {
         panel.classList.remove('day-closed');
       }
@@ -3148,7 +3137,12 @@ function showLoginOrLocked() {
     .then(function (r) { return r.json(); })
     .then(function (d) {
       var locked = Boolean(d.caisse_locked_until);
-      if (locked) document.getElementById('locked-reopen-text').textContent = caisseLockText(d);
+      if (locked) {
+        var when = new Date(d.caisse_locked_until).toLocaleString('fr-FR', {
+          weekday: 'long', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
+        });
+        document.getElementById('locked-reopen-text').textContent = 'Réouverture prévue le ' + when + '.';
+      }
       document.getElementById('login-card-normal').style.display = locked ? 'none' : '';
       document.getElementById('login-card-locked').style.display = locked ? 'block' : 'none';
     })
@@ -3244,10 +3238,11 @@ function forceOpenCaisse() {
     .then(function (r) { return r.json(); })
     .then(function (d) {
       if (d.caisse_locked_until) {
-        // Session gardée d'avant la fermeture : effacée, le code PIN sera redemandé à l'ouverture.
-        try { sessionStorage.removeItem('caisse-session'); } catch (e) {}
         document.documentElement.classList.remove('auth-checking');
-        document.getElementById('locked-reopen-text').textContent = caisseLockText(d);
+        var when = new Date(d.caisse_locked_until).toLocaleString('fr-FR', {
+          weekday: 'long', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
+        });
+        document.getElementById('locked-reopen-text').textContent = 'Réouverture prévue le ' + when + '.';
         document.getElementById('login-card-normal').style.display = 'none';
         document.getElementById('login-card-locked').style.display = 'block';
         return;

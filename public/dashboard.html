@@ -1328,15 +1328,6 @@
             border-radius: 999px; cursor: pointer; flex-shrink: 0;
             transition: background .2s ease, transform .15s cubic-bezier(.34,1.56,.64,1); }
   .switch:active { transform: scale(.93); }
-  .caisse-hours { display: grid; gap: 10px; margin-bottom: 16px; }
-  .caisse-hour-row { display: flex; align-items: center; gap: 14px; padding: 12px 14px; border-radius: 14px; background: var(--fill); }
-  .caisse-hour-text { flex: 1; min-width: 0; }
-  .caisse-hour-title { font-weight: 600; font-size: 15px; }
-  .caisse-hour-row .fld { flex-shrink: 0; width: 140px; }
-  .caisse-hour-row .fld input { background: var(--card); }
-  @media (max-width: 640px) { .caisse-hour-row { flex-wrap: wrap; } .caisse-hour-text { flex-basis: 100%; } }
-  .z-pending-banner { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 12px; margin-bottom: 14px;
-    background: color-mix(in srgb, var(--red) 12%, transparent); color: var(--red); font-size: 14px; font-weight: 600; }
   .switch.on { background: var(--green); }
   .switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px;
                    border-radius: 50%; background: #fff; transition: transform .2s ease; }
@@ -1851,7 +1842,6 @@
   <div class="tab-panel" id="t-caisse">
     <div class="card-box">
       <h3>Période en cours</h3>
-      <div class="z-pending-banner" id="caisse-z-pending" style="display:none"></div>
       <p class="hint" id="caisse-period-since">Depuis le début.</p>
       <div class="total-line" style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:16px">
         <span style="color:var(--grey);font-size:14px" id="caisse-sales-count">0 vente</span>
@@ -1924,24 +1914,13 @@
         <svg class="accordion-chevron" id="caisse-settings-chevron" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
       </h3>
       <div class="accordion-body" id="caisse-settings-body" style="display:none">
-      <div class="caisse-hours">
-        <div class="caisse-hour-row">
-          <div class="caisse-hour-text">
-            <div class="caisse-hour-title">Ouverture de la caisse</div>
-            <div class="hint" style="margin:2px 0 0">Avant cette heure, impossible d'encaisser.</div>
-          </div>
-          <div class="fld" style="margin:0"><input id="caisse-open-hour" type="time" value="09:00"></div>
-          <div class="switch" id="caisse-open-switch" onclick="this.classList.toggle('on')" title="Activer / désactiver"></div>
-        </div>
-        <div class="caisse-hour-row">
-          <div class="caisse-hour-text">
-            <div class="caisse-hour-title">Fermeture automatique</div>
-            <div class="hint" style="margin:2px 0 0">À cette heure la caisse se ferme. S'il reste des ventes, la <strong>clôture Z reste en attente</strong> : la caisse ne rouvre qu'une fois la clôture faite ici par l'administrateur.</div>
-          </div>
-          <div class="fld" style="margin:0"><input id="caisse-close-hour" type="time" value="20:00"></div>
-          <div class="switch" id="caisse-close-switch" onclick="this.classList.toggle('on')" title="Activer / désactiver"></div>
-        </div>
+      <div class="grid2">
+        <div class="fld"><label for="caisse-inactivity">Déconnexion automatique après (secondes)</label>
+          <input id="caisse-inactivity" type="number" min="5" max="300"></div>
+        <div class="fld"><label for="caisse-reopen-hour">Heure de réouverture le lendemain d'une clôture</label>
+          <input id="caisse-reopen-hour" type="time" value="00:00"></div>
       </div>
+      <p class="hint">Après une clôture, la caisse reste fermée (impossible d'encaisser) jusqu'à cette heure le <strong>lendemain</strong> — quelle que soit l'heure de la clôture.</p>
       <button class="btn btn-primary" onclick="saveCaisseInactivity()">Enregistrer</button>
       </div>
     </div>
@@ -7324,10 +7303,6 @@ function loadCaisseTab() {
       : 'Depuis le début (aucune clôture précédente).';
     document.getElementById('caisse-sales-count').textContent = r.sales_count + (r.sales_count > 1 ? ' ventes' : ' vente');
     document.getElementById('caisse-total').textContent = eur(r.total_cents);
-    var zBox = document.getElementById('caisse-z-pending');
-    var zPending = r.caisse_lock && r.caisse_lock.reason === 'z_pending';
-    zBox.style.display = zPending ? 'flex' : 'none';
-    zBox.textContent = zPending ? '⚠️ Clôture Z en attente — la caisse est fermée jusqu\'à ce que vous clôturiez cette période.' : '';
 
     var methodLabels = { especes: 'Espèces', cb: 'CB', autre: 'Autre' };
     var methods = Object.keys(r.by_method);
@@ -7355,10 +7330,8 @@ function loadCaisseTab() {
   loadClosingsList();
 
   api('/api/settings').then(function (r) {
-    document.getElementById('caisse-open-hour').value = r.settings.caisse_open_hour || r.settings.caisse_reopen_hour || '09:00';
-    document.getElementById('caisse-close-hour').value = r.settings.caisse_close_hour || '20:00';
-    document.getElementById('caisse-open-switch').classList.toggle('on', String(r.settings.caisse_open_enabled) === '1');
-    document.getElementById('caisse-close-switch').classList.toggle('on', String(r.settings.caisse_close_enabled) === '1');
+    document.getElementById('caisse-inactivity').value = r.settings.caisse_inactivity_seconds || 15;
+    document.getElementById('caisse-reopen-hour').value = r.settings.caisse_reopen_hour || '00:00';
     document.getElementById('set-tpe-print-mode').value = r.settings.tpe_print_mode === 'text' ? 'text' : 'escpos';
     if (window.__bridgeStatusInterval) clearInterval(window.__bridgeStatusInterval);
     pollBridgeStatus();
@@ -7411,14 +7384,10 @@ function startCaisseClosing() {
 }
 
 function saveCaisseInactivity() {
-  var body = {
-    caisse_open_enabled: document.getElementById('caisse-open-switch').classList.contains('on') ? '1' : '0',
-    caisse_open_hour: document.getElementById('caisse-open-hour').value || '09:00',
-    caisse_close_enabled: document.getElementById('caisse-close-switch').classList.contains('on') ? '1' : '0',
-    caisse_close_hour: document.getElementById('caisse-close-hour').value || '20:00'
-  };
-  api('/api/settings', { method: 'PUT', body: body })
-    .then(function () { toast('Réglages enregistrés'); loadCaisseTab(); })
+  var seconds = Number(document.getElementById('caisse-inactivity').value) || 15;
+  var reopenHour = document.getElementById('caisse-reopen-hour').value || '00:00';
+  api('/api/settings', { method: 'PUT', body: { caisse_inactivity_seconds: seconds, caisse_reopen_hour: reopenHour } })
+    .then(function () { toast('Réglages enregistrés'); })
     .catch(function (e) { toast(e.message, true); });
 }
 
