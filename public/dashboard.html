@@ -49,7 +49,7 @@
 <style>
   html.auth-checking #login { display: none; }
 </style>
-<link rel="stylesheet" href="/app.css?v=21">
+<link rel="stylesheet" href="/app.css?v=24">
 <style>
   .wrap { max-width: none; margin: 0; padding: clamp(16px,1.8vw,28px); }
 
@@ -309,7 +309,7 @@
   .sms-alert { background: rgba(255,59,48,.10); border: 1px solid rgba(255,59,48,.35); color: #d1362b; border-radius: 12px; padding: 10px 14px; font-size: 13.5px; margin-bottom: 10px; }
   .sms-badge.failed { background: rgba(255,59,48,.15); color: #d1362b; }
   .sms-badge.pending { background: var(--fill); color: var(--grey); }
-  .sidebar-version { text-align: right; padding: 4px 14px 0; font-size: 11.5px; color: var(--grey); opacity: .8; letter-spacing: .02em; user-select: none; }
+  .sidebar-version { text-align: right; padding: 4px 14px 0; font-size: 11.5px; color: var(--grey); letter-spacing: .02em; user-select: none; }
   html[data-sidebar-collapsed="1"] .sidebar-version { display: none; }
   .sidebar-logout-mobile { display: none !important; }
   .mobile-action, .mobile-more-btn { display: none !important; }
@@ -2186,10 +2186,10 @@
       <h4 style="font-size:14.5px;font-weight:600;margin:0 0 4px">Couleur d'accentuation</h4>
       <p class="hint">Remplace le bleu par défaut de l'app (boutons, sélections, liens) par la couleur de votre choix.</p>
       <div style="display:flex;align-items:center;gap:10px">
-        <input type="color" id="acc-accent-color" value="#0071e3"
+        <input type="color" id="acc-accent-color" value="#0062c4"
                style="width:44px;height:44px;border:none;border-radius:12px;padding:0;cursor:pointer;background:none"
                onchange="document.getElementById('acc-accent-color-hex').textContent = this.value">
-        <span class="hint" id="acc-accent-color-hex" style="margin:0">#0071e3</span>
+        <span class="hint" id="acc-accent-color-hex" style="margin:0">#0062c4</span>
         <button class="btn btn-soft" style="padding:8px 14px;font-size:13px" onclick="saveAccentColor()">Enregistrer</button>
         <button class="btn btn-ghost" style="padding:8px 14px;font-size:13px" onclick="resetAccentColor()">Réinitialiser</button>
       </div>
@@ -8002,8 +8002,8 @@ function saveAccentColor() {
 function resetAccentColor() {
   api('/api/settings', { method: 'PUT', body: { accent_color: '' } })
     .then(function () {
-      document.getElementById('acc-accent-color').value = '#0071e3';
-      document.getElementById('acc-accent-color-hex').textContent = '#0071e3';
+      document.getElementById('acc-accent-color').value = '#0062c4';
+      document.getElementById('acc-accent-color-hex').textContent = '#0062c4';
       toast('Bleu par défaut restauré — rechargez la page pour le voir partout');
     })
     .catch(function (e) { toast(e.message, true); });

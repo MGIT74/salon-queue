@@ -9,7 +9,8 @@ check('schema : colonne products.online_bookable (defaut 1, idempotente)', /colu
 check('API : creation et modification d\'un produit', /const onlineBookable = req\.body\.online_bookable/.test(cat) && /sets\.push\('online_bookable = \?'\)/.test(cat));
 check('API : modification groupee (produits seulement)', /table === 'products' && req\.body\.online_bookable !== undefined/.test(cat));
 check('reservation en ligne (serveur) : refuse les produits caisse seulement', /FROM products WHERE id IN \(\?\) AND salon_id = \? AND online_bookable = 1/.test(appt));
-check('creation de rdv par l\'equipe (admin-create) : non restreinte', (appt.match(/online_bookable = 1/g) || []).length === 1);
+check('creation de rdv par l\'equipe (admin-create) : non restreinte (seules la reservation en ligne simple et groupee le sont)', (appt.match(/online_bookable = 1/g) || []).length === 2
+  && !/router\.post\('\/admin-create'[\s\S]*?online_bookable = 1/.test(appt.slice(appt.indexOf("router.post('/admin-create'"), appt.indexOf("router.post('/admin-create'") + 6000).split("router.post('/cancel")[0]));
 check('page de reservation : produits filtres', /products = r\[2\]\.items\.filter\(function \(p\) \{ return p\.online_bookable !== 0/.test(rdv));
 check('reservation du compte client : produits filtres', /bookProducts = r\[2\]\.items\.filter\(function \(p\) \{ return p\.online_bookable !== 0/.test(compte));
 check('dashboard : case dans la fiche produit', /id="sc-online"/.test(dash) && /body\.online_bookable = document\.getElementById\('sc-online'\)\.checked/.test(dash));

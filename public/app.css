@@ -1,10 +1,10 @@
 :root {
-  --bg: #eef0f2; --card: #ffffff; --ink: #1d1d1f; --grey: #86868b;
-  --sep: #d8d8dd; --fill: #f2f2f7; --fill-2: #e8e8ed;
-  --blue: #0071e3; --blue-hover: #0058b9; --blue-soft: #e8f1fd;
-  --accent: #0071e3; --accent-hover: #0058b9; --accent-rgb: 0,113,227;
-  --green: #34c759; --green-hover: #28a746;
-  --red: #ff3b30; --orange: #ff9500;
+  --bg: #eef0f2; --card: #ffffff; --ink: #1d1d1f; --grey: #66666b;
+  --sep: #bcbdc6; --fill: #e4e5eb; --fill-2: #d6d7df;
+  --blue: #0062c4; --blue-hover: #004fa0; --blue-soft: #e3eefb;
+  --accent: #0062c4; --accent-hover: #004fa0; --accent-rgb: 0,98,196;
+  --green: #1e7e34; --green-hover: #17692b;
+  --red: #c4001b; --orange: #b35a00;
   --shadow: 0 1px 2px rgba(0,0,0,0.04), 0 6px 20px rgba(0,0,0,0.06);
   --shadow-lg: 0 12px 40px rgba(0,0,0,0.14);
 }
@@ -182,7 +182,7 @@ button:active:not(:disabled), .switch:active {
 .fld input[type="time"], .fld input[type="date"] {
   width: auto; min-width: 150px; max-width: 100%;
 }
-.fld input::placeholder { color: var(--grey); opacity: .6; }
+.fld input::placeholder { color: var(--grey); opacity: .85; }
 
 /* Certains navigateurs mobiles (Chrome Android notamment) rendent
    l'icône native d'un input[type=date] dans une zone qui déborde de sa
@@ -556,6 +556,7 @@ input[type="date"] { -webkit-appearance: none; appearance: none; }
 /* Mode clair : fines bordures + ombre legere pour que le contour des cartes se voie sur le fond blanc. */
 :root:not([data-theme="dark"]) .item-card,
 :root:not([data-theme="dark"]) .svc-card { box-shadow: 0 0 0 1px #cfcfd6, 0 2px 6px rgba(0,0,0,.07); }
+:root:not([data-theme="dark"]) :is(.theme-btn, .phone-cc-btn, .items-search input, .keypad button:not(.empty), .btn-soft, .conn-btn, .history-btn, .drawer-btn) { box-shadow: inset 0 0 0 1px var(--sep); }
 :root:not([data-theme="dark"]) .item-card.sel,
 :root:not([data-theme="dark"]) .svc-card.sel { box-shadow: none; }
 
