@@ -457,6 +457,15 @@
     <div class="err" id="profile-err"></div>
     <div class="msg" id="profile-msg"></div>
 
+    <div class="eyebrow">Mes proches</div>
+    <p style="color:var(--grey);font-size:13.5px;margin:-6px 0 12px">Enfants, amis… : enregistrez leur prénom pour les ajouter en un clic quand vous réservez à plusieurs.</p>
+    <div id="relatives-list"></div>
+    <div style="display:flex;gap:8px;margin-bottom:6px">
+      <input id="rel-new" type="text" maxlength="60" placeholder="Prénom" style="flex:1;min-width:0" onkeydown="if(event.key==='Enter')addRelative()">
+      <button class="go" style="width:auto;margin:0;padding:10px 18px" onclick="addRelative()">Ajouter</button>
+    </div>
+    <div class="err" id="rel-err"></div>
+
     <div class="eyebrow">Changer mon mot de passe</div>
     <div class="fld"><label for="pf-current">Mot de passe actuel</label><input id="pf-current" type="password"></div>
     <div class="fld"><label for="pf-new">Nouveau mot de passe</label><input id="pf-new" type="password" placeholder="6 caractères minimum"></div>
@@ -479,6 +488,32 @@
   <section class="panel" id="p-book-barber">
     <div class="eyebrow" id="bk-barber-eyebrow">Choisissez votre coiffeur</div>
     <div class="svc-grid" id="bk-barber-grid"></div>
+    <button type="button" class="group-entry" id="bk-group-entry" onclick="openBookGroup()" style="display:none">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M17 14.2c2.4.2 4 2 4 5.8"/></svg>
+      <span><b>Réserver pour plusieurs personnes</b><small>Vous et vos proches : chacun son horaire, à la suite ou en même temps.</small></span>
+    </button>
+  </section>
+
+  <section class="panel" id="p-book-group">
+    <button class="back" onclick="show('p-book-barber')">‹ Retour</button>
+    <div class="eyebrow">Réserver pour plusieurs personnes</div>
+    <div id="bk-group-mount"></div>
+  </section>
+
+  <section class="panel" id="p-book-group-confirm">
+    <button class="back" onclick="show('p-book-group')">‹ Retour</button>
+    <div class="eyebrow" id="bk-group-summary"></div>
+    <div class="fld"><label for="bk-group-note">Note pour le salon (allergie, préférence… optionnel)</label><textarea id="bk-group-note" rows="3" style="width:100%;font-family:inherit;font-size:15px;padding:12px;border-radius:12px;border:1px solid var(--sep);background:var(--card);color:var(--ink);resize:vertical"></textarea></div>
+    <button class="go" id="bk-group-btn" onclick="submitBookGroup()">Confirmer les rendez-vous</button>
+  </section>
+
+  <section class="panel" id="p-book-group-confirmed">
+    <div class="confirm-box">
+      <div class="check"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+      <h1>C'est confirmé !</h1>
+      <div id="bk-group-list" style="text-align:left;margin-top:14px"></div>
+      <button class="go" style="margin-top:24px" onclick="goHome()">Retour à l'accueil</button>
+    </div>
   </section>
 
   <section class="panel" id="p-book-gift-code">
@@ -614,6 +649,13 @@
 </div>
 
 <script src="/app.js?v=17"></script>
+<script src="/group-booking.js?v=1"></script>
+<style>
+.group-entry{display:flex;align-items:center;gap:14px;width:100%;margin-top:18px;padding:16px;border:1px dashed var(--blue);background:var(--blue-soft);color:var(--blue);border-radius:18px;font-family:inherit;text-align:left;cursor:pointer}
+.group-entry span{display:flex;flex-direction:column;gap:3px}.group-entry b{font-size:15px;color:var(--ink)}.group-entry small{font-size:13px;color:var(--grey)}
+.gb-done{padding:10px 0;border-bottom:1px solid var(--sep)}.gb-done:last-child{border:none}.gb-done b{display:block}.gb-done span{color:var(--grey);font-size:14px}
+.rel-row{display:flex;align-items:center;gap:8px;margin-bottom:8px}.rel-row input{flex:1;min-width:0}.rel-row button{border:none;background:var(--fill);color:var(--grey);border-radius:10px;padding:9px 12px;font-family:inherit;cursor:pointer}.rel-row button.del:hover{color:#ff3b30}
+</style>
 <script>
 mountThemeButton();
 var SALON_SLUG = (function () {
@@ -801,7 +843,7 @@ function renderVisitCard(upcomingList, historyList) {
       ' à ' + a.scheduled_at.slice(11, 16);
     return '<div class="card" style="margin-bottom:12px">' +
       '<div class="visit-row" style="cursor:pointer" onclick="toggleVisitDetails(\'up-' + i + '\')">' +
-        '<div><div class="name">' + esc(a.service_name || 'Prestation') + '</div>' +
+        '<div><div class="name">' + esc(a.service_name || 'Prestation') + (a.person_name ? ' · ' + esc(a.person_name) : '') + '</div>' +
         '<div class="when">' + when + '</div></div>' +
         '<button class="go" style="width:auto;margin:0;padding:10px 16px;font-size:14px;background:var(--red)" onclick="event.stopPropagation();openCancelModal(\'' + a.cancel_token + '\')">Annuler</button>' +
       '</div>' +
@@ -908,6 +950,87 @@ function populateHome(d) {
 
   renderVisitCard(d.upcoming_appointments || [], d.recent_visits || []);
   renderGiftCards(d.gift_cards || []);
+  setRelatives(d.relatives || []);
+}
+
+/* ---------- Mes proches ---------- */
+var myRelatives = [];
+function setRelatives(list) {
+  myRelatives = list;
+  if (bookGroupCtl) bookGroupCtl.setRelatives(myRelatives);
+  var box = document.getElementById('relatives-list'); if (!box) return;
+  box.innerHTML = list.map(function (r) {
+    return '<div class="rel-row" data-id="' + esc(r.id) + '"><input type="text" maxlength="60" value="' + esc(r.name) + '" onchange="renameRelative(\'' + esc(r.id) + '\', this)">' +
+      '<button class="del" title="Supprimer" onclick="deleteRelative(\'' + esc(r.id) + '\')">✕</button></div>';
+  }).join('');
+}
+function addRelative() {
+  var inp = document.getElementById('rel-new'), name = inp.value.trim(), err = document.getElementById('rel-err');
+  err.textContent = ''; if (!name) return;
+  api('/api/client-auth/relatives', { method: 'POST', body: { name: name } }).then(function (r) {
+    if (!myRelatives.some(function (x) { return x.id === r.item.id; })) myRelatives.push(r.item);
+    inp.value = ''; setRelatives(myRelatives);
+  }).catch(function (e) { err.textContent = e.message; });
+}
+function renameRelative(id, input) {
+  var name = input.value.trim(), err = document.getElementById('rel-err'); err.textContent = '';
+  if (!name) { setRelatives(myRelatives); return; }
+  api('/api/client-auth/relatives/' + encodeURIComponent(id), { method: 'PUT', body: { name: name } }).then(function () {
+    myRelatives.forEach(function (x) { if (x.id === id) x.name = name; }); setRelatives(myRelatives);
+  }).catch(function (e) { err.textContent = e.message; });
+}
+function deleteRelative(id) {
+  api('/api/client-auth/relatives/' + encodeURIComponent(id), { method: 'DELETE' }).then(function () {
+    setRelatives(myRelatives.filter(function (x) { return x.id !== id; }));
+  }).catch(function (e) { toast(e.message, true); });
+}
+
+/* ---------- Reservation a plusieurs ---------- */
+var bookGroupCtl = null, bookGroupPayload = null;
+function openBookGroup() {
+  if (!bookGroupCtl) {
+    bookGroupCtl = GroupBooking.create({
+      mount: document.getElementById('bk-group-mount'), api: apiForBooking,
+      services: bookServices, extras: bookExtras, barbers: bookBarbers, relatives: myRelatives,
+      eur: eur, toast: toast, continueLabel: 'Continuer',
+      createRelative: function (name) {
+        return api('/api/client-auth/relatives', { method: 'POST', body: { name: name } }).then(function (r) {
+          if (!myRelatives.some(function (x) { return x.id === r.item.id; })) myRelatives.push(r.item);
+          setRelatives(myRelatives); return r.item;
+        });
+      },
+      onContinue: function (people, payload) {
+        bookGroupPayload = payload;
+        document.getElementById('bk-group-summary').textContent = people.length + ' personnes — ' + people.map(function (p) { return p.isSelf ? 'vous' : p.name; }).join(', ');
+        show('p-book-group-confirm');
+      }
+    });
+  } else {
+    bookGroupCtl.setCatalog({ services: bookServices, extras: bookExtras, barbers: bookBarbers });
+    bookGroupCtl.setRelatives(myRelatives); bookGroupCtl.reset();
+  }
+  show('p-book-group');
+}
+function submitBookGroup() {
+  var btn = document.getElementById('bk-group-btn');
+  btn.disabled = true; btn.textContent = 'Enregistrement…';
+  var note = document.getElementById('bk-group-note').value.trim();
+  api('/api/client-auth/me').then(function (me) {
+    return apiForBooking('/api/appointments/group', {
+      method: 'POST',
+      body: { client_name: me.profile.name, email: me.profile.email, phone: me.profile.phone || null,
+              client_note: note || null, people: bookGroupPayload,
+              base_url: window.location.origin + '/rdv.html' + (bookSalonSlug ? '?salon=' + bookSalonSlug : '') }
+    });
+  }).then(function (r) {
+    document.getElementById('bk-group-list').innerHTML = r.appointments.map(function (a) {
+      var when = new Date(a.scheduled_at.replace(' ', 'T')).toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' }) + ' à ' + String(a.scheduled_at).slice(11, 16);
+      return '<div class="gb-done"><b>' + esc(a.name) + '</b><span>' + esc(when) + ' — ' + esc(a.service_name || '') + (a.barber_name ? ' · ' + esc(a.barber_name) : '') + '</span></div>';
+    }).join('');
+    document.getElementById('bk-group-note').value = '';
+    show('p-book-group-confirmed'); hideFooter();
+  }).catch(function (e) { toast(e.message, true); })
+    .finally(function () { btn.disabled = false; btn.textContent = 'Confirmer les rendez-vous'; });
 }
 
 /**
@@ -1068,6 +1191,9 @@ function goBook(afterLoad) {
     bookCatalogLoaded = true;
     renderBookBarberGrid();
     renderBookServiceGrid();
+    document.getElementById('bk-group-entry').style.display = bookBarbers.length ? '' : 'none';
+    bookGroupCtl = null;   // catalogue (re)charge : le module se reconstruit au prochain usage
+    document.getElementById('bk-group-mount').innerHTML = '';
     finish();
   }).catch(function (e) { toast(e.message, true); });
 }

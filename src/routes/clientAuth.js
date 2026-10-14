@@ -214,7 +214,7 @@ router.get('/me', requireClient, wrap(async (req, res) => {
   // 'confirmed' indéfiniment côté appointments, seule la file liée
   // (promoted_queue_id) sait qu'il est déjà 'done'.
   const [upcomingRows] = await pool.query(
-    `SELECT a.id, a.scheduled_at, a.cancel_token, a.service_id, a.barber_id, a.client_note,
+    `SELECT a.id, a.scheduled_at, a.cancel_token, a.service_id, a.barber_id, a.client_note, a.client_name, a.group_id,
             s.name AS service_name, s.price_cents AS service_price_cents,
             bar.name AS barber_name, sl.slug AS salon_slug, sl.name AS salon_name
      FROM appointments a
@@ -243,7 +243,10 @@ router.get('/me', requireClient, wrap(async (req, res) => {
       extras: extraRows.map((e) => e.name),
       price_cents: totalCents,
       client_note: upcoming.client_note || '',
-      cancel_token: upcoming.cancel_token
+      cancel_token: upcoming.cancel_token,
+      // Rendez-vous pris POUR un proche (reservation a plusieurs) : son prenom, pour l'afficher dans la liste.
+      person_name: upcoming.client_name && String(upcoming.client_name).trim().toLowerCase() !== String(c.name || '').trim().toLowerCase() ? upcoming.client_name : null,
+      group_id: upcoming.group_id || null
     });
   }
 
@@ -274,9 +277,12 @@ router.get('/me', requireClient, wrap(async (req, res) => {
     [c.salon_id, key]
   );
 
+  const [relativeRows] = await pool.query('SELECT id, name FROM client_relatives WHERE client_id = ? ORDER BY created_at ASC', [c.id]);
+
   res.json({
     ok: true,
     profile: { name: c.name, email: c.email, phone: c.phone },
+    relatives: relativeRows,
     loyalty_activated: loyaltyActivated,
     loyalty: loyaltyActivated ? { points: loyalty.points, rewards_available: loyalty.rewards_available } : null,
     upcoming_appointments: upcomingAppointments,
@@ -366,6 +372,42 @@ router.put('/appointments/:id/note', requireClient, wrap(async (req, res) => {
   if (!appt) return res.status(404).json({ error: 'Rendez-vous introuvable' });
 
   await pool.query('UPDATE appointments SET client_note = ? WHERE id = ?', [note, appt.id]);
+  res.json({ ok: true });
+}));
+
+/* ---------- Mes proches (reservation a plusieurs) ---------- */
+const MAX_RELATIVES = 12;
+function cleanRelativeName(v) { return String(v == null ? '' : v).replace(/\s+/g, ' ').trim().slice(0, 100); }
+
+router.get('/relatives', requireClient, wrap(async (req, res) => {
+  const [rows] = await pool.query('SELECT id, name FROM client_relatives WHERE client_id = ? ORDER BY created_at ASC', [req.clientAccount.id]);
+  res.json({ ok: true, items: rows });
+}));
+
+router.post('/relatives', requireClient, wrap(async (req, res) => {
+  const name = cleanRelativeName(req.body.name);
+  if (!name) return res.status(400).json({ error: 'Le prénom est requis' });
+  const [[count]] = await pool.query('SELECT COUNT(*) AS n FROM client_relatives WHERE client_id = ?', [req.clientAccount.id]);
+  if (count.n >= MAX_RELATIVES) return res.status(400).json({ error: 'Maximum ' + MAX_RELATIVES + ' proches enregistrés.' });
+  // Meme prenom deja enregistre : on le renvoie tel quel (pas de doublon).
+  const [[same]] = await pool.query('SELECT id, name FROM client_relatives WHERE client_id = ? AND LOWER(name) = LOWER(?)', [req.clientAccount.id, name]);
+  if (same) return res.json({ ok: true, item: same, existing: true });
+  const id = crypto.randomUUID();
+  await pool.query('INSERT INTO client_relatives (id, client_id, name) VALUES (?, ?, ?)', [id, req.clientAccount.id, name]);
+  res.json({ ok: true, item: { id, name } });
+}));
+
+router.put('/relatives/:id', requireClient, wrap(async (req, res) => {
+  const name = cleanRelativeName(req.body.name);
+  if (!name) return res.status(400).json({ error: 'Le prénom est requis' });
+  const [r] = await pool.query('UPDATE client_relatives SET name = ? WHERE id = ? AND client_id = ?', [name, req.params.id, req.clientAccount.id]);
+  if (!r.affectedRows) return res.status(404).json({ error: 'Proche introuvable' });
+  res.json({ ok: true, item: { id: req.params.id, name } });
+}));
+
+router.delete('/relatives/:id', requireClient, wrap(async (req, res) => {
+  const [r] = await pool.query('DELETE FROM client_relatives WHERE id = ? AND client_id = ?', [req.params.id, req.clientAccount.id]);
+  if (!r.affectedRows) return res.status(404).json({ error: 'Proche introuvable' });
   res.json({ ok: true });
 }));
 

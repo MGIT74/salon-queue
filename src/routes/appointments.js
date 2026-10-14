@@ -4,8 +4,9 @@ const { pool, utcIso, getSettings } = require('../db');
 const requireAdmin = require('../middleware/auth');
 const requireAdminOrBarber = require('../middleware/barberAuth');
 const { clientKey } = require('../lib/queueMath');
-const { sendAppointmentConfirmation, sendAppointmentCancelledByAdmin, sendAppointmentRescheduled, sendGiftCodeRenewed } = require('../lib/mailer');
+const { sendAppointmentConfirmation, sendGroupAppointmentConfirmation, sendAppointmentCancelledByAdmin, sendAppointmentRescheduled, sendGiftCodeRenewed } = require('../lib/mailer');
 const { wrap } = require('../lib/wrap');
+const groupBooking = require('../lib/groupBooking');
 
 const router = express.Router();
 
@@ -236,6 +237,8 @@ async function computeSlotsForBarber(barberId, dateStr, durationMin, rdvSettings
     [barberId, weekday]
   );
   breaks.forEach((b) => busyRanges.push([timeToMinutes(b.start_time), timeToMinutes(b.end_time)]));
+  // Creneaux deja choisis (pas encore enregistres) par les autres personnes d'une reservation de groupe.
+  (opts.extraBusy || []).forEach((r) => busyRanges.push(r));
 
   const startMin = timeToMinutes(schedule.start_time);
   const endMin = timeToMinutes(schedule.end_time);
@@ -307,9 +310,13 @@ router.get('/availability', wrap(async (req, res) => {
   }
   const durationMin = service.duration_min + extraDuration;
   var slotOpts = req.query.exclude_appointment_id ? { excludeAppointmentId: req.query.exclude_appointment_id } : {};
+  // Reservation a plusieurs : creneaux deja retenus par les AUTRES personnes du groupe (cf. lib/groupBooking).
+  const held = groupBooking.parseHeld(req.query.held);
+  const bufferMinForHeld = Number(rdvSettings.rdv_buffer_min) || 0;
+  const optsFor = (bid) => Object.assign({}, slotOpts, held.length ? { extraBusy: groupBooking.heldRanges(held, bid, date, bufferMinForHeld) } : {});
 
   if (barber_id) {
-    const slots = await computeSlotsForBarber(barber_id, date, durationMin, rdvSettings, slotOpts);
+    const slots = await computeSlotsForBarber(barber_id, date, durationMin, rdvSettings, optsFor(barber_id));
     return res.json({ ok: true, slots: slots.map((s) => ({ time: s, barber_id })) });
   }
 
@@ -318,7 +325,7 @@ router.get('/availability', wrap(async (req, res) => {
   );
   const allSlots = {};
   for (const b of barbers) {
-    const slots = await computeSlotsForBarber(b.id, date, durationMin, rdvSettings, slotOpts);
+    const slots = await computeSlotsForBarber(b.id, date, durationMin, rdvSettings, optsFor(b.id));
     slots.forEach((s) => { if (!allSlots[s]) allSlots[s] = b.id; });
   }
   const merged = Object.keys(allSlots).sort().map((time) => ({ time, barber_id: allSlots[time] }));
@@ -573,6 +580,152 @@ router.post('/', wrap(async (req, res) => {
   }
 
   res.json({ ok: true, id });
+}));
+
+/**
+ * Reservation a PLUSIEURS (un parent + ses enfants...) : une seule demande, un rendez-vous par personne,
+ * chacun avec sa prestation, son coiffeur (le meme ou un autre) et son horaire (a la suite ou en meme
+ * temps). Tout ou rien : si un creneau n'est plus libre, rien n'est enregistre et on dit pour qui.
+ * Les personnes sont enregistrees l'une apres l'autre : chaque verification voit donc les rendez-vous
+ * deja poses pour les precedentes (deux personnes ne peuvent pas se chevaucher chez le meme coiffeur).
+ * Le rendez-vous reste au nom d'email/telephone du client qui reserve (annulation, fidelite).
+ */
+router.post('/group', wrap(async (req, res) => {
+  const { client_name, email, phone } = req.body;
+  if (!email) return res.status(400).json({ error: "L'email est requis pour la confirmation" });
+  if (!client_name) return res.status(400).json({ error: 'Le nom est requis' });
+  const clientNote = req.body.client_note ? String(req.body.client_note).slice(0, 500) : null;
+
+  const norm = groupBooking.normalizePeople(req.body);
+  if (norm.error) return res.status(400).json({ error: norm.error, person_index: norm.index });
+
+  const rdvSettings = await getSettings(req.salon.id);
+  const nowStr = nowParisDatetimeString(rdvSettings.timezone);
+  const groupId = crypto.randomUUID();
+  const created = [];   // { id, cancelToken, person, barberId, scheduledAt, serviceName, extraIds, products, durationMin }
+
+  const fail = async (status, index, message) => {
+    if (created.length) await pool.query('DELETE FROM appointments WHERE id IN (?)', [created.map((c) => c.id)]);
+    return res.status(status).json({ error: message, person_index: index });
+  };
+
+  for (let i = 0; i < norm.people.length; i++) {
+    const p = norm.people[i];
+    if (`${p.date} ${p.time}:00` < nowStr) return fail(400, i, 'Le créneau de ' + p.name + ' est déjà passé, choisissez une date/heure à venir.');
+    if (isBeyondAdvanceWindow(p.date, rdvSettings)) return fail(400, i, 'La date de ' + p.name + ' est trop éloignée, choisissez une date plus proche.');
+
+    const [[service]] = await pool.query('SELECT name, duration_min FROM services WHERE id = ? AND salon_id = ? AND deleted_at IS NULL', [p.service_id, req.salon.id]);
+    if (!service) return fail(404, i, 'Prestation introuvable pour ' + p.name + '.');
+
+    let extraIds = [], extraDuration = 0, extraNames = [];
+    if (p.extras.length) {
+      const [rows] = await pool.query('SELECT id, name, duration_min FROM extras WHERE id IN (?) AND salon_id = ?', [p.extras, req.salon.id]);
+      extraIds = rows.map((r) => r.id);
+      extraDuration = rows.reduce((a, r) => a + r.duration_min, 0);
+      extraNames = rows.map((r) => r.name);
+    }
+    let productSelections = [];
+    if (p.products.length) {
+      const [rows] = await pool.query('SELECT id FROM products WHERE id IN (?) AND salon_id = ? AND online_bookable = 1', [p.products.map((x) => x.id), req.salon.id]);
+      const valid = new Set(rows.map((r) => r.id));
+      productSelections = p.products.filter((x) => valid.has(x.id));
+    }
+    const durationMin = service.duration_min + extraDuration;
+
+    // Coiffeur : celui demande (doit etre de CE salon) ou le premier libre a cette heure precise.
+    let barberId = p.barber_id;
+    if (barberId) {
+      const [[owned]] = await pool.query('SELECT id FROM barbers WHERE id = ? AND salon_id = ? AND active = 1', [barberId, req.salon.id]);
+      if (!owned) return fail(404, i, 'Coiffeur introuvable pour ' + p.name + '.');
+      const slots = await computeSlotsForBarber(barberId, p.date, durationMin, rdvSettings);
+      if (!slots.includes(p.time)) return fail(409, i, "Le créneau de " + p.name + " n'est plus disponible (" + p.time + ").");
+    } else {
+      const [barbers] = await pool.query('SELECT id FROM barbers WHERE salon_id = ? AND active = 1 AND accepts_appointments = 1', [req.salon.id]);
+      for (const b of barbers) {
+        const slots = await computeSlotsForBarber(b.id, p.date, durationMin, rdvSettings);
+        if (slots.includes(p.time)) { barberId = b.id; break; }
+      }
+      if (!barberId) return fail(409, i, "Le créneau de " + p.name + " n'est plus disponible (" + p.time + ").");
+    }
+
+    const id = crypto.randomUUID();
+    const cancelToken = crypto.randomBytes(24).toString('hex');
+    const scheduledAt = p.date + ' ' + p.time + ':00';
+    await pool.query(
+      `INSERT INTO appointments (id, salon_id, barber_id, client_name, email, phone, service_id, scheduled_at, status, cancel_token, client_note, group_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?, ?)`,
+      [id, req.salon.id, barberId, p.name, email, phone || null, p.service_id, scheduledAt, cancelToken, clientNote, groupId]
+    );
+    created.push({ id, cancelToken, person: p, barberId, scheduledAt, serviceName: service.name + (extraNames.length ? ' + ' + extraNames.join(', ') : ''), extraIds, productSelections, durationMin });
+    if (extraIds.length) await pool.query('INSERT INTO appointment_extras (appointment_id, extra_id) VALUES ?', [extraIds.map((eid) => [id, eid])]);
+    if (productSelections.length) await pool.query('INSERT INTO appointment_products (appointment_id, product_id, quantity) VALUES ?', [productSelections.map((x) => [id, x.id, x.quantity])]);
+  }
+
+  // Tout est enregistre : mail unique, puis mise en file immediate des passages d'AUJOURD'HUI.
+  const baseUrl = String(req.body.base_url || '').replace(/\/$/, '');
+  const cancelLink = (token, all) => baseUrl + (baseUrl.includes('?') ? '&' : '?') + 'cancel=' + token + (all ? '&all=1' : '');
+  const barberIds = Array.from(new Set(created.map((c) => c.barberId).filter(Boolean)));
+  const nameById = {};
+  if (barberIds.length) {
+    const [bRows] = await pool.query('SELECT id, name FROM barbers WHERE id IN (?)', [barberIds]);
+    bRows.forEach((b) => { nameById[b.id] = b.name; });
+  }
+  const fmtWhen = (at) => new Date(at.replace(' ', 'T')).toLocaleString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit' });
+  try {
+    await sendGroupAppointmentConfirmation(req.salon.id, email, {
+      clientName: client_name,
+      items: created.map((c) => ({ personName: c.person.name, when: fmtWhen(c.scheduledAt), serviceName: c.serviceName, barberName: nameById[c.barberId] || null, cancelUrl: cancelLink(c.cancelToken, false) })),
+      cancelAllUrl: cancelLink(created[0].cancelToken, true)
+    });
+  } catch (err) {
+    console.error('[rdv] envoi email de confirmation de groupe échoué:', err.message);
+  }
+
+  const today = nowInParis(rdvSettings.timezone).dateStr;
+  for (const c of created) {
+    if (c.person.date === today) {
+      await promoteAppointment({ id: c.id, salon_id: req.salon.id, barber_id: c.barberId, client_name: c.person.name, email, phone, service_id: c.person.service_id, scheduled_at: c.scheduledAt }, c.extraIds, c.productSelections);
+    }
+  }
+
+  res.json({
+    ok: true, group_id: groupId,
+    appointments: created.map((c) => ({ id: c.id, name: c.person.name, scheduled_at: c.scheduledAt, service_name: c.serviceName, barber_name: nameById[c.barberId] || null }))
+  });
+}));
+
+/**
+ * Annule TOUS les rendez-vous encore a venir du groupe auquel appartient ce lien (bouton « Annuler tout »
+ * de l'email de groupe). Le delai limite d'annulation s'applique a chaque rendez-vous : ceux qui sont
+ * deja trop proches sont gardes, et le client est prevenu.
+ */
+router.post('/cancel-group', wrap(async (req, res) => {
+  const { token } = req.body;
+  if (!token) return res.status(400).json({ error: 'Token requis' });
+  const [[appt]] = await pool.query('SELECT id, salon_id, group_id FROM appointments WHERE cancel_token = ?', [token]);
+  if (!appt) return res.status(404).json({ error: 'Rendez-vous introuvable' });
+
+  const members = appt.group_id
+    ? (await pool.query("SELECT id, salon_id, scheduled_at, promoted_queue_id, gift_card_id FROM appointments WHERE group_id = ? AND status = 'confirmed'", [appt.group_id]))[0]
+    : (await pool.query("SELECT id, salon_id, scheduled_at, promoted_queue_id, gift_card_id FROM appointments WHERE id = ? AND status = 'confirmed'", [appt.id]))[0];
+  if (!members.length) return res.status(409).json({ error: 'Ces rendez-vous sont déjà annulés' });
+
+  const rdvSettings = await getSettings(appt.salon_id);
+  const deadlineMin = Number(rdvSettings.rdv_cancel_deadline_min) || 0;
+  const nowMs = new Date(nowParisDatetimeString(rdvSettings.timezone).replace(' ', 'T') + 'Z');
+  let cancelled = 0, kept = 0;
+  for (const m of members) {
+    const minutesUntil = (new Date(m.scheduled_at.replace(' ', 'T') + 'Z') - nowMs) / 60000;
+    if (deadlineMin > 0 && minutesUntil < deadlineMin) { kept++; continue; }
+    await pool.query('UPDATE appointments SET status = ? WHERE id = ?', ['cancelled', m.id]);
+    if (m.promoted_queue_id) {
+      await pool.query("UPDATE queue SET status = 'cancelled' WHERE id = ? AND status IN ('waiting','in_progress')", [m.promoted_queue_id]);
+    }
+    if (m.gift_card_id) await releaseGiftAfterCancellation(m.salon_id, m.gift_card_id);
+    cancelled++;
+  }
+  if (!cancelled) return res.status(403).json({ error: "Trop tard pour annuler ces rendez-vous en ligne, contactez directement le salon." });
+  res.json({ ok: true, cancelled, kept });
 }));
 
 /**

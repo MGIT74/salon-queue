@@ -102,7 +102,10 @@ const suite = [
   ['79-conges-calendrier-lib.js', false, ['exit']],
   ['80-conges-calendrier-annuel.js', false, ['exit']],
   ['81-fiche-coiffeur-page.js', false, ['exit']],
-  ['82-onglets-pastille-fondu.js', false, ['exit']]
+  ['82-onglets-pastille-fondu.js', false, ['exit']],
+  ['83-groupe-reservation-api.js', false, ['exit']],
+  ['84-proches-compte-api.js', false, ['exit']],
+  ['85-reservation-groupe-interface.js', false, ['exit']]
 ];
 
 let bad = 0;

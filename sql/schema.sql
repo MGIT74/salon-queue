@@ -1274,3 +1274,31 @@ WHERE NOT EXISTS (SELECT 1 FROM catalog_categories c WHERE c.salon_id = t.salon_
 UPDATE products p JOIN catalog_categories c ON c.salon_id = p.salon_id AND c.kind = 'products' AND c.name = TRIM(p.category)
 SET p.category_id = c.id
 WHERE p.category_id IS NULL AND p.category IS NOT NULL AND TRIM(p.category) <> '';
+
+-- ============================================================
+-- Reservation a plusieurs (un parent + ses enfants, des amis...)
+-- ============================================================
+-- group_id : les rendez-vous pris ensemble partagent le meme group_id (annulation de
+-- tout le groupe d'un coup, mail de confirmation unique). NULL = rendez-vous simple.
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'appointments' AND column_name = 'group_id');
+SET @sql := IF(@c = 0, "ALTER TABLE appointments ADD COLUMN group_id CHAR(36) NULL", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @idx := (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'appointments' AND index_name = 'idx_appointments_group');
+SET @sql := IF(@idx = 0, 'CREATE INDEX idx_appointments_group ON appointments(group_id)', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- « Mes proches » : les personnes qu'un client reserve regulierement avec lui (ses enfants...).
+-- Rattaches au COMPTE client (donc valables dans tous les salons de l'enseigne). Seul le prenom
+-- est memorise : le rendez-vous reste au nom/email/telephone du parent.
+CREATE TABLE IF NOT EXISTS client_relatives (
+  id CHAR(36) PRIMARY KEY,
+  client_id CHAR(36) NOT NULL,
+  name VARCHAR(100) NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+SET @idx := (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'client_relatives' AND index_name = 'idx_client_relatives_client');
+SET @sql := IF(@idx = 0, 'CREATE INDEX idx_client_relatives_client ON client_relatives(client_id)', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;

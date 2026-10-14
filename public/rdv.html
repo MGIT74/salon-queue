@@ -186,6 +186,35 @@
   <section class="panel on" id="p-barber">
     <div class="eyebrow" id="barber-eyebrow">Choisissez votre coiffeur</div>
     <div class="svc-grid" id="barber-grid"></div>
+    <button type="button" class="group-entry" id="group-entry" onclick="openGroupBooking()" style="display:none">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M17 14.2c2.4.2 4 2 4 5.8"/></svg>
+      <span><b>Réserver pour plusieurs personnes</b><small>Vous et vos enfants, ou des amis : chacun son horaire, à la suite ou en même temps.</small></span>
+    </button>
+  </section>
+
+  <section class="panel" id="p-group">
+    <button class="back" onclick="show('p-barber')">‹ Retour</button>
+    <div class="eyebrow">Réserver pour plusieurs personnes</div>
+    <div id="group-mount"></div>
+  </section>
+
+  <section class="panel" id="p-group-contact">
+    <button class="back" onclick="show('p-group')">‹ Retour</button>
+    <div class="eyebrow" id="group-contact-summary"></div>
+    <div class="fld"><label for="grp-name">Votre prénom</label><input id="grp-name" type="text" autocomplete="given-name"></div>
+    <div class="fld"><label for="grp-email">Email — pour la confirmation</label><input id="grp-email" type="email" autocomplete="email"></div>
+    <div class="fld"><label for="grp-phone">Téléphone</label><input id="grp-phone" type="tel" autocomplete="tel"></div>
+    <button class="go" id="group-confirm-btn" onclick="submitGroup()">Confirmer les rendez-vous</button>
+  </section>
+
+  <section class="panel" id="p-group-confirmed">
+    <div class="confirm-box">
+      <div class="check"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+      <h1>C'est confirmé !</h1>
+      <div id="group-confirm-list" style="text-align:left;margin-top:14px"></div>
+      <p style="color:var(--grey);font-size:13.5px;margin-top:14px">Un email récapitulatif vous a été envoyé, avec un lien pour annuler.</p>
+      <button class="go" style="margin-top:24px" onclick="startNewBooking()">Prendre un autre rendez-vous</button>
+    </div>
   </section>
 
   <section class="panel" id="p-gift-code">
@@ -295,6 +324,12 @@
 </div>
 
 <script src="/app.js?v=17"></script>
+<script src="/group-booking.js?v=1"></script>
+<style>
+.group-entry{display:flex;align-items:center;gap:14px;width:100%;margin-top:18px;padding:16px;border:1px dashed var(--blue);background:var(--blue-soft);color:var(--blue);border-radius:18px;font-family:inherit;text-align:left;cursor:pointer}
+.group-entry span{display:flex;flex-direction:column;gap:3px}.group-entry b{font-size:15px;color:var(--ink)}.group-entry small{font-size:13px;color:var(--grey)}
+.gb-done{padding:10px 0;border-bottom:1px solid var(--sep)}.gb-done:last-child{border:none}.gb-done b{display:block}.gb-done span{color:var(--grey);font-size:14px}
+</style>
 <script>
 mountThemeButton();
 vitrinePageFlow(document.querySelector('.wrap'), ['p-service', 'p-extras', 'p-products', 'p-datetime', 'p-contact']);
@@ -413,6 +448,7 @@ function loadCatalog() {
     document.getElementById('salon-mark').textContent = salonName.toUpperCase();
     renderBarberGrid();
     renderServiceGrid();
+    document.getElementById('group-entry').style.display = barbers.length ? '' : 'none';
 
     // Pré-remplissage depuis "Réserver à nouveau" (compte.html) : la
     // prestation de la dernière visite est déjà sélectionnée, le client
@@ -753,20 +789,72 @@ function startNewBooking() {
   loadCatalog().then(function () { show('p-barber'); }).catch(function (e) { toast(e.message, true); });
 }
 
+/* ---------- Reservation a plusieurs ---------- */
+var groupCtl = null, groupPeople = null, groupPayload = null;
+
+function openGroupBooking() {
+  if (!groupCtl) {
+    groupCtl = GroupBooking.create({
+      mount: document.getElementById('group-mount'), api: api,
+      services: services, extras: extras, barbers: barbers, relatives: [],
+      eur: eur, toast: toast, continueLabel: 'Continuer',
+      onContinue: function (people, payload) {
+        groupPeople = people; groupPayload = payload;
+        var self = people[0];
+        document.getElementById('group-contact-summary').textContent = people.length + ' personnes — ' + people.map(function (p) { return p.isSelf ? 'vous' : p.name; }).join(', ');
+        show('p-group-contact');
+      }
+    });
+  } else groupCtl.reset();
+  show('p-group');
+}
+
+function submitGroup() {
+  var name = document.getElementById('grp-name').value.trim();
+  var email = document.getElementById('grp-email').value.trim();
+  var phone = document.getElementById('grp-phone').value.trim();
+  if (!name) { toast('Entrez votre prénom', true); return; }
+  if (!email) { toast('Entrez votre email', true); return; }
+  if (!phone) { toast('Entrez votre téléphone', true); return; }
+  var btn = document.getElementById('group-confirm-btn');
+  btn.disabled = true; btn.textContent = 'Enregistrement…';
+  api('/api/appointments/group', {
+    method: 'POST',
+    body: { client_name: name, email: email, phone: phone, people: groupPayload,
+            base_url: window.location.origin + window.location.pathname + (SALON_SLUG ? '?salon=' + SALON_SLUG : '') }
+  }).then(function (r) {
+    document.getElementById('group-confirm-list').innerHTML = r.appointments.map(function (a) {
+      var when = new Date(a.scheduled_at.replace(' ', 'T')).toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' }) + ' à ' + String(a.scheduled_at).slice(11, 16);
+      return '<div class="gb-done"><b>' + esc(a.name) + '</b><span>' + esc(when) + ' — ' + esc(a.service_name || '') + (a.barber_name ? ' · ' + esc(a.barber_name) : '') + '</span></div>';
+    }).join('');
+    show('p-group-confirmed');
+  }).catch(function (e) { toast(e.message, true); })
+    .finally(function () { btn.disabled = false; btn.textContent = 'Confirmer les rendez-vous'; });
+}
+
 /* ---------- Annulation ---------- */
-var pendingCancelToken = null;
+var pendingCancelToken = null, pendingCancelAll = false;
 
 function checkForCancelLink() {
   var token = new URLSearchParams(window.location.search).get('cancel');
   if (!token) return false;
   pendingCancelToken = token;
+  pendingCancelAll = new URLSearchParams(window.location.search).get('all') === '1';
+  if (pendingCancelAll) {
+    document.querySelector('#p-cancel h1').textContent = 'Annuler tous les rendez-vous ?';
+    document.getElementById('cancel-details').textContent = 'Confirmez pour libérer tous les créneaux de cette réservation.';
+    document.querySelector('#p-cancel .go').textContent = 'Oui, tout annuler';
+  }
   show('p-cancel');
   return true;
 }
 
 function confirmCancel() {
-  api('/api/appointments/cancel', { method: 'POST', body: { token: pendingCancelToken } })
-    .then(function () { show('p-cancelled'); })
+  api(pendingCancelAll ? '/api/appointments/cancel-group' : '/api/appointments/cancel', { method: 'POST', body: { token: pendingCancelToken } })
+    .then(function (r) {
+      if (pendingCancelAll && r && r.kept) toast(r.kept + ' rendez-vous ne peuvent plus être annulés en ligne (délai dépassé) — contactez le salon.');
+      show('p-cancelled');
+    })
     .catch(function (e) { toast(e.message, true); });
 }
 

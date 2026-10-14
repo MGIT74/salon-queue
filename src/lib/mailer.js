@@ -202,6 +202,35 @@ async function sendAppointmentConfirmation(salonId, to, info) {
 }
 
 /**
+ * Confirmation d'une reservation a plusieurs : un seul mail qui liste chaque personne (heure, prestation,
+ * coiffeur) avec son lien d'annulation, plus « Tout annuler ».
+ */
+async function sendGroupAppointmentConfirmation(salonId, to, info) {
+  const { tx, from, salon } = await getTransport(salonId);
+  const esc = (v) => String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const lines = info.items.map((it) =>
+    `${it.personName} — ${it.when} — ${it.serviceName}${it.barberName ? ' avec ' + it.barberName : ''}`);
+  await tx.sendMail({
+    from,
+    to,
+    subject: 'Confirmation de vos rendez-vous — ' + salon,
+    text:
+      `Bonjour ${info.clientName},\n\n` +
+      `Vos rendez-vous chez ${salon} sont confirmés :\n\n` +
+      info.items.map((it, i) => `• ${lines[i]}\n  Annuler : ${it.cancelUrl}`).join('\n') +
+      `\n\nTout annuler d'un coup : ${info.cancelAllUrl}\n\n${salon}`,
+    html:
+      `<p>Bonjour ${esc(info.clientName)},</p>` +
+      `<p>Vos rendez-vous chez ${esc(salon)} sont confirmés :</p>` +
+      '<ul>' + info.items.map((it) =>
+        `<li><strong>${esc(it.personName)}</strong> — ${esc(it.when)}<br>${esc(it.serviceName)}${it.barberName ? ' avec ' + esc(it.barberName) : ''}<br>` +
+        `<a href="${esc(it.cancelUrl)}">Annuler ce rendez-vous</a></li>`).join('') + '</ul>' +
+      `<p><a href="${esc(info.cancelAllUrl)}">Tout annuler</a></p>` +
+      `<p>${esc(salon)}</p>`
+  });
+}
+
+/**
  * Annulation à l'initiative du SALON (pas du client) - texte
  * volontairement différent (excuses), distinct de l'annulation
  * self-service (client via son lien/compte), qui n'envoie aucun
@@ -361,7 +390,7 @@ async function sendCustomClientEmail(salonId, to, clientName, subject, message) 
 }
 
 module.exports = {
-  sendTurnSoon, sendTest, sendGiftConfirmation, sendGiftCodeRenewed, sendLoyaltyActivation, sendAppointmentConfirmation,
+  sendTurnSoon, sendTest, sendGiftConfirmation, sendGiftCodeRenewed, sendLoyaltyActivation, sendAppointmentConfirmation, sendGroupAppointmentConfirmation,
   sendAppointmentReminder, sendAppointmentCancelledByAdmin, sendAppointmentRescheduled,
   sendClientVerificationEmail, sendClientPasswordReset, sendSalonClosureNotice, sendCustomClientEmail, invalidateTransport
 };
