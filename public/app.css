@@ -608,3 +608,6 @@ body .tfx > button { transition: color .25s ease, transform .1s ease; }
   .tfx > .st-ind { transition: none; }
   .tab-panel.on { animation-name: panel-fade-in; }
 }
+
+/* Mode clair : boutons désactivés lisibles (gris plein au lieu d'un bleu délavé) */
+:root:not([data-theme="dark"]) :is(.go, .rel-add button):disabled { opacity: 1; background: var(--fill); color: var(--grey); box-shadow: inset 0 0 0 1px var(--sep); }
