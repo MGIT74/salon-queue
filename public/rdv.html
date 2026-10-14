@@ -192,8 +192,10 @@
     </button>
   </section>
 
-  <section class="panel" id="p-group">
-    <div id="group-mount"></div>
+  <section class="panel flow" id="p-group">
+    <div class="flow-top" id="gb-top"></div>
+    <div class="flow-body" id="gb-body"></div>
+    <div class="step-bar" id="gb-bar"></div>
   </section>
 
   <section class="panel" id="p-group-contact">
@@ -322,7 +324,7 @@
 </div>
 
 <script src="/app.js?v=17"></script>
-<script src="/group-booking.js?v=2"></script>
+<script src="/group-booking.js?v=3"></script>
 <style>
 .group-entry{display:flex;align-items:center;gap:14px;width:100%;margin-top:18px;padding:16px;border:1px dashed var(--blue);background:var(--blue-soft);color:var(--blue);border-radius:18px;font-family:inherit;text-align:left;cursor:pointer}
 .group-entry span{display:flex;flex-direction:column;gap:3px}.group-entry b{font-size:15px;color:var(--ink)}.group-entry small{font-size:13px;color:var(--grey)}
@@ -793,7 +795,7 @@ var groupCtl = null, groupPeople = null, groupPayload = null;
 function openGroupBooking() {
   if (!groupCtl) {
     groupCtl = GroupBooking.create({
-      mount: document.getElementById('group-mount'), api: api,
+      zones: { top: document.getElementById('gb-top'), body: document.getElementById('gb-body'), bar: document.getElementById('gb-bar') }, api: api,
       services: services, extras: extras, barbers: barbers, relatives: [],
       eur: eur, toast: toast, continueLabel: 'Continuer', onExit: function () { show('p-barber'); },
       onContinue: function (people, payload) {

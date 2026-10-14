@@ -77,6 +77,7 @@
   function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 
   var STYLE = '' +
+    '.gb-recap-person{margin-bottom:12px;opacity:.75}.gb-recap-person.on{opacity:1}.gb-recap-person .recap-ctx{margin-bottom:6px}' +
     '.gb-rows{display:flex;flex-direction:column;gap:10px;margin-bottom:14px}' +
     '.gb-row{display:flex;align-items:center;gap:12px;background:var(--fill);border-radius:16px;padding:12px 14px}' +
     '.gb-av{width:38px;height:38px;border-radius:50%;background:var(--blue-soft);color:var(--blue);font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}' +
@@ -117,7 +118,17 @@
    */
   function create(cfg) {
     injectStyle();
-    var el = cfg.mount, people = [], uid = 0, view = 'recap', cur = null;
+    var people = [], uid = 0, view = 'recap', cur = null;
+    // Trois zones (en-tete / liste / colonne de droite) : fournies par la page (cfg.zones, mises en page comme la reservation normale),
+    // sinon creees dans cfg.mount.
+    var zones = cfg.zones;
+    if (!zones) {
+      cfg.mount.innerHTML = '<div class="gb"><div class="flow-top"></div><div class="flow-body"></div><div class="step-bar"></div></div>';
+      zones = { top: cfg.mount.querySelector('.flow-top'), body: cfg.mount.querySelector('.flow-body'), bar: cfg.mount.querySelector('.step-bar') };
+    }
+    var el = { contains: function (n) { return zones.top.contains(n) || zones.body.contains(n) || zones.bar.contains(n); },
+               addEventListener: function (t, f) { [zones.top, zones.body, zones.bar].forEach(function (z) { z.addEventListener(t, f); }); },
+               querySelector: function (q) { return zones.top.querySelector(q) || zones.body.querySelector(q) || zones.bar.querySelector(q); } };
     var eur = cfg.eur || function (c) { return (c / 100).toFixed(2) + ' €'; };
     var today = function () { return cfg.today ? cfg.today() : new Date().toISOString().slice(0, 10); };
     var STEPS = ['barber', 'service', 'extras', 'datetime'];
@@ -174,71 +185,87 @@
     }
 
     /* ---------- Rendu ---------- */
+    // Trois zones comme la reservation normale : en-tete (retour + titre), liste qui defile, colonne de droite (recapitulatif + bouton).
     function back(label2) { return '<button type="button" class="back" data-act="back">‹ ' + (label2 || 'Retour') + '</button>'; }
-    function nextBtn(text, disabled, act) { return '<button type="button" class="go" data-act="' + (act || 'next') + '"' + (disabled ? ' disabled' : '') + '>' + text + '</button>'; }
+    function goBtn(text, disabled, act) { return '<button type="button" class="go" data-act="' + (act || 'next') + '"' + (disabled ? ' disabled' : '') + '>' + text + '</button>'; }
+    function fmtMin(m) { return typeof formatMinutes === 'function' ? formatMinutes(m) : m + ' min'; }
 
+    // Recapitulatif detaille : un bloc par personne (meme habillage que celui de la reservation normale) + total.
     function recapHtml() {
-      var ready = people.length > 1 && people.every(complete);
-      var total = people.reduce(function (t, p) { return t + personPrice(p, cfg.services, cfg.extras); }, 0);
-      var used = {}; people.forEach(function (p) { if (p.relativeId) used[p.relativeId] = true; });
-      var rels = (cfg.relatives || []).filter(function (r) { return !used[r.id]; });
-      var h = back('Retour') + '<div class="eyebrow">Réserver pour plusieurs personnes</div>' +
-        '<p class="step-sub">Chaque personne a sa prestation, son coiffeur et son horaire : à la suite, en même temps ou décalés.</p><div class="gb-rows">';
-      people.forEach(function (p, i) {
-        var s = byId(cfg.services, p.serviceId);
-        var line = complete(p) ? esc(s.name) + (barberName(p.slot.barberId) ? ' · ' + esc(barberName(p.slot.barberId)) : '') + '<br>' + esc(fmtDate(p.date)) + ' à ' + esc(p.slot.time) : '<span class="todo">À compléter</span>';
-        h += '<div class="gb-row" data-i="' + i + '"><span class="gb-av">' + esc(label(p).charAt(0).toUpperCase()) + '</span><div class="gb-info"><b>' + esc(label(p)) + '</b><span>' + line + '</span></div>' +
-          '<button type="button" class="gb-mini" data-act="edit">' + (complete(p) ? 'Modifier' : 'Compléter') + '</button>' +
-          (people.length > 1 ? '<button type="button" class="gb-mini x" data-act="remove" aria-label="Retirer">✕</button>' : '') + '</div>';
+      var html = '', cents = 0;
+      people.forEach(function (p) {
+        var s = byId(cfg.services, p.serviceId), who = label(p) + (p.isSelf ? '' : '');
+        var b = p.slot ? barberName(p.slot.barberId) : (p.pref ? barberName(p.pref) : '');
+        var ctx = [esc(who)]; if (b) ctx.push(esc(b)); if (p.slot) ctx.push(esc(fmtDate(p.date)) + ' à ' + esc(p.slot.time));
+        var rows = '';
+        function row(k, n, meta, price) { rows += '<div class="recap-row"><span class="recap-k">' + k + '</span><span class="recap-n">' + esc(n) + (meta ? ' <em>' + esc(meta) + '</em>' : '') + '</span><span class="recap-p">' + price + '</span></div>'; }
+        if (s) {
+          row('Prestation', s.name, Number(s.duration_min) > 0 ? fmtMin(s.duration_min) : '', eur(Number(s.price_cents) || 0));
+          (p.extraIds || []).forEach(function (id) { var x = byId(cfg.extras, id); if (x) row('Supplément', x.name, Number(x.duration_min) > 0 ? '+' + fmtMin(x.duration_min) : '', '+' + eur(Number(x.price_cents) || 0)); });
+        }
+        cents += personPrice(p, cfg.services, cfg.extras);
+        html += '<div class="gb-recap-person' + (p === cur && view !== 'recap' ? ' on' : '') + '"><div class="recap-ctx"><strong>' + ctx[0] + '</strong>' + (ctx.length > 1 ? ' · ' + ctx.slice(1).join(' · ') : '') + '</div>' +
+          (rows ? '<div class="recap-list">' + rows + '</div>' : '') + '</div>';
       });
-      h += '</div>';
-      if (people.length < MAX_PEOPLE) {
-        if (rels.length) h += '<div class="gb-chips">' + rels.map(function (r) { return '<button type="button" class="gb-chip" data-act="add-rel" data-id="' + esc(r.id) + '">+ ' + esc(r.name) + '</button>'; }).join('') + '</div>';
-        h += '<button type="button" class="gb-addbtn" data-act="add">+ Ajouter une personne</button>';
-      } else h += '<div class="gb-empty">Maximum ' + MAX_PEOPLE + ' personnes par réservation.</div>';
-      h += '<div class="gb-total"><span>' + people.length + ' personne' + (people.length > 1 ? 's' : '') + '</span><span>' + eur(total) + '</span></div>' + nextBtn(esc(cfg.continueLabel || 'Continuer'), !ready, 'continue');
-      if (people.length < 2) h += '<div class="gb-empty">Ajoutez au moins une autre personne.</div>';
-      else if (!ready) h += '<div class="gb-empty">Complétez chaque personne (prestation et horaire).</div>';
-      return h;
+      return html + '<div class="recap-total"><span>Total · ' + people.length + ' personne' + (people.length > 1 ? 's' : '') + '</span><span><strong>' + eur(cents) + '</strong></span></div>';
     }
 
-    function stepHtml(p) {
-      var who = p.isSelf ? '' : esc(label(p)) + ' — ';
-      if (view === 'name') {
-        return back() + '<div class="eyebrow">Qui vient avec vous ?</div><div class="fld"><label for="gb-name">Prénom</label><input id="gb-name" class="gb-input" maxlength="60" autocomplete="off" value="' + esc(p.name) + '"></div>' +
-          (cfg.createRelative ? '<label class="gb-save"><input type="checkbox" data-act="save"' + (p.saveRelative ? ' checked' : '') + '> Ajouter ce prénom à « Mes proches »</label>' : '') +
-          nextBtn('Suivant', !String(p.name || '').trim());
+    function views() {
+      if (view === 'recap') {
+        var ready = people.length > 1 && people.every(complete);
+        var used = {}; people.forEach(function (p) { if (p.relativeId) used[p.relativeId] = true; });
+        var rels = (cfg.relatives || []).filter(function (r) { return !used[r.id]; });
+        var body = '<div class="gb-rows">';
+        people.forEach(function (p, i) {
+          var s = byId(cfg.services, p.serviceId);
+          var line = complete(p) ? esc(s.name) + (barberName(p.slot.barberId) ? ' · ' + esc(barberName(p.slot.barberId)) : '') + '<br>' + esc(fmtDate(p.date)) + ' à ' + esc(p.slot.time) : '<span class="todo">À compléter</span>';
+          body += '<div class="gb-row" data-i="' + i + '"><span class="gb-av">' + esc(label(p).charAt(0).toUpperCase()) + '</span><div class="gb-info"><b>' + esc(label(p)) + '</b><span>' + line + '</span></div>' +
+            '<button type="button" class="gb-mini" data-act="edit">' + (complete(p) ? 'Modifier' : 'Compléter') + '</button>' +
+            (people.length > 1 ? '<button type="button" class="gb-mini x" data-act="remove" aria-label="Retirer">✕</button>' : '') + '</div>';
+        });
+        body += '</div>';
+        if (people.length < MAX_PEOPLE) {
+          if (rels.length) body += '<div class="gb-chips">' + rels.map(function (r) { return '<button type="button" class="gb-chip" data-act="add-rel" data-id="' + esc(r.id) + '">+ ' + esc(r.name) + '</button>'; }).join('') + '</div>';
+          body += '<button type="button" class="gb-addbtn" data-act="add">+ Ajouter une personne</button>';
+        } else body += '<div class="gb-empty">Maximum ' + MAX_PEOPLE + ' personnes par réservation.</div>';
+        return { top: back() + '<div class="eyebrow">Réserver pour plusieurs personnes</div><p class="step-sub">Chaque personne a sa prestation, son coiffeur et son horaire : à la suite, en même temps ou décalés.</p>',
+                 body: body, go: goBtn(esc(cfg.continueLabel || 'Continuer'), !ready, 'continue'),
+                 hint: people.length < 2 ? 'Ajoutez au moins une autre personne.' : !ready ? 'Complétez chaque personne (prestation et horaire).' : '' };
       }
-      if (view === 'barber') {
-        return back() + '<div class="eyebrow">' + who + 'Choisissez le coiffeur</div><div class="svc-grid">' +
-          '<button type="button" class="svc-card barber-tile' + (!p.pref ? ' sel' : '') + '" data-pick="barber" data-id=""><span class="icon">★</span><span class="name">Premier disponible</span></button>' +
-          cfg.barbers.map(function (b) { return barberCard(b, String(p.pref) === String(b.id)).replace('<button', '<button data-pick="barber"'); }).join('') + '</div>' + nextBtn('Suivant', false);
-      }
-      if (view === 'service') {
-        return back() + '<div class="eyebrow">' + who + 'Prestation</div><div class="item-grid">' +
-          cfg.services.map(function (it) { return itemCard('services', it, String(p.serviceId) === String(it.id)).replace('<button', '<button data-pick="service"'); }).join('') + '</div>' + nextBtn('Suivant', !p.serviceId);
-      }
-      if (view === 'extras') {
-        return back() + '<div class="eyebrow">' + who + 'Suppléments (optionnels)</div><p class="step-sub">Touchez pour ajouter.</p><div class="item-grid">' +
-          cfg.extras.map(function (it) { return itemCard('extras', it, p.extraIds.indexOf(String(it.id)) !== -1).replace('<button', '<button data-pick="extra"'); }).join('') + '</div>' + nextBtn('Suivant', false);
-      }
-      // datetime
-      var h = back() + '<div class="eyebrow">' + who + 'Date et heure</div><div class="fld"><label for="gb-date">Date</label><input id="gb-date" type="date" min="' + today() + '" value="' + esc(p.date) + '"></div>';
-      if (p.suggestions && p.suggestions.length) h += '<div class="gb-chips">' + p.suggestions.map(function (sg) {
-        return '<button type="button" class="gb-chip sugg" data-act="sugg" data-time="' + esc(sg.time) + '" data-barber="' + esc(sg.barberId) + '">' + (sg.kind === 'after' ? '⏩ À la suite de ' : '⏱ En même temps que ') + esc(sg.name) + ' · ' + esc(sg.time) + (barberName(sg.barberId) ? ' · ' + esc(barberName(sg.barberId)) : '') + '</button>'; }).join('') + '</div>';
-      h += '<div class="eyebrow" style="margin-top:14px">Créneaux disponibles</div>';
+      var p = cur, who = p.isSelf ? '' : esc(label(p)) + ' — ';
+      if (view === 'name') return { top: back() + '<div class="eyebrow">Qui vient avec vous ?</div>',
+        body: '<div class="fld"><label for="gb-name">Prénom</label><input id="gb-name" maxlength="60" autocomplete="off" value="' + esc(p.name) + '"></div>' +
+          (cfg.createRelative ? '<label class="gb-save"><input type="checkbox" data-act="save"' + (p.saveRelative ? ' checked' : '') + '> Ajouter ce prénom à « Mes proches »</label>' : ''),
+        go: goBtn('Suivant', !String(p.name || '').trim()) };
+      if (view === 'barber') return { top: back() + '<div class="eyebrow">' + who + 'Choisissez le coiffeur</div>',
+        body: '<div class="svc-grid"><button type="button" class="svc-card barber-tile' + (!p.pref ? ' sel' : '') + '" data-pick="barber" data-id=""><span class="icon">★</span><span class="name">Premier disponible</span></button>' +
+          cfg.barbers.map(function (b) { return barberCard(b, String(p.pref) === String(b.id)).replace('<button', '<button data-pick="barber"'); }).join('') + '</div>', go: goBtn('Suivant', false) };
+      if (view === 'service') return { top: back() + '<div class="eyebrow">' + who + 'Prestation</div>',
+        body: '<div class="item-grid">' + cfg.services.map(function (it) { return itemCard('services', it, String(p.serviceId) === String(it.id)).replace('<button', '<button data-pick="service"'); }).join('') + '</div>',
+        go: goBtn('Suivant', !p.serviceId) };
+      if (view === 'extras') return { top: back() + '<div class="eyebrow">' + who + 'Suppléments (optionnels)</div><p class="step-sub">Personnalisez la prestation : touchez pour ajouter.</p>',
+        body: '<div class="item-grid">' + cfg.extras.map(function (it) { return itemCard('extras', it, p.extraIds.indexOf(String(it.id)) !== -1).replace('<button', '<button data-pick="extra"'); }).join('') + '</div>', go: goBtn('Suivant', false) };
+      // date et heure
       var morning = (p.slots || []).filter(function (s) { return s.time < '12:00'; }), aft = (p.slots || []).filter(function (s) { return s.time >= '12:00'; });
-      if (morning.length && aft.length) h += '<div class="half-toggle" style="margin-bottom:14px"><button type="button" class="' + (p.half === 'morning' ? 'sel' : '') + '" data-act="half" data-half="morning">Matin</button><button type="button" class="' + (p.half === 'afternoon' ? 'sel' : '') + '" data-act="half" data-half="afternoon">Après-midi</button></div>';
+      var body2 = '<div class="fld"><label for="gb-date">Date</label><input id="gb-date" type="date" min="' + today() + '" value="' + esc(p.date) + '"></div>';
+      if (p.suggestions && p.suggestions.length) body2 += '<div class="gb-chips">' + p.suggestions.map(function (sg) {
+        return '<button type="button" class="gb-chip sugg" data-act="sugg" data-time="' + esc(sg.time) + '" data-barber="' + esc(sg.barberId) + '">' + (sg.kind === 'after' ? '⏩ À la suite de ' : '⏱ En même temps que ') + esc(sg.name) + ' · ' + esc(sg.time) + (barberName(sg.barberId) ? ' · ' + esc(barberName(sg.barberId)) : '') + '</button>'; }).join('') + '</div>';
+      body2 += '<div class="eyebrow" style="margin-top:20px">Créneaux disponibles</div>';
+      if (morning.length && aft.length) body2 += '<div class="half-toggle" style="margin-bottom:14px"><button type="button" class="' + (p.half === 'morning' ? 'sel' : '') + '" data-act="half" data-half="morning">Matin</button><button type="button" class="' + (p.half === 'afternoon' ? 'sel' : '') + '" data-act="half" data-half="afternoon">Après-midi</button></div>';
       var list = (morning.length && aft.length) ? (p.half === 'morning' ? morning : aft) : (p.slots || []);
-      h += '<div class="slots-grid" id="gb-slots">' + (p.loading || !p.slots ? '<div class="empty">Chargement…</div>' : !list.length ? '<div class="empty">Aucun créneau disponible ce jour-là</div>' :
+      body2 += '<div class="slots-grid">' + (p.loading || !p.slots ? '<div class="empty">Chargement…</div>' : !list.length ? '<div class="empty">Aucun créneau disponible ce jour-là</div>' :
         list.map(function (s) { var on = p.slot && p.slot.time === s.time && String(p.slot.barberId) === String(s.barber_id);
           return '<button type="button" class="slot-btn' + (on ? ' sel' : '') + '" data-act="slot" data-time="' + esc(s.time) + '" data-barber="' + esc(s.barber_id) + '">' + esc(s.time) + '</button>'; }).join('')) + '</div>';
-      if (p.note) h += '<div class="gb-warn">' + esc(p.note) + '</div>';
-      if (p.slot) h += '<div class="gb-ok">✓ ' + esc(fmtDate(p.date)) + ' à ' + esc(p.slot.time) + (barberName(p.slot.barberId) ? ' · ' + esc(barberName(p.slot.barberId)) : '') + '</div>';
-      return h + nextBtn('Valider', !p.slot);
+      if (p.note) body2 += '<div class="gb-warn">' + esc(p.note) + '</div>';
+      return { top: back() + '<div class="eyebrow">' + who + 'Date et heure</div>', body: body2, go: goBtn('Valider', !p.slot) };
     }
 
-    function paint() { el.innerHTML = '<div class="gb">' + (view === 'recap' ? recapHtml() : stepHtml(cur)) + '</div>'; }
+    function paint() {
+      var v = views(), keep = zones.body.scrollTop;
+      zones.top.innerHTML = v.top; zones.body.innerHTML = v.body;
+      zones.bar.innerHTML = '<div class="flow-recap">' + recapHtml() + '</div>' + v.go + (v.hint ? '<div class="gb-empty">' + v.hint + '</div>' : '');
+      zones.body.scrollTop = keep;
+    }
 
     /* ---------- Navigation ---------- */
     function go(v) { view = v; paint(); if (v === 'datetime') loadSlots(cur); }
@@ -287,7 +314,7 @@
       if (act === 'slot' || act === 'sugg') { cur.slot = { time: t.getAttribute('data-time'), barberId: t.getAttribute('data-barber') }; cur.note = ''; return paint(); }
     });
     el.addEventListener('input', function (e) {
-      if (e.target.id === 'gb-name') { cur.name = e.target.value; var b = el.querySelector('[data-act=next]'); if (b) b.disabled = !cur.name.trim(); }
+      if (e.target.id === 'gb-name') { cur.name = e.target.value; var b = zones.bar.querySelector('[data-act=next]'); if (b) b.disabled = !cur.name.trim(); }
     });
     el.addEventListener('change', function (e) {
       var t = e.target;

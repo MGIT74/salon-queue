@@ -494,8 +494,10 @@
     </button>
   </section>
 
-  <section class="panel" id="p-book-group">
-    <div id="bk-group-mount"></div>
+  <section class="panel flow" id="p-book-group">
+    <div class="flow-top" id="bkgb-top"></div>
+    <div class="flow-body" id="bkgb-body"></div>
+    <div class="step-bar" id="bkgb-bar"></div>
   </section>
 
   <section class="panel" id="p-book-group-confirm">
@@ -647,7 +649,7 @@
 </div>
 
 <script src="/app.js?v=17"></script>
-<script src="/group-booking.js?v=2"></script>
+<script src="/group-booking.js?v=3"></script>
 <style>
 .group-entry{display:flex;align-items:center;gap:14px;width:100%;margin-top:18px;padding:16px;border:1px dashed var(--blue);background:var(--blue-soft);color:var(--blue);border-radius:18px;font-family:inherit;text-align:left;cursor:pointer}
 .group-entry span{display:flex;flex-direction:column;gap:3px}.group-entry b{font-size:15px;color:var(--ink)}.group-entry small{font-size:13px;color:var(--grey)}
@@ -988,7 +990,7 @@ var bookGroupCtl = null, bookGroupPayload = null;
 function openBookGroup() {
   if (!bookGroupCtl) {
     bookGroupCtl = GroupBooking.create({
-      mount: document.getElementById('bk-group-mount'), api: apiForBooking,
+      zones: { top: document.getElementById('bkgb-top'), body: document.getElementById('bkgb-body'), bar: document.getElementById('bkgb-bar') }, api: apiForBooking,
       services: bookServices, extras: bookExtras, barbers: bookBarbers, relatives: myRelatives,
       eur: eur, toast: toast, continueLabel: 'Continuer', onExit: function () { show('p-book-barber'); },
       createRelative: function (name) {
@@ -1191,7 +1193,6 @@ function goBook(afterLoad) {
     renderBookServiceGrid();
     document.getElementById('bk-group-entry').style.display = bookBarbers.length ? '' : 'none';
     bookGroupCtl = null;   // catalogue (re)charge : le module se reconstruit au prochain usage
-    document.getElementById('bk-group-mount').innerHTML = '';
     finish();
   }).catch(function (e) { toast(e.message, true); });
 }
