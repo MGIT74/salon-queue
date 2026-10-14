@@ -1192,6 +1192,9 @@
   .bp-layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 18px; align-items: start; }
   .bp-main { min-width: 0; }
             border-bottom: 3px solid var(--k); display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0; }
+  .bp-tabbody.fade { animation: bpTabIn .32s cubic-bezier(.22,.8,.3,1) both; }
+  @keyframes bpTabIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .bp-tabbody.fade { animation: none; } }
   .bp-panel { background: var(--card); border-radius: 18px; padding: 18px; box-shadow: var(--shadow); }
   .bp-profile { background: var(--card); border-radius: 18px; padding: 24px 18px 18px; box-shadow: var(--shadow); text-align: center; }
   .bp-ring { --rc: var(--accent); width: 100px; height: 100px; border-radius: 50%; padding: 4px; margin: 0 auto 14px; box-sizing: border-box;
@@ -4731,9 +4734,13 @@ function closeBarber() {
   if (t && t.scrollIntoView) t.scrollIntoView({ block: 'start' });
 }
 
+var barberTabFade = false;   // vrai juste pour le rendu qui suit un changement d'onglet : seul le contenu de l'onglet apparait en fondu
 function switchBarberTab(id, tab) {
+  if (barberDetailTab[id] === tab) return;
   barberDetailTab[id] = tab;
+  barberTabFade = true;
   renderBarbers();
+  barberTabFade = false;
 }
 
 function renderBarberDetail(b) {
@@ -4792,7 +4799,7 @@ function renderBarberDetail(b) {
 
   return '<div class="bp-stats">' + renderStatsTab(b) + '</div>' +
     '<div class="bp-layout"><div class="bp-main">' +
-    '<div class="bp-panel">' + tabs + '<div>' + body + '</div></div></div>' + profile + '</div>';
+    '<div class="bp-panel">' + tabs + '<div class="bp-tabbody' + (barberTabFade ? ' fade' : '') + '">' + body + '</div></div></div>' + profile + '</div>';
 }
 
 function renderScheduleTab(b) {
