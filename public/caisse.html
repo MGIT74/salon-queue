@@ -243,6 +243,14 @@
   .timeline-hours { position: relative; height: 18px; margin-bottom: 6px; }
   .timeline-hours span { position: absolute; top: 0; font-size: 12px; color: var(--grey); white-space: nowrap; transform: translateX(-1px); }
   .timeline-hours span.h { color: var(--ink); font-weight: 600; }
+  /* Dezoome sous la largeur lisible (jusqu'a 0 % = journee entiere a l'ecran) : seules les heures pleines restent. */
+  .timeline-inner.compact .timeline-hours span:not(.h) { display: none; }
+  .timeline-inner.compact .timeline-hours span.h { font-size: 11px; }
+  .timeline-inner.compact .timeline-block .tb-time { display: none; }
+  .timeline-inner.compact .timeline-hours span.h:last-child { transform: translateX(-100%); }
+  /* Les traits de chaque pas (5 min...) deviennent trop serres : on ne garde que les traits des heures. */
+  .timeline-inner.compact .timeline-minute-grid { background-image: linear-gradient(to right, transparent 1px, transparent 1px), linear-gradient(to right, rgba(128,128,128,.38) 1px, transparent 1px); }
+  .timeline-zoom-ctrl button:disabled { opacity: .35; cursor: default; }
   .timeline-row { display: flex; align-items: center; min-height: 54px; border-top: 1px solid var(--sep); }
   .timeline-row:first-child { border-top: none; }
   .timeline-row-label { width: 22px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; padding-right: 0; }
@@ -2272,17 +2280,29 @@ function renderAgendaTimeline(dateStr) {
   var labelsPerHour = 60 / stepMin;
   var fitPerHour = Math.max(90, labelsPerHour * TIMELINE_LABEL_PX);   // px par heure a 100%
   var minZoom = Math.max(0.6, (labelsPerHour * TIMELINE_LABEL_PX) / fitPerHour);
-  var effZoom = Math.max(timelineZoom, minZoom);
-  timelineMinZoom = minZoom; timelineEffectiveZoom = effZoom;          // +/- repartent de la valeur AFFICHEE
+  // En dessous de la largeur « lisible », on peut dezoomer jusqu'a 0 % : la frise tient alors entierement
+  // dans la largeur de l'ecran (vue complete de l'ouverture a la fermeture du salon, sans defilement).
+  // Les libelles intermediaires (08:05, 08:10...) sont alors masques : seules les heures pleines restent.
+  var effZoom = Math.max(0, timelineZoom);
+  var compact = effZoom < minZoom;
+  timelineMinZoom = 0; timelineEffectiveZoom = effZoom;          // +/- repartent de la valeur AFFICHEE
   var innerWidth = Math.round(hourCount * fitPerHour * effZoom);
+  if (compact) {
+    // Entre 0 % et la largeur lisible, chaque cran resserre vraiment : on passe progressivement de la largeur
+    // lisible (defilement) a la largeur de l'ecran (0 % = tout tient, sans defilement).
+    var shown = document.querySelector('.timeline-scroll');
+    var avail = (shown && shown.clientWidth) || 900;
+    var readable = Math.round(hourCount * fitPerHour * minZoom);
+    innerWidth = readable <= avail ? 0 : Math.round(avail + (readable - avail) * (effZoom / minZoom));
+  }
   var zoomPct = Math.round(effZoom * 100);
   var zoomCtrl = '<div class="timeline-zoom-ctrl"><div class="timeline-zoom-ctrl-inner">' +
-    '<button type="button" onclick="event.stopPropagation();adjustAgendaZoom(-1)" title="Dézoomer">−</button>' +
-    '<span>' + zoomPct + '%</span>' +
+    '<button type="button" onclick="event.stopPropagation();adjustAgendaZoom(-1)" title="Dézoomer"' + (effZoom === 0 ? ' disabled' : '') + '>−</button>' +
+    '<span title="' + (effZoom === 0 ? 'Vue complète de la journée' : '') + '">' + zoomPct + '%</span>' +
     '<button type="button" onclick="event.stopPropagation();adjustAgendaZoom(1)" title="Zoomer">+</button>' +
     '</div></div>';
 
-  return zoomCtrl + '<div class="timeline-scroll"><div class="timeline-inner" ' +
+  return zoomCtrl + '<div class="timeline-scroll"><div class="timeline-inner' + (compact ? ' compact' : '') + (effZoom === 0 ? ' fit' : '') + '" ' +
     'data-date="' + dateStr + '" data-range-start="' + rangeStart + '" data-range-end="' + rangeEnd + '" ' +
     'style="min-width:' + innerWidth + 'px">' +
     '<div class="timeline-hours">' + hoursHtml + '</div>' +
@@ -2323,11 +2343,11 @@ function updateAgendaNowLines() {
   });
 }
 
-/** +1 pour zoomer, -1 pour dézoomer (pas de 20%, borné 60%-250%). */
+/** +1 pour zoomer, -1 pour dézoomer (pas de 20%, de 0 % = journée entière à l'écran jusqu'à 250 %). */
 function adjustAgendaZoom(delta) {
   // On part du zoom REELLEMENT affiche (il peut etre au-dessus de celui demande : le minimum depend du pas).
   var base = timelineEffectiveZoom == null ? timelineZoom : timelineEffectiveZoom;
-  timelineZoom = Math.max(timelineMinZoom, Math.min(2.5, +(base + delta * 0.2).toFixed(2)));
+  timelineZoom = Math.max(0, Math.min(2.5, +(base + delta * 0.2).toFixed(2)));
   if (calViewMode === 'day') renderCalDay();
   else if (calSelectedDate) { if (calViewMode === 'month') renderCalMonth(); else renderCalWeek(); }
 }

@@ -35,7 +35,7 @@ function parse(w, step, zoom) {
   const doc = new JSDOM('<body>' + html + '</body>').window.document;
   const labels = [...doc.querySelectorAll('.timeline-hours span')].map(s => ({ t: s.textContent, h: s.classList.contains('h') }));
   const inner = doc.querySelector('.timeline-inner');
-  return { labels, innerWidth: parseInt(inner.style.minWidth, 10), range: Number(inner.dataset.rangeEnd) - Number(inner.dataset.rangeStart), grid: doc.querySelector('.timeline-minute-grid').getAttribute('style'), pct: doc.querySelector('.timeline-zoom-ctrl span').textContent };
+  return { labels, compact: inner.classList.contains('compact'), innerWidth: parseInt(inner.style.minWidth, 10), range: Number(inner.dataset.rangeEnd) - Number(inner.dataset.rangeStart), grid: doc.querySelector('.timeline-minute-grid').getAttribute('style'), pct: doc.querySelector('.timeline-zoom-ctrl span').textContent };
 }
 const toMin = (s) => Number(s.slice(0, 2)) * 60 + Number(s.slice(3));
 
@@ -52,11 +52,11 @@ const toMin = (s) => Number(s.slice(0, 2)) * 60 + Number(s.slice(3));
     check('pas ' + String(step).padStart(2) + ' min : traits de fond = un par pas + un plus marque par heure', m && Math.abs(Number(m[1]) - pctStep) < 0.001 && Math.abs(Number(m[2]) - pctHour) < 0.001, r.grid);
   }
 
-  console.log('\n[B] Aucun chevauchement : chaque libelle garde au moins 44 px (zoom normal ET zoom reduit)');
+  console.log('\n[B] Aucun chevauchement : chaque libelle garde au moins 44 px ; en dessous (dezoom jusqu\'a 0 %), seules les heures pleines restent');
   for (const step of [5, 10, 15, 20, 30]) for (const z of [1, 0.6]) {
     const w = makeWin(); const r = parse(w, step, z);
     const pxPerLabel = r.innerWidth / r.range * step;
-    check('pas ' + String(step).padStart(2) + ' min, zoom demande ' + Math.round(z * 100) + '% : ' + pxPerLabel.toFixed(1) + ' px par libelle', pxPerLabel >= 43.5, 'largeur ' + r.innerWidth + 'px, affiche ' + r.pct);
+    check('pas ' + String(step).padStart(2) + ' min, zoom demande ' + Math.round(z * 100) + '% : ' + (r.compact ? 'vue resserree (libelles intermediaires masques)' : pxPerLabel.toFixed(1) + ' px par libelle'), r.compact || pxPerLabel >= 43.5, 'largeur ' + r.innerWidth + 'px, affiche ' + r.pct);
   }
 
   console.log('\n[C] Largeur : la frise s\'elargit quand le pas est fin (defilement horizontal)');
@@ -68,10 +68,12 @@ const toMin = (s) => Number(s.slice(0, 2)) * 60 + Number(s.slice(3));
   { const w = makeWin(); w.rdvSlotStepMin = 5; w.dashTimelineCache = { dateStr: w.__today, appts: [] };
     const show = () => { w.document.getElementById('dash-timeline').innerHTML = w.renderDayTimelineHtml(w.__today, []); return w.document.querySelector('.timeline-zoom-ctrl span').textContent; };
     check('pas 5 : zoom de depart 100% (= juste assez large pour tous les libelles)', show() === '100%');
-    w.adjustTimelineZoom(-1); w.adjustTimelineZoom(-1); w.adjustTimelineZoom(-1);
-    check('"-" au minimum : reste a 100% (on ne peut pas faire se chevaucher les libelles)', w.document.querySelector('.timeline-zoom-ctrl span').textContent === '100%');
+    w.adjustTimelineZoom(-1);
+    check('"-" sous 100 % : vue resserree (heures pleines seulement)', w.document.querySelector('.timeline-zoom-ctrl span').textContent === '80%' && w.document.querySelector('.timeline-inner').classList.contains('compact'));
+    for (let i = 0; i < 8; i++) w.adjustTimelineZoom(-1);
+    check('"-" jusqu\'a 0 % : journee entiere a l\'ecran, bouton "-" desactive', w.document.querySelector('.timeline-zoom-ctrl span').textContent === '0%' && w.document.querySelector('.timeline-inner').classList.contains('fit') && w.document.querySelector('.timeline-zoom-ctrl button').disabled);
     w.adjustTimelineZoom(1);
-    check('puis UN seul clic sur "+" : monte tout de suite a 120% (pas de clics a vide)', w.document.querySelector('.timeline-zoom-ctrl span').textContent === '120%', w.document.querySelector('.timeline-zoom-ctrl span').textContent);
+    check('puis UN seul clic sur "+" : remonte tout de suite a 20% (pas de clics a vide)', w.document.querySelector('.timeline-zoom-ctrl span').textContent === '20%', w.document.querySelector('.timeline-zoom-ctrl span').textContent);
     for (let i = 0; i < 12; i++) w.adjustTimelineZoom(1);
     check('zoom maximum 250%', w.document.querySelector('.timeline-zoom-ctrl span').textContent === '250%'); }
 
@@ -106,7 +108,7 @@ const toMin = (s) => Number(s.slice(0, 2)) * 60 + Number(s.slice(3));
   check('meme boucle "une heure a chaque pas"', /for \(var t = rangeStart; t <= rangeEnd; t \+= stepMin\)/.test(caisse) && /rdvSlotStepMin > 0 \? rdvSlotStepMin : 15/.test(caisse));
   check('meme grille (un trait par pas + un par heure) et meme largeur sans chevauchement', /background-size:' \+ stepPct \+ '% 100%, ' \+ hourPct/.test(caisse) && /fitPerHour = Math\.max\(90, labelsPerHour \* TIMELINE_LABEL_PX\)/.test(caisse));
   check('pas lu dans les reglages PUBLICS, AVANT le rendu (dans le meme Promise.all que les RDV)', /function loadRdvSlotStep\(\)[\s\S]*settings\/public/.test(caisse) && /loadRdvSlotStep\(\)\s*\]\)/.test(caisse));
-  check('zoom de la caisse part de la valeur affichee', /timelineMinZoom, Math\.min\(2\.5, \+\(base \+ delta \* 0\.2\)/.test(caisse));
+  check('zoom de la caisse part de la valeur affichee', /Math\.max\(0, Math\.min\(2\.5, \+\(base \+ delta \* 0\.2\)/.test(caisse) && /timeline-inner\.compact \.timeline-hours span:not\(\.h\) \{ display: none; \}/.test(caisse));
   for (const [n, src] of [['dashboard', dash], ['caisse', caisse]]) {
     check(n + ' : heures pleines en gras + 2 couches de traits (fin par pas, marque par heure)', /\.timeline-hours span\.h \{/.test(src) && /rgba\(128,128,128,\.38\) 1px/.test(src));
     check(n + ' : centrage automatique sur "maintenant" des qu\'une frise apparait, seulement si elle est VRAIMENT plus large que l\'ecran', /installTimelineAutoScroll/.test(src) && /sc\.scrollLeft = Math\.max\(0, now\.offsetLeft - sc\.clientWidth \/ 2\)/.test(src) && /sc\.scrollWidth - sc\.clientWidth < 80\) return/.test(src));
