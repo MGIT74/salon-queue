@@ -97,7 +97,8 @@ const suite = [
   ['74-timeline-heure-sur-bloc.js', false, ['exit']],
   ['75-cartes-compte-infos-hors-visuel.js', false, ['exit']],
   ['76-produit-caisse-seulement.js', false, ['exit']],
-  ['77-icone-cadeau-partout.js', false, ['exit']]
+  ['77-icone-cadeau-partout.js', false, ['exit']],
+  ['78-fidelite-sans-badge-cadeau.js', false, ['exit']]
 ];
 
 let bad = 0;
