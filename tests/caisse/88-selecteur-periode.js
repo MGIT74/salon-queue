@@ -50,7 +50,9 @@ btn.click(); pop().querySelector('.dr-d[data-v="2026-10-10"]').click(); pop().qu
 check('un seul jour choisi : debut = fin', a.value === '2026-10-10' && b.value === '2026-10-10');
 btn.click(); pop().querySelector('.dr-preset[data-p="all"]').click(); pop().querySelector('.dr-apply').click();
 check('"Toutes les dates" : efface la periode et previent le code (change)', a.value === '' && b.value === '' && fired === 3, fired);
-btn.click(); doc.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+btn.click(); w.dispatchEvent(new w.Event('scroll')); doc.dispatchEvent(new w.Event('scroll', { bubbles: true }));
+check('defilement de la page : la fenetre reste ouverte', !!pop());
+btn.click(); btn.click(); btn.click(); doc.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
 check('Echap ferme la fenetre', !pop());
 
 // champs ajoutes plus tard par un rendu (ex. statistiques par coiffeur)

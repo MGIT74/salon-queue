@@ -190,6 +190,7 @@
       if (a === 'apply') return apply();
       if (a === 'cancel') return closePop();
     });
+    active.place = place;
     root.addEventListener('resize', closePop);
     render(); place();
   }
@@ -231,7 +232,8 @@
 
   if (typeof document !== 'undefined') {
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && pop) { e.stopPropagation(); closePop(); } }, true);
-    root.addEventListener('scroll', function (e) { if (pop && !narrow() && !pop.contains(e.target)) closePop(); }, true);
+    // Le défilement de la page ne ferme plus la fenêtre : elle suit simplement le bouton.
+    root.addEventListener('scroll', function (e) { if (pop && active && active.place && !(e.target.nodeType && pop.contains(e.target))) active.place(); }, true);
     var go = function () {
       scan(document);
       if (root.MutationObserver) new MutationObserver(function () { scan(document); }).observe(document.body, { childList: true, subtree: true });
