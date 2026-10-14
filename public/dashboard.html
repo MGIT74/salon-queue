@@ -4927,7 +4927,7 @@ function renderStatsTab(b) {
 }
 
 function renderLeavesTab(b) {
-  return '<p class="hint" style="margin:0 0 12px">Cliquez sur un jour, ou <strong>glissez la souris</strong> sur plusieurs jours (en vertical : tous les mêmes jours de la semaine, ex. tous les lundis), puis cochez « En congé ». Les jours en congé ne sont plus proposés à la réservation.</p>' +
+  return '<p class="hint" style="margin:0 0 12px">Cliquez sur un jour, ou <strong>glissez la souris</strong> sur plusieurs jours (en vertical : tous les mêmes jours de la semaine, ex. tous les lundis), puis cochez « En congé ». <span class="lv-touch-hint">Sur téléphone : appuyez un instant sur un jour, puis glissez.</span> Les jours en congé ne sont plus proposés à la réservation.</p>' +
     '<div class="lv-year" id="leaves-list-' + b.id + '"><div class="empty">Chargement…</div></div>';
 }
 
@@ -5250,23 +5250,75 @@ function lvBind(id, box) {
   };
   box.onmouseover = function (e) {
     if (!st.dragging) return;
-    var b = lvDateUnder(e.target);
-    if (!b) return;
-    var a = st.anchor;
-    // Glissé surtout VERTICAL : on ne prend que la colonne du jour de départ (ex. tous les lundis) ;
-    // sinon (horizontal / en biais) : tous les jours entre les deux, dans l'ordre du calendrier.
-    var vertical = Math.abs(e.clientY - st.ay) > Math.abs(e.clientX - st.ax) && a !== b;
-    var wd = new Date(a + 'T00:00:00Z').getUTCDay();
-    if (b < a) { var t = a; a = b; b = t; }
-    var out = [], d = a, n = 0;
-    while (d <= b && n++ < 400) {
-      if (!vertical || new Date(d + 'T00:00:00Z').getUTCDay() === wd) out.push(d);
-      d = lvAddDays(d, 1);
-    }
-    if (!out.length) out = [st.anchor];
-    st.sel = out;
-    lvPaintSel(id, box);
+    lvExtendSel(id, box, e.target, e.clientX, e.clientY);
   };
+  // Écran tactile : un appui court = un jour ; appui MAINTENU un instant puis glisser = plusieurs jours (sinon le doigt fait défiler la page).
+  if (!box._lvTouch) {
+    box._lvTouch = true;
+    var timer = null, start = null, moved = false;
+    box.addEventListener('touchstart', function (e) {
+      if (e.touches.length !== 1 || e.target.closest('.lv-bubble')) return;
+      var cell = e.target.closest('.lv-day');
+      if (!cell) return;
+      var t = e.touches[0];
+      start = { x: t.clientX, y: t.clientY, d: cell.getAttribute('data-d') };
+      moved = false; st.touchActive = false;
+      clearTimeout(timer);
+      timer = setTimeout(function () {
+        st.touchActive = true; st.dragging = true;
+        st.anchor = start.d; st.sel = [start.d]; st.ax = start.x; st.ay = start.y;
+        lvHideBubble(id); lvPaintSel(id, box);
+        if (navigator.vibrate) { try { navigator.vibrate(12); } catch (x) {} }
+      }, 220);
+    }, { passive: true });
+    box.addEventListener('touchmove', function (e) {
+      if (!start) return;
+      var t = e.touches[0];
+      if (!st.touchActive) {
+        if (Math.abs(t.clientX - start.x) > 10 || Math.abs(t.clientY - start.y) > 10) { moved = true; clearTimeout(timer); }
+        return;                                   // pas encore en mode sélection : la page défile normalement
+      }
+      e.preventDefault();                         // en mode sélection : le doigt ne fait plus défiler
+      var el = document.elementFromPoint(t.clientX, t.clientY);
+      if (el) lvExtendSel(id, box, el, t.clientX, t.clientY);
+    }, { passive: false });
+    var end = function (e) {
+      clearTimeout(timer);
+      if (!start) return;
+      var d = start.d; start = null;
+      if (st.touchActive) {                       // fin d'un glissé
+        st.touchActive = false; st.dragging = false;
+        if (e.cancelable) e.preventDefault();
+        if (st.sel.length) lvShowBubble(id);
+      } else if (!moved && e.type === 'touchend') {   // simple appui : un seul jour
+        if (e.cancelable) e.preventDefault();     // évite les faux clics souris émulés
+        st.anchor = d; st.sel = [d]; lvPaintSel(id, box); lvShowBubble(id);
+      }
+    };
+    box.addEventListener('touchend', end);
+    box.addEventListener('touchcancel', end);
+  }
+}
+
+// Met à jour la sélection quand le pointeur (souris ou doigt) arrive sur `el`.
+function lvExtendSel(id, box, el, x, y) {
+  var st = lvState_(id);
+  var b = lvDateUnder(el);
+  if (!b) return;
+  var a = st.anchor;
+  // Glissé surtout VERTICAL : on ne prend que la colonne du jour de départ (ex. tous les lundis) ;
+  // sinon (horizontal / en biais) : tous les jours entre les deux, dans l'ordre du calendrier.
+  var vertical = Math.abs(y - st.ay) > Math.abs(x - st.ax) && a !== b;
+  var wd = new Date(a + 'T00:00:00Z').getUTCDay();
+  if (b < a) { var t = a; a = b; b = t; }
+  var out = [], d = a, n = 0;
+  while (d <= b && n++ < 400) {
+    if (!vertical || new Date(d + 'T00:00:00Z').getUTCDay() === wd) out.push(d);
+    d = lvAddDays(d, 1);
+  }
+  if (!out.length) out = [st.anchor];
+  st.sel = out;
+  lvPaintSel(id, box);
 }
 
 // Jour « sous la souris » : un vrai jour, ou - pour une case vide / l'en-tête du mois - le jour le plus proche de ce mois,

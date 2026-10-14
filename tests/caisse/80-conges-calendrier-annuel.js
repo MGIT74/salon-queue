@@ -15,4 +15,5 @@ check('serveur : POST /:id/leaves/days (coiffeur du salon, transaction)', /route
 check('base : colonne barber_leaves.repeat_yearly', /column_name = 'repeat_yearly'/.test(sql));
 check('glisse vertical : cases vides / en-tete du mois = jour le plus proche (jamais de selection qui s\'arrete court)', /function lvDateUnder\(el\)/.test(dash) && /data-edge="first"/.test(dash) && /data-edge="last"/.test(dash) && /var b = lvDateUnder\(e\.target\)/.test(dash));
 check('glisse vertical : seulement la colonne du jour de depart (tous les lundis), horizontal = jours entre', /var vertical = Math\.abs\(e\.clientY - st\.ay\) > Math\.abs\(e\.clientX - st\.ax\)/.test(dash) && /getUTCDay\(\) === wd/.test(dash));
+check('mobile : appui maintenu + glisser = plusieurs jours, appui court = un jour, balayage rapide = defilement normal', /addEventListener\('touchstart'/.test(dash) && /addEventListener\('touchmove'[\s\S]*\{ passive: false \}/.test(dash) && /setTimeout\(function \(\) \{\s*st\.touchActive = true/.test(dash) && /document\.elementFromPoint/.test(dash) && /function lvExtendSel\(/.test(dash));
 console.log('\n' + pass + ' OK, ' + fail + ' ECHEC'); process.exit(fail ? 1 : 0);
