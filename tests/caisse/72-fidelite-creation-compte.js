@@ -25,7 +25,7 @@ const fakePool = { query: async (sql, p) => {
 const fakes = {
   '../db': { pool: fakePool, getOwnerSettings: async () => ({ loyalty_threshold: 8 }) },
   './queueMath': { clientKey: (r) => (r.email || r.phone || r.client_name || '').toLowerCase() || null },
-  './mailer': { sendLoyaltyActivation: async (salon, to, info) => { state.mails.push({ to, threshold: info.threshold }); } },
+  './mailer': { sendLoyaltyActivation: async (salon, to, info) => { state.mails.push({ to, threshold: info.serviceThreshold, productThreshold: info.productThreshold }); } },
   './activityLog': { logActivity: () => {} }
 };
 const origLoad = Module._load;
@@ -36,7 +36,7 @@ Module._load = origLoad;
 (async () => {
   const c = { client_name: 'Karim', email: 'karim@ex.fr', phone: '0600000000' };
   check('creation du compte : carte creee et activee', (await activateOnAccountCreation('s1', c)) === true && state.accounts.length === 1 && state.accounts[0].activated);
-  check('email d\'activation envoye avec le seuil du salon', state.mails.length === 1 && state.mails[0].to === 'karim@ex.fr' && state.mails[0].threshold === 8);
+  check('email d\'activation envoye avec le seuil du salon', state.mails.length === 1 && state.mails[0].to === 'karim@ex.fr' && state.mails[0].threshold === 8 && state.mails[0].productThreshold === 8);
   check('meme client deja avec carte : rien de nouveau (pas de doublon, pas de 2e email)', (await activateOnAccountCreation('s1', c)) === false && state.accounts.length === 1 && state.mails.length === 1);
   check('carte deja desactivee par l\'admin : pas reactivee de force', (await (async () => { state.accounts.push({ salon_id: 's1', client_key: 'old@ex.fr', activated: false }); return activateOnAccountCreation('s1', { client_name: 'Old', email: 'old@ex.fr' }); })()) === false);
   check('sans email : rien', (await activateOnAccountCreation('s1', { client_name: 'X', email: '' })) === false);

@@ -123,4 +123,5 @@ node tests/caisse/89-caisse-tiroir-rdv.js  # Caisse : tiroir client d'un RDV (mo
 node tests/caisse/90-actualisation-discrete.js  # Actualisation discrete 15 s (caisse, compte client) : delai d'inactivite, garde occupe, defilement conserve
 node tests/caisse/91-audit-securite.js  # Audit securite : liens d'email (base_url), echappement HTML des emails, CSV, verrou de reservation, limite publique
 node tests/caisse/92-encaissement-avance.js  # Encaissement a l'avance (serveur + base) : garde sa place, deja paye, reste a payer apres supplement
+node tests/caisse/93-fidelite-deux-paliers.js  # Fidelite a deux paliers (prestation / produit), deduction a l'utilisation, reconversion des anciennes recompenses
 ```

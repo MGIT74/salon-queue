@@ -1,4 +1,5 @@
 const express = require('express');
+const { thresholdsForSalon } = require('../lib/loyaltyRules');
 const crypto = require('crypto');
 const { pool, utcIso, getSettings, getCaisseLockedUntil, caisseDayStartUtc } = require('../db');
 const { getVatRates, rateForItem, TABLES: VAT_TABLES } = require('../lib/vat');
@@ -325,13 +326,16 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
     await earnLoyaltyPoint(req.salon.id, outcome.queueRow);
     // Une récompense de fidélité était appliquée à ce ticket (gagnée à
     // un passage précédent) — on la consomme maintenant.
+    // Remise prestation OU produit : retire les points du palier correspondant (s'il est bien atteint).
     if (loyalty_redeem) {
       const key = clientKey(outcome.queueRow);
       if (key) {
+        const type = loyalty_redeem === 'product' ? 'product' : 'service';
+        const t = await thresholdsForSalon(req.salon.id);
         await pool.query(
-          `UPDATE loyalty_accounts SET rewards_available = GREATEST(rewards_available - 1, 0), updated_at = NOW()
-           WHERE salon_id = ? AND client_key = ? AND rewards_available > 0`,
-          [req.salon.id, key]
+          `UPDATE loyalty_accounts SET points = points - ?, updated_at = NOW()
+           WHERE salon_id = ? AND client_key = ? AND points >= ?`,
+          [t[type], req.salon.id, key, t[type]]
         );
       }
     }

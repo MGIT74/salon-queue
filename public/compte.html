@@ -110,6 +110,12 @@
   .card-info .big { font-size: 24px; font-weight: 700; letter-spacing: -.02em; }
   .card-info .lbl { font-size: 12.5px; color: var(--grey); margin-top: 2px; }
   #loyalty-section .card { background: none; padding: 0; border-radius: 0; margin-bottom: 12px; }
+  .loyalty-tiers { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0 0 16px; }
+  .loyalty-tiers .tier { background: var(--card); border-radius: 14px; padding: 10px 12px; }
+  .loyalty-tiers .tier-top { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--grey); }
+  .loyalty-tiers .tier-top b { color: var(--ink); font-weight: 600; }
+  .loyalty-tiers .tier-bar { height: 6px; border-radius: 99px; background: var(--fill); margin-top: 8px; overflow: hidden; }
+  .loyalty-tiers .tier-bar i { display: block; height: 100%; border-radius: 99px; background: var(--blue); }
 
   /* Léger effet d'éclat qui balaie la carte une fois au chargement -
      purement décoratif, s'arrête de lui-même (animation non bouclée). */
@@ -417,6 +423,7 @@
           </div>
         </div>
       </div>
+      <div class="loyalty-tiers" id="loyalty-tiers"></div>
     </div>
     <div id="loyalty-inactive-msg" class="msg" style="display:none">
       Votre carte de fidélité n'est pas encore activée — demandez à votre coiffeur de l'activer lors de votre prochain passage.
@@ -951,6 +958,22 @@ AutoRefresh.start(function () {
   return api('/api/client-auth/me').then(populateHome);
 }, { idleMs: 15000 });
 
+/** Remise prestation / remise produit : chacune a son propre nombre de points à atteindre. */
+function renderLoyaltyTiers(l) {
+  var box = document.getElementById('loyalty-tiers');
+  if (!box) return;
+  var t = l && l.thresholds;
+  if (!t) { box.innerHTML = ''; return; }
+  var rw = l.rewards || {};
+  var tier = function (label, ok, need) {
+    var pct = Math.min(100, Math.round((l.points / need) * 100));
+    return '<div class="tier"><div class="tier-top"><span>' + label + '</span><b>' +
+      (ok ? 'Disponible' : l.points + ' / ' + need) + '</b></div>' +
+      '<div class="tier-bar"><i style="width:' + pct + '%"></i></div></div>';
+  };
+  box.innerHTML = tier('Remise prestation', rw.service, t.service) + tier('Remise produit', rw.product, t.product);
+}
+
 function populateHome(d) {
   document.getElementById('home-hello').textContent = 'Bonjour ' + d.profile.name;
   document.getElementById('pf-name').value = d.profile.name;
@@ -963,6 +986,7 @@ function populateHome(d) {
   document.getElementById('loyalty-inactive-msg').style.display = d.loyalty_activated ? 'none' : 'block';
   if (d.loyalty_activated) {
     document.getElementById('loyalty-points').textContent = d.loyalty.points;
+    renderLoyaltyTiers(d.loyalty);
   }
 
   renderVisitCard(d.upcoming_appointments || [], d.recent_visits || []);

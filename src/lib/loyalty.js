@@ -47,9 +47,8 @@ async function activateOnAccountCreation(salonId, { client_name, email, phone })
   logActivity(salonId, 'loyalty_activate', 'Carte de fidélité activée automatiquement (création du compte client) : ' + name);
 
   try {
-    const settings = await getOwnerSettings(salon.owner_id);
-    const threshold = Math.max(1, Number(settings.loyalty_threshold) || 10);
-    await sendLoyaltyActivation(salonId, mail, { clientName: name, threshold });
+    const t = require('./loyaltyRules').thresholdsFrom(await getOwnerSettings(salon.owner_id));
+    await sendLoyaltyActivation(salonId, mail, { clientName: name, serviceThreshold: t.service, productThreshold: t.product });
   } catch (err) {
     console.error('[fidélité] envoi email d\'activation échoué:', err.message);
   }

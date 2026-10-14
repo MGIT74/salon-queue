@@ -1,4 +1,5 @@
 const express = require('express');
+const { thresholdsForSalon, rewardsFor } = require('../lib/loyaltyRules');
 const crypto = require('crypto');
 const { pool, utcIso, getSettings } = require('../db');
 const { loadQueue, recompute, clientKey } = require('../lib/queueMath');
@@ -157,17 +158,23 @@ router.get('/pending-payment', requireAdminOrBarber, wrap(async (req, res) => {
   // doit proposer d'activer sa carte (avec son accord), pas afficher
   // une récompense qui n'existe pas.
   const [loyaltyRows] = await pool.query(
-    'SELECT client_key, rewards_available, activated_at FROM loyalty_accounts WHERE salon_id = ? AND activated_at IS NOT NULL',
+    'SELECT client_key, points, activated_at FROM loyalty_accounts WHERE salon_id = ? AND activated_at IS NOT NULL',
     [req.salon.id]
   );
   const loyaltyByKey = {};
-  loyaltyRows.forEach((l) => { loyaltyByKey[l.client_key] = l.rewards_available; });
+  loyaltyRows.forEach((l) => { loyaltyByKey[l.client_key] = l.points; });
+  const loyaltyT = await thresholdsForSalon(req.salon.id);
 
   rows = rows.map((r) => {
     const key = clientKey(r);
     const activated = key ? Object.prototype.hasOwnProperty.call(loyaltyByKey, key) : false;
     const extra = { loyalty_member: activated };
-    if (activated && loyaltyByKey[key] > 0) extra.loyalty_rewards_available = loyaltyByKey[key];
+    if (activated) {
+      // Remises débloquées, chacune par son propre palier de points.
+      const r = rewardsFor(loyaltyByKey[key], loyaltyT);
+      extra.loyalty_points = loyaltyByKey[key];
+      if (r.service || r.product) extra.loyalty_rewards = r;
+    }
     return Object.assign({}, r, extra);
   });
 

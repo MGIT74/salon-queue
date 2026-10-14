@@ -104,6 +104,14 @@ async function sendAppointmentReminder(salonId, to, info) {
   });
 }
 
+/** Règle des deux paliers (prestation / produit), ou l'ancien palier unique si seul `threshold` est fourni. */
+function loyaltyRuleText(info) {
+  const svc = info.serviceThreshold || info.threshold;
+  const prod = info.productThreshold || info.threshold;
+  if (svc === prod) return `Dès ${svc} points, vous profitez d'une réduction sur une prestation ou un produit, utilisable dès votre prochaine visite.`;
+  return `Dès ${svc} points, vous profitez d'une réduction sur une prestation, et dès ${prod} points d'une réduction sur un produit.`;
+}
+
 async function sendLoyaltyActivation(salonId, to, info) {
   const { tx, from, salon } = await getTransport(salonId);
   await tx.sendMail({
@@ -112,14 +120,10 @@ async function sendLoyaltyActivation(salonId, to, info) {
     subject: 'Votre carte de fidélité est activée — ' + salon,
     text: `Bonjour ${info.clientName},\n\n` +
           `Votre carte de fidélité chez ${salon} vient d'être activée !\n\n` +
-          `À chaque passage réglé, vous gagnez 1 point. Tous les ${info.threshold} points, ` +
-          `vous obtenez une récompense (réduction sur une prestation ou un produit), ` +
-          `utilisable dès votre prochaine visite.\n\n${salon}`,
+          `À chaque passage réglé, vous gagnez 1 point. ${loyaltyRuleText(info)}\n\n${salon}`,
     html: `<p>Bonjour ${h(info.clientName)},</p>` +
           `<p>Votre carte de fidélité chez ${h(salon)} vient d'être activée !</p>` +
-          `<p>À chaque passage réglé, vous gagnez 1 point. Tous les <strong>${h(info.threshold)} points</strong>, ` +
-          `vous obtenez une récompense (réduction sur une prestation ou un produit), ` +
-          `utilisable dès votre prochaine visite.</p>` +
+          `<p>À chaque passage réglé, vous gagnez 1 point. ${h(loyaltyRuleText(info))}</p>` +
           `<p>${h(salon)}</p>`
   });
 }

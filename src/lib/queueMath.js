@@ -32,17 +32,11 @@ async function earnLoyaltyPoint(salonId, row) {
   );
   if (!existing || !existing.activated_at) return;
 
-  const [[salon]] = await pool.query('SELECT owner_id FROM salons WHERE id = ?', [salonId]);
-  const settings = await getOwnerSettings(salon.owner_id);
-  const threshold = Math.max(1, Number(settings.loyalty_threshold) || 10);
-
-  let points = existing.points + 1;
-  let rewards = existing.rewards_available;
-  if (points >= threshold) { points -= threshold; rewards += 1; }
-
+  // Les points s'accumulent : chaque palier (prestation / produit) se débloque en atteignant son propre
+  // nombre de points, et ne retire ses points qu'au moment où la remise est utilisée (voir loyaltyRules.js).
   await pool.query(
-    'UPDATE loyalty_accounts SET points = ?, rewards_available = ?, client_name = ?, updated_at = NOW() WHERE id = ?',
-    [points, rewards, row.client_name, existing.id]
+    'UPDATE loyalty_accounts SET points = points + 1, client_name = ?, updated_at = NOW() WHERE id = ?',
+    [row.client_name, existing.id]
   );
 }
 

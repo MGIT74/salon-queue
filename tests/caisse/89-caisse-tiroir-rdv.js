@@ -34,7 +34,7 @@ let JSDOM = null; try { JSDOM = require('jsdom').JSDOM; } catch (_) { /* absent 
     w.showConfirm = () => Promise.resolve(true); w.showPrompt = () => Promise.resolve(true);
     w.barberApi = (url, o) => {
       calls.push(['api', (o && o.method) || 'GET', url, o && o.body, o && o.actingAs]);
-      if (/client-marketing/.test(url)) return Promise.resolve({ loyalty: { activated: true, points: 7, rewards_available: 1 }, gifts: [{ amount_cents: 1500, used_at: null, items: [{ quantity: 1, item_name: 'Barbe' }] }] });
+      if (/client-marketing/.test(url)) return Promise.resolve({ loyalty: { activated: true, points: 7, rewards: { service: true, product: false }, thresholds: { service: 5, product: 10 } }, gifts: [{ amount_cents: 1500, used_at: null, items: [{ quantity: 1, item_name: 'Barbe' }] }] });
       if (/client-history/.test(url)) return Promise.resolve({ items: [1, 2, 3, 4, 5].map((i) => ({ id: 'h' + i, checkin_at: '2026-09-0' + i + 'T10:00:00Z', service_name: 'Coupe', total_price_cents: 2500, status: 'done', source: i % 2 ? 'online' : 'walkin', start_at: '2026-09-0' + i + 'T10:00:00Z', end_at: '2026-09-0' + i + 'T10:30:00Z' })) });
       if (/availability/.test(url)) return Promise.resolve({ slots: [{ time: '10:00' }, { time: '15:30' }] });
       if (/lookup/.test(url)) return Promise.resolve({ item: Object.assign({}, APPT, { promoted_queue_id: 'q-rdv' }) });
@@ -53,7 +53,7 @@ let JSDOM = null; try { JSDOM = require('jsdom').JSDOM; } catch (_) { /* absent 
     check('Deplacer + Annuler le RDV visibles', $('ad-actions').style.display === 'flex');
     check('RDV pas encore dans la file : pas de crayon, note non modifiable', $('ad-edit-btn').style.display === 'none' && /entrera dans la file/.test($('ad-note-box').textContent));
     await tick();
-    check('Tiroir : fidelite + cadeau affiches (comme l\'admin)', $('ad-marketing-section').style.display === 'block' && /7 points/.test($('ad-marketing-content').textContent) && /1 récompense/.test($('ad-marketing-content').textContent) && /Cadeau disponible/.test($('ad-marketing-content').textContent));
+    check('Tiroir : fidelite + cadeau affiches (comme l\'admin)', $('ad-marketing-section').style.display === 'block' && /7 points/.test($('ad-marketing-content').textContent) && /Remise disponible/.test($('ad-marketing-content').textContent) && /3 points avant la remise \(10\)/.test($('ad-marketing-content').textContent) && /Cadeau disponible/.test($('ad-marketing-content').textContent));
     check('Tiroir : historique (RDV futur -> par contact), 5 passages dont 4 affiches', /5 passages au total/.test($('ad-visit-count').textContent) && $('ad-visits').querySelectorAll('.ad-visit-row').length === 4 && calls.some((c) => c[0] === 'api' && /client-history-by-contact\?/.test(c[2])));
     w.closeApptDrawer();
     check('✕ ferme le tiroir', !drawer());

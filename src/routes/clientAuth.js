@@ -1,4 +1,5 @@
 const express = require('express');
+const { thresholdsForSalon, rewardsFor } = require('../lib/loyaltyRules');
 const { safeBaseUrl } = require('../lib/safeUrl');
 const crypto = require('crypto');
 const { pool, getSettings } = require('../db');
@@ -287,7 +288,8 @@ router.get('/me', requireClient, wrap(async (req, res) => {
     profile: { name: c.name, email: c.email, phone: c.phone },
     relatives: relativeRows,
     loyalty_activated: loyaltyActivated,
-    loyalty: loyaltyActivated ? { points: loyalty.points, rewards_available: loyalty.rewards_available } : null,
+    loyalty: loyaltyActivated ? Object.assign({ points: loyalty.points, rewards_available: loyalty.rewards_available },
+      await (async () => { const t = await thresholdsForSalon(c.salon_id); return { thresholds: t, rewards: rewardsFor(loyalty.points, t) }; })()) : null,
     upcoming_appointments: upcomingAppointments,
     recent_visits: recentVisits,
     gift_cards: giftCards.map((g) => {

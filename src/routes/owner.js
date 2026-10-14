@@ -1,4 +1,5 @@
 const express = require('express');
+const { thresholdsFrom, thresholdsForOwner, rewardsFor } = require('../lib/loyaltyRules');
 const crypto = require('crypto');
 const { pool, utcIso, getOwnerSettings, setOwnerSettings } = require('../db');
 const { slugTaken } = require('../lib/slugs');
@@ -289,6 +290,8 @@ router.put('/password', requireAdmin, wrap(async (req, res) => {
 
 const DEFAULT_MARKETING_SETTINGS = {
   loyalty_threshold: 10,
+  loyalty_service_threshold: 10,
+  loyalty_product_threshold: 10,
   loyalty_service_discount_pct: 50,
   loyalty_product_discount_pct: 20
 };
@@ -304,6 +307,10 @@ router.get('/marketing-settings', requireAdminOrBarber, wrap(async (req, res) =>
   Object.keys(DEFAULT_MARKETING_SETTINGS).forEach((k) => {
     out[k] = raw[k] !== undefined ? Number(raw[k]) : DEFAULT_MARKETING_SETTINGS[k];
   });
+  // Paliers jamais réglés : ils reprennent l'ancien palier unique (aucun changement pour le salon).
+  const t = thresholdsFrom(raw);
+  out.loyalty_service_threshold = t.service;
+  out.loyalty_product_threshold = t.product;
   res.json({ ok: true, settings: out });
 }));
 
@@ -316,9 +323,13 @@ router.put('/marketing-settings', requireAdmin, wrap(async (req, res) => {
   if (Object.values(updates).some((n) => !Number.isFinite(n))) {
     return res.status(400).json({ error: 'Valeur invalide' });
   }
-  if (updates.loyalty_threshold !== undefined && updates.loyalty_threshold < 1) {
-    return res.status(400).json({ error: 'Le seuil doit être au moins 1 passage' });
+  for (const k of ['loyalty_threshold', 'loyalty_service_threshold', 'loyalty_product_threshold']) {
+    if (updates[k] !== undefined && (updates[k] < 1 || !Number.isInteger(updates[k]))) {
+      return res.status(400).json({ error: 'Le nombre de points doit être un entier d\'au moins 1' });
+    }
   }
+  // L'ancien palier unique suit le palier prestation (email d'activation, anciens écrans).
+  if (updates.loyalty_service_threshold !== undefined) updates.loyalty_threshold = updates.loyalty_service_threshold;
   for (const k of ['loyalty_service_discount_pct', 'loyalty_product_discount_pct']) {
     if (updates[k] !== undefined && (updates[k] < 0 || updates[k] > 100)) {
       return res.status(400).json({ error: 'Le pourcentage doit être entre 0 et 100' });
@@ -432,9 +443,12 @@ router.get('/loyalty-accounts', requireAdmin, wrap(async (req, res) => {
     'WHERE salon_id = ? AND activated_at IS NOT NULL ORDER BY updated_at DESC LIMIT 300',
     [req.salon.id]
   );
+  const loyaltyT = await thresholdsForOwner(req.ownerId);
   res.json({
     ok: true,
+    thresholds: loyaltyT,
     items: rows.map((r) => Object.assign({}, r, {
+      rewards: rewardsFor(r.points, loyaltyT),
       activated_at: utcIso(r.activated_at),
       updated_at: utcIso(r.updated_at)
     }))
@@ -519,9 +533,8 @@ router.post('/loyalty-accounts/activate', requireAdminOrBarber, wrap(async (req,
   }
 
   try {
-    const settings = await getOwnerSettings(req.ownerId);
-    const threshold = Math.max(1, Number(settings.loyalty_threshold) || 10);
-    await sendLoyaltyActivation(req.salon.id, email, { clientName, threshold });
+    const t = await thresholdsForOwner(req.ownerId);
+    await sendLoyaltyActivation(req.salon.id, email, { clientName, serviceThreshold: t.service, productThreshold: t.product });
   } catch (err) {
     console.error('[fidélité] envoi email d\'activation échoué:', err.message);
   }
@@ -566,11 +579,14 @@ router.get('/client-marketing', requireAdminOrBarber, wrap(async (req, res) => {
     };
   });
 
+  const loyaltyT = await thresholdsForOwner(req.ownerId);
   res.json({
     ok: true,
     loyalty: loyalty ? {
       points: loyalty.points,
       rewards_available: loyalty.rewards_available,
+      rewards: rewardsFor(loyalty.points, loyaltyT),
+      thresholds: loyaltyT,
       activated: Boolean(loyalty.activated_at)
     } : null,
     gifts: relevantGifts

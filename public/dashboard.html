@@ -1705,11 +1705,12 @@
   <div class="tab-panel" id="t-marketing">
     <div class="card-box">
       <h3>Programme de fidélité</h3>
-      <p class="hint">Cumulé au niveau de l'enseigne — un client gagne 1 point par passage payé, sur n'importe lequel de vos salons.</p>
+      <p class="hint">Cumulé au niveau de l'enseigne — un client gagne 1 point par passage payé, sur n'importe lequel de vos salons. La remise prestation et la remise produit ont chacune leur propre nombre de points à atteindre ; utiliser une remise retire ses points.</p>
       <div class="grid2">
-        <div class="fld"><label for="mk-threshold">Passages requis pour une récompense</label>
-          <input id="mk-threshold" type="number" min="1" value="10"></div>
-        <div></div>
+        <div class="fld"><label for="mk-threshold">Points à atteindre — remise prestation</label>
+          <input id="mk-threshold" type="number" min="1" step="1" value="10"></div>
+        <div class="fld"><label for="mk-product-threshold">Points à atteindre — remise produit</label>
+          <input id="mk-product-threshold" type="number" min="1" step="1" value="10"></div>
       </div>
       <div class="grid2">
         <div class="fld"><label for="mk-service-pct">Remise sur une prestation (%)</label>
@@ -1791,7 +1792,7 @@
       <div class="item" id="loyalty-list-head" style="background:none;box-shadow:none;border-radius:0;margin-bottom:0;padding:0 4px">
         <div class="item-main">
           <div class="loyalty-info-grid loyalty-info-head">
-            <div class="f">Email</div><div class="f">Points</div><div class="f">Récompenses</div>
+            <div class="f">Email</div><div class="f">Points</div><div class="f">Remises disponibles</div>
             <div class="f">Activé le</div><div class="f">Dernière activité</div>
           </div>
         </div>
@@ -3807,6 +3808,17 @@ function openClientDrawer(id, source, directData) {
   }).catch(function (e) { toast(e.message, true); });
 }
 
+/** Les deux paliers (prestation / produit) : disponible, ou combien de points il manque. */
+function loyaltyTiersHtml(l) {
+  var t = l.thresholds, rw = l.rewards || {};
+  if (!t) return '';
+  var row = function (label, ok, need) {
+    return '<div class="detail-row"><span class="detail-label">' + label + '</span><span class="detail-value" style="color:' + (ok ? 'var(--green)' : 'var(--grey)') + '">' +
+      (ok ? 'Remise disponible' : (need - l.points) + ' point' + (need - l.points > 1 ? 's' : '') + ' avant la remise (' + need + ')') + '</span></div>';
+  };
+  return row('Remise prestation', rw.service, t.service) + row('Remise produit', rw.product, t.product);
+}
+
 function renderDrawerMarketing(r) {
   var parts = [];
 
@@ -3814,8 +3826,7 @@ function renderDrawerMarketing(r) {
     parts.push(
       '<div class="detail-row"><span class="detail-label">⭐ Fidélité</span><span class="detail-value">' +
       r.loyalty.points + ' point' + (r.loyalty.points > 1 ? 's' : '') +
-      (r.loyalty.rewards_available > 0 ? ' · ' + r.loyalty.rewards_available + ' récompense' + (r.loyalty.rewards_available > 1 ? 's' : '') + ' disponible' + (r.loyalty.rewards_available > 1 ? 's' : '') : '') +
-      '</span></div>'
+      '</span></div>' + loyaltyTiersHtml(r.loyalty)
     );
   } else {
     parts.push('<div class="hint" style="margin:0 0 4px">Carte de fidélité non activée</div>');
@@ -5617,7 +5628,8 @@ var giftsPage = 1, giftsPerPage = 10;
 
 function loadMarketingTab() {
   api('/api/owner/marketing-settings').then(function (r) {
-    document.getElementById('mk-threshold').value = r.settings.loyalty_threshold;
+    document.getElementById('mk-threshold').value = r.settings.loyalty_service_threshold || r.settings.loyalty_threshold;
+    document.getElementById('mk-product-threshold').value = r.settings.loyalty_product_threshold || r.settings.loyalty_threshold;
     document.getElementById('mk-service-pct').value = r.settings.loyalty_service_discount_pct;
     document.getElementById('mk-product-pct').value = r.settings.loyalty_product_discount_pct;
   }).catch(function (e) { toast(e.message, true); });
@@ -5701,7 +5713,8 @@ function renderLoyaltyAccountsList() {
         var infoGrid = [
           '<div class="f"><b>' + esc(a.recipient_email || a.client_key || '—') + '</b></div>',
           '<div class="f"><b>' + a.points + '</b></div>',
-          '<div class="f">' + (a.rewards_available > 0 ? '<b>' + a.rewards_available + ' disponible' + (a.rewards_available > 1 ? 's' : '') + '</b>' : '') + '</div>',
+          '<div class="f">' + (a.rewards && (a.rewards.service || a.rewards.product)
+            ? '<b>' + [a.rewards.service ? 'Prestation' : '', a.rewards.product ? 'Produit' : ''].filter(Boolean).join(' + ') + '</b>' : '') + '</div>',
           '<div class="f"><b>' + fmtDate(a.activated_at) + '</b></div>',
           '<div class="f"><b>' + fmtDate(a.updated_at) + '</b></div>'
         ].join('');
@@ -5829,13 +5842,15 @@ function resendGiftCode(giftId) {
 
 function saveMarketingSettings() {
   var threshold = Number(document.getElementById('mk-threshold').value);
+  var productThreshold = Number(document.getElementById('mk-product-threshold').value);
   var servicePct = Number(document.getElementById('mk-service-pct').value);
   var productPct = Number(document.getElementById('mk-product-pct').value);
 
   api('/api/owner/marketing-settings', {
     method: 'PUT',
     body: {
-      loyalty_threshold: threshold,
+      loyalty_service_threshold: threshold,
+      loyalty_product_threshold: productThreshold,
       loyalty_service_discount_pct: servicePct,
       loyalty_product_discount_pct: productPct
     }

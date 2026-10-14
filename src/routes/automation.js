@@ -1,4 +1,5 @@
 const express = require('express');
+const { thresholdsForSalon, rewardsFor } = require('../lib/loyaltyRules');
 const { pool, getSettings } = require('../db');
 const requireAutomationKey = require('../middleware/automationAuth');
 const { computeSlotsForBarber, nowInParis, nowParisDatetimeString, parisLocalToUtcDate } = require('./appointments');
@@ -719,6 +720,7 @@ router.get('/salons/:id/client-gifts-loyalty', requireAutomationKey, wrap(async 
       client_name: loyalty.client_name,
       points: loyalty.points,
       rewards_available: loyalty.rewards_available,
+      rewards_unlocked: rewardsFor(loyalty.points, await thresholdsForSalon(salonId)),
       card_activated: Boolean(loyalty.activated_at)
     } : null
   });

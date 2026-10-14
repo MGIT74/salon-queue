@@ -132,6 +132,9 @@ applySchema({ attempts: 3, delayMs: 2000 })
   .then((r) => console.log('[schema] base a jour (' + r.tables + ' tables dans ' + r.database + ')'))
   .catch((e) => console.error('[schema] ATTENTION - schema NON applique automatiquement (' + e.message + '). ' +
     'Des colonnes recentes peuvent manquer : lancez  bash scripts/run-migration.sh  puis redemarrez.'))
+  .then(() => require('./src/lib/loyaltyRules').convertLegacyRewards()
+    .then((n) => { if (n) console.log('[fidelite] ' + n + ' ancienne(s) recompense(s) reconvertie(s) en points'); })
+    .catch((e) => console.error('[fidelite] reconversion des anciennes recompenses echouee : ' + e.message)))
   .then(startServer);
 
 function startServer() {

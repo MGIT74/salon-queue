@@ -987,7 +987,7 @@ var ticketQueueId = null; // coupe d'origine si le ticket vient d'un encaissemen
 var ticketMode = null;
 var ticketModeName = '';
 var ticketDrafts = {}; // { [barberId]: { ticket, ticketQueueId, loyaltyDiscount, loyaltyRewardsAvailable } } - brouillon du ticket en cours de chaque coiffeur, gardé le temps de la session tablette (en mémoire, pas côté serveur)
-var loyaltyRewardsAvailable = 0; // récompenses dispo pour le client du ticket en cours
+var loyaltyRewardsAvailable = null; // remises fidélité débloquées pour le client du ticket : { service: bool, product: bool } (chacune a son propre palier de points)
 var loyaltyDiscount = null; // { index, originalPrice, type } si une réduction fidélité est appliquée
 var marketingSettings = { loyalty_service_discount_pct: 50, loyalty_product_discount_pct: 20 };
 var pendingPayments = [];
@@ -2376,9 +2376,7 @@ function adRenderMarketing(r) {
   var parts = [];
   if (r.loyalty && r.loyalty.activated) {
     parts.push('<div class="detail-row"><span class="detail-label">⭐ Fidélité</span><span class="detail-value">' +
-      r.loyalty.points + ' point' + (r.loyalty.points > 1 ? 's' : '') +
-      (r.loyalty.rewards_available > 0 ? ' · ' + r.loyalty.rewards_available + ' récompense' + (r.loyalty.rewards_available > 1 ? 's' : '') + ' disponible' + (r.loyalty.rewards_available > 1 ? 's' : '') : '') +
-      '</span></div>');
+      r.loyalty.points + ' point' + (r.loyalty.points > 1 ? 's' : '') + '</span></div>' + loyaltyTiersHtml(r.loyalty));
   } else {
     parts.push('<div class="hint" style="margin:0 0 4px">Carte de fidélité non activée</div>');
   }
@@ -2390,6 +2388,17 @@ function adRenderMarketing(r) {
   });
   document.getElementById('ad-marketing-content').innerHTML = parts.join('');
   document.getElementById('ad-marketing-section').style.display = 'block';
+}
+
+/** Les deux paliers (prestation / produit) : disponible, ou combien de points il manque. */
+function loyaltyTiersHtml(l) {
+  var t = l.thresholds, rw = l.rewards || {};
+  if (!t) return '';
+  var row = function (label, ok, need) {
+    return '<div class="detail-row"><span class="detail-label">' + label + '</span><span class="detail-value" style="color:' + (ok ? 'var(--green)' : 'var(--grey)') + '">' +
+      (ok ? 'Remise disponible' : (need - l.points) + ' point' + (need - l.points > 1 ? 's' : '') + ' avant la remise (' + need + ')') + '</span></div>';
+  };
+  return row('Remise prestation', rw.service, t.service) + row('Remise produit', rw.product, t.product);
 }
 
 function adSourceIcon(v) {
@@ -3400,8 +3409,10 @@ function renderPendingList() {
         : '<div class="lock-note" style="color:var(--grey)">ℹ️ Rappel : cadeau non réclamé en attente (sans rapport avec cette venue)</div>' +
           (giftItemsList ? '<div class="meta" style="color:var(--grey)">' + esc(giftItemsList) + '</div>' : '');
     }
-    var loyaltyNote = q.loyalty_rewards_available
-      ? '<div class="lock-note" style="color:var(--blue)">⭐ Fidélité disponible</div>'
+    var lr = q.loyalty_rewards;
+    var loyaltyNote = lr && (lr.service || lr.product)
+      ? '<div class="lock-note" style="color:var(--blue)">⭐ Fidélité : remise ' +
+        (lr.service && lr.product ? 'prestation ou produit' : (lr.service ? 'prestation' : 'produit')) + ' disponible</div>'
       : '';
     var explicitGift = Boolean(q.gift_card && q.gift_card.explicit);
     var displayAmount = explicitGift ? q.gift_card.amount_cents : q.total_price_cents;
@@ -3516,7 +3527,7 @@ function usePendingForTicket(queueId) {
   });
   ticketQueueId = queueId;
   ticketMode = null;
-  loyaltyRewardsAvailable = q.loyalty_rewards_available || 0;
+  loyaltyRewardsAvailable = q.loyalty_rewards || null;
   loyaltyDiscount = null;
   renderTicket();
   toast('Ticket de ' + q.client_name + ' chargé — choisissez le paiement');
@@ -3575,7 +3586,7 @@ function useAdvanceForTicket(queueId) {
   ticketQueueId = queueId;
   ticketMode = 'advance';
   ticketModeName = q.client_name;
-  loyaltyRewardsAvailable = q.loyalty_rewards_available || 0;
+  loyaltyRewardsAvailable = q.loyalty_rewards || null;
   loyaltyDiscount = null;
   renderTicket();
   toast('Ticket de ' + q.client_name + ' chargé (paiement d\'avance) — choisissez le paiement');
@@ -3827,11 +3838,15 @@ function setLineSeller(index, barberId) {
 // construit à la main sans identité de client connue.
 function updateLoyaltyVisibility() {
   var section = document.getElementById('loyalty-section');
-  var show = ticket.length > 0 && ticketQueueId && loyaltyRewardsAvailable > 0;
+  var lr = loyaltyRewardsAvailable || {};
+  var show = ticket.length > 0 && ticketQueueId && ticketMode !== 'balance' && Boolean(lr.service || lr.product);
   section.style.display = show ? 'block' : 'none';
   if (show) {
     var hasService = ticket.some(function (l) { return l.item_type === 'service'; });
     var hasProduct = ticket.some(function (l) { return l.item_type === 'product'; });
+    // Chaque remise n'apparaît que si son propre palier de points est atteint.
+    document.getElementById('loyalty-btn-service').style.display = lr.service ? '' : 'none';
+    document.getElementById('loyalty-btn-product').style.display = lr.product ? '' : 'none';
     document.getElementById('loyalty-btn-service').disabled = !hasService && !(loyaltyDiscount && loyaltyDiscount.type === 'service');
     document.getElementById('loyalty-btn-product').disabled = !hasProduct && !(loyaltyDiscount && loyaltyDiscount.type === 'product');
     document.getElementById('loyalty-btn-service').classList.toggle('btn-primary', loyaltyDiscount && loyaltyDiscount.type === 'service');
@@ -3931,7 +3946,7 @@ function pay(method, cashCents) {
   var total = ticketTotal();
   var soldTicket = ticket.slice();
   var linkedQueueId = ticketQueueId;
-  var usedLoyalty = Boolean(loyaltyDiscount);
+  var usedLoyalty = loyaltyDiscount ? loyaltyDiscount.type : false; // 'service' ou 'product' : le serveur retire les points de CE palier
   var saleCtx = { method: method, cashCents: method === 'partage' ? cashCents : null, chargeCents: method === 'partage' ? total - cashCents : total, total: total, soldTicket: soldTicket, linkedQueueId: linkedQueueId, gift: gift, usedLoyalty: usedLoyalty, requestId: newRequestId(), ticketMode: ticketMode, ticketModeName: ticketModeName };
 
   if (method === 'cb') {
