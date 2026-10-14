@@ -49,7 +49,7 @@
 <style>
   html.auth-checking #login { display: none; }
 </style>
-<link rel="stylesheet" href="/app.css?v=25">
+<link rel="stylesheet" href="/app.css?v=26">
 <style>
   .wrap { max-width: none; margin: 0; padding: clamp(16px,1.8vw,28px); }
 
@@ -1852,7 +1852,7 @@
       <p class="hint">Chaque vente encaissée, avec le coiffeur, les prestations/produits et le tarif.</p>
       <div class="grid2" style="margin-bottom:12px">
         <div class="fld" style="margin:0"><label for="sales-detail-from">Du</label>
-          <input type="date" id="sales-detail-from" onchange="onSalesDetailFilterChange()"></div>
+          <input type="date" id="sales-detail-from" data-range-to="sales-detail-to" onchange="onSalesDetailFilterChange()"></div>
         <div class="fld" style="margin:0"><label for="sales-detail-to">Au</label>
           <input type="date" id="sales-detail-to" onchange="onSalesDetailFilterChange()"></div>
       </div>
@@ -1879,7 +1879,7 @@
       <div class="accordion-body" id="closings-body" style="display:none">
       <div class="grid2" style="margin-bottom:12px">
         <div class="fld" style="margin:0"><label for="closings-from">Du</label>
-          <input type="date" id="closings-from" onchange="onClosingsFilterChange()"></div>
+          <input type="date" id="closings-from" data-range-to="closings-to" onchange="onClosingsFilterChange()"></div>
         <div class="fld" style="margin:0"><label for="closings-to">Au</label>
           <input type="date" id="closings-to" onchange="onClosingsFilterChange()"></div>
       </div>
@@ -2037,7 +2037,7 @@
           <select id="rdv-filter-barber" onchange="onRdvFilterChange()"><option value="">Tous</option></select>
         </div>
         <div class="fld"><label for="rdv-filter-from">Du</label>
-          <input type="date" id="rdv-filter-from" onchange="onRdvFilterChange()"></div>
+          <input type="date" id="rdv-filter-from" data-range-to="rdv-filter-to" onchange="onRdvFilterChange()"></div>
         <div class="fld"><label for="rdv-filter-to">Au</label>
           <input type="date" id="rdv-filter-to" onchange="onRdvFilterChange()"></div>
       </div>
@@ -2107,7 +2107,7 @@
     </div>
 
     <div class="clients-toolbar">
-      <div class="fld" style="margin:0"><label for="client-date-from">Du</label><input id="client-date-from" type="date" onchange="applyClientDateFilter()"></div>
+      <div class="fld" style="margin:0"><label for="client-date-from">Du</label><input id="client-date-from" type="date" data-range-to="client-date-to" onchange="applyClientDateFilter()"></div>
       <div class="fld" style="margin:0"><label for="client-date-to">Au</label><input id="client-date-to" type="date" onchange="applyClientDateFilter()"></div>
       <button class="btn btn-ghost" onclick="clearClientDateFilter()">Réinitialiser</button>
       <div class="fld" style="margin:0"><label for="client-per-page">Par page</label>
@@ -2679,6 +2679,7 @@
 </div>
 
 <script src="/app.js?v=17"></script>
+<script src="/daterange.js?v=1"></script>
 <script>
   // Le lien "Creer mon salon" n'a de sens que si l'inscription est ouverte sur
   // cette installation (fermee chez un client unique). Masque par defaut : s'il
@@ -4925,7 +4926,7 @@ function renderStatsCtl(b) {
   var todayStr = nowSalonDatetimeString().slice(0, 10);
   return st.period === 'range'
     ? '<div class="stats-range-picker">' +
-      '<div class="fld"><label>Du</label><input type="date" id="stats-from-' + b.id + '" value="' + (st.customFrom || todayStr) + '" onchange="setStatsRange(\'' + b.id + '\')"></div>' +
+      '<div class="fld"><label>Du</label><input type="date" id="stats-from-' + b.id + '" data-range-to="stats-to-' + b.id + '" value="' + (st.customFrom || todayStr) + '" onchange="setStatsRange(\'' + b.id + '\')"></div>' +
       '<div class="fld"><label>Au</label><input type="date" id="stats-to-' + b.id + '" value="' + (st.customTo || todayStr) + '" onchange="setStatsRange(\'' + b.id + '\')"></div>' +
       '</div>'
     : '<div class="stats-nav">' +
@@ -8877,7 +8878,7 @@ function openAddSalonClosure() {
   var todayStr = nowSalonDatetimeString().slice(0, 10);
   var overlay = _buildModal(
     '<div class="modal-title">Ajouter une fermeture</div>' +
-    '<div class="fld"><label>Du</label><input type="date" id="asc-from" value="' + todayStr + '"></div>' +
+    '<div class="fld"><label>Du</label><input type="date" id="asc-from" data-range-to="asc-to" value="' + todayStr + '"></div>' +
     '<div class="fld"><label>Au</label><input type="date" id="asc-to" value="' + todayStr + '"></div>' +
     '<div class="fld"><label>Motif (optionnel)</label><input type="text" id="asc-reason" placeholder="Ex: jour férié, fermeture exceptionnelle…"></div>' +
     '<div style="display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 14px;background:var(--fill);border-radius:12px;margin-bottom:16px;cursor:pointer" onclick="ascToggleSendEmail()">' +
