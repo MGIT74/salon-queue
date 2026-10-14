@@ -1512,7 +1512,7 @@ function selectActiveBarber(barberId) {
 /** Texte de l'écran « Caisse fermée » : raison (ouverture, fermeture automatique, clôture Z en attente) + réouverture prévue. */
 function caisseLockText(d) {
   var msg = d.caisse_lock_message || 'Caisse fermée.';
-  if (d.caisse_locked_until && d.caisse_locked_until !== 'z_pending') {
+  if (d.caisse_locked_until && d.caisse_locked_until !== 'z_pending' && d.caisse_lock_reason !== 'before_open') {
     var when = new Date(d.caisse_locked_until).toLocaleString('fr-FR', { weekday: 'long', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
     msg += ' Réouverture prévue le ' + when + '.';
   }
@@ -1529,6 +1529,10 @@ function refreshCaisseLockState() {
       if (d.caisse_locked_until) {
         document.getElementById('caisse-closed-reopen-text').textContent = caisseLockText(d);
         panel.classList.add('day-closed');
+        // Caisse fermée (fermeture automatique, Z en attente, avant l'ouverture) : la session du coiffeur se
+        // termine et la tablette revient à l'écran « Caisse fermée ». À l'ouverture, il faudra donc TOUJOURS
+        // retaper un code PIN (comme avant, quand le Z fait sur la tablette ramenait à l'écran de départ).
+        if (me && !paymentInFlight) { logout(); showLoginOrLocked(); }
       } else {
         panel.classList.remove('day-closed');
       }
@@ -3240,6 +3244,8 @@ function forceOpenCaisse() {
     .then(function (r) { return r.json(); })
     .then(function (d) {
       if (d.caisse_locked_until) {
+        // Session gardée d'avant la fermeture : effacée, le code PIN sera redemandé à l'ouverture.
+        try { sessionStorage.removeItem('caisse-session'); } catch (e) {}
         document.documentElement.classList.remove('auth-checking');
         document.getElementById('locked-reopen-text').textContent = caisseLockText(d);
         document.getElementById('login-card-normal').style.display = 'none';

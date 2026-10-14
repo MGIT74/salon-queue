@@ -91,6 +91,7 @@ const sell = () => api('POST', '/api/sales', { payment_method: 'especes', items:
   const caisse = fs.readFileSync(__dirname + '/../../public/caisse.html', 'utf8');
   const dash = fs.readFileSync(__dirname + '/../../public/dashboard.html', 'utf8');
   check('caisse : onglet Cloture retire, message de verrouillage du serveur affiche', /id="nav-cloture" onclick="switchCaisseTab\('cloture'\)" style="display:none"/.test(caisse) && (caisse.match(/caisseLockText\(d\)/g) || []).length >= 3);
+  check('caisse fermee pendant une session : deconnexion, le code PIN sera redemande a l\'ouverture', /if \(me && !paymentInFlight\) \{ logout\(\); showLoginOrLocked\(\); \}/.test(caisse) && /sessionStorage\.removeItem\('caisse-session'\); \} catch \(e\) \{\}\n        document\.documentElement\.classList\.remove\('auth-checking'\);/.test(caisse));
   check('dashboard : 2 interrupteurs + 2 heures, plus de « deconnexion automatique »', /id="caisse-open-switch"/.test(dash) && /id="caisse-close-switch"/.test(dash) && /id="caisse-open-hour"/.test(dash) && /id="caisse-close-hour"/.test(dash) && !/id="caisse-inactivity"/.test(dash));
 
   sql("DELETE FROM sales; DELETE FROM cash_closings; DELETE FROM settings WHERE salon_id='s1' AND \\`key\\` LIKE 'caisse_%'");
