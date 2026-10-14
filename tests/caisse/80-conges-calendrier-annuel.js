@@ -14,4 +14,5 @@ check('Echap et clic en dehors ferment la bulle', /e\.key !== 'Escape'/.test(das
 check('serveur : POST /:id/leaves/days (coiffeur du salon, transaction)', /router\.post\('\/:id\/leaves\/days'/.test(br) && /beginTransaction/.test(br) && /owned/.test(br));
 check('base : colonne barber_leaves.repeat_yearly', /column_name = 'repeat_yearly'/.test(sql));
 check('glisse vertical : cases vides / en-tete du mois = jour le plus proche (jamais de selection qui s\'arrete court)', /function lvDateUnder\(el\)/.test(dash) && /data-edge="first"/.test(dash) && /data-edge="last"/.test(dash) && /var b = lvDateUnder\(e\.target\)/.test(dash));
+check('glisse vertical : seulement la colonne du jour de depart (tous les lundis), horizontal = jours entre', /var vertical = Math\.abs\(e\.clientY - st\.ay\) > Math\.abs\(e\.clientX - st\.ax\)/.test(dash) && /getUTCDay\(\) === wd/.test(dash));
 console.log('\n' + pass + ' OK, ' + fail + ' ECHEC'); process.exit(fail ? 1 : 0);

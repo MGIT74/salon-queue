@@ -4766,7 +4766,7 @@ function renderStatsTab(b) {
 }
 
 function renderLeavesTab(b) {
-  return '<p class="hint" style="margin:0 0 12px">Cliquez sur un jour, ou <strong>glissez la souris</strong> sur plusieurs jours, puis cochez « En congé ». Les jours en congé ne sont plus proposés à la réservation.</p>' +
+  return '<p class="hint" style="margin:0 0 12px">Cliquez sur un jour, ou <strong>glissez la souris</strong> sur plusieurs jours (en vertical : tous les mêmes jours de la semaine, ex. tous les lundis), puis cochez « En congé ». Les jours en congé ne sont plus proposés à la réservation.</p>' +
     '<div class="lv-year" id="leaves-list-' + b.id + '"><div class="empty">Chargement…</div></div>';
 }
 
@@ -5083,7 +5083,7 @@ function lvBind(id, box) {
     var cell = e.target.closest('.lv-day');
     if (!cell) return;
     e.preventDefault();
-    st.dragging = true; st.anchor = cell.getAttribute('data-d'); st.sel = [st.anchor];
+    st.dragging = true; st.anchor = cell.getAttribute('data-d'); st.sel = [st.anchor]; st.ax = e.clientX; st.ay = e.clientY;
     lvPaintSel(id, box);
     lvHideBubble(id);
   };
@@ -5092,9 +5092,17 @@ function lvBind(id, box) {
     var b = lvDateUnder(e.target);
     if (!b) return;
     var a = st.anchor;
+    // Glissé surtout VERTICAL : on ne prend que la colonne du jour de départ (ex. tous les lundis) ;
+    // sinon (horizontal / en biais) : tous les jours entre les deux, dans l'ordre du calendrier.
+    var vertical = Math.abs(e.clientY - st.ay) > Math.abs(e.clientX - st.ax) && a !== b;
+    var wd = new Date(a + 'T00:00:00Z').getUTCDay();
     if (b < a) { var t = a; a = b; b = t; }
     var out = [], d = a, n = 0;
-    while (d <= b && n++ < 400) { out.push(d); d = lvAddDays(d, 1); }
+    while (d <= b && n++ < 400) {
+      if (!vertical || new Date(d + 'T00:00:00Z').getUTCDay() === wd) out.push(d);
+      d = lvAddDays(d, 1);
+    }
+    if (!out.length) out = [st.anchor];
     st.sel = out;
     lvPaintSel(id, box);
   };
