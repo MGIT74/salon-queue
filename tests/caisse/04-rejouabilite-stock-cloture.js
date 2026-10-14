@@ -53,7 +53,7 @@ const uuid = () => require('crypto').randomUUID();
   console.log(sql("SELECT COUNT(*), MIN(ticket_number), MAX(ticket_number), COUNT(DISTINCT ticket_number) FROM sales WHERE salon_id='s1'"), '(nb, min, max, distincts)');
 
   console.log('\n=== I8  cloture puis message de fermeture (heure de Paris attendue)');
-  r = await api('POST','/api/owner/caisse/close',{ starting_cash_cents: 20000, closed_by_barber_id:'b1' });
+  r = await api('POST','/api/owner/caisse/close',{ starting_cash_cents: 20000, closed_by_barber_id:'b1' }, Object.assign({}, H, { 'X-Admin-Password': 'adminpw' }));
   console.log('close :', r.status, JSON.stringify(r.body));
   r = await api('POST','/api/sales',{ payment_method:'cb', items:[it()] });
   console.log(r.status, r.body.error);

@@ -1,7 +1,7 @@
 const express = require('express');
 const { thresholdsForSalon } = require('../lib/loyaltyRules');
 const crypto = require('crypto');
-const { pool, utcIso, getSettings, getCaisseLockedUntil, caisseDayStartUtc } = require('../db');
+const { pool, utcIso, getSettings, getCaisseLock, caisseDayStartUtc } = require('../db');
 const { getVatRates, rateForItem, TABLES: VAT_TABLES } = require('../lib/vat');
 const { clientKey, earnLoyaltyPoint } = require('../lib/queueMath');
 const { sendGiftConfirmation } = require('../lib/mailer');
@@ -131,14 +131,14 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
       // 1. La caisse peut être verrouillée jusqu'au lendemain suite à une
       // clôture — vérifié ici côté serveur (pas seulement visuellement).
       const settings = await getSettings(req.salon.id, db);
-      const lockedUntil = await getCaisseLockedUntil(req.salon.id, settings, db);
-      if (lockedUntil) {
-        throw new HttpError(423,
-          'La caisse est fermée suite à une clôture — réouverture prévue le ' +
-          new Date(lockedUntil).toLocaleString('fr-FR', {
+      const lock = await getCaisseLock(req.salon.id, settings, db);
+      if (lock) {
+        throw new HttpError(423, lock.until
+          ? lock.message + ' Réouverture prévue le ' + lock.until.toLocaleString('fr-FR', {
             day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
             timeZone: settings.timezone || 'Europe/Paris'
-          }) + '.');
+          }) + '.'
+          : lock.message);
       }
 
       // 2. Client en attente d'encaissement : appartient à ce coiffeur, pas

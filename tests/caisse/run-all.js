@@ -113,7 +113,8 @@ const suite = [
   ['90-actualisation-discrete.js', false, ['exit']],
   ['91-audit-securite.js', false, ['exit']],
   ['92-encaissement-avance.js', true, ['exit']],
-  ['93-fidelite-deux-paliers.js', true, ['exit']]
+  ['93-fidelite-deux-paliers.js', true, ['exit']],
+  ['94-horaires-caisse.js', true, ['exit']]
 ];
 
 let bad = 0;

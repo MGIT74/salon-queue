@@ -40,7 +40,7 @@ const line = (t) => console.log('\n=== ' + t);
   line('C1  cloture Z : coherence des totaux');
   r = await api('GET','/api/owner/caisse/current-period');
   console.log('periode en cours :', JSON.stringify(r.body).slice(0, 220));
-  r = await api('POST','/api/owner/caisse/close',{ starting_cash_cents: 20000, closed_by_barber_id: 'b1' });
+  r = await api('POST','/api/owner/caisse/close',{ starting_cash_cents: 20000, closed_by_barber_id: 'b1' }, Object.assign({}, H, { 'X-Admin-Password': 'adminpw' }));
   console.log('close ->', r.status, JSON.stringify(r.body).slice(0, 160));
   const cid = sql("SELECT id FROM cash_closings WHERE salon_id='s1' ORDER BY period_end DESC LIMIT 1");
   console.log('Z.total_cents            =', sql(`SELECT total_cents FROM cash_closings WHERE id='${cid}'`));
@@ -51,7 +51,7 @@ const line = (t) => console.log('\n=== ' + t);
   line('C2  apres cloture : vente refusee ? 2e cloture ?');
   r = await api('POST','/api/sales',{ payment_method:'especes', items:[{item_type:'service',item_id:'sv1',item_name:'Coupe',unit_price_cents:2000,quantity:1}] });
   console.log('vente apres cloture :', r.status, r.body && r.body.error);
-  r = await api('POST','/api/owner/caisse/close',{ starting_cash_cents: 20000 });
+  r = await api('POST','/api/owner/caisse/close',{ starting_cash_cents: 20000 }, Object.assign({}, H, { 'X-Admin-Password': 'adminpw' }));
   console.log('2e cloture :', r.status, r.body && r.body.error);
 
   // --- Mon code recent : recomptage ---
