@@ -1,7 +1,7 @@
 const express = require('express');
 const { thresholdsFrom, thresholdsForOwner, rewardsFor } = require('../lib/loyaltyRules');
 const crypto = require('crypto');
-const { pool, utcIso, getOwnerSettings, setOwnerSettings } = require('../db');
+const { pool, utcIso, getOwnerSettings, setOwnerSettings, getSettings, getCaisseLock } = require('../db');
 const { slugTaken } = require('../lib/slugs');
 const requireAdmin = require('../middleware/auth');
 const requireAdminOrBarber = require('../middleware/barberAuth');
@@ -646,15 +646,18 @@ router.get('/caisse/current-period', requireAdminOrBarber, wrap(async (req, res)
     total_cents: total,
     sales_count: sales.length,
     by_method: byMethod,
-    by_barber: byBarber
+    by_barber: byBarber,
+    // Fermeture automatique passée avec des ventes non clôturées : le dashboard affiche « Clôture Z en attente ».
+    caisse_lock: await (async () => { const l = await getCaisseLock(req.salon.id, await getSettings(req.salon.id)); return l ? { reason: l.reason, message: l.message } : null; })()
   });
 }));
 
 /**
  * Cloture la periode ouverte actuelle - fige les chiffres dans
  * cash_closings. Accessible a l'admin ET aux coiffeurs connectes par
- * PIN (une seule caisse partagee par tout le salon - n'importe quel
- * coiffeur en service peut la cloturer, pas seulement l'admin).
+ * PIN (pendant les heures d'ouverture de la caisse). Si elle n'a pas été
+ * faite avant la fermeture automatique, elle reste en attente : l'admin la
+ * fait depuis le dashboard, ou débloque la caisse avec son mot de passe.
  */
 router.post('/caisse/close', requireAdminOrBarber, wrap(async (req, res) => {
   const startingCashCents = Math.round(Number(req.body.starting_cash_cents));

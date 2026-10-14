@@ -1,5 +1,5 @@
 const express = require('express');
-const { pool, getSettings, setSettings, getCaisseLockedUntil, getPlatformSettings } = require('../db');
+const { pool, getSettings, setSettings, getCaisseLock, getPlatformSettings } = require('../db');
 const { sendTest, invalidateTransport, sendAppointmentConfirmation, sendAppointmentReminder, sendAppointmentCancelledByAdmin, sendAppointmentRescheduled, sendTurnSoon, sendSalonClosureNotice } = require('../lib/mailer');
 const requireAdmin = require('../middleware/auth');
 const { logActivity } = require('../lib/activityLog');
@@ -25,6 +25,7 @@ const EDITABLE = [
   'email_tpl_closure_subject', 'email_tpl_closure_body',
   'accent_color', 'login_image_url',
   'caisse_inactivity_seconds', 'caisse_reopen_hour', 'currency',
+  'caisse_open_enabled', 'caisse_open_hour', 'caisse_close_enabled', 'caisse_close_hour',
   'rdv_slot_step_min', 'rdv_min_lead_min', 'rdv_max_advance_days',
   'rdv_buffer_min', 'rdv_cancel_deadline_min', 'rdv_prep_alert_min',
   // Informations légales (ticket de caisse) - voir CGI / loi anti-fraude TVA.
@@ -154,6 +155,20 @@ router.put('/', requireAdmin, wrap(async (req, res) => {
   const SAFE_IMAGE_URL = /^(data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=]+|https:\/\/[^\s"'<>]+)$/i;
   if (patch.login_image_url && !SAFE_IMAGE_URL.test(patch.login_image_url)) {
     return res.status(400).json({ error: "Format d'image invalide" });
+  }
+
+  // Horaires de la caisse : interrupteurs '0'/'1' et heures HH:MM ; la fermeture doit suivre l'ouverture.
+  ['caisse_open_enabled', 'caisse_close_enabled'].forEach((k) => {
+    if (patch[k] !== undefined) patch[k] = (patch[k] === true || String(patch[k]) === '1') ? '1' : '0';
+  });
+  for (const k of ['caisse_open_hour', 'caisse_close_hour']) {
+    if (patch[k] !== undefined && !/^([01]\d|2[0-3]):[0-5]\d$/.test(String(patch[k]))) {
+      return res.status(400).json({ error: 'Heure invalide (format HH:MM)' });
+    }
+  }
+  if (patch.caisse_open_enabled === '1' && patch.caisse_close_enabled === '1' && patch.caisse_open_hour && patch.caisse_close_hour &&
+      patch.caisse_close_hour <= patch.caisse_open_hour) {
+    return res.status(400).json({ error: 'L\'heure de fermeture doit être après l\'heure d\'ouverture.' });
   }
 
   if (patch.timezone) {
@@ -372,7 +387,8 @@ router.post('/email-templates/test', requireAdmin, wrap(async (req, res) => {
 // Réglages publics utiles à la borne (nom du salon uniquement)
 router.get('/public', wrap(async (req, res) => {
   const s = await getSettings(req.salon.id);
-  const caisseLockedUntil = await getCaisseLockedUntil(req.salon.id, s);
+  const caisseLock = await getCaisseLock(req.salon.id, s);
+  const caisseLockedUntil = caisseLock ? (caisseLock.until ? caisseLock.until.toISOString() : 'z_pending') : null;
   // Utilisée par l'écran de connexion "générique" (aucun salon précis
   // dans l'URL) - distincte de login_image_url ci-dessous, propre à
   // CE salon (utilisée elle sur la page de connexion CLIENT du salon).
@@ -425,7 +441,9 @@ router.get('/public', wrap(async (req, res) => {
     // cloud. Actif dès qu'une clé de pont existe, pas un réglage à part.
     tpe_bridge_url: bridgeKey ? '1' : null,
     tpe_print_mode: s.tpe_print_mode === 'text' ? 'text' : 'escpos',
-    caisse_locked_until: caisseLockedUntil
+    caisse_locked_until: caisseLockedUntil,
+    caisse_lock_reason: caisseLock ? caisseLock.reason : null,
+    caisse_lock_message: caisseLock ? caisseLock.message : null
   });
 }));
 
