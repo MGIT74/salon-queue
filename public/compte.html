@@ -646,6 +646,7 @@
 </div>
 
 <script src="/app.js?v=17"></script>
+<script src="/autorefresh.js?v=1"></script>
 <script src="/group-booking.js?v=11"></script>
 <style>
 .gb-done{padding:10px 0;border-bottom:1px solid var(--sep)}.gb-done:last-child{border:none}.gb-done b{display:block}.gb-done span{color:var(--grey);font-size:14px}
@@ -942,6 +943,13 @@ function refreshHomeInBackground() {
     show('p-login');
   });
 }
+
+// Accueil client : actualisation discrète toutes les 15 s d'inactivité (fidélité, RDV à venir).
+AutoRefresh.start(function () {
+  var home = document.getElementById('p-home');
+  if (!home || !home.classList.contains('on') || !localStorage.getItem('client_token')) return;
+  return api('/api/client-auth/me').then(populateHome);
+}, { idleMs: 15000 });
 
 function populateHome(d) {
   document.getElementById('home-hello').textContent = 'Bonjour ' + d.profile.name;

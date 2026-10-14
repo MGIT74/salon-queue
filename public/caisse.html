@@ -961,6 +961,7 @@
 </div>
 
 <script src="/app.js?v=17"></script>
+<script src="/autorefresh.js?v=1"></script>
 <script>requireSalonInUrl("Pour utiliser la caisse, ouvrez le lien de votre salon.");</script>
 <script>
 mountThemeButton();
@@ -2888,6 +2889,21 @@ function stopAgendaAutoRefresh() {
   if (agendaNowLineTimer) clearInterval(agendaNowLineTimer);
   agendaNowLineTimer = null;
 }
+
+/* Actualisation discrète (15 s sans toucher l'écran) : catalogue/stocks sur l'onglet Caisse, RDV et file sur l'Agenda.
+   Jamais pendant un ticket en cours, un tiroir/une fenêtre ouverte ou un paiement. */
+function caisseIsBusy() {
+  if (ticket && ticket.length) return true;
+  if (document.querySelector('.appt-drawer-backdrop.on, .history-drawer-backdrop.on, .z-overlay.on, .receipt-overlay.on, .tpe-overlay.on, .modal-overlay, .modal-backdrop')) return true;
+  var login = document.getElementById('login-screen');
+  return Boolean(login && login.style.display !== 'none' && login.offsetParent !== null);
+}
+AutoRefresh.start(function () {
+  var on = document.querySelector('.caisse-tab-panel.on');
+  var id = on ? on.id : '';
+  if (id === 'panel-caisse') return loadCatalog();
+  if (id === 'panel-agenda') { calMonthCache = {}; return loadAgendaPeriod(); }
+}, { idleMs: 15000, busy: caisseIsBusy });
 
 function loadInactivitySetting() {
   var headers = {};

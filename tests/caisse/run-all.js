@@ -109,7 +109,8 @@ const suite = [
   ['86-import-csv-clients.js', false, ['exit']],
   ['87-import-rdv.js', false, ['exit']],
   ['88-selecteur-periode.js', false, ['exit']],
-  ['89-caisse-tiroir-rdv.js', false, ['exit']]
+  ['89-caisse-tiroir-rdv.js', false, ['exit']],
+  ['90-actualisation-discrete.js', false, ['exit']]
 ];
 
 let bad = 0;
