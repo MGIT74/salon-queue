@@ -1015,10 +1015,8 @@
   /* Dezoome sous la largeur lisible (jusqu'a 0 % = journee entiere a l'ecran) : seules les heures pleines restent. */
   .timeline-inner.compact .timeline-hours span:not(.h) { display: none; }
   .timeline-inner.compact .timeline-hours span.h { font-size: 11px; }
-  /* Vue resserree (jusqu'a 0 %) : l'heure reste toujours affichee, juste sous le nom du client. */
+  /* Vue resserree (jusqu'a 0 %) : l'heure reste affichee au-dessus du nom, exactement comme a 100 %. */
   .timeline-inner.compact .timeline-block { padding: 2px 6px; }
-  .timeline-inner.compact .timeline-block .tb-name { order: 1; }
-  .timeline-inner.compact .timeline-block .tb-time { order: 2; }
   .timeline-inner.compact .timeline-hours span.h:last-child { transform: translateX(-100%); }
   /* Les traits de chaque pas (5 min...) deviennent trop serres : on ne garde que les traits des heures. */
   .timeline-inner.compact .timeline-minute-grid { background-image: linear-gradient(to right, transparent 1px, transparent 1px), linear-gradient(to right, rgba(128,128,128,.38) 1px, transparent 1px); }
