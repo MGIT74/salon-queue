@@ -18,7 +18,7 @@ check('ligne totalement vide ignoree et comptee', r.ignored === 0 && r.totalRows
 check('champ multi-ligne lu comme un seul client', r[r.length - 1].name === 'Multi\nligne');
 r = P('Name,Phone\r\nAnna,0612\r\n,\r\n');
 check('virgule + en-tetes anglais + CRLF', r.length === 1 && r[0].phone === '0612' && r.ignored === 0, r);
-check('envoi par lots de 300 + route /bulk appelee', /BATCH = 100/.test(html) && /manual-client\/bulk/.test(html));
+check('envoi par lots de 100 + route /bulk appelee', /batch: 100/.test(html) && /manual-client\/bulk/.test(html));
 
 // --- B. route /manual-client/bulk ---
 const rows = [{ client_name: 'Anna', email: 'a@x.fr', phone: '06' }];
@@ -64,7 +64,7 @@ const call = (body) => new Promise((resolve, reject) => {
     const w = dom.window; let reloaded = 0; const calls = [];
     w.esc = (x) => String(x); w.location.reload = () => {}; 
     w.api = (url, o) => { calls.push(url); if (/bulk/.test(url)) { const n = o.body.clients.length; if (calls.filter((c) => /bulk/.test(c)).length === 2) return Promise.reject(new Error('Serveur indisponible')); return Promise.resolve({ inserted: n - 1, skipped: 1 }); } return Promise.resolve({}); };
-    const a2 = html.indexOf('function runClientsImport'), e2 = html.indexOf('function deleteSelectedClients');
+    const a2 = html.indexOf('function _importErrorsHtml'), e2 = html.indexOf('/* ============ Import de RDV');
     w.eval(html.slice(a2, e2));
     const list = []; for (let i = 0; i < 250; i++) list.push({ name: 'C' + i });
     w.runClientsImport(list);

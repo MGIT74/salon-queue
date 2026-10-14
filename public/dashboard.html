@@ -2052,6 +2052,7 @@
             <option value="50">50</option>
           </select>
         </div>
+        <button class="btn btn-soft" onclick="importRdvCsv()">Importer des RDV</button>
       </div>
       <div class="clients-export-bar" id="rdv-export-bar" style="display:none">
         <span id="rdv-selected-count" class="export-count"></span>
@@ -7783,16 +7784,21 @@ function confirmImportClients(clients) {
   });
 }
 
+function _importErrorsHtml(errors, noun) {
+  if (!errors.length) return '';
+  return '<br><span style="color:var(--red);font-weight:600">' + errors.length + ' ' + noun + (errors.length > 1 ? 's' : '') + ' en erreur :</span>' +
+    '<div style="margin-top:6px;max-height:160px;overflow-y:auto;font-size:13px;color:var(--red)">' +
+    errors.map(function (m) { return esc(m); }).join('<br>') + '</div>';
+}
+
 /**
- * Import réel par lots de 100 envoyés l'un après l'autre (un seul appel
- * serveur par lot), avec une fenêtre de progression de 0 à 100 %. Un lot
- * en échec n'interrompt pas les suivants. À la fin, la fenêtre détaille
- * importés / déjà présents / erreurs et « Valider » recharge la page.
+ * Fenêtre de progression 0-100 % commune aux imports (clients, RDV) : envoie
+ * les lots l'un après l'autre (cfg.send/apply/fail), un lot en échec
+ * n'interrompt pas les suivants. À la fin, cfg.summary() détaille le
+ * résultat et « Valider » recharge la page.
  */
-function runClientsImport(clients) {
-  var total = clients.length;
-  var BATCH = 100;
-  var inserted = 0, skipped = 0, done = 0, errors = [];
+function runBatchImport(cfg) {
+  var total = cfg.total, batch = cfg.batch, done = 0;
 
   var ov = document.createElement('div');
   ov.className = 'modal-overlay on';
@@ -7821,36 +7827,298 @@ function runClientsImport(clients) {
 
   function next(pos) {
     if (pos >= total) return Promise.resolve();
-    var chunk = clients.slice(pos, pos + BATCH);
-    return api('/api/queue/manual-client/bulk', { method: 'POST', body: { clients: chunk } })
-      .then(function (r) { inserted += r.inserted || 0; skipped += r.skipped || 0; },
-            function (e) {
-              errors.push('Lignes ' + (pos + 1) + ' à ' + (pos + chunk.length) + ' : ' +
-                ((e && e.message) || 'erreur inconnue'));
-            })
-      .then(function () { done += chunk.length; paint(); return next(pos + BATCH); });
+    var count = Math.min(batch, total - pos);
+    return cfg.send(pos)
+      .then(function (r) { cfg.apply(r, pos); }, function (e) { cfg.fail(e, pos, count); })
+      .then(function () { done += count; paint(); return next(pos + batch); });
   }
 
-  next(0).then(function () {
-    if (inserted > 0) return api('/api/queue/manual-client/import-log', { method: 'POST', body: { count: inserted } }).catch(function () {});
-  }).then(function () {
-    var failedRows = errors.length;
-    var html = '<b style="color:var(--ink)">' + inserted + ' client' + (inserted > 1 ? 's' : '') + ' importé' + (inserted > 1 ? 's' : '') + '</b>';
-    if (skipped) html += '<br>' + skipped + ' déjà présent' + (skipped > 1 ? 's' : '') + ' (non dupliqué' + (skipped > 1 ? 's' : '') + ')';
-    if (errors.length) {
-      html += '<br><span style="color:var(--red);font-weight:600">' + errors.length + ' lot' + (errors.length > 1 ? 's' : '') + ' en erreur :</span>' +
-        '<div style="margin-top:6px;max-height:160px;overflow-y:auto;font-size:13px;color:var(--red)">' +
-        errors.map(function (m) { return esc(m); }).join('<br>') + '</div>';
-    }
-    document.getElementById('imp-title').textContent = failedRows ? 'Import terminé avec des erreurs' : 'Import terminé';
-    document.getElementById('imp-bar').style.background = failedRows ? 'var(--orange)' : 'var(--green)';
+  return next(0).then(function () { return cfg.after ? cfg.after() : null; }).then(function () {
+    var failed = cfg.errorCount() > 0;
+    document.getElementById('imp-title').textContent = failed ? 'Import terminé avec des erreurs' : 'Import terminé';
+    document.getElementById('imp-bar').style.background = failed ? 'var(--orange)' : 'var(--green)';
     done = total; paint();
     var res = document.getElementById('imp-result');
-    res.innerHTML = html; res.style.display = '';
+    res.innerHTML = cfg.summary(); res.style.display = '';
     document.getElementById('imp-actions').style.display = '';
     var ok = document.getElementById('imp-ok');
     ok.onclick = function () { location.reload(); };
     ok.focus();
+  });
+}
+
+/**
+ * Import clients : lots de 100 vers /manual-client/bulk (voir
+ * runBatchImport pour la fenêtre de progression et la fin de l'import).
+ */
+function runClientsImport(clients) {
+  var total = clients.length;
+  var inserted = 0, skipped = 0, errors = [];
+  runBatchImport({
+    total: total, batch: 100,
+    send: function (pos) {
+      return api('/api/queue/manual-client/bulk', { method: 'POST', body: { clients: clients.slice(pos, pos + 100) } });
+    },
+    apply: function (r) { inserted += r.inserted || 0; skipped += r.skipped || 0; },
+    fail: function (e, pos, count) {
+      errors.push('Lignes ' + (pos + 1) + ' à ' + (pos + count) + ' : ' + ((e && e.message) || 'erreur inconnue'));
+    },
+    after: function () {
+      if (inserted > 0) return api('/api/queue/manual-client/import-log', { method: 'POST', body: { count: inserted } }).catch(function () {});
+    },
+    errorCount: function () { return errors.length; },
+    summary: function () {
+      var html = '<b style="color:var(--ink)">' + inserted + ' client' + (inserted > 1 ? 's' : '') + ' importé' + (inserted > 1 ? 's' : '') + '</b>';
+      if (skipped) html += '<br>' + skipped + ' déjà présent' + (skipped > 1 ? 's' : '') + ' (non dupliqué' + (skipped > 1 ? 's' : '') + ')';
+      return html + _importErrorsHtml(errors, 'lot');
+    }
+  });
+}
+
+/* ============ Import de RDV depuis un CSV (ex. export Bookly) ============ */
+var RDV_HEADER_ALIASES = {
+  date: ['daterendezvous', 'date', 'datederendezvous', 'daterdv', 'datedebut', 'debut', 'start', 'datetime'],
+  barber: ['equipe', 'coiffeur', 'staff', 'employe', 'team', 'barber', 'intervenant'],
+  name: ['nomclient', 'nom', 'name', 'client', 'customername', 'nomduclient'],
+  phone: ['telephoneclient', 'telephone', 'tel', 'phone', 'mobile', 'portable'],
+  email: ['emailclient', 'email', 'mail', 'courriel'],
+  service: ['service', 'prestation'],
+  status: ['statut', 'status', 'etat'],
+  note: ['notes', 'note', 'commentaire', 'commentaires'],
+  site: ['site', 'salon', 'lieu', 'location']
+};
+
+function _plainKey(s) {
+  return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ').trim();
+}
+// "Ibrahim (Tous)" et "Ibrahim" sont le même coiffeur côté Bookly.
+function _barberKey(s) {
+  return _plainKey(String(s || '').replace(/\((tous|all)\)/ig, ''));
+}
+
+function _parseRdvDate(str) {
+  str = String(str || '').trim();
+  var m = str.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{1,2}):(\d{2})/);
+  if (m) return { date: m[1] + '-' + m[2] + '-' + m[3], time: ('0' + m[4]).slice(-2) + ':' + m[5] };
+  m = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})[ T,]*(\d{1,2})[:h](\d{2})/);
+  if (m) return { date: m[3] + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[1]).slice(-2), time: ('0' + m[4]).slice(-2) + ':' + m[5] };
+  return null;
+}
+
+function parseRdvCsv(text) {
+  text = text.replace(/^﻿/, '');
+  var firstLine = (text.split(/\r\n|\r|\n/)[0] || '');
+  var delim = (firstLine.match(/;/g) || []).length > (firstLine.match(/,/g) || []).length ? ';' : ',';
+  if ((firstLine.match(/\t/g) || []).length > (firstLine.match(/[;,]/g) || []).length) delim = '\t';
+  var rows = _parseCsvText(text, delim);
+  var out = { rows: [], badDate: 0, missing: [], totalRows: 0 };
+  if (rows.length < 2) { out.missing = ['date', 'name', 'service', 'barber']; return out; }
+
+  var colMap = {};
+  rows[0].forEach(function (h, i) {
+    var norm = _plainKey(h).replace(/ /g, '');
+    Object.keys(RDV_HEADER_ALIASES).forEach(function (f) {
+      if (colMap[f] === undefined && RDV_HEADER_ALIASES[f].indexOf(norm) !== -1) colMap[f] = i;
+    });
+  });
+  ['date', 'name', 'service', 'barber'].forEach(function (f) { if (colMap[f] === undefined) out.missing.push(f); });
+  if (out.missing.length) return out;
+
+  function cell(row, f) { return colMap[f] !== undefined ? (row[colMap[f]] || '').trim() : ''; }
+  rows.slice(1).forEach(function (row, i) {
+    out.totalRows++;
+    var d = _parseRdvDate(cell(row, 'date'));
+    if (!d) { out.badDate++; return; }
+    out.rows.push({
+      line: i + 2, date: d.date, time: d.time,
+      barber: cell(row, 'barber'), name: cell(row, 'name'), email: cell(row, 'email'),
+      phone: cell(row, 'phone'), service: cell(row, 'service'), status: cell(row, 'status') || '—',
+      note: cell(row, 'note'), site: cell(row, 'site')
+    });
+  });
+  return out;
+}
+
+function importRdvCsv() {
+  var input = document.createElement('input');
+  input.type = 'file'; input.accept = '.csv,text/csv'; input.style.display = 'none';
+  document.body.appendChild(input);
+  input.onchange = function () {
+    var file = input.files && input.files[0];
+    document.body.removeChild(input);
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onerror = function () { toast('Impossible de lire ce fichier', true); };
+    reader.onload = function (e) {
+      var parsed;
+      try { parsed = parseRdvCsv(String(e.target.result)); }
+      catch (err) { toast('Fichier CSV illisible : ' + err.message, true); return; }
+      if (parsed.missing.length) {
+        var labels = { date: 'date', name: 'nom du client', service: 'prestation', barber: 'coiffeur (équipe)' };
+        toast('Colonnes introuvables dans ce fichier : ' + parsed.missing.map(function (f) { return labels[f]; }).join(', '), true);
+        return;
+      }
+      if (!parsed.rows.length) { toast('Aucun rendez-vous lisible dans ce fichier', true); return; }
+      Promise.all([api('/api/barbers?all=1'), api('/api/catalog/services?all=1')]).then(function (r) {
+        openRdvImportModal(parsed, r[0].items || [], r[1].items || []);
+      }).catch(function (err) { toast(err.message, true); });
+    };
+    reader.readAsText(file, 'utf-8');
+  };
+  input.click();
+}
+
+// Regroupe les valeurs du fichier (ex. "Ibrahim" + "Ibrahim (Tous)") et
+// propose un coiffeur/une prestation de l'app quand le nom correspond
+// EXACTEMENT (jamais approximativement : "Coupe" n'est pas "Coupe enfant").
+function _groupRdv(rows, field, keyFn, candidates) {
+  var groups = {}, order = [];
+  rows.forEach(function (r) {
+    var k = keyFn(r[field]);
+    if (!groups[k]) { groups[k] = { key: k, labels: {}, count: 0, choice: '' }; order.push(k); }
+    groups[k].labels[r[field] || '(vide)'] = true;
+    groups[k].count++;
+  });
+  return order.map(function (k) {
+    var g = groups[k];
+    var exact = candidates.filter(function (c) { return keyFn(c.name) === k; });
+    if (exact.length === 1) g.choice = exact[0].id;
+    return g;
+  });
+}
+
+function openRdvImportModal(parsed, barberList, serviceList) {
+  var rows = parsed.rows;
+  var nowStr = nowSalonDatetimeString();
+  var statusCounts = {}, statusOn = {};
+  rows.forEach(function (r) { statusCounts[r.status] = (statusCounts[r.status] || 0) + 1; });
+  Object.keys(statusCounts).forEach(function (s) {
+    statusOn[s] = /accept|confirm|valid|approuv|approved/i.test(s) || Object.keys(statusCounts).length === 1;
+  });
+  var includePast = false;
+  var sites = {};
+  rows.forEach(function (r) { if (r.site) sites[r.site] = (sites[r.site] || 0) + 1; });
+
+  var barberGroups = _groupRdv(rows, 'barber', _barberKey, barberList);
+  var serviceGroups = _groupRdv(rows, 'service', _plainKey, serviceList);
+  var dates = rows.map(function (r) { return r.date; }).sort();
+
+  var ov = document.createElement('div');
+  ov.className = 'modal-overlay on';
+  document.body.appendChild(ov);
+
+  function isPast(r) { return (r.date + ' ' + r.time + ':00') < nowStr; }
+  function groupOf(groups, key) { return groups.filter(function (g) { return g.key === key; })[0]; }
+
+  function plan() {
+    var active = rows.filter(function (r) { return statusOn[r.status]; });
+    var pastCount = active.filter(isPast).length;
+    var usable = active.filter(function (r) { return includePast || !isPast(r); });
+    var bg = {}, sg = {};
+    usable.forEach(function (r) { bg[_barberKey(r.barber)] = true; sg[_plainKey(r.service)] = true; });
+    var unresolved = 0;
+    barberGroups.forEach(function (g) { if (bg[g.key] && g.choice === '') unresolved++; });
+    serviceGroups.forEach(function (g) { if (sg[g.key] && g.choice === '') unresolved++; });
+    var toSend = usable.filter(function (r) {
+      var b = groupOf(barberGroups, _barberKey(r.barber)).choice, s = groupOf(serviceGroups, _plainKey(r.service)).choice;
+      return b && b !== 'ignore' && s && s !== 'ignore';
+    });
+    return { active: active, pastCount: pastCount, usable: usable, bg: bg, sg: sg, unresolved: unresolved, toSend: toSend };
+  }
+
+  function selectHtml(kind, g, list) {
+    var opts = '<option value=""' + (g.choice === '' ? ' selected' : '') + '>— Choisir —</option>' +
+      list.map(function (c) {
+        return '<option value="' + c.id + '"' + (g.choice === c.id ? ' selected' : '') + '>' + esc(c.name) + (c.active === 0 || c.active === false ? ' (inactif)' : '') + '</option>';
+      }).join('') +
+      '<option value="ignore"' + (g.choice === 'ignore' ? ' selected' : '') + '>Ignorer ces RDV</option>';
+    var bad = g.choice === '';
+    return '<select class="modal-input" style="margin:0;padding:9px 12px;width:230px;flex:none' + (bad ? ';outline:2px solid var(--red)' : '') + '" onchange="_rdvImpSet(\'' + kind + '\',\'' + g.key.replace(/'/g, '') + '\',this.value)">' + opts + '</select>';
+  }
+
+  function mapRows(kind, groups, used, list) {
+    var shown = groups.filter(function (g) { return used[g.key]; });
+    if (!shown.length) return '<div style="color:var(--grey);font-size:13.5px">Aucun.</div>';
+    return shown.map(function (g) {
+      return '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid var(--sep)">' +
+        '<div style="min-width:0;flex:1"><b style="color:var(--ink)">' + esc(Object.keys(g.labels).join(' / ')) + '</b>' +
+        '<div style="font-size:12.5px;color:var(--grey)">' + g.count + ' RDV</div></div>' + selectHtml(kind, g, list) + '</div>';
+    }).join('');
+  }
+
+  function render() {
+    var p = plan();
+    var siteTxt = Object.keys(sites).map(function (s) { return esc(s) + ' (' + sites[s] + ')'; }).join(', ');
+    var statusHtml = Object.keys(statusCounts).map(function (s) {
+      return '<label style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--ink);padding:3px 0">' +
+        '<input type="checkbox" ' + (statusOn[s] ? 'checked' : '') + ' onchange="_rdvImpSet(\'status\',this.getAttribute(\'data-s\'),this.checked)" data-s="' + esc(s) + '"> ' +
+        esc(s) + ' <span style="color:var(--grey)">· ' + statusCounts[s] + '</span></label>';
+    }).join('');
+    ov.innerHTML =
+      '<div class="modal-box" style="max-width:620px" role="dialog" aria-modal="true">' +
+        '<h3 class="modal-title">Importer des rendez-vous</h3>' +
+        '<div class="modal-message" style="margin-bottom:12px">' + rows.length + ' rendez-vous lus, du ' + esc(dates[0]) + ' au ' + esc(dates[dates.length - 1]) + '.' +
+          (siteTxt ? '<br>Site dans le fichier : ' + siteTxt + '. Vérifiez que c\'est bien le salon affiché en haut à gauche.' : '') +
+          (parsed.badDate ? '<br><span style="color:var(--orange)">' + parsed.badDate + ' ligne(s) avec une date illisible ignorée(s).</span>' : '') + '</div>' +
+        '<div style="font-weight:600;color:var(--ink);margin:8px 0 4px">Statuts à importer</div>' + statusHtml +
+        '<label style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--ink);padding:8px 0 0"><input type="checkbox" id="imp-past" ' + (includePast ? 'checked' : '') + ' onchange="_rdvImpSet(\'past\',\'\',this.checked)"> ' +
+          'Importer aussi les RDV déjà passés <span style="color:var(--grey)">· ' + p.pastCount + ' (historique)</span></label>' +
+        '<div style="font-weight:600;color:var(--ink);margin:16px 0 4px">Coiffeurs : qui est qui ?</div>' + mapRows('barber', barberGroups, p.bg, barberList) +
+        '<div style="font-weight:600;color:var(--ink);margin:16px 0 4px">Prestations</div>' + mapRows('service', serviceGroups, p.sg, serviceList) +
+        '<div class="modal-message" style="margin:16px 0 0" id="imp-plan">' +
+          (p.unresolved ? '<span style="color:var(--red);font-weight:600">' + p.unresolved + ' correspondance' + (p.unresolved > 1 ? 's' : '') + ' à choisir avant d\'importer.</span>'
+            : '<b style="color:var(--ink)">' + p.toSend.length + ' rendez-vous seront importés</b>' + (p.usable.length - p.toSend.length ? ', ' + (p.usable.length - p.toSend.length) + ' ignorés.' : '.') +
+              '<br>Aucun email n\'est envoyé aux clients.') + '</div>' +
+        '<div class="modal-actions" style="margin-top:16px">' +
+          '<button class="btn btn-soft" id="imp-cancel">Annuler</button>' +
+          '<button class="btn btn-primary" id="imp-go"' + (p.unresolved || !p.toSend.length ? ' disabled' : '') + '>Importer</button>' +
+        '</div>' +
+      '</div>';
+    document.getElementById('imp-cancel').onclick = close;
+    document.getElementById('imp-go').onclick = function () {
+      var send = plan().toSend.map(function (r) {
+        return { line: r.line, date: r.date, time: r.time, client_name: r.name, email: r.email, phone: r.phone, note: r.note,
+          barber_id: groupOf(barberGroups, _barberKey(r.barber)).choice, service_id: groupOf(serviceGroups, _plainKey(r.service)).choice };
+      });
+      close();
+      runRdvImport(send);
+    };
+  }
+  function close() { window._rdvImpSet = null; if (ov.parentNode) ov.parentNode.removeChild(ov); }
+
+  window._rdvImpSet = function (kind, key, val) {
+    if (kind === 'status') statusOn[key] = !!val;
+    else if (kind === 'past') includePast = !!val;
+    else groupOf(kind === 'barber' ? barberGroups : serviceGroups, key).choice = val;
+    var scroll = ov.firstChild ? ov.firstChild.scrollTop : 0;
+    render();
+    if (ov.firstChild) ov.firstChild.scrollTop = scroll;
+  };
+  render();
+}
+
+function runRdvImport(items) {
+  var inserted = 0, skipped = 0, overlaps = 0, errors = [];
+  runBatchImport({
+    total: items.length, batch: 100,
+    send: function (pos) {
+      return api('/api/appointments/import', { method: 'POST', body: { rows: items.slice(pos, pos + 100) } });
+    },
+    apply: function (r) {
+      inserted += r.inserted || 0; skipped += r.skipped || 0; overlaps += r.overlaps || 0;
+      (r.errors || []).forEach(function (e) { errors.push('Ligne ' + e.line + ' : ' + e.error); });
+    },
+    fail: function (e, pos, count) {
+      errors.push('Lignes ' + (pos + 1) + ' à ' + (pos + count) + ' du lot envoyé : ' + ((e && e.message) || 'erreur inconnue'));
+    },
+    errorCount: function () { return errors.length; },
+    summary: function () {
+      var html = '<b style="color:var(--ink)">' + inserted + ' rendez-vous importé' + (inserted > 1 ? 's' : '') + '</b>';
+      if (skipped) html += '<br>' + skipped + ' déjà présent' + (skipped > 1 ? 's' : '') + ' (non dupliqué' + (skipped > 1 ? 's' : '') + ')';
+      if (overlaps) html += '<br><span style="color:var(--orange);font-weight:600">' + overlaps + ' chevauchent un autre RDV du même coiffeur</span> (importés quand même)';
+      return html + _importErrorsHtml(errors, 'ligne');
+    }
   });
 }
 

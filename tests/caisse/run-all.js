@@ -106,7 +106,8 @@ const suite = [
   ['83-groupe-reservation-api.js', false, ['exit']],
   ['84-proches-compte-api.js', false, ['exit']],
   ['85-reservation-groupe-interface.js', false, ['exit']],
-  ['86-import-csv-clients.js', false, ['exit']]
+  ['86-import-csv-clients.js', false, ['exit']],
+  ['87-import-rdv.js', false, ['exit']]
 ];
 
 let bad = 0;

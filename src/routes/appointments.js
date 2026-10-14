@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const { pool, utcIso, getSettings } = require('../db');
 const requireAdmin = require('../middleware/auth');
 const requireAdminOrBarber = require('../middleware/barberAuth');
+const { logActivity } = require('../lib/activityLog');
 const { clientKey } = require('../lib/queueMath');
 const { sendAppointmentConfirmation, sendGroupAppointmentConfirmation, sendAppointmentCancelledByAdmin, sendAppointmentRescheduled, sendGiftCodeRenewed } = require('../lib/mailer');
 const { wrap } = require('../lib/wrap');
@@ -843,6 +844,87 @@ router.post('/admin-create', requireAdminOrBarber, wrap(async (req, res) => {
   }
 
   res.json({ ok: true, id });
+}));
+
+/**
+ * Import de rendez-vous en lot (depuis un export CSV, ex. Bookly) - admin
+ * uniquement. Le rapprochement coiffeur/prestation est fait côté
+ * dashboard : chaque ligne arrive avec un barber_id et un service_id de CE
+ * salon. Volontairement plus souple que admin-create : pas de contrôle de
+ * disponibilité ni de créneau passé (reprise d'un agenda existant, déjà
+ * validé par l'ancien outil) ; un chevauchement avec un autre RDV du
+ * même coiffeur est importé mais compté dans `overlaps`. Aucun email n'est
+ * envoyé. Les doublons (même coiffeur, même heure, même nom) sont ignorés,
+ * donc relancer un fichier déjà importé en partie est sans danger.
+ */
+router.post('/import', requireAdmin, wrap(async (req, res) => {
+  const list = Array.isArray(req.body.rows) ? req.body.rows : [];
+  if (!list.length) return res.status(400).json({ error: 'Aucun rendez-vous à importer' });
+  if (list.length > 200) return res.status(400).json({ error: 'Maximum 200 rendez-vous par lot' });
+
+  const [barberRows] = await pool.query('SELECT id FROM barbers WHERE salon_id = ?', [req.salon.id]);
+  const [serviceRows] = await pool.query('SELECT id, duration_min FROM services WHERE salon_id = ?', [req.salon.id]);
+  const barberIds = new Set(barberRows.map((b) => b.id));
+  const serviceDur = new Map(serviceRows.map((x) => [x.id, x.duration_min]));
+
+  const errors = [];
+  const valid = [];
+  list.forEach((r, i) => {
+    const line = Number(r && r.line) || i + 1;
+    const date = String((r && r.date) || '');
+    const time = String((r && r.time) || '');
+    const name = String((r && r.client_name) || '').trim().slice(0, 255);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time) || isNaN(Date.parse(date + 'T' + time + ':00Z'))) {
+      return errors.push({ line, error: 'Date ou heure illisible' });
+    }
+    if (!name) return errors.push({ line, error: 'Nom du client manquant' });
+    if (!barberIds.has(r.barber_id)) return errors.push({ line, error: 'Coiffeur inconnu' });
+    if (!serviceDur.has(r.service_id)) return errors.push({ line, error: 'Prestation inconnue' });
+    valid.push({
+      line, name, date, time, barber_id: r.barber_id, service_id: r.service_id,
+      email: String(r.email || '').trim().slice(0, 255) || null,
+      phone: String(r.phone || '').trim().slice(0, 50) || null,
+      note: String(r.note || '').trim().slice(0, 500) || null,
+      scheduledAt: date + ' ' + time + ':00',
+      start: Date.parse(date + 'T' + time + ':00Z') / 60000
+    });
+  });
+
+  let skipped = 0, overlaps = 0;
+  const toInsert = [];
+  if (valid.length) {
+    const dates = valid.map((v) => v.date).sort();
+    const [existing] = await pool.query(
+      `SELECT a.barber_id, a.scheduled_at, a.client_name,
+              COALESCE(s.duration_min, 0) + COALESCE((SELECT SUM(e.duration_min) FROM appointment_extras ae JOIN extras e ON e.id = ae.extra_id WHERE ae.appointment_id = a.id), 0) AS dur
+       FROM appointments a LEFT JOIN services s ON s.id = a.service_id
+       WHERE a.salon_id = ? AND a.status = 'confirmed' AND DATE(a.scheduled_at) BETWEEN ? AND ?`,
+      [req.salon.id, dates[0], dates[dates.length - 1]]
+    );
+    const occupied = existing.map((a) => {
+      const at = String(a.scheduled_at).replace('T', ' ').slice(0, 19);
+      return { barber: a.barber_id, at, name: String(a.client_name || '').trim().toLowerCase(),
+               start: Date.parse(at.replace(' ', 'T') + 'Z') / 60000, dur: Number(a.dur) || 0 };
+    });
+    for (const v of valid) {
+      const lname = v.name.toLowerCase();
+      if (occupied.some((o) => o.barber === v.barber_id && o.at === v.scheduledAt && o.name === lname)) { skipped++; continue; }
+      const dur = serviceDur.get(v.service_id) || 0;
+      if (occupied.some((o) => o.barber === v.barber_id && v.start < o.start + o.dur && o.start < v.start + dur)) overlaps++;
+      occupied.push({ barber: v.barber_id, at: v.scheduledAt, name: lname, start: v.start, dur });
+      toInsert.push(v);
+    }
+  }
+
+  if (toInsert.length) {
+    await pool.query(
+      'INSERT INTO appointments (id, salon_id, barber_id, client_name, email, phone, service_id, scheduled_at, status, cancel_token, client_note, source) VALUES ' +
+      toInsert.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?, 'import')").join(', '),
+      toInsert.flatMap((v) => [crypto.randomUUID(), req.salon.id, v.barber_id, v.name, v.email, v.phone, v.service_id, v.scheduledAt, crypto.randomBytes(24).toString('hex'), v.note])
+    );
+  }
+  if (toInsert.length) logActivity(req.salon.id, 'appointments_import', toInsert.length + ' rendez-vous importé' + (toInsert.length > 1 ? 's' : '') + ' depuis un fichier CSV');
+  res.json({ ok: true, inserted: toInsert.length, skipped, overlaps, errors });
 }));
 
 /**
