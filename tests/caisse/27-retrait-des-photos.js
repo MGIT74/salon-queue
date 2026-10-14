@@ -113,11 +113,11 @@ console.log('\n[D] PHOTO d\'un coiffeur : retrait (vraies fonctions)');
     return w.renderBarberDetail({ id: 'b1', name: 'Alice', photo_url: photo, has_pin: true, active: true });
   }
   let html = render('data:image/png;base64,AAAA');
-  check('avec photo : "Retirer la photo" present, relie a removeBarberPhoto', /removeBarberPhoto\('b1'\)/.test(html) && /Retirer la photo/.test(html));
-  check('...et "Photo" (ajout/changement) toujours present', /uploadBarberPhoto/.test(html) && /<span>Photo<\/span>/.test(html));
+  check('avec photo : croix rouge (comme les photos de prestation), reliee a removeBarberPhoto', /class="cat-photo-remove bp-photo-x"/.test(html) && /removeBarberPhoto\('b1'\)/.test(html) && /Retirer la photo/.test(html));
+  check('...et un clic sur la photo ouvre le choix de fichier (ajout/changement)', /title="Changer la photo"/.test(html) && /photo-input-b1'\)\.click\(\)/.test(html) && /uploadBarberPhoto/.test(html));
   html = render(null);
-  check('sans photo : pas de "Retirer la photo" (rien a retirer)', !/removeBarberPhoto/.test(html) && !/Retirer la photo/.test(html));
-  check('...mais l\'ajout reste possible', /uploadBarberPhoto/.test(html));
+  check('sans photo : pas de croix rouge (rien a retirer)', !/removeBarberPhoto/.test(html) && !/Retirer la photo/.test(html));
+  check('...mais l\'ajout reste possible', /uploadBarberPhoto/.test(html) && /title="Changer la photo"/.test(html));
 }
 
 console.log('\n[F] Grille des actions d\'un coiffeur : un nombre impair de boutons ne laisse pas le dernier seul dans un coin');

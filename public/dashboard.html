@@ -1196,17 +1196,35 @@
   @media (prefers-reduced-motion: reduce) { .bp-tabbody.fade { animation-name: bpTabInSoft; } }
   @keyframes bpTabInSoft { from { opacity: 0; } to { opacity: 1; } }
   .bp-panel { background: var(--card); border-radius: 18px; padding: 18px; box-shadow: var(--shadow); }
-  .bp-profile { background: var(--card); border-radius: 18px; padding: 24px 18px 18px; box-shadow: var(--shadow); text-align: center; }
-  .bp-ring { --rc: var(--accent); width: 100px; height: 100px; border-radius: 50%; padding: 4px; margin: 0 auto 14px; box-sizing: border-box;
+  .bp-profile { position: relative; background: var(--card); border-radius: 18px; padding: 22px 16px 18px; box-shadow: var(--shadow); text-align: center; }
+  .bp-ring { --rc: var(--accent); width: 92px; height: 92px; border-radius: 50%; padding: 4px; margin: 0 auto 14px; box-sizing: border-box;
              background: conic-gradient(from 210deg, var(--rc), #a855f7 55%, var(--rc)); }
   .bp-ring .bp-av { width: 100%; height: 100%; font-size: 34px; border: 3px solid var(--card); box-sizing: border-box; }
+  .bp-photo-wrap { position: relative; width: 92px; margin: 0 auto 12px; }
+  .bp-photo-wrap .bp-ring { margin: 0; }
+  .bp-photo { position: relative; cursor: pointer; border-radius: 50%; transition: transform .2s ease; }
+  .bp-photo:hover { transform: scale(1.03); }
+  .bp-photo:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  .bp-cam { position: absolute; right: -2px; bottom: 0; width: 28px; height: 28px; border-radius: 50%; background: var(--card); color: var(--ink);
+            border: 1px solid var(--sep); box-shadow: var(--shadow); display: flex; align-items: center; justify-content: center; }
+  .bp-cam svg { width: 14px; height: 14px; }
+  .bp-photo-x { top: 0; right: -4px; z-index: 2; }
+  .bp-name-row { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; }
+  .bp-edit { border: none; background: none; color: var(--grey); cursor: pointer; padding: 5px; border-radius: 8px; display: inline-flex; line-height: 0; transition: background .15s ease, color .15s ease; }
+  .bp-edit:hover { background: var(--fill); color: var(--ink); }
+  .bp-edit svg { width: 15px; height: 15px; }
+  .bp-power { position: absolute; top: 12px; right: 12px; width: 34px; height: 34px; border-radius: 50%; border: none; cursor: pointer;
+              background: rgba(255,59,48,.12); color: var(--red); display: flex; align-items: center; justify-content: center; transition: background .15s ease, transform .1s ease; }
+  .bp-power:hover { background: rgba(255,59,48,.22); }
+  .bp-power:active { transform: scale(.92); }
+  .bp-power.on { background: rgba(52,199,89,.15); color: var(--green); }
+  .bp-power.on:hover { background: rgba(52,199,89,.26); }
+  .bp-profile.inactive .bp-ring { filter: grayscale(.7); opacity: .75; }
+  .bc-chip.pin { border: none; font-family: inherit; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; transition: background .15s ease, color .15s ease; }
+  .bc-chip.pin:hover { background: rgba(var(--accent-rgb), .15); color: var(--blue); }
   .bp-name { font-size: 18px; font-weight: 600; letter-spacing: -.02em; }
   .bp-role { font-size: 13px; color: var(--grey); margin: 2px 0 12px; }
   .bp-chips { justify-content: center; }
-  .bp-sep { height: 1px; background: var(--sep); margin: 16px -18px 14px; }
-  .bp-profile .barber-quick-actions { grid-template-columns: 1fr; gap: 6px; margin: 0; text-align: left; }
-  .bp-profile .barber-quick-actions > button:last-of-type:nth-of-type(odd) { grid-column: auto; }
-  .bp-profile .quick-action { flex-direction: row; justify-content: flex-start; gap: 10px; padding: 11px 14px; font-size: 14px; border-radius: 12px; }
   .bp-others { margin-top: 28px; }
   .bp-others-head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
   .bp-others-head h3 { margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -.02em; }
@@ -1216,9 +1234,6 @@
   @media (max-width: 980px) {
     .bp-layout { grid-template-columns: minmax(0, 1fr); }
     .bp-side { order: -1; }
-    .bp-profile .barber-quick-actions { grid-template-columns: 1fr 1fr; }
-    .bp-profile .barber-quick-actions > button:last-of-type:nth-of-type(odd) { grid-column: 1 / -1; }
-    .bp-profile .quick-action { padding: 10px 12px; font-size: 13.5px; }
   }
   @media (max-width: 640px) {
         .bp-panel { padding: 14px; }
@@ -4652,14 +4667,18 @@ function leaveBadgeHtml(b) {
 
 
 // Pastilles d'état d'un coiffeur (mode de prise de RDV, inactif, congé...).
-function barberStatusChips(b) {
+function barberStatusChips(b, editable) {
   var chips = '';
   if (!b.active) chips += '<span class="bc-chip off">Inactif</span>';
   if (b.kiosk_hidden && b.accepts_appointments) chips += '<span class="bc-chip blue">RDV uniquement</span>';
   else if (!b.kiosk_hidden && !b.accepts_appointments) chips += '<span class="bc-chip orange">Sans RDV uniquement</span>';
   else if (b.kiosk_hidden && !b.accepts_appointments) chips += '<span class="bc-chip red">Masqué partout</span>';
   else chips += '<span class="bc-chip green">RDV + sans RDV</span>';
-  chips += '<span class="bc-chip">' + (b.has_pin ? 'Code PIN' : 'Sans code') + '</span>';
+  if (editable) {   // dans la fiche : un clic sur la puce change le code
+    chips += '<button type="button" class="bc-chip pin" title="' + (b.has_pin ? 'Changer le code PIN' : 'Définir un code PIN') + '" onclick="event.stopPropagation();setBarberPin(\'' + b.id + '\',\'' + esc(b.name).replace(/'/g, "\\'") + '\')">' +
+      (b.has_pin ? 'Code PIN' : 'Sans code') +
+      '<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>';
+  } else chips += '<span class="bc-chip">' + (b.has_pin ? 'Code PIN' : 'Sans code') + '</span>';
   return chips;
 }
 
@@ -4759,49 +4778,34 @@ function renderBarberDetail(b) {
   var body = barberTabBody(b, tab);
   var color = b.color || stableColorForId(b.id);
 
-  var actions = '<div class="barber-quick-actions">' +
-      '<button class="quick-action" onclick="event.stopPropagation();renameBarber(\'' + b.id + '\')">' +
-        '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>' +
-        '<span>Renommer</span>' +
-      '</button>' +
-      '<button class="quick-action" onclick="event.stopPropagation();document.getElementById(\'photo-input-' + b.id + '\').click()">' +
-        '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8a2 2 0 0 1 2-2h1.5l1-1.5h7l1 1.5H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/><circle cx="12" cy="13" r="3.2"/></svg>' +
-        '<span>Photo</span>' +
-      '</button>' +
-      '<input type="file" accept="image/*" id="photo-input-' + b.id + '" style="display:none" onchange="event.stopPropagation();uploadBarberPhoto(\'' + b.id + '\', this)">' +
-      (b.photo_url
-        ? '<button class="quick-action" onclick="event.stopPropagation();removeBarberPhoto(\'' + b.id + '\')">' +
-            '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>' +
-            '<span>Retirer la photo</span>' +
-          '</button>'
-        : '') +
-      '<button class="quick-action" onclick="event.stopPropagation();setBarberPin(\'' + b.id + '\',\'' + esc(b.name).replace(/'/g, "\\'") + '\')">' +
-        '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10.5" width="16" height="10" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></svg>' +
-        '<span>' + (b.has_pin ? 'Changer le code' : 'Définir un code') + '</span>' +
-      '</button>' +
-      (b.active
-        ? '<button class="quick-action danger" onclick="event.stopPropagation();archiveBarber(\'' + b.id + '\')">' +
-            '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 8l8 8M16 8l-8 8"/></svg>' +
-            '<span>Désactiver</span>' +
-          '</button>'
-        : '<button class="quick-action" onclick="event.stopPropagation();restoreBarber(\'' + b.id + '\')">' +
-            '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m9 12 2 2 4-4"/></svg>' +
-            '<span>Réactiver</span>' +
-          '</button>') +
-    '</div>';
-
   var tabs = '<div class="subtabs" id="bp-tabs-' + b.id + '">' +
     '<button data-tab="horaires" class="' + (tab === 'horaires' ? 'on' : '') + '" onclick="switchBarberTab(\'' + b.id + '\',\'horaires\')">Horaires</button>' +
     '<button data-tab="prestations" class="' + (tab === 'prestations' ? 'on' : '') + '" onclick="switchBarberTab(\'' + b.id + '\',\'prestations\')">Prestations</button>' +
     '<button data-tab="conges" class="' + (tab === 'conges' ? 'on' : '') + '" onclick="switchBarberTab(\'' + b.id + '\',\'conges\')">Congés</button>' +
     '</div>';
 
-  var profile = '<aside class="bp-side"><div class="bp-profile">' +
-    '<div class="bp-ring" style="--rc:' + esc(color) + '">' + barberAvatarHtml(b, 'bp-av') + '</div>' +
-    '<div class="bp-name">' + esc(b.name) + '</div>' +
+  // Carte profil compacte : clic sur la photo = changer la photo (croix rouge = la retirer), crayon à côté du nom = renommer,
+  // puce « Code PIN » = changer le code, bouton rond en haut à droite = désactiver / réactiver.
+  var ico = function (d) { return '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + d + '</svg>'; };
+  var profile = '<aside class="bp-side"><div class="bp-profile' + (b.active ? '' : ' inactive') + '">' +
+    (b.active
+      ? '<button type="button" class="bp-power" title="Désactiver ce coiffeur" aria-label="Désactiver ce coiffeur" onclick="event.stopPropagation();archiveBarber(\'' + b.id + '\')">' + ico('<path d="M12 3v9"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/>') + '</button>'
+      : '<button type="button" class="bp-power on" title="Réactiver ce coiffeur" aria-label="Réactiver ce coiffeur" onclick="event.stopPropagation();restoreBarber(\'' + b.id + '\')">' + ico('<path d="M12 3v9"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/>') + '</button>') +
+    '<div class="bp-photo-wrap">' +
+      '<div class="bp-photo" role="button" tabindex="0" title="Changer la photo" onclick="document.getElementById(\'photo-input-' + b.id + '\').click()">' +
+        '<div class="bp-ring" style="--rc:' + esc(color) + '">' + barberAvatarHtml(b, 'bp-av') + '</div>' +
+        '<span class="bp-cam">' + ico('<path d="M4 8a2 2 0 0 1 2-2h1.5l1-1.5h7l1 1.5H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/><circle cx="12" cy="13" r="3.2"/>') + '</span>' +
+      '</div>' +
+      (b.photo_url
+        ? '<button type="button" class="cat-photo-remove bp-photo-x" title="Retirer la photo" aria-label="Retirer la photo" onclick="event.stopPropagation();removeBarberPhoto(\'' + b.id + '\')">' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>'
+        : '') +
+      '<input type="file" accept="image/*" id="photo-input-' + b.id + '" style="display:none" onchange="event.stopPropagation();uploadBarberPhoto(\'' + b.id + '\', this)">' +
+    '</div>' +
+    '<div class="bp-name-row"><span class="bp-name">' + esc(b.name) + '</span>' +
+      '<button type="button" class="bp-edit" title="Renommer" aria-label="Renommer" onclick="event.stopPropagation();renameBarber(\'' + b.id + '\')">' + ico('<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>') + '</button></div>' +
     '<div class="bp-role">' + (currentSalonName ? esc(currentSalonName) : 'Coiffeur') + '</div>' +
-    '<div class="bp-chips">' + leaveBadgeHtml(b) + barberStatusChips(b) + '</div>' +
-    '<div class="bp-sep"></div>' + actions +
+    '<div class="bp-chips">' + leaveBadgeHtml(b) + barberStatusChips(b, true) + '</div>' +
     '</div></aside>';
 
   return '<div class="bp-stats">' + renderStatsTab(b) + '</div>' +
