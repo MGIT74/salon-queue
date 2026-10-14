@@ -4927,7 +4927,7 @@ function renderStatsTab(b) {
 }
 
 function renderLeavesTab(b) {
-  return '<p class="hint" style="margin:0 0 12px">Cliquez sur un jour, ou <strong>glissez la souris</strong> sur plusieurs jours (en vertical : tous les mêmes jours de la semaine, ex. tous les lundis), puis cochez « En congé ». <span class="lv-touch-hint">Sur téléphone : appuyez un instant sur un jour, puis glissez.</span> Les jours en congé ne sont plus proposés à la réservation.</p>' +
+  return '<p class="hint" style="margin:0 0 12px">Cliquez sur un jour, ou <strong>glissez la souris librement</strong> sur les jours voulus (en ligne, en diagonale, en cercle, comme vous voulez : seuls les jours traversés sont choisis), puis cochez « En congé ». <span class="lv-touch-hint">Sur téléphone : appuyez un instant sur un jour, puis glissez.</span> Les jours en congé ne sont plus proposés à la réservation.</p>' +
     '<div class="lv-year" id="leaves-list-' + b.id + '"><div class="empty">Chargement…</div></div>';
 }
 
@@ -5244,13 +5244,13 @@ function lvBind(id, box) {
     var cell = e.target.closest('.lv-day');
     if (!cell) return;
     e.preventDefault();
-    st.dragging = true; st.anchor = cell.getAttribute('data-d'); st.sel = [st.anchor]; st.ax = e.clientX; st.ay = e.clientY;
+    st.dragging = true; st.anchor = cell.getAttribute('data-d'); st.sel = [st.anchor]; st.last = st.anchor; st.px = e.clientX; st.py = e.clientY;
     lvPaintSel(id, box);
     lvHideBubble(id);
   };
-  box.onmouseover = function (e) {
+  box.onmousemove = function (e) {
     if (!st.dragging) return;
-    lvExtendSel(id, box, e.target, e.clientX, e.clientY);
+    lvExtendSel(id, box, e.clientX, e.clientY);
   };
   // Écran tactile : un appui court = un jour ; appui MAINTENU un instant puis glisser = plusieurs jours (sinon le doigt fait défiler la page).
   if (!box._lvTouch) {
@@ -5266,7 +5266,7 @@ function lvBind(id, box) {
       clearTimeout(timer);
       timer = setTimeout(function () {
         st.touchActive = true; st.dragging = true;
-        st.anchor = start.d; st.sel = [start.d]; st.ax = start.x; st.ay = start.y;
+        st.anchor = start.d; st.sel = [start.d]; st.last = start.d; st.px = start.x; st.py = start.y;
         lvHideBubble(id); lvPaintSel(id, box);
         if (navigator.vibrate) { try { navigator.vibrate(12); } catch (x) {} }
       }, 220);
@@ -5279,8 +5279,7 @@ function lvBind(id, box) {
         return;                                   // pas encore en mode sélection : la page défile normalement
       }
       e.preventDefault();                         // en mode sélection : le doigt ne fait plus défiler
-      var el = document.elementFromPoint(t.clientX, t.clientY);
-      if (el) lvExtendSel(id, box, el, t.clientX, t.clientY);
+      lvExtendSel(id, box, t.clientX, t.clientY);
     }, { passive: false });
     var end = function (e) {
       clearTimeout(timer);
@@ -5300,37 +5299,24 @@ function lvBind(id, box) {
   }
 }
 
-// Met à jour la sélection quand le pointeur (souris ou doigt) arrive sur `el`.
-function lvExtendSel(id, box, el, x, y) {
+// Sélection LIBRE : le pointeur (souris ou doigt) « peint » les jours qu'il traverse - ligne, diagonale, cercle, zigzag...
+// Le trajet entre deux mesures est suivi pas à pas (tous les ~5 px) pour ne jamais sauter un jour quand on va vite.
+function lvExtendSel(id, box, x, y) {
   var st = lvState_(id);
-  var b = lvDateUnder(el);
-  if (!b) return;
-  var a = st.anchor;
-  // Glissé surtout VERTICAL : on ne prend que la colonne du jour de départ (ex. tous les lundis) ;
-  // sinon (horizontal / en biais) : tous les jours entre les deux, dans l'ordre du calendrier.
-  var vertical = Math.abs(y - st.ay) > Math.abs(x - st.ax) && a !== b;
-  var wd = new Date(a + 'T00:00:00Z').getUTCDay();
-  if (b < a) { var t = a; a = b; b = t; }
-  var out = [], d = a, n = 0;
-  while (d <= b && n++ < 400) {
-    if (!vertical || new Date(d + 'T00:00:00Z').getUTCDay() === wd) out.push(d);
-    d = lvAddDays(d, 1);
+  var x0 = st.px === undefined ? x : st.px, y0 = st.py === undefined ? y : st.py;
+  var steps = Math.max(1, Math.ceil(Math.hypot(x - x0, y - y0) / 5));
+  var have = {};
+  st.sel.forEach(function (d) { have[d] = 1; });
+  for (var i = 1; i <= steps; i++) {
+    var el = document.elementFromPoint(x0 + (x - x0) * i / steps, y0 + (y - y0) * i / steps);
+    var cell = el && el.closest ? el.closest('.lv-day') : null;
+    if (!cell) continue;
+    var d = cell.getAttribute('data-d');
+    st.last = d;
+    if (!have[d] && st.sel.length < 400) { have[d] = 1; st.sel.push(d); }
   }
-  if (!out.length) out = [st.anchor];
-  st.sel = out;
+  st.px = x; st.py = y;
   lvPaintSel(id, box);
-}
-
-// Jour « sous la souris » : un vrai jour, ou - pour une case vide / l'en-tête du mois - le jour le plus proche de ce mois,
-// pour que le glissé (surtout vertical) ne s'arrête jamais court quand le pointeur passe sur du vide.
-function lvDateUnder(el) {
-  var day = el.closest('.lv-day');
-  if (day) return day.getAttribute('data-d');
-  var month = el.closest('.lv-month');
-  if (!month) return null;
-  var edge = el.closest('[data-edge]');
-  if (!edge) return null;
-  return month.getAttribute(edge.getAttribute('data-edge') === 'last' ? 'data-last' : 'data-first');
 }
 
 function lvPaintSel(id, box) {
@@ -5369,6 +5355,7 @@ function lvShowBubble(id) {
   var map = lvDayMap(id);
   var allOff = st.sel.every(function (d) { return map[d]; });
   var allRepeat = allOff && st.sel.every(function (d) { return map[d].repeat; });
+  st.sel.sort();
   var n = st.sel.length;
   bub.innerHTML =
     '<label class="lv-chk"><input type="checkbox" id="lv-on-' + id + '"' + (allOff ? ' checked' : '') + ' onchange="lvApply(\'' + id + '\')"> ' +
@@ -5377,7 +5364,7 @@ function lvShowBubble(id) {
     '<div class="lv-foot"><button type="button" class="btn btn-ghost" onclick="lvClose(\'' + id + '\')">Fermer</button></div>';
   bub.style.display = 'block';
   // Ancrage sous le dernier jour sélectionné
-  var last = box.querySelector('.lv-day[data-d="' + st.sel[st.sel.length - 1] + '"]') || box.querySelector('.lv-day.sel');
+  var last = box.querySelector('.lv-day[data-d="' + (st.last || st.sel[st.sel.length - 1]) + '"]') || box.querySelector('.lv-day.sel');
   if (!last) return;
   var br = box.getBoundingClientRect(), cr = last.getBoundingClientRect();
   var w = bub.offsetWidth, left = cr.left - br.left + cr.width / 2 - w / 2;
