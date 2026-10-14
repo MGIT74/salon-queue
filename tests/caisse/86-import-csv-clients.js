@@ -18,7 +18,7 @@ check('ligne totalement vide ignoree et comptee', r.ignored === 0 && r.totalRows
 check('champ multi-ligne lu comme un seul client', r[r.length - 1].name === 'Multi\nligne');
 r = P('Name,Phone\r\nAnna,0612\r\n,\r\n');
 check('virgule + en-tetes anglais + CRLF', r.length === 1 && r[0].phone === '0612' && r.ignored === 0, r);
-check('envoi par lots de 300 + route /bulk appelee', /BATCH = 300/.test(html) && /manual-client\/bulk/.test(html));
+check('envoi par lots de 300 + route /bulk appelee', /BATCH = 100/.test(html) && /manual-client\/bulk/.test(html));
 
 // --- B. route /manual-client/bulk ---
 const rows = [{ client_name: 'Anna', email: 'a@x.fr', phone: '06' }];
@@ -57,6 +57,24 @@ const call = (body) => new Promise((resolve, reject) => {
   check('lot vide refuse (400)', x.statusCode === 400);
   x = await call({ clients: new Array(501).fill({ name: 'x' }) });
   check('plus de 500 par lot refuse (400)', x.statusCode === 400);
+  // --- C. fenetre de progression (jsdom si dispo) ---
+  let JSDOM = null; try { JSDOM = require('jsdom').JSDOM; } catch (_) { /* jsdom absent */ }
+  if (JSDOM) {
+    const dom = new JSDOM('<body></body>', { runScripts: 'outside-only' });
+    const w = dom.window; let reloaded = 0; const calls = [];
+    w.esc = (x) => String(x); w.location.reload = () => {}; 
+    w.api = (url, o) => { calls.push(url); if (/bulk/.test(url)) { const n = o.body.clients.length; if (calls.filter((c) => /bulk/.test(c)).length === 2) return Promise.reject(new Error('Serveur indisponible')); return Promise.resolve({ inserted: n - 1, skipped: 1 }); } return Promise.resolve({}); };
+    const a2 = html.indexOf('function runClientsImport'), e2 = html.indexOf('function deleteSelectedClients');
+    w.eval(html.slice(a2, e2));
+    const list = []; for (let i = 0; i < 250; i++) list.push({ name: 'C' + i });
+    w.runClientsImport(list);
+    check('fenetre de progression ouverte a 0 %', /0 %/.test(w.document.body.textContent) && !!w.document.getElementById('imp-bar'));
+    await new Promise((r) => setTimeout(r, 50));
+    const txt = w.document.body.textContent;
+    check('fin : 100 %, titre "avec des erreurs", lot en erreur detaille', /100 %/.test(txt) && /avec des erreurs/.test(txt) && /Lignes 101 à 200 : Serveur indisponible/.test(txt), txt.slice(0, 200));
+    check('fin : 148 importes (lots 1 et 3) et 2 doublons comptes', /148 clients importés/.test(txt) && /2 déjà présents/.test(txt), txt.slice(0, 200));
+    check('bouton Valider visible et journal appele', w.document.getElementById('imp-actions').style.display === '' && calls.some((c) => /import-log/.test(c)));
+  } else console.log('  (jsdom absent : fenetre de progression non testee)');
   console.log('\nRESULTAT : ' + pass + ' verifications reussies, ' + fail + ' echec(s)');
   process.exit(fail ? 1 : 0);
 })();

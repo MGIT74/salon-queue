@@ -7784,34 +7784,73 @@ function confirmImportClients(clients) {
 }
 
 /**
- * Import réel par lots de 300 envoyés l'un après l'autre (un seul appel
- * serveur par lot). Un lot en échec n'interrompt pas les suivants et le
- * résultat final détaille importés / déjà présents / en échec.
+ * Import réel par lots de 100 envoyés l'un après l'autre (un seul appel
+ * serveur par lot), avec une fenêtre de progression de 0 à 100 %. Un lot
+ * en échec n'interrompt pas les suivants. À la fin, la fenêtre détaille
+ * importés / déjà présents / erreurs et « Valider » recharge la page.
  */
 function runClientsImport(clients) {
   var total = clients.length;
-  var BATCH = 300;
-  var inserted = 0, skipped = 0, failed = 0, pos = 0;
+  var BATCH = 100;
+  var inserted = 0, skipped = 0, done = 0, errors = [];
 
-  toast('Import de ' + total + ' client' + (total > 1 ? 's' : '') + ' en cours…');
+  var ov = document.createElement('div');
+  ov.className = 'modal-overlay on';
+  ov.innerHTML =
+    '<div class="modal-box" role="dialog" aria-modal="true" aria-live="polite">' +
+      '<h3 class="modal-title" id="imp-title">Import en cours…</h3>' +
+      '<div style="height:10px;border-radius:999px;background:var(--fill-2);overflow:hidden;margin:6px 0 10px">' +
+        '<div id="imp-bar" style="height:100%;width:0;border-radius:999px;background:var(--accent);transition:width .25s ease"></div>' +
+      '</div>' +
+      '<div style="display:flex;justify-content:space-between;font-size:13.5px;color:var(--grey);margin-bottom:6px">' +
+        '<span id="imp-count">0 / ' + total + '</span><b id="imp-pct" style="color:var(--ink)">0 %</b>' +
+      '</div>' +
+      '<div id="imp-result" class="modal-message" style="margin:14px 0 0;display:none"></div>' +
+      '<div class="modal-actions" id="imp-actions" style="margin-top:18px;display:none">' +
+        '<button class="btn btn-primary" id="imp-ok">Valider</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(ov);
 
-  function next() {
-    if (pos >= total) return Promise.resolve();
-    var chunk = clients.slice(pos, pos + BATCH);
-    pos += BATCH;
-    return api('/api/queue/manual-client/bulk', { method: 'POST', body: { clients: chunk } })
-      .then(function (r) { inserted += r.inserted || 0; skipped += r.skipped || 0; },
-            function () { failed += chunk.length; })
-      .then(next);
+  function paint() {
+    var pct = Math.min(100, Math.round(done / total * 100));
+    document.getElementById('imp-bar').style.width = pct + '%';
+    document.getElementById('imp-pct').textContent = pct + ' %';
+    document.getElementById('imp-count').textContent = Math.min(done, total) + ' / ' + total;
   }
 
-  next().then(function () {
+  function next(pos) {
+    if (pos >= total) return Promise.resolve();
+    var chunk = clients.slice(pos, pos + BATCH);
+    return api('/api/queue/manual-client/bulk', { method: 'POST', body: { clients: chunk } })
+      .then(function (r) { inserted += r.inserted || 0; skipped += r.skipped || 0; },
+            function (e) {
+              errors.push('Lignes ' + (pos + 1) + ' à ' + (pos + chunk.length) + ' : ' +
+                ((e && e.message) || 'erreur inconnue'));
+            })
+      .then(function () { done += chunk.length; paint(); return next(pos + BATCH); });
+  }
+
+  next(0).then(function () {
     if (inserted > 0) return api('/api/queue/manual-client/import-log', { method: 'POST', body: { count: inserted } }).catch(function () {});
-  }).then(loadClients).then(function () {
-    var msg = inserted + ' client' + (inserted > 1 ? 's' : '') + ' importé' + (inserted > 1 ? 's' : '');
-    if (skipped) msg += ', ' + skipped + ' déjà présent' + (skipped > 1 ? 's' : '');
-    if (failed) msg += ', ' + failed + ' en échec';
-    toast(msg, failed > 0 && inserted === 0);
+  }).then(function () {
+    var failedRows = errors.length;
+    var html = '<b style="color:var(--ink)">' + inserted + ' client' + (inserted > 1 ? 's' : '') + ' importé' + (inserted > 1 ? 's' : '') + '</b>';
+    if (skipped) html += '<br>' + skipped + ' déjà présent' + (skipped > 1 ? 's' : '') + ' (non dupliqué' + (skipped > 1 ? 's' : '') + ')';
+    if (errors.length) {
+      html += '<br><span style="color:var(--red);font-weight:600">' + errors.length + ' lot' + (errors.length > 1 ? 's' : '') + ' en erreur :</span>' +
+        '<div style="margin-top:6px;max-height:160px;overflow-y:auto;font-size:13px;color:var(--red)">' +
+        errors.map(function (m) { return esc(m); }).join('<br>') + '</div>';
+    }
+    document.getElementById('imp-title').textContent = failedRows ? 'Import terminé avec des erreurs' : 'Import terminé';
+    document.getElementById('imp-bar').style.background = failedRows ? 'var(--orange)' : 'var(--green)';
+    done = total; paint();
+    var res = document.getElementById('imp-result');
+    res.innerHTML = html; res.style.display = '';
+    document.getElementById('imp-actions').style.display = '';
+    var ok = document.getElementById('imp-ok');
+    ok.onclick = function () { location.reload(); };
+    ok.focus();
   });
 }
 
