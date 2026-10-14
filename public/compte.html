@@ -649,7 +649,7 @@
 </div>
 
 <script src="/app.js?v=17"></script>
-<script src="/group-booking.js?v=6"></script>
+<script src="/group-booking.js?v=7"></script>
 <style>
 .group-entry{display:flex;align-items:center;gap:14px;width:100%;margin-top:18px;padding:16px;border:1px dashed var(--blue);background:var(--blue-soft);color:var(--blue);border-radius:18px;font-family:inherit;text-align:left;cursor:pointer}
 .group-entry span{display:flex;flex-direction:column;gap:3px}.group-entry b{font-size:15px;color:var(--ink)}.group-entry small{font-size:13px;color:var(--grey)}
@@ -1001,7 +1001,7 @@ function openBookGroup() {
       },
       onContinue: function (people, payload) {
         bookGroupPayload = payload;
-        document.getElementById('bk-group-summary').textContent = people.length + ' personnes — ' + people.map(function (p) { return p.isSelf ? 'vous' : p.name; }).join(', ');
+        document.getElementById('bk-group-summary').textContent = people.length + (people.length > 1 ? ' personnes — ' : ' personne — ') + people.map(function (p) { return p.isSelf ? 'vous' : p.name; }).join(', ');
         show('p-book-group-confirm');
       }
     });
@@ -1029,8 +1029,10 @@ function submitBookGroup() {
     }).join('');
     document.getElementById('bk-group-note').value = '';
     show('p-book-group-confirmed'); hideFooter();
-  }).catch(function (e) { toast(e.message, true); })
-    .finally(function () { btn.disabled = false; btn.textContent = 'Confirmer les rendez-vous'; });
+  }).catch(function (e) {
+    toast(e.message, true);
+    if (e.data && typeof e.data.person_index === 'number' && e.data.person_index >= 0 && bookGroupCtl) { bookGroupCtl.focusPerson(e.data.person_index, e.message); show('p-book-group'); }
+  }).finally(function () { btn.disabled = false; btn.textContent = 'Confirmer les rendez-vous'; });
 }
 
 /**
@@ -1163,7 +1165,7 @@ function apiForBooking(path, opts) {
     body: opts.body ? JSON.stringify(opts.body) : undefined
   }).then(function (r) {
     return r.json().then(function (data) {
-      if (!r.ok) throw new Error(data.error || 'Erreur ' + r.status);
+      if (!r.ok) { var err = new Error(data.error || 'Erreur ' + r.status); err.data = data; throw err; }
       return data;
     });
   });

@@ -324,7 +324,7 @@
 </div>
 
 <script src="/app.js?v=17"></script>
-<script src="/group-booking.js?v=6"></script>
+<script src="/group-booking.js?v=7"></script>
 <style>
 .group-entry{display:flex;align-items:center;gap:14px;width:100%;margin-top:18px;padding:16px;border:1px dashed var(--blue);background:var(--blue-soft);color:var(--blue);border-radius:18px;font-family:inherit;text-align:left;cursor:pointer}
 .group-entry span{display:flex;flex-direction:column;gap:3px}.group-entry b{font-size:15px;color:var(--ink)}.group-entry small{font-size:13px;color:var(--grey)}
@@ -367,7 +367,7 @@ function api(path, opts) {
     body: opts.body ? JSON.stringify(opts.body) : undefined
   }).then(function (r) {
     return r.json().then(function (data) {
-      if (!r.ok) throw new Error(data.error || 'Erreur ' + r.status);
+      if (!r.ok) { var err = new Error(data.error || 'Erreur ' + r.status); err.data = data; throw err; }
       return data;
     });
   });
@@ -801,7 +801,7 @@ function openGroupBooking() {
       onContinue: function (people, payload) {
         groupPeople = people; groupPayload = payload;
         var self = people[0];
-        document.getElementById('group-contact-summary').textContent = people.length + ' personnes — ' + people.map(function (p) { return p.isSelf ? 'vous' : p.name; }).join(', ');
+        document.getElementById('group-contact-summary').textContent = people.length + (people.length > 1 ? ' personnes — ' : ' personne — ') + people.map(function (p) { return p.isSelf ? 'vous' : p.name; }).join(', ');
         show('p-group-contact');
       }
     });
@@ -828,8 +828,11 @@ function submitGroup() {
       return '<div class="gb-done"><b>' + esc(a.name) + '</b><span>' + esc(when) + ' — ' + esc(a.service_name || '') + (a.barber_name ? ' · ' + esc(a.barber_name) : '') + '</span></div>';
     }).join('');
     show('p-group-confirmed');
-  }).catch(function (e) { toast(e.message, true); })
-    .finally(function () { btn.disabled = false; btn.textContent = 'Confirmer les rendez-vous'; });
+  }).catch(function (e) {
+    toast(e.message, true);
+    // Un creneau vient d'etre pris : on renvoie directement sur la personne concernee pour qu'elle en choisisse un autre.
+    if (e.data && typeof e.data.person_index === 'number' && e.data.person_index >= 0 && groupCtl) { groupCtl.focusPerson(e.data.person_index, e.message); show('p-group'); }
+  }).finally(function () { btn.disabled = false; btn.textContent = 'Confirmer les rendez-vous'; });
 }
 
 /* ---------- Annulation ---------- */

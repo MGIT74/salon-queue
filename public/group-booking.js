@@ -78,6 +78,16 @@
 
   var STYLE = '' +
     '.gb-recap-person{margin-bottom:16px;opacity:.8}.gb-recap-person.on{opacity:1}' +
+    '.gb-pills{position:relative;padding-right:34px}' +
+    '.gb-pill-x{position:absolute;right:0;top:0;border:none;background:var(--fill);color:var(--grey);width:26px;height:26px;border-radius:50%;font-size:12px;cursor:pointer;font-family:inherit;flex:none}.gb-pill-x:hover{color:#fff;background:#ff3b30}' +
+    'button.gb-pill{border:none;font-family:inherit;cursor:pointer}button.gb-pill:hover{filter:brightness(1.25)}' +
+    '.gb-menu{flex-basis:100%;display:flex;flex-direction:column;background:var(--card);border:1px solid var(--sep);border-radius:12px;padding:4px;margin-top:2px}' +
+    '.gb-menu button{border:none;background:none;color:var(--ink);text-align:left;padding:9px 10px;border-radius:8px;font-family:inherit;font-size:14px;cursor:pointer}.gb-menu button:hover,.gb-menu button.on{background:var(--fill)}.gb-menu button.on{font-weight:600}' +
+    '.gb-whos{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:22px}' +
+    '.gb-who{display:inline-flex;align-items:center;gap:10px;border:2px solid transparent;background:var(--fill);color:var(--ink);border-radius:16px;padding:12px 18px 12px 12px;font-family:inherit;font-size:16px;font-weight:600;cursor:pointer}' +
+    '.gb-who i{font-style:normal;width:32px;height:32px;border-radius:50%;background:var(--blue-soft);color:var(--blue);display:flex;align-items:center;justify-content:center;font-size:14px}' +
+    '.gb-who.on{border-color:var(--blue);background:var(--blue-soft)}.gb-who.on i{background:var(--blue);color:#fff}' +
+    '.gb-addrow{display:flex;gap:8px}.gb-addrow input{flex:1;min-width:0}' +
     '.gb-pills{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}' +
     '.gb-pill{display:inline-flex;align-items:center;gap:6px;background:var(--fill);color:var(--ink);border-radius:999px;padding:5px 11px;font-size:13px;font-weight:500;line-height:1.3}' +
     '.gb-pill b{font-weight:700}' +
@@ -123,7 +133,7 @@
    */
   function create(cfg) {
     injectStyle();
-    var people = [], uid = 0, view = 'recap', cur = null;
+    var people = [], uid = 0, view = 'who', cur = null, fromWho = false, menuFor = null, wsel = null;
     // Trois zones (en-tete / liste / colonne de droite) : fournies par la page (cfg.zones, mises en page comme la reservation normale),
     // sinon creees dans cfg.mount.
     var zones = cfg.zones;
@@ -151,8 +161,29 @@
     function complete(p) { return !!(p.serviceId && p.slot && (p.isSelf || String(p.name || '').trim())); }
     function stepsFor(p) { return STEPS.filter(function (s) { return s !== 'extras' || (cfg.extras && cfg.extras.length); }).concat(p.isSelf ? [] : []); }
 
-    function reset() {
-      people = [newPerson({ isSelf: true })]; cur = people[0]; view = 'barber'; paint();
+    function newWho() { return { self: true, rels: {}, extra: [], draft: '', draftSave: false }; }
+    function reset() { people = []; cur = null; fromWho = false; menuFor = null; wsel = newWho(); view = 'who'; paint(); }
+    function whoCount() { return (wsel.self ? 1 : 0) + Object.keys(wsel.rels).filter(function (k) { return wsel.rels[k]; }).length + wsel.extra.length; }
+    function addWhoName() {
+      var n = String(wsel.draft || '').trim(); if (!n) return;
+      var low = n.toLowerCase(), rel = (cfg.relatives || []).filter(function (r) { return String(r.name).toLowerCase() === low; })[0];
+      if (rel) wsel.rels[rel.id] = true;
+      else if (!wsel.extra.some(function (x) { return x.name.toLowerCase() === low; })) wsel.extra.push({ name: n, save: !!wsel.draftSave });
+      wsel.draft = ''; paint();
+    }
+    // Construit (ou met a jour, sans perdre ce qui est deja choisi) la liste des personnes depuis l'ecran « Qui vient ? ».
+    function applyWho() {
+      var next = [];
+      function keep(match, init) { var f = people.filter(match)[0]; next.push(f || newPerson(init)); }
+      if (wsel.self) keep(function (p) { return p.isSelf; }, { isSelf: true });
+      (cfg.relatives || []).forEach(function (r) { if (wsel.rels[r.id]) keep(function (p) { return String(p.relativeId) === String(r.id); }, { name: r.name, relativeId: r.id }); });
+      wsel.extra.forEach(function (x) { keep(function (p) { return !p.isSelf && !p.relativeId && p.name === x.name; }, { name: x.name, saveRelative: x.save }); });
+      people = next.slice(0, MAX_PEOPLE);
+    }
+    function personByUid(u) { for (var i = 0; i < people.length; i++) if (String(people[i].uid) === String(u)) return people[i]; return null; }
+    function nextIncomplete(after) {
+      for (var i = after + 1; i < people.length; i++) if (!complete(people[i])) return people[i];
+      return null;
     }
 
     /* ---------- Creneaux ---------- */
@@ -201,9 +232,13 @@
       people.forEach(function (p) {
         var s = byId(cfg.services, p.serviceId), who = label(p) + (p.isSelf ? '' : '');
         var b = p.slot ? barberName(p.slot.barberId) : (p.pref ? barberName(p.pref) : '');
-        var pills = '<span class="gb-pill who"><i>' + esc(who.charAt(0).toUpperCase()) + '</i>' + esc(who) + '</span>' +
-          (b ? '<span class="gb-pill">✂ ' + esc(b) + '</span>' : '') +
-          (p.slot ? '<span class="gb-pill">🗓 ' + esc(fmtDate(p.date)) + ' · <b>' + esc(p.slot.time) + '</b></span>' : '');
+        var menu = '';
+        if (menuFor === p.uid) menu = '<div class="gb-menu">' + cfg.barbers.map(function (bb) {
+          return '<button type="button" data-act="set-barber" data-uid="' + p.uid + '" data-id="' + esc(bb.id) + '"' + (String(bb.id) === String(p.slot ? p.slot.barberId : p.pref) ? ' class="on"' : '') + '>' + esc(bb.name) + '</button>'; }).join('') + '</div>';
+        var pills = '<button type="button" class="gb-pill who" data-act="pill-who" data-uid="' + p.uid + '" title="Modifier"><i>' + esc(who.charAt(0).toUpperCase()) + '</i>' + esc(who) + '</button>' +
+          (b ? '<button type="button" class="gb-pill" data-act="pill-barber" data-uid="' + p.uid + '" title="Changer de coiffeur">✂ ' + esc(b) + ' ▾</button>' : '') +
+          (p.slot ? '<button type="button" class="gb-pill" data-act="pill-date" data-uid="' + p.uid + '" title="Changer la date ou l\'heure">🗓 ' + esc(fmtDate(p.date)) + ' · <b>' + esc(p.slot.time) + '</b></button>' : '') +
+          '<button type="button" class="gb-pill-x" data-act="rm" data-uid="' + p.uid + '" title="Retirer ' + esc(who) + '" aria-label="Retirer ' + esc(who) + '">✕</button>' + menu;
         var rows = '';
         function row(k, n, meta, price) { rows += '<div class="recap-row"><span class="recap-k">' + k + '</span><span class="recap-n">' + esc(n) + (meta ? ' <em>' + esc(meta) + '</em>' : '') + '</span><span class="recap-p">' + price + '</span></div>'; }
         if (s) {
@@ -218,8 +253,19 @@
     }
 
     function views() {
+      if (view === 'who') {
+        var chips = '<button type="button" class="gb-who' + (wsel.self ? ' on' : '') + '" data-act="who-self"><i>M</i>Moi</button>';
+        (cfg.relatives || []).forEach(function (r) { chips += '<button type="button" class="gb-who' + (wsel.rels[r.id] ? ' on' : '') + '" data-act="who-rel" data-id="' + esc(r.id) + '"><i>' + esc(String(r.name).charAt(0).toUpperCase()) + '</i>' + esc(r.name) + '</button>'; });
+        wsel.extra.forEach(function (x, i) { chips += '<button type="button" class="gb-who on" data-act="who-del" data-i="' + i + '" title="Retirer"><i>' + esc(x.name.charAt(0).toUpperCase()) + '</i>' + esc(x.name) + ' ✕</button>'; });
+        var n = whoCount();
+        return { top: back() + '<div class="eyebrow">Qui vient au salon ?</div><p class="step-sub">Cochez les personnes à inscrire. Vous n\'êtes pas obligé de réserver pour vous.</p>',
+          body: '<div class="gb-whos">' + chips + '</div>' +
+            '<div class="fld"><label for="gb-who-name">Ajouter quelqu\'un d\'autre</label><div class="gb-addrow"><input id="gb-who-name" maxlength="60" autocomplete="off" placeholder="Prénom" value="' + esc(wsel.draft) + '"><button type="button" class="gb-mini" data-act="who-add">Ajouter</button></div></div>' +
+            (cfg.createRelative ? '<label class="gb-save"><input type="checkbox" data-act="who-save"' + (wsel.draftSave ? ' checked' : '') + '> Enregistrer ce prénom dans « Mes proches »</label>' : ''),
+          go: goBtn('Suivant', n < 1, 'who-next'), hint: n < 1 ? 'Choisissez au moins une personne.' : n > MAX_PEOPLE ? 'Maximum ' + MAX_PEOPLE + ' personnes.' : '' };
+      }
       if (view === 'recap') {
-        var ready = people.length > 1 && people.every(complete);
+        var ready = people.length > 0 && people.every(complete);
         var used = {}; people.forEach(function (p) { if (p.relativeId) used[p.relativeId] = true; });
         var rels = (cfg.relatives || []).filter(function (r) { return !used[r.id]; });
         var body = '<div class="gb-rows">';
@@ -228,7 +274,7 @@
           var line = complete(p) ? esc(s.name) + (barberName(p.slot.barberId) ? ' · ' + esc(barberName(p.slot.barberId)) : '') + '<br>' + esc(fmtDate(p.date)) + ' à ' + esc(p.slot.time) : '<span class="todo">À compléter</span>';
           body += '<div class="gb-row" data-i="' + i + '"><span class="gb-av">' + esc(label(p).charAt(0).toUpperCase()) + '</span><div class="gb-info"><b>' + esc(label(p)) + '</b><span>' + line + '</span></div>' +
             '<button type="button" class="gb-mini" data-act="edit">' + (complete(p) ? 'Modifier' : 'Compléter') + '</button>' +
-            (people.length > 1 ? '<button type="button" class="gb-mini x" data-act="remove" aria-label="Retirer">✕</button>' : '') + '</div>';
+            '<button type="button" class="gb-mini x" data-act="remove" aria-label="Retirer">✕</button>' + '</div>';
         });
         body += '</div>';
         if (people.length < MAX_PEOPLE) {
@@ -237,7 +283,7 @@
         } else body += '<div class="gb-empty">Maximum ' + MAX_PEOPLE + ' personnes par réservation.</div>';
         return { top: back() + '<div class="eyebrow">Réserver pour plusieurs personnes</div><p class="step-sub">Chaque personne a sa prestation, son coiffeur et son horaire : à la suite, en même temps ou décalés.</p>',
                  body: body, go: goBtn(esc(cfg.continueLabel || 'Continuer'), !ready, 'continue'),
-                 hint: people.length < 2 ? 'Ajoutez au moins une autre personne.' : !ready ? 'Complétez chaque personne (prestation et horaire).' : '' };
+                 hint: !people.length ? 'Ajoutez au moins une personne.' : !ready ? 'Complétez chaque personne (prestation et horaire).' : '' };
       }
       var p = cur, who = p.isSelf ? '' : esc(label(p)) + ' — ';
       if (view === 'name') return { top: back() + '<div class="eyebrow">Qui vient avec vous ?</div>',
@@ -263,7 +309,7 @@
       body2 += '<div class="slots-grid">' + (p.loading || !p.slots ? '<div class="empty">Chargement…</div>' : !list.length ? '<div class="empty">Aucun créneau disponible ce jour-là</div>' :
         list.map(function (s) { var on = p.slot && p.slot.time === s.time && String(p.slot.barberId) === String(s.barber_id);
           return '<button type="button" class="slot-btn' + (on ? ' sel' : '') + '" data-act="slot" data-time="' + esc(s.time) + '" data-barber="' + esc(s.barber_id) + '">' + esc(s.time) + '</button>'; }).join('')) + '</div>';
-      if (p.note) body2 += '<div class="gb-warn">' + esc(p.note) + '</div>';
+      if (p.note || p.alert) body2 += '<div class="gb-warn">' + esc(p.alert || p.note) + '</div>';
       return { top: back() + '<div class="eyebrow">' + who + 'Date et heure</div>', body: body2, go: goBtn('Valider', !p.slot) };
     }
 
@@ -275,16 +321,24 @@
     }
 
     /* ---------- Navigation ---------- */
-    function go(v) { view = v; paint(); if (v === 'datetime') loadSlots(cur); }
+    function go(v) { view = v; menuFor = null; paint(); if (v === 'datetime') loadSlots(cur); }
     function firstStep(p) { return p.isSelf || p.name || p.relativeId ? 'barber' : 'name'; }
     function nextStep() {
       if (view === 'name') return go('barber');
       var seq = stepsFor(cur), i = seq.indexOf(view);
       if (i < seq.length - 1) return go(seq[i + 1]);
-      go('recap');
+      // fin de la personne : si on enchaine depuis « Qui vient ? », on passe a la suivante, sinon retour au recapitulatif
+      var nx = fromWho ? nextIncomplete(people.indexOf(cur)) : null;
+      if (nx) { cur = nx; return go('barber'); }
+      fromWho = false; go('recap');
     }
     function prevStep() {
       var seq = stepsFor(cur), i = seq.indexOf(view);
+      if (fromWho && view === 'barber') {
+        var k = people.indexOf(cur);
+        if (k <= 0) { fromWho = false; return go('who'); }
+        cur = people[k - 1]; return go('datetime');
+      }
       if (view === 'barber' && !cur.isSelf && !cur.relativeId) return go('name');
       if (i > 0) return go(seq[i - 1]);
       // premiere etape : on quitte la personne
@@ -309,7 +363,33 @@
         if (pick === 'extra') { var k = cur.extraIds.indexOf(String(id)); if (k === -1) cur.extraIds.push(String(id)); else cur.extraIds.splice(k, 1); cur.slot = null; cur.slots = null; paint(); return; }
       }
       var row = t.closest('.gb-row'), i = row ? Number(row.getAttribute('data-i')) : -1;
-      if (act === 'back') return view === 'recap' ? (cfg.onExit && cfg.onExit()) : prevStep();
+      if (act === 'who-self') { wsel.self = !wsel.self; return paint(); }
+      if (act === 'who-rel') { var rid = t.getAttribute('data-id'); wsel.rels[rid] = !wsel.rels[rid]; return paint(); }
+      if (act === 'who-del') { wsel.extra.splice(Number(t.getAttribute('data-i')), 1); return paint(); }
+      if (act === 'who-add') return addWhoName();
+      if (act === 'who-next') {
+        if (whoCount() < 1) return;
+        if (whoCount() > MAX_PEOPLE) { if (cfg.toast) cfg.toast('Maximum ' + MAX_PEOPLE + ' personnes.', true); return; }
+        applyWho(); fromWho = true; cur = nextIncomplete(-1) || people[0]; return go('barber');
+      }
+      if (act === 'pill-who') { var pw = personByUid(t.getAttribute('data-uid')); if (pw) { cur = pw; go('barber'); } return; }
+      if (act === 'pill-date') { var pd = personByUid(t.getAttribute('data-uid')); if (pd && pd.serviceId) { cur = pd; go('datetime'); } return; }
+      if (act === 'pill-barber') { var pb = personByUid(t.getAttribute('data-uid')); menuFor = menuFor === (pb && pb.uid) ? null : (pb && pb.uid); return paint(); }
+      if (act === 'set-barber') {
+        var ps = personByUid(t.getAttribute('data-uid')), bid = t.getAttribute('data-id'); menuFor = null;
+        if (!ps) return paint();
+        if (String(ps.pref) !== String(bid) || (ps.slot && String(ps.slot.barberId) !== String(bid))) { ps.pref = bid; ps.slot = null; ps.slots = null; ps.suggestions = []; }
+        if (ps.serviceId) { cur = ps; return go('datetime'); }   // les creneaux du nouveau coiffeur se rechargent
+        return paint();
+      }
+      if (act === 'rm') {
+        var pr = personByUid(t.getAttribute('data-uid')); if (!pr) return;
+        people.splice(people.indexOf(pr), 1); menuFor = null;
+        if (!people.length) { fromWho = false; wsel = newWho(); return go('who'); }
+        if (cur === pr) { cur = people[0]; fromWho = false; return go('recap'); }
+        return paint();
+      }
+      if (act === 'back') return view === 'who' ? (cfg.onExit && cfg.onExit()) : view === 'recap' ? (cfg.onExit && cfg.onExit()) : prevStep();
       if (act === 'next') return nextStep();
       if (act === 'add') return addPerson();
       if (act === 'add-rel') { var r = byId(cfg.relatives || [], t.getAttribute('data-id')); if (r) addPerson({ name: r.name, relativeId: r.id }); return; }
@@ -317,15 +397,18 @@
       if (act === 'remove') { people.splice(i, 1); return paint(); }
       if (act === 'continue') return doContinue();
       if (act === 'half') { cur.half = t.getAttribute('data-half'); return paint(); }
-      if (act === 'slot' || act === 'sugg') { cur.slot = { time: t.getAttribute('data-time'), barberId: t.getAttribute('data-barber') }; cur.note = ''; return paint(); }
+      if (act === 'slot' || act === 'sugg') { cur.slot = { time: t.getAttribute('data-time'), barberId: t.getAttribute('data-barber') }; cur.note = ''; cur.alert = ''; return paint(); }
     });
+    el.addEventListener('keydown', function (e) { if (e.key === 'Enter' && e.target.id === 'gb-who-name') { e.preventDefault(); addWhoName(); } });
     el.addEventListener('input', function (e) {
+      if (e.target.id === 'gb-who-name') wsel.draft = e.target.value;
       if (e.target.id === 'gb-name') { cur.name = e.target.value; var b = zones.bar.querySelector('[data-act=next]'); if (b) b.disabled = !cur.name.trim(); }
     });
     el.addEventListener('change', function (e) {
       var t = e.target;
       if (t.id === 'gb-date') { cur.date = t.value; cur.slot = null; loadSlots(cur); }
       if (t.getAttribute && t.getAttribute('data-act') === 'save') cur.saveRelative = t.checked;
+      if (t.getAttribute && t.getAttribute('data-act') === 'who-save') wsel.draftSave = t.checked;
     });
 
     function doContinue() {
@@ -339,7 +422,8 @@
     return {
       reset: reset,
       getPeople: function () { return people; },
-      setRelatives: function (list) { cfg.relatives = list || []; if (view === 'recap') paint(); },
+      focusPerson: function (i, msg) { var q = people[i]; if (!q) return; q.slot = null; q.alert = msg || ''; cur = q; fromWho = false; go('datetime'); },
+      setRelatives: function (list) { cfg.relatives = list || []; if (view === 'recap' || view === 'who') paint(); },
       setCatalog: function (c) { cfg.services = c.services || cfg.services; cfg.extras = c.extras || cfg.extras; cfg.barbers = c.barbers || cfg.barbers; }
     };
   }
