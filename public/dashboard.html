@@ -1180,16 +1180,22 @@
              padding: 9px 16px 9px 12px; font-family: inherit; font-size: 14px; font-weight: 600; color: var(--ink); cursor: pointer; box-shadow: var(--shadow); }
   .bp-back:hover { background: var(--fill); }
   .bp-title { font-size: 21px; font-weight: 600; letter-spacing: -.03em; margin: 0; }
-  .bp-stats { background: var(--card); border-radius: 18px; padding: 18px; box-shadow: var(--shadow); margin-bottom: 18px; }
+  .bp-stats { background: var(--card); border-radius: 18px; padding: 18px; box-shadow: var(--shadow); height: 100%; box-sizing: border-box; }
   .bp-stats-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; }
   .bp-stats-head h3 { margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -.02em; }
   .bp-stats .period-picker { margin-bottom: 0; width: 360px; max-width: 100%; }
   .bp-stats .stats-nav { margin-bottom: 14px; }
-  .bp-stats .stats-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
-  .bp-stats .stat-tile.wide { grid-column: auto; }
+  /* Grille « bento » : 3 tuiles en haut, 2 plus larges dessous (2 tuiles seulement tant que le taux d'occupation n'est pas connu). */
+  .bp-stats .stats-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
+  .bp-stats .stat-tile { grid-column: span 3; display: flex; flex-direction: column; justify-content: center; }
+  .bp-stats .stats-grid.bento .stat-tile { grid-column: span 2; }
+  .bp-stats .stats-grid.bento .stat-tile:nth-child(n+4) { grid-column: span 3; }
+  .bp-stats .stat-tile.wide { grid-column: span 2; }
   .bp-stats .stats-range-picker { margin-bottom: 14px; }
-  @media (max-width: 980px) { .bp-stats .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .bp-stats .stat-tile.wide { grid-column: 1 / -1; } }
-  .bp-layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 18px; align-items: start; }
+  @media (max-width: 980px) { .bp-stats .stats-grid, .bp-stats .stats-grid.bento { grid-template-columns: repeat(2, minmax(0, 1fr)); } .bp-stats .stat-tile, .bp-stats .stats-grid.bento .stat-tile, .bp-stats .stats-grid.bento .stat-tile:nth-child(n+4) { grid-column: auto; } .bp-stats .stat-tile.wide, .bp-stats .stats-grid.bento .stat-tile.wide { grid-column: 1 / -1; } }
+  .bp-layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 18px; align-items: stretch; margin-bottom: 18px; }
+  .bp-side { min-width: 0; }
+  .bp-side .bp-profile { height: 100%; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; align-items: center; }
   .bp-main { min-width: 0; }
   .bp-tabbody.fade { animation: bpTabIn .32s cubic-bezier(.22,.8,.3,1) both; }
   @keyframes bpTabIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
@@ -4808,9 +4814,9 @@ function renderBarberDetail(b) {
     '<div class="bp-chips">' + leaveBadgeHtml(b) + barberStatusChips(b, true) + '</div>' +
     '</div></aside>';
 
-  return '<div class="bp-stats">' + renderStatsTab(b) + '</div>' +
-    '<div class="bp-layout"><div class="bp-main">' +
-    '<div class="bp-panel">' + tabs + '<div class="bp-tabbody" id="bp-tabbody-' + b.id + '">' + body + '</div></div></div>' + profile + '</div>';
+  // Bento : statistiques à gauche, carte profil à droite (même hauteur), puis le panneau d'onglets pleine largeur dessous.
+  return '<div class="bp-layout"><div class="bp-main"><div class="bp-stats">' + renderStatsTab(b) + '</div></div>' + profile + '</div>' +
+    '<div class="bp-panel">' + tabs + '<div class="bp-tabbody" id="bp-tabbody-' + b.id + '">' + body + '</div></div>';
 }
 
 function renderScheduleTab(b) {
@@ -5145,6 +5151,7 @@ function loadBarberStats(id) {
       var grid = document.getElementById('stats-grid-' + id);
       if (!grid) return;
       var a = r.availability;
+      grid.classList.toggle('bento', !!a);
       grid.innerHTML =
         '<div class="stat-tile"><div class="v">' + r.done_count + '</div><div class="l">coupes terminées</div></div>' +
         '<div class="stat-tile"><div class="v">' + eur(r.revenue_cents) + '</div><div class="l">encaissé</div></div>' +
