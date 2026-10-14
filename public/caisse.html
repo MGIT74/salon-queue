@@ -3505,7 +3505,7 @@ function renderItemCats() {
   if (f && f !== '__none' && !cats.some(function (c) { return c.id === f; })) f = caisseCatFilter[currentCat] = '';
   var chip = function (value, label, n) {
     return '<button type="button" class="' + (f === value ? 'on' : '') + '" data-catid="' + esc(value) + '" ' +
-      'style="padding:7px 16px;border-radius:999px;border:1px solid var(--line, #d8d8d8);background:' + (f === value ? 'var(--ink, #111)' : 'var(--card, #fff)') + ';color:' + (f === value ? '#fff' : 'inherit') + ';font:inherit;font-size:14px;cursor:pointer">' +
+      'style="padding:7px 16px;border-radius:999px;border:1px solid var(--line, #d8d8d8);background:' + (f === value ? 'var(--ink, #111)' : 'var(--card, #fff)') + ';color:' + (f === value ? 'var(--card, #fff)' : 'inherit') + ';font:inherit;font-size:14px;cursor:pointer">' +
       esc(label) + ' <span style="opacity:.6">' + n + '</span></button>';
   };
   var html = chip('', 'Toutes', all.length);
