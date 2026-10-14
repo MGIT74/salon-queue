@@ -5308,9 +5308,13 @@ function lvExtendSel(id, box, x, y) {
   var have = {};
   st.sel.forEach(function (d) { have[d] = 1; });
   for (var i = 1; i <= steps; i++) {
-    var el = document.elementFromPoint(x0 + (x - x0) * i / steps, y0 + (y - y0) * i / steps);
+    var px = x0 + (x - x0) * i / steps, py = y0 + (y - y0) * i / steps;
+    var el = document.elementFromPoint(px, py);
     var cell = el && el.closest ? el.closest('.lv-day') : null;
     if (!cell) continue;
+    // Seul le CENTRE de la case compte (on ignore les 22 % de chaque bord) : une diagonale qui frôle le coin d'une case voisine ne la prend plus.
+    var r = cell.getBoundingClientRect(), mx = r.width * 0.22, my = r.height * 0.22;
+    if (px < r.left + mx || px > r.right - mx || py < r.top + my || py > r.bottom - my) continue;
     var d = cell.getAttribute('data-d');
     st.last = d;
     if (!have[d] && st.sel.length < 400) { have[d] = 1; st.sel.push(d); }
