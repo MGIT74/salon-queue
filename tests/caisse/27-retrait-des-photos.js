@@ -107,9 +107,9 @@ console.log('\n[D] PHOTO d\'un coiffeur : retrait (vraies fonctions)');
   function render(photo) {
     const dom = new JSDOM('<div></div>', { runScripts: 'outside-only', url: 'http://localhost/' });
     const w = dom.window;
-    w.barberDetailTab = {}; w.barberTabFade = false; w.esc = (x) => String(x); w.leaveBadgeHtml = () => ''; w.barberStatusChips = () => ''; w.barberAvatarHtml = () => ''; w.stableColorForId = () => '#000'; w.currentSalonName = '';
+    w.barberDetailTab = {}; w.esc = (x) => String(x); w.leaveBadgeHtml = () => ''; w.barberStatusChips = () => ''; w.barberAvatarHtml = () => ''; w.stableColorForId = () => '#000'; w.currentSalonName = '';
     ['renderScheduleTab', 'renderStatsTab', 'renderCapabilitiesTab', 'renderLeavesTab'].forEach(n => { w[n] = () => ''; });
-    w.eval(fnSrc(dash, 'renderBarberDetail'));
+    w.eval(fnSrc(dash, 'barberTabBody')); w.eval(fnSrc(dash, 'renderBarberDetail'));
     return w.renderBarberDetail({ id: 'b1', name: 'Alice', photo_url: photo, has_pin: true, active: true });
   }
   let html = render('data:image/png;base64,AAAA');
