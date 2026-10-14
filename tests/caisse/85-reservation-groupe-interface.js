@@ -62,8 +62,10 @@ let JSDOM; try { ({ JSDOM } = require('jsdom')); } catch (e) { console.log('jsdo
     assert(/Qui vient/.test(eyebrow())); const nm = m.querySelector('#gb-name');
     assert(m.querySelector('[data-act=next]').disabled); nm.value = 'Tom'; nm.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
     assert(!m.querySelector('[data-act=next]').disabled); clickEl('[data-act=next]'); ok('nouvelle personne : prénom puis mêmes étapes');
-    assert(m.querySelector('[data-pick=barber].sel'), 'coiffeur pré-sélectionné'); clickEl('[data-act=next]');
-    assert(m.querySelector('[data-pick=service].sel')); clickEl('[data-pick=service][data-id=s2]'); clickEl('[data-act=next]'); clickEl('[data-act=next]');
+    assert(!m.querySelector('[data-pick=barber].sel'), 'rien de pré-sélectionné pour la nouvelle personne');
+    assert(!/Prestation/.test(m.querySelector('.flow-recap').textContent.split('Tom')[1] || ''), 'récap vide pour la nouvelle personne');
+    clickEl('[data-pick=barber][data-barber-id="b1"], [data-pick=barber][data-id="b1"]'); clickEl('[data-act=next]');
+    assert(!m.querySelector('[data-pick=service].sel'), 'aucune prestation pré-sélectionnée'); ok('la nouvelle personne repart vide (rien copié de la précédente)'); clickEl('[data-pick=service][data-id=s2]'); clickEl('[data-act=next]'); clickEl('[data-act=next]');
     await wait(400);
     assert(calls.some((u) => /held=b1%7C/.test(u)), 'held envoyé'); ok('les créneaux de la 2e personne tiennent compte de la 1re (held)');
     assert(m.querySelector('.gb-chip.sugg'), 'raccourci'); ok('raccourci « à la suite » affiché');

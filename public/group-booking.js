@@ -295,7 +295,6 @@
     function addPerson(init) {
       if (people.length >= MAX_PEOPLE) return;
       var prev = people[people.length - 1], np = newPerson(init || {});
-      if (prev && prev.serviceId) { np.serviceId = prev.serviceId; np.pref = prev.pref; np.extraIds = prev.extraIds.slice(); }   // fratrie : memes choix par defaut, modifiables
       if (prev) np.date = prev.date;
       people.push(np); cur = np; go(firstStep(np));
     }
