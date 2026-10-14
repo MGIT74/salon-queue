@@ -588,3 +588,22 @@ input[type="date"] { -webkit-appearance: none; appearance: none; }
 .dp-foot { display: flex; justify-content: space-between; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--sep); }
 .dp-link { color: var(--accent) !important; font-size: 14px; font-weight: 600; padding: 6px 8px; border-radius: 8px; }
 .dp-link:hover { background: var(--fill) !important; }
+
+/* ---------- Onglets : pastille qui glisse + fondu des panneaux (voir « Onglets » dans app.js) ---------- */
+.tfx > .st-ind { position: absolute; z-index: 0; left: 0; top: 0; width: 0; height: 0; pointer-events: none; opacity: 0;
+                 transition: left .32s cubic-bezier(.22,.8,.3,1), top .32s cubic-bezier(.22,.8,.3,1), width .32s cubic-bezier(.22,.8,.3,1),
+                             height .32s cubic-bezier(.22,.8,.3,1), background-color .25s ease, opacity .2s ease; }
+body .tfx > button { position: relative; z-index: 1; }
+/* Le bouton actif perd son propre fond : c'est la pastille qui le porte (la couleur du texte, elle, change en douceur). */
+.tfx.tfx-on > button.on, .tfx.tfx-on > button.sel { background: transparent !important; box-shadow: none !important; transition-property: color, transform, opacity !important; }
+.tfx.tfx-probe > button { transition: none !important; }
+body .tfx > button { transition: color .25s ease, transform .1s ease; }
+
+.tab-panel.on { animation: tab-fade-in .28s ease; }
+.panel.on { animation: panel-fade-in .28s ease; }
+@keyframes tab-fade-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes panel-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .tfx > .st-ind { transition: none; }
+  .tab-panel.on { animation-name: panel-fade-in; }
+}

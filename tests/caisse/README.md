@@ -112,4 +112,5 @@ node tests/caisse/78-fidelite-sans-badge-cadeau.js  # Fidélité sans badge cade
 node tests/caisse/79-conges-calendrier-lib.js  # Congés : jours <-> plages, répétition annuelle
 node tests/caisse/80-conges-calendrier-annuel.js  # Congés : calendrier annuel (glisser, bulle)
 node tests/caisse/81-fiche-coiffeur-page.js  # Fiche coiffeur en page + cartes
+node tests/caisse/82-onglets-pastille-fondu.js  # Onglets partout : pastille qui glisse + fondu
 ```

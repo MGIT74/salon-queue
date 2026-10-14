@@ -1173,3 +1173,92 @@ function vitrinePageFlow(wrap, panelIds) {
   window.addEventListener('resize', close);
   window.addEventListener('scroll', function (e) { if (pop && !pop.contains(e.target)) close(); }, true);
 })();
+
+
+/* ---------- Onglets : pastille qui glisse + contenu en fondu (tous les écrans) ----------
+   Repère tout seul les barres d'onglets (.subtabs, .period-picker, .cat-tabs, .tabs, barres du bas...) : une pastille se glisse
+   sous le bouton actif au lieu de sauter. Rien à brancher dans chaque page : on observe les classes « on » / « sel » des boutons,
+   même quand la barre est recréée par un rendu. Les panneaux .tab-panel / .panel apparaissent en fondu via app.css. */
+(function () {
+  if (typeof document === 'undefined' || !window.MutationObserver) return;
+  var SEL = '.subtabs, .period-picker, .cat-tabs, .cal-view-switch, .half-toggle, .dash-leader-tabs, .tabs, .caisse-footer, .poste-footer, .client-footer';
+  var queued = [];
+
+  function activeBtn(c) {
+    var list = c.querySelectorAll('button.on, button.sel');
+    for (var i = 0; i < list.length; i++) if (list[i].closest(SEL) === c) return list[i];
+    return null;
+  }
+
+  function enhance(c) {
+    if (c._tfx) return;
+    c._tfx = true;
+    c.classList.add('tfx');
+    if (getComputedStyle(c).position === 'static') c.style.position = 'relative';
+    ensureInd(c);
+    if (window.ResizeObserver) new ResizeObserver(function () { place(c, false); }).observe(c);
+    place(c, false);
+  }
+
+  function ensureInd(c) {
+    if (!c._tfxInd) { c._tfxInd = document.createElement('span'); c._tfxInd.className = 'st-ind'; c._tfxInd.setAttribute('aria-hidden', 'true'); }
+    if (c._tfxInd.parentNode !== c) c.appendChild(c._tfxInd);
+    return c._tfxInd;
+  }
+
+  function off(c) { c.classList.remove('tfx-on'); if (c._tfxInd) c._tfxInd.style.opacity = '0'; c._tfxPlaced = false; }
+
+  // Place la pastille sous le bouton actif ; « animate » = glisse (sinon elle apparait directement au bon endroit).
+  function place(c, animate) {
+    var ind = ensureInd(c), on = activeBtn(c);
+    if (!on || !c.offsetWidth || !on.offsetWidth || getComputedStyle(c).display === 'grid') { off(c); return; }
+    // Lit le style d'origine du bouton actif (fond, ombre, couleur) sans transition parasite, pour que la pastille lui ressemble.
+    c.classList.remove('tfx-on'); c.classList.add('tfx-probe');
+    var cs = getComputedStyle(on);
+    var bg = cs.backgroundColor, shadow = cs.boxShadow, radius = cs.borderRadius, color = cs.color;
+    c.classList.remove('tfx-probe'); c.classList.add('tfx-on');
+    var plain = !bg || bg === 'transparent' || /,\s*0\)$/.test(bg);
+    var w = on.offsetWidth, h = on.offsetHeight, l = on.offsetLeft, t = on.offsetTop;
+    if (plain) {                                    // barre du bas : simple trait coloré sur le bouton actif
+      var bw = Math.min(30, w * 0.6);
+      l += (w - bw) / 2; w = bw; h = 3;
+      bg = color; shadow = 'none'; radius = '0 0 4px 4px';
+    }
+    if (!animate || !c._tfxPlaced) ind.style.transition = 'none';
+    ind.style.opacity = '1'; ind.style.background = bg; ind.style.boxShadow = shadow; ind.style.borderRadius = radius;
+    ind.style.left = l + 'px'; ind.style.top = t + 'px'; ind.style.width = w + 'px'; ind.style.height = h + 'px';
+    if (!animate || !c._tfxPlaced) { void ind.offsetWidth; ind.style.transition = ''; }
+    c._tfxPlaced = true;
+  }
+
+  function schedule(c, animate) {
+    for (var i = 0; i < queued.length; i++) if (queued[i].c === c) { queued[i].a = queued[i].a || animate; return; }
+    queued.push({ c: c, a: animate });
+    if (queued.length === 1) requestAnimationFrame(function () { var q = queued; queued = []; q.forEach(function (x) { place(x.c, x.a); }); });
+  }
+
+  function scan(root) {
+    if (!root || root.nodeType !== 1) return;
+    if (root.matches && root.matches(SEL)) enhance(root);
+    if (root.querySelectorAll) [].forEach.call(root.querySelectorAll(SEL), enhance);
+  }
+
+  function placeAll() { [].forEach.call(document.querySelectorAll('.tfx'), function (c) { schedule(c, false); }); }
+
+  new MutationObserver(function (muts) {
+    for (var i = 0; i < muts.length; i++) {
+      var m = muts[i], t = m.target;
+      if (m.type === 'attributes') {
+        if (t === document.documentElement) { placeAll(); continue; }
+        if (t.tagName === 'BUTTON') { var c = t.closest('.tfx'); if (c) schedule(c, c._tfxPlaced === true); }
+      } else {
+        for (var j = 0; j < m.addedNodes.length; j++) scan(m.addedNodes[j]);
+        if (t.classList && t.classList.contains('tfx')) { ensureInd(t); schedule(t, false); }
+      }
+    }
+  }).observe(document.documentElement, { subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'data-theme'] });
+
+  function init() { scan(document.body); if (document.fonts && document.fonts.ready) document.fonts.ready.then(placeAll); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+  window.addEventListener('load', placeAll);
+})();

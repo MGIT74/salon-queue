@@ -101,7 +101,8 @@ const suite = [
   ['78-fidelite-sans-badge-cadeau.js', false, ['exit']],
   ['79-conges-calendrier-lib.js', false, ['exit']],
   ['80-conges-calendrier-annuel.js', false, ['exit']],
-  ['81-fiche-coiffeur-page.js', false, ['exit']]
+  ['81-fiche-coiffeur-page.js', false, ['exit']],
+  ['82-onglets-pastille-fondu.js', false, ['exit']]
 ];
 
 let bad = 0;

@@ -27,5 +27,5 @@ for (const [n, c] of [['caisse', caisse], ['admin', dash]]) {
 }
 check('admin : n\'envoie au pont que s\'il est configure (sinon dialogue navigateur)', /if \(!d\.tpe_bridge_url\) \{ done\(\); window\.print\(\); return; \}/.test(dash));
 check('caisse : sans pont, dialogue navigateur', /if \(!tpeBridgeUrl \|\| !currentZClosing\) \{ window\.print\(\); return; \}/.test(caisse));
-check('app.js versionne (cache) sur les pages', /app\.js\?v=15/.test(caisse) && /app\.js\?v=15/.test(dash));
+check('app.js versionne (cache) sur les pages', /app\.js\?v=\d+/.test(caisse) && /app\.js\?v=\d+/.test(dash));
 console.log('\n' + pass + ' OK, ' + fail + ' ECHEC'); process.exit(fail ? 1 : 0);

@@ -49,7 +49,7 @@
 <style>
   html.auth-checking #login { display: none; }
 </style>
-<link rel="stylesheet" href="/app.css?v=20">
+<link rel="stylesheet" href="/app.css?v=21">
 <style>
   .wrap { max-width: none; margin: 0; padding: clamp(16px,1.8vw,28px); }
 
@@ -1195,14 +1195,6 @@
   @keyframes bpTabIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
   @media (prefers-reduced-motion: reduce) { .bp-tabbody.fade { animation-name: bpTabInSoft; } }
   @keyframes bpTabInSoft { from { opacity: 0; } to { opacity: 1; } }
-  .bp-panel .subtabs { position: relative; }
-  .bp-panel .subtabs button { position: relative; z-index: 1; transition: color .2s ease; }
-  .bp-panel .subtabs button.on { background: transparent; box-shadow: none; }
-  [data-theme="dark"] .bp-panel .subtabs button.on { background: transparent; }
-  .st-ind { position: absolute; z-index: 0; left: 0; top: 0; width: 0; height: 0; border-radius: 999px; background: var(--card); box-shadow: var(--shadow);
-            transition: left .32s cubic-bezier(.22,.8,.3,1), width .32s cubic-bezier(.22,.8,.3,1); pointer-events: none; }
-  [data-theme="dark"] .st-ind { background: #48484a; }
-  @media (max-width: 640px) { .st-ind { display: none; } .bp-panel .subtabs button.on { background: var(--blue); box-shadow: none; } }
   .bp-panel { background: var(--card); border-radius: 18px; padding: 18px; box-shadow: var(--shadow); }
   .bp-profile { background: var(--card); border-radius: 18px; padding: 24px 18px 18px; box-shadow: var(--shadow); text-align: center; }
   .bp-ring { --rc: var(--accent); width: 100px; height: 100px; border-radius: 50%; padding: 4px; margin: 0 auto 14px; box-sizing: border-box;
@@ -2658,7 +2650,7 @@
   </div>
 </div>
 
-<script src="/app.js?v=16"></script>
+<script src="/app.js?v=17"></script>
 <script>
   // Le lien "Creer mon salon" n'a de sens que si l'inscription est ouverte sur
   // cette installation (fermee chez un client unique). Masque par defaut : s'il
@@ -4713,7 +4705,6 @@ function renderBarbers() {
       '<h2 class="bp-title">' + esc(cur.name) + '</h2></div>' +
     renderBarberDetail(cur) + others;
   populateBarberTab(cur.id);
-  placeTabIndicator(document.getElementById('bp-tabs-' + cur.id), false);
 }
 
 // Remplit l'onglet affiché (Congés, Statistiques, Prestations) APRÈS chaque rendu de la fiche : renderBarbers() est aussi
@@ -4743,7 +4734,7 @@ function closeBarber() {
   if (t && t.scrollIntoView) t.scrollIntoView({ block: 'start' });
 }
 
-// Changement d'onglet SUR PLACE (pas de repeint de la fiche) : la pastille glisse d'un onglet à l'autre et le contenu apparait en fondu.
+// Changement d'onglet SUR PLACE (pas de repeint de la fiche) : la pastille glisse toute seule (voir « Onglets » dans app.js) et le contenu apparait en fondu.
 function switchBarberTab(id, tab) {
   if (barberDetailTab[id] === tab) return;
   var b = barbers.filter(function (x) { return x.id === id; })[0];
@@ -4751,21 +4742,10 @@ function switchBarberTab(id, tab) {
   barberDetailTab[id] = tab;
   if (!b || !tabs || !body) { renderBarbers(); return; }
   [].forEach.call(tabs.querySelectorAll('button'), function (btn) { btn.classList.toggle('on', btn.getAttribute('data-tab') === tab); });
-  placeTabIndicator(tabs, true);
   body.innerHTML = barberTabBody(b, tab);
   body.classList.remove('fade'); void body.offsetWidth; body.classList.add('fade');   // relance l'animation
   populateBarberTab(id, true);
 }
-
-// Pastille qui glisse sous l'onglet actif (bureau) ; sans animation au premier affichage.
-function placeTabIndicator(tabs, animate) {
-  var ind = tabs && tabs.querySelector('.st-ind'), on = tabs && tabs.querySelector('button.on');
-  if (!ind || !on) return;
-  if (!animate) ind.style.transition = 'none';
-  ind.style.left = on.offsetLeft + 'px'; ind.style.width = on.offsetWidth + 'px'; ind.style.top = on.offsetTop + 'px'; ind.style.height = on.offsetHeight + 'px';
-  if (!animate) { void ind.offsetWidth; ind.style.transition = ''; }
-}
-window.addEventListener('resize', function () { var t = document.querySelector('.bp-panel .subtabs'); if (t) placeTabIndicator(t, false); });
 
 function barberTabBody(b, tab) {
   return tab === 'horaires' ? renderScheduleTab(b) :
@@ -4810,7 +4790,7 @@ function renderBarberDetail(b) {
           '</button>') +
     '</div>';
 
-  var tabs = '<div class="subtabs" id="bp-tabs-' + b.id + '"><span class="st-ind"></span>' +
+  var tabs = '<div class="subtabs" id="bp-tabs-' + b.id + '">' +
     '<button data-tab="horaires" class="' + (tab === 'horaires' ? 'on' : '') + '" onclick="switchBarberTab(\'' + b.id + '\',\'horaires\')">Horaires</button>' +
     '<button data-tab="prestations" class="' + (tab === 'prestations' ? 'on' : '') + '" onclick="switchBarberTab(\'' + b.id + '\',\'prestations\')">Prestations</button>' +
     '<button data-tab="conges" class="' + (tab === 'conges' ? 'on' : '') + '" onclick="switchBarberTab(\'' + b.id + '\',\'conges\')">Congés</button>' +
@@ -4901,16 +4881,20 @@ function addBreakRow(btn) {
 
 function renderStatsTab(b) {
   var st = barberStatsState[b.id] || { period: 'day', offset: 0 };
-  var isRange = st.period === 'range';
-  var todayStr = nowSalonDatetimeString().slice(0, 10);
-
-  return '<div class="bp-stats-head"><h3>Statistiques</h3><div class="period-picker">' +
+  // L'en-tête (sélecteur de période) reste en place quand on change de période : la pastille glisse. Seul le corps est redessiné.
+  return '<div class="bp-stats-head"><h3>Statistiques</h3><div class="period-picker" id="stats-picker-' + b.id + '">' +
     ['day', 'week', 'month', 'range'].map(function (p) {
       var label = p === 'day' ? 'Jour' : p === 'week' ? 'Semaine' : p === 'month' ? 'Mois' : 'Plage';
-      return '<button class="' + (st.period === p ? 'on' : '') + '" onclick="setStatsPeriod(\'' + b.id + '\',\'' + p + '\')">' + label + '</button>';
+      return '<button data-p="' + p + '" class="' + (st.period === p ? 'on' : '') + '" onclick="setStatsPeriod(\'' + b.id + '\',\'' + p + '\')">' + label + '</button>';
     }).join('') +
-    '</div></div>' +
-    (isRange
+    '</div></div><div id="stats-body-' + b.id + '">' + renderStatsBody(b) + '</div>';
+}
+
+function renderStatsBody(b) {
+  var st = barberStatsState[b.id] || { period: 'day', offset: 0 };
+  var isRange = st.period === 'range';
+  var todayStr = nowSalonDatetimeString().slice(0, 10);
+  return (isRange
       ? '<div class="stats-range-picker">' +
         '<div class="fld"><label>Du</label><input type="date" id="stats-from-' + b.id + '" value="' + (st.customFrom || todayStr) + '" onchange="setStatsRange(\'' + b.id + '\')"></div>' +
         '<div class="fld"><label>Au</label><input type="date" id="stats-to-' + b.id + '" value="' + (st.customTo || todayStr) + '" onchange="setStatsRange(\'' + b.id + '\')"></div>' +
@@ -5104,7 +5088,15 @@ function setStatsPeriod(id, period) {
     customFrom: prevCustom.customFrom || todayStr,
     customTo: prevCustom.customTo || todayStr
   };
-  renderBarbers();   // repeint la fiche, qui recharge les statistiques
+  // Sur place : le sélecteur de période garde sa pastille (elle glisse), seul le corps des statistiques est redessiné.
+  var picker = document.getElementById('stats-picker-' + id), body = document.getElementById('stats-body-' + id);
+  var b = barbers.filter(function (x) { return x.id === id; })[0];
+  if (!picker || !body || !b) { renderBarbers(); return; }
+  [].forEach.call(picker.querySelectorAll('button'), function (btn) {
+    btn.classList.toggle('on', btn.getAttribute('data-p') === period);
+  });
+  body.innerHTML = renderStatsBody(b);
+  loadBarberStats(id);
 }
 
 function setStatsRange(id) {
