@@ -116,4 +116,5 @@ node tests/caisse/82-onglets-pastille-fondu.js  # Onglets partout : pastille qui
 node tests/caisse/83-groupe-reservation-api.js  # Reservation a plusieurs : API (groupe, annulation groupee)
 node tests/caisse/84-proches-compte-api.js  # Mes proches : CRUD du compte client
 node tests/caisse/85-reservation-groupe-interface.js  # Reservation a plusieurs : interface (jsdom si dispo)
+node tests/caisse/86-import-csv-clients.js  # Import CSV clients : lecture du fichier + route en lot (base simulee)
 ```

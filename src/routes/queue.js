@@ -188,6 +188,48 @@ router.post('/manual-client', requireAdmin, wrap(async (req, res) => {
 }));
 
 /**
+ * Import CSV en lot : un seul appel pour jusqu'à 500 clients (au lieu d'un
+ * appel par client, qui échouait en silence sur les gros fichiers). Les
+ * doublons (même nom + email + téléphone déjà présents dans le salon, ou
+ * répétés dans le lot) sont ignorés, donc relancer un import déjà passé
+ * en partie ne recrée pas les fiches existantes.
+ */
+router.post('/manual-client/bulk', requireAdmin, wrap(async (req, res) => {
+  const list = Array.isArray(req.body.clients) ? req.body.clients : [];
+  if (list.length === 0) return res.status(400).json({ error: 'Aucun client à importer' });
+  if (list.length > 500) return res.status(400).json({ error: 'Maximum 500 clients par lot' });
+
+  const norm = (v) => String(v || '').trim().toLowerCase();
+  const keyOf = (n, e, t) => norm(n) + '|' + norm(e) + '|' + String(t || '').replace(/\s+/g, '');
+
+  const [existing] = await pool.query(
+    'SELECT client_name, email, phone FROM queue WHERE salon_id = ?', [req.salon.id]
+  );
+  const seen = new Set(existing.map((r) => keyOf(r.client_name, r.email, r.phone)));
+
+  const values = [];
+  let skipped = 0;
+  for (const c of list) {
+    const name = String((c && c.name) || '').trim().slice(0, 255);
+    if (!name) { skipped++; continue; }
+    const email = String((c && c.email) || '').trim().slice(0, 255) || null;
+    const phone = String((c && c.phone) || '').trim().slice(0, 50) || null;
+    const k = keyOf(name, email, phone);
+    if (seen.has(k)) { skipped++; continue; }
+    seen.add(k);
+    values.push([crypto.randomUUID(), req.salon.id, name, email, phone]);
+  }
+  if (values.length) {
+    await pool.query(
+      "INSERT INTO queue (id, salon_id, client_name, email, phone, status, checkin_at, start_at, end_at) VALUES " +
+      values.map(() => "(?, ?, ?, ?, ?, 'done', NOW(), NOW(), NOW())").join(', '),
+      values.flat()
+    );
+  }
+  res.json({ ok: true, inserted: values.length, skipped });
+}));
+
+/**
  * Résumé unique après un import CSV (voir importClientsCsv côté
  * dashboard) : évite une ligne de journal par client importé.
  */

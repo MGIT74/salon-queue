@@ -7706,29 +7706,38 @@ function _normalizeCsvHeader(h) {
     .toLowerCase().replace(/[^a-z]/g, '');
 }
 
-function _parseCsvLine(line, delim) {
-  var out = [], cur = '', inQuotes = false;
-  for (var i = 0; i < line.length; i++) {
-    var ch = line[i];
+// Lit tout le fichier d'un coup (et non ligne par ligne) pour gérer
+// correctement les champs entre guillemets contenant un retour à la ligne.
+function _parseCsvText(text, delim) {
+  var rows = [], row = [], cur = '', inQuotes = false;
+  for (var i = 0; i < text.length; i++) {
+    var ch = text[i];
     if (inQuotes) {
-      if (ch === '"') { if (line[i + 1] === '"') { cur += '"'; i++; } else inQuotes = false; }
+      if (ch === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else inQuotes = false; }
       else cur += ch;
     } else if (ch === '"') inQuotes = true;
-    else if (ch === delim) { out.push(cur); cur = ''; }
-    else cur += ch;
+    else if (ch === delim) { row.push(cur.trim()); cur = ''; }
+    else if (ch === '\n' || ch === '\r') {
+      if (ch === '\r' && text[i + 1] === '\n') i++;
+      row.push(cur.trim()); cur = '';
+      if (row.some(function (v) { return v !== ''; })) rows.push(row);
+      row = [];
+    } else cur += ch;
   }
-  out.push(cur);
-  return out.map(function (v) { return v.trim(); });
+  row.push(cur.trim());
+  if (row.some(function (v) { return v !== ''; })) rows.push(row);
+  return rows;
 }
 
 function parseClientsCsv(text) {
-  text = text.replace(/^\uFEFF/, ''); // BOM éventuel (Excel)
-  var lines = text.split(/\r\n|\r|\n/).filter(function (l) { return l.trim() !== ''; });
-  if (!lines.length) return [];
-
-  var sample = lines[0];
-  var delim = (sample.match(/;/g) || []).length >= (sample.match(/,/g) || []).length ? ';' : ',';
-  var rows = lines.map(function (l) { return _parseCsvLine(l, delim); });
+  text = text.replace(/^﻿/, ''); // BOM éventuel (Excel)
+  var firstLine = (text.split(/\r\n|\r|\n/)[0] || '');
+  var delim = (firstLine.match(/;/g) || []).length >= (firstLine.match(/,/g) || []).length ? ';' : ',';
+  if ((firstLine.match(/\t/g) || []).length > (firstLine.match(/[;,]/g) || []).length) delim = '\t';
+  var rows = _parseCsvText(text, delim);
+  var out = [];
+  out.totalRows = 0; out.ignored = 0; out.noName = 0;
+  if (!rows.length) return out;
 
   // Repère les colonnes reconnues dans la 1re ligne ; si aucune ne
   // correspond, on suppose qu'il n'y a pas d'en-tête et on retombe sur
@@ -7743,61 +7752,66 @@ function parseClientsCsv(text) {
   var hasHeader = Object.keys(colMap).length > 0;
   if (!hasHeader) colMap = { name: 0, email: 1, phone: 2 };
   var dataRows = hasHeader ? rows.slice(1) : rows;
+  out.totalRows = dataRows.length;
 
-  var out = [];
   dataRows.forEach(function (row) {
     var name = colMap.name !== undefined ? (row[colMap.name] || '').trim() : '';
-    if (!name) return; // ligne sans nom = ignorée
-    out.push({
-      name: name,
-      email: colMap.email !== undefined ? (row[colMap.email] || '').trim() : '',
-      phone: colMap.phone !== undefined ? (row[colMap.phone] || '').trim() : ''
-    });
+    var email = colMap.email !== undefined ? (row[colMap.email] || '').trim() : '';
+    var phone = colMap.phone !== undefined ? (row[colMap.phone] || '').trim() : '';
+    if (!name) {
+      // Sans nom mais avec un email ou un téléphone : on garde le contact
+      // (identifié par cette coordonnée) au lieu de le perdre en silence.
+      name = email || phone;
+      if (!name) { out.ignored++; return; }
+      out.noName++;
+    }
+    out.push({ name: name, email: email, phone: phone });
   });
   return out;
 }
 
 function confirmImportClients(clients) {
   var n = clients.length;
-  showConfirm(
-    n + ' client' + (n > 1 ? 's' : '') + ' trouvé' + (n > 1 ? 's' : '') + ' dans ce fichier. Les importer ?',
-    { title: 'Importer des clients', confirmLabel: 'Importer' }
-  ).then(function (ok) {
+  var msg = n + ' client' + (n > 1 ? 's' : '') + ' trouvé' + (n > 1 ? 's' : '') + ' dans ce fichier';
+  if (clients.totalRows && clients.totalRows !== n) msg += ' (sur ' + clients.totalRows + ' lignes)';
+  msg += '.';
+  if (clients.noName) msg += ' ' + clients.noName + ' sans nom seront enregistrés avec leur email ou téléphone.';
+  if (clients.ignored) msg += ' ' + clients.ignored + ' ligne' + (clients.ignored > 1 ? 's' : '') + ' vide' + (clients.ignored > 1 ? 's' : '') + ' (ni nom, ni email, ni téléphone) ignorée' + (clients.ignored > 1 ? 's' : '') + '.';
+  msg += ' Les fiches déjà présentes (même nom, email et téléphone) ne seront pas dupliquées. Les importer ?';
+  showConfirm(msg, { title: 'Importer des clients', confirmLabel: 'Importer' }).then(function (ok) {
     if (ok) runClientsImport(clients);
   });
 }
 
 /**
- * Import réel, en parallèle limité (4 à la fois) pour rester rapide sur
- * de gros fichiers sans bombarder le serveur. Chaque client est ajouté
- * via le même endpoint que "+ Ajouter un client" (historique 'Terminé').
- * Les échecs individuels n'interrompent pas le reste de l'import.
+ * Import réel par lots de 300 envoyés l'un après l'autre (un seul appel
+ * serveur par lot). Un lot en échec n'interrompt pas les suivants et le
+ * résultat final détaille importés / déjà présents / en échec.
  */
 function runClientsImport(clients) {
   var total = clients.length;
-  var idx = 0, okCount = 0, failCount = 0;
-  var CONCURRENCY = 4;
+  var BATCH = 300;
+  var inserted = 0, skipped = 0, failed = 0, pos = 0;
 
   toast('Import de ' + total + ' client' + (total > 1 ? 's' : '') + ' en cours…');
 
-  function worker() {
-    if (idx >= total) return Promise.resolve();
-    var c = clients[idx++];
-    return api('/api/queue/manual-client', {
-      method: 'POST',
-      body: { client_name: c.name, email: c.email, phone: c.phone, source: 'csv_import' }
-    }).then(function () { okCount++; }, function () { failCount++; }).then(worker);
+  function next() {
+    if (pos >= total) return Promise.resolve();
+    var chunk = clients.slice(pos, pos + BATCH);
+    pos += BATCH;
+    return api('/api/queue/manual-client/bulk', { method: 'POST', body: { clients: chunk } })
+      .then(function (r) { inserted += r.inserted || 0; skipped += r.skipped || 0; },
+            function () { failed += chunk.length; })
+      .then(next);
   }
 
-  var workers = [];
-  for (var i = 0; i < Math.min(CONCURRENCY, total); i++) workers.push(worker());
-
-  Promise.all(workers).then(function () {
-    if (okCount > 0) return api('/api/queue/manual-client/import-log', { method: 'POST', body: { count: okCount } }).catch(function () {});
+  next().then(function () {
+    if (inserted > 0) return api('/api/queue/manual-client/import-log', { method: 'POST', body: { count: inserted } }).catch(function () {});
   }).then(loadClients).then(function () {
-    var msg = okCount + ' client' + (okCount > 1 ? 's' : '') + ' importé' + (okCount > 1 ? 's' : '');
-    if (failCount) msg += ', ' + failCount + ' échec' + (failCount > 1 ? 's' : '');
-    toast(msg, failCount > 0 && okCount === 0);
+    var msg = inserted + ' client' + (inserted > 1 ? 's' : '') + ' importé' + (inserted > 1 ? 's' : '');
+    if (skipped) msg += ', ' + skipped + ' déjà présent' + (skipped > 1 ? 's' : '');
+    if (failed) msg += ', ' + failed + ' en échec';
+    toast(msg, failed > 0 && inserted === 0);
   });
 }
 
