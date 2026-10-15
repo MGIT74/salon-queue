@@ -34,7 +34,7 @@
 <style>
   html.auth-checking #login-screen { display: none; }
 </style>
-<link rel="stylesheet" href="/app.css?v=30">
+<link rel="stylesheet" href="/app.css?v=31">
 <style>
   html, body { min-height: 100%; }
   .wrap { max-width: 480px; margin: 0 auto; padding: 20px 18px 40px; }
@@ -295,7 +295,7 @@
   </button>
 </div>
 
-<script src="/app.js?v=18"></script>
+<script src="/app.js?v=19"></script>
 <script src="/staff-group.js?v=5"></script>
 <script>requireSalonInUrl("Pour utiliser votre poste, ouvrez le lien de votre salon.");</script>
 <script>
@@ -1111,7 +1111,8 @@ function openPosteAddAppointment(dateStr) {
   function paListCfg(kind) {
     return {
       kind: kind, gridId: 'pa-' + kind + '-grid', searchId: 'pa-' + kind + '-search', qId: 'pa-' + kind + '-q', emptyId: 'pa-' + kind + '-empty', summaryId: 'pa-' + kind + '-summary',
-      items: kind === 'extras' ? extras : products, chosen: kind === 'extras' ? state.extraIds : state.productIds,
+      items: kind === 'extras' ? extras : products.filter(function (p) { return p.online_bookable !== 0; }),   // « caisse seulement » : pas proposé dans un RDV
+      chosen: kind === 'extras' ? state.extraIds : state.productIds,
       onclick: kind === 'extras' ? 'paToggleExtra(this)' : 'paToggleProduct(this)'
     };
   }

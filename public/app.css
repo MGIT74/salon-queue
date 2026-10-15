@@ -419,6 +419,14 @@ input[type="date"] { -webkit-appearance: none; appearance: none; }
 .item-group { grid-column: 1 / -1; margin: 12px 2px 0; font-size: 12.5px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--grey); }
 .item-group:first-child { margin-top: 0; }
 .item-group[hidden] { display: none; }
+/* Pastilles de catégories des produits (étapes « Produits » des réservations) */
+.vitrine-cats { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 12px; margin: 0 0 2px; scrollbar-width: none; flex: none; }
+.vitrine-cats::-webkit-scrollbar { display: none; }
+.vitrine-cat { flex: none; white-space: nowrap; padding: 8px 14px; border: none; border-radius: 999px; background: var(--fill); color: var(--ink); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; transition: background .15s ease, color .15s ease; }
+.vitrine-cat span { font-weight: 500; opacity: .55; margin-left: 2px; }
+.vitrine-cat:hover { background: var(--fill-2, var(--fill)); }
+.vitrine-cat.on { background: var(--accent); color: #fff; }
+.vitrine-cat.on span { opacity: .8; }
 .item-card { position: relative; display: flex; flex-direction: column; text-align: left; padding: 0; border: none; background: var(--fill); color: var(--ink);
   border-radius: 20px; overflow: hidden; cursor: pointer; font-family: inherit; -webkit-tap-highlight-color: transparent;
   transition: transform .12s ease, background .15s ease; }

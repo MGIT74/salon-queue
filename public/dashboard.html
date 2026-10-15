@@ -49,7 +49,7 @@
 <style>
   html.auth-checking #login { display: none; }
 </style>
-<link rel="stylesheet" href="/app.css?v=30">
+<link rel="stylesheet" href="/app.css?v=31">
 <style>
   .wrap { max-width: none; margin: 0; padding: clamp(16px,1.8vw,28px); }
 
@@ -2709,7 +2709,7 @@
   </div>
 </div>
 
-<script src="/app.js?v=18"></script>
+<script src="/app.js?v=19"></script>
 <script src="/staff-group.js?v=5"></script>
 <script src="/daterange.js?v=4"></script>
 <script>
@@ -6524,7 +6524,8 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
   function aaListCfg(kind) {
     return {
       kind: kind, gridId: 'aa-' + kind + '-grid', searchId: 'aa-' + kind + '-search', qId: 'aa-' + kind + '-q', emptyId: 'aa-' + kind + '-empty', summaryId: 'aa-' + kind + '-summary',
-      items: kind === 'extras' ? extras : products, chosen: kind === 'extras' ? state.extraIds : state.productIds,
+      items: kind === 'extras' ? extras : products.filter(function (p) { return p.online_bookable !== 0; }),   // « caisse seulement » : pas proposé dans un RDV
+      chosen: kind === 'extras' ? state.extraIds : state.productIds,
       onclick: kind === 'extras' ? 'aaToggleExtra(this)' : 'aaToggleProduct(this)'
     };
   }

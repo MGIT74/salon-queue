@@ -837,8 +837,16 @@ function productIcon(name) {
 }
 
 // Les produits sont regroupes par categorie quand le gerant en a renseigne ; sinon une simple liste.
-function groupItems(kind, items) {
+function groupItems(kind, items, cats) {
   if (kind !== 'products') return [{ title: '', items: items }];
+  // Catégories créées dans l'administration (ordre choisi par l'admin) ; sinon l'ancien libellé texte.
+  if (cats && cats.length) {
+    var byId = Object.create(null), rest = [];
+    cats.forEach(function (c) { byId[c.id] = []; });
+    items.forEach(function (it) { if (it.category_id && byId[it.category_id]) byId[it.category_id].push(it); else rest.push(it); });
+    var gs = cats.filter(function (c) { return byId[c.id].length; }).map(function (c) { return { title: c.name, id: c.id, items: byId[c.id] }; });
+    if (gs.length) { if (rest.length) gs.push({ title: 'Autres', id: '__none', items: rest }); return gs; }
+  }
   var order = [], map = Object.create(null);
   items.forEach(function (it) {
     var c = String(it.category || '').trim();
@@ -847,9 +855,45 @@ function groupItems(kind, items) {
   });
   var named = order.filter(function (c) { return c; });
   if (!named.length) return [{ title: '', items: items }];
-  var groups = named.map(function (c) { return { title: c, items: map[c] }; });
-  if (map['']) groups.push({ title: 'Autres', items: map[''] });
+  var groups = named.map(function (c) { return { title: c, id: 'txt:' + c, items: map[c] }; });
+  if (map['']) groups.push({ title: 'Autres', id: '__none', items: map[''] });
   return groups;
+}
+
+/* Catégories de produits du salon (publiques), chargées une fois par salon pour les étapes « Produits » des
+   réservations (en ligne, compte client, dashboard, caisse, Mon poste). */
+function vitrineCategories(cfg) {
+  var store = window.__vitrineCats = window.__vitrineCats || {};
+  var slug = (typeof SALON_SLUG === 'string' && SALON_SLUG) || '';
+  var c = store[slug];
+  if (c && c.list) return c.list;
+  if (!c) {
+    c = store[slug] = { list: null, waiting: [] };
+    if (typeof fetch !== 'function') { c.list = []; return c.list; }
+    var headers = {}; if (slug) headers['X-Salon-Slug'] = slug;
+    fetch('/api/catalog/categories', { headers: headers }).then(function (r) { return r.json(); }).then(function (d) {
+      c.list = (d && d.categories && d.categories.products) || [];
+    }).catch(function () { c.list = []; }).then(function () {
+      // Grilles déjà affichées avant l'arrivée des catégories : on les redessine (sélection conservée).
+      c.waiting.forEach(function (w) { if (document.getElementById(w.gridId)) vitrineRender(w); });
+      c.waiting = [];
+    });
+  }
+  if (cfg && c.waiting.indexOf(cfg) === -1) c.waiting.push(cfg);
+  return null;
+}
+
+/* Pastilles de catégories au-dessus d'une grille de produits (étapes avec recherche) : « Tous », puis chaque
+   catégorie qui a au moins un produit. Seulement s'il y a au moins deux familles à distinguer. */
+function vitrineCatChipsHtml(cfg, groups) {
+  var named = groups.filter(function (g) { return g.title; });
+  if (named.length < 2) return '';
+  var f = cfg._cat || '';
+  var chip = function (id, label, n) {
+    return '<button type="button" class="vitrine-cat' + (f === id ? ' on' : '') + '" data-cat="' + esc(id) + '" aria-pressed="' + (f === id) + '">' +
+      esc(label) + ' <span>' + n + '</span></button>';
+  };
+  return chip('', 'Tous', cfg.items.length) + named.map(function (g) { return chip(g.id, g.title, g.items.length); }).join('');
 }
 
 /**
@@ -884,11 +928,36 @@ function vitrineCardHtml(kind, it, selected, onclick, opts) {
  *   searchId?, qId?, emptyId?, summaryId? }. La recherche n'apparait que si la liste depasse 8 articles ; elle repart vide.
  */
 function vitrineRender(cfg) {
+  var live = window.__vitrineLive = window.__vitrineLive || {};
+  var prev = live[cfg.gridId];
+  if (prev && prev !== cfg && cfg._cat === undefined) cfg._cat = prev._cat || '';   // catégorie gardée d'un rendu à l'autre
+  live[cfg.gridId] = cfg;
   var chosen = cfg.chosen || [];
-  document.getElementById(cfg.gridId).innerHTML = groupItems(cfg.kind, cfg.items).map(function (g) {
-    return (g.title ? '<div class="item-group">' + esc(g.title) + '</div>' : '') +
-      g.items.map(function (it) { return vitrineCardHtml(cfg.kind, it, chosen.indexOf(it.id) !== -1, cfg.onclick, cfg.card); }).join('');
+  var withCats = cfg.kind === 'products' && cfg.searchId;   // étapes de réservation (pas la grille de la caisse)
+  var cats = withCats && typeof vitrineCategories === 'function' ? vitrineCategories(cfg) : null;
+  var groups = groupItems(cfg.kind, cfg.items, cats);
+  var grid = document.getElementById(cfg.gridId);
+  grid.innerHTML = groups.map(function (g) {
+    return (g.title ? '<div class="item-group"' + (withCats ? ' data-cat="' + esc(g.id || '') + '"' : '') + '>' + esc(g.title) + '</div>' : '') +
+      g.items.map(function (it) {
+        var html = vitrineCardHtml(cfg.kind, it, chosen.indexOf(it.id) !== -1, cfg.onclick, cfg.card);
+        return withCats ? html.replace('<button', '<button data-cat="' + esc(g.id || '') + '"') : html;
+      }).join('');
   }).join('');
+  if (withCats && typeof vitrineCatChipsHtml === 'function') {
+    var bar = document.getElementById(cfg.gridId + '-cats');
+    if (!bar) { bar = document.createElement('div'); bar.id = cfg.gridId + '-cats'; bar.className = 'vitrine-cats'; grid.parentNode.insertBefore(bar, grid); }
+    if (cfg._cat && !groups.some(function (g) { return g.id === cfg._cat; })) cfg._cat = '';
+    bar.innerHTML = vitrineCatChipsHtml(cfg, groups);
+    bar.style.display = bar.innerHTML ? '' : 'none';
+    Array.prototype.forEach.call(bar.querySelectorAll('.vitrine-cat'), function (b) {
+      b.onclick = function () {
+        cfg._cat = b.getAttribute('data-cat');
+        Array.prototype.forEach.call(bar.querySelectorAll('.vitrine-cat'), function (x) { var on = x === b; x.classList.toggle('on', on); x.setAttribute('aria-pressed', on); });
+        if (cfg.qId) vitrineFilter(cfg); else vitrineApplyCat(cfg);
+      };
+    });
+  }
   if (cfg.searchId) document.getElementById(cfg.searchId).style.display = cfg.items.length > 8 ? '' : 'none';
   if (cfg.qId) document.getElementById(cfg.qId).value = '';
   if (cfg.emptyId) {
@@ -897,7 +966,14 @@ function vitrineRender(cfg) {
     empty.textContent = cfg.items.length ? 'Aucun résultat' : none;
     empty.style.display = cfg.items.length ? 'none' : 'block';
   }
+  if (cfg._cat && typeof vitrineApplyCat === 'function') { if (cfg.qId) vitrineFilter(cfg); else vitrineApplyCat(cfg); }
   if (cfg.summaryId) vitrineSummary(cfg);
+}
+
+function vitrineApplyCat(cfg) {
+  var f = cfg._cat || '', grid = document.getElementById(cfg.gridId);
+  grid.querySelectorAll('.item-card').forEach(function (c) { c.hidden = !!f && c.getAttribute('data-cat') !== f; });
+  grid.querySelectorAll('.item-group').forEach(function (g) { g.hidden = !!f && g.getAttribute('data-cat') !== f; });
 }
 
 // Resume du choix : combien, et l'effet sur la duree et le prix. cfg : { kind, summaryId, items, chosen }.
@@ -923,8 +999,10 @@ function vitrineFilter(cfg) {
   var raw = document.getElementById(cfg.qId).value;
   var q = normText(raw).trim();
   var grid = document.getElementById(cfg.gridId), any = false;
+  // La catégorie choisie (pastilles) se combine avec la recherche : on garde la config affichée en dernier.
+  var live = ((window.__vitrineLive || {})[cfg.gridId] || cfg), f = live._cat || '';
   grid.querySelectorAll('.item-card').forEach(function (c) {
-    var ok = !q || c.getAttribute('data-name').indexOf(q) !== -1;
+    var ok = (!q || c.getAttribute('data-name').indexOf(q) !== -1) && (!f || c.getAttribute('data-cat') === f);
     c.hidden = !ok;
     if (ok) any = true;
   });
@@ -934,7 +1012,7 @@ function vitrineFilter(cfg) {
     g.hidden = !visible;
   });
   var empty = document.getElementById(cfg.emptyId);
-  empty.textContent = 'Aucun résultat pour « ' + raw.trim() + ' »';
+  empty.textContent = raw.trim() ? 'Aucun résultat pour « ' + raw.trim() + ' »' : 'Aucun produit dans cette catégorie';
   empty.style.display = any ? 'none' : 'block';
 }
 
