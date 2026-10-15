@@ -129,4 +129,5 @@ node tests/caisse/95-stats-dashboard-ventes.js  # Dashboard : encaisse du jour e
 node tests/caisse/96-journal-par-salon.js  # Journal d'activite isole par salon (plus de melange entre salons de l'enseigne)
 node tests/caisse/97-onglet-a-encaisser.js  # Caisse : 4e onglet « À encaisser » (liste des encaissements en attente + pastille)
 node tests/caisse/98-rdv-groupe-salon.js  # RDV pour plusieurs personnes depuis le dashboard, la caisse et Mon poste (admin-group)
+node tests/caisse/99-compte-client-proches-salon.js  # Ajouter un RDV : compte client reconnu (nom, email, telephone) avec ses proches, ajout d'un proche par le salon
 ```

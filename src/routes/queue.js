@@ -994,15 +994,30 @@ router.get('/clients-search', requireAdminOrBarber, wrap(async (req, res) => {
   const q = String(req.query.q || '').trim();
   if (q.length < 3) return res.json({ ok: true, items: [] });
   const like = '%' + q + '%';
+  // Recherche aussi par email ou téléphone (chiffres seuls : « 06 12 » retrouve 0612…).
+  const digits = q.replace(/\D/g, '');
+  const phoneLike = digits.length >= 3 ? '%' + digits + '%' : null;
+  const phoneSql = (col) => (phoneLike ? ` OR REPLACE(REPLACE(REPLACE(${col}, ' ', ''), '.', ''), '-', '') LIKE ?` : '');
+  const params = (extra) => [req.salon.id, like, like].concat(phoneLike ? [phoneLike] : []).concat(extra || []);
 
   const [fromQueue] = await pool.query(
-    'SELECT client_name, email, phone, checkin_at AS ref_at FROM queue WHERE salon_id = ? AND client_name LIKE ? ORDER BY checkin_at DESC LIMIT 20',
-    [req.salon.id, like]
+    'SELECT client_name, email, phone, checkin_at AS ref_at FROM queue WHERE salon_id = ? AND (client_name LIKE ? OR email LIKE ?' + phoneSql('phone') + ') ORDER BY checkin_at DESC LIMIT 20',
+    params()
   );
   const [fromAppointments] = await pool.query(
-    'SELECT client_name, email, phone, created_at AS ref_at FROM appointments WHERE salon_id = ? AND client_name LIKE ? ORDER BY created_at DESC LIMIT 20',
-    [req.salon.id, like]
+    'SELECT client_name, email, phone, created_at AS ref_at FROM appointments WHERE salon_id = ? AND (client_name LIKE ? OR email LIKE ?' + phoneSql('phone') + ') ORDER BY created_at DESC LIMIT 20',
+    params()
   );
+  // Comptes clients (espace client) : prioritaires, avec leurs proches (enfants…) pour la réservation à plusieurs.
+  const [accounts] = await pool.query(
+    'SELECT id, name AS client_name, email, phone, created_at AS ref_at FROM clients WHERE salon_id = ? AND (name LIKE ? OR email LIKE ?' + phoneSql('phone') + ') ORDER BY created_at DESC LIMIT 10',
+    params()
+  );
+  const relativesByClient = {};
+  if (accounts.length) {
+    const [rels] = await pool.query('SELECT id, client_id, name FROM client_relatives WHERE client_id IN (?) ORDER BY created_at ASC', [accounts.map((a) => a.id)]);
+    rels.forEach((r) => { (relativesByClient[r.client_id] = relativesByClient[r.client_id] || []).push({ id: r.id, name: r.name }); });
+  }
 
   const byKey = {};
   [...fromQueue, ...fromAppointments].forEach((r) => {
@@ -1011,13 +1026,54 @@ router.get('/clients-search', requireAdminOrBarber, wrap(async (req, res) => {
     const existing = byKey[key];
     if (!existing || new Date(r.ref_at) > new Date(existing.ref_at)) byKey[key] = r;
   });
+  accounts.forEach((a) => {
+    const key = clientKey(a);
+    if (!key) return;
+    const prev = byKey[key];
+    byKey[key] = Object.assign({}, a, {
+      ref_at: prev && new Date(prev.ref_at) > new Date(a.ref_at) ? prev.ref_at : a.ref_at,
+      phone: a.phone || (prev && prev.phone) || '',
+      account_id: a.id
+    });
+  });
 
   const items = Object.values(byKey)
-    .sort((a, b) => new Date(b.ref_at) - new Date(a.ref_at))
+    .sort((a, b) => (b.account_id ? 1 : 0) - (a.account_id ? 1 : 0) || new Date(b.ref_at) - new Date(a.ref_at))
     .slice(0, 8)
-    .map((r) => ({ name: r.client_name, email: r.email || '', phone: r.phone || '' }));
+    .map((r) => ({
+      name: r.client_name, email: r.email || '', phone: r.phone || '',
+      account_id: r.account_id || null,
+      relatives: r.account_id ? (relativesByClient[r.account_id] || []) : []
+    }));
 
   res.json({ ok: true, items });
+}));
+
+/** Proches (enfants…) enregistrés dans le compte d'un client de CE salon - réservation à plusieurs côté salon. */
+async function salonClientAccount(req, res) {
+  const [[c]] = await pool.query('SELECT id FROM clients WHERE id = ? AND salon_id = ?', [String(req.params.id || ''), req.salon.id]);
+  if (!c) { res.status(404).json({ error: 'Compte client introuvable' }); return null; }
+  return c;
+}
+router.get('/client-accounts/:id/relatives', requireAdminOrBarber, wrap(async (req, res) => {
+  const c = await salonClientAccount(req, res); if (!c) return;
+  const [rows] = await pool.query('SELECT id, name FROM client_relatives WHERE client_id = ? ORDER BY created_at ASC', [c.id]);
+  res.json({ ok: true, relatives: rows });
+}));
+/** Le salon ajoute un proche au compte du client (case « Enregistrer dans ses proches ») : visible ensuite dans son espace client. */
+router.post('/client-accounts/:id/relatives', requireAdminOrBarber, wrap(async (req, res) => {
+  const c = await salonClientAccount(req, res); if (!c) return;
+  const name = String((req.body && req.body.name) || '').replace(/\s+/g, ' ').trim().slice(0, 100);
+  if (!name) return res.status(400).json({ error: 'Le prénom est requis' });
+  const [[same]] = await pool.query('SELECT id, name FROM client_relatives WHERE client_id = ? AND LOWER(name) = LOWER(?)', [c.id, name]);
+  if (same) return res.json({ ok: true, item: same, existing: true });
+  const [[count]] = await pool.query('SELECT COUNT(*) AS n FROM client_relatives WHERE client_id = ?', [c.id]);
+  if (count.n >= 12) return res.status(400).json({ error: 'Maximum 12 proches enregistrés.' });
+  const id = crypto.randomUUID();
+  await pool.query('INSERT INTO client_relatives (id, client_id, name) VALUES (?, ?, ?)', [id, c.id, name]);
+  const [[acc]] = await pool.query('SELECT name FROM clients WHERE id = ?', [c.id]);
+  logActivity(req.salon.id, 'client_relative_add', 'Proche "' + name + '" ajouté au compte de ' + (acc ? acc.name : 'un client'));
+  res.json({ ok: true, item: { id, name } });
 }));
 
 module.exports = router;

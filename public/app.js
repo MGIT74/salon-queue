@@ -648,6 +648,8 @@ function attachClientAutocomplete(container, nameId, emailId, phoneId, fetchFn) 
   function hide() { dropdown.style.display = 'none'; }
 
   nameInput.addEventListener('input', function () {
+    // Nom retapé à la main : ce n'est plus forcément le client choisi dans la liste.
+    nameInput._clientPick = null;
     var q = nameInput.value.trim();
     clearTimeout(debounceId);
     if (q.length < 3) { hide(); return; }
@@ -656,7 +658,9 @@ function attachClientAutocomplete(container, nameId, emailId, phoneId, fetchFn) 
         if (!r.items || !r.items.length) { hide(); return; }
         dropdown.innerHTML = r.items.map(function (c, i) {
           return '<div class="autocomplete-item" data-i="' + i + '">' +
-            '<div class="ac-name">' + esc(c.name) + '</div>' +
+            '<div class="ac-name">' + esc(c.name) +
+              (c.account_id ? ' <span class="ac-badge">Compte client' + (c.relatives && c.relatives.length ? ' · ' + c.relatives.length + ' proche' + (c.relatives.length > 1 ? 's' : '') : '') + '</span>' : '') +
+            '</div>' +
             (c.email || c.phone ? '<div class="ac-meta">' + esc([c.email, c.phone].filter(Boolean).join(' · ')) + '</div>' : '') +
             '</div>';
         }).join('');
@@ -668,6 +672,7 @@ function attachClientAutocomplete(container, nameId, emailId, phoneId, fetchFn) 
             nameInput.value = c.name;
             if (emailInput) emailInput.value = c.email || '';
             if (phoneInput) phoneInput.value = c.phone || '';
+            nameInput._clientPick = c;   // compte client + proches, repris par « Plusieurs personnes »
             hide();
           };
         });

@@ -276,7 +276,7 @@
         return { top: back() + '<div class="eyebrow">Qui vient au salon ?</div><p class="step-sub">' + (cfg.whoSub || 'Cochez les personnes à inscrire. Vous n\'êtes pas obligé de réserver pour vous.') + '</p>',
           body: '<div class="gb-whos">' + chips + '</div>' +
             '<div class="fld"><label for="gb-who-name">Ajouter quelqu\'un d\'autre</label><div class="gb-addrow"><input id="gb-who-name" maxlength="60" autocomplete="off" placeholder="Prénom" value="' + esc(wsel.draft) + '"><button type="button" class="gb-mini" data-act="who-add">Ajouter</button></div></div>' +
-            (cfg.createRelative ? '<label class="gb-save"><input type="checkbox" data-act="who-save"' + (wsel.draftSave ? ' checked' : '') + '> Enregistrer ce prénom dans « Mes proches »</label>' : ''),
+            (cfg.createRelative ? '<label class="gb-save"><input type="checkbox" data-act="who-save"' + (wsel.draftSave ? ' checked' : '') + '> ' + esc(cfg.saveLabel || 'Enregistrer ce prénom dans « Mes proches »') + '</label>' : ''),
           go: goBtn('Suivant', n < 1, 'who-next'), hint: n < 1 ? 'Choisissez au moins une personne.' : n > MAX_PEOPLE ? 'Maximum ' + MAX_PEOPLE + ' personnes.' : '' };
       }
       if (view === 'recap') {

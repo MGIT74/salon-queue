@@ -93,11 +93,14 @@
   function readClient(overlay, P) {
     var v = function (k) { var el = overlay.querySelector('#' + P + '-' + k); return el ? el.value.trim() : ''; };
     var c = { name: v('name'), email: v('email'), phone: v('phone') };
+    // Client choisi dans la liste et qui a un compte : ses proches (enfants…) seront proposés d'emblée.
+    var pick = overlay.querySelector('#' + P + '-name')._clientPick;
+    if (pick && pick.account_id) { c.account_id = pick.account_id; c.relatives = (pick.relatives || []).slice(); }
     var err = overlay.querySelector('#' + P + '-client-error');
     if (!c.name) { if (err) { err.textContent = 'Le nom du client est requis'; err.style.display = 'block'; } overlay.querySelector('#' + P + '-name').focus(); return null; }
     if (err) err.style.display = 'none';
     var pill = overlay.querySelector('#' + P + '-client-pill');
-    if (pill) pill.querySelector('span').textContent = c.name + (c.phone ? ' · ' + c.phone : '');
+    if (pill) pill.querySelector('span').textContent = c.name + (c.phone ? ' · ' + c.phone : '') + (c.account_id ? ' · Compte client' : '');
     return c;
   }
 

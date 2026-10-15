@@ -11,7 +11,7 @@ const check = (n, ok, x = '') => { (ok ? pass++ : fail++); console.log((ok ? '  
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 const fnSrc = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i === -1) throw new Error('introuvable: ' + name); const j = src.indexOf('\n}\n', i); return src.slice(i, j + 3); };
 const IMG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
-const SHARED = ['esc', 'normText', 'vitrineIcon', 'vitrineBaseIcon', 'extraIcon', 'productIcon', 'groupItems', 'vitrineCardHtml', 'vitrineRender', 'vitrineSummary', 'vitrineFilter', 'vitrineSelectOne', 'vitrineToggle', 'vitrineSearchHtml', 'formatMinutes', '_lockBodyScroll', '_unlockBodyScroll', '_buildModal', '_closeModal'];
+const SHARED = ['esc', 'normText', 'vitrineIcon', 'vitrineBaseIcon', 'extraIcon', 'productIcon', 'groupItems', 'vitrineCardHtml', 'vitrineRender', 'vitrineSummary', 'vitrineFilter', 'vitrineSelectOne', 'vitrineToggle', 'vitrineSearchHtml', 'formatMinutes', '_lockBodyScroll', '_unlockBodyScroll', '_buildModal', '_closeModal', 'vitrineFlow', 'vitrineRecapHtml'];
 const VARS = ['VITRINE_PLUS_SVG', 'VITRINE_CHECK_SVG', 'VITRINE_CHECK_SM_SVG'].map(n => app.match(new RegExp('^var ' + n + ' = .*;$', 'm'))[0]).join('\n');
 
 function world(html) {
@@ -138,8 +138,11 @@ const visible = (w, id) => w.document.getElementById(id).style.display !== 'none
   console.log('\n[D] Fichiers partages et coherence');
   check('le style des cartes (.item-card, .item-grid.compact) et celui de la barre dans une fenetre sont dans app.css', /\.item-grid\.compact \{/.test(css) && /\.modal-box \.step-bar \{ position: sticky; bottom: -26px/.test(css) && /\.item-card\.has-photo \.item-media \{[^}]*background-size: contain/.test(css));
   const pages = fs.readdirSync(path.join(__dirname, '../../public')).filter(f => f.endsWith('.html'));
-  const stale = pages.filter(f => { const s = R(f); return (/app\.css\?v=(\d+)/.test(s) && !/app\.css\?v=6/.test(s)) || (/app\.js\?v=(\d+)/.test(s) && !/app\.js\?v=8/.test(s)); });
-  check('TOUTES les pages demandent la nouvelle version des fichiers partages (app.css v6, app.js v8) : aucun navigateur ne garde l\'ancien', stale.length === 0, stale.join(','));
+  // Toutes les pages demandent la MEME version (la plus recente) d'app.css et d'app.js : aucun navigateur ne garde l'ancienne.
+  const ver = (re) => pages.map(f => (R(f).match(re) || [])[1]).filter(Boolean).map(Number);
+  const cssV = Math.max(...ver(/app\.css\?v=(\d+)/)), jsV = Math.max(...ver(/app\.js\?v=(\d+)/));
+  const stale = pages.filter(f => { const s = R(f); return (/app\.css\?v=(\d+)/.test(s) && !new RegExp('app\\.css\\?v=' + cssV + '"').test(s)) || (/app\.js\?v=(\d+)/.test(s) && !new RegExp('app\\.js\\?v=' + jsV + '"').test(s)); });
+  check('TOUTES les pages demandent la derniere version des fichiers partages (app.css v' + cssV + ', app.js v' + jsV + ') : aucun navigateur ne garde l\'ancienne', stale.length === 0, stale.join(','));
   const users = ['rdv.html', 'compte.html', 'kiosk.html', 'dashboard.html', 'poste.html', 'caisse.html'];
   check('les 6 pages concernees utilisent le meme code (vitrineRender) et plus aucune copie locale', users.every(f => /vitrineRender\(/.test(R(f))) && !/function (normText|extraIcon|productIcon|groupItems|vitrineCardHtml)\(/.test(users.map(R).join('')));
 
