@@ -128,4 +128,5 @@ node tests/caisse/94-horaires-caisse.js  # Horaires de caisse : ouverture / ferm
 node tests/caisse/95-stats-dashboard-ventes.js  # Dashboard : encaisse du jour et CA de la semaine = toutes les ventes de la caisse, par jour du salon
 node tests/caisse/96-journal-par-salon.js  # Journal d'activite isole par salon (plus de melange entre salons de l'enseigne)
 node tests/caisse/97-onglet-a-encaisser.js  # Caisse : 4e onglet « À encaisser » (liste des encaissements en attente + pastille)
+node tests/caisse/98-rdv-groupe-salon.js  # RDV pour plusieurs personnes depuis le dashboard, la caisse et Mon poste (admin-group)
 ```

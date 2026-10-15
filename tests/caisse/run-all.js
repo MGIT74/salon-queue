@@ -117,7 +117,8 @@ const suite = [
   ['94-horaires-caisse.js', true, ['exit']],
   ['95-stats-dashboard-ventes.js', true, ['exit']],
   ['96-journal-par-salon.js', true, ['exit']],
-  ['97-onglet-a-encaisser.js', false, ['exit']]
+  ['97-onglet-a-encaisser.js', false, ['exit']],
+  ['98-rdv-groupe-salon.js', true, ['exit']]
 ];
 
 let bad = 0;

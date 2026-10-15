@@ -296,6 +296,7 @@
 </div>
 
 <script src="/app.js?v=17"></script>
+<script src="/staff-group.js?v=2"></script>
 <script>requireSalonInUrl("Pour utiliser votre poste, ouvrez le lien de votre salon.");</script>
 <script>
 mountThemeButton();
@@ -1013,6 +1014,18 @@ function selectCalDay(dateStr) {
  * - toujours pour lui-même, pas d'étape de choix du coiffeur (contrairement
  * à l'assistant admin). Email optionnel, comme côté admin.
  */
+/** « Plusieurs personnes » depuis « Ajouter un RDV » de Mon poste (le coiffeur connecté par défaut). */
+var paGroupCtx = null;
+function paOpenGroup() {
+  if (!paGroupCtx) return;
+  var ctx = paGroupCtx;
+  _closeModal(ctx.overlay);
+  StaffGroupBooking.open({
+    api: barberApi, services: services, date: ctx.dateStr, barberId: me ? me.id : null, barbers: barbers.length ? barbers : (me ? [me] : []),
+    onDone: function () { Object.keys(calMonthCache).forEach(function (k) { delete calMonthCache[k]; }); loadAgendaPeriod(); }
+  });
+}
+
 function openPosteAddAppointment(dateStr) {
   var when = new Date(dateStr + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' });
   var state = { serviceId: null, extraIds: [], productIds: [], time: null };
@@ -1024,6 +1037,7 @@ function openPosteAddAppointment(dateStr) {
     '</div>' +
 
     '<div id="pa-step-service">' +
+      StaffGroupBooking.buttonHtml('paOpenGroup()') +
       '<div class="aa-step-title">Prestation</div>' +
       '<div class="item-grid compact" id="pa-service-grid"></div>' +
     '</div>' +
@@ -1071,6 +1085,7 @@ function openPosteAddAppointment(dateStr) {
       '</div>' +
     '</div>'
   );
+  paGroupCtx = { overlay: overlay, dateStr: dateStr };
   var flowRefresh = vitrineFlow(overlay, function () {
     function pick(list, ids) { return list.filter(function (x) { return ids.indexOf(String(x.id)) !== -1; }); }
     return {

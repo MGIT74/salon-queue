@@ -982,6 +982,7 @@
 </div>
 
 <script src="/app.js?v=17"></script>
+<script src="/staff-group.js?v=2"></script>
 <script src="/autorefresh.js?v=2"></script>
 <script>requireSalonInUrl("Pour utiliser la caisse, ouvrez le lien de votre salon.");</script>
 <script>
@@ -2750,6 +2751,19 @@ function loadSalonScheduleForTimeline() {
  * de "Mon poste", adapté à catalog.services/extras et à barberId
  * explicite (au lieu de me.id).
  */
+/** « Plusieurs personnes » depuis « Ajouter un RDV » de l'Agenda de la caisse (chaque personne a son coiffeur). */
+var paGroupCtx = null;
+function paOpenGroup() {
+  if (!paGroupCtx) return;
+  var ctx = paGroupCtx;
+  _closeModal(ctx.overlay);
+  StaffGroupBooking.open({
+    api: barberApi, apiOpts: function (bid) { return { actingAs: bid || ctx.barberId }; },
+    services: catalog.services, date: ctx.dateStr, barberId: ctx.barberId, barbers: allBarbers,
+    onDone: function () { Object.keys(calMonthCache).forEach(function (k) { delete calMonthCache[k]; }); loadAgendaPeriod(); }
+  });
+}
+
 function openCaisseAddAppointment(dateStr, barberId) {
   var barber = allBarbers.find(function (b) { return b.id === barberId; });
   var when = new Date(dateStr + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' });
@@ -2762,6 +2776,7 @@ function openCaisseAddAppointment(dateStr, barberId) {
     '</div>' +
 
     '<div id="pa-step-service">' +
+      StaffGroupBooking.buttonHtml('paOpenGroup()') +
       '<div class="aa-step-title">Prestation</div>' +
       '<div class="item-grid compact" id="pa-service-grid"></div>' +
     '</div>' +
@@ -2809,6 +2824,7 @@ function openCaisseAddAppointment(dateStr, barberId) {
       '</div>' +
     '</div>'
   );
+  paGroupCtx = { overlay: overlay, dateStr: dateStr, barberId: barberId };
   var flowRefresh = vitrineFlow(overlay, function () {
     function pick(list, ids) { return list.filter(function (x) { return ids.indexOf(String(x.id)) !== -1; }); }
     return {

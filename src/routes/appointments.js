@@ -632,9 +632,18 @@ router.post('/', bookingRateLimiter, wrap(withBookingLock(async (req, res) => {
  * deja poses pour les precedentes (deux personnes ne peuvent pas se chevaucher chez le meme coiffeur).
  * Le rendez-vous reste au nom d'email/telephone du client qui reserve (annulation, fidelite).
  */
-router.post('/group', bookingRateLimiter, wrap(withBookingLock(async (req, res) => {
+router.post('/group', bookingRateLimiter, wrap(withBookingLock((req, res) => createGroupBooking(req, res, false))));
+
+/**
+ * Même réservation à plusieurs, faite par le SALON (dashboard, caisse, Mon poste) : email facultatif
+ * (confirmation envoyée seulement s'il est renseigné), pas de délai minimum ni de fenêtre maximale,
+ * coiffeur au choix pour chaque personne.
+ */
+router.post('/admin-group', requireAdminOrBarber, wrap(withBookingLock((req, res) => createGroupBooking(req, res, true))));
+
+async function createGroupBooking(req, res, staff) {
   const { client_name, email, phone } = req.body;
-  if (!email) return res.status(400).json({ error: "L'email est requis pour la confirmation" });
+  if (!email && !staff) return res.status(400).json({ error: "L'email est requis pour la confirmation" });
   if (!client_name) return res.status(400).json({ error: 'Le nom est requis' });
   const clientNote = req.body.client_note ? String(req.body.client_note).slice(0, 500) : null;
 
@@ -654,7 +663,7 @@ router.post('/group', bookingRateLimiter, wrap(withBookingLock(async (req, res) 
   for (let i = 0; i < norm.people.length; i++) {
     const p = norm.people[i];
     if (`${p.date} ${p.time}:00` < nowStr) return fail(400, i, 'Le créneau de ' + p.name + ' est déjà passé, choisissez une date/heure à venir.');
-    if (isBeyondAdvanceWindow(p.date, rdvSettings)) return fail(400, i, 'La date de ' + p.name + ' est trop éloignée, choisissez une date plus proche.');
+    if (!staff && isBeyondAdvanceWindow(p.date, rdvSettings)) return fail(400, i, 'La date de ' + p.name + ' est trop éloignée, choisissez une date plus proche.');
 
     const [[service]] = await pool.query('SELECT name, duration_min FROM services WHERE id = ? AND salon_id = ? AND deleted_at IS NULL', [p.service_id, req.salon.id]);
     if (!service) return fail(404, i, 'Prestation introuvable pour ' + p.name + '.');
@@ -679,12 +688,12 @@ router.post('/group', bookingRateLimiter, wrap(withBookingLock(async (req, res) 
     if (barberId) {
       const [[owned]] = await pool.query('SELECT id FROM barbers WHERE id = ? AND salon_id = ? AND active = 1', [barberId, req.salon.id]);
       if (!owned) return fail(404, i, 'Coiffeur introuvable pour ' + p.name + '.');
-      const slots = await computeSlotsForBarber(barberId, p.date, durationMin, rdvSettings);
+      const slots = await computeSlotsForBarber(barberId, p.date, durationMin, rdvSettings, staff ? { skipLead: true } : {});
       if (!slots.includes(p.time)) return fail(409, i, "Le créneau de " + p.name + " n'est plus disponible (" + p.time + ").");
     } else {
       const [barbers] = await pool.query('SELECT id FROM barbers WHERE salon_id = ? AND active = 1 AND accepts_appointments = 1', [req.salon.id]);
       for (const b of barbers) {
-        const slots = await computeSlotsForBarber(b.id, p.date, durationMin, rdvSettings);
+        const slots = await computeSlotsForBarber(b.id, p.date, durationMin, rdvSettings, staff ? { skipLead: true } : {});
         if (slots.includes(p.time)) { barberId = b.id; break; }
       }
       if (!barberId) return fail(409, i, "Le créneau de " + p.name + " n'est plus disponible (" + p.time + ").");
@@ -696,7 +705,7 @@ router.post('/group', bookingRateLimiter, wrap(withBookingLock(async (req, res) 
     await pool.query(
       `INSERT INTO appointments (id, salon_id, barber_id, client_name, email, phone, service_id, scheduled_at, status, cancel_token, client_note, group_id)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?, ?)`,
-      [id, req.salon.id, barberId, p.name, email, phone || null, p.service_id, scheduledAt, cancelToken, clientNote, groupId]
+      [id, req.salon.id, barberId, p.name, email || null, phone || null, p.service_id, scheduledAt, cancelToken, clientNote, groupId]
     );
     created.push({ id, cancelToken, person: p, barberId, scheduledAt, serviceName: service.name + (extraNames.length ? ' + ' + extraNames.join(', ') : ''), extraIds, productSelections, durationMin });
     if (extraIds.length) await pool.query('INSERT INTO appointment_extras (appointment_id, extra_id) VALUES ?', [extraIds.map((eid) => [id, eid])]);
@@ -713,7 +722,7 @@ router.post('/group', bookingRateLimiter, wrap(withBookingLock(async (req, res) 
     bRows.forEach((b) => { nameById[b.id] = b.name; });
   }
   const fmtWhen = (at) => new Date(at.replace(' ', 'T')).toLocaleString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit' });
-  try {
+  if (email) try {
     await sendGroupAppointmentConfirmation(req.salon.id, email, {
       clientName: client_name,
       items: created.map((c) => ({ personName: c.person.name, when: fmtWhen(c.scheduledAt), serviceName: c.serviceName, barberName: nameById[c.barberId] || null, cancelUrl: cancelLink(c.cancelToken, false) })),
@@ -734,7 +743,7 @@ router.post('/group', bookingRateLimiter, wrap(withBookingLock(async (req, res) 
     ok: true, group_id: groupId,
     appointments: created.map((c) => ({ id: c.id, name: c.person.name, scheduled_at: c.scheduledAt, service_name: c.serviceName, barber_name: nameById[c.barberId] || null }))
   });
-})));
+}
 
 /**
  * Annule TOUS les rendez-vous encore a venir du groupe auquel appartient ce lien (bouton « Annuler tout »

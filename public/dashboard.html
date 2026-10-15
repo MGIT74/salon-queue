@@ -2710,6 +2710,7 @@
 </div>
 
 <script src="/app.js?v=17"></script>
+<script src="/staff-group.js?v=2"></script>
 <script src="/daterange.js?v=3"></script>
 <script>
   // Le lien "Creer mon salon" n'a de sens que si l'inscription est ouverte sur
@@ -6381,6 +6382,24 @@ function renderExpandPanel(dateStr, dayAppts) {
  * Ajout manuel d'un RDV par l'admin (ex: client au téléphone) depuis le
  * panneau du jour - email optionnel, mais coiffeur toujours requis.
  */
+/** « Plusieurs personnes » depuis la fenêtre « Ajouter un RDV » du dashboard. */
+var aaGroupCtx = null;
+function aaOpenGroup() {
+  if (!aaGroupCtx) return;
+  var ctx = aaGroupCtx;
+  _closeModal(ctx.overlay);
+  StaffGroupBooking.open({
+    api: api, services: services, date: ctx.dateStr, barberId: ctx.barberId,
+    barbers: barbers.filter(function (b) { return isBookableForAdmin(b, ctx.dateStr); }),
+    onDone: function () {
+      refreshQueue();
+      Object.keys(calMonthCache).forEach(function (k) { delete calMonthCache[k]; });
+      loadCalendarPeriod();
+      renderRdvList();
+    }
+  });
+}
+
 function openAdminAddAppointment(dateStr, preselectedBarberId) {
   var rdvBarbers = barbers.filter(function (b) { return isBookableForAdmin(b, dateStr); });
   var when = new Date(dateStr + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' });
@@ -6395,6 +6414,7 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
     '</div>' +
 
     '<div id="aa-step-barber">' +
+      StaffGroupBooking.buttonHtml('aaOpenGroup()') +
       '<div class="aa-step-title">Coiffeur</div>' +
       '<div class="aa-grid">' + rdvBarbers.map(function (b) {
         return '<button class="aa-card" data-id="' + b.id + '" onclick="aaSelectBarber(this)">' + esc(b.name) + '</button>';
@@ -6451,6 +6471,7 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
       '</div>' +
     '</div>'
   );
+  aaGroupCtx = { overlay: overlay, dateStr: dateStr, barberId: preselectedBarberId || null };
   var flowRefresh = vitrineFlow(overlay, function () {
     function pick(list, ids) { return list.filter(function (x) { return ids.indexOf(String(x.id)) !== -1; }); }
     return {
