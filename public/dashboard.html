@@ -1695,14 +1695,11 @@
         <div class="dash-card-head"><h3>Chiffre d'affaires</h3></div>
         <div class="dash-big-num" id="dash-ca-total">—</div>
         <div class="st-delta" id="dash-ca-delta"></div>
-        <div class="dash-ca-rows" id="dash-ca-rows"></div>
       </div>
 
       <div class="dash-card dash-card-missed">
         <div class="dash-card-head"><h3>Manque à gagner</h3></div>
         <div class="dash-big-num dash-missed-num" id="dash-missed-total">—</div>
-        <div class="dash-missed-sub" id="dash-missed-sub"></div>
-        <div class="dash-missed-list" id="dash-missed-list"></div>
       </div>
 
       <div class="dash-card dash-card-list">
@@ -3509,17 +3506,8 @@ function loadDashSalon() {
       cd.className = 'st-delta ' + (cp > 0 ? 'up' : cp < 0 ? 'down' : 'flat');
       cd.textContent = cp ? (cp > 0 ? '▲ +' : '▼ −') + Math.abs(cp) + ' % vs période préc.' : '= période préc.';
     }
-    var row = function (k, v) { return '<div class="dash-ca-row"><span>' + k + '</span><b>' + v + '</b></div>'; };
-    document.getElementById('dash-ca-rows').innerHTML =
-      row('Prestations', eur(rv.services_cents || 0)) + row('Suppléments', eur(rv.extras_cents || 0)) + row('Produits', eur(rv.products_cents || 0)) +
-      row('Tickets', rv.tickets || 0) + row('Panier moyen', rv.avg_ticket_cents == null ? '—' : eur(rv.avg_ticket_cents));
     // Manque à gagner global : temps libre de tous les coiffeurs actifs x leur prix moyen à la minute.
     document.getElementById('dash-missed-total').textContent = eur(r.potential_revenue_cents);
-    document.getElementById('dash-missed-sub').textContent = '≈ ' + r.free_slots + ' créneaux libres · occupation ' + r.occupancy_pct + ' %' +
-      (r.potential_catalog_based && r.potential_revenue_cents > 0 ? ' · estimé d\'après les prix' : '');
-    document.getElementById('dash-missed-list').innerHTML = (r.per_barber || []).filter(function (b) { return b.potential_revenue_cents > 0; }).slice(0, 4).map(function (b) {
-      return '<div class="dash-missed-row"><span>' + esc(b.name) + ' · ' + b.occupancy_pct + ' % occupé</span><b>' + eur(b.potential_revenue_cents) + '</b></div>';
-    }).join('');
   }).catch(function (e) { toast(e.message, true); });
 }
 
