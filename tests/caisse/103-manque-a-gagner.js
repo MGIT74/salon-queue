@@ -29,7 +29,7 @@ const check = (n, ok, extra) => { (ok ? pass++ : fail++); console.log((ok ? '  O
   check('aucune prestation proposée : pas d\'estimation possible (0 €)', a.potential_revenue_cents === 0 && a.potential_basis === 'none', a);
 
   const dash = fs.readFileSync(__dirname + '/../../public/dashboard.html', 'utf8');
-  check('la case précise « d\'après le prix moyen de ses prestations » quand c\'est le cas', /potential_basis === 'catalog' \? '<br><span[^>]*>d\\'après le prix moyen de ses prestations/.test(dash));
+  check('la case précise « d\'après le prix moyen de ses prestations » quand c\'est le cas (et pas sous 0 €)', /potential_basis === 'catalog' && a\.potential_revenue_cents > 0 \? '<br><span[^>]*>d\\'après le prix moyen de ses prestations/.test(dash));
   const src = fs.readFileSync(__dirname + '/../../src/routes/barbers.js', 'utf8');
   check('avec des encaissements, le calcul reste basé sur ce qui a été réellement encaissé', /bookedMinutes > 0 && revenueCents > 0 \? revenueCents \/ bookedMinutes/.test(src));
 

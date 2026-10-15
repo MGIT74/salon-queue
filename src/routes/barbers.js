@@ -1,6 +1,6 @@
 const express = require('express');
 const crypto = require('crypto');
-const { pool, getSettings } = require('../db');
+const { pool, getSettings, parisLocalToUtcDate } = require('../db');
 const { activeBarberCount } = require('../lib/queueMath');
 const { getPendingRecount } = require('../lib/pendingRecount');
 const requireAdmin = require('../middleware/auth');
@@ -314,6 +314,216 @@ router.put('/:id/schedule', requireAdmin, wrap(async (req, res) => {
  * local — le serveur se contente de filtrer, évitant tout décalage
  * jour/heure entre le fuseau du serveur et celui du salon.
  */
+const toSqlUtc = (d) => d.toISOString().slice(0, 19).replace('T', ' ');
+function addDaysStr(dateStr, n) {
+  const d = new Date(dateStr + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10);
+}
+function daysBetween(a, b) { return Math.round((new Date(b + 'T00:00:00Z') - new Date(a + 'T00:00:00Z')) / 86400000); }
+
+/**
+ * Chiffres d'un coiffeur sur UNE période (utilisé pour la période affichée ET la période précédente, pour les
+ * comparaisons « +12 % »). startSql/endSql : bornes UTC ; start_date/end_date : jours locaux du salon (inclus).
+ */
+async function barberPeriodCore(salonId, barberId, startSql, endSql, start_date, end_date) {
+  const [[row]] = await pool.query(
+    `SELECT COUNT(*) AS done_count, COALESCE(SUM(total_price_cents), 0) AS revenue_cents,
+            COALESCE(SUM(TIMESTAMPDIFF(MINUTE, start_at, end_at)), 0) AS booked_minutes
+     FROM queue q
+     WHERE barber_id = ? AND salon_id = ? AND status = 'done'
+     AND end_at >= ? AND end_at < ?`,
+    [barberId, salonId, startSql, endSql]
+  );
+
+  // Chiffre d'affaires ENCAISSÉ à son nom (prestations, suppléments ET produits), ligne par ligne, depuis les
+  // ventes de la caisse - voir salesRevenueByBarber. Les passages terminés (nombre, minutes) restent ceux de la file.
+  const sold = (await salesRevenueByBarber(pool, salonId, { fromSql: startSql, toSql: endSql })).get(barberId)
+    || { service_cents: 0, service_count: 0, product_cents: 0, product_count: 0 };
+
+  // Nombre de passages : lignes de ticket attribuees a ce coiffeur par un AUTRE coiffeur (ou retirees de ses passages) - voir lineAttribution.js.
+  const adj = applyTransfers(
+    new Map([[barberId, { name: null, count: Number(row.done_count), cents: Number(row.revenue_cents) }]]),
+    await serviceLineTransfers(pool, salonId, { fromSql: startSql, toSql: endSql })
+  ).get(barberId);
+  const doneCount = Math.max(0, adj.count);
+  const revenueCents = sold.service_cents;
+  const bookedMinutes = Number(row.booked_minutes);
+  const productCount = sold.product_count;
+  const productRevenueCents = sold.product_cents;
+  const totalCents = revenueCents + productRevenueCents;
+
+  // Tickets encaissés à son nom (une vente = un client) : base du panier moyen et des ventes en plus, cohérente
+  // avec « encaissé » (même source : les ventes de la caisse).
+  const [[tk]] = await pool.query(
+    `SELECT COUNT(*) AS tickets, COALESCE(SUM(has_addon), 0) AS with_addon FROM (
+       SELECT si.sale_id, MAX(si.item_type IN ('extra', 'product')) AS has_addon
+       FROM sale_items si JOIN sales s ON s.id = si.sale_id
+       WHERE s.salon_id = ? AND s.created_at >= ? AND s.created_at < ? AND COALESCE(si.barber_id, s.barber_id) = ?
+       GROUP BY si.sale_id) t`,
+    [salonId, startSql, endSql, barberId]
+  );
+  const tickets = Number(tk.tickets);
+
+  const core = {
+    done_count: doneCount,
+    revenue_cents: totalCents,
+    service_revenue_cents: revenueCents,
+    product_count: productCount,
+    product_revenue_cents: productRevenueCents,
+    booked_minutes: bookedMinutes,
+    tickets_count: tickets,
+    // Panier moyen : ce que rapporte un client (un ticket encaissé) en moyenne, prestations + produits.
+    avg_ticket_cents: tickets > 0 ? Math.round(totalCents / tickets) : null,
+    // Ventes en plus : part de ses tickets avec au moins un supplément ou un produit.
+    addon_rate_pct: tickets > 0 ? Math.round((100 * Number(tk.with_addon)) / tickets) : null
+  };
+
+  if (!(start_date && end_date)) return core;
+
+  // RDV ratés sur ses RDV de la période : annulés, et absents (RDV arrivé en file puis marqué absent).
+  const [[missed]] = await pool.query(
+    `SELECT COUNT(*) AS total,
+            COALESCE(SUM(a.status = 'cancelled'), 0) AS cancelled,
+            COALESCE(SUM(a.status <> 'cancelled' AND q.status = 'cancelled'), 0) AS no_show
+     FROM appointments a LEFT JOIN queue q ON q.id = a.promoted_queue_id
+     WHERE a.salon_id = ? AND a.barber_id = ? AND a.scheduled_at >= ? AND a.scheduled_at <= ?`,
+    [salonId, barberId, start_date + ' 00:00:00', end_date + ' 23:59:59']
+  );
+  core.appointments_total = Number(missed.total);
+  core.cancelled_count = Number(missed.cancelled);
+  core.no_show_count = Number(missed.no_show);
+
+  // Calcul des créneaux disponibles/libres : nécessite les dates
+  // locales de salon en jours calendaires précis (start_date/end_date,
+  // YYYY-MM-DD inclus) - jamais dérivées de start/end (UTC), qui
+  // décaleraient le jour selon l'heure d'été/hiver (même piège que
+  // scheduled_at ailleurs dans l'app).
+  const [schedules] = await pool.query('SELECT weekday, start_time, end_time FROM barber_schedules WHERE barber_id = ? AND active = 1', [barberId]);
+  const [breaks] = await pool.query('SELECT weekday, start_time, end_time FROM barber_breaks WHERE barber_id = ? AND active = 1', [barberId]);
+  const [leaves] = await pool.query('SELECT start_date, end_date FROM barber_leaves WHERE barber_id = ?', [barberId]);
+  const settings = await getSettings(salonId);
+  const slotStepMin = Number(settings.rdv_slot_step_min) || 15;
+
+  const schedByDay = {};
+  schedules.forEach((x) => { schedByDay[x.weekday] = x; });
+  const breaksByDay = {};
+  breaks.forEach((x) => { (breaksByDay[x.weekday] = breaksByDay[x.weekday] || []).push(x); });
+  const leaveRanges = leaves.map((l) => ({ start: String(l.start_date).slice(0, 10), end: String(l.end_date).slice(0, 10) }));
+  function timeToMin(t) { const [h, m] = String(t).split(':').map(Number); return h * 60 + m; }
+  function isOnLeave(dateStr) { return leaveRanges.some((l) => dateStr >= l.start && dateStr <= l.end); }
+
+  let availableMinutes = 0;
+  const d = new Date(start_date + 'T00:00:00Z');
+  const endD = new Date(end_date + 'T00:00:00Z');
+  while (d <= endD) {
+    const dateStr = d.toISOString().slice(0, 10);
+    const sched = schedByDay[d.getUTCDay()]; // 0=dimanche ... 6=samedi
+    if (!isOnLeave(dateStr) && sched) {
+      let dayMinutes = timeToMin(sched.end_time) - timeToMin(sched.start_time);
+      (breaksByDay[d.getUTCDay()] || []).forEach((x) => { dayMinutes -= Math.max(0, timeToMin(x.end_time) - timeToMin(x.start_time)); });
+      availableMinutes += Math.max(0, dayMinutes);
+    }
+    d.setUTCDate(d.getUTCDate() + 1);
+  }
+
+  const freeMinutes = Math.max(0, availableMinutes - bookedMinutes);
+  const occupancyPct = availableMinutes > 0 ? Math.round((100 * bookedMinutes) / availableMinutes) : 0;
+  // Prix moyen par minute : celui réellement encaissé sur la période ; s'il n'y a encore rien d'encaissé (journée
+  // vide, coiffeur qui débute...), on prend le prix moyen à la minute des prestations qu'il propose (ses prix et
+  // durées personnalisés s'il en a, hors prestations qu'il ne fait pas) - sinon le manque à gagner resterait à 0 €.
+  let avgRevenuePerMinute = bookedMinutes > 0 && revenueCents > 0 ? revenueCents / bookedMinutes : 0;
+  let potentialBasis = avgRevenuePerMinute > 0 ? 'sales' : 'none';
+  if (!avgRevenuePerMinute) {
+    const [svc] = await pool.query(
+      `SELECT COALESCE(p.price_cents, s.price_cents) AS price_cents, COALESCE(p.duration_min, s.duration_min) AS duration_min
+       FROM services s
+       LEFT JOIN barber_service_prices p ON p.service_id = s.id AND p.barber_id = ?
+       WHERE s.salon_id = ? AND s.active = 1 AND s.deleted_at IS NULL
+         AND s.id NOT IN (SELECT service_id FROM barber_service_exclusions WHERE barber_id = ?)`,
+      [barberId, salonId, barberId]
+    );
+    const rates = svc.filter((x) => Number(x.duration_min) > 0 && Number(x.price_cents) > 0).map((x) => Number(x.price_cents) / Number(x.duration_min));
+    if (rates.length) { avgRevenuePerMinute = rates.reduce((x, y) => x + y, 0) / rates.length; potentialBasis = 'catalog'; }
+  }
+
+  core.availability = {
+    available_minutes: availableMinutes,
+    free_minutes: freeMinutes,
+    free_slots: Math.floor(freeMinutes / slotStepMin),
+    occupancy_pct: occupancyPct,
+    potential_revenue_cents: Math.round(freeMinutes * avgRevenuePerMinute),
+    potential_basis: potentialBasis   // 'sales' (encaissé) | 'catalog' (prix moyen de ses prestations) | 'none'
+  };
+  // Productivité : encaissé (prestations + produits) par heure de travail PRÉVUE - compare justement temps plein et mi-temps.
+  core.revenue_per_hour_cents = availableMinutes > 0 ? Math.round((totalCents * 60) / availableMinutes) : null;
+  return core;
+}
+
+/**
+ * Courbe : encaissé (prestations + produits) du coiffeur par jour (≤ 31 jours), par semaine (≤ ~6 mois) ou par mois,
+ * la moyenne des AUTRES coiffeurs actifs du salon, et la même courbe sur la période précédente (même durée, juste avant).
+ */
+async function barberSeries(salonId, barberId, start_date, end_date, tz) {
+  const nDays = daysBetween(start_date, end_date) + 1;
+  const unit = nDays <= 31 ? 'day' : nDays <= 190 ? 'week' : 'month';
+  const buckets = [];
+  if (unit === 'day') {
+    for (let i = 0; i < nDays; i++) { const ds = addDaysStr(start_date, i); buckets.push({ from: ds, to: ds }); }
+  } else if (unit === 'week') {
+    for (let ds = start_date; ds <= end_date; ds = addDaysStr(ds, 7)) { const te = addDaysStr(ds, 6); buckets.push({ from: ds, to: te < end_date ? te : end_date }); }
+  } else {
+    let ds = start_date;
+    while (ds <= end_date) {
+      const d = new Date(ds + 'T00:00:00Z');
+      const last = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).toISOString().slice(0, 10);
+      buckets.push({ from: ds, to: last < end_date ? last : end_date });
+      ds = addDaysStr(last, 1);
+    }
+  }
+  const utc = (ds) => parisLocalToUtcDate(ds, '00:00:00', tz);
+  const prevStart = addDaysStr(start_date, -nDays);
+  const winFrom = utc(prevStart), winTo = utc(addDaysStr(end_date, 1));
+
+  const [lines] = await pool.query(
+    `SELECT COALESCE(si.barber_id, s.barber_id) AS barber_id, s.created_at, SUM(si.unit_price_cents * si.quantity) AS cents
+     FROM sale_items si JOIN sales s ON s.id = si.sale_id
+     WHERE s.salon_id = ? AND s.created_at >= ? AND s.created_at < ?
+     GROUP BY si.sale_id, COALESCE(si.barber_id, s.barber_id), s.created_at`,
+    [salonId, toSqlUtc(winFrom), toSqlUtc(winTo)]
+  );
+  const [others] = await pool.query('SELECT id FROM barbers WHERE salon_id = ? AND active = 1 AND id <> ?', [salonId, barberId]);
+  const otherIds = new Set(others.map((o) => o.id));
+
+  const edges = (shift) => buckets.map((bk) => ({ from: utc(addDaysStr(bk.from, shift)).getTime(), to: utc(addDaysStr(bk.to, shift + 1)).getTime() }));
+  const cur = edges(0), prev = edges(-nDays);
+  const self = buckets.map(() => 0), team = buckets.map(() => 0), before = buckets.map(() => 0);
+  lines.forEach((l) => {
+    const t = new Date(String(l.created_at).replace(' ', 'T') + (String(l.created_at).includes('Z') || l.created_at instanceof Date ? '' : 'Z')).getTime();
+    const cents = Number(l.cents) || 0;
+    for (let i = 0; i < buckets.length; i++) {
+      if (t >= cur[i].from && t < cur[i].to) { if (l.barber_id === barberId) self[i] += cents; else if (otherIds.has(l.barber_id)) team[i] += cents; break; }
+      if (t >= prev[i].from && t < prev[i].to) { if (l.barber_id === barberId) before[i] += cents; break; }
+    }
+  });
+  // Jours pas encore arrivés : pas de point (sinon la courbe tombe à 0 € et fausse la lecture).
+  const todayLocal = new Intl.DateTimeFormat('en-CA', { timeZone: tz || 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  buckets.forEach((bk, i) => { if (bk.from > todayLocal) { self[i] = null; team[i] = null; } });
+  return {
+    unit,
+    labels: buckets.map((bk) => bk.from),
+    ends: buckets.map((bk) => bk.to),
+    barber_cents: self,
+    team_avg_cents: otherIds.size ? team.map((c) => (c == null ? null : Math.round(c / otherIds.size))) : null,
+    previous_cents: before,
+    team_size: otherIds.size
+  };
+}
+
+/**
+ * Statistiques d'un coiffeur sur une période donnée. Le client calcule
+ * lui-même les bornes (start/end en ISO UTC) à partir de son fuseau
+ * local — le serveur se contente de filtrer, évitant tout décalage
+ * jour/heure entre le fuseau du serveur et celui du salon.
+ */
 router.get('/:id/stats', requireAdmin, wrap(async (req, res) => {
   const { start, end, start_date, end_date } = req.query;
   if (!start || !end) return res.status(400).json({ error: 'start et end requis (ISO)' });
@@ -324,131 +534,25 @@ router.get('/:id/stats', requireAdmin, wrap(async (req, res) => {
   );
   if (!owned) return res.status(404).json({ error: 'Coiffeur introuvable' });
 
-  const startSql = new Date(start).toISOString().slice(0, 19).replace('T', ' ');
-  const endSql = new Date(end).toISOString().slice(0, 19).replace('T', ' ');
-
-  const [[row]] = await pool.query(
-    `SELECT COUNT(*) AS done_count, COALESCE(SUM(total_price_cents), 0) AS revenue_cents,
-            COALESCE(SUM(TIMESTAMPDIFF(MINUTE, start_at, end_at)), 0) AS booked_minutes
-     FROM queue
-     WHERE barber_id = ? AND salon_id = ? AND status = 'done'
-     AND end_at >= ? AND end_at < ?`,
-    [req.params.id, req.salon.id, startSql, endSql]
-  );
-
-  // Chiffre d'affaires ENCAISSÉ à son nom (prestations, suppléments ET produits), ligne par ligne, depuis les
-  // ventes de la caisse - voir salesRevenueByBarber. Les passages terminés (nombre, minutes) restent ceux de la file.
-  const sold = (await salesRevenueByBarber(pool, req.salon.id, { fromSql: startSql, toSql: endSql })).get(req.params.id)
-    || { service_cents: 0, service_count: 0, product_cents: 0, product_count: 0 };
-
-  // Nombre de passages : lignes de ticket attribuees a ce coiffeur par un AUTRE coiffeur (ou retirees de ses passages) - voir lineAttribution.js.
-  const adj = applyTransfers(
-    new Map([[req.params.id, { name: null, count: Number(row.done_count), cents: Number(row.revenue_cents) }]]),
-    await serviceLineTransfers(pool, req.salon.id, { fromSql: startSql, toSql: endSql })
-  ).get(req.params.id);
-  const doneCount = Math.max(0, adj.count);
-  const revenueCents = sold.service_cents;
-  const bookedMinutes = Number(row.booked_minutes);
-  const productCount = sold.product_count;
-  const productRevenueCents = sold.product_cents;
-
-  // Calcul des créneaux disponibles/libres : nécessite les dates
-  // locales de salon en jours calendaires précis (start_date/end_date,
-  // YYYY-MM-DD inclus) - jamais dérivées de start/end (UTC), qui
-  // décaleraient le jour selon l'heure d'été/hiver (même piège que
-  // scheduled_at ailleurs dans l'app).
-  var availability = null;
-  if (start_date && end_date) {
-    const [schedules] = await pool.query(
-      'SELECT weekday, start_time, end_time FROM barber_schedules WHERE barber_id = ? AND active = 1',
-      [req.params.id]
-    );
-    const [breaks] = await pool.query(
-      'SELECT weekday, start_time, end_time FROM barber_breaks WHERE barber_id = ? AND active = 1',
-      [req.params.id]
-    );
-    const [leaves] = await pool.query(
-      'SELECT start_date, end_date FROM barber_leaves WHERE barber_id = ?',
-      [req.params.id]
-    );
-    const settings = await getSettings(req.salon.id);
-    const slotStepMin = Number(settings.rdv_slot_step_min) || 15;
-
-    const schedByDay = {};
-    schedules.forEach((s) => { schedByDay[s.weekday] = s; });
-    const breaksByDay = {};
-    breaks.forEach((b) => {
-      if (!breaksByDay[b.weekday]) breaksByDay[b.weekday] = [];
-      breaksByDay[b.weekday].push(b);
-    });
-    const leaveRanges = leaves.map((l) => ({
-      start: String(l.start_date).slice(0, 10),
-      end: String(l.end_date).slice(0, 10)
-    }));
-
-    function timeToMin(t) { const [h, m] = String(t).split(':').map(Number); return h * 60 + m; }
-    function isOnLeave(dateStr) { return leaveRanges.some((l) => dateStr >= l.start && dateStr <= l.end); }
-
-    var availableMinutes = 0;
-    var d = new Date(start_date + 'T00:00:00Z');
-    const endD = new Date(end_date + 'T00:00:00Z');
-    while (d <= endD) {
-      const dateStr = d.toISOString().slice(0, 10);
-      const weekday = d.getUTCDay(); // 0=dimanche ... 6=samedi
-      if (!isOnLeave(dateStr)) {
-        const sched = schedByDay[weekday];
-        if (sched) {
-          var dayMinutes = timeToMin(sched.end_time) - timeToMin(sched.start_time);
-          (breaksByDay[weekday] || []).forEach((b) => {
-            dayMinutes -= Math.max(0, timeToMin(b.end_time) - timeToMin(b.start_time));
-          });
-          availableMinutes += Math.max(0, dayMinutes);
-        }
-      }
-      d.setUTCDate(d.getUTCDate() + 1);
-    }
-
-    const freeMinutes = Math.max(0, availableMinutes - bookedMinutes);
-    const occupancyPct = availableMinutes > 0 ? Math.round((100 * bookedMinutes) / availableMinutes) : 0;
-    // Prix moyen par minute : celui réellement encaissé sur la période ; s'il n'y a encore rien d'encaissé (journée
-    // vide, coiffeur qui débute...), on prend le prix moyen à la minute des prestations qu'il propose (ses prix et
-    // durées personnalisés s'il en a, hors prestations qu'il ne fait pas) - sinon le manque à gagner resterait à 0 €.
-    let avgRevenuePerMinute = bookedMinutes > 0 && revenueCents > 0 ? revenueCents / bookedMinutes : 0;
-    let potentialBasis = avgRevenuePerMinute > 0 ? 'sales' : 'none';
-    if (!avgRevenuePerMinute) {
-      const [svc] = await pool.query(
-        `SELECT COALESCE(p.price_cents, s.price_cents) AS price_cents, COALESCE(p.duration_min, s.duration_min) AS duration_min
-         FROM services s
-         LEFT JOIN barber_service_prices p ON p.service_id = s.id AND p.barber_id = ?
-         WHERE s.salon_id = ? AND s.active = 1 AND s.deleted_at IS NULL
-           AND s.id NOT IN (SELECT service_id FROM barber_service_exclusions WHERE barber_id = ?)`,
-        [req.params.id, req.salon.id, req.params.id]
-      );
-      const rates = svc.filter((x) => Number(x.duration_min) > 0 && Number(x.price_cents) > 0).map((x) => Number(x.price_cents) / Number(x.duration_min));
-      if (rates.length) { avgRevenuePerMinute = rates.reduce((a, b) => a + b, 0) / rates.length; potentialBasis = 'catalog'; }
-    }
-
-    availability = {
-      available_minutes: availableMinutes,
-      free_minutes: freeMinutes,
-      free_slots: Math.floor(freeMinutes / slotStepMin),
-      occupancy_pct: occupancyPct,
-      potential_revenue_cents: Math.round(freeMinutes * avgRevenuePerMinute),
-      potential_basis: potentialBasis   // 'sales' (encaissé) | 'catalog' (prix moyen de ses prestations) | 'none'
+  const startD = new Date(start), endD = new Date(end);
+  const core = await barberPeriodCore(req.salon.id, req.params.id, toSqlUtc(startD), toSqlUtc(endD), start_date, end_date);
+  const out = Object.assign({ ok: true }, core);
+  if (start_date && end_date && /^\d{4}-\d{2}-\d{2}$/.test(start_date) && /^\d{4}-\d{2}-\d{2}$/.test(end_date) && start_date <= end_date) {
+    // Période précédente : même nombre de jours, juste avant (pour les « +12 % / −8 % » de chaque case).
+    const nDays = daysBetween(start_date, end_date) + 1;
+    const span = endD.getTime() - startD.getTime();
+    const prev = await barberPeriodCore(req.salon.id, req.params.id, toSqlUtc(new Date(startD.getTime() - span)), toSqlUtc(startD),
+      addDaysStr(start_date, -nDays), addDaysStr(start_date, -1));
+    out.previous = {
+      done_count: prev.done_count, revenue_cents: prev.revenue_cents, avg_ticket_cents: prev.avg_ticket_cents,
+      addon_rate_pct: prev.addon_rate_pct, revenue_per_hour_cents: prev.revenue_per_hour_cents,
+      occupancy_pct: prev.availability ? prev.availability.occupancy_pct : null,
+      no_show_count: prev.no_show_count, cancelled_count: prev.cancelled_count
     };
+    const settings = await getSettings(req.salon.id);
+    out.series = await barberSeries(req.salon.id, req.params.id, start_date, end_date, settings.timezone);
   }
-
-  res.json(Object.assign(
-    {
-      ok: true, done_count: doneCount,
-      revenue_cents: revenueCents + productRevenueCents,
-      service_revenue_cents: revenueCents,
-      product_count: productCount,
-      product_revenue_cents: productRevenueCents,
-      booked_minutes: bookedMinutes
-    },
-    availability ? { availability: availability } : {}
-  ));
+  res.json(out);
 }));
 
 /**

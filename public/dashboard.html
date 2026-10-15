@@ -1205,7 +1205,35 @@
   .bp-stats .stats-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
   .bp-stats .stat-tile { grid-column: span 3; display: flex; flex-direction: column; justify-content: center; }
   .bp-stats .stats-grid.bento .stat-tile { grid-column: span 2; }
-  .bp-stats .stats-grid.bento .stat-tile:nth-child(n+4) { grid-column: span 3; }
+  .bp-stats .stats-grid.bento .stat-tile:nth-child(n+4) { grid-column: span 2; }
+  .stat-tile .st-help { display: block; font-size: 11px; opacity: .75; }
+  .st-delta { font-size: 11.5px; font-weight: 600; margin-top: 6px; font-variant-numeric: tabular-nums; }
+  .st-delta.up { color: var(--green, #30d158); }
+  .st-delta.down { color: var(--red, #ff453a); }
+  .st-delta.flat { color: var(--grey); font-weight: 500; }
+  /* Courbe des statistiques coiffeur */
+  .bp-chart { margin-top: 14px; background: var(--fill); border-radius: 14px; padding: 14px 16px 10px; }
+  .bc-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+  .bc-title { font-size: 14px; font-weight: 600; }
+  .bc-legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--grey); }
+  .bc-leg { display: inline-flex; align-items: center; gap: 6px; }
+  .bc-wrap { position: relative; }
+  .bc-svg { max-width: 100%; height: auto; display: block; overflow: visible; touch-action: pan-y; }
+  .bc-grid { stroke: var(--sep); stroke-width: 1; vector-effect: non-scaling-stroke; }
+  .bc-ax { fill: var(--grey); font-size: 11px; }
+  .bc-line { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .bc-line.me { stroke: var(--accent, #0a84ff); stroke-width: 2.5; }
+  .bc-line.team { stroke: var(--ink); opacity: .55; stroke-dasharray: 6 5; }
+  .bc-line.prev { stroke: var(--grey); opacity: .7; stroke-dasharray: 1.5 4.5; }
+  .bc-cross { stroke: var(--grey); stroke-width: 1; opacity: .5; vector-effect: non-scaling-stroke; }
+  .bc-dot { stroke: var(--fill); stroke-width: 2; }
+  .bc-dot.me { fill: var(--accent, #0a84ff); }
+  .bc-dot.team { fill: var(--ink); }
+  .bc-dot.prev { fill: var(--grey); }
+  .bc-tip { position: absolute; top: 4px; pointer-events: none; background: var(--card); border-radius: 12px; padding: 9px 11px; box-shadow: 0 8px 28px rgba(0,0,0,.25); font-size: 12.5px; min-width: 210px; z-index: 2; }
+  .bc-tip-t { font-weight: 600; margin-bottom: 5px; text-transform: capitalize; }
+  .bc-tip-r { display: flex; align-items: center; gap: 7px; color: var(--grey); padding: 1px 0; }
+  .bc-tip-r b { margin-left: auto; color: var(--ink); font-variant-numeric: tabular-nums; }
   .bp-stats .stat-tile.wide { grid-column: span 2; }
   @media (max-width: 980px) { .bp-stats .stats-grid, .bp-stats .stats-grid.bento { grid-template-columns: repeat(2, minmax(0, 1fr)); } .bp-stats .stat-tile, .bp-stats .stats-grid.bento .stat-tile, .bp-stats .stats-grid.bento .stat-tile:nth-child(n+4) { grid-column: auto; } .bp-stats .stat-tile.wide, .bp-stats .stats-grid.bento .stat-tile.wide { grid-column: 1 / -1; } }
   .bp-layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 18px; align-items: stretch; margin-bottom: 18px; }
@@ -4969,14 +4997,15 @@ function renderStatsTab(b) {
 // Corps des statistiques = ligne de contrôle (flèches ou Du/Au) + tuiles. Les tuiles gardent leurs 5 emplacements (bento) même
 // avant l'arrivée des chiffres, et la ligne de contrôle a une hauteur fixe : changer de période ne fait plus bouger la mise en page.
 function renderStatsBody(b) {
+  var ph = function (label, cls) { return '<div class="stat-tile' + (cls ? ' ' + cls : '') + '"><div class="v">—</div><div class="l">' + label + '</div></div>'; };
   return '<div class="stats-ctl" id="stats-ctl-' + b.id + '">' + renderStatsCtl(b) + '</div>' +
     '<div class="stats-grid bento" id="stats-grid-' + b.id + '">' +
-    '<div class="stat-tile"><div class="v">—</div><div class="l">coupes terminées</div></div>' +
-    '<div class="stat-tile"><div class="v">—</div><div class="l">encaissé</div></div>' +
+    ph('coupes terminées') + ph('encaissé') +
     '<div class="stat-tile wide"><div class="v">—</div><div class="l">taux d\'occupation (performance)</div><div class="occ-bar"><div class="occ-bar-fill" style="width:0%"></div></div></div>' +
-    '<div class="stat-tile"><div class="v">—</div><div class="l">créneaux libres (≈)</div></div>' +
-    '<div class="stat-tile warn"><div class="v">—</div><div class="l">manque à gagner estimé</div></div>' +
-    '</div>';
+    ph('panier moyen') + ph('ventes en plus') + ph('encaissé par heure travaillée') +
+    ph('RDV ratés') + ph('créneaux libres (≈)') + ph('manque à gagner estimé', 'warn') +
+    '</div>' +
+    '<div class="bp-chart" id="stats-chart-' + b.id + '"></div>';
 }
 
 function renderStatsCtl(b) {
@@ -5229,25 +5258,121 @@ function loadBarberStats(id) {
       var grid = document.getElementById('stats-grid-' + id);
       if (!grid) return;
       grid.classList.remove('loading');
-      var a = r.availability;
+      var a = r.availability, pv = r.previous || null;
       grid.classList.toggle('bento', !!a);
+      // « +12 % » / « −8 % » par rapport à la période précédente (même durée, juste avant). Rien si pas comparable.
+      var delta = function (cur, prev, unit) {
+        if (!pv || cur == null || prev == null) return '';
+        if (unit === 'pt') {
+          var dp = cur - prev;
+          if (!dp) return '<div class="st-delta flat">= période préc.</div>';
+          return '<div class="st-delta ' + (dp > 0 ? 'up' : 'down') + '">' + (dp > 0 ? '▲ +' : '▼ −') + Math.abs(dp) + ' pt vs période préc.</div>';
+        }
+        if (!prev) return cur ? '<div class="st-delta up">▲ nouveau vs période préc.</div>' : '';
+        var pc = Math.round(((cur - prev) / prev) * 100);
+        if (!pc) return '<div class="st-delta flat">= période préc.</div>';
+        return '<div class="st-delta ' + (pc > 0 ? 'up' : 'down') + '">' + (pc > 0 ? '▲ +' : '▼ −') + Math.abs(pc) + ' % vs période préc.</div>';
+      };
+      var tile = function (v, label, extra, cls) { return '<div class="stat-tile' + (cls ? ' ' + cls : '') + '"><div class="v">' + v + '</div><div class="l">' + label + '</div>' + (extra || '') + '</div>'; };
+      var missed = (r.no_show_count || 0) + (r.cancelled_count || 0);
       grid.innerHTML =
-        '<div class="stat-tile"><div class="v">' + r.done_count + '</div><div class="l">coupes terminées</div></div>' +
-        '<div class="stat-tile"><div class="v">' + eur(r.revenue_cents) + '</div><div class="l">encaissé</div></div>' +
+        tile(r.done_count, 'coupes terminées', delta(r.done_count, pv && pv.done_count)) +
+        tile(eur(r.revenue_cents), 'encaissé', delta(r.revenue_cents, pv && pv.revenue_cents)) +
         (a ? (
           '<div class="stat-tile wide">' +
             '<div class="v">' + a.occupancy_pct + ' %</div><div class="l">taux d\'occupation (performance)</div>' +
             '<div class="occ-bar"><div class="occ-bar-fill" style="width:' + Math.min(100, a.occupancy_pct) + '%"></div></div>' +
+            delta(a.occupancy_pct, pv && pv.occupancy_pct, 'pt') +
           '</div>' +
-          '<div class="stat-tile"><div class="v">' + a.free_slots + '</div><div class="l">créneaux libres (≈)</div></div>' +
-          '<div class="stat-tile warn"><div class="v">' + eur(a.potential_revenue_cents) + '</div><div class="l">manque à gagner estimé' +
-            (a.potential_basis === 'catalog' ? '<br><span style="opacity:.7;font-size:.9em">d\'après le prix moyen de ses prestations</span>' : '') + '</div></div>'
+          tile(r.avg_ticket_cents == null ? '—' : eur(r.avg_ticket_cents), 'panier moyen <span class="st-help">par client</span>', delta(r.avg_ticket_cents, pv && pv.avg_ticket_cents)) +
+          tile(r.addon_rate_pct == null ? '—' : r.addon_rate_pct + ' %', 'ventes en plus <span class="st-help">clients avec produit ou supplément</span>', delta(r.addon_rate_pct, pv && pv.addon_rate_pct, 'pt')) +
+          tile(r.revenue_per_hour_cents == null ? '—' : eur(r.revenue_per_hour_cents), 'encaissé par heure travaillée', delta(r.revenue_per_hour_cents, pv && pv.revenue_per_hour_cents)) +
+          tile(missed, 'RDV ratés', '<div class="st-delta flat">' + (r.no_show_count || 0) + ' absent' + ((r.no_show_count || 0) > 1 ? 's' : '') + ' · ' + (r.cancelled_count || 0) + ' annulé' + ((r.cancelled_count || 0) > 1 ? 's' : '') + (r.appointments_total ? ' sur ' + r.appointments_total + ' RDV' : '') + '</div>') +
+          tile(a.free_slots, 'créneaux libres (≈)') +
+          tile(eur(a.potential_revenue_cents), 'manque à gagner estimé' +
+            (a.potential_basis === 'catalog' && a.potential_revenue_cents > 0 ? '<br><span style="opacity:.7;font-size:.9em">d\'après le prix moyen de ses prestations</span>' : ''), '', 'warn')
         ) : '') ;
+      renderBarberChart(id, r.series);
     })
     .catch(function (e) {
       var g = document.getElementById('stats-grid-' + id); if (g) g.classList.remove('loading');
       toast(e.message, true);
     });
+}
+
+/* Courbe des statistiques coiffeur : son encaissé (trait plein), la moyenne des autres coiffeurs (tirets) et la même
+   courbe sur la période précédente (pointillés, estompée). Un seul axe (euros), survol = repère + infobulle. */
+function renderBarberChart(id, se) {
+  var box = document.getElementById('stats-chart-' + id);
+  if (!box) return;
+  if (!se || !se.labels || se.labels.length < 2) { box.innerHTML = ''; box.style.display = 'none'; return; }
+  box.style.display = '';
+  var n = se.labels.length;
+  var series = [
+    { key: 'me', name: 'Ce coiffeur', data: se.barber_cents, cls: 'me' },
+    se.team_avg_cents ? { key: 'team', name: 'Moyenne de l\'équipe (' + se.team_size + ')', data: se.team_avg_cents, cls: 'team' } : null,
+    { key: 'prev', name: 'Période précédente', data: se.previous_cents, cls: 'prev' }
+  ].filter(Boolean);
+  var max = 0; series.forEach(function (s) { s.data.forEach(function (v) { if (v != null && v > max) max = v; }); });
+  // Graduations « rondes » en euros.
+  var step = (function () { var raw = Math.max(1, max / 100) / 4, p = Math.pow(10, Math.floor(Math.log10(raw))); var m = raw / p; return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 5 ? 5 : 10) * p; })();
+  var top = Math.max(step * 4, Math.ceil(max / 100 / step) * step) * 100;
+  // Dessin à la taille réelle (jamais étiré : les textes gardent leur taille), redessiné si la fenêtre change.
+  box._series = se;
+  if (!window._bcResize) {
+    window._bcResize = true;
+    var rt = null;
+    window.addEventListener('resize', function () { clearTimeout(rt); rt = setTimeout(function () {
+      document.querySelectorAll('.bp-chart').forEach(function (bx) { if (bx._series) renderBarberChart(bx.id.replace('stats-chart-', ''), bx._series); });
+    }, 150); });
+  }
+  var W = Math.max(280, Math.round((box.clientWidth || 752) - 32)), H = 220, L = 54, R = 12, T = 12, B = 30, iw = W - L - R, ih = H - T - B;
+  var x = function (i) { return L + (n === 1 ? iw / 2 : (i * iw) / (n - 1)); };
+  var y = function (v) { return T + ih - (v / top) * ih; };
+  var fmtDay = function (ds, short) {
+    var d = new Date(ds + 'T00:00:00');
+    if (se.unit === 'month') return d.toLocaleDateString('fr-FR', { month: short ? 'short' : 'long', year: short ? undefined : 'numeric' });
+    return d.toLocaleDateString('fr-FR', short ? { day: 'numeric', month: 'short' } : { weekday: 'short', day: 'numeric', month: 'short' });
+  };
+  var grid = '';
+  for (var g = 0; g <= 4; g++) {
+    var gv = (top / 4) * g;
+    grid += '<line class="bc-grid" x1="' + L + '" x2="' + (W - R) + '" y1="' + y(gv) + '" y2="' + y(gv) + '"/>' +
+      '<text class="bc-ax" x="' + (L - 8) + '" y="' + (y(gv) + 4) + '" text-anchor="end">' + Math.round(gv / 100) + ' €</text>';
+  }
+  var every = Math.max(1, Math.ceil(n / Math.max(2, Math.min(8, Math.floor(iw / 64))))), xl = '';   // assez d'espace entre les dates, même sur mobile
+  for (var i = 0; i < n; i += every) xl += '<text class="bc-ax" x="' + x(i) + '" y="' + (H - 8) + '" text-anchor="middle">' + esc(fmtDay(se.labels[i], true)) + '</text>';
+  var lines = series.slice().reverse().map(function (s) {
+    var d = '', pen = false;   // les jours à venir (null) ne sont pas tracés
+    s.data.forEach(function (v, i) { if (v == null) { pen = false; return; } d += (pen ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(v).toFixed(1) + ' '; pen = true; });
+    return '<path class="bc-line ' + s.cls + '" d="' + d + '"/>';
+  }).join('');
+  var legend = series.map(function (s) { return '<span class="bc-leg"><svg width="22" height="8" aria-hidden="true"><line class="bc-line ' + s.cls + '" x1="1" x2="21" y1="4" y2="4"/></svg>' + esc(s.name) + '</span>'; }).join('');
+  var unitTxt = se.unit === 'day' ? 'par jour' : se.unit === 'week' ? 'par semaine' : 'par mois';
+  box.innerHTML = '<div class="bc-head"><div class="bc-title">Encaissé ' + unitTxt + '</div><div class="bc-legend">' + legend + '</div></div>' +
+    '<div class="bc-wrap"><svg class="bc-svg" viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H + '" role="img" aria-label="Encaissé ' + unitTxt + ' : ce coiffeur, moyenne de l\'équipe et période précédente">' +
+      grid + xl + lines + '<line class="bc-cross" x1="0" x2="0" y1="' + T + '" y2="' + (T + ih) + '" style="display:none"/>' +
+      series.map(function (s) { return '<circle class="bc-dot ' + s.cls + '" r="4.5" style="display:none"/>'; }).join('') +
+    '</svg><div class="bc-tip" style="display:none"></div></div>';
+  // Survol / toucher : repère vertical + infobulle avec les 3 valeurs du point le plus proche.
+  var svg = box.querySelector('.bc-svg'), tip = box.querySelector('.bc-tip'), cross = box.querySelector('.bc-cross'), dots = box.querySelectorAll('.bc-dot');
+  var show = function (ev) {
+    var rc = svg.getBoundingClientRect(), px = ((ev.touches ? ev.touches[0].clientX : ev.clientX) - rc.left) * (W / rc.width);
+    var i = Math.max(0, Math.min(n - 1, Math.round(((px - L) / iw) * (n - 1))));
+    cross.setAttribute('x1', x(i)); cross.setAttribute('x2', x(i)); cross.style.display = '';
+    series.forEach(function (s, k) { if (s.data[i] == null) { dots[k].style.display = 'none'; return; } dots[k].setAttribute('cx', x(i)); dots[k].setAttribute('cy', y(s.data[i])); dots[k].style.display = ''; });
+    var title = se.unit === 'week' ? 'Semaine du ' + fmtDay(se.labels[i], true) : fmtDay(se.labels[i]);
+    tip.innerHTML = '<div class="bc-tip-t">' + esc(title) + '</div>' + series.map(function (s) {
+      return '<div class="bc-tip-r"><svg width="18" height="8" aria-hidden="true"><line class="bc-line ' + s.cls + '" x1="1" x2="17" y1="4" y2="4"/></svg><span>' + esc(s.name) + '</span><b>' + (s.data[i] == null ? '—' : eur(s.data[i])) + '</b></div>';
+    }).join('');
+    tip.style.display = '';
+    // À côté du repère (à droite, ou à gauche s'il n'y a pas la place) : ne cache jamais le point survolé.
+    var left = (x(i) / W) * rc.width, tw = tip.offsetWidth;
+    tip.style.left = (left + 14 + tw <= rc.width ? left + 14 : Math.max(0, left - 14 - tw)) + 'px';
+  };
+  var hide = function () { tip.style.display = 'none'; cross.style.display = 'none'; dots.forEach(function (d) { d.style.display = 'none'; }); };
+  svg.addEventListener('mousemove', show); svg.addEventListener('touchstart', show, { passive: true }); svg.addEventListener('touchmove', show, { passive: true });
+  svg.addEventListener('mouseleave', hide);
 }
 
 function loadBarberLeaves(id) {
