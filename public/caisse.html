@@ -3440,7 +3440,7 @@ function deleteUnpaidPassage(queueId) {
   if (!q) return;
   var detail = q.service.name + (q.extras.length ? ' + ' + q.extras.map(function (x) { return x.name; }).join(', ') : '');
   showConfirm(
-    q.client_name + ' — ' + detail + ' (' + eur(q.total_price_cents) + ') ne sera pas encaissé. Son passage et sa réservation seront supprimés : rien dans le chiffre d\'affaires ni dans les statistiques. Son compte client est conservé.',
+    q.client_name + ' — ' + detail + ' (' + eur(q.total_price_cents) + ') ne sera pas encaissé.',
     { title: 'Supprimer ce passage ?', danger: true, confirmLabel: 'Supprimer' }
   ).then(function (ok) {
     if (!ok) return false;
