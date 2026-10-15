@@ -33,6 +33,70 @@
 </script>
 <style>
   html.auth-checking #login-screen { display: none; }
+
+  .poste-tl-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12.5px; color: var(--grey); margin: 4px 0 8px; }
+  .poste-tl-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .poste-tl-legend i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+  /* Agenda : même planning du jour (timeline par coiffeur) que le tableau de bord et la caisse. */
+  /* --- Planning du jour (timeline), utilisée dans l'Agenda --- */
+  .timeline-scroll { overflow-x: auto; width: 100%; max-width: 100%; }
+  .timeline-inner { position: relative; }
+  .timeline-hours { position: relative; height: 18px; margin-bottom: 6px; }
+  .timeline-hours span { position: absolute; top: 0; font-size: 12px; color: var(--grey); white-space: nowrap; transform: translateX(-1px); }
+  .timeline-hours span.h { color: var(--ink); font-weight: 600; }
+  /* Dezoome sous la largeur lisible (jusqu'a 0 % = journee entiere a l'ecran) : seules les heures pleines restent. */
+  .timeline-inner.compact .timeline-hours span:not(.h) { display: none; }
+  .timeline-inner.compact .timeline-hours span.h { font-size: 11px; }
+  /* Vue resserree (jusqu'a 0 %) : l'heure reste affichee au-dessus du nom, exactement comme a 100 %. */
+  .timeline-inner.compact .timeline-block { padding: 2px 6px; }
+  .timeline-inner.compact .timeline-hours span.h:last-child { transform: translateX(-100%); }
+  /* Les traits de chaque pas (5 min...) deviennent trop serres : on ne garde que les traits des heures. */
+  .timeline-inner.compact .timeline-minute-grid { background-image: linear-gradient(to right, transparent 1px, transparent 1px), linear-gradient(to right, rgba(128,128,128,.38) 1px, transparent 1px); }
+  .timeline-zoom-ctrl button:disabled { opacity: .35; cursor: default; }
+  .timeline-row { display: flex; align-items: center; min-height: 54px; border-top: 1px solid var(--sep); }
+  .timeline-row:first-child { border-top: none; }
+  .timeline-row-label { width: 22px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; padding-right: 0; }
+  .timeline-row-label .dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .timeline-row-track { position: relative; flex: 1; height: 40px; }
+  .timeline-block {
+    position: absolute; top: 3px; bottom: 3px; border-radius: 8px; padding: 2px 8px;
+    font-size: 12.5px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis; cursor: pointer; display: flex; flex-direction: column; justify-content: center;
+    align-items: flex-start; line-height: 1.15;
+  }
+  /* Heure du rendez-vous, au-dessus du nom du client. */
+  .timeline-block .tb-time { font-size: 10.5px; font-weight: 700; opacity: .92; letter-spacing: .2px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+  .timeline-block .tb-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+  .timeline-now-line {
+    position: absolute; top: 0; bottom: 0; width: 2px; background: var(--accent, var(--blue));
+    z-index: 5; cursor: help;
+  }
+  .timeline-now-line::before {
+    content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+    border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 7px solid var(--accent, var(--blue));
+  }
+  .timeline-now-line::after {
+    content: ''; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+    border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 7px solid var(--accent, var(--blue));
+  }
+  .timeline-empty { padding: 20px 0; text-align: center; color: var(--grey); font-size: 14px; }
+  .timeline-row-track { cursor: pointer; }
+  .timeline-row-track:hover { background: var(--fill); border-radius: 8px; }
+  .timeline-minute-grid {
+    position: absolute; left: 22px; right: 0; top: 0; bottom: 0; pointer-events: none; z-index: 0;
+    /* 1re couche : un trait fin a chaque pas ; 2e couche : un trait plus marque a chaque heure */
+    background-image: linear-gradient(to right, var(--sep) 1px, transparent 1px),
+                      linear-gradient(to right, rgba(128,128,128,.38) 1px, transparent 1px);
+    background-repeat: repeat-x, repeat-x; background-position: left top, left top;
+  }
+  .timeline-zoom-ctrl { display: flex; align-items: center; justify-content: flex-end; gap: 6px; margin-bottom: 8px; }
+  .timeline-zoom-ctrl-inner { display: flex; align-items: center; gap: 6px; background: var(--fill); border-radius: 999px; padding: 4px 6px; }
+  .timeline-zoom-ctrl button {
+    width: 22px; height: 22px; border-radius: 50%; border: none; background: var(--card); color: var(--ink);
+    font-size: 14px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    font-family: inherit; line-height: 1;
+  }
+  .timeline-zoom-ctrl span { font-size: 11px; color: var(--grey); min-width: 32px; text-align: center; }
 </style>
 <link rel="stylesheet" href="/app.css?v=31">
 <style>
@@ -346,6 +410,8 @@ function barberApi(path, opts) {
   opts = opts || {};
   var headers = { 'Content-Type': 'application/json' };
   if (me) { headers['X-Barber-Id'] = me.id; headers['X-Barber-Pin'] = me.pin; }
+  // RDV pris au nom d'un collègue depuis l'Agenda (comme le sélecteur par bulle de la caisse).
+  if (me && opts.actingAs && opts.actingAs !== me.id) headers['X-Acting-As-Barber-Id'] = opts.actingAs;
   if (SALON_SLUG) headers['X-Salon-Slug'] = SALON_SLUG;
   return fetch(path, {
     method: opts.method || 'GET',
@@ -811,7 +877,8 @@ function finishMine(id) {
     })
     .catch(function (e) { toast(e.message, true); });
 }
-/* ---------- Agenda personnel (lecture seule) ---------- */
+/* ---------- Agenda : TOUS les coiffeurs du salon, même planning (timeline) que le tableau de bord ----------
+   Chaque coiffeur voit les RDV de ses collègues et peut ajouter un RDV au nom de l'un d'eux (clic sur sa ligne). */
 var calAnchor = new Date();
 var calViewMode = 'month';
 var calMonthCache = {};
@@ -853,8 +920,9 @@ function loadAgendaPeriod() {
   var keys = neededMonthKeys();
   var toFetch = keys.filter(function (k) { return !calMonthCache[k]; });
   Promise.all(toFetch.map(function (k) {
-    return barberApi('/api/appointments?month=' + k + '&all=1').then(function (r) { calMonthCache[k] = r.items; });
-  })).then(function () {
+    // caisse_view=1 : les RDV de TOUS les coiffeurs (comme la caisse), pas seulement les siens.
+    return barberApi('/api/appointments?month=' + k + '&all=1&caisse_view=1').then(function (r) { calMonthCache[k] = r.items; });
+  }).concat([loadRdvSlotStep(), loadSalonScheduleForTimeline()])).then(function () {
     if (calViewMode === 'month') renderCalMonth();
     else if (calViewMode === 'week') renderCalWeek();
     else renderCalDay();
@@ -871,29 +939,26 @@ function apptsForRange(startDate, endDate) {
   });
 }
 
-function calSourceBadge(a) {
-  var isWalkin = a.source === 'walkin';
-  var title = isWalkin ? 'Sans RDV (passage au salon)' : 'RDV en ligne';
-  var icon = isWalkin
-    ? '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="13" cy="4" r="1.5"/><path d="M9.5 21l2-6-1.5-1.5.5-4.5 3-1 2 2.5 2.5 1"/><path d="M14.5 21l-1-5"/></svg>'
-    : '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5.5" width="16" height="15" rx="2.5"/><path d="M4 9.5h16"/><path d="M8 3.5v3.5M16 3.5v3.5"/></svg>';
-  return '<span title="' + title + '" style="display:inline-flex;vertical-align:middle;color:var(--blue);margin-right:4px">' + icon + '</span>';
+/** Un point par coiffeur ayant au moins un RDV ce jour-là (couleur de sa bulle), comme dans la caisse. */
+function calDayDotsHtml(dayAppts) {
+  var seen = {}, dots = [];
+  dayAppts.forEach(function (a) {
+    var bid = a.barber_id || 'unassigned';
+    if (seen[bid]) return;
+    seen[bid] = true;
+    dots.push('<span class="cal-dot" style="background:' + (bid === 'unassigned' ? 'var(--grey)' : stableColorForId(bid)) + '"></span>');
+  });
+  return dots.length ? '<div class="cal-dots">' + dots.join('') + '</div>' : '';
 }
 
 function renderCalMonth() {
   document.getElementById('cal-month-label').textContent = monthNames[calAnchor.getMonth()] + ' ' + calAnchor.getFullYear();
-
   var firstDay = new Date(calAnchor.getFullYear(), calAnchor.getMonth(), 1);
   var daysInMonth = new Date(calAnchor.getFullYear(), calAnchor.getMonth() + 1, 0).getDate();
   var startOffset = (firstDay.getDay() + 6) % 7;
-
   var monthAppts = apptsForRange(firstDay, new Date(calAnchor.getFullYear(), calAnchor.getMonth(), daysInMonth));
   var byDay = {};
-  monthAppts.forEach(function (a) {
-    var d = a.scheduled_at.slice(0, 10);
-    if (!byDay[d]) byDay[d] = [];
-    byDay[d].push(a);
-  });
+  monthAppts.forEach(function (a) { var d = a.scheduled_at.slice(0, 10); (byDay[d] = byDay[d] || []).push(a); });
 
   var todayStr = ymd(new Date());
   var dayCells = [];
@@ -904,51 +969,35 @@ function renderCalMonth() {
   var html = '';
   for (var w = 0; w < dayCells.length; w += 7) {
     var weekDays = dayCells.slice(w, w + 7);
-    var weekHtml = weekDays.map(function (d) {
+    html += '<div class="cal-grid cal-week-row">' + weekDays.map(function (d) {
       if (d === null) return '<div class="cal-day empty"></div>';
       var dateStr = calAnchor.getFullYear() + '-' + String(calAnchor.getMonth() + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
-      var has = (byDay[dateStr] || []).length > 0;
       var classes = 'cal-day' + (dateStr === todayStr ? ' today' : '') + (dateStr === calSelectedDate ? ' selected' : '');
       return '<div class="' + classes + '" onclick="selectCalDay(\'' + dateStr + '\')">' +
-        '<div class="cal-day-num">' + d + '</div>' +
-        (has ? '<div class="cal-dots"><span class="cal-dot"></span></div>' : '') +
-        '</div>';
-    }).join('');
-
-    html += '<div class="cal-grid cal-week-row">' + weekHtml + '</div>';
-
+        '<div class="cal-day-num">' + d + '</div>' + calDayDotsHtml(byDay[dateStr] || []) + '</div>';
+    }).join('') + '</div>';
     var selectedInThisWeek = calSelectedDate && weekDays.some(function (d) {
       if (d === null) return false;
-      var dateStr = calAnchor.getFullYear() + '-' + String(calAnchor.getMonth() + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
-      return dateStr === calSelectedDate;
+      return calAnchor.getFullYear() + '-' + String(calAnchor.getMonth() + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0') === calSelectedDate;
     });
-    if (selectedInThisWeek) html += renderCalExpandPanel(calSelectedDate, byDay[calSelectedDate] || []);
+    if (selectedInThisWeek) html += renderCalExpandPanel(calSelectedDate);
   }
   document.getElementById('cal-days').innerHTML = html;
 }
 
-function renderCalExpandPanel(dateStr, dayAppts) {
+function renderCalExpandPanel(dateStr) {
   var when = new Date(dateStr + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' });
-  var sorted = dayAppts.slice().sort(function (a, b) { return a.scheduled_at.localeCompare(b.scheduled_at); });
-  sorted.forEach(function (a) { calApptById[a.id] = a; });
-
-  var rows = sorted.length === 0
-    ? '<div class="empty">Aucun rendez-vous ce jour-là</div>'
-    : sorted.map(function (a) {
-        var time = a.scheduled_at.slice(11, 16);
-        return '<div class="cal-expand-row" style="cursor:pointer" onclick="openPosteClientDrawer(\'' + a.id + '\')">' +
-          '<div class="cal-day-view-time">' + time + '</div>' +
-          '<div style="flex:1"><div class="cal-day-view-name">' + esc(a.client_name) + ' ' + calSourceBadge(a) + '</div>' +
-          '<div class="cal-day-view-meta">' + esc(a.service_name) + '</div></div>' +
-          '</div>';
-      }).join('');
-
   return '<div class="cal-expand-panel">' +
     '<div class="cal-expand-head"><strong style="text-transform:capitalize">' + when + '</strong>' +
     '<button class="btn btn-soft" onclick="event.stopPropagation();selectCalDay(null)">Fermer</button></div>' +
-    '<button class="btn btn-primary" style="width:100%;margin-bottom:14px" onclick="event.stopPropagation();openPosteAddAppointment(\'' + dateStr + '\')">+ Ajouter un RDV</button>' +
-    rows +
+    posteAddBtnHtml(dateStr) +
+    renderAgendaTimeline(dateStr) +
     '</div>';
+}
+
+function posteAddBtnHtml(dateStr) {
+  return '<button class="btn btn-primary" style="width:100%;margin-bottom:6px" onclick="event.stopPropagation();openPosteAddAppointment(\'' + dateStr + '\')">+ Ajouter un RDV</button>' +
+    '<p class="hint" style="margin:0 0 12px;text-align:center;font-size:12.5px;color:var(--grey)">Pour un collègue : touchez sa ligne dans le planning.</p>';
 }
 
 function renderCalWeek() {
@@ -956,57 +1005,213 @@ function renderCalWeek() {
   var end = addDays(start, 6);
   document.getElementById('cal-month-label').textContent =
     start.getDate() + ' ' + monthNames[start.getMonth()] + ' – ' + end.getDate() + ' ' + monthNames[end.getMonth()] + ' ' + end.getFullYear();
-
-  var weekAppts = apptsForRange(start, end);
   var byDay = {};
-  weekAppts.forEach(function (a) {
-    var d = a.scheduled_at.slice(0, 10);
-    if (!byDay[d]) byDay[d] = [];
-    byDay[d].push(a);
-  });
-
+  apptsForRange(start, end).forEach(function (a) { var d = a.scheduled_at.slice(0, 10); (byDay[d] = byDay[d] || []).push(a); });
   var todayStr = ymd(new Date());
   var cells = '';
   for (var i = 0; i < 7; i++) {
-    var d = addDays(start, i);
-    var dateStr = ymd(d);
-    var has = (byDay[dateStr] || []).length > 0;
+    var d = addDays(start, i), dateStr = ymd(d);
     var classes = 'cal-day' + (dateStr === todayStr ? ' today' : '') + (dateStr === calSelectedDate ? ' selected' : '');
     cells += '<div class="' + classes + '" onclick="selectCalDay(\'' + dateStr + '\')">' +
-      '<div class="cal-day-num">' + d.getDate() + '</div>' +
-      (has ? '<div class="cal-dots"><span class="cal-dot"></span></div>' : '') +
-      '</div>';
+      '<div class="cal-day-num">' + d.getDate() + '</div>' + calDayDotsHtml(byDay[dateStr] || []) + '</div>';
   }
-
   var html = '<div class="cal-grid cal-week-row">' + cells + '</div>';
-  if (calSelectedDate) html += renderCalExpandPanel(calSelectedDate, byDay[calSelectedDate] || []);
+  if (calSelectedDate) html += renderCalExpandPanel(calSelectedDate);
   document.getElementById('cal-days').innerHTML = html;
 }
 
 function renderCalDay() {
   document.getElementById('cal-month-label').textContent =
     calAnchor.toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
-
-  var dayAppts = apptsForRange(calAnchor, calAnchor).sort(function (a, b) { return a.scheduled_at.localeCompare(b.scheduled_at); });
-  dayAppts.forEach(function (a) { calApptById[a.id] = a; });
-  var view = document.getElementById('cal-day-view');
-  var addBtn = '<button class="btn btn-primary" style="width:100%;margin-bottom:14px" onclick="openPosteAddAppointment(\'' + ymd(calAnchor) + '\')">+ Ajouter un RDV</button>';
-  view.innerHTML = addBtn + (dayAppts.length === 0
-    ? '<div class="empty">Aucun rendez-vous ce jour-là</div>'
-    : '<div class="cal-day-view-list">' + dayAppts.map(function (a) {
-        var time = a.scheduled_at.slice(11, 16);
-        return '<div class="cal-day-view-appt" style="cursor:pointer" onclick="openPosteClientDrawer(\'' + a.id + '\')">' +
-          '<div class="cal-day-view-time">' + time + '</div>' +
-          '<div><div class="cal-day-view-name">' + esc(a.client_name) + ' ' + calSourceBadge(a) + '</div>' +
-          '<div class="cal-day-view-meta">' + esc(a.service_name) + '</div></div>' +
-          '</div>';
-      }).join('') + '</div>');
+  document.getElementById('cal-day-view').innerHTML = posteAddBtnHtml(ymd(calAnchor)) + renderAgendaTimeline(ymd(calAnchor));
 }
 
 function selectCalDay(dateStr) {
   calSelectedDate = (!dateStr || dateStr === calSelectedDate) ? null : dateStr;
+  if (calSelectedDate) calAnchor = new Date(calSelectedDate + 'T00:00:00');
   if (calViewMode === 'month') renderCalMonth();
   else if (calViewMode === 'week') renderCalWeek();
+}
+
+/* ---------- Planning du jour (timeline par coiffeur), repris de la caisse ---------- */
+var timelineZoom = 1;
+var rdvSlotStepMin = 15;
+var TIMELINE_LABEL_PX = 44;
+var timelineMinZoom = 0.6;
+var timelineEffectiveZoom = null;
+var salonScheduleByWeekday = null;
+var agendaNowLineTimer = null;
+
+// Une frise LARGE (pas fin) depasse l'ecran : au lieu de l'ouvrir sur le matin, on la centre sur le trait
+// "maintenant" quand on regarde AUJOURD'HUI. Se declenche des qu'une frise apparait dans la page, quel que
+// soit l'endroit qui l'affiche (aucun appel a ajouter nulle part).
+(function installTimelineAutoScroll() {
+  function scrollToNow(sc) {
+    var now = sc.querySelector('.timeline-now-line');
+    // Un debordement de quelques pixels (le dernier libelle) ne justifie pas de decaler la frise (cela
+    // cacherait la colonne de gauche) : on ne centre que si elle est VRAIMENT plus large que l'ecran.
+    if (!now || sc.scrollWidth - sc.clientWidth < 80) return;
+    sc.scrollLeft = Math.max(0, now.offsetLeft - sc.clientWidth / 2);
+  }
+  new MutationObserver(function (muts) {
+    muts.forEach(function (m) {
+      m.addedNodes.forEach(function (n) {
+        if (n.nodeType !== 1) return;
+        if (n.classList.contains('timeline-scroll')) scrollToNow(n);
+        else if (n.querySelectorAll) n.querySelectorAll('.timeline-scroll').forEach(scrollToNow);
+      });
+    });
+  }).observe(document.body || document.documentElement, { childList: true, subtree: true });
+})();
+
+function loadRdvSlotStep() {
+  var headers = SALON_SLUG ? { 'X-Salon-Slug': SALON_SLUG } : {};
+  return fetch('/api/settings/public', { headers: headers })
+    .then(function (r) { return r.json(); })
+    .then(function (d) { rdvSlotStepMin = Number(d.rdv_slot_step_min) || 15; })
+    .catch(function () {});
+}
+
+function timeStrToMinutes(t) { var hm = t.slice(0, 5).split(':'); return Number(hm[0]) * 60 + Number(hm[1]); }
+
+function loadSalonScheduleForTimeline() {
+  if (salonScheduleByWeekday) return Promise.resolve(salonScheduleByWeekday);
+  return barberApi('/api/salon-calendar/schedule').then(function (r) {
+    salonScheduleByWeekday = {};
+    (r.schedules || []).forEach(function (x) {
+      if (!x.active) return;
+      salonScheduleByWeekday[x.weekday] = { startMin: timeStrToMinutes(x.start_time), endMin: timeStrToMinutes(x.end_time) };
+    });
+    return salonScheduleByWeekday;
+  }).catch(function () { salonScheduleByWeekday = {}; return salonScheduleByWeekday; });
+}
+
+/** Coiffeurs affichés : tous ceux qui prennent des RDV (moi en premier), plus ceux qui ont un RDV ce jour-là. */
+function posteTimelineBarbers(appts) {
+  var list = (barbers || []).filter(function (b) { return b.accepts_appointments || (me && b.id === me.id); });
+  appts.forEach(function (a) {
+    if (a.barber_id && !list.some(function (b) { return b.id === a.barber_id; })) {
+      list.push({ id: a.barber_id, name: a.barber_name || 'Coiffeur', accepts_appointments: 0 });
+    }
+  });
+  if (me && !list.some(function (b) { return b.id === me.id; })) list.push({ id: me.id, name: me.name, accepts_appointments: 1 });
+  return list.sort(function (x, y) {
+    if (me && x.id === me.id) return -1;
+    if (me && y.id === me.id) return 1;
+    return String(x.name).localeCompare(String(y.name));
+  });
+}
+
+function renderAgendaTimeline(dateStr) {
+  var d = new Date(dateStr + 'T00:00:00');
+  var appts = apptsForRange(d, d);
+  appts.forEach(function (a) { calApptById[a.id] = a; });
+  var rowsBarbers = posteTimelineBarbers(appts);
+
+  var items = appts.map(function (a) {
+    var hm = a.scheduled_at.slice(11, 16).split(':');
+    return { id: a.id, barberId: a.barber_id, clientName: a.client_name, serviceName: a.service_name,
+      startMin: Number(hm[0]) * 60 + Number(hm[1]), durMin: Math.max(a.duration_min || 30, 15), timeLabel: a.scheduled_at.slice(11, 16) };
+  });
+
+  // Plage horaire = heures d'ouverture du salon ce jour-là, élargie seulement si un RDV en dépasse.
+  var weekday = d.getDay();
+  var salonDay = salonScheduleByWeekday && salonScheduleByWeekday[weekday];
+  var starts = items.map(function (it) { return it.startMin; }), ends = items.map(function (it) { return it.startMin + it.durMin; });
+  var baseStart = salonDay ? salonDay.startMin : (starts.length ? Math.floor(Math.min.apply(null, starts) / 60) * 60 : 9 * 60);
+  var baseEnd = salonDay ? salonDay.endMin : (ends.length ? Math.ceil(Math.max.apply(null, ends) / 60) * 60 : 19 * 60);
+  var rangeStart = Math.floor(Math.min.apply(null, [baseStart].concat(starts)) / 60) * 60;
+  var rangeEnd = Math.ceil(Math.max.apply(null, [baseEnd].concat(ends)) / 60) * 60;
+  if (rangeEnd - rangeStart < 4 * 60) rangeEnd = rangeStart + 4 * 60;
+  var hourCount = (rangeEnd - rangeStart) / 60;
+
+  var stepMin = rdvSlotStepMin > 0 ? rdvSlotStepMin : 15;
+  var hoursHtml = '';
+  for (var t = rangeStart; t <= rangeEnd; t += stepMin) {
+    var tFrac = (t - rangeStart) / (rangeEnd - rangeStart);
+    hoursHtml += '<span' + (t % 60 === 0 ? ' class="h"' : '') + ' style="left: calc(22px + (100% - 22px) * ' + tFrac + ')">' +
+      String(Math.floor(t / 60)).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0') + '</span>';
+  }
+
+  var rowsHtml = rowsBarbers.map(function (b) {
+    var color = stableColorForId(b.id);
+    var blocksHtml = items.filter(function (it) { return it.barberId === b.id; }).map(function (it) {
+      var leftPct = ((it.startMin - rangeStart) / (rangeEnd - rangeStart)) * 100;
+      var widthPct = (it.durMin / (rangeEnd - rangeStart)) * 100;
+      return '<div class="timeline-block" style="left:' + leftPct + '%;width:' + widthPct + '%;background:' + color + '" ' +
+        'title="' + esc(it.timeLabel + ' — ' + it.clientName + ' — ' + (it.serviceName || '') + ' — ' + b.name) + '" ' +
+        'onclick="event.stopPropagation();openPosteClientDrawer(\'' + it.id + '\')">' +
+        '<span class="tb-time">' + esc(it.timeLabel) + '</span><span class="tb-name">' + esc(it.clientName) + '</span></div>';
+    }).join('');
+    var trackClick = b.accepts_appointments || (me && b.id === me.id)
+      ? ' onclick="openPosteAddAppointment(\'' + dateStr + '\',\'' + b.id + '\')" title="Ajouter un RDV pour ' + esc(b.name) + '"'
+      : ' onclick="toast(\'' + esc(String(b.name).replace(/'/g, '')) + ' ne prend pas de RDV en ligne\', true)"';
+    return '<div class="timeline-row">' +
+      '<div class="timeline-row-label" title="' + esc(b.name) + '"><span class="dot" style="background:' + color + '"></span></div>' +
+      '<div class="timeline-row-track"' + trackClick + '>' + blocksHtml + '</div>' +
+      '</div>';
+  }).join('');
+
+  var nowLineHtml = '';
+  var nowStr = nowSalonDatetimeString();
+  if (dateStr === nowStr.slice(0, 10)) {
+    var nowMin = Number(nowStr.slice(11, 13)) * 60 + Number(nowStr.slice(14, 16));
+    if (nowMin >= rangeStart && nowMin <= rangeEnd) {
+      nowLineHtml = '<div class="timeline-now-line" title="Maintenant — ' + nowStr.slice(11, 16) + '" ' +
+        'style="left: calc(22px + (100% - 22px) * ' + ((nowMin - rangeStart) / (rangeEnd - rangeStart)) + ')"></div>';
+    }
+  }
+  var stepPct = (stepMin / (rangeEnd - rangeStart)) * 100, hourPct = (60 / (rangeEnd - rangeStart)) * 100;
+  var minuteGridHtml = '<div class="timeline-minute-grid" style="background-size:' + stepPct + '% 100%, ' + hourPct + '% 100%"></div>';
+
+  var labelsPerHour = 60 / stepMin;
+  var fitPerHour = Math.max(90, labelsPerHour * TIMELINE_LABEL_PX);
+  var minZoom = Math.max(0.6, (labelsPerHour * TIMELINE_LABEL_PX) / fitPerHour);
+  var effZoom = Math.max(0, timelineZoom);
+  var compact = effZoom < minZoom;
+  timelineMinZoom = 0; timelineEffectiveZoom = effZoom;
+  var innerWidth = Math.round(hourCount * fitPerHour * effZoom);
+  if (compact) {
+    var shown = document.querySelector('.timeline-scroll');
+    var avail = (shown && shown.clientWidth) || 900;
+    var readable = Math.round(hourCount * fitPerHour * minZoom);
+    innerWidth = readable <= avail ? 0 : Math.round(avail + (readable - avail) * (effZoom / minZoom));
+  }
+  var zoomCtrl = '<div class="timeline-zoom-ctrl"><div class="timeline-zoom-ctrl-inner">' +
+    '<button type="button" onclick="event.stopPropagation();adjustAgendaZoom(-1)" title="Dézoomer"' + (effZoom === 0 ? ' disabled' : '') + '>−</button>' +
+    '<span>' + Math.round(effZoom * 100) + '%</span>' +
+    '<button type="button" onclick="event.stopPropagation();adjustAgendaZoom(1)" title="Zoomer">+</button>' +
+    '</div></div>';
+  var legend = '<div class="poste-tl-legend">' + rowsBarbers.map(function (b) {
+    return '<span><i style="background:' + stableColorForId(b.id) + '"></i>' + esc(me && b.id === me.id ? b.name + ' (moi)' : b.name) + '</span>';
+  }).join('') + '</div>';
+
+  return legend + zoomCtrl + '<div class="timeline-scroll"><div class="timeline-inner' + (compact ? ' compact' : '') + (effZoom === 0 ? ' fit' : '') + '" ' +
+    'data-date="' + dateStr + '" data-range-start="' + rangeStart + '" data-range-end="' + rangeEnd + '" style="min-width:' + innerWidth + 'px">' +
+    '<div class="timeline-hours">' + hoursHtml + '</div>' + minuteGridHtml + rowsHtml + nowLineHtml +
+    '</div></div>';
+}
+
+/** Déplace juste la ligne « maintenant », sans reconstruire le reste. */
+function updateAgendaNowLines() {
+  var nowStr = nowSalonDatetimeString(), todayStr = nowStr.slice(0, 10);
+  var nowMin = Number(nowStr.slice(11, 13)) * 60 + Number(nowStr.slice(14, 16));
+  document.querySelectorAll('.timeline-inner[data-range-start]').forEach(function (inner) {
+    var rs = Number(inner.dataset.rangeStart), re = Number(inner.dataset.rangeEnd);
+    var line = inner.querySelector('.timeline-now-line');
+    if (!(inner.dataset.date === todayStr && nowMin >= rs && nowMin <= re)) { if (line) line.remove(); return; }
+    if (!line) { line = document.createElement('div'); line.className = 'timeline-now-line'; inner.appendChild(line); }
+    line.style.left = 'calc(22px + (100% - 22px) * ' + ((nowMin - rs) / (re - rs)) + ')';
+    line.title = 'Maintenant — ' + nowStr.slice(11, 16);
+  });
+}
+if (!agendaNowLineTimer) agendaNowLineTimer = setInterval(updateAgendaNowLines, 30000);
+
+function adjustAgendaZoom(delta) {
+  var base = timelineEffectiveZoom == null ? timelineZoom : timelineEffectiveZoom;
+  timelineZoom = Math.max(0, Math.min(2.5, +(base + delta * 0.2).toFixed(2)));
+  if (calViewMode === 'day') renderCalDay();
+  else if (calSelectedDate) { if (calViewMode === 'month') renderCalMonth(); else renderCalWeek(); }
 }
 
 /**
@@ -1028,13 +1233,17 @@ function paOpenGroup() {
   });
 }
 
-function openPosteAddAppointment(dateStr) {
+function openPosteAddAppointment(dateStr, barberId) {
   var when = new Date(dateStr + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' });
+  // Coiffeur du RDV : moi par défaut, ou le collègue dont on a touché la ligne dans le planning.
+  var targetId = barberId || (me && me.id);
+  var target = (typeof barbers !== 'undefined' && barbers ? barbers : []).filter(function (b) { return b.id === targetId; })[0] || (me && targetId === me.id ? me : null);
+  var forOther = !!(me && targetId !== me.id);
   var state = { serviceId: null, extraIds: [], productIds: [], time: null };
 
   var overlay = _buildModal(
     '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px">' +
-    '<div style="min-width:0"><div class="modal-title" style="margin-bottom:0">Ajouter un RDV — ' + when + '</div>' +
+    '<div style="min-width:0"><div class="modal-title" style="margin-bottom:0">Ajouter un RDV — ' + (forOther && target ? esc(target.name) + ' — ' : '') + when + '</div>' +
       StaffGroupBooking.clientPillHtml('pa', "paGoStep('client')") +
     '</div>' +
     '<button id="pa-close-x" style="background:var(--fill);border:none;width:30px;height:30px;border-radius:50%;color:var(--grey);font-size:14px;cursor:pointer;flex-shrink:0;margin-left:10px">✕</button>' +
@@ -1096,7 +1305,7 @@ function openPosteAddAppointment(dateStr) {
     return {
       service: services.find(function (x) { return String(x.id) === String(state.serviceId); }),
       extras: pick(extras, state.extraIds.map(String)), products: pick(products, state.productIds.map(String)),
-      barber: '', when: when, time: state.time
+      barber: forOther && target ? target.name : '', when: when, time: state.time
     };
   });
 
@@ -1184,7 +1393,7 @@ function openPosteAddAppointment(dateStr) {
     var toggleEl = overlay.querySelector('#pa-half-toggle');
     slotsEl.innerHTML = '<span class="hint" style="margin:0">Chargement…</span>';
     toggleEl.style.display = 'none';
-    barberApi('/api/appointments/availability?date=' + dateStr + '&service_id=' + state.serviceId + '&barber_id=' + me.id + '&extras=' + state.extraIds.join(','))
+    barberApi('/api/appointments/availability?date=' + dateStr + '&service_id=' + state.serviceId + '&barber_id=' + targetId + '&extras=' + state.extraIds.join(','), { actingAs: targetId })
       .then(function (r) {
         if (!r.slots.length) { slotsEl.innerHTML = '<span class="hint" style="margin:0">Aucun créneau disponible ce jour-là</span>'; return; }
 
@@ -1220,7 +1429,9 @@ function openPosteAddAppointment(dateStr) {
 
     barberApi('/api/appointments/admin-create', {
       method: 'POST',
+      actingAs: targetId,   // RDV au nom du coiffeur choisi (moi ou un collègue)
       body: {
+        barber_id: targetId,
         client_name: name,
         email: overlay.querySelector('#pa-email').value.trim(),
         phone: overlay.querySelector('#pa-phone').value.trim(),
@@ -1231,7 +1442,7 @@ function openPosteAddAppointment(dateStr) {
       }
     }).then(function () {
       _closeModal(overlay);
-      toast('RDV ajouté');
+      toast(forOther && target ? 'RDV ajouté pour ' + target.name : 'RDV ajouté');
       Object.keys(calMonthCache).forEach(function (k) { delete calMonthCache[k]; });
       loadAgendaPeriod();
     }).catch(function (e) { errEl.textContent = e.message; errEl.style.display = 'block'; });
@@ -1259,15 +1470,16 @@ function openPosteClientDrawer(id) {
     '</div>' +
     '<div class="detail-row"><span class="detail-label">Quand</span><span class="detail-value" style="text-transform:capitalize">' + when + '</span></div>' +
     '<div class="detail-row"><span class="detail-label">Prestation</span><span class="detail-value">' + esc(a.service_name) + '</span></div>' +
+    (a.barber_name ? '<div class="detail-row"><span class="detail-label">Coiffeur</span><span class="detail-value">' + esc(a.barber_name) + (me && a.barber_id === me.id ? ' (moi)' : '') + '</span></div>' : '') +
     (a.email ? '<div class="detail-row"><span class="detail-label">Email</span><span class="detail-value">' + esc(a.email) + '</span></div>' : '') +
     (a.phone ? '<div class="detail-row"><span class="detail-label">Téléphone</span><span class="detail-value">' + esc(a.phone) + '</span></div>' : '') +
     (a.client_note ? '<div class="detail-row" style="flex-direction:column;align-items:flex-start;gap:2px"><span class="detail-label">📝 Note du client (RDV)</span><span class="detail-value" style="font-weight:400">' + esc(a.client_note) + '</span></div>' : '') +
     '<div style="margin-top:14px">' +
       '<label style="display:block;font-size:12.5px;font-weight:600;color:var(--grey);margin-bottom:6px">Note interne</label>' +
-      (a.promoted_queue_id
+      (a.promoted_queue_id && (!a.barber_id || (me && a.barber_id === me.id))
         ? '<textarea id="pcd-note" rows="2" style="width:100%;padding:11px 13px;border:1px solid var(--sep);border-radius:10px;background:var(--card);color:var(--ink);font-family:inherit;font-size:14px;resize:vertical;margin-bottom:8px">' + esc(a.note || '') + '</textarea>' +
           '<button class="btn btn-soft" id="pcd-save-note-btn" style="width:100%">Enregistrer la note</button>'
-        : '<p class="hint" style="margin:0">Pas encore modifiable — ce RDV entrera dans la file le jour même.</p>') +
+        : '<p class="hint" style="margin:0">' + (a.barber_id && me && a.barber_id !== me.id ? 'RDV d\'un collègue : sa note interne se modifie depuis son poste.' : 'Pas encore modifiable — ce RDV entrera dans la file le jour même.') + '</p>') +
     '</div>'
   );
 
