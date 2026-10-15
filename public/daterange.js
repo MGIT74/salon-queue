@@ -127,7 +127,7 @@
         '<div class="dr-body"><div class="dr-presets">' + ps.map(function (p) {
           return '<button type="button" class="dr-preset" data-p="' + p.id + '" data-from="' + p.from + '" data-to="' + p.to + '">' + p.label + '</button>';
         }).join('') + '</div><div class="dr-cals"><div class="dr-months">' + monthHtml(st.vy, st.vm, 'left') + (two ? monthHtml(ny, nm, 'right') : '') +
-        '</div><div class="dr-today"><button type="button" class="dr-link" data-a="today">Accéder à aujourd\'hui</button></div></div></div>' +
+        '</div></div></div>' +
         '<div class="dr-foot"><span class="dr-sum" id="dr-sum"></span><button type="button" class="dr-apply" data-a="apply">Appliquer</button><button type="button" class="dr-cancel" data-a="cancel">Annuler</button></div>';
       paintDays(); paintPresets(); sum();
     }
@@ -186,7 +186,6 @@
       }
       if (a === 'prev') { shift(-1); return render(); }
       if (a === 'next') { shift(1); return render(); }
-      if (a === 'today') { st.vy = t.getFullYear(); st.vm = t.getMonth(); return render(); }
       if (a === 'apply') return apply();
       if (a === 'cancel') return closePop();
     });

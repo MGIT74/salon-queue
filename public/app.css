@@ -633,7 +633,7 @@ body .tfx > button { transition: color .25s ease, transform .1s ease; }
 .dr-preset { text-align: left; padding: 8px 10px; border-radius: 10px; font-size: 14px; font-weight: 500; color: var(--ink); }
 .dr-preset:hover { background: var(--fill) !important; }
 .dr-preset.on { background: var(--blue-soft) !important; color: var(--accent); font-weight: 700; }
-.dr-cals { padding: 14px 16px 8px; }
+.dr-cals { padding: 14px 16px 16px; }
 .dr-months { display: flex; gap: 22px; }
 .dr-cal { width: 266px; }
 .dr-head { display: flex; align-items: center; justify-content: center; gap: 6px; margin-bottom: 8px; height: 38px; }
@@ -659,9 +659,6 @@ body .tfx > button { transition: color .25s ease, transform .1s ease; }
 .dr-d.end { border-radius: 0 10px 10px 0 !important; }
 .dr-d.start.end { border-radius: 10px !important; }
 .dr-d.start::after, .dr-d.end::after { background: #fff; }
-.dr-today { text-align: right; padding: 6px 4px 6px; }
-.dr-link { color: var(--grey) !important; font-size: 13px; font-weight: 600; padding: 6px 8px; border-radius: 8px; }
-.dr-link:hover { background: var(--fill) !important; color: var(--ink) !important; }
 .dr-foot { display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding: 12px 14px; border-top: 1px solid var(--sep); }
 .dr-sum { margin-right: auto; font-size: 13.5px; color: var(--grey); font-weight: 500; }
 .dr-apply, .dr-cancel { padding: 10px 18px; border-radius: 12px; font-size: 14.5px; font-weight: 700; }
@@ -681,11 +678,10 @@ body .tfx > button { transition: color .25s ease, transform .1s ease; }
   .dr-presets::-webkit-scrollbar { display: none; }
   .dr-pop .dr-preset { white-space: nowrap; flex: none; background: var(--fill); padding: 9px 15px; border-radius: 999px; font-size: 14px; }
   .dr-pop .dr-preset.on { background: var(--blue-soft); color: var(--accent); }
-  .dr-cals { padding: 14px 16px 2px; }
+  .dr-cals { padding: 14px 16px 14px; }
   .dr-cal { width: 100%; }
   .dr-head { margin-bottom: 10px; }
   .dr-d { height: 42px; }
-  .dr-today { padding: 8px 0 10px; }
   /* Pied : période choisie bien visible au-dessus de deux gros boutons */
   .dr-foot { position: sticky; bottom: 0; background: var(--card); flex-wrap: wrap; gap: 10px; padding: 12px 16px; padding-bottom: max(14px, env(safe-area-inset-bottom)); }
   .dr-sum { display: block; width: 100%; margin: 0 0 2px; text-align: center; font-size: 14px; color: var(--ink); font-weight: 600; }
