@@ -335,7 +335,66 @@ router.get('/salon-stats', requireAdmin, wrap(async (req, res) => {
     perBarber.push({ id: b.id, name: b.name, potential_revenue_cents: a.potential_revenue_cents, occupancy_pct: a.occupancy_pct });
   }
   perBarber.sort((x, y) => y.potential_revenue_cents - x.potential_revenue_cents);
+
+  // CA général de la période : détail prestations / suppléments / produits, tickets, panier moyen.
+  const [[ca]] = await pool.query(
+    `SELECT COALESCE(SUM(CASE WHEN si.item_type = 'service' THEN si.unit_price_cents * si.quantity ELSE 0 END), 0) AS services,
+            COALESCE(SUM(CASE WHEN si.item_type = 'extra' THEN si.unit_price_cents * si.quantity ELSE 0 END), 0) AS extras,
+            COALESCE(SUM(CASE WHEN si.item_type = 'product' THEN si.unit_price_cents * si.quantity ELSE 0 END), 0) AS products,
+            COALESCE(SUM(si.unit_price_cents * si.quantity), 0) AS lines_total,
+            COUNT(DISTINCT si.sale_id) AS tickets
+     FROM sale_items si JOIN sales s ON s.id = si.sale_id
+     WHERE s.salon_id = ? AND s.created_at >= ? AND s.created_at < ?`,
+    [req.salon.id, startSql, endSql]
+  );
+  const [[cash]] = await pool.query(
+    'SELECT COALESCE(SUM(total_price_cents), 0) AS total, COUNT(*) AS n FROM sales WHERE salon_id = ? AND created_at >= ? AND created_at < ?',
+    [req.salon.id, startSql, endSql]
+  );
+  const span = new Date(end).getTime() - new Date(start).getTime();
+  const [[cashPrev]] = await pool.query(
+    'SELECT COALESCE(SUM(total_price_cents), 0) AS total FROM sales WHERE salon_id = ? AND created_at >= ? AND created_at < ?',
+    [req.salon.id, toSqlUtc(new Date(new Date(start).getTime() - span)), startSql]
+  );
+
+  // Classement des coiffeurs sur la période : encaissé (prestations + produits), rapidité (durée réelle moyenne), produits.
+  const soldMap = await salesRevenueByBarber(pool, req.salon.id, { fromSql: startSql, toSql: endSql });
+  const [doneRows] = await pool.query(
+    `SELECT barber_id, COUNT(*) AS n FROM queue WHERE salon_id = ? AND status = 'done' AND end_at >= ? AND end_at < ? GROUP BY barber_id`,
+    [req.salon.id, startSql, endSql]
+  );
+  const doneBy = Object.fromEntries(doneRows.map((x) => [x.barber_id, Number(x.n)]));
+  const [allBarbers] = await pool.query('SELECT id, name, photo_url FROM barbers WHERE salon_id = ?', [req.salon.id]);
+  const byRevenue = allBarbers.map((b) => {
+    const sold = soldMap.get(b.id);
+    return { id: b.id, name: b.name, photo_url: b.photo_url, revenue_cents: sold ? sold.service_cents + sold.product_cents : 0, done_count: doneBy[b.id] || 0 };
+  }).filter((x) => x.revenue_cents > 0 || x.done_count > 0).sort((x, y) => y.revenue_cents - x.revenue_cents).slice(0, 5);
+  const [bySpeed] = await pool.query(
+    `SELECT b.id, b.name, b.photo_url, ROUND(AVG(TIMESTAMPDIFF(MINUTE, q.start_at, q.end_at))) AS avg_minutes, COUNT(*) AS done_count
+     FROM queue q JOIN barbers b ON b.id = q.barber_id
+     WHERE q.salon_id = ? AND q.status = 'done' AND q.end_at >= ? AND q.end_at < ? AND q.start_at IS NOT NULL
+     GROUP BY b.id ORDER BY avg_minutes ASC LIMIT 5`,
+    [req.salon.id, startSql, endSql]
+  );
+  const [byProducts] = await pool.query(
+    `SELECT b.id, b.name, b.photo_url, COALESCE(SUM(si.unit_price_cents * si.quantity), 0) AS product_revenue_cents, COALESCE(SUM(si.quantity), 0) AS product_count
+     FROM sale_items si JOIN sales s ON s.id = si.sale_id JOIN barbers b ON b.id = COALESCE(si.barber_id, s.barber_id)
+     WHERE s.salon_id = ? AND si.item_type = 'product' AND s.created_at >= ? AND s.created_at < ?
+     GROUP BY b.id ORDER BY product_revenue_cents DESC LIMIT 5`,
+    [req.salon.id, startSql, endSql]
+  );
+
   res.json({
+    revenue: {
+      total_cents: Number(cash.total), previous_total_cents: Number(cashPrev.total), tickets: Number(cash.n),
+      avg_ticket_cents: Number(cash.n) ? Math.round(Number(cash.total) / Number(cash.n)) : null,
+      services_cents: Number(ca.services), extras_cents: Number(ca.extras), products_cents: Number(ca.products)
+    },
+    leaderboard: {
+      by_revenue: byRevenue,
+      by_speed: bySpeed.map((x) => ({ id: x.id, name: x.name, photo_url: x.photo_url, avg_minutes: Number(x.avg_minutes), done_count: Number(x.done_count) })),
+      by_products: byProducts.map((x) => ({ id: x.id, name: x.name, photo_url: x.photo_url, product_revenue_cents: Number(x.product_revenue_cents), product_count: Number(x.product_count) }))
+    },
     ok: true, series,
     total_cents: sum(series.barber_cents), previous_total_cents: sum(series.previous_cents),
     potential_revenue_cents: potential, free_slots: freeSlots,

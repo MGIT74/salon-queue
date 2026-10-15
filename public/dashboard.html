@@ -179,6 +179,11 @@
   .dash-period .stats-ctl { flex: 1; min-width: 260px; margin: 0; }
   .dash-period .stats-nav { margin: 0; }
   .dash-missed-num { color: var(--orange, #f97316); }
+  .dash-card-ca .st-delta { margin: 2px 0 10px; }
+  .dash-ca-rows { display: flex; flex-direction: column; gap: 6px; }
+  .dash-ca-row { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; }
+  .dash-ca-row span { color: var(--grey); }
+  .dash-ca-row b { font-weight: 600; font-variant-numeric: tabular-nums; }
   .dash-missed-sub { font-size: 12.5px; color: var(--grey); margin: 4px 0 12px; line-height: 1.4; }
   .dash-missed-list { display: flex; flex-direction: column; gap: 6px; }
   .dash-missed-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; }
@@ -1674,7 +1679,7 @@
 
     <div class="dash-grid">
       <div class="dash-card dash-card-leader">
-        <div class="dash-card-head"><h3>Classement du jour</h3></div>
+        <div class="dash-card-head"><h3>Classement</h3></div>
         <div class="dash-leader-tabs">
           <button class="dash-leader-tab on" data-metric="revenue" onclick="setDashLeaderMetric('revenue')">CA</button>
           <button class="dash-leader-tab" data-metric="speed" onclick="setDashLeaderMetric('speed')">Rapidité</button>
@@ -1690,18 +1695,12 @@
         <div class="dash-missed-list" id="dash-missed-list"></div>
       </div>
 
-      <div class="dash-card dash-card-gauge">
-        <div class="dash-card-head" style="width:100%"><h3>File d'attente</h3></div>
-        <div class="dash-gauge-wrap">
-          <svg class="dash-gauge" viewBox="0 0 120 120">
-            <circle class="dash-gauge-bg" cx="60" cy="60" r="52"></circle>
-            <circle class="dash-gauge-fg" id="dash-gauge-fg" cx="60" cy="60" r="52"></circle>
-          </svg>
-          <div class="dash-gauge-center">
-            <div class="dash-gauge-num" id="dash-gauge-num">0</div>
-            <div class="dash-gauge-label" id="dash-gauge-label">en attente</div>
-          </div>
-        </div>
+      <!-- CA général de la période choisie (filtre global) -->
+      <div class="dash-card dash-card-ca">
+        <div class="dash-card-head"><h3>CA général</h3></div>
+        <div class="dash-big-num" id="dash-ca-total">—</div>
+        <div class="st-delta" id="dash-ca-delta"></div>
+        <div class="dash-ca-rows" id="dash-ca-rows"></div>
       </div>
 
       <div class="dash-card dash-card-list">
@@ -3311,8 +3310,8 @@ function renderDashLeaderboard() {
   var key = dashLeaderMetric === 'revenue' ? 'by_revenue' : (dashLeaderMetric === 'speed' ? 'by_speed' : 'by_products');
   var rows = dashLeaderData[key] || [];
   var emptyMsg = dashLeaderMetric === 'speed'
-    ? 'Pas encore de coupe terminée aujourd\'hui'
-    : (dashLeaderMetric === 'products' ? 'Aucune vente de produit aujourd\'hui' : 'Aucune vente aujourd\'hui');
+    ? 'Aucune coupe terminée sur cette période'
+    : (dashLeaderMetric === 'products' ? 'Aucune vente de produit sur cette période' : 'Aucune vente sur cette période');
 
   document.getElementById('dash-leader-list').innerHTML = rows.length === 0
     ? '<div class="empty">' + emptyMsg + '</div>'
@@ -3412,10 +3411,12 @@ function loadDashboardTab() {
   var gaugeMax = 10; // au-delà de 10 en attente, la jauge reste pleine
   var gaugeRatio = Math.max(0, Math.min(1, waitingCount / gaugeMax));
   var circumference = 2 * Math.PI * 52;
+  if (document.getElementById('dash-gauge-fg')) {   // ancienne jauge « File d'attente » (remplacée par « CA général »)
   document.getElementById('dash-gauge-fg').style.strokeDasharray =
     (circumference * gaugeRatio) + ' ' + circumference;
   document.getElementById('dash-gauge-num').textContent = waitingCount;
   document.getElementById('dash-gauge-label').textContent = waitingCount > 1 ? 'en attente' : 'en attente';
+  }
 
   api('/api/queue/stats/today').then(function (r) {
     document.getElementById('dash-pill-rev').textContent = eur(r.revenue_cents);
@@ -3423,23 +3424,6 @@ function loadDashboardTab() {
 
   loadDashSalon();   // filtre global : courbe « Encaissé du salon » + manque à gagner
 
-  api('/api/queue/stats/week').then(function (r) {
-    var maxRevenue = Math.max.apply(null, r.days.map(function (d) { return d.revenue_cents; }).concat([1]));
-    var totalWeek = r.days.reduce(function (a, d) { return a + d.revenue_cents; }, 0);
-    if (!document.getElementById('dash-week-total')) return;   // carte remplacée par « Manque à gagner »
-    document.getElementById('dash-week-total').textContent = eur(totalWeek);
-    document.getElementById('dash-week-bars').innerHTML = r.days.map(function (d, i) {
-      var isToday = i === r.days.length - 1; // le serveur renvoie les 7 jours du SALON, aujourd'hui en dernier
-      var h = Math.max(6, Math.round((d.revenue_cents / maxRevenue) * 62));
-      var label = WEEKDAY_LABELS_SHORT[new Date(d.date + 'T00:00:00').getDay()].charAt(0).toUpperCase();
-      return '<div class="dash-bar-col" title="' + eur(d.revenue_cents) + '">' +
-        '<div class="dash-bar' + (isToday ? ' today' : '') + '" style="height:' + h + 'px"></div>' +
-        '<div class="dash-bar-label">' + label + '</div></div>';
-    }).join('');
-
-    dashLeaderData = r.leaderboard || { by_revenue: [], by_speed: [], by_products: [] };
-    renderDashLeaderboard();
-  }).catch(function () {});
 
   var todayStr = ymd(new Date());
   loadSalonScheduleForTimeline().then(function () {
@@ -3510,6 +3494,23 @@ function loadDashSalon() {
       dl.textContent = pc ? (pc > 0 ? '▲ +' : '▼ −') + Math.abs(pc) + ' % vs période préc.' : '= période préc.';
     }
     renderRevenueChart(document.getElementById('dash-rev-chart'), r.series, { me: 'Salon', noTitle: true });
+    // Classement des coiffeurs sur la période choisie.
+    dashLeaderData = r.leaderboard || { by_revenue: [], by_speed: [], by_products: [] };
+    renderDashLeaderboard();
+    // CA général : toutes les ventes de la caisse sur la période (+ détail).
+    var rv = r.revenue || {};
+    document.getElementById('dash-ca-total').textContent = eur(rv.total_cents || 0);
+    var cd = document.getElementById('dash-ca-delta');
+    if (!rv.previous_total_cents) { cd.className = 'st-delta flat'; cd.textContent = rv.total_cents ? 'pas d\'encaissement sur la période préc.' : ''; }
+    else {
+      var cp = Math.round(((rv.total_cents - rv.previous_total_cents) / rv.previous_total_cents) * 100);
+      cd.className = 'st-delta ' + (cp > 0 ? 'up' : cp < 0 ? 'down' : 'flat');
+      cd.textContent = cp ? (cp > 0 ? '▲ +' : '▼ −') + Math.abs(cp) + ' % vs période préc.' : '= période préc.';
+    }
+    var row = function (k, v) { return '<div class="dash-ca-row"><span>' + k + '</span><b>' + v + '</b></div>'; };
+    document.getElementById('dash-ca-rows').innerHTML =
+      row('Prestations', eur(rv.services_cents || 0)) + row('Suppléments', eur(rv.extras_cents || 0)) + row('Produits', eur(rv.products_cents || 0)) +
+      row('Tickets', rv.tickets || 0) + row('Panier moyen', rv.avg_ticket_cents == null ? '—' : eur(rv.avg_ticket_cents));
     // Manque à gagner global : temps libre de tous les coiffeurs actifs x leur prix moyen à la minute.
     document.getElementById('dash-missed-total').textContent = eur(r.potential_revenue_cents);
     document.getElementById('dash-missed-sub').textContent = '≈ ' + r.free_slots + ' créneaux libres · occupation ' + r.occupancy_pct + ' %' +

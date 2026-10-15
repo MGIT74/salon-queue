@@ -18,5 +18,9 @@ check('plus de code d\'onglet specifique dans le dashboard (tout est dans le mod
 check('selecteur de periode des statistiques : change sur place (la pastille glisse), pas de repeint de la fiche',
   /id="stats-picker-/.test(dash) && /id="stats-body-/.test(dash) && /body\.innerHTML = renderStatsBody\(b\);\s*loadBarberStats\(id\);/.test(dash));
 const pages = fs.readdirSync(path.join(__dirname, '../../public')).filter((f) => f.endsWith('.html'));
-check('versions app.js / app.css relevees partout ou ils sont charges (cache navigateur)', pages.every((f) => { const h = rd(f); return (!/\/app\.js\?v=/.test(h) || /\/app\.js\?v=17/.test(h)) && (!/\/app\.css\?v=/.test(h) || /\/app\.css\?v=\d+/.test(h)); }));
+check('versions app.js / app.css relevees partout ou ils sont charges (cache navigateur)', (() => {
+  // Toutes les pages chargent la MEME version (la plus recente) d'app.js et d'app.css.
+  const v = (re) => new Set(pages.map((f) => (rd(f).match(re) || [])[1]).filter(Boolean));
+  return v(/\/app\.js\?v=(\d+)/).size === 1 && v(/\/app\.css\?v=(\d+)/).size === 1;
+})());
 console.log('\n' + pass + ' OK, ' + fail + ' ECHEC'); process.exit(fail ? 1 : 0);

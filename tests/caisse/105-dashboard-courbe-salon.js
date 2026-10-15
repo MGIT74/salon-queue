@@ -46,12 +46,18 @@ const check = (n, ok, extra) => { (ok ? pass++ : fail++); console.log((ok ? '  O
   const day = await fetch(BASE + '/api/barbers/salon-stats?start=2026-03-01T23:00:00.000Z&end=2026-03-02T23:00:00.000Z&start_date=2026-03-02&end_date=2026-03-02', { headers: ADMIN }).then((x) => x.json());
   check('filtre « Jour » : courbe heure par heure (8 h - 20 h), 30 € à 10 h et 20 € à 11 h (heure de Paris)', day.series.unit === 'hour' && day.series.labels[0] === '2026-03-02T08:00' &&
     day.series.barber_cents[day.series.labels.indexOf('2026-03-02T10:00')] === 3000 && day.series.barber_cents[day.series.labels.indexOf('2026-03-02T11:00')] === 2000, day.series);
+  const rv = st.body.revenue || {};
+  check('CA général de la période : 65 € (prestations 50 €, produits 15 €), 3 tickets, panier moyen 21,67 €, période préc. 40 €',
+    rv.total_cents === 6500 && rv.services_cents === 5000 && rv.products_cents === 1500 && rv.tickets === 3 && rv.avg_ticket_cents === 2167 && rv.previous_total_cents === 4000, rv);
+  const lb = st.body.leaderboard || {};
+  check('classement sur la période : Bob 35 € devant Alice 30 €, produits : Bob', lb.by_revenue && lb.by_revenue[0].id === 'b2' && lb.by_revenue[0].revenue_cents === 3500 && lb.by_revenue[1].id === 'b1' && lb.by_products[0].id === 'b2', lb);
   r = await fetch(BASE + '/api/barbers/salon-stats?start=2026-03-01T23:00:00.000Z&end=2026-03-08T23:00:00.000Z&start_date=2026-03-02&end_date=2026-03-08', { headers: BARBER });
   check('filtre global réservé à l\'admin', r.status === 401 || r.status === 403, r.status);
 
   const dash = fs.readFileSync(__dirname + '/../../public/dashboard.html', 'utf8');
   check('en haut du tableau de bord : le même sélecteur que la fiche coiffeur (Jour / Semaine / Mois / Plage, flèches, Du/Au)', /id="stats-picker-salon"/.test(dash) && /setStatsPeriod\('salon','range'\)/.test(dash) && /id="stats-ctl-salon"/.test(dash) && /if \(id === 'salon'\) return loadDashSalon\(\);/.test(dash));
   check('carte « Encaissé du salon » : plus de boutons 7 jours / 30 jours / 3 mois ni de titre « Encaissé par jour » dans la courbe', /<h3>Encaissé du salon<\/h3>/.test(dash) && !/setDashRevenueRange/.test(dash) && /renderRevenueChart\(document\.getElementById\('dash-rev-chart'\), r\.series, \{ me: 'Salon', noTitle: true \}\)/.test(dash));
+  check('« Classement » (plus « du jour ») et « CA général » à la place de « File d\'attente », remplis par le filtre global', /<h3>Classement<\/h3>/.test(dash) && !/Classement du jour/.test(dash) && /<h3>CA général<\/h3>/.test(dash) && !/<h3>File d'attente<\/h3>/.test(dash) && /dashLeaderData = r\.leaderboard/.test(dash) && /dash-ca-rows/.test(dash) && !/stats\/week/.test(dash));
   check('« CA de la semaine » remplacé par « Manque à gagner » global (créneaux libres, occupation, détail par coiffeur)', !/<h3>CA de la semaine<\/h3>/.test(dash) && /<h3>Manque à gagner<\/h3>/.test(dash) && /id="dash-missed-list"/.test(dash));
 
   sql(clean);
