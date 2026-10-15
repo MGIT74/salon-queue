@@ -176,8 +176,10 @@
   .dash-rev-head { gap: 10px; flex-wrap: wrap; }
   .dash-period { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin: 0 0 16px; }
   .dash-period .period-picker { margin: 0; width: 360px; max-width: 100%; }
-  .dash-period .stats-ctl { flex: 1; min-width: 260px; margin: 0; }
-  .dash-period .stats-nav { margin: 0; }
+  .dash-period .stats-ctl { flex: 0 1 auto; min-width: 0; margin: 0; }
+  /* Libellé de la période collé aux flèches, juste à côté du sélecteur */
+  .dash-period .stats-nav { margin: 0; justify-content: flex-start; gap: 12px; }
+  .dash-period .stats-period-label { flex: none; white-space: nowrap; }
   .dash-missed-num { color: var(--orange, #f97316); }
   .dash-card-ca .st-delta { margin: 2px 0 10px; }
   .dash-ca-rows { display: flex; flex-direction: column; gap: 6px; }
@@ -1688,19 +1690,19 @@
         <div id="dash-leader-list"></div>
       </div>
 
+      <!-- Chiffre d'affaires de la période choisie (filtre global) -->
+      <div class="dash-card dash-card-ca">
+        <div class="dash-card-head"><h3>Chiffre d'affaires</h3></div>
+        <div class="dash-big-num" id="dash-ca-total">—</div>
+        <div class="st-delta" id="dash-ca-delta"></div>
+        <div class="dash-ca-rows" id="dash-ca-rows"></div>
+      </div>
+
       <div class="dash-card dash-card-missed">
         <div class="dash-card-head"><h3>Manque à gagner</h3></div>
         <div class="dash-big-num dash-missed-num" id="dash-missed-total">—</div>
         <div class="dash-missed-sub" id="dash-missed-sub"></div>
         <div class="dash-missed-list" id="dash-missed-list"></div>
-      </div>
-
-      <!-- CA général de la période choisie (filtre global) -->
-      <div class="dash-card dash-card-ca">
-        <div class="dash-card-head"><h3>CA général</h3></div>
-        <div class="dash-big-num" id="dash-ca-total">—</div>
-        <div class="st-delta" id="dash-ca-delta"></div>
-        <div class="dash-ca-rows" id="dash-ca-rows"></div>
       </div>
 
       <div class="dash-card dash-card-list">
