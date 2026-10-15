@@ -34,6 +34,12 @@ const check = (n, ok, extra) => { (ok ? pass++ : fail++); console.log((ok ? '  O
   const files = ['dashboard', 'caisse', 'poste'].map((f) => fs.readFileSync(__dirname + '/../../public/' + f + '.html', 'utf8'));
   check('bouton « Plusieurs personnes » dans Ajouter un RDV : dashboard, caisse, Mon poste', files.every((h) => /staff-group\.js/.test(h) && /StaffGroupBooking\.buttonHtml\(/.test(h) && /StaffGroupBooking\.open\(/.test(h)));
   check('dashboard : clic sur la ligne d\'un coiffeur (etape Prestation en premier) -> « Plusieurs personnes » propose d\'emblee', /\(preselectedBarberId \? StaffGroupBooking\.buttonHtml\('aaOpenGroup\(\)'\) : ''\)/.test(files[0]));
+  const sg = fs.readFileSync(__dirname + '/../../public/staff-group.js', 'utf8');
+  const rdv = fs.readFileSync(__dirname + '/../../public/rdv.html', 'utf8');
+  check('meme ecran que la reservation en ligne : rdv.html?staff=1 ouverte dans la fenetre', /rdv\.html\?staff=1/.test(sg) && /StaffBookingBridge/.test(sg) && /STAFF_BRIDGE/.test(rdv) && /\/api\/appointments\/admin-group/.test(rdv));
+  const H = (u) => fetch(BASE + u).then((x) => ({ xfo: x.headers.get('x-frame-options'), csp: x.headers.get('content-security-policy') || '' }));
+  const hr = await H('/rdv.html'), hd = await H('/dashboard.html');
+  check('rdv.html affichable seulement par notre propre domaine, les autres pages restent interdites en iframe', hr.xfo === 'SAMEORIGIN' && /frame-ancestors 'self'/.test(hr.csp) && hd.xfo === 'DENY' && /frame-ancestors 'none'/.test(hd.csp));
   sql('DELETE FROM appointments');
   console.log('\nRESULTAT : ' + pass + ' verifications reussies, ' + fail + ' echec(s)');
   process.exit(fail ? 1 : 0);

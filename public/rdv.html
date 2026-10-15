@@ -320,8 +320,9 @@
 </div>
 
 <script src="/app.js?v=17"></script>
-<script src="/group-booking.js?v=11"></script>
+<script src="/group-booking.js?v=12"></script>
 <style>
+body.staff-mode .gift-summary-box,body.staff-mode .theme-btn{display:none!important}
 .gb-done{padding:10px 0;border-bottom:1px solid var(--sep)}.gb-done:last-child{border:none}.gb-done b{display:block}.gb-done span{color:var(--grey);font-size:14px}
 </style>
 <script>
@@ -331,6 +332,16 @@ vitrinePageFlow(document.querySelector('.wrap'), ['p-service', 'p-extras', 'p-pr
 var SALON_SLUG = (function () {
   try { return new URLSearchParams(window.location.search).get('salon') || ''; }
   catch (e) { return ''; }
+})();
+
+/* Mode « salon » (?staff=1) : cette même page, ouverte dans une fenêtre du dashboard, de la caisse ou de
+   Mon poste pour saisir un RDV à PLUSIEURS personnes. Écran identique à la réservation en ligne ; seul
+   l'enregistrement final passe par la page parente (route du salon, email facultatif). */
+var STAFF_BRIDGE = (function () {
+  try {
+    if (new URLSearchParams(window.location.search).get('staff') !== '1' || window.parent === window) return null;
+    return window.parent.StaffBookingBridge || null;
+  } catch (e) { return null; }
 })();
 
 /**
@@ -442,6 +453,7 @@ function loadCatalog() {
     document.getElementById('salon-mark').textContent = salonName.toUpperCase();
     renderBarberGrid();
     renderServiceGrid();
+    if (STAFF_BRIDGE) { enterStaffMode(); return; }
 
     // Pré-remplissage depuis "Réserver à nouveau" (compte.html) : la
     // prestation de la dernière visite est déjà sélectionnée, le client
@@ -786,16 +798,28 @@ function startNewBooking() {
 /* ---------- Reservation a plusieurs ---------- */
 var groupCtl = null, groupPeople = null, groupPayload = null;
 
+function enterStaffMode() {
+  document.body.classList.add('staff-mode');
+  document.querySelector('.rdv-header h1').textContent = 'RDV pour plusieurs personnes';
+  document.querySelector('label[for="grp-name"]').textContent = 'Nom du client';
+  document.querySelector('label[for="grp-email"]').textContent = 'Email (optionnel — confirmation envoyée s\'il est renseigné)';
+  document.querySelector('label[for="grp-phone"]').textContent = 'Téléphone (optionnel)';
+  openGroupBooking();
+}
+
 function openGroupBooking() {
   if (!groupCtl) {
     groupCtl = GroupBooking.create({
       zones: { top: document.getElementById('gb-top'), body: document.getElementById('gb-body'), bar: document.getElementById('gb-bar') }, api: api,
       services: services, extras: extras, barbers: barbers, relatives: [],
-      eur: eur, toast: toast, continueLabel: 'Continuer', onExit: function () { show('p-barber'); },
+      eur: eur, toast: toast, continueLabel: 'Continuer',
+      selfChip: STAFF_BRIDGE ? 'Le client' : null, selfName: STAFF_BRIDGE ? 'Le client' : null,
+      whoSub: STAFF_BRIDGE ? 'Cochez les personnes à inscrire : le client et/ou ses accompagnants (enfants, amis…).' : null,
+      onExit: function () { if (STAFF_BRIDGE) STAFF_BRIDGE.close(); else show('p-barber'); },
       onContinue: function (people, payload) {
         groupPeople = people; groupPayload = payload;
         var self = people[0];
-        document.getElementById('group-contact-summary').textContent = people.length + (people.length > 1 ? ' personnes — ' : ' personne — ') + people.map(function (p) { return p.isSelf ? 'vous' : p.name; }).join(', ');
+        document.getElementById('group-contact-summary').textContent = people.length + (people.length > 1 ? ' personnes — ' : ' personne — ') + people.map(function (p) { return p.isSelf ? (STAFF_BRIDGE ? 'le client' : 'vous') : p.name; }).join(', ');
         show('p-group-contact');
       }
     });
@@ -807,12 +831,12 @@ function submitGroup() {
   var name = document.getElementById('grp-name').value.trim();
   var email = document.getElementById('grp-email').value.trim();
   var phone = document.getElementById('grp-phone').value.trim();
-  if (!name) { toast('Entrez votre prénom', true); return; }
-  if (!email) { toast('Entrez votre email', true); return; }
-  if (!phone) { toast('Entrez votre téléphone', true); return; }
+  if (!name) { toast(STAFF_BRIDGE ? 'Entrez le nom du client' : 'Entrez votre prénom', true); return; }
+  if (!STAFF_BRIDGE && !email) { toast('Entrez votre email', true); return; }
+  if (!STAFF_BRIDGE && !phone) { toast('Entrez votre téléphone', true); return; }
   var btn = document.getElementById('group-confirm-btn');
   btn.disabled = true; btn.textContent = 'Enregistrement…';
-  api('/api/appointments/group', {
+  (STAFF_BRIDGE ? STAFF_BRIDGE.api : api)(STAFF_BRIDGE ? '/api/appointments/admin-group' : '/api/appointments/group', {
     method: 'POST',
     body: { client_name: name, email: email, phone: phone, people: groupPayload,
             base_url: window.location.origin + window.location.pathname + (SALON_SLUG ? '?salon=' + SALON_SLUG : '') }
@@ -821,6 +845,13 @@ function submitGroup() {
       var when = new Date(a.scheduled_at.replace(' ', 'T')).toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' }) + ' à ' + String(a.scheduled_at).slice(11, 16);
       return '<div class="gb-done"><b>' + esc(a.name) + '</b><span>' + esc(when) + ' — ' + esc(a.service_name || '') + (a.barber_name ? ' · ' + esc(a.barber_name) : '') + '</span></div>';
     }).join('');
+    if (STAFF_BRIDGE) {
+      STAFF_BRIDGE.done(r);
+      var note = document.querySelector('#p-group-confirmed .confirm-box p');
+      if (note) note.textContent = email ? 'Un email récapitulatif a été envoyé au client, avec un lien pour annuler.' : 'Rendez-vous enregistrés dans l\'agenda.';
+      var again = document.querySelector('#p-group-confirmed .confirm-box .go');
+      if (again) { again.textContent = 'Fermer'; again.onclick = function () { STAFF_BRIDGE.close(); }; }
+    }
     show('p-group-confirmed');
   }).catch(function (e) {
     toast(e.message, true);

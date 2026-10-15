@@ -168,8 +168,8 @@
       for (var k in (init || {})) p[k] = init[k];
       return p;
     }
-    function label(p) { return p.isSelf ? 'Vous' : (String(p.name || '').trim() || 'Personne ' + (people.indexOf(p) + 1)); }
-    function shortName(p) { return p.isSelf ? 'vous' : label(p); }
+    function label(p) { return p.isSelf ? (cfg.selfName || 'Vous') : (String(p.name || '').trim() || 'Personne ' + (people.indexOf(p) + 1)); }
+    function shortName(p) { return p.isSelf ? (cfg.selfName ? cfg.selfName.toLowerCase() : 'vous') : label(p); }
     function barberName(id) { var b = byId(cfg.barbers, id); return b ? b.name : ''; }
     function fmtDate(d) { try { return new Date(d + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }); } catch (e) { return d; } }
     function complete(p) { return !!(p.serviceId && p.slot && (p.isSelf || String(p.name || '').trim())); }
@@ -269,11 +269,11 @@
 
     function views() {
       if (view === 'who') {
-        var chips = '<button type="button" class="gb-who' + (wsel.self ? ' on' : '') + '" data-act="who-self"><i>M</i>Moi</button>';
+        var chips = '<button type="button" class="gb-who' + (wsel.self ? ' on' : '') + '" data-act="who-self"><i>' + esc((cfg.selfChip || 'Moi').charAt(0)) + '</i>' + esc(cfg.selfChip || 'Moi') + '</button>';
         (cfg.relatives || []).forEach(function (r) { chips += '<button type="button" class="gb-who' + (wsel.rels[r.id] ? ' on' : '') + '" data-act="who-rel" data-id="' + esc(r.id) + '"><i>' + esc(String(r.name).charAt(0).toUpperCase()) + '</i>' + esc(r.name) + '</button>'; });
         wsel.extra.forEach(function (x, i) { chips += '<button type="button" class="gb-who on" data-act="who-del" data-i="' + i + '" title="Retirer"><i>' + esc(x.name.charAt(0).toUpperCase()) + '</i>' + esc(x.name) + ic('x') + '</button>'; });
         var n = whoCount();
-        return { top: back() + '<div class="eyebrow">Qui vient au salon ?</div><p class="step-sub">Cochez les personnes à inscrire. Vous n\'êtes pas obligé de réserver pour vous.</p>',
+        return { top: back() + '<div class="eyebrow">Qui vient au salon ?</div><p class="step-sub">' + (cfg.whoSub || 'Cochez les personnes à inscrire. Vous n\'êtes pas obligé de réserver pour vous.') + '</p>',
           body: '<div class="gb-whos">' + chips + '</div>' +
             '<div class="fld"><label for="gb-who-name">Ajouter quelqu\'un d\'autre</label><div class="gb-addrow"><input id="gb-who-name" maxlength="60" autocomplete="off" placeholder="Prénom" value="' + esc(wsel.draft) + '"><button type="button" class="gb-mini" data-act="who-add">Ajouter</button></div></div>' +
             (cfg.createRelative ? '<label class="gb-save"><input type="checkbox" data-act="who-save"' + (wsel.draftSave ? ' checked' : '') + '> Enregistrer ce prénom dans « Mes proches »</label>' : ''),

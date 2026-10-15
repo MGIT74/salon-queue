@@ -56,14 +56,17 @@ const PORT = Number((process.env.PORT || '3000').toString().replace(/[\r\n]+$/, 
 //   front n'utilise que des scripts inline et des data:/self, la
 //   directive reste donc souple sur les styles/img mais stricte sur
 //   les scripts et les connexions.
+// Exception : rdv.html peut être affichée dans un iframe de NOTRE domaine seulement (« RDV pour plusieurs
+// personnes » ouvert depuis le dashboard, la caisse et Mon poste). Les sites tiers restent bloqués.
 function securityHeaders(req, res, next) {
-  res.setHeader('X-Frame-Options', 'DENY');
+  const sameOriginFrame = req.path === '/rdv.html';
+  res.setHeader('X-Frame-Options', sameOriginFrame ? 'SAMEORIGIN' : 'DENY');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'same-origin');
   res.setHeader(
     'Content-Security-Policy',
     "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; " +
-    "img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+    "img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; frame-ancestors " + (sameOriginFrame ? "'self'" : "'none'") + "; base-uri 'self'; form-action 'self'"
   );
   next();
 }
