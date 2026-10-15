@@ -203,10 +203,12 @@ router.get('/clients', requireAdmin, wrap(async (req, res) => {
  * devenir long sur une enseigne active).
  */
 router.get('/activity-log', requireAdmin, wrap(async (req, res) => {
-  const salonFilter = req.query.salon; // absent ou 'all' => tous les salons
+  // Journal ISOLÉ par salon : par défaut, uniquement le salon actuellement ouvert dans le dashboard
+  // (avant, tous les salons de l'enseigne se mélangeaient). 'all' reste possible si demandé explicitement.
+  const salonFilter = req.query.salon || req.salon.id;
 
   let salonIds;
-  if (!salonFilter || salonFilter === 'all') {
+  if (salonFilter === 'all') {
     const [rows] = await pool.query('SELECT id FROM salons WHERE owner_id = ?', [req.ownerId]);
     salonIds = rows.map((r) => r.id);
   } else {
