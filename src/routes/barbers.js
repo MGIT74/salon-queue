@@ -309,6 +309,21 @@ router.put('/:id/schedule', requireAdmin, wrap(async (req, res) => {
 }));
 
 /**
+ * Courbe GLOBALE du salon (tableau de bord) : encaissé (prestations + produits) par jour / semaine / mois,
+ * et la même courbe sur la période précédente. ?start_date=AAAA-MM-JJ&end_date=AAAA-MM-JJ (jours locaux inclus).
+ */
+router.get('/salon-series', requireAdmin, wrap(async (req, res) => {
+  const { start_date, end_date } = req.query;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(start_date || '') || !/^\d{4}-\d{2}-\d{2}$/.test(end_date || '') || start_date > end_date || daysBetween(start_date, end_date) > 400) {
+    return res.status(400).json({ error: 'Période invalide' });
+  }
+  const settings = await getSettings(req.salon.id);
+  const series = await barberSeries(req.salon.id, null, start_date, end_date, settings.timezone);
+  const sum = (a) => a.reduce((x, y) => x + (y || 0), 0);
+  res.json({ ok: true, series, total_cents: sum(series.barber_cents), previous_total_cents: sum(series.previous_cents) });
+}));
+
+/**
  * Statistiques d'un coiffeur sur une période donnée. Le client calcule
  * lui-même les bornes (start/end en ISO UTC) à partir de son fuseau
  * local — le serveur se contente de filtrer, évitant tout décalage
@@ -490,8 +505,10 @@ async function barberSeries(salonId, barberId, start_date, end_date, tz) {
      GROUP BY si.sale_id, COALESCE(si.barber_id, s.barber_id), s.created_at`,
     [salonId, toSqlUtc(winFrom), toSqlUtc(winTo)]
   );
-  const [others] = await pool.query('SELECT id FROM barbers WHERE salon_id = ? AND active = 1 AND id <> ?', [salonId, barberId]);
+  // barberId null = tout le salon (courbe globale du tableau de bord) : pas de « moyenne des autres ».
+  const [others] = barberId ? await pool.query('SELECT id FROM barbers WHERE salon_id = ? AND active = 1 AND id <> ?', [salonId, barberId]) : [[]];
   const otherIds = new Set(others.map((o) => o.id));
+  const mine = (bid) => !barberId || bid === barberId;
 
   const edges = (shift) => buckets.map((bk) => ({ from: utc(addDaysStr(bk.from, shift)).getTime(), to: utc(addDaysStr(bk.to, shift + 1)).getTime() }));
   const cur = edges(0), prev = edges(-nDays);
@@ -500,8 +517,8 @@ async function barberSeries(salonId, barberId, start_date, end_date, tz) {
     const t = new Date(String(l.created_at).replace(' ', 'T') + (String(l.created_at).includes('Z') || l.created_at instanceof Date ? '' : 'Z')).getTime();
     const cents = Number(l.cents) || 0;
     for (let i = 0; i < buckets.length; i++) {
-      if (t >= cur[i].from && t < cur[i].to) { if (l.barber_id === barberId) self[i] += cents; else if (otherIds.has(l.barber_id)) team[i] += cents; break; }
-      if (t >= prev[i].from && t < prev[i].to) { if (l.barber_id === barberId) before[i] += cents; break; }
+      if (t >= cur[i].from && t < cur[i].to) { if (mine(l.barber_id)) self[i] += cents; else if (otherIds.has(l.barber_id)) team[i] += cents; break; }
+      if (t >= prev[i].from && t < prev[i].to) { if (mine(l.barber_id)) before[i] += cents; break; }
     }
   });
   // Jours pas encore arrivés : pas de point (sinon la courbe tombe à 0 € et fausse la lecture).

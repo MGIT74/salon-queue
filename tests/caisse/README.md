@@ -135,4 +135,5 @@ node tests/caisse/101-categories-produits-rdv.js  # Etape Produits des reservati
 node tests/caisse/102-pause-messages-clients.js  # Reglages : pause des emails / SMS aux clients pendant l'import des RDV (faux serveur SMTP)
 node tests/caisse/103-manque-a-gagner.js  # Fiche coiffeur : manque a gagner estime, prix moyen de ses prestations quand rien n'est encore encaisse
 node tests/caisse/104-stats-coiffeur-courbe.js  # Fiche coiffeur : panier moyen, ventes en plus, par heure, RDV rates, vs periode precedente, courbe 3 lignes
+node tests/caisse/105-dashboard-courbe-salon.js  # Tableau de bord : courbe globale « Encaisse du salon » (7 j / 30 j / 3 mois) + periode precedente
 ```

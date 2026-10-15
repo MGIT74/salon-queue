@@ -124,7 +124,8 @@ const suite = [
   ['101-categories-produits-rdv.js', true, ['exit']],
   ['102-pause-messages-clients.js', false, ['exit']],
   ['103-manque-a-gagner.js', true, ['exit']],
-  ['104-stats-coiffeur-courbe.js', true, ['exit']]
+  ['104-stats-coiffeur-courbe.js', true, ['exit']],
+  ['105-dashboard-courbe-salon.js', true, ['exit']]
 ];
 
 let bad = 0;

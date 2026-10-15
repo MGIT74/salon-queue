@@ -173,6 +173,13 @@
   .dash-cat-row:hover { color: var(--blue); }
   .dash-cat-row b { font-variant-numeric: tabular-nums; }
 
+  .dash-rev-head { gap: 10px; flex-wrap: wrap; }
+  .dash-rev-picker { margin: 0; width: 250px; max-width: 100%; padding: 3px; }
+  .dash-rev-picker button { padding: 6px 8px; font-size: 12.5px; }
+  .dash-rev-kpi { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
+  .dash-rev-kpi .dash-big-num { margin: 0; }
+  .dash-rev-kpi .st-delta { margin: 0; }
+  .dash-card .bp-chart.dash-rev-chart { margin-top: 4px; padding: 6px 0 0; background: transparent; }
   .dash-week-cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; flex: 1; align-items: end; }
   .dash-week-day { display: flex; flex-direction: column; align-items: center; gap: 8px; }
   .dash-week-day-label { font-size: 11px; color: var(--grey); text-transform: uppercase; }
@@ -1231,7 +1238,8 @@
   .bc-dot.team { fill: var(--ink); }
   .bc-dot.prev { fill: var(--grey); }
   .bc-tip { position: absolute; top: 4px; pointer-events: none; background: var(--card); border-radius: 12px; padding: 9px 11px; box-shadow: 0 8px 28px rgba(0,0,0,.25); font-size: 12.5px; min-width: 210px; z-index: 2; }
-  .bc-tip-t { font-weight: 600; margin-bottom: 5px; text-transform: capitalize; }
+  .bc-tip-t { font-weight: 600; margin-bottom: 5px; }
+  .bc-tip-t::first-letter { text-transform: uppercase; }
   .bc-tip-r { display: flex; align-items: center; gap: 7px; color: var(--grey); padding: 1px 0; }
   .bc-tip-r b { margin-left: auto; color: var(--ink); font-variant-numeric: tabular-nums; }
   .bp-stats .stat-tile.wide { grid-column: span 2; }
@@ -1684,9 +1692,17 @@
         <div class="dash-card-head"><h3>Catalogue</h3></div>
         <div id="dash-catalog-list"></div>
       </div>
+      <!-- Encaissé du salon (global) : même courbe que la fiche de chaque coiffeur, pour tout le salon. -->
       <div class="dash-card">
-        <div class="dash-card-head"><h3>Cette semaine</h3></div>
-        <div class="dash-week-cal" id="dash-week-cal"></div>
+        <div class="dash-card-head dash-rev-head"><h3>Encaissé du salon</h3>
+          <div class="period-picker dash-rev-picker" id="dash-rev-picker">
+            <button data-d="7" class="on" onclick="setDashRevenueRange(7)">7 jours</button>
+            <button data-d="30" onclick="setDashRevenueRange(30)">30 jours</button>
+            <button data-d="90" onclick="setDashRevenueRange(90)">3 mois</button>
+          </div>
+        </div>
+        <div class="dash-rev-kpi"><span class="dash-big-num" id="dash-rev-total">—</span><span class="st-delta" id="dash-rev-delta"></span></div>
+        <div class="bp-chart dash-rev-chart" id="dash-rev-chart"></div>
       </div>
     </div>
 
@@ -3388,6 +3404,8 @@ function loadDashboardTab() {
     document.getElementById('dash-pill-rev').textContent = eur(r.revenue_cents);
   }).catch(function () {});
 
+  loadDashRevenue();   // courbe globale « Encaissé du salon »
+
   api('/api/queue/stats/week').then(function (r) {
     var maxRevenue = Math.max.apply(null, r.days.map(function (d) { return d.revenue_cents; }).concat([1]));
     var totalWeek = r.days.reduce(function (a, d) { return a + d.revenue_cents; }, 0);
@@ -3443,28 +3461,34 @@ function loadDashboardTab() {
           '</div>';
         }).join('');
 
-    // Petit calendrier de la semaine : nombre de RDV par jour (7 derniers
-    // jours glissants, même fenêtre que le graphique de CA), à partir des
-    // mêmes RDV déjà récupérés ci-dessus plutôt qu'un nouvel appel.
-    var counts = {};
-    items.forEach(function (a) {
-      var d = a.scheduled_at.slice(0, 10);
-      counts[d] = (counts[d] || 0) + 1;
-    });
-    var todayStr = new Date().toISOString().slice(0, 10);
-    var cells = [];
-    for (var i = 0; i < 7; i++) {
-      var d = new Date();
-      d.setDate(d.getDate() + i);
-      var key = d.toISOString().slice(0, 10);
-      cells.push({ key: key, label: WEEKDAY_LABELS_SHORT[d.getDay()].slice(0, 3), count: counts[key] || 0, isToday: key === todayStr });
+  }).catch(function () {});
+}
+
+
+/* Tableau de bord : courbe GLOBALE de l'encaissé du salon (7 jours / 30 jours / 3 mois jusqu'à aujourd'hui),
+   avec la même courbe sur la période précédente - même dessin que dans la fiche de chaque coiffeur. */
+var dashRevenueDays = 7;
+function setDashRevenueRange(days) {
+  dashRevenueDays = days;
+  document.querySelectorAll('#dash-rev-picker button').forEach(function (b) { b.classList.toggle('on', Number(b.getAttribute('data-d')) === days); });
+  loadDashRevenue();
+}
+function loadDashRevenue() {
+  var box = document.getElementById('dash-rev-chart');
+  if (!box) return;
+  var end = nowSalonDatetimeString().slice(0, 10);
+  var d = new Date(end + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() - (dashRevenueDays - 1));
+  var start = d.toISOString().slice(0, 10);
+  api('/api/barbers/salon-series?start_date=' + start + '&end_date=' + end).then(function (r) {
+    document.getElementById('dash-rev-total').textContent = eur(r.total_cents);
+    var dl = document.getElementById('dash-rev-delta'), cur = r.total_cents, prev = r.previous_total_cents;
+    if (!prev) { dl.className = 'st-delta flat'; dl.textContent = cur ? 'pas d\'encaissement sur la période préc.' : ''; }
+    else {
+      var pc = Math.round(((cur - prev) / prev) * 100);
+      dl.className = 'st-delta ' + (pc > 0 ? 'up' : pc < 0 ? 'down' : 'flat');
+      dl.textContent = pc ? (pc > 0 ? '▲ +' : '▼ −') + Math.abs(pc) + ' % vs période préc.' : '= période préc.';
     }
-    document.getElementById('dash-week-cal').innerHTML = cells.map(function (c) {
-      return '<div class="dash-week-day' + (c.isToday ? ' today' : '') + '">' +
-        '<div class="dash-week-day-label">' + c.label + '</div>' +
-        '<div class="dash-week-day-count">' + c.count + '</div>' +
-      '</div>';
-    }).join('');
+    renderRevenueChart(box, r.series, { me: 'Salon', noTitle: false });
   }).catch(function () {});
 }
 
@@ -5303,13 +5327,18 @@ function loadBarberStats(id) {
 /* Courbe des statistiques coiffeur : son encaissé (trait plein), la moyenne des autres coiffeurs (tirets) et la même
    courbe sur la période précédente (pointillés, estompée). Un seul axe (euros), survol = repère + infobulle. */
 function renderBarberChart(id, se) {
-  var box = document.getElementById('stats-chart-' + id);
+  renderRevenueChart(document.getElementById('stats-chart-' + id), se, {});
+}
+
+/* Courbe d'encaissé réutilisable (fiche coiffeur, et tableau de bord en global). opts.me : nom de la ligne principale. */
+function renderRevenueChart(box, se, opts) {
+  opts = opts || {};
   if (!box) return;
   if (!se || !se.labels || se.labels.length < 2) { box.innerHTML = ''; box.style.display = 'none'; return; }
   box.style.display = '';
   var n = se.labels.length;
   var series = [
-    { key: 'me', name: 'Ce coiffeur', data: se.barber_cents, cls: 'me' },
+    { key: 'me', name: opts.me || 'Ce coiffeur', data: se.barber_cents, cls: 'me' },
     se.team_avg_cents ? { key: 'team', name: 'Moyenne de l\'équipe (' + se.team_size + ')', data: se.team_avg_cents, cls: 'team' } : null,
     { key: 'prev', name: 'Période précédente', data: se.previous_cents, cls: 'prev' }
   ].filter(Boolean);
@@ -5318,12 +5347,12 @@ function renderBarberChart(id, se) {
   var step = (function () { var raw = Math.max(1, max / 100) / 4, p = Math.pow(10, Math.floor(Math.log10(raw))); var m = raw / p; return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 5 ? 5 : 10) * p; })();
   var top = Math.max(step * 4, Math.ceil(max / 100 / step) * step) * 100;
   // Dessin à la taille réelle (jamais étiré : les textes gardent leur taille), redessiné si la fenêtre change.
-  box._series = se;
+  box._series = se; box._opts = opts;
   if (!window._bcResize) {
     window._bcResize = true;
     var rt = null;
     window.addEventListener('resize', function () { clearTimeout(rt); rt = setTimeout(function () {
-      document.querySelectorAll('.bp-chart').forEach(function (bx) { if (bx._series) renderBarberChart(bx.id.replace('stats-chart-', ''), bx._series); });
+      document.querySelectorAll('.bp-chart').forEach(function (bx) { if (bx._series && bx.offsetParent) renderRevenueChart(bx, bx._series, bx._opts); });
     }, 150); });
   }
   var W = Math.max(280, Math.round((box.clientWidth || 752) - 32)), H = 220, L = 54, R = 12, T = 12, B = 30, iw = W - L - R, ih = H - T - B;
@@ -5349,8 +5378,8 @@ function renderBarberChart(id, se) {
   }).join('');
   var legend = series.map(function (s) { return '<span class="bc-leg"><svg width="22" height="8" aria-hidden="true"><line class="bc-line ' + s.cls + '" x1="1" x2="21" y1="4" y2="4"/></svg>' + esc(s.name) + '</span>'; }).join('');
   var unitTxt = se.unit === 'day' ? 'par jour' : se.unit === 'week' ? 'par semaine' : 'par mois';
-  box.innerHTML = '<div class="bc-head"><div class="bc-title">Encaissé ' + unitTxt + '</div><div class="bc-legend">' + legend + '</div></div>' +
-    '<div class="bc-wrap"><svg class="bc-svg" viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H + '" role="img" aria-label="Encaissé ' + unitTxt + ' : ce coiffeur, moyenne de l\'équipe et période précédente">' +
+  box.innerHTML = '<div class="bc-head"><div class="bc-title">' + (opts.noTitle ? '' : 'Encaissé ' + unitTxt) + '</div><div class="bc-legend">' + legend + '</div></div>' +
+    '<div class="bc-wrap"><svg class="bc-svg" viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H + '" role="img" aria-label="Encaissé ' + unitTxt + ' : ' + esc(opts.me || 'ce coiffeur') + ' et période précédente">' +
       grid + xl + lines + '<line class="bc-cross" x1="0" x2="0" y1="' + T + '" y2="' + (T + ih) + '" style="display:none"/>' +
       series.map(function (s) { return '<circle class="bc-dot ' + s.cls + '" r="4.5" style="display:none"/>'; }).join('') +
     '</svg><div class="bc-tip" style="display:none"></div></div>';
