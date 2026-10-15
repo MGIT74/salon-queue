@@ -330,15 +330,15 @@
   .caisse-layout {
     display: grid; gap: 18px; align-items: start;
     grid-template-columns: 1fr 340px;
-    grid-template-areas: "grid ticket" "pending ticket";
+    grid-template-areas: "grid ticket";
   }
   .caisse-grid-col { grid-area: grid; }
   .ticket-panel { grid-area: ticket; }
-  .pending-section { grid-area: pending; }
+  .pending-section { margin-top: 2px; }
   @media (max-width: 860px) {
     .caisse-layout {
       grid-template-columns: 1fr;
-      grid-template-areas: "grid" "ticket" "pending";
+      grid-template-areas: "grid" "ticket";
     }
   }
 
@@ -350,6 +350,10 @@
   }
   .cat-tabs button.on { background: var(--card); font-weight: 600; box-shadow: var(--shadow); }
   .cat-tabs button:active { transform: scale(.95); }
+  /* 4e onglet « À encaisser » : nombre de clients en attente d'encaissement */
+  .cat-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 6px; margin-left: 4px;
+    border-radius: 999px; background: var(--red); color: #fff; font-size: 12px; font-weight: 700; vertical-align: 1px; }
+  .pending-section .pending-list { max-height: none; }
 
   .item-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
   .item-btn {
@@ -648,7 +652,8 @@
     #panel-caisse .caisse-grid-col { display: flex; flex-direction: column; min-height: 0; }
     #panel-caisse .caisse-grid-col .cat-tabs { flex: none; }
     #panel-caisse #item-grid { flex: 1 1 auto; min-height: 0; overflow-y: auto; align-content: start; grid-auto-rows: max-content; padding: 3px 6px 16px 3px; margin-bottom: 0; overscroll-behavior: contain; }
-    #panel-caisse .pending-list { max-height: 26vh; margin-bottom: 8px; }
+    #panel-caisse .pending-section { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 6px 16px 0; }
+    #panel-caisse .pending-list { max-height: none; overflow: visible; margin-bottom: 8px; }
     #panel-caisse .ticket-panel { position: static; max-height: none; min-height: 0; margin-bottom: 10px; }
     /* Ticket : les lignes s'etirent avec le contenu (plus de mini-zone de 2 lignes) ; Espèces/CB plus compacts pour laisser la place ;
        seul le panneau defile si le ticket depasse vraiment la hauteur de l'ecran. */
@@ -759,16 +764,17 @@
           <button class="on" data-cat="services">Prestations</button>
           <button data-cat="extras">Suppléments</button>
           <button data-cat="products">Produits</button>
+          <button data-cat="pending" id="cat-tab-pending">À encaisser <span class="cat-badge" id="pending-tab-count" style="display:none"></span></button>
         </div>
         <div id="item-cats" style="display:none;gap:8px;flex-wrap:wrap;margin:0 0 10px"></div>
         <div class="item-grid" id="item-grid"></div>
+        <div class="pending-section" id="pending-section" style="display:none">
+          <div class="section-label" id="pending-label" style="display:none;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--grey);margin:22px 0 10px 2px">En attente d'encaissement</div>
+          <div class="pending-list" id="pending-list"></div>
+          <button type="button" class="btn btn-soft advance-btn" id="advance-btn" onclick="openAdvancePicker()" style="margin-top:12px">Encaisser à l'avance un client de la file</button>
+        </div>
       </div>
 
-      <div class="pending-section">
-        <div class="section-label" id="pending-label" style="display:none;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--grey);margin:22px 0 10px 2px">En attente d'encaissement</div>
-        <div class="pending-list" id="pending-list"></div>
-        <button type="button" class="btn btn-soft advance-btn" id="advance-btn" onclick="openAdvancePicker()" style="margin-top:12px">Encaisser à l'avance un client de la file</button>
-      </div>
 
       <div class="ticket-panel">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0">
@@ -3364,8 +3370,17 @@ document.getElementById('cat-tabs').addEventListener('click', function (e) {
   if (!btn) return;
   currentCat = btn.dataset.cat;
   document.querySelectorAll('#cat-tabs button').forEach(function (b) { b.classList.toggle('on', b === btn); });
-  renderItemGrid();
+  applyCatView();
+  if (currentCat === 'pending') loadPendingPayments(); else renderItemGrid();
 });
+
+/** Onglet « À encaisser » : la liste des encaissements en attente remplace la grille d'articles. */
+function applyCatView() {
+  var pending = currentCat === 'pending';
+  document.getElementById('item-grid').style.display = pending ? 'none' : '';
+  document.getElementById('pending-section').style.display = pending ? 'block' : 'none';
+  if (pending) document.getElementById('item-cats').style.display = 'none';
+}
 
 /**
  * Coupes terminées par ce coiffeur, pas encore encaissées. Seule la
@@ -3383,12 +3398,15 @@ function loadPendingPayments() {
 function renderPendingList() {
   var label = document.getElementById('pending-label');
   var list = document.getElementById('pending-list');
+  // Pastille du 4e onglet « À encaisser » : nombre de clients en attente (hors mis de côté).
+  var badge = document.getElementById('pending-tab-count');
+  var waitingCount = pendingPayments.filter(function (q) { return !q.deferred; }).length;
+  if (badge) { badge.textContent = waitingCount; badge.style.display = waitingCount ? '' : 'none'; }
+  label.style.display = 'none'; // le titre est désormais l'onglet lui-même
   if (!pendingPayments.length) {
-    label.style.display = 'none';
-    list.innerHTML = '';
+    list.innerHTML = '<div class="empty" style="padding:28px 0">Aucun encaissement en attente</div>';
     return;
   }
-  label.style.display = 'block';
 
   // Le premier client NON mis de côté est le seul "actif" (encaissable
   // tout de suite) — les suivants restent verrouillés jusqu'à ce qu'il
@@ -3687,6 +3705,7 @@ function renderItemCats() {
 }
 
 function renderItemGrid() {
+  if (currentCat === 'pending') return; // onglet « À encaisser » : pas de grille d'articles
   renderItemCats();
   var items = catalog[currentCat] || [];
   var cf = caisseCatFilter[currentCat];
