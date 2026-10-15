@@ -309,6 +309,43 @@ router.put('/:id/schedule', requireAdmin, wrap(async (req, res) => {
 }));
 
 /**
+ * Tableau de bord, filtre de période GLOBAL (Jour / Semaine / Mois / Plage, comme la fiche coiffeur) :
+ * courbe de l'encaissé du salon + période précédente, et manque à gagner global (somme des coiffeurs actifs).
+ * ?start&end (ISO UTC, fin exclue) & start_date&end_date (jours locaux inclus).
+ */
+router.get('/salon-stats', requireAdmin, wrap(async (req, res) => {
+  const { start, end, start_date, end_date } = req.query;
+  if (!start || !end || isNaN(new Date(start)) || isNaN(new Date(end)) ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(start_date || '') || !/^\d{4}-\d{2}-\d{2}$/.test(end_date || '') || start_date > end_date || daysBetween(start_date, end_date) > 400) {
+    return res.status(400).json({ error: 'Période invalide' });
+  }
+  const settings = await getSettings(req.salon.id);
+  const series = await barberSeries(req.salon.id, null, start_date, end_date, settings.timezone);
+  const sum = (a) => a.reduce((x, y) => x + (y || 0), 0);
+  const [active] = await pool.query('SELECT id, name FROM barbers WHERE salon_id = ? AND active = 1 ORDER BY name', [req.salon.id]);
+  const startSql = toSqlUtc(new Date(start)), endSql = toSqlUtc(new Date(end));
+  let potential = 0, freeSlots = 0, available = 0, booked = 0, catalogBased = false;
+  const perBarber = [];
+  for (const b of active) {
+    const c = await barberPeriodCore(req.salon.id, b.id, startSql, endSql, start_date, end_date);
+    const a = c.availability;
+    if (!a || !a.available_minutes) continue;
+    potential += a.potential_revenue_cents; freeSlots += a.free_slots; available += a.available_minutes; booked += c.booked_minutes;
+    if (a.potential_basis === 'catalog') catalogBased = true;
+    perBarber.push({ id: b.id, name: b.name, potential_revenue_cents: a.potential_revenue_cents, occupancy_pct: a.occupancy_pct });
+  }
+  perBarber.sort((x, y) => y.potential_revenue_cents - x.potential_revenue_cents);
+  res.json({
+    ok: true, series,
+    total_cents: sum(series.barber_cents), previous_total_cents: sum(series.previous_cents),
+    potential_revenue_cents: potential, free_slots: freeSlots,
+    occupancy_pct: available > 0 ? Math.round((100 * booked) / available) : 0,
+    potential_catalog_based: catalogBased,
+    per_barber: perBarber
+  });
+}));
+
+/**
  * Courbe GLOBALE du salon (tableau de bord) : encaissé (prestations + produits) par jour / semaine / mois,
  * et la même courbe sur la période précédente. ?start_date=AAAA-MM-JJ&end_date=AAAA-MM-JJ (jours locaux inclus).
  */
@@ -479,9 +516,12 @@ async function barberPeriodCore(salonId, barberId, startSql, endSql, start_date,
  */
 async function barberSeries(salonId, barberId, start_date, end_date, tz) {
   const nDays = daysBetween(start_date, end_date) + 1;
-  const unit = nDays <= 31 ? 'day' : nDays <= 190 ? 'week' : 'month';
+  const unit = nDays === 1 ? 'hour' : nDays <= 31 ? 'day' : nDays <= 190 ? 'week' : 'month';
   const buckets = [];
-  if (unit === 'day') {
+  if (unit === 'hour') {
+    // Une seule journée : heure par heure (8 h - 20 h au minimum, élargi aux heures où il y a eu des ventes).
+    for (let h = 0; h < 24; h++) buckets.push({ from: start_date, to: start_date, hour: h });
+  } else if (unit === 'day') {
     for (let i = 0; i < nDays; i++) { const ds = addDaysStr(start_date, i); buckets.push({ from: ds, to: ds }); }
   } else if (unit === 'week') {
     for (let ds = start_date; ds <= end_date; ds = addDaysStr(ds, 7)) { const te = addDaysStr(ds, 6); buckets.push({ from: ds, to: te < end_date ? te : end_date }); }
@@ -510,7 +550,11 @@ async function barberSeries(salonId, barberId, start_date, end_date, tz) {
   const otherIds = new Set(others.map((o) => o.id));
   const mine = (bid) => !barberId || bid === barberId;
 
-  const edges = (shift) => buckets.map((bk) => ({ from: utc(addDaysStr(bk.from, shift)).getTime(), to: utc(addDaysStr(bk.to, shift + 1)).getTime() }));
+  const pad2 = (n) => String(n).padStart(2, '0');
+  const edges = (shift) => buckets.map((bk) => (bk.hour != null
+    ? { from: parisLocalToUtcDate(addDaysStr(bk.from, shift), pad2(bk.hour) + ':00:00', tz).getTime(),
+        to: bk.hour === 23 ? utc(addDaysStr(bk.from, shift + 1)).getTime() : parisLocalToUtcDate(addDaysStr(bk.from, shift), pad2(bk.hour + 1) + ':00:00', tz).getTime() }
+    : { from: utc(addDaysStr(bk.from, shift)).getTime(), to: utc(addDaysStr(bk.to, shift + 1)).getTime() }));
   const cur = edges(0), prev = edges(-nDays);
   const self = buckets.map(() => 0), team = buckets.map(() => 0), before = buckets.map(() => 0);
   lines.forEach((l) => {
@@ -521,16 +565,26 @@ async function barberSeries(salonId, barberId, start_date, end_date, tz) {
       if (t >= prev[i].from && t < prev[i].to) { if (mine(l.barber_id)) before[i] += cents; break; }
     }
   });
-  // Jours pas encore arrivés : pas de point (sinon la courbe tombe à 0 € et fausse la lecture).
+  // Jours (ou heures) pas encore arrivés : pas de point (sinon la courbe tombe à 0 € et fausse la lecture).
   const todayLocal = new Intl.DateTimeFormat('en-CA', { timeZone: tz || 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
-  buckets.forEach((bk, i) => { if (bk.from > todayLocal) { self[i] = null; team[i] = null; } });
+  const nowMs = Date.now();
+  buckets.forEach((bk, i) => {
+    if (bk.from > todayLocal || (bk.hour != null && cur[i].from > nowMs)) { self[i] = null; team[i] = null; }
+  });
+  let keep = buckets.map((bk, i) => i);
+  if (unit === 'hour') {
+    const used = buckets.map((bk, i) => i).filter((i) => (self[i] || 0) + (team[i] || 0) + (before[i] || 0) > 0);
+    const lo = Math.min(8, used.length ? used[0] : 8), hi = Math.max(20, used.length ? used[used.length - 1] : 20);
+    keep = keep.filter((i) => i >= lo && i <= hi);
+  }
+  const pick = (arr) => keep.map((i) => arr[i]);
   return {
     unit,
-    labels: buckets.map((bk) => bk.from),
-    ends: buckets.map((bk) => bk.to),
-    barber_cents: self,
-    team_avg_cents: otherIds.size ? team.map((c) => (c == null ? null : Math.round(c / otherIds.size))) : null,
-    previous_cents: before,
+    labels: pick(buckets.map((bk) => (bk.hour != null ? bk.from + 'T' + pad2(bk.hour) + ':00' : bk.from))),
+    ends: pick(buckets.map((bk) => bk.to)),
+    barber_cents: pick(self),
+    team_avg_cents: otherIds.size ? pick(team).map((c) => (c == null ? null : Math.round(c / otherIds.size))) : null,
+    previous_cents: pick(before),
     team_size: otherIds.size
   };
 }

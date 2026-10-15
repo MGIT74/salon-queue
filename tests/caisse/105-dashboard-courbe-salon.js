@@ -36,9 +36,23 @@ const check = (n, ok, extra) => { (ok ? pass++ : fail++); console.log((ok ? '  O
   r = await get('start_date=2026-03-02&end_date=2026-03-08', BARBER);
   check('réservé à l\'admin (un coiffeur avec son code PIN ne voit pas le chiffre du salon)', r.status === 401 || r.status === 403, r.status);
 
+  // Filtre global du tableau de bord : même calcul, + manque à gagner global (somme des coiffeurs actifs).
+  sql("DELETE FROM barber_schedules WHERE barber_id IN ('b1','b2'); DELETE FROM barber_breaks WHERE barber_id IN ('b1','b2'); DELETE FROM barber_leaves WHERE barber_id IN ('b1','b2')");
+  sql("INSERT INTO barber_schedules (id,barber_id,weekday,start_time,end_time,active) SELECT UUID(),b.id,d.n,'09:00','19:00',1 FROM barbers b JOIN (SELECT 0 n UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5 UNION SELECT 6) d WHERE b.id IN ('b1','b2')");
+  const st = await fetch(BASE + '/api/barbers/salon-stats?start=2026-03-01T23:00:00.000Z&end=2026-03-08T23:00:00.000Z&start_date=2026-03-02&end_date=2026-03-08', { headers: ADMIN }).then(async (x) => ({ status: x.status, body: await x.json() }));
+  const per = {}; (st.body.per_barber || []).forEach((b) => { per[b.id] = b; });
+  check('filtre global (Semaine) : encaissé 65 €, même courbe que ci-dessus', st.status === 200 && st.body.total_cents === 6500 && st.body.series.barber_cents[0] === 5000, st.body.total_cents);
+  check('manque à gagner global = somme des coiffeurs actifs, détail par coiffeur', st.body.potential_revenue_cents === (st.body.per_barber || []).reduce((a, b) => a + b.potential_revenue_cents, 0) && per.b1 && per.b2 && st.body.free_slots > 0, st.body);
+  const day = await fetch(BASE + '/api/barbers/salon-stats?start=2026-03-01T23:00:00.000Z&end=2026-03-02T23:00:00.000Z&start_date=2026-03-02&end_date=2026-03-02', { headers: ADMIN }).then((x) => x.json());
+  check('filtre « Jour » : courbe heure par heure (8 h - 20 h), 30 € à 10 h et 20 € à 11 h (heure de Paris)', day.series.unit === 'hour' && day.series.labels[0] === '2026-03-02T08:00' &&
+    day.series.barber_cents[day.series.labels.indexOf('2026-03-02T10:00')] === 3000 && day.series.barber_cents[day.series.labels.indexOf('2026-03-02T11:00')] === 2000, day.series);
+  r = await fetch(BASE + '/api/barbers/salon-stats?start=2026-03-01T23:00:00.000Z&end=2026-03-08T23:00:00.000Z&start_date=2026-03-02&end_date=2026-03-08', { headers: BARBER });
+  check('filtre global réservé à l\'admin', r.status === 401 || r.status === 403, r.status);
+
   const dash = fs.readFileSync(__dirname + '/../../public/dashboard.html', 'utf8');
-  check('carte « Encaissé du salon » à la place de « Cette semaine », avec 7 jours / 30 jours / 3 mois', /<h3>Encaissé du salon<\/h3>/.test(dash) && !/<h3>Cette semaine<\/h3>/.test(dash) && /setDashRevenueRange\(7\)/.test(dash) && /setDashRevenueRange\(30\)/.test(dash) && /setDashRevenueRange\(90\)/.test(dash));
-  check('même courbe que la fiche coiffeur (fonction partagée), chargée avec le tableau de bord', /function renderRevenueChart\(box, se, opts\)/.test(dash) && /renderRevenueChart\(box, r\.series, \{ me: 'Salon'/.test(dash) && /loadDashRevenue\(\);   \/\/ courbe globale/.test(dash));
+  check('en haut du tableau de bord : le même sélecteur que la fiche coiffeur (Jour / Semaine / Mois / Plage, flèches, Du/Au)', /id="stats-picker-salon"/.test(dash) && /setStatsPeriod\('salon','range'\)/.test(dash) && /id="stats-ctl-salon"/.test(dash) && /if \(id === 'salon'\) return loadDashSalon\(\);/.test(dash));
+  check('carte « Encaissé du salon » : plus de boutons 7 jours / 30 jours / 3 mois ni de titre « Encaissé par jour » dans la courbe', /<h3>Encaissé du salon<\/h3>/.test(dash) && !/setDashRevenueRange/.test(dash) && /renderRevenueChart\(document\.getElementById\('dash-rev-chart'\), r\.series, \{ me: 'Salon', noTitle: true \}\)/.test(dash));
+  check('« CA de la semaine » remplacé par « Manque à gagner » global (créneaux libres, occupation, détail par coiffeur)', !/<h3>CA de la semaine<\/h3>/.test(dash) && /<h3>Manque à gagner<\/h3>/.test(dash) && /id="dash-missed-list"/.test(dash));
 
   sql(clean);
   console.log('\nRESULTAT : ' + pass + ' verifications reussies, ' + fail + ' echec(s)');

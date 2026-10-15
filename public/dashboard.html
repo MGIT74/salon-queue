@@ -174,6 +174,16 @@
   .dash-cat-row b { font-variant-numeric: tabular-nums; }
 
   .dash-rev-head { gap: 10px; flex-wrap: wrap; }
+  .dash-period { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin: 0 0 16px; }
+  .dash-period .period-picker { margin: 0; width: 360px; max-width: 100%; }
+  .dash-period .stats-ctl { flex: 1; min-width: 260px; margin: 0; }
+  .dash-period .stats-nav { margin: 0; }
+  .dash-missed-num { color: var(--orange, #f97316); }
+  .dash-missed-sub { font-size: 12.5px; color: var(--grey); margin: 4px 0 12px; line-height: 1.4; }
+  .dash-missed-list { display: flex; flex-direction: column; gap: 6px; }
+  .dash-missed-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; }
+  .dash-missed-row span { color: var(--grey); }
+  .dash-missed-row b { font-variant-numeric: tabular-nums; font-weight: 600; }
   .dash-rev-picker { margin: 0; width: 250px; max-width: 100%; padding: 3px; }
   .dash-rev-picker button { padding: 6px 8px; font-size: 12.5px; }
   .dash-rev-kpi { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
@@ -1650,6 +1660,18 @@
       <div class="dash-pill"><span class="dash-pill-dot" style="background:var(--ink)"></span>Encaissé aujourd'hui <b id="dash-pill-rev">0,00 €</b></div>
     </div>
 
+    <!-- Filtre de période GLOBAL du tableau de bord (même sélecteur que la fiche de chaque coiffeur) :
+         pilote la courbe « Encaissé du salon » et le « Manque à gagner ». -->
+    <div class="dash-period">
+      <div class="period-picker" id="stats-picker-salon">
+        <button data-p="day" onclick="setStatsPeriod('salon','day')">Jour</button>
+        <button data-p="week" class="on" onclick="setStatsPeriod('salon','week')">Semaine</button>
+        <button data-p="month" onclick="setStatsPeriod('salon','month')">Mois</button>
+        <button data-p="range" onclick="setStatsPeriod('salon','range')">Plage</button>
+      </div>
+      <div class="stats-ctl" id="stats-ctl-salon"></div>
+    </div>
+
     <div class="dash-grid">
       <div class="dash-card dash-card-leader">
         <div class="dash-card-head"><h3>Classement du jour</h3></div>
@@ -1661,10 +1683,11 @@
         <div id="dash-leader-list"></div>
       </div>
 
-      <div class="dash-card">
-        <div class="dash-card-head"><h3>CA de la semaine</h3></div>
-        <div class="dash-big-num" id="dash-week-total">0,00 €</div>
-        <div class="dash-bars" id="dash-week-bars"></div>
+      <div class="dash-card dash-card-missed">
+        <div class="dash-card-head"><h3>Manque à gagner</h3></div>
+        <div class="dash-big-num dash-missed-num" id="dash-missed-total">—</div>
+        <div class="dash-missed-sub" id="dash-missed-sub"></div>
+        <div class="dash-missed-list" id="dash-missed-list"></div>
       </div>
 
       <div class="dash-card dash-card-gauge">
@@ -1694,13 +1717,7 @@
       </div>
       <!-- Encaissé du salon (global) : même courbe que la fiche de chaque coiffeur, pour tout le salon. -->
       <div class="dash-card">
-        <div class="dash-card-head dash-rev-head"><h3>Encaissé du salon</h3>
-          <div class="period-picker dash-rev-picker" id="dash-rev-picker">
-            <button data-d="7" class="on" onclick="setDashRevenueRange(7)">7 jours</button>
-            <button data-d="30" onclick="setDashRevenueRange(30)">30 jours</button>
-            <button data-d="90" onclick="setDashRevenueRange(90)">3 mois</button>
-          </div>
-        </div>
+        <div class="dash-card-head dash-rev-head"><h3>Encaissé du salon</h3><span id="dash-rev-period"></span></div>
         <div class="dash-rev-kpi"><span class="dash-big-num" id="dash-rev-total">—</span><span class="st-delta" id="dash-rev-delta"></span></div>
         <div class="bp-chart dash-rev-chart" id="dash-rev-chart"></div>
       </div>
@@ -3404,11 +3421,12 @@ function loadDashboardTab() {
     document.getElementById('dash-pill-rev').textContent = eur(r.revenue_cents);
   }).catch(function () {});
 
-  loadDashRevenue();   // courbe globale « Encaissé du salon »
+  loadDashSalon();   // filtre global : courbe « Encaissé du salon » + manque à gagner
 
   api('/api/queue/stats/week').then(function (r) {
     var maxRevenue = Math.max.apply(null, r.days.map(function (d) { return d.revenue_cents; }).concat([1]));
     var totalWeek = r.days.reduce(function (a, d) { return a + d.revenue_cents; }, 0);
+    if (!document.getElementById('dash-week-total')) return;   // carte remplacée par « Manque à gagner »
     document.getElementById('dash-week-total').textContent = eur(totalWeek);
     document.getElementById('dash-week-bars').innerHTML = r.days.map(function (d, i) {
       var isToday = i === r.days.length - 1; // le serveur renvoie les 7 jours du SALON, aujourd'hui en dernier
@@ -3465,21 +3483,24 @@ function loadDashboardTab() {
 }
 
 
-/* Tableau de bord : courbe GLOBALE de l'encaissé du salon (7 jours / 30 jours / 3 mois jusqu'à aujourd'hui),
-   avec la même courbe sur la période précédente - même dessin que dans la fiche de chaque coiffeur. */
-var dashRevenueDays = 7;
-function setDashRevenueRange(days) {
-  dashRevenueDays = days;
-  document.querySelectorAll('#dash-rev-picker button').forEach(function (b) { b.classList.toggle('on', Number(b.getAttribute('data-d')) === days); });
-  loadDashRevenue();
-}
-function loadDashRevenue() {
-  var box = document.getElementById('dash-rev-chart');
-  if (!box) return;
-  var end = nowSalonDatetimeString().slice(0, 10);
-  var d = new Date(end + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() - (dashRevenueDays - 1));
-  var start = d.toISOString().slice(0, 10);
-  api('/api/barbers/salon-series?start_date=' + start + '&end_date=' + end).then(function (r) {
+/* Tableau de bord : filtre de période GLOBAL (Jour / Semaine / Mois / Plage, mêmes contrôles que la fiche coiffeur,
+   identifiant 'salon') -> courbe de l'encaissé du salon (+ période précédente) et manque à gagner global. */
+function loadDashSalon() {
+  var id = 'salon';
+  if (!barberStatsState[id]) barberStatsState[id] = { period: 'week', offset: 0 };
+  var st = barberStatsState[id];
+  var ctl = document.getElementById('stats-ctl-salon');
+  if (!ctl) return;
+  if (!ctl.firstChild || ctl._period !== st.period) { ctl.innerHTML = renderStatsCtl({ id: id }); ctl._period = st.period; }
+  var range = periodRange(st.period, st.offset, { from: st.customFrom, to: st.customTo });
+  var labelEl = document.getElementById('stats-label-salon'), nextBtn = document.getElementById('stats-next-salon');
+  if (labelEl) labelEl.textContent = range.label;
+  if (nextBtn) nextBtn.disabled = st.offset >= 0;
+  var endIncl = new Date(range.end); endIncl.setDate(endIncl.getDate() - 1);
+  var qs = 'start=' + range.start.toISOString() + '&end=' + range.end.toISOString() +
+    '&start_date=' + localDateStr(range.start) + '&end_date=' + localDateStr(endIncl);
+  var per = document.getElementById('dash-rev-period'); if (per) per.textContent = range.label;
+  api('/api/barbers/salon-stats?' + qs).then(function (r) {
     document.getElementById('dash-rev-total').textContent = eur(r.total_cents);
     var dl = document.getElementById('dash-rev-delta'), cur = r.total_cents, prev = r.previous_total_cents;
     if (!prev) { dl.className = 'st-delta flat'; dl.textContent = cur ? 'pas d\'encaissement sur la période préc.' : ''; }
@@ -3488,8 +3509,15 @@ function loadDashRevenue() {
       dl.className = 'st-delta ' + (pc > 0 ? 'up' : pc < 0 ? 'down' : 'flat');
       dl.textContent = pc ? (pc > 0 ? '▲ +' : '▼ −') + Math.abs(pc) + ' % vs période préc.' : '= période préc.';
     }
-    renderRevenueChart(box, r.series, { me: 'Salon', noTitle: false });
-  }).catch(function () {});
+    renderRevenueChart(document.getElementById('dash-rev-chart'), r.series, { me: 'Salon', noTitle: true });
+    // Manque à gagner global : temps libre de tous les coiffeurs actifs x leur prix moyen à la minute.
+    document.getElementById('dash-missed-total').textContent = eur(r.potential_revenue_cents);
+    document.getElementById('dash-missed-sub').textContent = '≈ ' + r.free_slots + ' créneaux libres · occupation ' + r.occupancy_pct + ' %' +
+      (r.potential_catalog_based && r.potential_revenue_cents > 0 ? ' · estimé d\'après les prix' : '');
+    document.getElementById('dash-missed-list').innerHTML = (r.per_barber || []).filter(function (b) { return b.potential_revenue_cents > 0; }).slice(0, 4).map(function (b) {
+      return '<div class="dash-missed-row"><span>' + esc(b.name) + ' · ' + b.occupancy_pct + ' % occupé</span><b>' + eur(b.potential_revenue_cents) + '</b></div>';
+    }).join('');
+  }).catch(function (e) { toast(e.message, true); });
 }
 
 
@@ -5227,7 +5255,11 @@ function setStatsPeriod(id, period) {
   };
   // Sur place : le sélecteur de période garde sa pastille (elle glisse), seul le corps des statistiques est redessiné.
   var picker = document.getElementById('stats-picker-' + id), body = document.getElementById('stats-body-' + id);
-  var b = barbers.filter(function (x) { return x.id === id; })[0];
+  var b = id === 'salon' ? { id: 'salon' } : barbers.filter(function (x) { return x.id === id; })[0];
+  if (id === 'salon') {
+    if (picker) [].forEach.call(picker.querySelectorAll('button'), function (btn) { btn.classList.toggle('on', btn.getAttribute('data-p') === period); });
+    return loadDashSalon();
+  }
   if (!picker || !body || !b) { renderBarbers(); return; }
   [].forEach.call(picker.querySelectorAll('button'), function (btn) {
     btn.classList.toggle('on', btn.getAttribute('data-p') === period);
@@ -5263,6 +5295,7 @@ function localDateStr(d) {
 }
 
 function loadBarberStats(id) {
+  if (id === 'salon') return loadDashSalon();   // filtre global du tableau de bord
   var st = barberStatsState[id];
   var range = periodRange(st.period, st.offset, { from: st.customFrom, to: st.customTo });
   var labelEl = document.getElementById('stats-label-' + id);
@@ -5359,6 +5392,7 @@ function renderRevenueChart(box, se, opts) {
   var x = function (i) { return L + (n === 1 ? iw / 2 : (i * iw) / (n - 1)); };
   var y = function (v) { return T + ih - (v / top) * ih; };
   var fmtDay = function (ds, short) {
+    if (se.unit === 'hour') { var hh = Number(ds.slice(11, 13)); return short ? hh + ' h' : hh + ' h – ' + (hh + 1) + ' h'; }
     var d = new Date(ds + 'T00:00:00');
     if (se.unit === 'month') return d.toLocaleDateString('fr-FR', { month: short ? 'short' : 'long', year: short ? undefined : 'numeric' });
     return d.toLocaleDateString('fr-FR', short ? { day: 'numeric', month: 'short' } : { weekday: 'short', day: 'numeric', month: 'short' });
@@ -5377,7 +5411,7 @@ function renderRevenueChart(box, se, opts) {
     return '<path class="bc-line ' + s.cls + '" d="' + d + '"/>';
   }).join('');
   var legend = series.map(function (s) { return '<span class="bc-leg"><svg width="22" height="8" aria-hidden="true"><line class="bc-line ' + s.cls + '" x1="1" x2="21" y1="4" y2="4"/></svg>' + esc(s.name) + '</span>'; }).join('');
-  var unitTxt = se.unit === 'day' ? 'par jour' : se.unit === 'week' ? 'par semaine' : 'par mois';
+  var unitTxt = se.unit === 'hour' ? 'par heure' : se.unit === 'day' ? 'par jour' : se.unit === 'week' ? 'par semaine' : 'par mois';
   box.innerHTML = '<div class="bc-head"><div class="bc-title">' + (opts.noTitle ? '' : 'Encaissé ' + unitTxt) + '</div><div class="bc-legend">' + legend + '</div></div>' +
     '<div class="bc-wrap"><svg class="bc-svg" viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H + '" role="img" aria-label="Encaissé ' + unitTxt + ' : ' + esc(opts.me || 'ce coiffeur') + ' et période précédente">' +
       grid + xl + lines + '<line class="bc-cross" x1="0" x2="0" y1="' + T + '" y2="' + (T + ih) + '" style="display:none"/>' +
