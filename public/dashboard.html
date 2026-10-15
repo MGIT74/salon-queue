@@ -5240,7 +5240,8 @@ function loadBarberStats(id) {
             '<div class="occ-bar"><div class="occ-bar-fill" style="width:' + Math.min(100, a.occupancy_pct) + '%"></div></div>' +
           '</div>' +
           '<div class="stat-tile"><div class="v">' + a.free_slots + '</div><div class="l">créneaux libres (≈)</div></div>' +
-          '<div class="stat-tile warn"><div class="v">' + eur(a.potential_revenue_cents) + '</div><div class="l">manque à gagner estimé</div></div>'
+          '<div class="stat-tile warn"><div class="v">' + eur(a.potential_revenue_cents) + '</div><div class="l">manque à gagner estimé' +
+            (a.potential_basis === 'catalog' ? '<br><span style="opacity:.7;font-size:.9em">d\'après le prix moyen de ses prestations</span>' : '') + '</div></div>'
         ) : '') ;
     })
     .catch(function (e) {

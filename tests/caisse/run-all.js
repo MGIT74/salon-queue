@@ -122,7 +122,8 @@ const suite = [
   ['99-compte-client-proches-salon.js', true, ['exit']],
   ['100-supprimer-passage-non-paye.js', true, ['exit']],
   ['101-categories-produits-rdv.js', true, ['exit']],
-  ['102-pause-messages-clients.js', false, ['exit']]
+  ['102-pause-messages-clients.js', false, ['exit']],
+  ['103-manque-a-gagner.js', true, ['exit']]
 ];
 
 let bad = 0;

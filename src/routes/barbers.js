@@ -410,14 +410,31 @@ router.get('/:id/stats', requireAdmin, wrap(async (req, res) => {
 
     const freeMinutes = Math.max(0, availableMinutes - bookedMinutes);
     const occupancyPct = availableMinutes > 0 ? Math.round((100 * bookedMinutes) / availableMinutes) : 0;
-    const avgRevenuePerMinute = bookedMinutes > 0 ? revenueCents / bookedMinutes : 0;
+    // Prix moyen par minute : celui réellement encaissé sur la période ; s'il n'y a encore rien d'encaissé (journée
+    // vide, coiffeur qui débute...), on prend le prix moyen à la minute des prestations qu'il propose (ses prix et
+    // durées personnalisés s'il en a, hors prestations qu'il ne fait pas) - sinon le manque à gagner resterait à 0 €.
+    let avgRevenuePerMinute = bookedMinutes > 0 && revenueCents > 0 ? revenueCents / bookedMinutes : 0;
+    let potentialBasis = avgRevenuePerMinute > 0 ? 'sales' : 'none';
+    if (!avgRevenuePerMinute) {
+      const [svc] = await pool.query(
+        `SELECT COALESCE(p.price_cents, s.price_cents) AS price_cents, COALESCE(p.duration_min, s.duration_min) AS duration_min
+         FROM services s
+         LEFT JOIN barber_service_prices p ON p.service_id = s.id AND p.barber_id = ?
+         WHERE s.salon_id = ? AND s.active = 1 AND s.deleted_at IS NULL
+           AND s.id NOT IN (SELECT service_id FROM barber_service_exclusions WHERE barber_id = ?)`,
+        [req.params.id, req.salon.id, req.params.id]
+      );
+      const rates = svc.filter((x) => Number(x.duration_min) > 0 && Number(x.price_cents) > 0).map((x) => Number(x.price_cents) / Number(x.duration_min));
+      if (rates.length) { avgRevenuePerMinute = rates.reduce((a, b) => a + b, 0) / rates.length; potentialBasis = 'catalog'; }
+    }
 
     availability = {
       available_minutes: availableMinutes,
       free_minutes: freeMinutes,
       free_slots: Math.floor(freeMinutes / slotStepMin),
       occupancy_pct: occupancyPct,
-      potential_revenue_cents: Math.round(freeMinutes * avgRevenuePerMinute)
+      potential_revenue_cents: Math.round(freeMinutes * avgRevenuePerMinute),
+      potential_basis: potentialBasis   // 'sales' (encaissé) | 'catalog' (prix moyen de ses prestations) | 'none'
     };
   }
 

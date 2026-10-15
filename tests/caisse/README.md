@@ -133,4 +133,5 @@ node tests/caisse/99-compte-client-proches-salon.js  # Ajouter un RDV : compte c
 node tests/caisse/100-supprimer-passage-non-paye.js  # Caisse « A encaisser » : corbeille (double confirmation) pour un passage non paye, supprime avec sa reservation
 node tests/caisse/101-categories-produits-rdv.js  # Etape Produits des reservations : pastilles de categories, seulement les produits disponibles en ligne
 node tests/caisse/102-pause-messages-clients.js  # Reglages : pause des emails / SMS aux clients pendant l'import des RDV (faux serveur SMTP)
+node tests/caisse/103-manque-a-gagner.js  # Fiche coiffeur : manque a gagner estime, prix moyen de ses prestations quand rien n'est encore encaisse
 ```
