@@ -1,10 +1,31 @@
 const nodemailer = require('nodemailer');
+const { AsyncLocalStorage } = require('async_hooks');
+const forceStore = new AsyncLocalStorage();
+/** Exécute fn en ignorant la pause (ex. l'admin teste ses modèles d'emails sur sa propre adresse). */
+function forceSend(fn) { return forceStore.run({ force: true }, fn); }
 const { getSettings } = require('../db');
 
 // Un transport par salon, chacun avec sa propre config SMTP.
 const cache = new Map();
 
-async function getTransport(salonId) {
+// Pause des messages aux clients (Réglages > Notifications email, interrupteur « Envoyer les emails aux clients ») :
+// pendant une transition depuis un autre logiciel (import de RDV), aucun email lié aux RDV ni automatique ne part
+// vers les clients (confirmation, rappel, annulation, report, fermeture du salon, « c'est bientôt votre tour »,
+// envois groupés). Restent permis : les tests de l'admin, ceux que le client demande lui-même (vérification de son
+// email, mot de passe oublié) et ceux d'une action faite avec lui au salon (carte cadeau, activation fidélité).
+// L'envoi est simplement ignoré, sans erreur : la réservation, l'annulation, etc. aboutissent normalement.
+const PAUSED_TX = { sendMail: async () => ({ skipped: 'client_emails_paused' }) };
+async function emailsPaused(salonId) {
+  const s = await getSettings(salonId);
+  return String(s.client_emails_paused) === '1';
+}
+
+async function getTransport(salonId, opts) {
+  const forced = (opts && opts.force) || (forceStore.getStore() || {}).force;
+  if (!forced && await emailsPaused(salonId)) {
+    const s = await getSettings(salonId);
+    return { from: s.smtp_from || s.smtp_user || '', salon: s.salon_name || 'Le Salon', tx: PAUSED_TX, paused: true };
+  }
   if (cache.has(salonId)) return cache.get(salonId);
   const s = await getSettings(salonId);
   if (!s.smtp_host) throw new Error('SMTP non configuré (Dashboard > Réglages)');
@@ -113,7 +134,7 @@ function loyaltyRuleText(info) {
 }
 
 async function sendLoyaltyActivation(salonId, to, info) {
-  const { tx, from, salon } = await getTransport(salonId);
+  const { tx, from, salon } = await getTransport(salonId, { force: true });
   await tx.sendMail({
     from,
     to,
@@ -129,7 +150,7 @@ async function sendLoyaltyActivation(salonId, to, info) {
 }
 
 async function sendGiftConfirmation(salonId, to, info) {
-  const { tx, from, salon } = await getTransport(salonId);
+  const { tx, from, salon } = await getTransport(salonId, { force: true });
   const itemsList = info.items.map((it) => `${it.quantity} × ${it.item_name}`).join(', ');
   await tx.sendMail({
     from,
@@ -157,7 +178,7 @@ async function sendGiftConfirmation(salonId, to, info) {
  * le seul désormais valable pour ce même cadeau.
  */
 async function sendGiftCodeRenewed(salonId, to, info) {
-  const { tx, from, salon } = await getTransport(salonId);
+  const { tx, from, salon } = await getTransport(salonId, { force: true });
   const itemsList = info.items.map((it) => `${it.quantity} × ${it.item_name}`).join(', ');
   await tx.sendMail({
     from,
@@ -178,7 +199,7 @@ async function sendGiftCodeRenewed(salonId, to, info) {
 }
 
 async function sendTest(salonId, to) {
-  const { tx, from, salon } = await getTransport(salonId);
+  const { tx, from, salon } = await getTransport(salonId, { force: true });
   await tx.sendMail({
     from,
     to,
@@ -324,7 +345,7 @@ async function sendAppointmentRescheduled(salonId, to, info) {
 }
 
 async function sendClientVerificationEmail(salonId, to, verifyUrl) {
-  const { tx, from, salon } = await getTransport(salonId);
+  const { tx, from, salon } = await getTransport(salonId, { force: true });
   await tx.sendMail({
     from,
     to,
@@ -340,7 +361,7 @@ async function sendClientVerificationEmail(salonId, to, verifyUrl) {
 }
 
 async function sendClientPasswordReset(salonId, to, resetUrl) {
-  const { tx, from, salon } = await getTransport(salonId);
+  const { tx, from, salon } = await getTransport(salonId, { force: true });
   await tx.sendMail({
     from,
     to,
@@ -413,5 +434,5 @@ async function sendCustomClientEmail(salonId, to, clientName, subject, message) 
 module.exports = {
   sendTurnSoon, sendTest, sendGiftConfirmation, sendGiftCodeRenewed, sendLoyaltyActivation, sendAppointmentConfirmation, sendGroupAppointmentConfirmation,
   sendAppointmentReminder, sendAppointmentCancelledByAdmin, sendAppointmentRescheduled,
-  sendClientVerificationEmail, sendClientPasswordReset, sendSalonClosureNotice, sendCustomClientEmail, invalidateTransport
+  sendClientVerificationEmail, sendClientPasswordReset, sendSalonClosureNotice, sendCustomClientEmail, invalidateTransport, emailsPaused, forceSend
 };

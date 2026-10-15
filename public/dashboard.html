@@ -2459,6 +2459,18 @@
       </div>
     </div>
 
+    <!-- Pause des messages aux clients (transition depuis un autre logiciel / import de RDV) : toujours visible. -->
+    <div class="card-box" id="client-msg-card">
+      <div class="caisse-hour-row" style="background:transparent;padding:0">
+        <div class="caisse-hour-text">
+          <div class="caisse-hour-title" style="font-size:16px;font-weight:600">Envoyer les emails et SMS aux clients</div>
+          <div class="hint" style="margin:4px 0 0">Désactivez pendant l'import de vos RDV depuis un autre logiciel : aucune confirmation, aucun rappel (email ou SMS), aucune annulation ou fermeture ne sera envoyé aux clients. Les réservations fonctionnent normalement. Restent envoyés : vérification d'email et mot de passe oublié demandés par le client, carte cadeau et carte de fidélité faites au salon.</div>
+        </div>
+        <div class="switch on" id="client-msg-switch" role="switch" aria-checked="true" tabindex="0" title="Activer / désactiver" onclick="toggleClientMessages()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleClientMessages();}"></div>
+      </div>
+      <div id="client-msg-paused" class="hint" style="display:none;margin:12px 0 0;padding:10px 12px;border-radius:12px;background:rgba(255,159,10,.14);color:var(--orange,#ff9f0a);font-weight:600">⏸ Envoi en pause : vos clients ne reçoivent actuellement aucun email ni SMS automatique.</div>
+    </div>
+
     <div class="card-box">
       <h3 class="accordion-head" onclick="toggleSettingsAccordion('email-templates')">
         Notifications email
@@ -8784,10 +8796,35 @@ function saveTimezone() {
     .catch(function (e) { toast(e.message, true); });
 }
 
+function renderClientMessagesSwitch(paused) {
+  var sw = document.getElementById('client-msg-switch'), note = document.getElementById('client-msg-paused');
+  if (!sw) return;
+  sw.classList.toggle('on', !paused);
+  sw.setAttribute('aria-checked', paused ? 'false' : 'true');
+  if (note) note.style.display = paused ? 'block' : 'none';
+}
+
+/** Interrupteur « Envoyer les emails et SMS aux clients » : enregistré tout de suite (confirmation pour couper). */
+function toggleClientMessages() {
+  var sw = document.getElementById('client-msg-switch');
+  var pausing = sw.classList.contains('on');
+  var go = pausing
+    ? showConfirm('Plus aucun email ni SMS automatique ne partira vers vos clients (confirmations, rappels, annulations…) jusqu\'à ce que vous réactiviez l\'envoi.', { title: 'Mettre en pause les messages aux clients ?', confirmLabel: 'Mettre en pause' })
+    : Promise.resolve(true);
+  go.then(function (ok) {
+    if (!ok) return;
+    return api('/api/settings', { method: 'PUT', body: { client_emails_paused: pausing ? '1' : '0' } }).then(function () {
+      renderClientMessagesSwitch(pausing);
+      toast(pausing ? 'Messages aux clients en pause' : 'Envoi des messages aux clients réactivé');
+    });
+  }).catch(function (e) { toast(e.message, true); });
+}
+
 function loadSettings() {
   populateTimezoneSelect();
   api('/api/settings').then(function (r) {
     var s = r.settings;
+    renderClientMessagesSwitch(String(s.client_emails_paused) === '1');
     document.getElementById('set-salon').value = s.salon_name || '';
     document.getElementById('set-notify').value = s.notify_before_min || 30;
     document.getElementById('set-currency').value = s.currency || 'EUR';

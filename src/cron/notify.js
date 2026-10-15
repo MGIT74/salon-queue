@@ -12,6 +12,7 @@ async function checkAndNotifyForSalon(salonId) {
 
   const s = await getSettings(salonId);
   if (!s.smtp_host) return; // SMTP pas encore configuré pour ce salon
+  if (String(s.client_emails_paused) === '1') return; // messages aux clients en pause (rien n'est marqué comme envoyé)
 
   const threshold = Number(s.notify_before_min || 30);
 
@@ -49,6 +50,9 @@ async function checkAndNotifyForSalon(salonId) {
 async function checkAndNotifyAppointmentsForSalon(salonId) {
   const s = await getSettings(salonId);
   if (!s.smtp_host) return;
+  // Messages aux clients en pause (import depuis un autre logiciel) : aucun rappel, et rien n'est marqué comme envoyé
+  // pour que les rappels reprennent normalement à la réactivation.
+  if (String(s.client_emails_paused) === '1') return;
 
   const threshold = Number(s.notify_before_min || 30);
   const nowMs = new Date(nowParisDatetimeString(s.timezone).replace(' ', 'T') + 'Z').getTime();

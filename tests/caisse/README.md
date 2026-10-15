@@ -132,4 +132,5 @@ node tests/caisse/98-rdv-groupe-salon.js  # RDV pour plusieurs personnes depuis 
 node tests/caisse/99-compte-client-proches-salon.js  # Ajouter un RDV : compte client reconnu (nom, email, telephone) avec ses proches, ajout d'un proche par le salon
 node tests/caisse/100-supprimer-passage-non-paye.js  # Caisse « A encaisser » : corbeille (double confirmation) pour un passage non paye, supprime avec sa reservation
 node tests/caisse/101-categories-produits-rdv.js  # Etape Produits des reservations : pastilles de categories, seulement les produits disponibles en ligne
+node tests/caisse/102-pause-messages-clients.js  # Reglages : pause des emails / SMS aux clients pendant l'import des RDV (faux serveur SMTP)
 ```

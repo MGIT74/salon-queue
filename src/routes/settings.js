@@ -1,6 +1,6 @@
 const express = require('express');
 const { pool, getSettings, setSettings, getCaisseLock, getPlatformSettings } = require('../db');
-const { sendTest, invalidateTransport, sendAppointmentConfirmation, sendAppointmentReminder, sendAppointmentCancelledByAdmin, sendAppointmentRescheduled, sendTurnSoon, sendSalonClosureNotice } = require('../lib/mailer');
+const { forceSend, sendTest, invalidateTransport, sendAppointmentConfirmation, sendAppointmentReminder, sendAppointmentCancelledByAdmin, sendAppointmentRescheduled, sendTurnSoon, sendSalonClosureNotice } = require('../lib/mailer');
 const requireAdmin = require('../middleware/auth');
 const { logActivity } = require('../lib/activityLog');
 const sms = require('../lib/sms');
@@ -14,6 +14,7 @@ const router = express.Router();
 const EDITABLE = [
   'salon_name', 'notify_before_min', 'logo_url', 'gift_tile_image_url', 'loyalty_card_image_url', 'gift_card_image_url', 'timezone',
   'smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_from',
+  'client_emails_paused',
   'sms_reminder_enabled', 'sms_sender', 'sms_reminder_template', 'sms_strip_accents',
   'printer_connection_type', 'printer_ip', 'printer_model',
   'tpe_print_mode',
@@ -156,6 +157,9 @@ router.put('/', requireAdmin, wrap(async (req, res) => {
   if (patch.login_image_url && !SAFE_IMAGE_URL.test(patch.login_image_url)) {
     return res.status(400).json({ error: "Format d'image invalide" });
   }
+
+  // Pause des messages aux clients (transition depuis un autre logiciel) : '1' = aucun email ni SMS automatique.
+  if (patch.client_emails_paused !== undefined) patch.client_emails_paused = (patch.client_emails_paused === true || String(patch.client_emails_paused) === '1') ? '1' : '0';
 
   // Horaires de la caisse : interrupteurs '0'/'1' et heures HH:MM ; la fermeture doit suivre l'ouverture.
   ['caisse_open_enabled', 'caisse_close_enabled'].forEach((k) => {
@@ -374,7 +378,7 @@ router.post('/email-templates/test', requireAdmin, wrap(async (req, res) => {
   for (const type of types) {
     if (!senders[type]) { results[type] = { ok: false, error: 'Type inconnu' }; continue; }
     try {
-      await senders[type]();
+      await forceSend(() => senders[type]());   // test de l'admin sur sa propre adresse : jamais bloque par la pause
       results[type] = { ok: true };
     } catch (err) {
       results[type] = { ok: false, error: err.message };

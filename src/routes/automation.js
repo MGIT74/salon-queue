@@ -224,6 +224,9 @@ router.post('/salons/:id/send-client-email', requireAutomationKey, wrap(async (r
 
   const [[salon]] = await pool.query('SELECT id FROM salons WHERE id = ? AND active = 1', [salonId]);
   if (!salon) return res.status(404).json({ error: 'Salon introuvable ou inactif' });
+  if (String((await getSettings(salonId)).client_emails_paused) === '1') {
+    return res.status(409).json({ error: 'Les emails aux clients sont en pause pour ce salon (Réglages > Notifications email).' });
+  }
 
   // Vérifie que chaque adresse correspond bien à un vrai client déjà
   // venu dans CE salon - empêche l'outil d'être détourné pour envoyer
@@ -756,6 +759,8 @@ router.get('/sms-reminders/due', requireAutomationKey, wrap(async (req, res) => 
   for (const salon of salons) {
     const settings = await getSettings(salon.id);
     if (settings.sms_reminder_enabled !== '1') { skipped.disabled_salons++; continue; }
+    // Messages aux clients en pause (transition depuis un autre logiciel) : aucun SMS, rien n'est journalisé.
+    if (String(settings.client_emails_paused) === '1') { skipped.paused_salons = (skipped.paused_salons || 0) + 1; continue; }
     const credits = await getSmsCredits(salon.id);
     if (!credits.sms_enabled) { skipped.disabled_salons++; continue; }
 
