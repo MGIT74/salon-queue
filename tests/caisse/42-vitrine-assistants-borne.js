@@ -77,8 +77,10 @@ const visible = (w, id) => w.document.getElementById(id).style.display !== 'none
   w = world(); setup(w, { me: { id: 'b1', name: 'Alice' } });   // "me" : le coiffeur connecte a Mon poste
   w.eval(fnSrc(poste, 'openPosteAddAppointment'));
   w.openPosteAddAppointment('2026-10-08'); d = w.document;
+  check('Mon poste : 1re etape = le client (comme le dashboard et la caisse)', visible(w, 'pa-step-client') && !visible(w, 'pa-step-service'));
+  d.getElementById('pa-name').value = 'Karim'; w.paStartSolo();
   sv = [...d.querySelectorAll('#pa-service-grid .item-card')];
-  check('prestations en cartes de vitrine : image en haut, texte dessous ; etape Prestation affichee d\'emblee', sv.length === 2 && visible(w, 'pa-step-service') && sv[0].children[0].classList.contains('item-media') && sv[0].querySelector('.item-body .item-name').textContent === 'Barbe premium');
+  check('prestations en cartes de vitrine : image en haut, texte dessous ; etape Prestation juste apres le client', sv.length === 2 && visible(w, 'pa-step-service') && sv[0].children[0].classList.contains('item-media') && sv[0].querySelector('.item-body .item-name').textContent === 'Barbe premium');
   w.paSelectService(sv[1]);
   check('choisir : carte marquee et etape Supplements', sv[1].classList.contains('sel') && visible(w, 'pa-step-extras'));
   ex = [...d.querySelectorAll('#pa-extras-grid .item-card')];

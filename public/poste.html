@@ -1019,9 +1019,11 @@ var paGroupCtx = null;
 function paOpenGroup() {
   if (!paGroupCtx) return;
   var ctx = paGroupCtx;
+  var client = StaffGroupBooking.readClient(ctx.overlay, 'pa');
+  if (!client) return;
   _closeModal(ctx.overlay);
   StaffGroupBooking.open({
-    api: barberApi, services: services, date: ctx.dateStr, barberId: me ? me.id : null, barbers: barbers.length ? barbers : (me ? [me] : []),
+    api: barberApi, client: client,
     onDone: function () { Object.keys(calMonthCache).forEach(function (k) { delete calMonthCache[k]; }); loadAgendaPeriod(); }
   });
 }
@@ -1032,12 +1034,17 @@ function openPosteAddAppointment(dateStr) {
 
   var overlay = _buildModal(
     '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px">' +
-    '<div class="modal-title" style="margin-bottom:0">Ajouter un RDV — ' + when + '</div>' +
+    '<div style="min-width:0"><div class="modal-title" style="margin-bottom:0">Ajouter un RDV — ' + when + '</div>' +
+      StaffGroupBooking.clientPillHtml('pa', "paGoStep('client')") +
+    '</div>' +
     '<button id="pa-close-x" style="background:var(--fill);border:none;width:30px;height:30px;border-radius:50%;color:var(--grey);font-size:14px;cursor:pointer;flex-shrink:0;margin-left:10px">✕</button>' +
     '</div>' +
 
-    '<div id="pa-step-service">' +
-      StaffGroupBooking.buttonHtml('paOpenGroup()') +
+    // 1re étape : le client (clients existants proposés dès 3 lettres), puis une ou plusieurs personnes - comme le dashboard et la caisse.
+    StaffGroupBooking.clientStepHtml('pa', 'paStartSolo()', 'paOpenGroup()') +
+
+    '<div id="pa-step-service" style="display:none">' +
+      '<button class="aa-back" onclick="paGoStep(\'client\')">‹ Retour</button>' +
       '<div class="aa-step-title">Prestation</div>' +
       '<div class="item-grid compact" id="pa-service-grid"></div>' +
     '</div>' +
@@ -1075,9 +1082,7 @@ function openPosteAddAppointment(dateStr) {
     '<div id="pa-step-contact" style="display:none">' +
       '<button class="aa-back" onclick="paGoStep(\'datetime\')">‹ Retour</button>' +
       '<div class="aa-step-title" id="pa-contact-summary"></div>' +
-      '<div class="fld" style="margin-bottom:10px"><label>Nom du client</label><input class="modal-input" id="pa-name" type="text"></div>' +
-      '<div class="fld" style="margin-bottom:10px"><label>Email (optionnel)</label><input class="modal-input" id="pa-email" type="email"></div>' +
-      '<div class="fld" style="margin-bottom:14px"><label>Téléphone (optionnel)</label><input class="modal-input" id="pa-phone" type="tel"></div>' +
+      '<div class="hint" id="pa-contact-client" style="margin:0 0 14px"></div>' +
       '<div class="modal-error" id="pa-error" style="display:none"></div>' +
       '<div class="modal-actions">' +
       '<button class="btn btn-soft" id="pa-cancel-btn">Annuler</button>' +
@@ -1095,16 +1100,25 @@ function openPosteAddAppointment(dateStr) {
     };
   });
 
-  var STEPS = ['service', 'extras', 'products', 'datetime', 'contact'];
+  var STEPS = ['client', 'service', 'extras', 'products', 'datetime', 'contact'];
   attachClientAutocomplete(overlay, 'pa-name', 'pa-email', 'pa-phone', barberApi);
+  setTimeout(function () { var n = overlay.querySelector('#pa-name'); if (n) n.focus(); }, 60);
 
   window.paGoStep = function (step) {
     STEPS.forEach(function (s) { overlay.querySelector('#pa-step-' + s).style.display = s === step ? 'flex' : 'none'; });
+    overlay.querySelector('#pa-client-pill').style.display = step === 'client' ? 'none' : 'inline-flex';
     if (step === 'datetime') paLoadSlots();
     if (step === 'contact') {
       var s = services.find(function (x) { return x.id === state.serviceId; });
       overlay.querySelector('#pa-contact-summary').textContent = when + ' à ' + state.time + ' — ' + (s ? s.name : '');
+      var c = StaffGroupBooking.readClient(overlay, 'pa') || {};
+      overlay.querySelector('#pa-contact-client').textContent = [c.email, c.phone].filter(Boolean).join(' · ') || 'Sans email ni téléphone';
     }
+  };
+
+  window.paStartSolo = function () {
+    if (!StaffGroupBooking.readClient(overlay, 'pa')) return;
+    paGoStep('service');
   };
 
   // Prestations, supplements et produits : memes cartes de vitrine que la reservation en ligne (code partage dans app.js).
@@ -1202,7 +1216,7 @@ function openPosteAddAppointment(dateStr) {
   overlay.querySelector('#pa-save-btn').onclick = function () {
     var errEl = overlay.querySelector('#pa-error');
     var name = overlay.querySelector('#pa-name').value.trim();
-    if (!name) { errEl.textContent = 'Le nom du client est requis'; errEl.style.display = 'block'; return; }
+    if (!name) { paGoStep('client'); StaffGroupBooking.readClient(overlay, 'pa'); return; }
 
     barberApi('/api/appointments/admin-create', {
       method: 'POST',

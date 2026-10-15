@@ -32,7 +32,8 @@ const check = (n, ok, extra) => { (ok ? pass++ : fail++); console.log((ok ? '  O
   check('reservation en ligne : email toujours obligatoire', r.status === 400 && /email/i.test(r.body.error), r.body);
 
   const files = ['dashboard', 'caisse', 'poste'].map((f) => fs.readFileSync(__dirname + '/../../public/' + f + '.html', 'utf8'));
-  check('« Plusieurs personnes » dans Ajouter un RDV : dashboard, caisse, Mon poste', files.every((h) => /staff-group\.js/.test(h) && /StaffGroupBooking\.open\(/.test(h)) && /StaffGroupBooking\.buttonHtml\(/.test(files[2]));
+  check('« Plusieurs personnes » dans Ajouter un RDV : dashboard, caisse, Mon poste', files.every((h) => /staff-group\.js/.test(h) && /StaffGroupBooking\.open\(/.test(h)));
+  check('Mon poste aussi : le client en PREMIER, son nom affiché en haut, puis une ou plusieurs personnes', /clientStepHtml\('pa', 'paStartSolo\(\)', 'paOpenGroup\(\)'\)/.test(files[2]) && /STEPS = \['client'/.test(files[2]) && /clientPillHtml\('pa'/.test(files[2]) && /client: client/.test(files[2]));
   check('dashboard et caisse : le client en PREMIER, puis « Une personne » / « Plusieurs personnes »', /clientStepHtml\('aa', 'aaStartSolo\(\)', 'aaOpenGroup\(\)'\)/.test(files[0]) && /clientStepHtml\('pa', 'paStartSolo\(\)', 'paOpenGroup\(\)'\)/.test(files[1]) && /STEPS = \['client'/.test(files[0]) && /STEPS = \['client'/.test(files[1]));
   check('nom du client affiche en haut pendant toute la prise de RDV (seul ou a plusieurs)', /clientPillHtml\('aa'/.test(files[0]) && /clientPillHtml\('pa'/.test(files[1]) && /client: client/.test(files[0]) && /client: client/.test(files[1]));
   const sg = fs.readFileSync(__dirname + '/../../public/staff-group.js', 'utf8');

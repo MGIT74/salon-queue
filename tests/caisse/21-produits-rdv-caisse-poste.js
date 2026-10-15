@@ -94,6 +94,7 @@ async function testPoste() {
   }
 
   w.openPosteAddAppointment(today);
+  d.getElementById('pa-name').value = 'Test Poste Produits'; w.paStartSolo();
   check('l\'etape #pa-step-products existe', Boolean(d.getElementById('pa-step-products')));
   check('elle propose bien "Gel"', /Gel/.test(d.getElementById('pa-step-products').textContent));
 
