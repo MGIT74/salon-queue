@@ -303,6 +303,10 @@ router.get('/availability', wrap(async (req, res) => {
   if (isBeyondAdvanceWindow(date, rdvSettings)) {
     return res.json({ ok: true, slots: [] });
   }
+  // Verrou : une date deja passee (dans le fuseau DU SALON, pas UTC) n'a jamais de creneau.
+  if (String(date) < nowParisDatetimeString(rdvSettings.timezone).slice(0, 10)) {
+    return res.json({ ok: true, slots: [] });
+  }
 
   const [[service]] = await pool.query(
     'SELECT duration_min FROM services WHERE id = ? AND salon_id = ?', [service_id, req.salon.id]

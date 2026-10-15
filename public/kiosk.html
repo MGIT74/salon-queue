@@ -309,7 +309,7 @@
   </main>
 </div>
 
-<script src="/app.js?v=19"></script>
+<script src="/app.js?v=20"></script>
 <script>requireSalonInUrl("Pour utiliser cette borne, ouvrez le lien de votre salon.");</script>
 <script>
 mountThemeButton();
@@ -337,7 +337,7 @@ function loadCatalog() {
     salonName = r[2].salon_name;
     salonLogoUrl = r[2].logo_url || '';
     giftTileImage = r[2].gift_tile_image_url || '';
-    CURRENCY = r[2].currency || 'EUR';
+    CURRENCY = r[2].currency || 'EUR'; if (r[2].timezone) SALON_TIMEZONE = r[2].timezone;
     applyAccentColor(r[2].accent_color);
     document.getElementById('salon-name').textContent = salonName;
     document.getElementById('t-salon').textContent = salonName;

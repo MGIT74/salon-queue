@@ -159,7 +159,7 @@
                addEventListener: function (t, f) { [zones.top, zones.body, zones.bar].forEach(function (z) { z.addEventListener(t, f); }); },
                querySelector: function (q) { return zones.top.querySelector(q) || zones.body.querySelector(q) || zones.bar.querySelector(q); } };
     var eur = cfg.eur || function (c) { return (c / 100).toFixed(2) + ' €'; };
-    var today = function () { return cfg.today ? cfg.today() : new Date().toISOString().slice(0, 10); };
+    var today = function () { return cfg.today ? cfg.today() : (typeof salonToday === 'function' ? salonToday() : new Date().toISOString().slice(0, 10)); };
     var STEPS = ['barber', 'service', 'extras', 'datetime'];
 
     function newPerson(init) {
@@ -336,7 +336,11 @@
     }
 
     /* ---------- Navigation ---------- */
-    function go(v) { view = v; menuFor = null; paint(); if (v === 'datetime') loadSlots(cur); }
+    function go(v) {
+      // Date jamais dans le passé (fuseau du salon) : une fiche ouverte avant minuit repart sur aujourd'hui.
+      if (v === 'datetime' && cur && (!cur.date || cur.date < today())) { cur.date = today(); cur.slot = null; }
+      view = v; menuFor = null; paint(); if (v === 'datetime') loadSlots(cur);
+    }
     function firstStep(p) { return p.isSelf || p.name || p.relativeId ? 'barber' : 'name'; }
     function nextStep() {
       if (view === 'name') return go('barber');
@@ -421,7 +425,7 @@
     });
     el.addEventListener('change', function (e) {
       var t = e.target;
-      if (t.id === 'gb-date') { cur.date = t.value; cur.slot = null; loadSlots(cur); }
+      if (t.id === 'gb-date') { cur.date = (t.value && t.value >= today()) ? t.value : today(); t.value = cur.date; cur.slot = null; loadSlots(cur); }
       if (t.getAttribute && t.getAttribute('data-act') === 'save') cur.saveRelative = t.checked;
       if (t.getAttribute && t.getAttribute('data-act') === 'who-save') wsel.draftSave = t.checked;
     });

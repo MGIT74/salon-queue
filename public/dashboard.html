@@ -2780,7 +2780,7 @@
   </div>
 </div>
 
-<script src="/app.js?v=19"></script>
+<script src="/app.js?v=20"></script>
 <script src="/staff-group.js?v=5"></script>
 <script src="/daterange.js?v=4"></script>
 <script>
@@ -3424,7 +3424,7 @@ function loadDashboardTab() {
   loadDashSalon();   // filtre global : courbe « Encaissé du salon » + manque à gagner
 
 
-  var todayStr = ymd(new Date());
+  var todayStr = salonToday();
   loadSalonScheduleForTimeline().then(function () {
     return api('/api/appointments?month=' + monthKey(new Date()));
   }).then(function (r) {
@@ -5464,7 +5464,7 @@ function lvState_(id) {
 function renderLeavesList(id) {
   var box = document.getElementById('leaves-list-' + id);
   if (!box) return;
-  var st = lvState_(id), map = lvDayMap(id), todayIso = new Date().toISOString().slice(0, 10);
+  var st = lvState_(id), map = lvDayMap(id), todayIso = salonToday();
   var sel = {}; st.sel.forEach(function (d) { sel[d] = 1; });
   var count = 0;
   var months = LV_MONTHS.map(function (name, m) {
@@ -6511,7 +6511,7 @@ function renderMonthView() {
     byDay[d].push(a);
   });
 
-  var todayStr = ymd(new Date());
+  var todayStr = salonToday();
 
   // Construit la liste des jours (avec cases vides en debut/fin de
   // grille), puis les decoupe en semaines de 7 pour pouvoir inserer
@@ -6856,7 +6856,7 @@ function renderWeekView() {
     byDay[d].push(a);
   });
 
-  var todayStr = ymd(new Date());
+  var todayStr = salonToday();
   var cells = '';
   for (var i = 0; i < 7; i++) {
     var d = addDays(start, i);
@@ -7069,7 +7069,7 @@ function exportRdvCsv() {
   var blob = new Blob(['\uFEFF' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
   var link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
-  link.download = 'rendez-vous-' + new Date().toISOString().slice(0, 10) + '.csv';
+  link.download = 'rendez-vous-' + salonToday() + '.csv';
   link.click();
   URL.revokeObjectURL(link.href);
 }
@@ -7804,7 +7804,7 @@ function exportClientsCsv() {
   var blob = new Blob(['\uFEFF' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
   var link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
-  link.download = 'clients-' + new Date().toISOString().slice(0, 10) + '.csv';
+  link.download = 'clients-' + salonToday() + '.csv';
   link.click();
   URL.revokeObjectURL(link.href);
 }

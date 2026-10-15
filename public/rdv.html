@@ -319,8 +319,8 @@
   </section>
 </div>
 
-<script src="/app.js?v=19"></script>
-<script src="/group-booking.js?v=14"></script>
+<script src="/app.js?v=20"></script>
+<script src="/group-booking.js?v=15"></script>
 <style>
 body.staff-mode .gift-summary-box,body.staff-mode .theme-btn{display:none!important}
 .gb-done{padding:10px 0;border-bottom:1px solid var(--sep)}.gb-done:last-child{border:none}.gb-done b{display:block}.gb-done span{color:var(--grey);font-size:14px}
@@ -445,7 +445,7 @@ function loadCatalog() {
     products = r[2].items.filter(function (p) { return p.online_bookable !== 0; }); // « caisse seulement » : jamais proposé en ligne
     barbers = r[3].items.filter(function (b) { return b.accepts_appointments && hasBookableSchedule(b) && !isOnLeaveOn(b); });
     var salonName = r[4].salon_name;
-    CURRENCY = r[4].currency || 'EUR';
+    CURRENCY = r[4].currency || 'EUR'; if (r[4].timezone) SALON_TIMEZONE = r[4].timezone;
     giftCardImageUrl = r[4].gift_card_image_url || '';
     giftTileImageUrl = r[4].gift_tile_image_url || '';
     applyAccentColor(r[4].accent_color);
@@ -490,9 +490,9 @@ function selectBarber(el, id) {
     // Prestation et suppléments déjà déterminés par le cadeau -
     // seuls le coiffeur puis la date/heure restent à choisir.
     show('p-datetime');
-    var today = new Date().toISOString().slice(0, 10);
+    var today = salonToday();
     document.getElementById('rdv-date').min = today;
-    if (!document.getElementById('rdv-date').value) document.getElementById('rdv-date').value = today;
+    if (!document.getElementById('rdv-date').value || document.getElementById('rdv-date').value < today) document.getElementById('rdv-date').value = today;
     loadSlots();
     return;
   }
@@ -657,9 +657,9 @@ function goToProductsStep() {
 
 function goToDateStep() {
   if (!selService) { toast('Choisissez une prestation', true); return; }
-  var today = new Date().toISOString().slice(0, 10);
+  var today = salonToday();
   document.getElementById('rdv-date').min = today;
-  if (!document.getElementById('rdv-date').value) document.getElementById('rdv-date').value = today;
+  if (!document.getElementById('rdv-date').value || document.getElementById('rdv-date').value < today) document.getElementById('rdv-date').value = today;
   show('p-datetime');
   loadSlots();
 }

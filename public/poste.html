@@ -359,7 +359,7 @@
   </button>
 </div>
 
-<script src="/app.js?v=19"></script>
+<script src="/app.js?v=20"></script>
 <script src="/staff-group.js?v=5"></script>
 <script>requireSalonInUrl("Pour utiliser votre poste, ouvrez le lien de votre salon.");</script>
 <script>
@@ -392,7 +392,7 @@ function loadSalonName() {
     .then(function (r) { return r.json(); })
     .then(function (d) {
       var name = d.salon_name || 'Le Salon';
-      CURRENCY = d.currency || 'EUR';
+      CURRENCY = d.currency || 'EUR'; if (d.timezone) SALON_TIMEZONE = d.timezone;
       rdvPrepAlertMin = Number(d.rdv_prep_alert_min) || 0;
       applyAccentColor(d.accent_color);
       document.title = name + ' — Mon poste';
@@ -960,7 +960,7 @@ function renderCalMonth() {
   var byDay = {};
   monthAppts.forEach(function (a) { var d = a.scheduled_at.slice(0, 10); (byDay[d] = byDay[d] || []).push(a); });
 
-  var todayStr = ymd(new Date());
+  var todayStr = salonToday();
   var dayCells = [];
   for (var i = 0; i < startOffset; i++) dayCells.push(null);
   for (var day = 1; day <= daysInMonth; day++) dayCells.push(day);
@@ -1007,7 +1007,7 @@ function renderCalWeek() {
     start.getDate() + ' ' + monthNames[start.getMonth()] + ' – ' + end.getDate() + ' ' + monthNames[end.getMonth()] + ' ' + end.getFullYear();
   var byDay = {};
   apptsForRange(start, end).forEach(function (a) { var d = a.scheduled_at.slice(0, 10); (byDay[d] = byDay[d] || []).push(a); });
-  var todayStr = ymd(new Date());
+  var todayStr = salonToday();
   var cells = '';
   for (var i = 0; i < 7; i++) {
     var d = addDays(start, i), dateStr = ymd(d);

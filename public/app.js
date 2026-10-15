@@ -304,6 +304,11 @@ function nowSalonDatetimeString() {
   return get('year') + '-' + get('month') + '-' + get('day') + ' ' + get('hour') + ':' + get('minute') + ':' + get('second');
 }
 
+// Date du jour DU SALON ('YYYY-MM-DD'), jamais celle d'UTC (toISOString) ni celle de l'appareil :
+// à 00h48 à Paris, UTC est encore la veille. Toute valeur par défaut / borne « aujourd'hui » passe par ici.
+function salonToday() { return nowSalonDatetimeString().slice(0, 10); }
+if (typeof window !== 'undefined') window.salonToday = salonToday;
+
 // Devise du salon (EUR par défaut) - chaque page la met à jour après
 // avoir chargé les réglages du salon (CURRENCY = data.currency).
 var CURRENCY = 'EUR';

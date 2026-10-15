@@ -652,9 +652,9 @@
 
 </div>
 
-<script src="/app.js?v=19"></script>
+<script src="/app.js?v=20"></script>
 <script src="/autorefresh.js?v=2"></script>
-<script src="/group-booking.js?v=14"></script>
+<script src="/group-booking.js?v=15"></script>
 <style>
 .gb-done{padding:10px 0;border-bottom:1px solid var(--sep)}.gb-done:last-child{border:none}.gb-done b{display:block}.gb-done span{color:var(--grey);font-size:14px}
 #relatives-list{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
@@ -1262,9 +1262,9 @@ function selectBookBarber(el, id) {
     // Prestation et suppléments déjà déterminés par le cadeau - seuls
     // le coiffeur puis la date/heure restent à choisir.
     show('p-book-datetime');
-    var today = new Date().toISOString().slice(0, 10);
+    var today = salonToday();
     document.getElementById('bk-date').min = today;
-    if (!document.getElementById('bk-date').value) document.getElementById('bk-date').value = today;
+    if (!document.getElementById('bk-date').value || document.getElementById('bk-date').value < today) document.getElementById('bk-date').value = today;
     loadBookSlots();
     return;
   }
@@ -1495,9 +1495,9 @@ function goToBookProductsStep() {
 
 function goToBookDateStep() {
   if (!selBookService) { toast('Choisissez une prestation', true); return; }
-  var today = new Date().toISOString().slice(0, 10);
+  var today = salonToday();
   document.getElementById('bk-date').min = today;
-  if (!document.getElementById('bk-date').value) document.getElementById('bk-date').value = today;
+  if (!document.getElementById('bk-date').value || document.getElementById('bk-date').value < today) document.getElementById('bk-date').value = today;
   show('p-book-datetime');
   loadBookSlots();
 }
@@ -1676,7 +1676,7 @@ function guardMissingSalon() {
           document.getElementById('salon-mark').textContent = d.salon_name.toUpperCase();
           document.getElementById('salon-mark-app').textContent = d.salon_name.toUpperCase();
         }
-        CURRENCY = d.currency || 'EUR';
+        CURRENCY = d.currency || 'EUR'; if (d.timezone) SALON_TIMEZONE = d.timezone;
         applyAccentColor(d.accent_color);
         try { localStorage.setItem('theme_' + SALON_SLUG, JSON.stringify({ accent_color: d.accent_color || null })); } catch (e) {}
         if (d.login_image_url) {

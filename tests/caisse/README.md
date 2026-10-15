@@ -137,4 +137,5 @@ node tests/caisse/103-manque-a-gagner.js  # Fiche coiffeur : manque a gagner est
 node tests/caisse/104-stats-coiffeur-courbe.js  # Fiche coiffeur : panier moyen, ventes en plus, par heure, RDV rates, vs periode precedente, courbe 3 lignes
 node tests/caisse/105-dashboard-courbe-salon.js  # Tableau de bord : courbe globale « Encaisse du salon » (7 j / 30 j / 3 mois) + periode precedente
 node tests/caisse/106-poste-agenda-equipe.js  # Mon poste > Agenda : timeline de tous les coiffeurs, RDV au nom d'un collegue
+node tests/caisse/107-date-salon-minuit.js  # « Aujourd'hui » = date du salon (pas UTC) : apres minuit, reservation et agenda passent bien au lendemain
 ```

@@ -985,7 +985,7 @@
   </div>
 </div>
 
-<script src="/app.js?v=19"></script>
+<script src="/app.js?v=20"></script>
 <script src="/staff-group.js?v=5"></script>
 <script src="/autorefresh.js?v=2"></script>
 <script>requireSalonInUrl("Pour utiliser la caisse, ouvrez le lien de votre salon.");</script>
@@ -1025,7 +1025,7 @@ function loadSalonName() {
     .then(function (r) { return r.json(); })
     .then(function (d) {
       var name = d.salon_name || 'Le Salon';
-      CURRENCY = d.currency || 'EUR';
+      CURRENCY = d.currency || 'EUR'; if (d.timezone) SALON_TIMEZONE = d.timezone;
       rdvPrepAlertMin = Number(d.rdv_prep_alert_min) || 0;
       legalInfo = d.legal || {};
       vatRates = d.vat_rates || { service: 20, extra: 20, product: 20 };
@@ -2018,7 +2018,7 @@ function renderCalMonth() {
     byDay[d].push(a);
   });
 
-  var todayStr = ymd(new Date());
+  var todayStr = salonToday();
   var dayCells = [];
   for (var i = 0; i < startOffset; i++) dayCells.push(null);
   for (var day = 1; day <= daysInMonth; day++) dayCells.push(day);
@@ -2072,7 +2072,7 @@ function renderCalWeek() {
     byDay[d].push(a);
   });
 
-  var todayStr = ymd(new Date());
+  var todayStr = salonToday();
   var cells = '';
   for (var i = 0; i < 7; i++) {
     var d = addDays(start, i);
