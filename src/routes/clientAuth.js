@@ -254,8 +254,8 @@ router.get('/me', requireClient, wrap(async (req, res) => {
     });
   }
 
-  // Seulement le DERNIER passage TERMINÉ/ANNULÉ (jamais un en cours ou
-  // en attente, déjà couvert par upcoming_appointments) - une liste de
+  // Seulement le DERNIER passage PAYÉ (jamais un en cours, en attente
+  // d'encaissement, annulé ou supprimé car offert) - une liste de
   // plusieurs n'apportait pas grand-chose en pratique (souvent la même
   // prestation répétée), contrairement aux RDV à venir qui eux
   // méritent d'être tous visibles.
@@ -266,7 +266,7 @@ router.get('/me', requireClient, wrap(async (req, res) => {
      JOIN salons sl ON sl.id = q.salon_id
      LEFT JOIN services s ON s.id = q.service_id
      LEFT JOIN barbers b ON b.id = q.barber_id
-     WHERE q.salon_id = ? AND LOWER(TRIM(q.email)) = ? AND q.status IN ('done', 'cancelled')
+     WHERE q.salon_id = ? AND LOWER(TRIM(q.email)) = ? AND q.status = 'done' AND (q.paid_at IS NOT NULL OR q.prepaid_at IS NOT NULL)
      ORDER BY q.checkin_at DESC LIMIT 1`,
     [c.salon_id, key]
   );

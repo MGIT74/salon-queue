@@ -130,4 +130,5 @@ node tests/caisse/96-journal-par-salon.js  # Journal d'activite isole par salon 
 node tests/caisse/97-onglet-a-encaisser.js  # Caisse : 4e onglet « À encaisser » (liste des encaissements en attente + pastille)
 node tests/caisse/98-rdv-groupe-salon.js  # RDV pour plusieurs personnes depuis le dashboard, la caisse et Mon poste (admin-group)
 node tests/caisse/99-compte-client-proches-salon.js  # Ajouter un RDV : compte client reconnu (nom, email, telephone) avec ses proches, ajout d'un proche par le salon
+node tests/caisse/100-supprimer-passage-non-paye.js  # Caisse « A encaisser » : corbeille (double confirmation) pour un passage non paye, supprime avec sa reservation
 ```

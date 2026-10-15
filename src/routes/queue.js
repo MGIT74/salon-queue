@@ -207,6 +207,44 @@ router.post('/:id/defer-payment', requireAdminOrBarber, wrap(async (req, res) =>
   res.json({ ok: true, deferred: Boolean(newValue) });
 }));
 
+/**
+ * Supprime un passage « À encaisser » qui ne sera PAS payé (ex : coupe offerte) : comme si le client n'était
+ * jamais venu ni n'avait réservé. Le passage, ses suppléments/produits ET le RDV d'origine disparaissent - rien
+ * dans le chiffre d'affaires ni dans les statistiques. Le compte client (espace client, proches) n'est pas touché :
+ * son historique reste celui de ses venues payées. Refusé si une partie a déjà été encaissée (payé d'avance).
+ */
+router.delete('/:id/unpaid', requireAdminOrBarber, wrap(async (req, res) => {
+  const [[row]] = await pool.query(
+    'SELECT id, client_name, barber_id, status, paid_at, prepaid_at, total_price_cents FROM queue WHERE id = ? AND salon_id = ?',
+    [req.params.id, req.salon.id]
+  );
+  if (!row) return res.status(404).json({ error: 'Client introuvable' });
+  if (req.actingBarberId && row.barber_id && row.barber_id !== req.actingBarberId) {
+    return res.status(403).json({ error: "Ce n'est pas votre client." });
+  }
+  if (row.status !== 'done' || row.paid_at || row.prepaid_at) {
+    return res.status(409).json({ error: row.prepaid_at || row.paid_at
+      ? 'Ce client a déjà payé (en totalité ou d\'avance) : impossible de le supprimer, faites plutôt un remboursement.'
+      : 'Seul un passage terminé et en attente d\'encaissement peut être supprimé.' });
+  }
+  const [[sale]] = await pool.query('SELECT id FROM sales WHERE queue_id = ? AND salon_id = ? LIMIT 1', [row.id, req.salon.id]);
+  if (sale) return res.status(409).json({ error: 'Une vente est déjà liée à ce passage : impossible de le supprimer, faites plutôt un remboursement.' });
+
+  const [appts] = await pool.query('SELECT id FROM appointments WHERE promoted_queue_id = ? AND salon_id = ?', [row.id, req.salon.id]);
+  if (appts.length) await pool.query('DELETE FROM appointments WHERE id IN (?) AND salon_id = ?', [appts.map((a) => a.id), req.salon.id]);
+  await pool.query('DELETE FROM queue WHERE id = ? AND salon_id = ? AND paid_at IS NULL', [row.id, req.salon.id]);
+  await recompute(req.salon.id);
+
+  let who = '';
+  if (req.actingBarberId) {
+    const [[b]] = await pool.query('SELECT name FROM barbers WHERE id = ?', [req.actingBarberId]);
+    if (b) who = ' par ' + b.name;
+  }
+  logActivity(req.salon.id, 'unpaid_delete', 'Passage non payé de "' + row.client_name + '" supprimé' + who +
+    ' (' + ((Number(row.total_price_cents) || 0) / 100).toFixed(2).replace('.', ',') + ' €' + (appts.length ? ', RDV d\'origine supprimé aussi' : '') + ')');
+  res.json({ ok: true, deleted: true, appointments_deleted: appts.length });
+}));
+
 // --- Ajout manuel d'un client (admin uniquement, pas de check-in physique) ---
 router.post('/manual-client', requireAdmin, wrap(async (req, res) => {
   const { client_name, email, phone, service_id } = req.body;

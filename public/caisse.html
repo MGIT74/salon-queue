@@ -541,7 +541,11 @@
   .pending-card .lock-note { font-size: 11.5px; color: var(--orange); margin-top: 2px; }
   .pending-card.deferred { opacity: .7; }
   .pending-card.deferred .lock-note { color: var(--grey); }
-  .pending-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .pending-actions { display: flex; gap: 6px; flex-shrink: 0; align-items: center; }
+  /* Corbeille : supprimer un passage qui ne sera pas payé (double confirmation). */
+  .pending-del { width: 34px; height: 34px; border-radius: 50%; border: none; background: transparent; color: var(--red); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: background .15s ease; }
+  .pending-del:hover, .pending-del:focus-visible { background: var(--red-soft, rgba(255,59,48,.12)); }
+  .pending-card.locked .pending-del { opacity: 1; }
   .pending-actions .btn { padding: 8px 12px; font-size: 12.5px; white-space: nowrap; }
 
   /* --- Reçu imprimable --- */
@@ -3424,6 +3428,33 @@ function loadPendingPayments() {
   }).catch(function () {});
 }
 
+var PENDING_DEL_SVG = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg>';
+function pendingDelBtn(q) {
+  return '<button type="button" class="pending-del" title="Supprimer (ne sera pas payé)" aria-label="Supprimer ' + esc(q.client_name) + '" onclick="event.stopPropagation();deleteUnpaidPassage(\'' + q.id + '\')">' + PENDING_DEL_SVG + '</button>';
+}
+
+/** Passage offert / qui ne sera jamais payé : supprimé comme s'il n'avait jamais eu lieu (ni réservation, ni
+ *  chiffre, ni statistiques). Le compte client reste. Deux confirmations. */
+function deleteUnpaidPassage(queueId) {
+  var q = pendingPayments.find(function (x) { return x.id === queueId; });
+  if (!q) return;
+  var detail = q.service.name + (q.extras.length ? ' + ' + q.extras.map(function (x) { return x.name; }).join(', ') : '');
+  showConfirm(
+    q.client_name + ' — ' + detail + ' (' + eur(q.total_price_cents) + ') ne sera pas encaissé. Son passage et sa réservation seront supprimés : rien dans le chiffre d\'affaires ni dans les statistiques. Son compte client est conservé.',
+    { title: 'Supprimer ce passage ?', danger: true, confirmLabel: 'Supprimer' }
+  ).then(function (ok) {
+    if (!ok) return false;
+    return showConfirm('Cette suppression est définitive et ne peut pas être annulée. Confirmer la suppression du passage de ' + q.client_name + ' ?',
+      { title: 'Confirmer la suppression', danger: true, confirmLabel: 'Oui, supprimer définitivement' });
+  }).then(function (ok) {
+    if (!ok) return;
+    return barberApi('/api/queue/' + encodeURIComponent(queueId) + '/unpaid', { method: 'DELETE' }).then(function () {
+      toast('Passage de ' + q.client_name + ' supprimé');
+      loadPendingPayments();
+    });
+  }).catch(function (e) { toast(e.message, true); });
+}
+
 function renderPendingList() {
   var label = document.getElementById('pending-label');
   var list = document.getElementById('pending-list');
@@ -3453,6 +3484,7 @@ function renderPendingList() {
         '<div class="pending-actions">' +
           '<span class="amount">' + eur(q.prepaid ? q.balance_due_cents : q.total_price_cents) + '</span>' +
           '<button class="btn btn-soft" onclick="event.stopPropagation();toggleDeferPayment(\'' + q.id + '\')">Reprendre</button>' +
+          (q.prepaid ? '' : pendingDelBtn(q)) +
         '</div></div>';
     }
 
@@ -3502,6 +3534,7 @@ function renderPendingList() {
           ? '<button class="btn btn-ghost" onclick="event.stopPropagation();proposeLoyaltyActivation(\'' + q.id + '\')">Activer carte de fidélité</button>'
           : '') +
         (isActive ? '<button class="btn btn-ghost" onclick="event.stopPropagation();toggleDeferPayment(\'' + q.id + '\')">Mettre de côté</button>' : '') +
+        pendingDelBtn(q) +
       '</div></div>';
   }).join('');
 }

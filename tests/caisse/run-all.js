@@ -119,7 +119,8 @@ const suite = [
   ['96-journal-par-salon.js', true, ['exit']],
   ['97-onglet-a-encaisser.js', false, ['exit']],
   ['98-rdv-groupe-salon.js', true, ['exit']],
-  ['99-compte-client-proches-salon.js', true, ['exit']]
+  ['99-compte-client-proches-salon.js', true, ['exit']],
+  ['100-supprimer-passage-non-paye.js', true, ['exit']]
 ];
 
 let bad = 0;
