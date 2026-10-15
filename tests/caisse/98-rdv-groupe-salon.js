@@ -33,6 +33,7 @@ const check = (n, ok, extra) => { (ok ? pass++ : fail++); console.log((ok ? '  O
 
   const files = ['dashboard', 'caisse', 'poste'].map((f) => fs.readFileSync(__dirname + '/../../public/' + f + '.html', 'utf8'));
   check('bouton « Plusieurs personnes » dans Ajouter un RDV : dashboard, caisse, Mon poste', files.every((h) => /staff-group\.js/.test(h) && /StaffGroupBooking\.buttonHtml\(/.test(h) && /StaffGroupBooking\.open\(/.test(h)));
+  check('dashboard : clic sur la ligne d\'un coiffeur (etape Prestation en premier) -> « Plusieurs personnes » propose d\'emblee', /\(preselectedBarberId \? StaffGroupBooking\.buttonHtml\('aaOpenGroup\(\)'\) : ''\)/.test(files[0]));
   sql('DELETE FROM appointments');
   console.log('\nRESULTAT : ' + pass + ' verifications reussies, ' + fail + ' echec(s)');
   process.exit(fail ? 1 : 0);

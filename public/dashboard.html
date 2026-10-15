@@ -6424,6 +6424,9 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
 
     '<div id="aa-step-service" style="display:none">' +
       '<button class="aa-back" onclick="aaGoStep(\'barber\')">‹ Retour</button>' +
+      // Coiffeur déjà choisi (clic sur sa ligne de l'agenda) : cette étape est la PREMIÈRE, le choix
+      // « Plusieurs personnes » y est donc proposé d'emblée, sans repasser par « Retour ».
+      (preselectedBarberId ? StaffGroupBooking.buttonHtml('aaOpenGroup()') : '') +
       '<div class="aa-step-title">Prestation</div>' +
       '<div class="item-grid compact" id="aa-service-grid"></div>' +
     '</div>' +
