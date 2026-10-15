@@ -320,7 +320,7 @@
 </div>
 
 <script src="/app.js?v=17"></script>
-<script src="/group-booking.js?v=12"></script>
+<script src="/group-booking.js?v=13"></script>
 <style>
 body.staff-mode .gift-summary-box,body.staff-mode .theme-btn{display:none!important}
 .gb-done{padding:10px 0;border-bottom:1px solid var(--sep)}.gb-done:last-child{border:none}.gb-done b{display:block}.gb-done span{color:var(--grey);font-size:14px}
@@ -798,12 +798,21 @@ function startNewBooking() {
 /* ---------- Reservation a plusieurs ---------- */
 var groupCtl = null, groupPeople = null, groupPayload = null;
 
+function staffClientName() { return (STAFF_BRIDGE && STAFF_BRIDGE.client && STAFF_BRIDGE.client.name) || 'Le client'; }
+
 function enterStaffMode() {
   document.body.classList.add('staff-mode');
   document.querySelector('.rdv-header h1').textContent = 'RDV pour plusieurs personnes';
   document.querySelector('label[for="grp-name"]').textContent = 'Nom du client';
   document.querySelector('label[for="grp-email"]').textContent = 'Email (optionnel — confirmation envoyée s\'il est renseigné)';
   document.querySelector('label[for="grp-phone"]').textContent = 'Téléphone (optionnel)';
+  // Client déjà saisi dans « Ajouter un RDV » (dashboard / caisse) : son nom remplace « Le client », coordonnées pré-remplies.
+  var c = STAFF_BRIDGE.client;
+  if (c && c.name) {
+    document.getElementById('grp-name').value = c.name;
+    document.getElementById('grp-email').value = c.email || '';
+    document.getElementById('grp-phone').value = c.phone || '';
+  }
   openGroupBooking();
 }
 
@@ -813,13 +822,13 @@ function openGroupBooking() {
       zones: { top: document.getElementById('gb-top'), body: document.getElementById('gb-body'), bar: document.getElementById('gb-bar') }, api: api,
       services: services, extras: extras, barbers: barbers, relatives: [],
       eur: eur, toast: toast, continueLabel: 'Continuer',
-      selfChip: STAFF_BRIDGE ? 'Le client' : null, selfName: STAFF_BRIDGE ? 'Le client' : null,
+      selfChip: STAFF_BRIDGE ? staffClientName() : null, selfName: STAFF_BRIDGE ? staffClientName() : null,
       whoSub: STAFF_BRIDGE ? 'Cochez les personnes à inscrire : le client et/ou ses accompagnants (enfants, amis…).' : null,
       onExit: function () { if (STAFF_BRIDGE) STAFF_BRIDGE.close(); else show('p-barber'); },
       onContinue: function (people, payload) {
         groupPeople = people; groupPayload = payload;
         var self = people[0];
-        document.getElementById('group-contact-summary').textContent = people.length + (people.length > 1 ? ' personnes — ' : ' personne — ') + people.map(function (p) { return p.isSelf ? (STAFF_BRIDGE ? 'le client' : 'vous') : p.name; }).join(', ');
+        document.getElementById('group-contact-summary').textContent = people.length + (people.length > 1 ? ' personnes — ' : ' personne — ') + people.map(function (p) { return p.isSelf ? (STAFF_BRIDGE ? staffClientName() : 'vous') : p.name; }).join(', ');
         show('p-group-contact');
       }
     });

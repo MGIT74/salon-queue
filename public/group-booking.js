@@ -169,7 +169,7 @@
       return p;
     }
     function label(p) { return p.isSelf ? (cfg.selfName || 'Vous') : (String(p.name || '').trim() || 'Personne ' + (people.indexOf(p) + 1)); }
-    function shortName(p) { return p.isSelf ? (cfg.selfName ? cfg.selfName.toLowerCase() : 'vous') : label(p); }
+    function shortName(p) { return p.isSelf ? (cfg.selfName || 'vous') : label(p); }
     function barberName(id) { var b = byId(cfg.barbers, id); return b ? b.name : ''; }
     function fmtDate(d) { try { return new Date(d + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }); } catch (e) { return d; } }
     function complete(p) { return !!(p.serviceId && p.slot && (p.isSelf || String(p.name || '').trim())); }

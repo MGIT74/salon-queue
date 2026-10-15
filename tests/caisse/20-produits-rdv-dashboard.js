@@ -52,11 +52,13 @@ const check = (n, ok, x = '') => { (ok ? pass++ : fail++); console.log((ok ? '  
   const src = fs.readFileSync(path.join(__dirname, '../../public/dashboard.html'), 'utf8');
   const fnStart = src.indexOf('function openAdminAddAppointment');
   const fnEnd = src.indexOf('\nfunction ', fnStart + 10);
+  w.eval(fs.readFileSync(path.join(__dirname, '../../public/staff-group.js'), 'utf8'));
   w.eval(src.slice(fnStart, fnEnd));
 
   console.log('\n[A] La nouvelle etape Produits existe entre Supplements et Creneau');
   const today = new Date().toISOString().slice(0, 10);
   w.openAdminAddAppointment(today, 'b1');
+  d.getElementById('aa-name').value = 'Test Dashboard Produits'; w.aaStartSolo();
   check('l\'etape #aa-step-products existe dans le formulaire', Boolean(d.getElementById('aa-step-products')));
   check('elle propose bien "Gel" (produit de test)', /Gel/.test(d.getElementById('aa-step-products').textContent));
 

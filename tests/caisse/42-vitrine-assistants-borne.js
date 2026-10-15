@@ -18,6 +18,7 @@ function world(html) {
   const dom = new JSDOM(html || '<body></body>', { runScripts: 'outside-only', url: 'http://localhost/', pretendToBeVisual: true });
   const w = dom.window;
   w.eval("var _modalLockCount = 0, _modalScrollY = 0, CURRENCY = 'EUR'; function eur(c) { return (c / 100).toFixed(2).replace('.', ',') + ' €'; }\n" + VARS + '\n' + SHARED.map(n => fnSrc(app, n)).join('\n'));
+  w.eval(fs.readFileSync(path.join(__dirname, '../../public/staff-group.js'), 'utf8'));
   w.scrollTo = () => {};
   return w;
 }
@@ -42,7 +43,9 @@ const visible = (w, id) => w.document.getElementById(id).style.display !== 'none
   w.eval(fnSrc(dash, 'openAdminAddAppointment') + '\nvar aaBarbersPreselected = null;');
   w.openAdminAddAppointment('2026-10-08', 'b1');
   let d = w.document;
-  check('coiffeur deja connu (clic sur sa ligne) : on saute a l\'etape Prestation', visible(w, 'aa-step-service') && !visible(w, 'aa-step-barber'));
+  check('1re etape : le client (nom, puis une ou plusieurs personnes)', visible(w, 'aa-step-client') && !visible(w, 'aa-step-service'));
+  d.getElementById('aa-name').value = 'Karim'; w.aaStartSolo();
+  check('coiffeur deja connu (clic sur sa ligne) : apres le client, on saute a l\'etape Prestation', visible(w, 'aa-step-service') && !visible(w, 'aa-step-barber'));
   check('etape Coiffeur INCHANGEE (cartes de texte .aa-card)', d.querySelectorAll('#aa-step-barber .aa-card').length === 2);
   let sv = [...d.querySelectorAll('#aa-service-grid .item-card')];
   check('prestations : cartes de vitrine (compactes), dans l\'ordre du catalogue', sv.length === 2 && sv[0].dataset.id === 'sv1' && d.getElementById('aa-service-grid').classList.contains('compact'));
@@ -92,6 +95,7 @@ const visible = (w, id) => w.document.getElementById(id).style.display !== 'none
   w = world(); setup(w, { me: { id: 'b1', name: 'Alice' }, allBarbers: [{ id: 'b1', name: 'Alice' }], catalog: CATALOG });
   w.eval(fnSrc(caisse, 'openCaisseAddAppointment'));
   w.openCaisseAddAppointment('2026-10-08', 'b1'); d = w.document;
+  d.getElementById('pa-name').value = 'Karim'; w.paStartSolo();
   sv = [...d.querySelectorAll('#pa-service-grid .item-card')];
   check('caisse : prestations en cartes de vitrine, image en haut et texte dessous, etape Prestation affichee', sv.length === 2 && visible(w, 'pa-step-service') && sv[0].children[0].classList.contains('item-media') && sv[0].querySelector('.item-body .item-name').textContent === 'Barbe premium');
   w.paSelectService(sv[0]);

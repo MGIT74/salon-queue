@@ -41,6 +41,7 @@ async function testCaisse() {
   await sleep(1500);
 
   w.openCaisseAddAppointment(today, 'b1');
+  d.getElementById('pa-name').value = 'Test Caisse Produits'; w.paStartSolo();
   check('l\'etape #pa-step-products existe', Boolean(d.getElementById('pa-step-products')));
   check('elle propose bien "Gel"', /Gel/.test(d.getElementById('pa-step-products').textContent));
 
