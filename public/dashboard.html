@@ -2313,8 +2313,9 @@
       <h3>Mot de passe</h3>
       <p class="hint">Ce mot de passe est partagé par tous les salons de votre enseigne.</p>
       <div class="grid2">
+        <div class="fld"><label for="acc-current-pw">Mot de passe actuel</label><input id="acc-current-pw" type="password" autocomplete="current-password"></div>
         <div class="fld"><label for="acc-new-pw">Nouveau mot de passe</label>
-          <input id="acc-new-pw" type="password" placeholder="6 caractères minimum" autocomplete="new-password"></div>
+          <input id="acc-new-pw" type="password" placeholder="8 caractères minimum" autocomplete="new-password"></div>
         <div class="fld"><label for="acc-new-pw2">Confirmer</label>
           <input id="acc-new-pw2" type="password" autocomplete="new-password"></div>
       </div>
@@ -8771,15 +8772,18 @@ function removeGiftCardImage() {
 }
 
 function changeOwnPassword() {
+  var currentPw = document.getElementById('acc-current-pw').value;
   var pw = document.getElementById('acc-new-pw').value;
   var pw2 = document.getElementById('acc-new-pw2').value;
+  if (!currentPw) { toast('Saisissez votre mot de passe actuel', true); return; }
   if (!pw) { toast('Mot de passe requis', true); return; }
   if (pw !== pw2) { toast('Les mots de passe ne correspondent pas', true); return; }
-  if (pw.length < 6) { toast('6 caractères minimum', true); return; }
+  if (pw.length < 8) { toast('8 caractères minimum', true); return; }
 
-  api('/api/owner/password', { method: 'PUT', body: { new_password: pw } })
+  api('/api/owner/password', { method: 'PUT', body: { current_password: currentPw, new_password: pw } })
     .then(function () {
       toast('Mot de passe changé — reconnectez-vous si besoin');
+      document.getElementById('acc-current-pw').value = '';
       document.getElementById('acc-new-pw').value = '';
       document.getElementById('acc-new-pw2').value = '';
       setAdminPw(pw);
@@ -8787,6 +8791,24 @@ function changeOwnPassword() {
     })
     .catch(function (e) { toast(e.message, true); });
 }
+
+
+// Validation du lien administrateur reçu par email, après authentification.
+function checkAdminEmailVerification() {
+  var u = new URL(location.href);
+  var token = u.searchParams.get('admin_email_verify');
+  if (!token) return;
+  if (!/^[a-f0-9]{64}$/.test(token)) { toast('Lien de vérification invalide', true); return; }
+  api('/api/owner/email/verify', { method: 'POST', body: { token: token } })
+    .then(function () {
+      u.searchParams.delete('admin_email_verify');
+      history.replaceState(null, '', u.pathname + u.search + u.hash);
+      toast('Nouvelle adresse email administrateur confirmée');
+      loadOwnerProfile();
+    })
+    .catch(function (e) { toast('Connectez-vous en tant qu’administrateur pour confirmer : ' + e.message, true); });
+}
+window.addEventListener('load', function () { setTimeout(checkAdminEmailVerification, 1200); });
 
 function loadOwnerProfile() {
   api('/api/owner/profile').then(function (r) {
@@ -8800,10 +8822,10 @@ function saveOwnerProfile() {
   var email = document.getElementById('acc-owner-email').value.trim();
   var tasks = [];
   if (name) tasks.push(api('/api/owner/name', { method: 'PUT', body: { name: name } }));
-  if (email) tasks.push(api('/api/owner/email', { method: 'PUT', body: { email: email } }));
+  if (email) tasks.push(api('/api/owner/email', { method: 'PUT', body: { email: email, base_url: location.origin + '/dashboard.html' } }));
   if (!tasks.length) { toast('Rien à enregistrer', true); return; }
   Promise.all(tasks)
-    .then(function () { toast('Profil mis à jour'); })
+    .then(function (results) { toast(results.some(function (r) { return r && r.email_verification_pending; }) ? 'Un lien de validation a été envoyé à votre nouvelle adresse email' : 'Profil mis à jour'); })
     .catch(function (e) { toast(e.message, true); });
 }
 
