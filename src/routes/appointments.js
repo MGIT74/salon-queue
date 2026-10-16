@@ -330,6 +330,9 @@ router.get('/availability', wrap(async (req, res) => {
       extraDuration = rows.reduce((a, r) => a + r.duration_min, 0);
     }
   }
+  if (extraIds.length && (new Set(extraIds).size !== extraIds.length || extraNames.length !== extraIds.length)) {
+    return res.status(400).json({ error: 'Supplément invalide ou indisponible dans ce salon' });
+  }
   const durationMin = service.duration_min + extraDuration;
   var slotOpts = req.query.exclude_appointment_id ? { excludeAppointmentId: req.query.exclude_appointment_id } : {};
   // Reservation a plusieurs : creneaux deja retenus par les AUTRES personnes du groupe (cf. lib/groupBooking).
