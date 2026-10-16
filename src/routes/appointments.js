@@ -192,7 +192,8 @@ async function getBarberBusyMinutesToday(barberId) {
 async function computeSlotsForBarber(barberId, dateStr, durationMin, rdvSettings, opts) {
   rdvSettings = rdvSettings || {};
   opts = opts || {};
-  const stepMin = Number(rdvSettings.rdv_slot_step_min) || 15;
+  const configuredStep = Number(rdvSettings.rdv_slot_step_min);
+  const stepMin = Number.isSafeInteger(configuredStep) && configuredStep > 0 && configuredStep <= 120 ? configuredStep : 15;
   const leadMin = opts.skipLead ? 0 : (Number(rdvSettings.rdv_min_lead_min) || 0);
   const bufferMin = Number(rdvSettings.rdv_buffer_min) || 0;
 
