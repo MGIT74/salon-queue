@@ -39,18 +39,20 @@ const SLOT_STEP_MIN = 15;
  * cas ne devrait normalement pas se produire pour un RDV qu'on annule,
  * mais mieux vaut ne rien casser si jamais.
  */
-async function releaseGiftAfterCancellation(salonId, giftCardId) {
+async function releaseGiftAfterCancellation(salonId, giftCardId, appointmentId) {
+  if (!appointmentId) return;
   const [[gift]] = await pool.query(
-    'SELECT recipient_name, recipient_email, amount_cents, items_json, used_at FROM gift_cards WHERE id = ?',
-    [giftCardId]
+    'SELECT recipient_name, recipient_email, amount_cents, items_json, used_at, voided_at FROM gift_cards WHERE id = ? AND salon_id = ? AND pending_appointment_id = ?',
+    [giftCardId, salonId, appointmentId]
   );
-  if (!gift || gift.used_at) return;
+  if (!gift || gift.used_at || gift.voided_at) return;
 
   const newCode = generateGiftCode();
-  await pool.query(
-    'UPDATE gift_cards SET code = ?, pending_appointment_id = NULL WHERE id = ?',
-    [newCode, giftCardId]
+  const [released] = await pool.query(
+    'UPDATE gift_cards SET code = ?, pending_appointment_id = NULL WHERE id = ? AND salon_id = ? AND pending_appointment_id = ? AND used_at IS NULL AND voided_at IS NULL',
+    [newCode, giftCardId, salonId, appointmentId]
   );
+  if (released.affectedRows !== 1) return;
   let items = [];
   try { items = JSON.parse(gift.items_json || '[]'); } catch (e) { items = []; }
   try {
@@ -816,7 +818,7 @@ router.post('/cancel-group', wrap(async (req, res) => {
     if (m.promoted_queue_id) {
       await pool.query("UPDATE queue SET status = 'cancelled' WHERE id = ? AND status IN ('waiting','in_progress')", [m.promoted_queue_id]);
     }
-    if (m.gift_card_id) await releaseGiftAfterCancellation(m.salon_id, m.gift_card_id);
+    if (m.gift_card_id) await releaseGiftAfterCancellation(m.salon_id, m.gift_card_id, m.id);
     cancelled++;
   }
   if (!cancelled) return res.status(403).json({ error: "Trop tard pour annuler ces rendez-vous en ligne, contactez directement le salon." });
@@ -1065,7 +1067,7 @@ router.post('/cancel', wrap(async (req, res) => {
       [appt.promoted_queue_id]
     );
   }
-  if (appt.gift_card_id) await releaseGiftAfterCancellation(appt.salon_id, appt.gift_card_id);
+  if (appt.gift_card_id) await releaseGiftAfterCancellation(appt.salon_id, appt.gift_card_id, appt.id);
 
   res.json({ ok: true });
 }));
@@ -1101,7 +1103,7 @@ router.post('/:id/admin-cancel', requireAdminOrBarber, wrap(async (req, res) => 
       [appt.promoted_queue_id]
     );
   }
-  if (appt.gift_card_id) await releaseGiftAfterCancellation(appt.salon_id, appt.gift_card_id);
+  if (appt.gift_card_id) await releaseGiftAfterCancellation(appt.salon_id, appt.gift_card_id, appt.id);
 
   if (appt.email) {
     try {
@@ -1323,7 +1325,7 @@ router.delete('/:id', requireAdmin, wrap(async (req, res) => {
   // Sans ça, un cadeau resterait verrouillé indéfiniment (plus aucun
   // rendez-vous pour le libérer un jour) puisque la ligne qui le
   // bloquait vient de disparaître.
-  if (appt.gift_card_id) await releaseGiftAfterCancellation(req.salon.id, appt.gift_card_id);
+  if (appt.gift_card_id) await releaseGiftAfterCancellation(req.salon.id, appt.gift_card_id, appt.id);
   res.json({ ok: true });
 }));
 
