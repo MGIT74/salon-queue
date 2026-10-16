@@ -117,4 +117,42 @@ setInterval(() => {
   }
 }, 10 * 60 * 1000).unref();
 
-module.exports = { loginRateLimiter, signupRateLimiter, isBlocked, recordFailure, recordSuccess };
+
+// Variante persistante : MySQL permet de conserver les blocages après redémarrage.
+// La clé est hachée pour éviter de conserver IP / identifiants en clair.
+const crypto = require('crypto');
+const { pool } = require('../db');
+const persistentKey = (key) => crypto.createHash('sha256').update(String(key)).digest('hex');
+async function persistentIsBlocked(key) {
+  const [[r]] = await pool.query('SELECT blocked_until FROM security_attempts WHERE attempt_key = ?', [persistentKey(key)]);
+  return r && r.blocked_until ? Math.max(0, Math.ceil((new Date(r.blocked_until).getTime() - Date.now()) / 1000)) : 0;
+}
+async function persistentFailure(key, opts = {}) {
+  const { max, windowMs, blockMs } = Object.assign({}, DEFAULTS, opts);
+  const k = persistentKey(key), now = Date.now();
+  // Atomic update : plusieurs requêtes concurrentes ne peuvent pas perdre des échecs.
+  await pool.query(`INSERT INTO security_attempts (attempt_key, failure_count, first_at, blocked_until, updated_at)
+    VALUES (?, 1, NOW(3), IF(1 >= ?, DATE_ADD(NOW(3), INTERVAL ? MICROSECOND), NULL), NOW(3))
+    ON DUPLICATE KEY UPDATE
+    failure_count = IF(first_at < DATE_SUB(NOW(3), INTERVAL ? MICROSECOND) AND (blocked_until IS NULL OR blocked_until <= NOW(3)), 1, failure_count + 1),
+    blocked_until = IF(first_at < DATE_SUB(NOW(3), INTERVAL ? MICROSECOND) AND (blocked_until IS NULL OR blocked_until <= NOW(3)), NULL,
+      IF(failure_count >= ?, DATE_ADD(NOW(3), INTERVAL ? MICROSECOND), blocked_until)),
+    first_at = IF(first_at < DATE_SUB(NOW(3), INTERVAL ? MICROSECOND) AND (blocked_until IS NULL OR blocked_until <= NOW(3)), NOW(3), first_at),
+    updated_at = NOW(3)`, [k, max, blockMs * 1000, windowMs * 1000, windowMs * 1000, max, blockMs * 1000, windowMs * 1000]);
+}
+async function persistentSuccess(key) {
+  await pool.query('DELETE FROM security_attempts WHERE attempt_key = ?', [persistentKey(key)]);
+}
+async function guardPasswordAttempt(req, res, scope, identity) {
+  const ip = req.ip || 'unknown';
+  const keys = [scope + ':account:' + identity, scope + ':ip:' + ip];
+  for (const key of keys) {
+    const seconds = await persistentIsBlocked(key);
+    if (seconds) { res.set('Retry-After', String(seconds)); res.status(429).json({ error: 'Trop de tentatives. Réessayez dans ' + Math.ceil(seconds / 60) + ' min.' }); return null; }
+  }
+  return keys;
+}
+async function failPasswordAttempt(keys) { for (const k of keys) await persistentFailure(k, { max: 5, windowMs: 15 * 60000, blockMs: 15 * 60000 }); }
+async function clearPasswordAttempt(keys) { for (const k of keys) await persistentSuccess(k); }
+
+module.exports = { loginRateLimiter, signupRateLimiter, isBlocked, recordFailure, recordSuccess, persistentIsBlocked, persistentFailure, persistentSuccess, guardPasswordAttempt, failPasswordAttempt, clearPasswordAttempt };

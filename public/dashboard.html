@@ -48,6 +48,12 @@
 </script>
 <style>
   html.auth-checking #login { display: none; }
+
+/* Fermetures exceptionnelles visibles dans toutes les vues RDV. */
+.cal-day.salon-closed{background:rgba(128,128,128,.13);box-shadow:inset 0 0 0 1px rgba(150,150,150,.27)}
+.cal-day.salon-closed .cal-day-num{text-decoration:line-through;opacity:.65}
+.cal-day.salon-closed::after{content:'Fermé';display:block;font-size:10px;font-weight:700;color:var(--red,#e65c5c);margin-top:2px}
+.salon-closure-banner{padding:10px 13px;border-radius:9px;margin:0 0 12px;background:rgba(160,100,100,.13);color:var(--red,#e65c5c);font-weight:650;font-size:13px}
 </style>
 <link rel="stylesheet" href="/app.css?v=31">
 <style>
@@ -2313,8 +2319,9 @@
       <h3>Mot de passe</h3>
       <p class="hint">Ce mot de passe est partagé par tous les salons de votre enseigne.</p>
       <div class="grid2">
+        <div class="fld"><label for="acc-current-pw">Mot de passe actuel</label><input id="acc-current-pw" type="password" autocomplete="current-password"></div>
         <div class="fld"><label for="acc-new-pw">Nouveau mot de passe</label>
-          <input id="acc-new-pw" type="password" placeholder="6 caractères minimum" autocomplete="new-password"></div>
+          <input id="acc-new-pw" type="password" placeholder="8 caractères minimum" autocomplete="new-password"></div>
         <div class="fld"><label for="acc-new-pw2">Confirmer</label>
           <input id="acc-new-pw2" type="password" autocomplete="new-password"></div>
       </div>
@@ -6459,12 +6466,20 @@ function neededMonthKeys() {
   return keys.filter(function (k, i) { return keys.indexOf(k) === i; });
 }
 
+
+var rdvSalonClosures = [];
+function rdvIsSalonClosed(dateStr) { return rdvSalonClosures.some(function(c){return dateStr >= c.start_date && dateStr <= c.end_date;}); }
+function rdvClosureBanner(dateStr) { return rdvIsSalonClosed(dateStr) ? '<div class="salon-closure-banner">Salon fermé exceptionnellement ce jour</div>' : ''; }
+function rdvLoadSalonClosures() {
+  return api('/api/salon-calendar/public-closures').then(function(r){rdvSalonClosures=r.items||[];}).catch(function(){rdvSalonClosures=[];});
+}
+
 function loadCalendarPeriod() {
   var keys = neededMonthKeys();
   var toFetch = keys.filter(function (k) { return !calMonthCache[k]; });
   Promise.all(toFetch.map(function (k) {
     return api('/api/appointments?month=' + k + '&all=1').then(function (r) { calMonthCache[k] = r.items; });
-  })).then(function () {
+  }).concat([rdvLoadSalonClosures()])).then(function () {
     if (calViewMode === 'month') renderMonthView();
     else if (calViewMode === 'week') renderWeekView();
     else renderDayView();
@@ -6538,6 +6553,7 @@ function renderMonthView() {
         return '<span class="cal-dot" style="background:' + (rdvBarberColors[bid] || '#888') + '"></span>';
       }).join('');
       var classes = 'cal-day' + (dateStr === todayStr ? ' today' : '') + (dateStr === calSelectedDate ? ' selected' : '');
+      if (rdvIsSalonClosed(dateStr)) classes += ' salon-closed';
       return '<div class="' + classes + '" onclick="selectCalendarDay(\'' + dateStr + '\')">' +
         '<div class="cal-day-num">' + day + '</div>' +
         (dots ? '<div class="cal-dots">' + dots + '</div>' : '') +
@@ -6872,6 +6888,7 @@ function renderWeekView() {
       return '<span class="cal-dot" style="background:' + (rdvBarberColors[bid] || '#888') + '"></span>';
     }).join('');
     var classes = 'cal-day' + (dateStr === todayStr ? ' today' : '') + (dateStr === calSelectedDate ? ' selected' : '');
+      if (rdvIsSalonClosed(dateStr)) classes += ' salon-closed';
     cells += '<div class="' + classes + '" onclick="selectCalendarDay(\'' + dateStr + '\')">' +
       '<div class="cal-day-num">' + d.getDate() + '</div>' +
       (dots ? '<div class="cal-dots">' + dots + '</div>' : '') +
@@ -6891,7 +6908,7 @@ function renderDayView() {
   var dayAppts = applyCalBarberFilter(appointmentsForRange(calAnchor, calAnchor));
   dayAppts.forEach(function (a) { calAppointmentById[a.id] = a; });
   var view = document.getElementById('cal-day-view');
-  view.innerHTML = renderDayTimelineHtml(dateStr, dayAppts);
+  view.innerHTML = rdvClosureBanner(dateStr) + renderDayTimelineHtml(dateStr, dayAppts);
 
   calSelectedDate = dateStr;
   document.getElementById('rdv-list-title').textContent = 'Le ' + calAnchor.toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' });
@@ -8775,15 +8792,18 @@ function removeGiftCardImage() {
 }
 
 function changeOwnPassword() {
+  var currentPw = document.getElementById('acc-current-pw').value;
   var pw = document.getElementById('acc-new-pw').value;
   var pw2 = document.getElementById('acc-new-pw2').value;
+  if (!currentPw) { toast('Saisissez votre mot de passe actuel', true); return; }
   if (!pw) { toast('Mot de passe requis', true); return; }
   if (pw !== pw2) { toast('Les mots de passe ne correspondent pas', true); return; }
-  if (pw.length < 6) { toast('6 caractères minimum', true); return; }
+  if (pw.length < 8) { toast('8 caractères minimum', true); return; }
 
-  api('/api/owner/password', { method: 'PUT', body: { new_password: pw } })
+  api('/api/owner/password', { method: 'PUT', body: { current_password: currentPw, new_password: pw } })
     .then(function () {
       toast('Mot de passe changé — reconnectez-vous si besoin');
+      document.getElementById('acc-current-pw').value = '';
       document.getElementById('acc-new-pw').value = '';
       document.getElementById('acc-new-pw2').value = '';
       setAdminPw(pw);
@@ -8791,6 +8811,24 @@ function changeOwnPassword() {
     })
     .catch(function (e) { toast(e.message, true); });
 }
+
+
+// Validation du lien administrateur reçu par email, après authentification.
+function checkAdminEmailVerification() {
+  var u = new URL(location.href);
+  var token = u.searchParams.get('admin_email_verify');
+  if (!token) return;
+  if (!/^[a-f0-9]{64}$/.test(token)) { toast('Lien de vérification invalide', true); return; }
+  api('/api/owner/email/verify', { method: 'POST', body: { token: token } })
+    .then(function () {
+      u.searchParams.delete('admin_email_verify');
+      history.replaceState(null, '', u.pathname + u.search + u.hash);
+      toast('Nouvelle adresse email administrateur confirmée');
+      loadOwnerProfile();
+    })
+    .catch(function (e) { toast('Connectez-vous en tant qu’administrateur pour confirmer : ' + e.message, true); });
+}
+window.addEventListener('load', function () { setTimeout(checkAdminEmailVerification, 1200); });
 
 function loadOwnerProfile() {
   api('/api/owner/profile').then(function (r) {
@@ -8804,10 +8842,10 @@ function saveOwnerProfile() {
   var email = document.getElementById('acc-owner-email').value.trim();
   var tasks = [];
   if (name) tasks.push(api('/api/owner/name', { method: 'PUT', body: { name: name } }));
-  if (email) tasks.push(api('/api/owner/email', { method: 'PUT', body: { email: email } }));
+  if (email) tasks.push(api('/api/owner/email', { method: 'PUT', body: { email: email, base_url: location.origin + '/dashboard.html' } }));
   if (!tasks.length) { toast('Rien à enregistrer', true); return; }
   Promise.all(tasks)
-    .then(function () { toast('Profil mis à jour'); })
+    .then(function (results) { toast(results.some(function (r) { return r && r.email_verification_pending; }) ? 'Un lien de validation a été envoyé à votre nouvelle adresse email' : 'Profil mis à jour'); })
     .catch(function (e) { toast(e.message, true); });
 }
 
@@ -9262,25 +9300,51 @@ function openAddSalonClosure() {
     var customMessage = (sendEmail && ascMsgType === 'custom') ? overlay.querySelector('#asc-custom-text').value.trim() : '';
 
     var btn = overlay.querySelector('#asc-save-btn');
-    btn.disabled = true; btn.textContent = 'Ajout…';
-
-    api('/api/salon-calendar/closures', {
-      method: 'POST',
-      body: {
-        start_date: from, end_date: to,
-        reason: overlay.querySelector('#asc-reason').value.trim(),
-        send_email: sendEmail,
-        custom_message: customMessage
-      }
-    }).then(function (r) {
-      _closeModal(overlay);
-      if (r.email) toast('Fermeture ajoutée — email envoyé à ' + r.email.sent + '/' + r.email.total + ' client(s)');
-      else toast('Fermeture ajoutée');
-      loadSalonClosures();
-    }).catch(function (e) {
-      btn.disabled = false; btn.textContent = 'Ajouter';
-      errEl.textContent = e.message; errEl.style.display = 'block';
-    });
+    btn.disabled = true; btn.textContent = 'Vérification des rendez-vous…';
+    var reason = overlay.querySelector('#asc-reason').value.trim();
+    api('/api/salon-calendar/closures/preview?start_date=' + encodeURIComponent(from) + '&end_date=' + encodeURIComponent(to))
+      .then(function(preview) {
+        var affected = preview.items || [];
+        var confirmed = Promise.resolve(true);
+        if (affected.length) {
+          confirmed = new Promise(function(resolve) {
+            var rows = affected.map(function(a) {
+              var date = esc(a.scheduled_at.slice(8,10) + '/' + a.scheduled_at.slice(5,7) + '/' + a.scheduled_at.slice(0,4));
+              var time = esc(a.scheduled_at.slice(11,16));
+              return '<div style="display:grid;grid-template-columns:85px minmax(0,1fr);gap:12px;padding:12px 2px;border-bottom:1px solid var(--border,rgba(128,128,128,.18))">' +
+                '<div style="font-size:13px;font-weight:700;color:var(--blue)">' + date + '<div style="color:var(--ink);font-size:17px;margin-top:3px">' + time + '</div></div>' +
+                '<div style="min-width:0"><strong style="font-size:14px">' + esc(a.client_name || 'Client') + '</strong>' +
+                '<div style="font-size:13px;color:var(--muted);margin-top:3px">' + esc(a.service_name || 'Prestation') + ' · ' + esc(a.barber_name || 'Coiffeur non attribué') + '</div>' +
+                '<div style="font-size:12px;color:var(--muted);overflow-wrap:anywhere;margin-top:3px">' + esc(a.email || 'Pas d’adresse email') + '</div></div></div>';
+            }).join('');
+            var confirmOverlay = _buildModal(
+              '<div class="modal-title">Rendez-vous pendant la fermeture</div>' +
+              '<p style="color:var(--muted);margin:4px 0 14px">' + affected.length + ' rendez-vous prévus du ' + esc(from.split('-').reverse().join('/')) + ' au ' + esc(to.split('-').reverse().join('/')) + '</p>' +
+              '<div style="max-height:310px;overflow-y:auto;padding:0 12px;border:1px solid var(--border,rgba(128,128,128,.2));border-radius:12px;margin-bottom:14px">' + rows + '</div>' +
+              '<p style="font-size:13px;line-height:1.5;color:var(--muted);margin-bottom:12px">La fermeture bloquera les nouvelles réservations, mais <strong>ne supprimera pas ces rendez-vous</strong>. Il faudra les gérer séparément.</p>' +
+              '<p style="font-size:12px;color:var(--muted);margin-bottom:18px">' + (sendEmail ? 'L’email de fermeture sera envoyé à tous les clients connus du salon.' : 'Aucun email ne sera envoyé.') + '</p>' +
+              '<div class="modal-actions"><button type="button" class="btn btn-soft" id="asc-review-cancel">Retour</button><button type="button" class="btn btn-primary" id="asc-review-confirm">Confirmer la fermeture</button></div>'
+            );
+            confirmOverlay.querySelector('#asc-review-cancel').onclick = function(){_closeModal(confirmOverlay);resolve(false);};
+            confirmOverlay.querySelector('#asc-review-confirm').onclick = function(){_closeModal(confirmOverlay);resolve(true);};
+          });
+        }
+        return Promise.resolve(confirmed).then(function(ok) {
+          if (!ok) return null;
+          return api('/api/salon-calendar/closures', { method: 'POST', body: {
+            start_date: from, end_date: to, reason: reason, send_email: sendEmail,
+            custom_message: customMessage, confirm_existing_appointments: affected.length > 0
+          }});
+        });
+      }).then(function(r) {
+        if (!r) return;
+        _closeModal(overlay);
+        if (r.email) toast('Fermeture ajoutée — email envoyé à ' + r.email.sent + '/' + r.email.total + ' client(s)');
+        else toast('Fermeture ajoutée');
+        loadSalonClosures();
+      }).catch(function(e) {
+        errEl.textContent = e.message; errEl.style.display = 'block';
+      }).finally(function() { btn.disabled = false; btn.textContent = 'Ajouter'; });
   };
 }
 

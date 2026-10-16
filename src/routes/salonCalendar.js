@@ -46,6 +46,16 @@ router.put('/schedule', requireAdmin, wrap(async (req, res) => {
  * Fermetures exceptionnelles du salon entier (férié, fermeture
  * urgente...) - distinct des congés individuels de chaque coiffeur.
  */
+// Dates indisponibles exposées sans authentification pour le calendrier client.
+router.get('/public-closures', wrap(async (req, res) => {
+  const [rows] = await pool.query(
+    'SELECT DATE_FORMAT(start_date, \'%Y-%m-%d\') AS start_date, DATE_FORMAT(end_date, \'%Y-%m-%d\') AS end_date FROM salon_closures WHERE salon_id = ? AND end_date >= CURDATE() ORDER BY start_date',
+    [req.salon.id]
+  );
+  const fmt = (d) => d instanceof Date ? [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('-') : String(d).slice(0, 10);
+  res.json({ ok: true, items: rows.map(r => ({ start_date: fmt(r.start_date), end_date: fmt(r.end_date) })) });
+}));
+
 router.get('/closures', requireAdmin, wrap(async (req, res) => {
   const [rows] = await pool.query(
     'SELECT id, start_date, end_date, reason, created_at FROM salon_closures WHERE salon_id = ? ORDER BY start_date DESC',
@@ -60,9 +70,35 @@ router.get('/closures', requireAdmin, wrap(async (req, res) => {
   });
 }));
 
+// Contrôle préalable : rendez-vous déjà confirmés sur la période demandée.
+async function appointmentsAffected(salonId, from, to) {
+  const [rows] = await pool.query(`SELECT a.id, a.client_name, a.email, a.phone,
+    DATE_FORMAT(a.scheduled_at, '%Y-%m-%d %H:%i') AS scheduled_at,
+    s.name AS service_name, b.name AS barber_name
+    FROM appointments a LEFT JOIN services s ON s.id = a.service_id
+    LEFT JOIN barbers b ON b.id = a.barber_id
+    WHERE a.salon_id = ? AND a.scheduled_at >= CONCAT(?, ' 00:00:00')
+      AND a.scheduled_at < DATE_ADD(?, INTERVAL 1 DAY)
+      AND a.status NOT IN ('cancelled', 'completed', 'no_show')
+    ORDER BY a.scheduled_at, a.client_name`, [salonId, from, to]);
+  return rows;
+}
+router.get('/closures/preview', requireAdmin, wrap(async (req, res) => {
+  const { start_date, end_date } = req.query;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(start_date || '') || !/^\d{4}-\d{2}-\d{2}$/.test(end_date || '') || start_date > end_date)
+    return res.status(400).json({ error: 'Dates invalides' });
+  const items = await appointmentsAffected(req.salon.id, start_date, end_date);
+  res.json({ ok: true, count: items.length, items });
+}));
+
 router.post('/closures', requireAdmin, wrap(async (req, res) => {
   const { start_date, end_date, reason, send_email, custom_message } = req.body;
   if (!start_date || !end_date) return res.status(400).json({ error: 'Dates de début et de fin requises' });
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(start_date) || !/^\d{4}-\d{2}-\d{2}$/.test(end_date) || start_date > end_date) return res.status(400).json({ error: 'Période de fermeture invalide' });
+
+  const affected = await appointmentsAffected(req.salon.id, start_date, end_date);
+  if (affected.length && req.body.confirm_existing_appointments !== true)
+    return res.status(409).json({ error: 'Des rendez-vous existent sur cette période. Confirmation explicite requise.', count: affected.length, items: affected });
 
   const id = crypto.randomUUID();
   await pool.query(

@@ -4,13 +4,14 @@ const { safeBaseUrl } = require('../lib/safeUrl');
 const crypto = require('crypto');
 const { pool, getSettings } = require('../db');
 const { hashPassword, verifyPassword } = require('../lib/password');
-const { sendClientVerificationEmail, sendClientPasswordReset } = require('../lib/mailer');
+const { sendClientVerificationEmail, sendClientPasswordReset, sendClientSecurityNotice } = require('../lib/mailer');
 const { activateOnAccountCreation } = require('../lib/loyalty');
 const { clientKey } = require('../lib/queueMath');
 const { loginRateLimiter, signupRateLimiter } = require('../middleware/rateLimiter');
 const { nowParisDatetimeString } = require('./appointments');
 const { wrap } = require('../lib/wrap');
 
+const { guardPasswordAttempt, failPasswordAttempt, clearPasswordAttempt } = require('../middleware/rateLimiter');
 const router = express.Router();
 
 // base_url contient déjà ?salon=xxx si l'espace client est ouvert pour
@@ -94,11 +95,11 @@ router.post('/verify-email', wrap(async (req, res) => {
   const { token } = req.body;
   if (!token) return res.status(400).json({ error: 'Lien invalide' });
   const [[client]] = await pool.query(
-    'SELECT id FROM clients WHERE verify_token = ? AND verify_token_expires > NOW()', [token]
+    'SELECT id, pending_email FROM clients WHERE verify_token = ? AND verify_token_expires > NOW() AND salon_id = ?', [token, req.salon.id]
   );
   if (!client) return res.status(400).json({ error: 'Ce lien est invalide ou a expiré.' });
   await pool.query(
-    'UPDATE clients SET email_verified = 1, verify_token = NULL, verify_token_expires = NULL WHERE id = ?',
+    'UPDATE clients SET email = COALESCE(pending_email, email), pending_email = NULL, email_verified = 1, verify_token = NULL, verify_token_expires = NULL WHERE id = ?',
     [client.id]
   );
   res.json({ ok: true });
@@ -319,43 +320,55 @@ router.put('/me', requireClient, wrap(async (req, res) => {
     sets.push('phone = ?'); params.push(String(phone).trim());
   }
 
-  if (email && email !== req.clientAccount.email) {
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Adresse email invalide' });
+  // Ne jamais modifier l'adresse active avant confirmation du nouvel email.
+  if (email && String(email).trim().toLowerCase() !== String(req.clientAccount.email).trim().toLowerCase()) {
+    const newEmail = String(email).trim().toLowerCase();
+    if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(newEmail)) return res.status(400).json({ error: 'Adresse email invalide' });
     const [[existing]] = await pool.query(
-      'SELECT id FROM clients WHERE salon_id = ? AND email = ? AND id != ?',
-      [req.clientAccount.salon_id, email, req.clientAccount.id]
+      'SELECT id FROM clients WHERE salon_id = ? AND (email = ? OR pending_email = ?) AND id != ?',
+      [req.clientAccount.salon_id, newEmail, newEmail, req.clientAccount.id]
     );
     if (existing) return res.status(409).json({ error: 'Cet email est déjà utilisé par un autre compte' });
-
-    // Changer d'email doit forcer une nouvelle vérification - sinon
-    // le compte resterait marqué "vérifié" sans jamais avoir prouvé
-    // que ce client possède réellement cette nouvelle adresse.
     const verifyToken = crypto.randomBytes(32).toString('hex');
-    const verifyExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
-    sets.push('email = ?', 'email_verified = 0', 'verify_token = ?', 'verify_token_expires = ?');
-    params.push(email, verifyToken, verifyExpires);
-
+    const verifyExpires = new Date(Date.now() + 15 * 60 * 1000);
+    const verifyUrl = appendParam(safeBaseUrl(req, req.body.base_url), 'verify', verifyToken);
     try {
-      const verifyUrl = appendParam(safeBaseUrl(req, req.body.base_url), 'verify', verifyToken);
-      await sendClientVerificationEmail(req.clientAccount.salon_id, email, verifyUrl);
+      await sendClientVerificationEmail(req.clientAccount.salon_id, newEmail, verifyUrl, { change: true });
     } catch (err) {
       console.error('[client email change] envoi email échoué:', err.message);
+      return res.status(503).json({ error: 'Envoi de la vérification impossible. Réessayez plus tard.' });
     }
+    sets.push('pending_email = ?', 'verify_token = ?', 'verify_token_expires = ?');
+    params.push(newEmail, verifyToken, verifyExpires);
+    req.emailChangePending = true;
+    // Avertir l'ancienne adresse sans divulguer le lien de confirmation.
+    try { await sendClientSecurityNotice(req.clientAccount.salon_id, req.clientAccount.email, 'Demande de changement d’adresse email', 'Une demande de changement de votre adresse email a été effectuée. Si ce n’était pas vous, contactez le salon immédiatement.'); }
+    catch (err) { console.error('[client email change] notification:', err.message); }
   }
 
   if (new_password) {
+    const passwordAttemptKeys = await guardPasswordAttempt(req, res, 'client-password-change', req.clientAccount.id);
+    if (!passwordAttemptKeys) return;
     if (!current_password || !(await verifyPassword(current_password, req.clientAccount.password_hash))) {
+      await failPasswordAttempt(passwordAttemptKeys);
       return res.status(403).json({ error: 'Mot de passe actuel incorrect' });
     }
+    await clearPasswordAttempt(passwordAttemptKeys);
     if (new_password.length < 6) return res.status(400).json({ error: 'Le nouveau mot de passe doit contenir au moins 6 caractères' });
     sets.push('password_hash = ?'); params.push(await hashPassword(new_password));
+    req.passwordChanged = true;
   }
 
   if (!sets.length) return res.json({ ok: true });
 
   params.push(req.clientAccount.id);
   await pool.query(`UPDATE clients SET ${sets.join(', ')} WHERE id = ?`, params);
-  res.json({ ok: true });
+  if (req.passwordChanged) {
+    await pool.query('DELETE FROM client_sessions WHERE client_id = ? AND token != ?', [req.clientAccount.id, req.headers['x-client-token']]);
+    try { await sendClientSecurityNotice(req.clientAccount.salon_id, req.clientAccount.email, 'Mot de passe modifié', 'Le mot de passe de votre compte a été modifié. Si ce n’était pas vous, réinitialisez-le immédiatement.'); }
+    catch (err) { console.error('[client password change] notification:', err.message); }
+  }
+  res.json({ ok: true, email_verification_pending: Boolean(req.emailChangePending) });
 }));
 
 /**

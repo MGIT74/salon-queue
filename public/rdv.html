@@ -147,6 +147,24 @@
     display: flex; align-items: center; justify-content: center;
   }
 </style>
+<style>
+/* Calendrier client intégré au thème personnalisable du salon. */
+.closure-calendar{position:relative;width:100%;max-width:390px;margin:4px 0 18px;color:inherit}
+.closure-calendar input[type=date]{display:none}
+.closure-cal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:4px 0 14px;padding:0 4px}
+.closure-cal-head strong{font-size:16px;font-weight:650;text-transform:capitalize;letter-spacing:-.2px}
+.closure-cal-head button{display:grid;place-items:center;width:38px;height:38px;border:1px solid var(--border,rgba(128,128,128,.25));border-radius:11px;background:var(--card,#28282b);color:var(--accent,#007aff);font-size:23px;cursor:pointer;transition:background .15s}
+.closure-cal-head button:hover:not(:disabled){background:rgba(var(--accent-rgb,0,122,255),.12)}
+.closure-cal-head button:disabled{opacity:.25;cursor:not-allowed}
+.closure-cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}
+.closure-cal-grid span{text-align:center;font-size:11px;font-weight:600;padding:9px 0;color:var(--muted,#929292)}
+.closure-cal-grid button{border:1px solid transparent;border-radius:10px;min-width:0;height:42px;padding:0;background:transparent;color:inherit;font-size:14px;font-weight:550;cursor:pointer;transition:background .15s,color .15s,border-color .15s}
+.closure-cal-grid button:not(:disabled):hover{background:rgba(var(--accent-rgb,0,122,255),.12);border-color:var(--accent,#007aff)}
+.closure-cal-grid button.selected{background:var(--accent,#007aff);border-color:var(--accent,#007aff);color:#fff;font-weight:700;box-shadow:0 2px 9px rgba(var(--accent-rgb,0,122,255),.2)}
+.closure-cal-grid button:disabled{background:rgba(128,128,128,.10);color:var(--muted,#888);cursor:not-allowed;opacity:.42}
+.closure-cal-grid button:focus-visible,.closure-cal-head button:focus-visible{outline:2px solid var(--accent,#007aff);outline-offset:2px}
+@media(max-width:420px){.closure-calendar{max-width:100%}.closure-cal-grid{gap:3px}.closure-cal-grid button{height:39px}}
+</style>
 </head>
 <body>
 <div id="no-salon" role="alert"><div class="box"><h1>Lien incomplet</h1><p>Cette adresse ne précise pas de salon. Pour prendre rendez-vous, utilisez le lien (ou le QR code) fourni par votre salon.</p></div></div>
@@ -272,7 +290,7 @@
       Annuler l'utilisation du cadeau
     </button>
     <div class="flow-recap" data-recap></div>
-    <div class="fld"><label for="rdv-date">Date</label><input id="rdv-date" type="date" onchange="loadSlots()"></div>
+    <div class="fld"><label for="rdv-date">Date</label><div class="closure-calendar" id="rdv-date-calendar"><input id="rdv-date" type="date" onchange="loadSlots()"><div class="closure-cal-head"><button type="button" id="rdv-date-prev" aria-label="Mois précédent">‹</button><strong id="rdv-date-month"></strong><button type="button" id="rdv-date-next" aria-label="Mois suivant">›</button></div><div class="closure-cal-grid" id="rdv-date-grid"></div><p style="font-size:12px;color:#888;margin-top:8px">Les dates grisées sont indisponibles ou correspondent à une fermeture du salon.</p></div></div>
     <div class="eyebrow" style="margin-top:20px">Créneaux disponibles</div>
     <div id="half-toggle" class="half-toggle" style="display:none;margin-bottom:14px">
       <button id="half-morning" onclick="showHalf('morning')">Matin</button>
@@ -686,6 +704,7 @@ function showHalf(half) {
 }
 
 function loadSlots() {
+  if (!selService) return; // Ne pas demander de disponibilités avant le choix de la prestation.
   selDate = document.getElementById('rdv-date').value;
   selSlot = null;
   document.getElementById('date-next-btn').disabled = true;
@@ -907,6 +926,68 @@ function confirmCancel() {
 if (!checkForCancelLink()) {
   loadCatalog();
 }
+</script>
+<script>
+(function(){
+  var input = document.getElementById('rdv-date');
+  var grid = document.getElementById('rdv-date-grid');
+  var monthTitle = document.getElementById('rdv-date-month');
+  var closed = [];
+  var today = (typeof salonToday === 'function' ? salonToday() : new Date().toISOString().slice(0,10));
+  var shown = new Date(today + 'T12:00:00'); shown.setDate(1);
+  function pad(n){ return String(n).padStart(2,'0'); }
+  function iso(y,m,d){ return y+'-'+pad(m)+'-'+pad(d); }
+  function render(){
+    today = (typeof salonToday === 'function' ? salonToday() : new Date().toISOString().slice(0,10));
+    var y=shown.getFullYear(), m=shown.getMonth();
+    monthTitle.textContent = shown.toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+    grid.innerHTML='';
+    ['L','M','M','J','V','S','D'].forEach(function(day){var x=document.createElement('span');x.textContent=day;grid.appendChild(x);});
+    var offset=(new Date(y,m,1).getDay()+6)%7;
+    for(var k=0;k<offset;k++){grid.appendChild(document.createElement('span'));}
+    var count=new Date(y,m+1,0).getDate();
+    for(var d=1;d<=count;d++){
+      (function(day){var value=iso(y,m+1,day),button=document.createElement('button');button.type='button';button.textContent=day;
+      var unavailable=value<today || (input.max && value>input.max) || closed.some(function(c){return value>=c.start_date && value<=c.end_date;});
+      button.disabled=unavailable;button.className=value===input.value?'selected':'';
+      button.setAttribute('aria-label',value);if(unavailable)button.title='Date indisponible';
+      button.onclick=function(){input.value=value;input.dispatchEvent(new Event('change',{bubbles:true}));render();};grid.appendChild(button);})(d);
+    }
+    document.getElementById('rdv-date-prev').disabled=iso(y,m+1,1)<today.slice(0,7)+'-01';
+  }
+  document.getElementById('rdv-date-prev').onclick=function(){shown.setMonth(shown.getMonth()-1);render();};
+  document.getElementById('rdv-date-next').onclick=function(){shown.setMonth(shown.getMonth()+1);render();};
+  input.addEventListener('change',render);
+  // Utiliser l'API commune pour transmettre X-Salon-Slug : sinon les fermetures
+  // d'un autre salon (salon par défaut) étaient affichées.
+  api('/api/salon-calendar/public-closures')
+    .then(function(r){
+      closed = r.items || [];
+      // Sélectionner directement le premier jour ouvert, sans faire tâtonner le client.
+      var candidate = input.value && input.value >= today ? input.value : today;
+      var maxDate = input.max || '';
+      for (var n = 0; n < 366; n++) {
+        var blocked = closed.some(function(c){return candidate >= c.start_date && candidate <= c.end_date;});
+        if (!blocked) break;
+        var next = new Date(candidate + 'T12:00:00');
+        next.setDate(next.getDate() + 1);
+        candidate = iso(next.getFullYear(), next.getMonth() + 1, next.getDate());
+      }
+      if ((!maxDate || candidate <= maxDate) && candidate !== input.value) {
+        input.value = candidate;
+        if (selService) input.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      if (input.value) { shown = new Date(input.value + 'T12:00:00'); shown.setDate(1); }
+      render();
+    })
+    .catch(function(){
+      // En cas d'erreur, éviter d'afficher comme ouvertes des dates inconnues.
+      grid.innerHTML = '<p role="alert">Calendrier temporairement indisponible. Réessayez dans quelques instants.</p>';
+      input.value = '';
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+  render();
+})();
 </script>
 </body>
 </html>
