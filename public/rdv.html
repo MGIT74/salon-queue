@@ -943,10 +943,34 @@ if (!checkForCancelLink()) {
   document.getElementById('rdv-date-prev').onclick=function(){shown.setMonth(shown.getMonth()-1);render();};
   document.getElementById('rdv-date-next').onclick=function(){shown.setMonth(shown.getMonth()+1);render();};
   input.addEventListener('change',render);
-  fetch('/api/salon-calendar/public-closures'+location.search.split('#')[0],{credentials:'same-origin'})
-    .then(function(r){if(!r.ok)throw Error('closures');return r.json();})
-    .then(function(r){closed=r.items||[];if(closed.some(function(c){return input.value>=c.start_date&&input.value<=c.end_date;})){input.value='';input.dispatchEvent(new Event('change'));}render();})
-    .catch(function(){render();});
+  // Utiliser l'API commune pour transmettre X-Salon-Slug : sinon les fermetures
+  // d'un autre salon (salon par défaut) étaient affichées.
+  api('/api/salon-calendar/public-closures')
+    .then(function(r){
+      closed = r.items || [];
+      // Sélectionner directement le premier jour ouvert, sans faire tâtonner le client.
+      var candidate = input.value && input.value >= today ? input.value : today;
+      var maxDate = input.max || '';
+      for (var n = 0; n < 366; n++) {
+        var blocked = closed.some(function(c){return candidate >= c.start_date && candidate <= c.end_date;});
+        if (!blocked) break;
+        var next = new Date(candidate + 'T12:00:00');
+        next.setDate(next.getDate() + 1);
+        candidate = iso(next.getFullYear(), next.getMonth() + 1, next.getDate());
+      }
+      if ((!maxDate || candidate <= maxDate) && candidate !== input.value) {
+        input.value = candidate;
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      if (input.value) { shown = new Date(input.value + 'T12:00:00'); shown.setDate(1); }
+      render();
+    })
+    .catch(function(){
+      // En cas d'erreur, éviter d'afficher comme ouvertes des dates inconnues.
+      grid.innerHTML = '<p role="alert">Calendrier temporairement indisponible. Réessayez dans quelques instants.</p>';
+      input.value = '';
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    });
   render();
 })();
 </script>
