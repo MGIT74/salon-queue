@@ -803,7 +803,7 @@ router.post('/cancel-group', wrap(async (req, res) => {
   if (!appt) return res.status(404).json({ error: 'Rendez-vous introuvable' });
 
   const members = appt.group_id
-    ? (await pool.query("SELECT id, salon_id, scheduled_at, promoted_queue_id, gift_card_id FROM appointments WHERE group_id = ? AND status = 'confirmed'", [appt.group_id]))[0]
+    ? (await pool.query("SELECT id, salon_id, scheduled_at, promoted_queue_id, gift_card_id FROM appointments WHERE group_id = ? AND salon_id = ? AND status = 'confirmed'", [appt.group_id, appt.salon_id]))[0]
     : (await pool.query("SELECT id, salon_id, scheduled_at, promoted_queue_id, gift_card_id FROM appointments WHERE id = ? AND status = 'confirmed'", [appt.id]))[0];
   if (!members.length) return res.status(409).json({ error: 'Ces rendez-vous sont déjà annulés' });
 
@@ -812,7 +812,13 @@ router.post('/cancel-group', wrap(async (req, res) => {
   const nowMs = new Date(nowParisDatetimeString(rdvSettings.timezone).replace(' ', 'T') + 'Z');
   let cancelled = 0, kept = 0;
   for (const m of members) {
-    const minutesUntil = (new Date(m.scheduled_at.replace(' ', 'T') + 'Z') - nowMs) / 60000;
+    const scheduledLocal = m.scheduled_at instanceof Date ? m.scheduled_at.toISOString().slice(0, 19).replace('T', ' ') : String(m.scheduled_at).replace('T', ' ').slice(0, 19);
+    const minutesUntil = (new Date(scheduledLocal.replace(' ', 'T') + 'Z') - nowMs) / 60000;
+    if (minutesUntil <= 0) { kept++; continue; }
+    if (m.promoted_queue_id) {
+      const [[paid]] = await pool.query('SELECT id FROM sales WHERE salon_id = ? AND queue_id = ? LIMIT 1', [m.salon_id, m.promoted_queue_id]);
+      if (paid) { kept++; continue; }
+    }
     if (deadlineMin > 0 && minutesUntil < deadlineMin) { kept++; continue; }
     await pool.query('UPDATE appointments SET status = ? WHERE id = ?', ['cancelled', m.id]);
     if (m.promoted_queue_id) {
