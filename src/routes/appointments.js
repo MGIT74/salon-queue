@@ -1155,7 +1155,7 @@ router.put('/:id/reschedule', requireAdminOrBarber, wrap(withBookingLock(async (
     [req.params.id, req.salon.id]
   );
   if (!appt) return res.status(404).json({ error: 'Rendez-vous introuvable' });
-  if (appt.status === 'cancelled') return res.status(409).json({ error: 'Ce rendez-vous est annulé, impossible de le modifier.' });
+  if (appt.status !== 'confirmed') return res.status(409).json({ error: 'Seuls les rendez-vous confirmés peuvent être déplacés.' });
 
   // Un coiffeur (session PIN, pas admin) ne peut déplacer que le RDV du
   // coiffeur actif (lui-même, ou celui désigné par bulle depuis la caisse
@@ -1163,6 +1163,14 @@ router.put('/:id/reschedule', requireAdminOrBarber, wrap(withBookingLock(async (
   // à un autre coiffeur (barber_id), si ce dernier a le créneau libre.
   if (req.actingBarberId && appt.barber_id && appt.barber_id !== req.actingBarberId) {
     return res.status(403).json({ error: "Ce n'est pas le RDV de ce coiffeur." });
+  }
+
+  if (appt.promoted_queue_id) {
+    const [[paid]] = await pool.query(
+      'SELECT id FROM sales WHERE salon_id = ? AND queue_id = ? LIMIT 1',
+      [req.salon.id, appt.promoted_queue_id]
+    );
+    if (paid) return res.status(409).json({ error: 'Rendez-vous encaissé : déplacement interdit.' });
   }
 
   const finalBarberId = barber_id || appt.barber_id;
