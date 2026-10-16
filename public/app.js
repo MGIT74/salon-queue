@@ -308,6 +308,9 @@ function nowSalonDatetimeString() {
 // à 00h48 à Paris, UTC est encore la veille. Toute valeur par défaut / borne « aujourd'hui » passe par ici.
 function salonToday() { return nowSalonDatetimeString().slice(0, 10); }
 if (typeof window !== 'undefined') window.salonToday = salonToday;
+// Jour déjà passé (date du salon) : plus aucune prise de RDV depuis les agendas (admin, Mon poste, caisse).
+function isPastDay(dateStr) { return String(dateStr) < salonToday(); }
+if (typeof window !== 'undefined') window.isPastDay = isPastDay;
 
 // Offre propre à un coiffeur (cf. GET /api/barbers) : prestations/suppléments qu'il ne fait pas, et son tarif
 // personnalisé (prix et/ou durée) qui remplace celui du catalogue. Même règle que le serveur (src/lib/barberOffer.js).

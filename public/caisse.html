@@ -985,7 +985,7 @@
   </div>
 </div>
 
-<script src="/app.js?v=22"></script>
+<script src="/app.js?v=23"></script>
 <script src="/staff-group.js?v=5"></script>
 <script src="/autorefresh.js?v=2"></script>
 <script>requireSalonInUrl("Pour utiliser la caisse, ouvrez le lien de votre salon.");</script>
@@ -2184,7 +2184,7 @@ function renderAgendaTimeline(dateStr) {
     // Bouton de raccourci seulement si on sait pour QUI ajouter (une
     // bulle précise sélectionnée) - en mode "Tous", pas de coiffeur
     // évident à qui l'attribuer.
-    if (activeBarberId) {
+    if (activeBarberId && !isPastDay(dateStr)) {
       emptyMsg += '<button class="btn btn-primary" style="width:100%;margin-top:10px" onclick="openCaisseAddAppointment(\'' + dateStr + '\',\'' + activeBarberId + '\')">+ Ajouter un RDV</button>';
     }
     return emptyMsg;
@@ -2267,7 +2267,7 @@ function renderAgendaTimeline(dateStr) {
     // juste un message, plutot que d'ouvrir un formulaire pour un
     // coiffeur qui ne prend pas de RDV en ligne.
     var rowBarber = bid !== 'unassigned' && allBarbers.find(function (x) { return x.id === bid; });
-    var trackClick = bid === 'unassigned' ? ''
+    var trackClick = (bid === 'unassigned' || isPastDay(dateStr)) ? ''
       : (rowBarber && rowBarber.accepts_appointments)
         ? ' onclick="openCaisseAddAppointment(\'' + dateStr + '\',\'' + bid + '\')" title="Cliquer pour ajouter un RDV"'
         : ' onclick="event.stopPropagation();notifySansRdvOnly(this)" data-barber-name="' + esc(b.name) + '"';
@@ -2770,6 +2770,10 @@ function paOpenGroup() {
 }
 
 function openCaisseAddAppointment(dateStr, barberId) {
+  if (isPastDay(dateStr)) {
+    toast('Date passée : impossible de prendre un rendez-vous ce jour-là.', true);
+    return;
+  }
   var barber = allBarbers.find(function (b) { return b.id === barberId; });
   var when = new Date(dateStr + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' });
   var state = { serviceId: null, extraIds: [], productIds: [], time: null };

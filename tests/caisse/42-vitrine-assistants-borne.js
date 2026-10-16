@@ -12,6 +12,9 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 const fnSrc = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i === -1) throw new Error('introuvable: ' + name); const j = src.indexOf('\n}\n', i); return src.slice(i, j + 3); };
 const IMG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
 const CLOSURES = (s) => 'var rdvSalonClosures = [];\n' + (s.match(/^function rdvIsSalonClosed\(.*$/m) || [''])[0];  // fermetures exceptionnelles (aucune ici)
+// Jour passe : meme regle que app.js (date du jour = date locale du test)
+const PASTDAY = "function isPastDay(d) { var t = new Date(); return String(d) < t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0'); }";
+const FUTURE = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);   // jamais une date passee (refusee)
 const SHARED = ['esc', 'normText', 'vitrineIcon', 'vitrineBaseIcon', 'extraIcon', 'productIcon', 'groupItems', 'vitrineCardHtml', 'vitrineRender', 'vitrineSummary', 'vitrineFilter', 'vitrineSelectOne', 'vitrineToggle', 'vitrineSearchHtml', 'formatMinutes', '_lockBodyScroll', '_unlockBodyScroll', '_buildModal', '_closeModal', 'vitrineFlow', 'vitrineRecapHtml'];
 const VARS = ['VITRINE_PLUS_SVG', 'VITRINE_CHECK_SVG', 'VITRINE_CHECK_SM_SVG'].map(n => app.match(new RegExp('^var ' + n + ' = .*;$', 'm'))[0]).join('\n');
 
@@ -41,8 +44,8 @@ const visible = (w, id) => w.document.getElementById(id).style.display !== 'none
   console.log('\n[A] Tableau de bord - menu RDV : assistant "Ajouter un RDV" (depuis le calendrier)');
   let w = world();
   setup(w, { barbers: [{ id: 'b1', name: 'Alice' }, { id: 'b2', name: 'Bob' }], isBookableForAdmin: () => true });
-  w.eval(CLOSURES(dash) + '\n' + fnSrc(dash, 'openAdminAddAppointment') + '\nvar aaBarbersPreselected = null;');
-  w.openAdminAddAppointment('2026-10-08', 'b1');
+  w.eval(CLOSURES(dash) + '\n' + PASTDAY + '\n' + fnSrc(dash, 'openAdminAddAppointment') + '\nvar aaBarbersPreselected = null;');
+  w.openAdminAddAppointment(FUTURE, 'b1');
   let d = w.document;
   check('1re etape : le client (nom, puis une ou plusieurs personnes)', visible(w, 'aa-step-client') && !visible(w, 'aa-step-service'));
   d.getElementById('aa-name').value = 'Karim'; w.aaStartSolo();
@@ -76,8 +79,8 @@ const visible = (w, id) => w.document.getElementById(id).style.display !== 'none
 
   console.log('\n[B] Mon poste : assistant "Ajouter un RDV" (le coiffeur, pour lui-meme)');
   w = world(); setup(w, { me: { id: 'b1', name: 'Alice' } });   // "me" : le coiffeur connecte a Mon poste
-  w.eval(CLOSURES(poste) + '\n' + fnSrc(poste, 'openPosteAddAppointment'));
-  w.openPosteAddAppointment('2026-10-08'); d = w.document;
+  w.eval(CLOSURES(poste) + '\n' + PASTDAY + '\n' + fnSrc(poste, 'openPosteAddAppointment'));
+  w.openPosteAddAppointment(FUTURE); d = w.document;
   check('Mon poste : 1re etape = le client (comme le dashboard et la caisse)', visible(w, 'pa-step-client') && !visible(w, 'pa-step-service'));
   d.getElementById('pa-name').value = 'Karim'; w.paStartSolo();
   sv = [...d.querySelectorAll('#pa-service-grid .item-card')];
@@ -96,8 +99,8 @@ const visible = (w, id) => w.document.getElementById(id).style.display !== 'none
 
   console.log('\n[B2] Caisse : assistant "Ajouter un RDV" depuis l\'Agenda (meme assistant que Mon poste)');
   w = world(); setup(w, { me: { id: 'b1', name: 'Alice' }, allBarbers: [{ id: 'b1', name: 'Alice' }], catalog: CATALOG });
-  w.eval(fnSrc(caisse, 'openCaisseAddAppointment'));
-  w.openCaisseAddAppointment('2026-10-08', 'b1'); d = w.document;
+  w.eval(PASTDAY + '\n' + fnSrc(caisse, 'openCaisseAddAppointment'));
+  w.openCaisseAddAppointment(FUTURE, 'b1'); d = w.document;
   d.getElementById('pa-name').value = 'Karim'; w.paStartSolo();
   sv = [...d.querySelectorAll('#pa-service-grid .item-card')];
   check('caisse : prestations en cartes de vitrine, image en haut et texte dessous, etape Prestation affichee', sv.length === 2 && visible(w, 'pa-step-service') && sv[0].children[0].classList.contains('item-media') && sv[0].querySelector('.item-body .item-name').textContent === 'Barbe premium');

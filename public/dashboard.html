@@ -2787,7 +2787,7 @@
   </div>
 </div>
 
-<script src="/app.js?v=22"></script>
+<script src="/app.js?v=23"></script>
 <script src="/staff-group.js?v=5"></script>
 <script src="/daterange.js?v=4"></script>
 <script>
@@ -6290,7 +6290,7 @@ function renderDayTimelineHtml(dateStr, dayAppts) {
     // visible mais pas cliquable pour ajouter un RDV - juste un message,
     // au lieu d'ouvrir un formulaire pour un coiffeur qui ne prend pas
     // de RDV en ligne.
-    var trackClick = rdvIsSalonClosed(dateStr)
+    var trackClick = (rdvIsSalonClosed(dateStr) || isPastDay(dateStr))
       ? ''
       : b.bookable
       ? ' onclick="openAdminAddAppointment(\'' + dateStr + '\',\'' + bid + '\')"'
@@ -6616,6 +6616,10 @@ function aaOpenGroup() {
 }
 
 function openAdminAddAppointment(dateStr, preselectedBarberId) {
+  if (isPastDay(dateStr)) {
+    toast('Date passée : impossible de prendre un rendez-vous ce jour-là.', true);
+    return;
+  }
   if (rdvIsSalonClosed(dateStr)) {
     toast('Salon fermé ce jour : impossible de créer un rendez-vous.', true);
     return;

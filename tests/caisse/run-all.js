@@ -128,7 +128,8 @@ const suite = [
   ['105-dashboard-courbe-salon.js', true, ['exit']],
   ['106-poste-agenda-equipe.js', true, ['exit']],
   ['107-date-salon-minuit.js', false, ['exit']],
-  ['108-tarif-coiffeur-reservation.js', false, ['exit']]
+  ['108-tarif-coiffeur-reservation.js', false, ['exit']],
+  ['109-agenda-date-passee.js', false, ['exit']]
 ];
 
 let bad = 0;

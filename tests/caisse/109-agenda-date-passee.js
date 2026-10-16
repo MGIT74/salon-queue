@@ -1,0 +1,31 @@
+// Agendas (admin > Rendez-vous, Mon poste, caisse) : un jour deja passe se consulte mais n'est plus proposable
+// a une prise de RDV - pas de bouton « + Ajouter », lignes du planning non cliquables, assistant refuse.
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+let pass = 0, fail = 0;
+const check = (n, ok, x = '') => { (ok ? pass++ : fail++); console.log((ok ? '  OK   ' : '  ECHEC') + ' ' + n + (x ? '  [' + x + ']' : '')); };
+const read = (f) => fs.readFileSync(path.join(__dirname, '../../public', f), 'utf8');
+
+console.log('\n[A] isPastDay (app.js) : date du salon');
+const app = read('app.js');
+const a = app.indexOf('var SALON_TIMEZONE'), b = app.indexOf('window.isPastDay = isPastDay;') + 'window.isPastDay = isPastDay;'.length;
+const Real = Date, fixed = new Real('2026-10-15T22:30:00Z').getTime();   // 00h30 a Paris le 16
+class FakeDate extends Real { constructor(...x) { if (x.length) super(...x); else super(fixed); } static now() { return fixed; } }
+const ctx = { Date: FakeDate, Intl, window: {} }; vm.createContext(ctx); vm.runInContext(app.slice(a, b), ctx);
+check('le 15 est passe (00h30 a Paris le 16)', ctx.isPastDay('2026-10-15') === true);
+check('le 16 (aujourd\'hui) reste ouvert', ctx.isPastDay('2026-10-16') === false);
+check('le 17 reste ouvert', ctx.isPastDay('2026-10-17') === false);
+
+console.log('\n[B] Les trois agendas');
+const fnBody = (src, name) => { const i = src.indexOf('function ' + name + '('); return src.slice(i, src.indexOf('\nfunction ', i + 10)); };
+[['dashboard.html', 'openAdminAddAppointment'], ['poste.html', 'openPosteAddAppointment'], ['caisse.html', 'openCaisseAddAppointment']].forEach(([f, fn]) => {
+  const s = read(f);
+  check(f + ' : l\'assistant refuse une date passee', /^\s*if \(isPastDay\(dateStr\)\) \{\s*toast\('Date pass/m.test(fnBody(s, fn).split('\n').slice(1, 3).join('\n')));
+});
+check('admin : lignes du planning non cliquables un jour passe', /var trackClick = \(rdvIsSalonClosed\(dateStr\) \|\| isPastDay\(dateStr\)\)\s*\? ''/.test(read('dashboard.html')));
+check('poste : lignes non cliquables et pas de bouton « + Ajouter » un jour passe', /var trackClick = \(rdvIsSalonClosed\(dateStr\) \|\| isPastDay\(dateStr\)\) \? ''/.test(read('poste.html')) && /if \(isPastDay\(dateStr\)\) return '';/.test(fnBody(read('poste.html'), 'posteAddBtnHtml')));
+check('caisse : lignes non cliquables et pas de bouton « + Ajouter » un jour passe', /var trackClick = \(bid === 'unassigned' \|\| isPastDay\(dateStr\)\) \? ''/.test(read('caisse.html')) && /if \(activeBarberId && !isPastDay\(dateStr\)\)/.test(read('caisse.html')));
+
+console.log('\nRESULTAT : ' + pass + ' verifications reussies, ' + fail + ' echec(s)');
+process.exit(fail ? 1 : 0);

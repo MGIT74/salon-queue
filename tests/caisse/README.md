@@ -139,4 +139,5 @@ node tests/caisse/105-dashboard-courbe-salon.js  # Tableau de bord : courbe glob
 node tests/caisse/106-poste-agenda-equipe.js  # Mon poste > Agenda : timeline de tous les coiffeurs, RDV au nom d'un collegue
 node tests/caisse/107-date-salon-minuit.js  # « Aujourd'hui » = date du salon (pas UTC) : apres minuit, reservation et agenda passent bien au lendemain
 node tests/caisse/108-tarif-coiffeur-reservation.js  # Tarif propre a chaque coiffeur (prix + duree) et prestations qu'il ne fait pas / archivees : creneaux, reservations, ecrans
+node tests/caisse/109-agenda-date-passee.js  # Agendas admin / Mon poste / caisse : un jour passe se consulte mais n'est plus proposable a une prise de RDV
 ```
