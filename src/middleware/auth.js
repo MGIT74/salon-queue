@@ -81,7 +81,7 @@ module.exports = async function requireAdmin(req, res, next) {
 
     const ok = await verifyOwnerPassword(req.salon, given);
     if (!ok) {
-      recordFailure(rlKey);
+      if (given) recordFailure(rlKey);
       return res.status(401).json({ error: 'Mot de passe incorrect' });
     }
     // Uniquement pour les comptes créés par inscription (email_verified
