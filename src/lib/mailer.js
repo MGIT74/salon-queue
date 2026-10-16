@@ -3,7 +3,7 @@ const { AsyncLocalStorage } = require('async_hooks');
 const forceStore = new AsyncLocalStorage();
 /** Exécute fn en ignorant la pause (ex. l'admin teste ses modèles d'emails sur sa propre adresse). */
 function forceSend(fn) { return forceStore.run({ force: true }, fn); }
-const { getSettings } = require('../db');
+const { getSettings, pool } = require('../db');
 
 // Un transport par salon, chacun avec sa propre config SMTP.
 const cache = new Map();
@@ -20,11 +20,18 @@ async function emailsPaused(salonId) {
   return String(s.client_emails_paused) === '1';
 }
 
+// Nom affiché du salon : celui des réglages, sinon le vrai nom du salon (jamais un nom générique).
+async function salonDisplayName(salonId, s) {
+  if (s.salon_name) return s.salon_name;
+  try { const [[row]] = await pool.query('SELECT name FROM salons WHERE id = ?', [salonId]); return (row && row.name) || ''; }
+  catch (e) { return ''; }
+}
+
 async function getTransport(salonId, opts) {
   const forced = (opts && opts.force) || (forceStore.getStore() || {}).force;
   if (!forced && await emailsPaused(salonId)) {
     const s = await getSettings(salonId);
-    return { from: s.smtp_from || s.smtp_user || '', salon: s.salon_name || 'Le Salon', tx: PAUSED_TX, paused: true };
+    return { from: s.smtp_from || s.smtp_user || '', salon: await salonDisplayName(salonId, s), tx: PAUSED_TX, paused: true };
   }
   if (cache.has(salonId)) return cache.get(salonId);
   const s = await getSettings(salonId);
@@ -32,7 +39,7 @@ async function getTransport(salonId, opts) {
 
   const entry = {
     from: s.smtp_from || s.smtp_user,
-    salon: s.salon_name || 'Le Salon',
+    salon: await salonDisplayName(salonId, s),
     tx: nodemailer.createTransport({
       host: s.smtp_host,
       port: Number(s.smtp_port || 587),

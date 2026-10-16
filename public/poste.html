@@ -309,7 +309,7 @@
 
 <div class="wrap">
   <div class="login" id="login-screen">
-    <div class="mark" id="salon-mark">LE SALON</div>
+    <div class="mark" id="salon-mark">&nbsp;</div>
     <h1>Mon poste</h1>
     <div class="pin-dots" id="pin-dots">
       <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
@@ -412,7 +412,7 @@ function loadSalonName() {
   fetch('/api/settings/public', { headers: headers })
     .then(function (r) { return r.json(); })
     .then(function (d) {
-      var name = d.salon_name || 'Le Salon';
+      var name = d.salon_name || '';
       CURRENCY = d.currency || 'EUR'; if (d.timezone) SALON_TIMEZONE = d.timezone;
       rdvPrepAlertMin = Number(d.rdv_prep_alert_min) || 0;
       applyAccentColor(d.accent_color);

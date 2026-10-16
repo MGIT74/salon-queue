@@ -422,7 +422,7 @@ router.get('/public', wrap(async (req, res) => {
   res.json({
     ok: true,
     platform_login_image_url: platform.login_image_url || null,
-    salon_name: s.salon_name || 'Le Salon',
+    salon_name: s.salon_name || req.salon.name || '',   // vrai nom du salon, jamais un nom générique
     logo_url: s.logo_url || null,
     gift_tile_image_url: s.gift_tile_image_url || null,
     loyalty_card_image_url: s.loyalty_card_image_url || null,

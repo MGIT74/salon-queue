@@ -2892,7 +2892,7 @@ function loadCurrentSalonName() {
   })
     .then(function (r) { return r.json(); })
     .then(function (d) {
-      var name = d.salon_name || 'Le Salon';
+      var name = d.salon_name || '';
       currentSalonName = name;
       currentSalonLogo = d.logo_url || '';
       currentGiftTileImage = d.gift_tile_image_url || '';
