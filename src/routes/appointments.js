@@ -531,6 +531,9 @@ router.post('/', bookingRateLimiter, wrap(withBookingLock(async (req, res) => {
     extraDuration = rows.reduce((a, r) => a + r.duration_min, 0);
     extraNames = rows.map((r) => r.name);
   }
+  if (extraIds.length && (new Set(extraIds).size !== extraIds.length || extraNames.length !== extraIds.length)) {
+    return res.status(400).json({ error: 'Supplément invalide ou indisponible dans ce salon' });
+  }
   const durationMin = service.duration_min + extraDuration;
 
   // Détermine le coiffeur final (précis, ou le premier disponible
