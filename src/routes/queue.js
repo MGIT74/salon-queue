@@ -616,6 +616,23 @@ router.put('/:id', requireAdminOrBarber, wrap(async (req, res) => {
   }
 
   const { service_id, extras, barber_id, client_name, email, phone } = req.body;
+  const [[paidSale]] = await pool.query(
+    'SELECT id FROM sales WHERE salon_id = ? AND queue_id = ? LIMIT 1',
+    [req.salon.id, req.params.id]
+  );
+  if (paidSale) return res.status(409).json({ error: 'Passage déjà encaissé : modification interdite. Contactez le gérant.' });
+  if (service_id) {
+    const [[validService]] = await pool.query('SELECT id FROM services WHERE id = ? AND salon_id = ?', [service_id, req.salon.id]);
+    if (!validService) return res.status(400).json({ error: 'Prestation invalide pour ce salon' });
+  }
+  if (extras !== undefined && !Array.isArray(extras)) return res.status(400).json({ error: 'Suppléments invalides' });
+  if (Array.isArray(extras) && extras.length) {
+    const [validExtras] = await pool.query('SELECT id FROM extras WHERE salon_id = ? AND id IN (?)', [req.salon.id, extras]);
+    if (validExtras.length !== extras.length || new Set(extras).size !== extras.length) {
+      return res.status(400).json({ error: 'Supplément invalide pour ce salon' });
+    }
+  }
+
 
   // Un coiffeur ne peut pas ajouter un supplément à une coupe EN COURS
   // s'il y a déjà quelqu'un qui attend son tour derrière lui — ça le
