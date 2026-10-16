@@ -447,10 +447,11 @@ router.post('/checkin', signupRateLimiter('queue-checkin', { max: 12, windowMs: 
 // --- Coiffeur : démarrer, terminer, annuler ------------------------------
 router.post('/:id/start', requireAdminOrBarber, wrap(async (req, res) => {
   const [[row]] = await pool.query(
-    'SELECT id, barber_id, checkin_at FROM queue WHERE id = ? AND salon_id = ?',
+    'SELECT id, barber_id, checkin_at, status FROM queue WHERE id = ? AND salon_id = ?',
     [req.params.id, req.salon.id]
   );
   if (!row) return res.status(404).json({ error: 'Client introuvable' });
+  if (!["waiting"].includes(row.status)) return res.status(409).json({ error: 'Transition de statut impossible' });
 
   // Un coiffeur connecté par PIN (pas admin) ne peut agir qu'au nom du
   // coiffeur actif (bulle sélectionnée - lui-même par défaut), et
@@ -524,10 +525,11 @@ router.post('/:id/start', requireAdminOrBarber, wrap(async (req, res) => {
  */
 router.post('/:id/quick-finish', requireAdminOrBarber, wrap(async (req, res) => {
   const [[row]] = await pool.query(
-    'SELECT id, barber_id, checkin_at FROM queue WHERE id = ? AND salon_id = ?',
+    'SELECT id, barber_id, checkin_at, status FROM queue WHERE id = ? AND salon_id = ?',
     [req.params.id, req.salon.id]
   );
   if (!row) return res.status(404).json({ error: 'Client introuvable' });
+  if (!["waiting"].includes(row.status)) return res.status(409).json({ error: 'Transition de statut impossible' });
 
   if (req.actingBarberId) {
     if (row.barber_id && row.barber_id !== req.actingBarberId) {
@@ -568,10 +570,11 @@ router.post('/:id/quick-finish', requireAdminOrBarber, wrap(async (req, res) => 
 router.post('/:id/finish', requireAdminOrBarber, wrap(async (req, res) => {
   if (req.actingBarberId) {
     const [[row]] = await pool.query(
-      'SELECT barber_id FROM queue WHERE id = ? AND salon_id = ?',
+      'SELECT barber_id, status FROM queue WHERE id = ? AND salon_id = ?',
       [req.params.id, req.salon.id]
     );
     if (!row) return res.status(404).json({ error: 'Client introuvable' });
+    if (!["in_progress"].includes(row.status)) return res.status(409).json({ error: 'Transition de statut impossible' });
     if (row.barber_id !== req.actingBarberId) {
       return res.status(403).json({ error: "Ce n'est pas votre client en cours." });
     }
@@ -587,10 +590,11 @@ router.post('/:id/finish', requireAdminOrBarber, wrap(async (req, res) => {
 router.post('/:id/cancel', requireAdminOrBarber, wrap(async (req, res) => {
   if (req.actingBarberId) {
     const [[row]] = await pool.query(
-      'SELECT barber_id FROM queue WHERE id = ? AND salon_id = ?',
+      'SELECT barber_id, status FROM queue WHERE id = ? AND salon_id = ?',
       [req.params.id, req.salon.id]
     );
     if (!row) return res.status(404).json({ error: 'Client introuvable' });
+    if (!["waiting","in_progress"].includes(row.status)) return res.status(409).json({ error: 'Transition de statut impossible' });
     if (row.barber_id && row.barber_id !== req.actingBarberId) {
       return res.status(403).json({ error: "Ce n'est pas votre client." });
     }
