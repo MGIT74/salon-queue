@@ -344,20 +344,26 @@ async function sendAppointmentRescheduled(salonId, to, info) {
   });
 }
 
-async function sendClientVerificationEmail(salonId, to, verifyUrl) {
+async function sendClientVerificationEmail(salonId, to, verifyUrl, options = {}) {
   const { tx, from, salon } = await getTransport(salonId, { force: true });
   await tx.sendMail({
     from,
     to,
-    subject: 'Confirmez votre adresse email — ' + salon,
-    text: `Bienvenue ! Cliquez sur ce lien pour confirmer votre adresse email et activer votre compte ` +
-          `chez ${salon} (valable 24 heures) :\n\n${verifyUrl}\n\n` +
+    subject: (options.change ? 'Confirmez votre nouvelle adresse email — ' : 'Confirmez votre adresse email — ') + salon,
+    text: (options.change ? `Confirmez votre nouvelle adresse email ` : `Bienvenue ! Cliquez sur ce lien pour confirmer votre adresse email et activer votre compte `) +
+          `chez ${salon} (valable ${options.change ? '15 minutes' : '24 heures'}) :\n\n${verifyUrl}\n\n` +
           `Si vous n'êtes pas à l'origine de cette inscription, ignorez simplement cet email.`,
-    html: `<p>Bienvenue ! Cliquez sur ce lien pour confirmer votre adresse email et activer votre compte ` +
-          `chez ${h(salon)} (valable 24 heures) :</p>` +
+    html: `<p>${options.change ? 'Confirmez votre nouvelle adresse email' : 'Bienvenue ! Cliquez sur ce lien pour confirmer votre adresse email et activer votre compte'} ` +
+          `chez ${h(salon)} (valable ${options.change ? '15 minutes' : '24 heures'}) :</p>` +
           `<p><a href="${h(verifyUrl)}">${h(verifyUrl)}</a></p>` +
           `<p>Si vous n'êtes pas à l'origine de cette inscription, ignorez simplement cet email.</p>`
   });
+}
+
+async function sendClientSecurityNotice(salonId, to, subject, message) {
+  const { tx, from, salon } = await getTransport(salonId, { force: true });
+  await tx.sendMail({ from, to, subject: subject + ' — ' + salon,
+    text: message, html: '<p>' + h(message) + '</p>' });
 }
 
 async function sendClientPasswordReset(salonId, to, resetUrl) {
@@ -434,5 +440,5 @@ async function sendCustomClientEmail(salonId, to, clientName, subject, message) 
 module.exports = {
   sendTurnSoon, sendTest, sendGiftConfirmation, sendGiftCodeRenewed, sendLoyaltyActivation, sendAppointmentConfirmation, sendGroupAppointmentConfirmation,
   sendAppointmentReminder, sendAppointmentCancelledByAdmin, sendAppointmentRescheduled,
-  sendClientVerificationEmail, sendClientPasswordReset, sendSalonClosureNotice, sendCustomClientEmail, invalidateTransport, emailsPaused, forceSend
+  sendClientVerificationEmail, sendClientPasswordReset, sendClientSecurityNotice, sendSalonClosureNotice, sendCustomClientEmail, invalidateTransport, emailsPaused, forceSend
 };
