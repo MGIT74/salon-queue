@@ -18,7 +18,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Prendre rendez-vous</title>
-<link rel="stylesheet" href="/app.css?v=31">
+<link rel="stylesheet" href="/app.css?v=32">
 <script>
   // Adresse SANS ?salon=... : on masque la page le temps de savoir si la plateforme heberge plusieurs salons
   // (voir guardMissingSalon) - pour ne jamais montrer, meme une fraction de seconde, un formulaire sans salon.
@@ -290,13 +290,19 @@
       Annuler l'utilisation du cadeau
     </button>
     <div class="flow-recap" data-recap></div>
-    <div class="fld"><label for="rdv-date">Date</label><div class="closure-calendar" id="rdv-date-calendar"><input id="rdv-date" type="date" onchange="loadSlots()"><div class="closure-cal-head"><button type="button" id="rdv-date-prev" aria-label="Mois précédent">‹</button><strong id="rdv-date-month"></strong><button type="button" id="rdv-date-next" aria-label="Mois suivant">›</button></div><div class="closure-cal-grid" id="rdv-date-grid"></div><p style="font-size:12px;color:#888;margin-top:8px">Les dates grisées sont indisponibles ou correspondent à une fermeture du salon.</p></div></div>
-    <div class="eyebrow" style="margin-top:20px">Créneaux disponibles</div>
-    <div id="half-toggle" class="half-toggle" style="display:none;margin-bottom:14px">
-      <button id="half-morning" onclick="showHalf('morning')">Matin</button>
-      <button id="half-afternoon" onclick="showHalf('afternoon')">Après-midi</button>
+    <div class="dt-split">
+      <div class="dt-cal">
+        <div class="fld"><label for="rdv-date">Date</label><div class="closure-calendar" id="rdv-date-calendar"><input id="rdv-date" type="date" onchange="loadSlots()"><div class="closure-cal-head"><button type="button" id="rdv-date-prev" aria-label="Mois précédent">‹</button><strong id="rdv-date-month"></strong><button type="button" id="rdv-date-next" aria-label="Mois suivant">›</button></div><div class="closure-cal-grid" id="rdv-date-grid"></div><p style="font-size:12px;color:#888;margin-top:8px">Les dates grisées sont indisponibles ou correspondent à une fermeture du salon.</p></div></div>
+      </div>
+      <div class="dt-slots">
+        <div class="eyebrow" style="margin-top:20px">Créneaux disponibles</div>
+        <div id="half-toggle" class="half-toggle" style="display:none;margin-bottom:14px">
+          <button id="half-morning" onclick="showHalf('morning')">Matin</button>
+          <button id="half-afternoon" onclick="showHalf('afternoon')">Après-midi</button>
+        </div>
+        <div class="slots-grid" id="slots-grid"><div class="empty">Choisissez une date</div></div>
+      </div>
     </div>
-    <div class="slots-grid" id="slots-grid"><div class="empty">Choisissez une date</div></div>
     <button class="go" id="date-next-btn" onclick="goToContactStep()" disabled>Suivant</button>
   </section>
 
@@ -337,7 +343,7 @@
   </section>
 </div>
 
-<script src="/app.js?v=21"></script>
+<script src="/app.js?v=22"></script>
 <script src="/group-booking.js?v=16"></script>
 <style>
 body.staff-mode .gift-summary-box,body.staff-mode .theme-btn{display:none!important}

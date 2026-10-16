@@ -1158,7 +1158,7 @@ function giftTileHtml(imageUrl, onclick) {
    Le decoupage ne change rien sur mobile (display: contents, voir app.css) : seul le bureau (>= 900px) passe en 3 zones. */
 function vitrinePageFlow(wrap, panelIds) {
   wrap.classList.add('page-flow');
-  var BODY_START = '.item-grid,.aa-grid,.slots-grid,.fld,.modal-error,.hint,.items-empty,.items-search';
+  var BODY_START = '.item-grid,.aa-grid,.slots-grid,.fld,.dt-split,.modal-error,.hint,.items-empty,.items-search';
   panelIds.forEach(function (id) {
     var panel = document.getElementById(id);
     if (!panel || panel.classList.contains('flow')) return;
