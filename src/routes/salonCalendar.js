@@ -100,6 +100,29 @@ router.post('/closures', requireAdmin, wrap(async (req, res) => {
   if (affected.length && req.body.confirm_existing_appointments !== true)
     return res.status(409).json({ error: 'Des rendez-vous existent sur cette période. Confirmation explicite requise.', count: affected.length, items: affected });
 
+  // Préparer les destinataires AVANT l'insertion : une erreur SQL ne doit
+  // jamais créer une fermeture partielle suivie d'une erreur HTTP 500.
+  let recipients = [];
+  if (send_email) {
+    const [rows] = await pool.query(
+      `SELECT LOWER(email) AS email_lower, MIN(client_name) AS client_name
+       FROM (
+         SELECT c.email AS email, c.name AS client_name
+         FROM clients c INNER JOIN salons sl ON sl.owner_id = c.owner_id
+         WHERE sl.id = ? AND c.email IS NOT NULL AND c.email <> ''
+         UNION ALL
+         SELECT q.email, q.client_name FROM queue q
+         WHERE q.salon_id = ? AND q.email IS NOT NULL AND q.email <> ''
+         UNION ALL
+         SELECT a.email, a.client_name FROM appointments a
+         WHERE a.salon_id = ? AND a.email IS NOT NULL AND a.email <> ''
+       ) AS all_known
+       GROUP BY LOWER(email)`,
+      [req.salon.id, req.salon.id, req.salon.id]
+    );
+    recipients = rows;
+  }
+
   const id = crypto.randomUUID();
   await pool.query(
     'INSERT INTO salon_closures (id, salon_id, start_date, end_date, reason) VALUES (?, ?, ?, ?, ?)',
@@ -108,18 +131,7 @@ router.post('/closures', requireAdmin, wrap(async (req, res) => {
 
   let emailResult = null;
   if (send_email) {
-    // Tous les emails connus du salon (comptes clients ET historique de
-    // passages/RDV, même sans compte) - dédupliqué par adresse.
-    const [rows] = await pool.query(
-      `SELECT DISTINCT LOWER(email) AS email_lower, MIN(client_name) AS client_name FROM (
-         SELECT email, client_name FROM clients WHERE salon_id = ? AND email IS NOT NULL AND email != ''
-         UNION ALL
-         SELECT email, client_name FROM queue WHERE salon_id = ? AND email IS NOT NULL AND email != ''
-       ) AS all_known
-       GROUP BY LOWER(email)`,
-      [req.salon.id, req.salon.id]
-    );
-
+    const rows = recipients;
     let sent = 0;
     let failed = 0;
     for (const r of rows) {
