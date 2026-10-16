@@ -63,6 +63,7 @@ router.get('/closures', requireAdmin, wrap(async (req, res) => {
 router.post('/closures', requireAdmin, wrap(async (req, res) => {
   const { start_date, end_date, reason, send_email, custom_message } = req.body;
   if (!start_date || !end_date) return res.status(400).json({ error: 'Dates de début et de fin requises' });
+  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(start_date) || !/^\\d{4}-\\d{2}-\\d{2}$/.test(end_date) || start_date > end_date) return res.status(400).json({ error: 'Période de fermeture invalide' });
 
   const id = crypto.randomUUID();
   await pool.query(
