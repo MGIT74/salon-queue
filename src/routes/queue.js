@@ -568,6 +568,9 @@ router.post('/:id/quick-finish', requireAdminOrBarber, wrap(async (req, res) => 
 }));
 
 router.post('/:id/finish', requireAdminOrBarber, wrap(async (req, res) => {
+  const [[currentState]] = await pool.query('SELECT status FROM queue WHERE id = ? AND salon_id = ?', [req.params.id, req.salon.id]);
+  if (!currentState) return res.status(404).json({ error: 'Client introuvable' });
+  if (!['in_progress'].includes(currentState.status)) return res.status(409).json({ error: 'Transition de statut impossible' });
   if (req.actingBarberId) {
     const [[row]] = await pool.query(
       'SELECT barber_id, status FROM queue WHERE id = ? AND salon_id = ?',
@@ -588,6 +591,9 @@ router.post('/:id/finish', requireAdminOrBarber, wrap(async (req, res) => {
 }));
 
 router.post('/:id/cancel', requireAdminOrBarber, wrap(async (req, res) => {
+  const [[currentState]] = await pool.query('SELECT status FROM queue WHERE id = ? AND salon_id = ?', [req.params.id, req.salon.id]);
+  if (!currentState) return res.status(404).json({ error: 'Client introuvable' });
+  if (!['waiting', 'in_progress'].includes(currentState.status)) return res.status(409).json({ error: 'Transition de statut impossible' });
   if (req.actingBarberId) {
     const [[row]] = await pool.query(
       'SELECT barber_id, status FROM queue WHERE id = ? AND salon_id = ?',
