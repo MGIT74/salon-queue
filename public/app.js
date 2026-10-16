@@ -309,6 +309,24 @@ function nowSalonDatetimeString() {
 function salonToday() { return nowSalonDatetimeString().slice(0, 10); }
 if (typeof window !== 'undefined') window.salonToday = salonToday;
 
+// Offre propre à un coiffeur (cf. GET /api/barbers) : prestations/suppléments qu'il ne fait pas, et son tarif
+// personnalisé (prix et/ou durée) qui remplace celui du catalogue. Même règle que le serveur (src/lib/barberOffer.js).
+// kind = 'services' | 'extras'. Sans coiffeur précis (« premier disponible »), le catalogue tel quel.
+function barberItems(barber, kind, items) {
+  if (!barber) return items.slice();
+  var off = (kind === 'services' ? barber.disabled_service_ids : barber.disabled_extra_ids) || [];
+  var ovr = (kind === 'services' ? barber.service_overrides : barber.extra_overrides) || {};
+  return items.filter(function (it) { return off.indexOf(it.id) === -1; }).map(function (it) {
+    var o = ovr[it.id];
+    if (!o) return it;
+    return Object.assign({}, it, {
+      price_cents: o.price_cents !== undefined ? o.price_cents : it.price_cents,
+      duration_min: o.duration_min !== undefined ? o.duration_min : it.duration_min
+    });
+  });
+}
+if (typeof window !== 'undefined') window.barberItems = barberItems;
+
 // Devise du salon (EUR par défaut) - chaque page la met à jour après
 // avoir chargé les réglages du salon (CURRENCY = data.currency).
 var CURRENCY = 'EUR';

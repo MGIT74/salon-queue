@@ -985,7 +985,7 @@
   </div>
 </div>
 
-<script src="/app.js?v=20"></script>
+<script src="/app.js?v=21"></script>
 <script src="/staff-group.js?v=5"></script>
 <script src="/autorefresh.js?v=2"></script>
 <script>requireSalonInUrl("Pour utiliser la caisse, ouvrez le lien de votre salon.");</script>
@@ -2773,6 +2773,9 @@ function openCaisseAddAppointment(dateStr, barberId) {
   var barber = allBarbers.find(function (b) { return b.id === barberId; });
   var when = new Date(dateStr + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' });
   var state = { serviceId: null, extraIds: [], productIds: [], time: null };
+  // Offre de CE coiffeur : ses prestations et son tarif personnalisé (barberItems, app.js).
+  var svcOffer = typeof barberItems === 'function' ? barberItems(barber, 'services', catalog.services) : catalog.services;
+  var extOffer = typeof barberItems === 'function' ? barberItems(barber, 'extras', catalog.extras) : catalog.extras;
 
   var overlay = _buildModal(
     '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px">' +
@@ -2836,8 +2839,8 @@ function openCaisseAddAppointment(dateStr, barberId) {
   var flowRefresh = vitrineFlow(overlay, function () {
     function pick(list, ids) { return list.filter(function (x) { return ids.indexOf(String(x.id)) !== -1; }); }
     return {
-      service: catalog.services.find(function (x) { return String(x.id) === String(state.serviceId); }),
-      extras: pick(catalog.extras, state.extraIds.map(String)), products: pick(catalog.products, state.productIds.map(String)),
+      service: svcOffer.find(function (x) { return String(x.id) === String(state.serviceId); }),
+      extras: pick(extOffer, state.extraIds.map(String)), products: pick(catalog.products, state.productIds.map(String)),
       barber: (barber ? barber.name : ''), when: when, time: state.time
     };
   });
@@ -2851,7 +2854,7 @@ function openCaisseAddAppointment(dateStr, barberId) {
     overlay.querySelector('#pa-client-pill').style.display = step === 'client' ? 'none' : 'inline-flex';
     if (step === 'datetime') paLoadSlots();
     if (step === 'contact') {
-      var s = catalog.services.find(function (x) { return x.id === state.serviceId; });
+      var s = svcOffer.find(function (x) { return x.id === state.serviceId; });
       overlay.querySelector('#pa-contact-summary').textContent = when + ' à ' + state.time + ' — ' + (s ? s.name : '');
       var c = StaffGroupBooking.readClient(overlay, 'pa') || {};
       overlay.querySelector('#pa-contact-client').textContent = [c.email, c.phone].filter(Boolean).join(' · ') || 'Sans email ni téléphone';
@@ -2867,12 +2870,12 @@ function openCaisseAddAppointment(dateStr, barberId) {
   function paListCfg(kind) {
     return {
       kind: kind, gridId: 'pa-' + kind + '-grid', searchId: 'pa-' + kind + '-search', qId: 'pa-' + kind + '-q', emptyId: 'pa-' + kind + '-empty', summaryId: 'pa-' + kind + '-summary',
-      items: kind === 'extras' ? catalog.extras : catalog.products.filter(function (p) { return p.online_bookable !== 0; }),   // « caisse seulement » : pas proposé dans un RDV
+      items: kind === 'extras' ? extOffer : catalog.products.filter(function (p) { return p.online_bookable !== 0; }),   // « caisse seulement » : pas proposé dans un RDV
       chosen: kind === 'extras' ? state.extraIds : state.productIds,
       onclick: kind === 'extras' ? 'paToggleExtra(this)' : 'paToggleProduct(this)'
     };
   }
-  vitrineRender({ kind: 'services', gridId: 'pa-service-grid', items: catalog.services, chosen: [], onclick: 'paSelectService(this)' });
+  vitrineRender({ kind: 'services', gridId: 'pa-service-grid', items: svcOffer, chosen: [], onclick: 'paSelectService(this)' });
   vitrineRender(paListCfg('extras'));
   vitrineRender(paListCfg('products'));
   window.paFilter = function (kind) { vitrineFilter(paListCfg(kind)); };

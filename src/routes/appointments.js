@@ -16,6 +16,7 @@ const { clientKey } = require('../lib/queueMath');
 const { sendAppointmentConfirmation, sendGroupAppointmentConfirmation, sendAppointmentCancelledByAdmin, sendAppointmentRescheduled, sendGiftCodeRenewed } = require('../lib/mailer');
 const { wrap } = require('../lib/wrap');
 const groupBooking = require('../lib/groupBooking');
+const { loadCatalog, offerFor, resolveOffer } = require('../lib/barberOffer');
 
 const router = express.Router();
 
@@ -223,13 +224,15 @@ async function computeSlotsForBarber(barberId, dateStr, durationMin, rdvSettings
   if (onLeave) return [];
 
   const [existing] = await pool.query(
-    `SELECT a.scheduled_at, s.duration_min AS svc_duration,
-            COALESCE(SUM(e.duration_min), 0) AS extras_duration,
+    `SELECT a.scheduled_at, COALESCE(MAX(bsp.duration_min), MAX(s.duration_min)) AS svc_duration,
+            COALESCE(SUM(COALESCE(bep.duration_min, e.duration_min)), 0) AS extras_duration,
             q.status AS queue_status
      FROM appointments a
      JOIN services s ON s.id = a.service_id
+     LEFT JOIN barber_service_prices bsp ON bsp.barber_id = a.barber_id AND bsp.service_id = a.service_id
      LEFT JOIN appointment_extras ae ON ae.appointment_id = a.id
      LEFT JOIN extras e ON e.id = ae.extra_id
+     LEFT JOIN barber_extra_prices bep ON bep.barber_id = a.barber_id AND bep.extra_id = ae.extra_id
      LEFT JOIN queue q ON q.id = a.promoted_queue_id
      WHERE a.barber_id = ? AND a.status = 'confirmed' AND DATE(a.scheduled_at) = ?
        AND a.id != ?
@@ -333,20 +336,9 @@ router.get('/availability', wrap(async (req, res) => {
     return res.json({ ok: true, slots: [] });
   }
 
-  const [[service]] = await pool.query(
-    'SELECT duration_min FROM services WHERE id = ? AND salon_id = ?', [service_id, req.salon.id]
-  );
-  if (!service) return res.status(404).json({ error: 'Prestation introuvable' });
-
-  let extraDuration = 0;
-  if (req.query.extras) {
-    const extraIds = String(req.query.extras).split(',').filter(Boolean);
-    if (extraIds.length) {
-      const [rows] = await pool.query('SELECT duration_min FROM extras WHERE id IN (?) AND salon_id = ?', [extraIds, req.salon.id]);
-      extraDuration = rows.reduce((a, r) => a + r.duration_min, 0);
-    }
-  }
-  const durationMin = service.duration_min + extraDuration;
+  // Prestation + suppléments du catalogue, puis durée PROPRE à chaque coiffeur (tarif personnalisé, exclusions).
+  const cat = await loadCatalog(req.salon.id, service_id, req.query.extras ? String(req.query.extras).split(',').filter(Boolean) : []);
+  if (!cat.ok) return res.status(cat.status).json({ error: cat.error });
   var slotOpts = req.query.exclude_appointment_id ? { excludeAppointmentId: req.query.exclude_appointment_id } : {};
   // Reservation a plusieurs : creneaux deja retenus par les AUTRES personnes du groupe (cf. lib/groupBooking).
   const held = groupBooking.parseHeld(req.query.held);
@@ -354,8 +346,10 @@ router.get('/availability', wrap(async (req, res) => {
   const optsFor = (bid) => Object.assign({}, slotOpts, held.length ? { extraBusy: groupBooking.heldRanges(held, bid, date, bufferMinForHeld) } : {});
 
   if (barber_id) {
-    const slots = await computeSlotsForBarber(barber_id, date, durationMin, rdvSettings, optsFor(barber_id));
-    return res.json({ ok: true, slots: slots.map((s) => ({ time: s, barber_id })) });
+    const offer = await offerFor(barber_id, cat);
+    if (!offer.ok) return res.json({ ok: true, slots: [], reason: offer.error });
+    const slots = await computeSlotsForBarber(barber_id, date, offer.durationMin, rdvSettings, optsFor(barber_id));
+    return res.json({ ok: true, slots: slots.map((s) => ({ time: s, barber_id })), duration_min: offer.durationMin, price_cents: offer.priceCents });
   }
 
   const [barbers] = await pool.query(
@@ -363,7 +357,9 @@ router.get('/availability', wrap(async (req, res) => {
   );
   const allSlots = {};
   for (const b of barbers) {
-    const slots = await computeSlotsForBarber(b.id, date, durationMin, rdvSettings, optsFor(b.id));
+    const offer = await offerFor(b.id, cat);
+    if (!offer.ok) continue;   // ce coiffeur ne fait pas cette prestation
+    const slots = await computeSlotsForBarber(b.id, date, offer.durationMin, rdvSettings, optsFor(b.id));
     slots.forEach((s) => { if (!allSlots[s]) allSlots[s] = b.id; });
   }
   const merged = Object.keys(allSlots).sort().map((time) => ({ time, barber_id: allSlots[time] }));
@@ -444,15 +440,17 @@ router.get('/', requireAdminOrBarber, wrap(async (req, res) => {
   const orderDirection = (req.query.all && !req.query.month) ? 'DESC' : 'ASC';
 
   const [rows] = await pool.query(
-    `SELECT a.*, s.name AS service_name, s.duration_min AS service_duration_min, b.name AS barber_name,
+    `SELECT a.*, s.name AS service_name, COALESCE(bsp.duration_min, s.duration_min) AS service_duration_min, b.name AS barber_name,
             q.status AS queue_status,
             COALESCE((
-              SELECT SUM(e.duration_min) FROM appointment_extras ae
+              SELECT SUM(COALESCE(bep.duration_min, e.duration_min)) FROM appointment_extras ae
               JOIN extras e ON e.id = ae.extra_id
+              LEFT JOIN barber_extra_prices bep ON bep.barber_id = a.barber_id AND bep.extra_id = ae.extra_id
               WHERE ae.appointment_id = a.id
             ), 0) AS extras_duration_min
      FROM appointments a
      LEFT JOIN services s ON s.id = a.service_id
+     LEFT JOIN barber_service_prices bsp ON bsp.barber_id = a.barber_id AND bsp.service_id = a.service_id
      LEFT JOIN barbers b ON b.id = a.barber_id
      LEFT JOIN queue q ON q.id = a.promoted_queue_id
      WHERE ${conditions.join(' AND ')}
@@ -472,15 +470,17 @@ router.get('/lookup', requireAdminOrBarber, wrap(async (req, res) => {
   const id = String(req.query.id || ''), queueId = String(req.query.queue_id || '');
   if (!id && !queueId) return res.status(400).json({ error: 'id ou queue_id requis' });
   const [rows] = await pool.query(
-    `SELECT a.*, s.name AS service_name, s.duration_min AS service_duration_min, b.name AS barber_name,
+    `SELECT a.*, s.name AS service_name, COALESCE(bsp.duration_min, s.duration_min) AS service_duration_min, b.name AS barber_name,
             q.status AS queue_status,
             COALESCE((
-              SELECT SUM(e.duration_min) FROM appointment_extras ae
+              SELECT SUM(COALESCE(bep.duration_min, e.duration_min)) FROM appointment_extras ae
               JOIN extras e ON e.id = ae.extra_id
+              LEFT JOIN barber_extra_prices bep ON bep.barber_id = a.barber_id AND bep.extra_id = ae.extra_id
               WHERE ae.appointment_id = a.id
             ), 0) AS extras_duration_min
      FROM appointments a
      LEFT JOIN services s ON s.id = a.service_id
+     LEFT JOIN barber_service_prices bsp ON bsp.barber_id = a.barber_id AND bsp.service_id = a.service_id
      LEFT JOIN barbers b ON b.id = a.barber_id
      LEFT JOIN queue q ON q.id = a.promoted_queue_id
      WHERE a.salon_id = ? AND (a.id = ? OR a.promoted_queue_id = ?) LIMIT 1`,
@@ -536,23 +536,12 @@ router.post('/', bookingRateLimiter, wrap(withBookingLock(async (req, res) => {
     return res.status(400).json({ error: 'Cette date est trop éloignée, choisissez une date plus proche.' });
   }
 
-  const [[service]] = await pool.query(
-    'SELECT name, duration_min FROM services WHERE id = ? AND salon_id = ?', [service_id, req.salon.id]
-  );
-  if (!service) return res.status(404).json({ error: 'Prestation introuvable' });
-
-  let extraIds = Array.isArray(extras) ? extras : [];
-  let extraDuration = 0;
-  let extraNames = [];
-  if (extraIds.length) {
-    const [rows] = await pool.query('SELECT id, name, duration_min FROM extras WHERE id IN (?) AND salon_id = ?', [extraIds, req.salon.id]);
-    extraDuration = rows.reduce((a, r) => a + r.duration_min, 0);
-    extraNames = rows.map((r) => r.name);
-  }
-  if (extraIds.length && (new Set(extraIds).size !== extraIds.length || extraNames.length !== extraIds.length)) {
-    return res.status(400).json({ error: 'Supplément invalide ou indisponible dans ce salon' });
-  }
-  const durationMin = service.duration_min + extraDuration;
+  const cat = await loadCatalog(req.salon.id, service_id, Array.isArray(extras) ? extras : []);
+  if (!cat.ok) return res.status(cat.status).json({ error: cat.error });
+  const service = cat.service;
+  let extraIds = cat.extras.map((e) => e.id);
+  let extraNames = cat.extras.map((e) => e.name);
+  let durationMin;
 
   // Détermine le coiffeur final (précis, ou le premier disponible
   // parmi ceux en mode RDV pour ce créneau precis).
@@ -562,8 +551,10 @@ router.post('/', bookingRateLimiter, wrap(withBookingLock(async (req, res) => {
       'SELECT id FROM barbers WHERE salon_id = ? AND active = 1 AND accepts_appointments = 1', [req.salon.id]
     );
     for (const b of barbers) {
-      const slots = await computeSlotsForBarber(b.id, date, durationMin, rdvSettings);
-      if (slots.includes(time)) { finalBarberId = b.id; break; }
+      const offer = await offerFor(b.id, cat);
+      if (!offer.ok) continue;
+      const slots = await computeSlotsForBarber(b.id, date, offer.durationMin, rdvSettings);
+      if (slots.includes(time)) { finalBarberId = b.id; durationMin = offer.durationMin; break; }
     }
     if (!finalBarberId) return res.status(409).json({ error: "Ce créneau n'est plus disponible" });
   } else {
@@ -575,6 +566,9 @@ router.post('/', bookingRateLimiter, wrap(withBookingLock(async (req, res) => {
     );
     if (!ownedBarber) return res.status(404).json({ error: 'Coiffeur introuvable' });
 
+    const offer = await offerFor(finalBarberId, cat);
+    if (!offer.ok) return res.status(offer.status).json({ error: offer.error });
+    durationMin = offer.durationMin;
     const slots = await computeSlotsForBarber(finalBarberId, date, durationMin, rdvSettings);
     if (!slots.includes(time)) return res.status(409).json({ error: "Ce créneau n'est plus disponible" });
   }
@@ -713,36 +707,35 @@ async function createGroupBooking(req, res, staff) {
     if (`${p.date} ${p.time}:00` < nowStr) return fail(400, i, 'Le créneau de ' + p.name + ' est déjà passé, choisissez une date/heure à venir.');
     if (!staff && isBeyondAdvanceWindow(p.date, rdvSettings)) return fail(400, i, 'La date de ' + p.name + ' est trop éloignée, choisissez une date plus proche.');
 
-    const [[service]] = await pool.query('SELECT name, duration_min FROM services WHERE id = ? AND salon_id = ? AND deleted_at IS NULL', [p.service_id, req.salon.id]);
-    if (!service) return fail(404, i, 'Prestation introuvable pour ' + p.name + '.');
-
-    let extraIds = [], extraDuration = 0, extraNames = [];
-    if (p.extras.length) {
-      const [rows] = await pool.query('SELECT id, name, duration_min FROM extras WHERE id IN (?) AND salon_id = ?', [p.extras, req.salon.id]);
-      extraIds = rows.map((r) => r.id);
-      extraDuration = rows.reduce((a, r) => a + r.duration_min, 0);
-      extraNames = rows.map((r) => r.name);
-    }
+    const cat = await loadCatalog(req.salon.id, p.service_id, p.extras);
+    if (!cat.ok) return fail(cat.status, i, cat.error + ' (' + p.name + ').');
+    const service = cat.service;
+    const extraIds = cat.extras.map((e) => e.id), extraNames = cat.extras.map((e) => e.name);
     let productSelections = [];
     if (p.products.length) {
       const [rows] = await pool.query('SELECT id FROM products WHERE id IN (?) AND salon_id = ? AND online_bookable = 1', [p.products.map((x) => x.id), req.salon.id]);
       const valid = new Set(rows.map((r) => r.id));
       productSelections = p.products.filter((x) => valid.has(x.id));
     }
-    const durationMin = service.duration_min + extraDuration;
+    let durationMin;
 
     // Coiffeur : celui demande (doit etre de CE salon) ou le premier libre a cette heure precise.
     let barberId = p.barber_id;
     if (barberId) {
       const [[owned]] = await pool.query('SELECT id FROM barbers WHERE id = ? AND salon_id = ? AND active = 1', [barberId, req.salon.id]);
       if (!owned) return fail(404, i, 'Coiffeur introuvable pour ' + p.name + '.');
+      const offer = await offerFor(barberId, cat);
+      if (!offer.ok) return fail(offer.status, i, offer.error + ' (' + p.name + ').');
+      durationMin = offer.durationMin;
       const slots = await computeSlotsForBarber(barberId, p.date, durationMin, rdvSettings, staff ? { skipLead: true } : {});
       if (!slots.includes(p.time)) return fail(409, i, "Le créneau de " + p.name + " n'est plus disponible (" + p.time + ").");
     } else {
       const [barbers] = await pool.query('SELECT id FROM barbers WHERE salon_id = ? AND active = 1 AND accepts_appointments = 1', [req.salon.id]);
       for (const b of barbers) {
-        const slots = await computeSlotsForBarber(b.id, p.date, durationMin, rdvSettings, staff ? { skipLead: true } : {});
-        if (slots.includes(p.time)) { barberId = b.id; break; }
+        const offer = await offerFor(b.id, cat);
+        if (!offer.ok) continue;
+        const slots = await computeSlotsForBarber(b.id, p.date, offer.durationMin, rdvSettings, staff ? { skipLead: true } : {});
+        if (slots.includes(p.time)) { barberId = b.id; durationMin = offer.durationMin; break; }
       }
       if (!barberId) return fail(409, i, "Le créneau de " + p.name + " n'est plus disponible (" + p.time + ").");
     }
@@ -883,21 +876,10 @@ router.post('/admin-create', requireAdminOrBarber, wrap(withBookingLock(async (r
     return res.status(400).json({ error: 'Ce créneau est déjà passé, choisissez une date/heure à venir.' });
   }
 
-  const [[service]] = await pool.query(
-    'SELECT name, duration_min FROM services WHERE id = ? AND salon_id = ?', [service_id, req.salon.id]
-  );
-  if (!service) return res.status(404).json({ error: 'Prestation introuvable' });
-
-  let extraIds = Array.isArray(extras) ? extras : [];
-  let extraDuration = 0;
-  let extraNames = [];
-  if (extraIds.length) {
-    const [rows] = await pool.query('SELECT id, name, duration_min FROM extras WHERE id IN (?) AND salon_id = ?', [extraIds, req.salon.id]);
-    extraDuration = rows.reduce((a, r) => a + r.duration_min, 0);
-    extraNames = rows.map((r) => r.name);
-  }
-  if (extraIds.length && (new Set(extraIds).size !== extraIds.length || extraNames.length !== extraIds.length)) return res.status(400).json({ error: 'Supplément invalide ou hors salon' });
-  const durationMin = service.duration_min + extraDuration;
+  const cat = await loadCatalog(req.salon.id, service_id, Array.isArray(extras) ? extras : []);
+  if (!cat.ok) return res.status(cat.status).json({ error: cat.error });
+  const service = cat.service;
+  const extraIds = cat.extras.map((e) => e.id), extraNames = cat.extras.map((e) => e.name);
 
   // Le coiffeur demandé doit appartenir à CE salon - protection
   // identique à la route publique (voir plus haut), même si côté
@@ -908,6 +890,9 @@ router.post('/admin-create', requireAdminOrBarber, wrap(withBookingLock(async (r
     'SELECT id FROM barbers WHERE id = ? AND salon_id = ? AND active = 1', [barber_id, req.salon.id]
   );
   if (!ownedBarber) return res.status(404).json({ error: 'Coiffeur introuvable' });
+  const offer = await offerFor(barber_id, cat);
+  if (!offer.ok) return res.status(offer.status).json({ error: offer.error });
+  const durationMin = offer.durationMin;
 
   // Admin exempté du délai minimum de réservation (rdv_min_lead_min) et
   // de la fenêtre max à l'avance (pas vérifiée ici du tout) - ce sont
@@ -1208,8 +1193,13 @@ router.put('/:id/reschedule', requireAdminOrBarber, wrap(withBookingLock(async (
     [appt.id]
   );
   const extraIds = extraLinks.map((e) => e.id);
-  const extraDuration = extraLinks.reduce((a, e) => a + e.duration_min, 0);
-  const durationMin = appt.duration_min + extraDuration;
+  // Durée chez le coiffeur d'arrivée (son tarif personnalisé), et refus s'il ne fait pas cette prestation.
+  const offer = await offerFor(finalBarberId, {
+    service: { id: appt.service_id, duration_min: appt.duration_min, price_cents: 0 },
+    extras: extraLinks.map((e) => ({ id: e.id, name: e.name, duration_min: e.duration_min, price_cents: 0 }))
+  });
+  if (!offer.ok) return res.status(offer.status).json({ error: offer.error });
+  const durationMin = offer.durationMin;
   const [productLinks] = await pool.query('SELECT product_id, quantity FROM appointment_products WHERE appointment_id = ?', [appt.id]);
   const productSelections = productLinks.map((p) => ({ id: p.product_id, quantity: p.quantity }));
 

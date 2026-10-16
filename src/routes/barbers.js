@@ -49,6 +49,23 @@ router.get('/', wrap(async (req, res) => {
      JOIN barbers b ON b.id = bse.barber_id WHERE b.salon_id = ?`,
     [req.salon.id]
   );
+  // Tarifs personnalises (prix / duree propres a un coiffeur) : publics, comme les prix du catalogue.
+  const [svcOvr] = await pool.query(
+    `SELECT p.barber_id, p.service_id, p.price_cents, p.duration_min FROM barber_service_prices p
+     JOIN barbers b ON b.id = p.barber_id WHERE b.salon_id = ?`, [req.salon.id]);
+  const [extOvr] = await pool.query(
+    `SELECT p.barber_id, p.extra_id, p.price_cents, p.duration_min FROM barber_extra_prices p
+     JOIN barbers b ON b.id = p.barber_id WHERE b.salon_id = ?`, [req.salon.id]);
+  const ovrMap = (rows, bid, key) => {
+    const m = {};
+    rows.filter((r) => r.barber_id === bid).forEach((r) => {
+      const o = {};
+      if (r.price_cents !== null) o.price_cents = Number(r.price_cents);
+      if (r.duration_min !== null) o.duration_min = Number(r.duration_min);
+      if (Object.keys(o).length) m[r[key]] = o;
+    });
+    return m;
+  };
   const [extExcl] = await pool.query(
     `SELECT bee.* FROM barber_extra_exclusions bee
      JOIN barbers b ON b.id = bee.barber_id WHERE b.salon_id = ?`,
@@ -112,7 +129,9 @@ router.get('/', wrap(async (req, res) => {
       on_break_now: onBreakNow,
       outside_hours_now: outsideHoursNow,
       disabled_service_ids: svcExcl.filter((e) => e.barber_id === b.id).map((e) => e.service_id),
-      disabled_extra_ids: extExcl.filter((e) => e.barber_id === b.id).map((e) => e.extra_id)
+      disabled_extra_ids: extExcl.filter((e) => e.barber_id === b.id).map((e) => e.extra_id),
+      service_overrides: ovrMap(svcOvr, b.id, 'service_id'),
+      extra_overrides: ovrMap(extOvr, b.id, 'extra_id')
     });
   });
 

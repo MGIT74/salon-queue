@@ -2787,7 +2787,7 @@
   </div>
 </div>
 
-<script src="/app.js?v=20"></script>
+<script src="/app.js?v=21"></script>
 <script src="/staff-group.js?v=5"></script>
 <script src="/daterange.js?v=4"></script>
 <script>
@@ -6625,6 +6625,18 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
   var preBarber = preselectedBarberId && rdvBarbers.find(function (b) { return b.id === preselectedBarberId; });
 
   var state = { barberId: preselectedBarberId || null, serviceId: null, extraIds: [], productIds: [], time: null };
+  // Offre du coiffeur choisi (ses prestations, son tarif) - cf. barberItems (app.js).
+  function aaOffer(kind) {
+    var list = kind === 'services' ? services : extras;
+    var b = state.barberId && barbers.find(function (x) { return String(x.id) === String(state.barberId); });
+    return typeof barberItems === 'function' ? barberItems(b, kind, list) : list;
+  }
+  function aaApplyOffer() {
+    if (state.serviceId && !aaOffer('services').some(function (x) { return String(x.id) === String(state.serviceId); })) state.serviceId = null;
+    state.extraIds = state.extraIds.filter(function (id) { return aaOffer('extras').some(function (x) { return String(x.id) === String(id); }); });
+    vitrineRender({ kind: 'services', gridId: 'aa-service-grid', items: aaOffer('services'), chosen: state.serviceId ? [state.serviceId] : [], onclick: 'aaSelectService(this)' });
+    vitrineRender(aaListCfg('extras'));
+  }
 
   var overlay = _buildModal(
     '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px">' +
@@ -6697,8 +6709,8 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
   var flowRefresh = vitrineFlow(overlay, function () {
     function pick(list, ids) { return list.filter(function (x) { return ids.indexOf(String(x.id)) !== -1; }); }
     return {
-      service: services.find(function (x) { return String(x.id) === String(state.serviceId); }),
-      extras: pick(extras, state.extraIds.map(String)), products: pick(products, state.productIds.map(String)),
+      service: aaOffer('services').find(function (x) { return String(x.id) === String(state.serviceId); }),
+      extras: pick(aaOffer('extras'), state.extraIds.map(String)), products: pick(products, state.productIds.map(String)),
       barber: (function(){var b=(typeof rdvBarbers!=='undefined')&&rdvBarbers.find(function(x){return String(x.id)===String(state.barberId);});return b?b.name:'';})(), when: when, time: state.time
     };
   });
@@ -6719,7 +6731,7 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
     overlay.querySelector('#aa-client-pill').style.display = step === 'client' ? 'none' : 'inline-flex';
     if (step === 'datetime') aaLoadSlots();
     if (step === 'contact') {
-      var s = services.find(function (x) { return x.id === state.serviceId; });
+      var s = aaOffer('services').find(function (x) { return x.id === state.serviceId; });
       overlay.querySelector('#aa-contact-summary').textContent = when + ' à ' + state.time + ' — ' + (s ? s.name : '');
       var c = StaffGroupBooking.readClient(overlay, 'aa') || {};
       overlay.querySelector('#aa-contact-client').textContent = [c.email, c.phone].filter(Boolean).join(' · ') || 'Sans email ni téléphone';
@@ -6733,6 +6745,7 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
 
   window.aaSelectBarber = function (el) {
     state.barberId = el.dataset.id;
+    aaApplyOffer();
     overlay.querySelectorAll('#aa-step-barber .aa-card').forEach(function (c) { c.classList.remove('sel'); });
     el.classList.add('sel');
     aaGoStep('service');
@@ -6742,12 +6755,12 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
   function aaListCfg(kind) {
     return {
       kind: kind, gridId: 'aa-' + kind + '-grid', searchId: 'aa-' + kind + '-search', qId: 'aa-' + kind + '-q', emptyId: 'aa-' + kind + '-empty', summaryId: 'aa-' + kind + '-summary',
-      items: kind === 'extras' ? extras : products.filter(function (p) { return p.online_bookable !== 0; }),   // « caisse seulement » : pas proposé dans un RDV
+      items: kind === 'extras' ? aaOffer('extras') : products.filter(function (p) { return p.online_bookable !== 0; }),   // « caisse seulement » : pas proposé dans un RDV
       chosen: kind === 'extras' ? state.extraIds : state.productIds,
       onclick: kind === 'extras' ? 'aaToggleExtra(this)' : 'aaToggleProduct(this)'
     };
   }
-  vitrineRender({ kind: 'services', gridId: 'aa-service-grid', items: services, chosen: [], onclick: 'aaSelectService(this)' });
+  vitrineRender({ kind: 'services', gridId: 'aa-service-grid', items: aaOffer('services'), chosen: [], onclick: 'aaSelectService(this)' });
   vitrineRender(aaListCfg('extras'));
   vitrineRender(aaListCfg('products'));
   window.aaFilter = function (kind) { vitrineFilter(aaListCfg(kind)); };

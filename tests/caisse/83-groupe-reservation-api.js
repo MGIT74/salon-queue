@@ -21,7 +21,7 @@ const state = { appts: [], extras: [], inserted: 0, deleted: [], mails: [], queu
 const ymd = (d) => d.toISOString().slice(0, 10);
 const tomorrow = ymd(new Date(Date.now() + 86400000 * 2));
 const settings = { timezone: 'Europe/Paris', rdv_slot_step_min: 15, rdv_min_lead_min: 0, rdv_buffer_min: 0, rdv_max_advance_days: 0 };
-const SERVICES = { s30: { name: 'Coupe', duration_min: 30 }, s45: { name: 'Coupe + barbe', duration_min: 45 } };
+const SERVICES = { s30: { id: 's30', name: 'Coupe', duration_min: 30, price_cents: 2000 }, s45: { id: 's45', name: 'Coupe + barbe', duration_min: 45, price_cents: 2800 } };
 const BARBERS = { b1: 'Karim', b2: 'Sofiane' };
 function fakeQuery(sql, params) {
   sql = sql.replace(/\s+/g, ' ').trim();
@@ -34,6 +34,7 @@ function fakeQuery(sql, params) {
   if (/FROM barber_schedules/.test(sql)) return [[{ start_time: '09:00:00', end_time: '19:00:00' }]];
   if (/FROM barber_leaves/.test(sql)) return [[]];
   if (/FROM salon_closures/.test(sql)) return [[]];   // aucune fermeture exceptionnelle
+  if (/FROM barber_(service|extra)_(exclusions|prices)/.test(sql)) return [[]];   // ni exclusion ni tarif perso
   if (/FROM barber_breaks/.test(sql)) return [[]];
   if (/SELECT timer_enabled FROM barbers/.test(sql)) return [[{ timer_enabled: 1 }]];
   if (/FROM queue WHERE barber_id/.test(sql)) return [[]];

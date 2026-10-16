@@ -670,9 +670,9 @@
 
 </div>
 
-<script src="/app.js?v=20"></script>
+<script src="/app.js?v=21"></script>
 <script src="/autorefresh.js?v=2"></script>
-<script src="/group-booking.js?v=15"></script>
+<script src="/group-booking.js?v=16"></script>
 <style>
 .gb-done{padding:10px 0;border-bottom:1px solid var(--sep)}.gb-done:last-child{border:none}.gb-done b{display:block}.gb-done span{color:var(--grey);font-size:14px}
 #relatives-list{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
@@ -1052,7 +1052,7 @@ function openBookGroup() {
   if (!bookGroupCtl) {
     bookGroupCtl = GroupBooking.create({
       zones: { top: document.getElementById('bkgb-top'), body: document.getElementById('bkgb-body'), bar: document.getElementById('bkgb-bar') }, api: apiForBooking,
-      services: bookServices, extras: bookExtras, barbers: bookBarbers, relatives: myRelatives,
+      services: bookServicesAll, extras: bookExtrasAll, barbers: bookBarbers, relatives: myRelatives,
       eur: eur, toast: toast, continueLabel: 'Continuer', onExit: function () { show('p-book-barber'); },
       createRelative: function (name) {
         return api('/api/client-auth/relatives', { method: 'POST', body: { name: name } }).then(function (r) {
@@ -1067,7 +1067,7 @@ function openBookGroup() {
       }
     });
   } else {
-    bookGroupCtl.setCatalog({ services: bookServices, extras: bookExtras, barbers: bookBarbers });
+    bookGroupCtl.setCatalog({ services: bookServicesAll, extras: bookExtrasAll, barbers: bookBarbers });
     bookGroupCtl.setRelatives(myRelatives); bookGroupCtl.reset();
   }
   show('p-book-group');
@@ -1184,8 +1184,10 @@ function rebook(salonSlug, serviceId, barberId) {
     selBookService = serviceId || null;
     selBookBarber = barberId || null;
     renderBookBarberGrid();
-    renderBookServiceGrid();
+    applyBookBarberOffer();
+    if (!selBookService) { show('p-book-service'); return; }   // ce coiffeur ne fait plus cette prestation
     goToBookDateStep();
+    refreshBookRecap();
   });
 }
 
@@ -1193,6 +1195,8 @@ function rebook(salonSlug, serviceId, barberId) {
 var bookCatalogLoaded = false;
 var bookSalonSlug = SALON_SLUG;
 var bookServices = [], bookExtras = [], bookBarbers = [], bookProducts = [], bookGiftTileImage = '';
+// Catalogue complet ; bookServices/bookExtras = l'offre DU coiffeur choisi (ses prestations, son tarif).
+var bookServicesAll = [], bookExtrasAll = [];
 var selBookBarber = null, selBookService = null, selBookExtras = [], selBookProducts = [], selBookDate = null, selBookSlot = null;
 var activeBookGift = null;
 
@@ -1247,8 +1251,8 @@ function goBook(afterLoad) {
     apiForBooking('/api/settings/public').catch(function () { return {}; })
   ]).then(function (r) {
     bookGiftTileImage = (r[4] && r[4].gift_tile_image_url) || '';
-    bookServices = r[0].items;
-    bookExtras = r[1].items;
+    bookServicesAll = bookServices = r[0].items;
+    bookExtrasAll = bookExtras = r[1].items;
     bookProducts = r[2].items.filter(function (p) { return p.online_bookable !== 0; }); // « caisse seulement » : jamais proposé en ligne
     bookBarbers = r[3].items.filter(function (b) { return b.accepts_appointments && hasBookableSchedule(b) && !isOnLeaveOn(b); });
     bookCatalogLoaded = true;
@@ -1271,8 +1275,19 @@ function renderBookBarberGrid() {
   }
 }
 
+// Offre du coiffeur choisi : retire ce qu'il ne fait pas, applique son tarif ; un choix devenu impossible est retiré.
+function applyBookBarberOffer() {
+  var b = selBookBarber && bookBarbers.find(function (x) { return String(x.id) === String(selBookBarber); });
+  bookServices = barberItems(b, 'services', bookServicesAll);
+  bookExtras = barberItems(b, 'extras', bookExtrasAll);
+  if (selBookService && !bookServices.some(function (x) { return String(x.id) === String(selBookService); })) selBookService = null;
+  selBookExtras = selBookExtras.filter(function (id) { return bookExtras.some(function (x) { return String(x.id) === String(id); }); });
+  renderBookServiceGrid();
+}
+
 function selectBookBarber(el, id) {
   selBookBarber = id;
+  if (!activeBookGift) applyBookBarberOffer();
   document.querySelectorAll('#bk-barber-grid .svc-card').forEach(function (c) { c.classList.remove('sel'); });
   if (el) el.classList.add('sel');
 

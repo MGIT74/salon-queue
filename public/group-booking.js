@@ -20,13 +20,16 @@
 
   function byId(list, id) { for (var i = 0; i < list.length; i++) if (String(list[i].id) === String(id)) return list[i]; return null; }
 
-  /** Duree (minutes) et prix (centimes) d'une personne : prestation + supplements choisis. */
+  /** Duree (minutes) et prix (centimes) d'une personne : prestation + supplements choisis.
+   *  services/extras : une liste, ou une fonction (personne -> liste) pour le tarif propre a SON coiffeur. */
   function personDuration(p, services, extras) {
+    if (typeof services === 'function') { extras = extras(p); services = services(p); }
     var s = byId(services, p.serviceId), d = s ? Number(s.duration_min) || 0 : 0;
     (p.extraIds || []).forEach(function (id) { var e = byId(extras, id); if (e) d += Number(e.duration_min) || 0; });
     return d;
   }
   function personPrice(p, services, extras) {
+    if (typeof services === 'function') { extras = extras(p); services = services(p); }
     var s = byId(services, p.serviceId), c = s ? Number(s.price_cents) || 0 : 0;
     (p.extraIds || []).forEach(function (id) { var e = byId(extras, id); if (e) c += Number(e.price_cents) || 0; });
     return c;
@@ -171,6 +174,10 @@
     function label(p) { return p.isSelf ? (cfg.selfName || 'Vous') : (String(p.name || '').trim() || 'Personne ' + (people.indexOf(p) + 1)); }
     function shortName(p) { return p.isSelf ? (cfg.selfName || 'vous') : label(p); }
     function barberName(id) { var b = byId(cfg.barbers, id); return b ? b.name : ''; }
+    // Offre du coiffeur de cette personne (celui du creneau retenu, sinon celui choisi) : ses prestations, son tarif.
+    function offerBarber(p) { var bid = (p.slot && p.slot.barberId) || p.pref; return bid ? byId(cfg.barbers, bid) : null; }
+    function svcList(p) { return typeof barberItems === 'function' ? barberItems(offerBarber(p), 'services', cfg.services) : cfg.services; }
+    function extList(p) { return typeof barberItems === 'function' ? barberItems(offerBarber(p), 'extras', cfg.extras) : cfg.extras; }
     function fmtDate(d) { try { return new Date(d + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }); } catch (e) { return d; } }
     function complete(p) { return !!(p.serviceId && p.slot && (p.isSelf || String(p.name || '').trim())); }
     function stepsFor(p) { return STEPS.filter(function (s) { return s !== 'extras' || (cfg.extras && cfg.extras.length); }).concat(p.isSelf ? [] : []); }
@@ -208,7 +215,7 @@
     function loadSlots(p) {
       if (!p.serviceId || !p.date) { p.slots = null; p.suggestions = []; return; }
       var token = ++p.req; p.loading = true; p.slots = null; paint();
-      var held = heldParam(people, people.indexOf(p), p.date, cfg.services, cfg.extras);
+      var held = heldParam(people, people.indexOf(p), p.date, svcList, extList);
       cfg.api(slotsUrl(p, p.pref, held)).then(function (r) {
         if (token !== p.req) return;
         p.slots = r.slots || []; p.loading = false; p.note = '';
@@ -219,7 +226,7 @@
     }
     function loadSuggestions(p, held, token) {
       var others = people.filter(function (o) { return o !== p && o.slot && o.date === p.date; }).map(function (o) {
-        return { name: shortName(o), date: o.date, time: o.slot.time, barberId: o.slot.barberId, duration: personDuration(o, cfg.services, cfg.extras) };
+        return { name: shortName(o), date: o.date, time: o.slot.time, barberId: o.slot.barberId, duration: personDuration(o, svcList, extList) };
       });
       var need = {}; if (!p.pref) others.forEach(function (o) { need[o.barberId] = true; });
       var jobs = Object.keys(need).map(function (bid) {
@@ -244,7 +251,7 @@
     function recapHtml() {
       var html = '', cents = 0;
       people.forEach(function (p) {
-        var s = byId(cfg.services, p.serviceId), who = label(p) + (p.isSelf ? '' : '');
+        var s = byId(svcList(p), p.serviceId), who = label(p) + (p.isSelf ? '' : '');
         var b = p.slot ? barberName(p.slot.barberId) : (p.pref ? barberName(p.pref) : '');
         var menu = '';
         if (menuFor === p.uid) menu = '<div class="gb-menu">' + cfg.barbers.map(function (bb) {
@@ -252,15 +259,15 @@
         var pills = '<button type="button" class="gb-pill who" data-act="pill-who" data-uid="' + p.uid + '" title="Modifier"><i>' + esc(who.charAt(0).toUpperCase()) + '</i>' + esc(who) + '</button>' +
           (b ? '<button type="button" class="gb-pill" data-act="pill-barber" data-uid="' + p.uid + '" title="Changer de coiffeur">' + ic('scissors') + esc(b) + ic('chev') + '</button>' : '') +
           (p.slot ? '<button type="button" class="gb-pill" data-act="pill-date" data-uid="' + p.uid + '" title="Changer la date ou l\'heure">' + ic('calendar') + esc(fmtDate(p.date)) + ' · <b>' + esc(p.slot.time) + '</b></button>' : '') +
-          (s ? '<span class="gb-pill dur" title="Durée estimée">' + ic('clock') + esc(fmtMin(personDuration(p, cfg.services, cfg.extras))) + '</span>' : '') +
+          (s ? '<span class="gb-pill dur" title="Durée estimée">' + ic('clock') + esc(fmtMin(personDuration(p, svcList, extList))) + '</span>' : '') +
           '<button type="button" class="gb-pill-x" data-act="rm" data-uid="' + p.uid + '" title="Retirer ' + esc(who) + '" aria-label="Retirer ' + esc(who) + '">' + ic('x') + '</button>' + menu;
         var rows = '';
         function row(k, n, meta, price) { rows += '<div class="recap-row"><span class="recap-k">' + k + '</span><span class="recap-n">' + esc(n) + (meta ? ' <em>' + esc(meta) + '</em>' : '') + '</span><span class="recap-p">' + price + '</span></div>'; }
         if (s) {
           row('Prestation', s.name, Number(s.duration_min) > 0 ? fmtMin(s.duration_min) : '', eur(Number(s.price_cents) || 0));
-          (p.extraIds || []).forEach(function (id) { var x = byId(cfg.extras, id); if (x) row('Supplément', x.name, Number(x.duration_min) > 0 ? '+' + fmtMin(x.duration_min) : '', '+' + eur(Number(x.price_cents) || 0)); });
+          (p.extraIds || []).forEach(function (id) { var x = byId(extList(p), id); if (x) row('Supplément', x.name, Number(x.duration_min) > 0 ? '+' + fmtMin(x.duration_min) : '', '+' + eur(Number(x.price_cents) || 0)); });
         }
-        cents += personPrice(p, cfg.services, cfg.extras);
+        cents += personPrice(p, svcList, extList);
         html += '<div class="gb-recap-person' + (p === cur && view !== 'recap' ? ' on' : '') + '"><div class="gb-pills">' + pills + '</div>' +
           (rows ? '<div class="recap-list">' + rows + '</div>' : '') + '</div>';
       });
@@ -285,7 +292,7 @@
         var rels = (cfg.relatives || []).filter(function (r) { return !used[r.id]; });
         var body = '<div class="gb-rows">';
         people.forEach(function (p, i) {
-          var s = byId(cfg.services, p.serviceId);
+          var s = byId(svcList(p), p.serviceId);
           var line = complete(p) ? esc(s.name) + (barberName(p.slot.barberId) ? ' · ' + esc(barberName(p.slot.barberId)) : '') + '<br>' + esc(fmtDate(p.date)) + ' à ' + esc(p.slot.time) : '<span class="todo">À compléter</span>';
           body += '<div class="gb-row" data-i="' + i + '"><span class="gb-av">' + esc(label(p).charAt(0).toUpperCase()) + '</span><div class="gb-info"><b>' + esc(label(p)) + '</b><span>' + line + '</span></div>' +
             '<button type="button" class="gb-mini" data-act="edit">' + (complete(p) ? 'Modifier' : 'Compléter') + '</button>' +
@@ -309,10 +316,10 @@
         body: '<div class="svc-grid">' +
           cfg.barbers.map(function (b) { return barberCard(b, String(p.pref) === String(b.id)).replace('<button', '<button data-pick="barber"'); }).join('') + '</div>', go: goBtn('Suivant', !p.pref) };
       if (view === 'service') return { top: back() + '<div class="eyebrow">' + who + 'Prestation</div>',
-        body: '<div class="item-grid">' + cfg.services.map(function (it) { return itemCard('services', it, String(p.serviceId) === String(it.id)).replace('<button', '<button data-pick="service"'); }).join('') + '</div>',
+        body: '<div class="item-grid">' + svcList(p).map(function (it) { return itemCard('services', it, String(p.serviceId) === String(it.id)).replace('<button', '<button data-pick="service"'); }).join('') + '</div>',
         go: goBtn('Suivant', !p.serviceId) };
       if (view === 'extras') return { top: back() + '<div class="eyebrow">' + who + 'Suppléments (optionnels)</div><p class="step-sub">Personnalisez la prestation : touchez pour ajouter.</p>',
-        body: '<div class="item-grid">' + cfg.extras.map(function (it) { return itemCard('extras', it, p.extraIds.indexOf(String(it.id)) !== -1).replace('<button', '<button data-pick="extra"'); }).join('') + '</div>', go: goBtn('Suivant', false) };
+        body: '<div class="item-grid">' + extList(p).map(function (it) { return itemCard('extras', it, p.extraIds.indexOf(String(it.id)) !== -1).replace('<button', '<button data-pick="extra"'); }).join('') + '</div>', go: goBtn('Suivant', false) };
       // date et heure
       var morning = (p.slots || []).filter(function (s) { return s.time < '12:00'; }), aft = (p.slots || []).filter(function (s) { return s.time >= '12:00'; });
       var body2 = '<div class="fld"><label for="gb-date">Date</label><input id="gb-date" type="date" min="' + today() + '" value="' + esc(p.date) + '"></div>';
@@ -377,7 +384,15 @@
       var pick = t.getAttribute('data-pick'), act = t.getAttribute('data-act');
       if (pick) {
         var id = t.getAttribute('data-id') != null && pick !== 'barber' ? t.getAttribute('data-id') : (t.getAttribute('data-barber-id') || t.getAttribute('data-id') || '');
-        if (pick === 'barber') { if (String(cur.pref) !== String(id)) { cur.pref = id; cur.slot = null; cur.slots = null; } paint(); return; }
+        if (pick === 'barber') {
+          if (String(cur.pref) !== String(id)) {
+            cur.pref = id; cur.slot = null; cur.slots = null;
+            // Ce coiffeur ne fait pas la prestation / un supplement deja choisi : on les retire.
+            if (cur.serviceId && !byId(svcList(cur), cur.serviceId)) cur.serviceId = '';
+            cur.extraIds = cur.extraIds.filter(function (x) { return byId(extList(cur), x); });
+          }
+          paint(); return;
+        }
         if (pick === 'service') { if (String(cur.serviceId) !== String(id)) { cur.serviceId = id; cur.slot = null; cur.slots = null; } paint(); return; }
         if (pick === 'extra') { var k = cur.extraIds.indexOf(String(id)); if (k === -1) cur.extraIds.push(String(id)); else cur.extraIds.splice(k, 1); cur.slot = null; cur.slots = null; paint(); return; }
       }

@@ -220,10 +220,11 @@ router.get('/me', requireClient, wrap(async (req, res) => {
   // (promoted_queue_id) sait qu'il est déjà 'done'.
   const [upcomingRows] = await pool.query(
     `SELECT a.id, a.scheduled_at, a.cancel_token, a.service_id, a.barber_id, a.client_note, a.client_name, a.group_id,
-            s.name AS service_name, s.price_cents AS service_price_cents,
+            s.name AS service_name, COALESCE(bsp.price_cents, s.price_cents) AS service_price_cents,
             bar.name AS barber_name, sl.slug AS salon_slug, sl.name AS salon_name
      FROM appointments a
      JOIN services s ON s.id = a.service_id
+     LEFT JOIN barber_service_prices bsp ON bsp.barber_id = a.barber_id AND bsp.service_id = a.service_id
      LEFT JOIN barbers bar ON bar.id = a.barber_id
      LEFT JOIN queue q ON q.id = a.promoted_queue_id
      JOIN salons sl ON sl.id = a.salon_id
@@ -236,8 +237,9 @@ router.get('/me', requireClient, wrap(async (req, res) => {
   const upcomingAppointments = [];
   for (const upcoming of upcomingRows) {
     const [extraRows] = await pool.query(
-      `SELECT e.name, e.price_cents FROM appointment_extras ae JOIN extras e ON e.id = ae.extra_id WHERE ae.appointment_id = ?`,
-      [upcoming.id]
+      `SELECT e.name, COALESCE(bep.price_cents, e.price_cents) AS price_cents FROM appointment_extras ae JOIN extras e ON e.id = ae.extra_id
+       LEFT JOIN barber_extra_prices bep ON bep.barber_id = ? AND bep.extra_id = ae.extra_id WHERE ae.appointment_id = ?`,
+      [upcoming.barber_id, upcoming.id]
     );
     const totalCents = upcoming.service_price_cents + extraRows.reduce((sum, e) => sum + e.price_cents, 0);
     upcomingAppointments.push({
