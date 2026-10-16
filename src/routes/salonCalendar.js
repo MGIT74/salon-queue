@@ -71,6 +71,16 @@ router.get('/closures', requireAdmin, wrap(async (req, res) => {
 }));
 
 // Contrôle préalable : rendez-vous déjà confirmés sur la période demandée.
+async function closureToday(salonId) {
+  const settings = await getSettings(salonId);
+  const timezone = settings.timezone || 'Europe/Paris';
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit'
+  }).formatToParts(new Date());
+  const value = type => parts.find(p => p.type === type).value;
+  return value('year') + '-' + value('month') + '-' + value('day');
+}
+
 async function appointmentsAffected(salonId, from, to) {
   const settings = await getSettings(salonId);
   const timezone = settings.timezone || 'Europe/Paris';
@@ -93,8 +103,11 @@ router.get('/closures/preview', requireAdmin, wrap(async (req, res) => {
   const { start_date, end_date } = req.query;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(start_date || '') || !/^\d{4}-\d{2}-\d{2}$/.test(end_date || '') || start_date > end_date)
     return res.status(400).json({ error: 'Dates invalides' });
-  const items = await appointmentsAffected(req.salon.id, start_date, end_date);
-  res.json({ ok: true, count: items.length, items });
+  const today = await closureToday(req.salon.id);
+  if (end_date < today) return res.json({ ok: true, count: 0, items: [], entirely_past: true, effective_start_date: null });
+  const effectiveStart = start_date < today ? today : start_date;
+  const items = await appointmentsAffected(req.salon.id, effectiveStart, end_date);
+  res.json({ ok: true, count: items.length, items, effective_start_date: effectiveStart });
 }));
 
 router.post('/closures', requireAdmin, wrap(async (req, res) => {
@@ -102,7 +115,10 @@ router.post('/closures', requireAdmin, wrap(async (req, res) => {
   if (!start_date || !end_date) return res.status(400).json({ error: 'Dates de début et de fin requises' });
   if (!/^\d{4}-\d{2}-\d{2}$/.test(start_date) || !/^\d{4}-\d{2}-\d{2}$/.test(end_date) || start_date > end_date) return res.status(400).json({ error: 'Période de fermeture invalide' });
 
-  const affected = await appointmentsAffected(req.salon.id, start_date, end_date);
+  const today = await closureToday(req.salon.id);
+  if (end_date < today) return res.status(400).json({ error: 'Impossible de créer une fermeture entièrement passée' });
+  const effectiveStart = start_date < today ? today : start_date;
+  const affected = await appointmentsAffected(req.salon.id, effectiveStart, end_date);
   if (affected.length && req.body.confirm_existing_appointments !== true)
     return res.status(409).json({ error: 'Des rendez-vous existent sur cette période. Confirmation explicite requise.', count: affected.length, items: affected });
 
@@ -118,7 +134,7 @@ router.post('/closures', requireAdmin, wrap(async (req, res) => {
   const id = crypto.randomUUID();
   await pool.query(
     'INSERT INTO salon_closures (id, salon_id, start_date, end_date, reason) VALUES (?, ?, ?, ?, ?)',
-    [id, req.salon.id, start_date, end_date, reason || null]
+    [id, req.salon.id, effectiveStart, end_date, reason || null]
   );
 
   let emailResult = null;
@@ -130,7 +146,7 @@ router.post('/closures', requireAdmin, wrap(async (req, res) => {
       try {
         await sendSalonClosureNotice(req.salon.id, r.email_lower, {
           clientName: r.client_name || 'Cher client',
-          startDate: start_date,
+          startDate: effectiveStart,
           endDate: end_date,
           reason: reason || '',
           customMessage: custom_message
