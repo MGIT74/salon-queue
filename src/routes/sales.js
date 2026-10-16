@@ -429,56 +429,69 @@ router.post('/gift-cards/:id/redeem', requireAdminOrBarber, wrap(async (req, res
   const { queue_id } = req.body;
   if (!queue_id) return res.status(400).json({ error: 'queue_id requis' });
 
-  const [[gift]] = await pool.query(
-    'SELECT id, used_at FROM gift_cards WHERE id = ? AND salon_id = ?',
-    [req.params.id, req.salon.id]
-  );
-  if (!gift) return res.status(404).json({ error: 'Bon cadeau introuvable' });
-  if (gift.used_at) return res.status(409).json({ error: 'Ce bon cadeau a déjà été utilisé' });
-
-  const [[queueRow]] = await pool.query(
-    'SELECT barber_id, paid_at, client_name, email, phone FROM queue WHERE id = ? AND salon_id = ?',
-    [queue_id, req.salon.id]
-  );
-  if (!queueRow) return res.status(404).json({ error: 'Client introuvable' });
-  if (req.actingBarberId && queueRow.barber_id !== req.actingBarberId) {
-    return res.status(403).json({ error: "Ce n'est pas votre client." });
-  }
-  if (queueRow.paid_at) return res.status(409).json({ error: 'Ce client a déjà été encaissé.' });
-
-  // Deux marquages ATOMIQUES (WHERE ... IS NULL + vérification des
-  // lignes affectées) — si deux requêtes arrivent en même temps (double
-  // clic, ou tentative d'utiliser le même cadeau sur deux clients
-  // différents simultanément), une seule peut effectivement réussir.
-  const [giftResult] = await pool.query(
-    'UPDATE gift_cards SET used_at = NOW(), used_queue_id = ? WHERE id = ? AND used_at IS NULL AND voided_at IS NULL',
-    [queue_id, req.params.id]
-  );
-  if (giftResult.affectedRows === 0) {
-    const [[giftNow]] = await pool.query('SELECT voided_at FROM gift_cards WHERE id = ?', [req.params.id]);
-    if (giftNow && giftNow.voided_at) {
-      return res.status(409).json({ error: 'Ce bon cadeau a été désactivé.' });
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [[gift]] = await conn.query(
+      'SELECT id, used_at, voided_at, pending_appointment_id, used_queue_id, amount_cents FROM gift_cards WHERE id = ? AND salon_id = ? FOR UPDATE',
+      [req.params.id, req.salon.id]
+    );
+    if (!gift) { await conn.rollback(); return res.status(404).json({ error: 'Bon cadeau introuvable' }); }
+    if (gift.used_at || gift.voided_at) { await conn.rollback(); return res.status(409).json({ error: 'Ce bon cadeau est déjà utilisé ou désactivé' }); }
+    if (!Number.isSafeInteger(Number(gift.amount_cents)) || Number(gift.amount_cents) <= 0) {
+      await conn.rollback();
+      return res.status(409).json({ error: 'Montant du cadeau invalide' });
     }
-    return res.status(409).json({ error: 'Ce bon cadeau vient d\'être utilisé (probablement par un autre appareil).' });
+
+    const [[queueRow]] = await conn.query(
+      'SELECT barber_id, paid_at, gift_card_id, status, client_name, email, phone FROM queue WHERE id = ? AND salon_id = ? FOR UPDATE',
+      [queue_id, req.salon.id]
+    );
+    if (!queueRow) { await conn.rollback(); return res.status(404).json({ error: 'Client introuvable' }); }
+    if (req.actingBarberId && queueRow.barber_id !== req.actingBarberId) {
+      await conn.rollback();
+      return res.status(403).json({ error: "Ce n'est pas votre client." });
+    }
+    if (queueRow.paid_at || !['waiting', 'in_progress', 'done'].includes(queueRow.status)) {
+      await conn.rollback();
+      return res.status(409).json({ error: 'Ce passage ne peut pas être réglé par cadeau' });
+    }
+    if (queueRow.gift_card_id && queueRow.gift_card_id !== gift.id) {
+      await conn.rollback();
+      return res.status(409).json({ error: 'Un autre cadeau est associé à ce passage' });
+    }
+    if (gift.pending_appointment_id) {
+      const [[reserved]] = await conn.query(
+        'SELECT promoted_queue_id FROM appointments WHERE id = ? AND salon_id = ?',
+        [gift.pending_appointment_id, req.salon.id]
+      );
+      if (!reserved || reserved.promoted_queue_id !== queue_id) {
+        await conn.rollback();
+        return res.status(409).json({ error: 'Ce cadeau est réservé à un autre rendez-vous' });
+      }
+    }
+
+    const [giftResult] = await conn.query(
+      'UPDATE gift_cards SET used_at = NOW(), used_queue_id = ? WHERE id = ? AND salon_id = ? AND used_at IS NULL AND voided_at IS NULL',
+      [queue_id, gift.id, req.salon.id]
+    );
+    const [queueResult] = await conn.query(
+      'UPDATE queue SET paid_at = NOW(), gift_card_id = ? WHERE id = ? AND salon_id = ? AND paid_at IS NULL',
+      [gift.id, queue_id, req.salon.id]
+    );
+    if (giftResult.affectedRows !== 1 || queueResult.affectedRows !== 1) {
+      await conn.rollback();
+      return res.status(409).json({ error: 'Le cadeau ou le passage a déjà été utilisé' });
+    }
+    await conn.commit();
+    await earnLoyaltyPoint(req.salon.id, queueRow);
+    res.json({ ok: true });
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
   }
-
-  const [queueResult] = await pool.query(
-    'UPDATE queue SET paid_at = NOW() WHERE id = ? AND paid_at IS NULL',
-    [queue_id]
-  );
-  if (queueResult.affectedRows === 0) {
-    // Le client vient d'être payé autrement entre-temps — on annule la
-    // consommation du cadeau qu'on venait de marquer, pour ne pas le
-    // perdre pour rien.
-    await pool.query('UPDATE gift_cards SET used_at = NULL, used_queue_id = NULL WHERE id = ?', [req.params.id]);
-    return res.status(409).json({ error: 'Ce client vient d\'être encaissé autrement.' });
-  }
-
-  // Ce passage vient d'être réglé (via le cadeau) : compte aussi comme
-  // un vrai passage payé pour la fidélité.
-  await earnLoyaltyPoint(req.salon.id, queueRow);
-
-  res.json({ ok: true });
 }));
 
 /**
