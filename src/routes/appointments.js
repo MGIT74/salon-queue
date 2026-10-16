@@ -570,33 +570,45 @@ router.post('/', bookingRateLimiter, wrap(withBookingLock(async (req, res) => {
   // atomique, elle protege contre deux reservations lancees en meme
   // temps avec le meme code (l'une des deux perd la course et se voit
   // refusee proprement, plutot que les deux reussissent).
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
   if (gift_id) {
-    const [giftLock] = await pool.query(
+    const [giftLock] = await conn.query(
       `UPDATE gift_cards SET pending_appointment_id = ?
        WHERE id = ? AND salon_id = ? AND used_at IS NULL AND voided_at IS NULL AND pending_appointment_id IS NULL`,
       [id, gift_id, req.salon.id]
     );
     if (giftLock.affectedRows === 0) {
+      await conn.rollback();
       return res.status(409).json({ error: 'Ce cadeau n\'est plus disponible (déjà utilisé ou réservé pour un autre rendez-vous).' });
     }
   }
 
-  await pool.query(
+  await conn.query(
     `INSERT INTO appointments (id, salon_id, barber_id, client_name, email, phone, service_id, scheduled_at, status, cancel_token, client_note, gift_card_id)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?, ?)`,
     [id, req.salon.id, finalBarberId, client_name, email, phone || null, service_id, scheduledAt, cancelToken, clientNote, gift_id || null]
   );
   if (extraIds.length) {
-    await pool.query(
+    await conn.query(
       'INSERT INTO appointment_extras (appointment_id, extra_id) VALUES ?',
       [extraIds.map((eid) => [id, eid])]
     );
   }
   if (productSelections.length) {
-    await pool.query(
+    await conn.query(
       'INSERT INTO appointment_products (appointment_id, product_id, quantity) VALUES ?',
       [productSelections.map((p) => [id, p.id, p.quantity])]
     );
+  }
+
+    await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
   }
 
   const [[barber]] = finalBarberId
