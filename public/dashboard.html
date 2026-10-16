@@ -9252,6 +9252,7 @@ function openAddSalonClosure() {
     '<div class="fld"><label>Du</label><input type="date" id="asc-from" data-range-to="asc-to" value="' + todayStr + '"></div>' +
     '<div class="fld"><label>Au</label><input type="date" id="asc-to" value="' + todayStr + '"></div>' +
     '<div class="fld"><label>Motif (optionnel)</label><input type="text" id="asc-reason" placeholder="Ex: jour férié, fermeture exceptionnelle…"></div>' +
+    '<div id="asc-effective-period" style="display:none;margin-bottom:12px;padding:10px 12px;border-radius:10px;background:var(--fill);font-size:13px;color:var(--muted)"></div>' +
     '<div id="asc-appointments-preview" aria-live="polite" style="margin-bottom:14px;padding:12px 14px;border:1px solid var(--border,rgba(128,128,128,.2));border-radius:12px;font-size:13px;color:var(--muted)">Sélectionnez une période pour vérifier les rendez-vous existants.</div>' +
     '<div style="display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 14px;background:var(--fill);border-radius:12px;margin-bottom:16px;cursor:pointer" onclick="ascToggleSendEmail()">' +
       '<span style="font-size:14.5px">Prévenir les clients par email</span>' +
@@ -9284,6 +9285,21 @@ function openAddSalonClosure() {
     var from = overlay.querySelector('#asc-from').value;
     var to = overlay.querySelector('#asc-to').value;
     var target = overlay.querySelector('#asc-appointments-preview');
+    var info = overlay.querySelector('#asc-effective-period');
+    var saveButton = overlay.querySelector('#asc-save-btn');
+    var today = nowSalonDatetimeString().slice(0, 10);
+    var fullyPast = !!(to && to < today);
+    saveButton.disabled = fullyPast;
+    if (fullyPast) {
+      info.style.display = 'block';
+      info.textContent = 'Cette période est entièrement passée : fermeture impossible.';
+    } else if (from && from < today) {
+      info.style.display = 'block';
+      info.textContent = 'La période sélectionnée commence dans le passé. La fermeture prendra effet à partir du ' + today.split('-').reverse().join('/') + ' (maintenant).';
+    } else {
+      info.style.display = 'none';
+    }
+
     if (!from || !to || to < from) {
       target.textContent = 'Sélectionnez une période valide pour afficher les rendez-vous.';
       return;
@@ -9295,7 +9311,7 @@ function openAddSalonClosure() {
           if (requestId !== ascPreviewRequest || !overlay.isConnected) return;
           var items = data.items || [];
           if (!items.length) {
-            target.innerHTML = '<strong style="color:var(--green)">Aucun rendez-vous sur cette période.</strong>';
+            target.innerHTML = data.entirely_past ? 'Période entièrement passée : aucune fermeture possible.' : '<strong style="color:var(--green)">Aucun rendez-vous à venir sur cette période.</strong>';
             return;
           }
           var rows = items.map(function(a) {
@@ -9343,6 +9359,7 @@ function openAddSalonClosure() {
     var to = overlay.querySelector('#asc-to').value;
     if (!from || !to) { errEl.textContent = 'Les 2 dates sont requises'; errEl.style.display = 'block'; return; }
     if (to < from) { errEl.textContent = 'La date de fin doit être après la date de début'; errEl.style.display = 'block'; return; }
+    if (to < nowSalonDatetimeString().slice(0, 10)) { errEl.textContent = 'Impossible de créer une fermeture entièrement passée'; errEl.style.display = 'block'; return; }
 
     var sendEmail = overlay.querySelector('#asc-send-email-switch').classList.contains('on');
     var customMessage = (sendEmail && ascMsgType === 'custom') ? overlay.querySelector('#asc-custom-text').value.trim() : '';
