@@ -664,38 +664,49 @@ router.put('/:id', requireAdminOrBarber, wrap(async (req, res) => {
     if (phone !== undefined) { sets.push('phone = ?'); params.push(phone ? String(phone).trim() : null); }
   }
 
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
   if (sets.length) {
     params.push(req.params.id, req.salon.id);
-    await pool.query(`UPDATE queue SET ${sets.join(', ')} WHERE id = ? AND salon_id = ?`, params);
+    await conn.query(`UPDATE queue SET ${sets.join(', ')} WHERE id = ? AND salon_id = ?`, params);
   }
 
   if (Array.isArray(extras)) {
-    await pool.query('DELETE FROM queue_extras WHERE queue_id = ?', [req.params.id]);
+    await conn.query('DELETE FROM queue_extras WHERE queue_id = ?', [req.params.id]);
     if (extras.length) {
       const values = extras.map((extraId) => [req.params.id, extraId]);
-      await pool.query('INSERT INTO queue_extras (queue_id, extra_id) VALUES ?', [values]);
+      await conn.query('INSERT INTO queue_extras (queue_id, extra_id) VALUES ?', [values]);
     }
   }
 
   // Répercute les mêmes changements sur l'entrée d'agenda liée (si elle
   // existe), pour qu'un changement de prestation/suppléments en cours de
   // route reste visible et exact dans le calendrier Rendez-vous.
-  const [[linkedAppt]] = await pool.query(
+  const [[linkedAppt]] = await conn.query(
     'SELECT id FROM appointments WHERE promoted_queue_id = ?', [req.params.id]
   );
   if (linkedAppt) {
     if (service_id) {
-      await pool.query('UPDATE appointments SET service_id = ? WHERE id = ?', [service_id, linkedAppt.id]);
+      await conn.query('UPDATE appointments SET service_id = ? WHERE id = ?', [service_id, linkedAppt.id]);
     }
     if (Array.isArray(extras)) {
-      await pool.query('DELETE FROM appointment_extras WHERE appointment_id = ?', [linkedAppt.id]);
+      await conn.query('DELETE FROM appointment_extras WHERE appointment_id = ?', [linkedAppt.id]);
       if (extras.length) {
-        await pool.query(
+        await conn.query(
           'INSERT INTO appointment_extras (appointment_id, extra_id) VALUES ?',
           [extras.map((extraId) => [linkedAppt.id, extraId])]
         );
       }
     }
+  }
+
+    await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
   }
 
   await recompute(req.salon.id);
