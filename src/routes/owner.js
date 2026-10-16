@@ -6,7 +6,7 @@ const { slugTaken } = require('../lib/slugs');
 const requireAdmin = require('../middleware/auth');
 const requireAdminOrBarber = require('../middleware/barberAuth');
 const { hashPassword, verifyPassword } = require('../lib/password');
-const { sendLoyaltyActivation, sendGiftConfirmation, sendClientSecurityNotice } = require('../lib/mailer');
+const { sendLoyaltyActivation, sendGiftConfirmation, sendClientSecurityNotice, sendAdminEmailVerification } = require('../lib/mailer');
 const { clientKey } = require('../lib/queueMath');
 const { logActivity } = require('../lib/activityLog');
 const { wrap } = require('../lib/wrap');
@@ -274,9 +274,9 @@ router.put('/email', requireAdmin, wrap(async (req, res) => {
   const token = crypto.randomBytes(32).toString('hex');
   const expires = new Date(Date.now() + 15 * 60 * 1000);
   const base = require('../lib/safeUrl').safeBaseUrl(req, req.body.base_url);
-  const url = new URL(base);
+  const url = new URL('/dashboard.html', base);
   url.searchParams.set('admin_email_verify', token);
-  try { await sendClientSecurityNotice(req.salon.id, email, 'Validez votre nouvelle adresse email', 'Pour confirmer votre nouvelle adresse email (lien valable 15 minutes), ouvrez : ' + url.toString()); }
+  try { await sendAdminEmailVerification(req.salon.id, email, url.toString()); }
   catch (err) { console.error('[admin email] SMTP:', err.message); return res.status(503).json({ error: 'Impossible d’envoyer le lien de validation' }); }
   await pool.query('UPDATE owners SET pending_email = ?, email_change_token = ?, email_change_expires = ? WHERE id = ?', [email, token, expires, req.ownerId]);
   if (owner.email) {
