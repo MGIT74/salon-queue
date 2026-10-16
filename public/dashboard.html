@@ -48,6 +48,12 @@
 </script>
 <style>
   html.auth-checking #login { display: none; }
+
+/* Fermetures exceptionnelles visibles dans toutes les vues RDV. */
+.cal-day.salon-closed{background:rgba(128,128,128,.13);box-shadow:inset 0 0 0 1px rgba(150,150,150,.27)}
+.cal-day.salon-closed .cal-day-num{text-decoration:line-through;opacity:.65}
+.cal-day.salon-closed::after{content:'Fermé';display:block;font-size:10px;font-weight:700;color:var(--red,#e65c5c);margin-top:2px}
+.salon-closure-banner{padding:10px 13px;border-radius:9px;margin:0 0 12px;background:rgba(160,100,100,.13);color:var(--red,#e65c5c);font-weight:650;font-size:13px}
 </style>
 <link rel="stylesheet" href="/app.css?v=31">
 <style>
@@ -6456,12 +6462,20 @@ function neededMonthKeys() {
   return keys.filter(function (k, i) { return keys.indexOf(k) === i; });
 }
 
+
+var rdvSalonClosures = [];
+function rdvIsSalonClosed(dateStr) { return rdvSalonClosures.some(function(c){return dateStr >= c.start_date && dateStr <= c.end_date;}); }
+function rdvClosureBanner(dateStr) { return rdvIsSalonClosed(dateStr) ? '<div class="salon-closure-banner">Salon fermé exceptionnellement ce jour</div>' : ''; }
+function rdvLoadSalonClosures() {
+  return api('/api/salon-calendar/public-closures').then(function(r){rdvSalonClosures=r.items||[];}).catch(function(){rdvSalonClosures=[];});
+}
+
 function loadCalendarPeriod() {
   var keys = neededMonthKeys();
   var toFetch = keys.filter(function (k) { return !calMonthCache[k]; });
   Promise.all(toFetch.map(function (k) {
     return api('/api/appointments?month=' + k + '&all=1').then(function (r) { calMonthCache[k] = r.items; });
-  })).then(function () {
+  }).concat([rdvLoadSalonClosures()])).then(function () {
     if (calViewMode === 'month') renderMonthView();
     else if (calViewMode === 'week') renderWeekView();
     else renderDayView();
@@ -6535,6 +6549,7 @@ function renderMonthView() {
         return '<span class="cal-dot" style="background:' + (rdvBarberColors[bid] || '#888') + '"></span>';
       }).join('');
       var classes = 'cal-day' + (dateStr === todayStr ? ' today' : '') + (dateStr === calSelectedDate ? ' selected' : '');
+      if (rdvIsSalonClosed(dateStr)) classes += ' salon-closed';
       return '<div class="' + classes + '" onclick="selectCalendarDay(\'' + dateStr + '\')">' +
         '<div class="cal-day-num">' + day + '</div>' +
         (dots ? '<div class="cal-dots">' + dots + '</div>' : '') +
@@ -6869,6 +6884,7 @@ function renderWeekView() {
       return '<span class="cal-dot" style="background:' + (rdvBarberColors[bid] || '#888') + '"></span>';
     }).join('');
     var classes = 'cal-day' + (dateStr === todayStr ? ' today' : '') + (dateStr === calSelectedDate ? ' selected' : '');
+      if (rdvIsSalonClosed(dateStr)) classes += ' salon-closed';
     cells += '<div class="' + classes + '" onclick="selectCalendarDay(\'' + dateStr + '\')">' +
       '<div class="cal-day-num">' + d.getDate() + '</div>' +
       (dots ? '<div class="cal-dots">' + dots + '</div>' : '') +
@@ -6888,7 +6904,7 @@ function renderDayView() {
   var dayAppts = applyCalBarberFilter(appointmentsForRange(calAnchor, calAnchor));
   dayAppts.forEach(function (a) { calAppointmentById[a.id] = a; });
   var view = document.getElementById('cal-day-view');
-  view.innerHTML = renderDayTimelineHtml(dateStr, dayAppts);
+  view.innerHTML = rdvClosureBanner(dateStr) + renderDayTimelineHtml(dateStr, dayAppts);
 
   calSelectedDate = dateStr;
   document.getElementById('rdv-list-title').textContent = 'Le ' + calAnchor.toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' });
