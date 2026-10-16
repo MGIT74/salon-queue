@@ -276,6 +276,7 @@ router.put('/:id/schedule', requireAdmin, wrap(async (req, res) => {
     return res.status(400).json({ error: 'Planning incomplet ou invalide : aucun horaire modifié' });
   }
 
+  let rows = [], breakRows = [];
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
@@ -287,7 +288,7 @@ router.put('/:id/schedule', requireAdmin, wrap(async (req, res) => {
   // disponible) de "explicitement décoché sur tous les jours" (des
   // lignes existent, toutes inactives - ce coiffeur ne doit alors plus
   // être proposable pour un RDV, cf. la liste "Ajouter un RDV").
-  const rows = list
+  rows = list
     .filter((s) => s.start_time && s.end_time)
     .map((s) => [crypto.randomUUID(), req.params.id, Number(s.weekday), s.start_time, s.end_time, s.active ? 1 : 0]);
 
@@ -303,7 +304,7 @@ router.put('/:id/schedule', requireAdmin, wrap(async (req, res) => {
   // jour (weekday peut se répéter dans la liste).
   const breakList = Array.isArray(req.body.breaks) ? req.body.breaks : [];
   await conn.query('DELETE FROM barber_breaks WHERE barber_id = ?', [req.params.id]);
-  const breakRows = breakList
+  breakRows = breakList
     .filter((b) => b.start_time && b.end_time)
     .map((b) => [crypto.randomUUID(), req.params.id, Number(b.weekday), b.start_time, b.end_time, 1]);
   if (breakRows.length) {
