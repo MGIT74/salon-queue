@@ -5,8 +5,8 @@ const { pool, utcIso, getOwnerSettings, setOwnerSettings, getSettings, getCaisse
 const { slugTaken } = require('../lib/slugs');
 const requireAdmin = require('../middleware/auth');
 const requireAdminOrBarber = require('../middleware/barberAuth');
-const { hashPassword } = require('../lib/password');
-const { sendLoyaltyActivation, sendGiftConfirmation } = require('../lib/mailer');
+const { hashPassword, verifyPassword } = require('../lib/password');
+const { sendLoyaltyActivation, sendGiftConfirmation, sendClientSecurityNotice } = require('../lib/mailer');
 const { clientKey } = require('../lib/queueMath');
 const { logActivity } = require('../lib/activityLog');
 const { wrap } = require('../lib/wrap');
@@ -262,31 +262,59 @@ router.put('/name', requireAdmin, wrap(async (req, res) => {
   res.json({ ok: true });
 }));
 
+// Validation obligatoire de la nouvelle adresse admin : ancienne adresse conservée.
 router.put('/email', requireAdmin, wrap(async (req, res) => {
-  const email = String(req.body.email || '').trim();
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return res.status(400).json({ error: 'Adresse email invalide' });
-  }
-
-  const [[existing]] = await pool.query('SELECT id FROM owners WHERE email = ? AND id != ?', [email, req.ownerId]);
+  const email = String(req.body.email || '').trim().toLowerCase();
+  if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) return res.status(400).json({ error: 'Adresse email invalide' });
+  const [[owner]] = await pool.query('SELECT email FROM owners WHERE id = ?', [req.ownerId]);
+  if (!owner) return res.status(404).json({ error: 'Compte introuvable' });
+  if (String(owner.email || '').toLowerCase() === email) return res.json({ ok: true, unchanged: true });
+  const [[existing]] = await pool.query('SELECT id FROM owners WHERE (email = ? OR pending_email = ?) AND id != ?', [email, email, req.ownerId]);
   if (existing) return res.status(409).json({ error: 'Un autre compte utilise déjà cet email' });
+  const token = crypto.randomBytes(32).toString('hex');
+  const expires = new Date(Date.now() + 15 * 60 * 1000);
+  const base = require('../lib/safeUrl').safeBaseUrl(req, req.body.base_url);
+  const url = new URL(base);
+  url.searchParams.set('admin_email_verify', token);
+  try { await sendClientSecurityNotice(req.salon.id, email, 'Validez votre nouvelle adresse email', 'Pour confirmer votre nouvelle adresse email (lien valable 15 minutes), ouvrez : ' + url.toString()); }
+  catch (err) { console.error('[admin email] SMTP:', err.message); return res.status(503).json({ error: 'Impossible d’envoyer le lien de validation' }); }
+  await pool.query('UPDATE owners SET pending_email = ?, email_change_token = ?, email_change_expires = ? WHERE id = ?', [email, token, expires, req.ownerId]);
+  if (owner.email) {
+    try { await sendClientSecurityNotice(req.salon.id, owner.email, 'Demande de modification de votre email', 'Une demande de changement de votre adresse email administrateur a été effectuée. Si ce n’était pas vous, contactez le support.'); }
+    catch (err) { console.error('[admin email] notification:', err.message); }
+  }
+  res.json({ ok: true, email_verification_pending: true });
+}));
 
-  await pool.query('UPDATE owners SET email = ? WHERE id = ?', [email, req.ownerId]);
-  logActivity(req.salon.id, 'account_edit', 'Email du compte modifié en ' + email);
+// Le jeton ne vaut que pour l'enseigne authentifiée ; usage unique.
+router.post('/email/verify', requireAdmin, wrap(async (req, res) => {
+  const token = String(req.body.token || '');
+  if (!/^[a-f0-9]{64}$/.test(token)) return res.status(400).json({ error: 'Lien invalide' });
+  const [[pending]] = await pool.query('SELECT pending_email FROM owners WHERE id = ? AND email_change_token = ? AND email_change_expires > NOW()', [req.ownerId, token]);
+  if (!pending || !pending.pending_email) return res.status(400).json({ error: 'Lien invalide ou expiré' });
+  const [[existing]] = await pool.query('SELECT id FROM owners WHERE email = ? AND id != ?', [pending.pending_email, req.ownerId]);
+  if (existing) return res.status(409).json({ error: 'Cette adresse est déjà utilisée' });
+  await pool.query('UPDATE owners SET email = pending_email, pending_email = NULL, email_change_token = NULL, email_change_expires = NULL WHERE id = ? AND email_change_token = ? AND email_change_expires > NOW()', [req.ownerId, token]);
+  logActivity(req.salon.id, 'account_edit', 'Adresse email administrateur vérifiée et modifiée');
   res.json({ ok: true });
 }));
 
-// Permet à un compte déjà connecté de changer SON PROPRE mot de passe
-// (celui partagé par toute l'enseigne). requireAdmin ayant déjà vérifié
-// l'accès, on ne redemande pas l'ancien mot de passe.
 router.put('/password', requireAdmin, wrap(async (req, res) => {
-  const { new_password } = req.body;
-  if (!new_password || new_password.length < 6) {
-    return res.status(400).json({ error: 'Le nouveau mot de passe doit contenir au moins 6 caractères' });
-  }
+  const { current_password, new_password } = req.body;
+  if (!current_password) return res.status(400).json({ error: 'Mot de passe actuel obligatoire' });
+  if (typeof new_password !== 'string' || new_password.length < 8) return res.status(400).json({ error: 'Le nouveau mot de passe doit contenir au moins 8 caractères' });
+  const [[owner]] = await pool.query('SELECT email, password_hash, admin_password FROM owners WHERE id = ?', [req.ownerId]);
+  if (!owner) return res.status(404).json({ error: 'Compte introuvable' });
+  const valid = owner.password_hash ? await verifyPassword(current_password, owner.password_hash) :
+    (owner.admin_password ? require('../lib/password').timingSafeStringEqual(current_password, owner.admin_password.trim()) : false);
+  if (!valid) return res.status(403).json({ error: 'Mot de passe actuel incorrect' });
   const hash = await hashPassword(new_password);
-  await pool.query('UPDATE owners SET password_hash = ? WHERE id = ?', [hash, req.ownerId]);
-  logActivity(req.salon.id, 'account_edit', 'Mot de passe du compte modifié');
+  await pool.query('UPDATE owners SET password_hash = ?, admin_password = NULL WHERE id = ?', [hash, req.ownerId]);
+  logActivity(req.salon.id, 'account_edit', 'Mot de passe administrateur modifié');
+  if (owner.email) {
+    try { await sendClientSecurityNotice(req.salon.id, owner.email, 'Mot de passe administrateur modifié', 'Votre mot de passe administrateur vient d’être modifié. Si ce n’était pas vous, contactez immédiatement le support.'); }
+    catch (err) { console.error('[admin password] notification:', err.message); }
+  }
   res.json({ ok: true });
 }));
 
