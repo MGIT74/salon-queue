@@ -42,7 +42,7 @@ module.exports = async function requireAdminOrBarber(req, res, next) {
   // admin par mot de passe (le PIN est un secret plus faible, son
   // compteur ne doit pas pouvoir bloquer le propriétaire).
   const adminBlockedFor = isBlocked(adminRlKey);
-  if (adminBlockedFor) {
+  if (adminBlockedFor && req.get('X-Admin-Password')) {
     res.set('Retry-After', String(adminBlockedFor));
     return res.status(429).json({
       error: 'Trop de tentatives, réessayez dans ' + Math.ceil(adminBlockedFor / 60) + ' min.'
@@ -124,7 +124,7 @@ module.exports = async function requireAdminOrBarber(req, res, next) {
   // échec "mot de passe admin" seul compte pour l'enseigne.
   if (barberId && barberPin) {
     recordFailure(pinRlKey);
-  } else if (adminPassword) {
+  } else if (given) {
     recordFailure(adminRlKey);
   }
   return res.status(401).json({ error: 'Authentification requise' });
