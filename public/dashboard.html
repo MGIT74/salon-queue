@@ -9252,6 +9252,7 @@ function openAddSalonClosure() {
     '<div class="fld"><label>Du</label><input type="date" id="asc-from" data-range-to="asc-to" value="' + todayStr + '"></div>' +
     '<div class="fld"><label>Au</label><input type="date" id="asc-to" value="' + todayStr + '"></div>' +
     '<div class="fld"><label>Motif (optionnel)</label><input type="text" id="asc-reason" placeholder="Ex: jour férié, fermeture exceptionnelle…"></div>' +
+    '<div id="asc-appointments-preview" aria-live="polite" style="margin-bottom:14px;padding:12px 14px;border:1px solid var(--border,rgba(128,128,128,.2));border-radius:12px;font-size:13px;color:var(--muted)">Sélectionnez une période pour vérifier les rendez-vous existants.</div>' +
     '<div style="display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 14px;background:var(--fill);border-radius:12px;margin-bottom:16px;cursor:pointer" onclick="ascToggleSendEmail()">' +
       '<span style="font-size:14.5px">Prévenir les clients par email</span>' +
       '<div class="switch" id="asc-send-email-switch"></div>' +
@@ -9273,6 +9274,53 @@ function openAddSalonClosure() {
     '<button class="btn btn-primary" id="asc-save-btn">Ajouter</button>' +
     '</div>'
   );
+
+  // Aperçu non destructif des RDV : actualisé à chaque changement de date.
+  var ascPreviewTimer = null;
+  var ascPreviewRequest = 0;
+  function ascRefreshAppointments() {
+    clearTimeout(ascPreviewTimer);
+    var requestId = ++ascPreviewRequest;
+    var from = overlay.querySelector('#asc-from').value;
+    var to = overlay.querySelector('#asc-to').value;
+    var target = overlay.querySelector('#asc-appointments-preview');
+    if (!from || !to || to < from) {
+      target.textContent = 'Sélectionnez une période valide pour afficher les rendez-vous.';
+      return;
+    }
+    target.textContent = 'Recherche des rendez-vous…';
+    ascPreviewTimer = setTimeout(function() {
+      api('/api/salon-calendar/closures/preview?start_date=' + encodeURIComponent(from) + '&end_date=' + encodeURIComponent(to))
+        .then(function(data) {
+          if (requestId !== ascPreviewRequest || !overlay.isConnected) return;
+          var items = data.items || [];
+          if (!items.length) {
+            target.innerHTML = '<strong style="color:var(--green)">Aucun rendez-vous sur cette période.</strong>';
+            return;
+          }
+          var rows = items.map(function(a) {
+            var stamp = String(a.scheduled_at || '');
+            var day = stamp.length >= 16 ? stamp.slice(8,10) + '/' + stamp.slice(5,7) + ' à ' + stamp.slice(11,16) : stamp;
+            return '<div style="padding:9px 0;border-top:1px solid var(--border,rgba(128,128,128,.15))">' +
+              '<strong>' + esc(day) + ' — ' + esc(a.client_name || 'Client') + '</strong>' +
+              '<div style="color:var(--muted);margin-top:3px">' + esc(a.service_name || 'Prestation') + ' · ' + esc(a.barber_name || 'Coiffeur non attribué') + '</div>' +
+              '<div style="color:var(--muted);margin-top:2px">' + esc(a.phone || a.email || 'Contact non renseigné') + '</div></div>';
+          }).join('');
+          target.innerHTML = '<strong style="color:var(--ink)">' + items.length + ' rendez-vous concerné(s)</strong>' +
+            '<p style="margin:6px 0 10px;color:var(--muted)">Ces rendez-vous ne seront pas annulés automatiquement.</p>' +
+            '<div style="max-height:230px;overflow-y:auto">' + rows + '</div>';
+        })
+        .catch(function(e) {
+          if (requestId !== ascPreviewRequest || !overlay.isConnected) return;
+          target.textContent = 'Impossible de charger les rendez-vous : ' + e.message;
+        });
+    }, 250);
+  }
+  overlay.querySelector('#asc-from').addEventListener('change', ascRefreshAppointments);
+  overlay.querySelector('#asc-to').addEventListener('change', ascRefreshAppointments);
+  overlay.querySelector('#asc-from').addEventListener('input', ascRefreshAppointments);
+  overlay.querySelector('#asc-to').addEventListener('input', ascRefreshAppointments);
+  ascRefreshAppointments();
 
   var ascMsgType = 'default';
   window.ascSelectMsgType = function (type) {
