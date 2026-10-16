@@ -46,6 +46,16 @@ router.put('/schedule', requireAdmin, wrap(async (req, res) => {
  * Fermetures exceptionnelles du salon entier (férié, fermeture
  * urgente...) - distinct des congés individuels de chaque coiffeur.
  */
+// Dates indisponibles exposées sans authentification pour le calendrier client.
+router.get('/public-closures', wrap(async (req, res) => {
+  const [rows] = await pool.query(
+    'SELECT start_date, end_date FROM salon_closures WHERE salon_id = ? AND end_date >= CURDATE() ORDER BY start_date',
+    [req.salon.id]
+  );
+  const fmt = (d) => d instanceof Date ? [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('-') : String(d).slice(0, 10);
+  res.json({ ok: true, items: rows.map(r => ({ start_date: fmt(r.start_date), end_date: fmt(r.end_date) })) });
+}));
+
 router.get('/closures', requireAdmin, wrap(async (req, res) => {
   const [rows] = await pool.query(
     'SELECT id, start_date, end_date, reason, created_at FROM salon_closures WHERE salon_id = ? ORDER BY start_date DESC',
