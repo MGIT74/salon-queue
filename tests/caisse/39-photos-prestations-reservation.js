@@ -70,7 +70,7 @@ const cards = (w) => [...w.document.querySelectorAll('#svc-grid .item-card')];
 
   console.log('\n[F] Borne : la selection d\'une prestation a photo etait INVISIBLE (mesure : 0 pixel bleu au bord) - meme correction');
   const kiosk = fs.readFileSync(path.join(__dirname, '../../public/kiosk.html'), 'utf8');
-  check('borne : prestations et supplements sont des cartes de vitrine PARTAGEES (item-grid + vitrineRender), plus de regle .svc-card.has-photo ni .xchip', /class="item-grid" id="svc-grid"/.test(kiosk) && /class="item-grid" id="extras-grid"/.test(kiosk) && /vitrineRender\(\{ kind: 'services'/.test(kiosk) && /vitrineRender\(\{ kind: 'extras'/.test(kiosk) && !/\.svc-card\.has-photo|xchip/.test(kiosk));
+  check('borne : prestations et supplements sont des cartes de vitrine PARTAGEES (item-grid + vitrineRender), plus de regle .svc-card.has-photo ni .xchip', /class="item-grid" id="svc-grid"/.test(kiosk) && /class="item-grid" id="extras-grid"/.test(kiosk) && /vitrineRender\(\{ kind: 'services'/.test(kiosk) && /kind: kind, gridId: kind \+ '-grid'/.test(kiosk) && /vitrineRender\(kioskListCfg\('extras'\)\)/.test(kiosk) && !/\.svc-card\.has-photo|xchip/.test(kiosk));
   check('borne : plus d\'anneau "inset" pose sur la carte elle-meme (cache par la photo)', !/\.svc-card\.has-photo\.sel \{ box-shadow: inset/.test(kiosk));
   check('borne : le style (photo ENTIERE en haut, texte dessous, anneau + coche) vient de app.css, comme sur la reservation', /\.item-card\.sel::after \{[^}]*z-index: 2/.test(css) && /\.item-card\.has-photo \.item-media \{[^}]*aspect-ratio: 4 \/ 3/.test(css) && !/photo-bg|\.overlay/.test(kiosk));
 

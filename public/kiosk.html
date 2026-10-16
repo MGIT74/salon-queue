@@ -60,6 +60,20 @@
            overflow-y: auto; box-shadow: var(--shadow); transition: background .25s ease; }
   .panel { display: none; }
   .panel.on { display: block; }
+  /* Écran d'accueil / code cadeau / ticket : centrés, mais sans jamais couper le haut quand le contenu dépasse. */
+  .stage { justify-content: safe center; }
+  /* Étapes du formulaire (prestation, suppléments, produits) : en-tête fixe, liste qui défile, barre du bas
+     toujours visible (total + bouton) - même avec beaucoup de prestations, plus rien n'est repoussé hors de l'écran. */
+  .stage:has(.panel.kflow.on) { overflow: hidden; justify-content: flex-start; padding-bottom: clamp(16px,2.2vh,26px); }
+  .panel.kflow.on { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+  .kflow .khead { flex: none; }
+  .kflow .khead .ftitle { margin-bottom: clamp(10px,1.6vh,18px); }
+  .kflow .khead .hero-sub { margin: -4px 0 clamp(12px,1.8vh,18px) !important; }
+  .kflow .khead .fld { margin-bottom: clamp(10px,1.4vh,14px); }
+  .kflow .kbody { flex: 1 1 auto; min-height: 0; overflow-y: auto; margin: 0 -10px; padding: 4px 10px 12px; overscroll-behavior: contain; }
+  .kflow .kfoot { flex: none; padding-top: clamp(12px,1.6vh,16px); border-top: 1px solid var(--sep); }
+  .kflow .kfoot .total-line { margin: 0 0 clamp(10px,1.4vh,14px); padding: 0; border: none; }
+  .kflow .klabel { font-size: 14px; color: var(--grey); font-weight: 500; margin-bottom: 8px; }
 
   .eyebrow { font-size: clamp(14px,1.3vw,17px); font-weight: 600; color: var(--grey); margin-bottom: clamp(14px,2vh,22px); }
   .gift-tile .barber-fallback { background: linear-gradient(160deg, #b8860b, #8a5a00); font-size: clamp(32px,5vw,52px); }
@@ -260,31 +274,73 @@
       <button class="go" onclick="lookupGiftCode()">Valider le code</button>
     </section>
 
-    <section class="panel" id="p-form">
-      <button class="back" onclick="show('p-home')">‹ Retour</button>
-      <h1 class="ftitle">Vos informations</h1>
-      <p class="hero-sub" id="chosen-barber-note" style="margin:-8px 0 22px"></p>
-      <div class="row2">
-        <div class="fld"><label for="f-name">Prénom</label>
-          <input id="f-name" type="text" placeholder="Votre prénom" autocomplete="given-name"></div>
-        <div class="fld"><label for="f-mail">Email — pour être prévenu avant votre tour</label>
-          <input id="f-mail" type="email" placeholder="vous@exemple.com" autocomplete="email"></div>
+    <section class="panel kflow" id="p-form">
+      <div class="khead">
+        <button class="back" onclick="show('p-home')">‹ Retour</button>
+        <h1 class="ftitle">Vos informations</h1>
+        <p class="hero-sub" id="chosen-barber-note"></p>
+        <div class="row2">
+          <div class="fld"><label for="f-name">Prénom</label>
+            <input id="f-name" type="text" placeholder="Votre prénom" autocomplete="given-name"></div>
+          <div class="fld"><label for="f-mail">Email — pour être prévenu avant votre tour</label>
+            <input id="f-mail" type="email" placeholder="vous@exemple.com" autocomplete="email"></div>
+        </div>
+        <div class="klabel">Prestation</div>
       </div>
-      <div class="fld"><label>Prestation</label>
-        <div class="item-grid" id="svc-grid"></div></div>
-      <button class="go" id="step1-next-btn" onclick="goToExtrasStep()" disabled>Suivant</button>
+      <div class="kbody"><div class="item-grid" id="svc-grid"></div></div>
+      <div class="kfoot">
+        <div class="total-line" id="svc-total" style="display:none">
+          <span class="lab" id="svc-total-name"></span>
+          <span class="val" id="svc-total-val"></span>
+        </div>
+        <button class="go" id="step1-next-btn" onclick="goToExtrasStep()" disabled>Suivant</button>
+      </div>
     </section>
 
-    <section class="panel" id="p-form-extras">
-      <button class="back" onclick="show('p-form')">‹ Retour</button>
-      <h1 class="ftitle">Un petit plus ?</h1>
-      <p class="hero-sub" style="margin:-8px 0 22px">Suppléments optionnels, en plus de votre prestation.</p>
-      <div class="fld"><div class="item-grid" id="extras-grid"></div></div>
-      <div class="total-line">
-        <span class="lab">Durée · total</span>
-        <span class="val"><span id="tot-dur">0</span> min · <span id="tot-price">0,00 €</span></span>
+    <section class="panel kflow" id="p-form-extras">
+      <div class="khead">
+        <button class="back" onclick="show('p-form')">‹ Retour</button>
+        <h1 class="ftitle">Un petit plus ?</h1>
+        <p class="hero-sub">Suppléments optionnels, en plus de votre prestation.</p>
+        <div class="items-search" id="extras-search" style="display:none">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input type="search" id="extras-q" placeholder="Rechercher un supplément" autocomplete="off" oninput="filterKioskItems('extras')">
+        </div>
       </div>
-      <button class="go" id="submit-btn" onclick="submitForm()">Confirmer</button>
+      <div class="kbody">
+        <div class="item-grid" id="extras-grid"></div>
+        <div class="items-empty" id="extras-empty">Aucun résultat</div>
+      </div>
+      <div class="kfoot">
+        <div class="total-line">
+          <span class="lab">Durée · total</span>
+          <span class="val"><span class="tot-dur">0</span> min · <span class="tot-price">0,00 €</span></span>
+        </div>
+        <button class="go" id="extras-next-btn" onclick="afterExtrasStep(this)">Suivant</button>
+      </div>
+    </section>
+
+    <section class="panel kflow" id="p-form-products">
+      <div class="khead">
+        <button class="back" id="products-back-btn" onclick="backFromProducts()">‹ Retour</button>
+        <h1 class="ftitle">Un produit avec ça ?</h1>
+        <p class="hero-sub">Facultatif — à régler au salon avec votre prestation.</p>
+        <div class="items-search" id="products-search" style="display:none">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input type="search" id="products-q" placeholder="Rechercher un produit" autocomplete="off" oninput="filterKioskItems('products')">
+        </div>
+      </div>
+      <div class="kbody">
+        <div class="item-grid" id="products-grid"></div>
+        <div class="items-empty" id="products-empty">Aucun résultat</div>
+      </div>
+      <div class="kfoot">
+        <div class="total-line">
+          <span class="lab">Durée · total</span>
+          <span class="val"><span class="tot-dur">0</span> min · <span class="tot-price">0,00 €</span></span>
+        </div>
+        <button class="go" onclick="submitForm(this)">Confirmer</button>
+      </div>
     </section>
 
     <section class="panel" id="p-ticket">
@@ -314,12 +370,16 @@
 <script>
 mountThemeButton();
 
+var products = [], selProducts = [];
 var services = [], extras = [], barbers = [], queue = [], salonName = '', salonLogoUrl = '', giftTileImage = '';
 var selBarber = null, selExtras = [], selService = null;
 var activeGift = null; // { id, recipient_name, recipient_email, recipient_phone, items } si en mode "utiliser un cadeau"
 
-function svcById(id) { return services.find(function (s) { return s.id === id; }); }
-function extById(id) { return extras.find(function (e) { return e.id === id; }); }
+// Offre du coiffeur choisi (prestations retirées / tarif et durée propres à ce coiffeur), sinon le catalogue du salon.
+var kSvc = [], kExt = [];
+function svcById(id) { return kSvc.find(function (s) { return s.id === id; }) || services.find(function (s) { return s.id === id; }); }
+function extById(id) { return kExt.find(function (e) { return e.id === id; }) || extras.find(function (e) { return e.id === id; }); }
+function prodById(id) { return products.find(function (p) { return p.id === id; }); }
 
 function show(id) {
   document.querySelectorAll('.panel').forEach(function (p) { p.classList.remove('on'); });
@@ -331,9 +391,12 @@ function loadCatalog() {
   return Promise.all([
     api('/api/catalog/services'),
     api('/api/catalog/extras'),
-    api('/api/settings/public')
+    api('/api/settings/public'),
+    api('/api/catalog/products').catch(function () { return { items: [] }; })
   ]).then(function (r) {
     services = r[0].items; extras = r[1].items;
+    // « caisse seulement » : jamais proposé au client (même règle que la réservation en ligne)
+    products = (r[3].items || []).filter(function (p) { return p.online_bookable !== 0; });
     salonName = r[2].salon_name;
     salonLogoUrl = r[2].logo_url || '';
     giftTileImage = r[2].gift_tile_image_url || '';
@@ -375,11 +438,8 @@ function iconForItem(name) {
 
 function renderFormOptions() {
   var b = selBarber ? barbers.find(function (x) { return x.id === selBarber; }) : null;
-  var disabledSvc = (b && b.disabled_service_ids) || [];
-  var disabledExt = (b && b.disabled_extra_ids) || [];
-
-  var availableServices = services.filter(function (s) { return disabledSvc.indexOf(s.id) === -1; });
-  var availableExtras = extras.filter(function (e) { return disabledExt.indexOf(e.id) === -1; });
+  var availableServices = kSvc = barberItems(b, 'services', services);
+  var availableExtras = kExt = barberItems(b, 'extras', extras);
 
   // Si le service choisi n'est plus disponible avec ce coiffeur, on
   // désélectionne pour éviter d'envoyer un choix invalide.
@@ -393,11 +453,22 @@ function renderFormOptions() {
   // Prestations et supplements : cartes de vitrine partagees (app.js / app.css) - photo ENTIERE ou icone en haut, texte dessous.
   vitrineRender({ kind: 'services', gridId: 'svc-grid', items: availableServices, chosen: selService ? [selService] : [], onclick: "selectService('{id}')" });
   if (!availableServices.length) document.getElementById('svc-grid').innerHTML = '<div class="empty">Aucune prestation disponible</div>';
-  vitrineRender({ kind: 'extras', gridId: 'extras-grid', items: availableExtras, chosen: selExtras, onclick: "toggleExtra('{id}')" });
+  vitrineRender(kioskListCfg('extras'));
+  selProducts = selProducts.filter(function (id) { return !!prodById(id); });
+  vitrineRender(kioskListCfg('products'));
 
   updateStep1NextState();
   renderTotals();
 }
+
+function kioskListCfg(kind) {
+  return {
+    kind: kind, gridId: kind + '-grid', searchId: kind + '-search', qId: kind + '-q', emptyId: kind + '-empty',
+    items: kind === 'extras' ? kExt : products, chosen: kind === 'extras' ? selExtras : selProducts,
+    onclick: kind === 'extras' ? "toggleExtra('{id}')" : "toggleProduct('{id}')"
+  };
+}
+function filterKioskItems(kind) { vitrineFilter(kioskListCfg(kind)); }
 
 function selectService(id) {
   selService = id;
@@ -411,13 +482,31 @@ function updateStep1NextState() {
   var name = document.getElementById('f-name').value.trim();
   var btn = document.getElementById('step1-next-btn');
   if (btn) btn.disabled = !(name && selService);
+  updateStep1Label();
 }
 
+// Parcours : prestation > suppléments (s'il y en a) > produits (s'il y en a) > confirmation.
+// Le bouton du bas annonce toujours la suite : « Suivant » ou « Confirmer » sur la dernière étape.
 function goToExtrasStep() {
   var name = document.getElementById('f-name').value.trim();
   if (!name) { toast('Entrez votre prénom', true); return; }
   if (!selService) { toast('Choisissez une prestation', true); return; }
-  show('p-form-extras');
+  if (kExt.length) {
+    document.getElementById('extras-next-btn').textContent = products.length ? 'Suivant' : 'Confirmer';
+    show('p-form-extras');
+  } else if (products.length) {
+    show('p-form-products');
+  } else {
+    submitForm(document.getElementById('step1-next-btn'));
+  }
+}
+function afterExtrasStep(btn) {
+  if (products.length) show('p-form-products'); else submitForm(btn);
+}
+function backFromProducts() { show(kExt.length ? 'p-form-extras' : 'p-form'); }
+function updateStep1Label() {
+  var btn = document.getElementById('step1-next-btn');
+  if (btn) btn.textContent = (kExt.length || products.length) ? 'Suivant' : 'Confirmer';
 }
 
 function refresh() {
@@ -671,6 +760,17 @@ function submitGiftCheckin(b) {
 }
 
 /* ---------- Suppléments ---------- */
+function toggleProduct(id) {
+  var i = selProducts.indexOf(id);
+  if (i === -1) selProducts.push(id); else selProducts.splice(i, 1);
+  document.querySelectorAll('#products-grid .item-card').forEach(function (c) {
+    var on = selProducts.indexOf(c.dataset.id) !== -1;
+    c.classList.toggle('sel', on);
+    c.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+  renderTotals();
+}
+
 function toggleExtra(id) {
   var i = selExtras.indexOf(id);
   if (i === -1) selExtras.push(id); else selExtras.splice(i, 1);
@@ -684,25 +784,34 @@ function toggleExtra(id) {
 
 function renderTotals() {
   var s = svcById(selService);
-  if (!s) {
-    document.getElementById('tot-dur').textContent = '0';
-    document.getElementById('tot-price').textContent = eur(0);
-    return;
+  var dur = 0, cents = 0;
+  if (s) {
+    dur = s.duration_min + selExtras.reduce(function (a, id) { var e = extById(id); return a + (e ? e.duration_min : 0); }, 0);
+    cents = s.price_cents + selExtras.reduce(function (a, id) { var e = extById(id); return a + (e ? e.price_cents : 0); }, 0) +
+      selProducts.reduce(function (a, id) { var p = prodById(id); return a + (p ? Number(p.price_cents) || 0 : 0); }, 0);
   }
-  var dur = s.duration_min + selExtras.reduce(function (a, id) { return a + extById(id).duration_min; }, 0);
-  var cents = s.price_cents + selExtras.reduce(function (a, id) { return a + extById(id).price_cents; }, 0);
-  document.getElementById('tot-dur').textContent = dur;
-  document.getElementById('tot-price').textContent = eur(cents);
+  document.querySelectorAll('.tot-dur').forEach(function (el) { el.textContent = dur; });
+  document.querySelectorAll('.tot-price').forEach(function (el) { el.textContent = eur(cents); });
+  // Étape 1 : rappel de la prestation choisie à côté du bouton (toujours visible en bas, même si la liste défile).
+  var line = document.getElementById('svc-total');
+  if (line) {
+    line.style.display = s ? '' : 'none';
+    if (s) {
+      document.getElementById('svc-total-name').textContent = s.name;
+      document.getElementById('svc-total-val').textContent = s.duration_min + ' min · ' + eur(s.price_cents);
+    }
+  }
 }
 
 /* ---------- Envoi ---------- */
-function submitForm() {
+function submitForm(btn) {
   var name = document.getElementById('f-name').value.trim();
   var mail = document.getElementById('f-mail').value.trim();
   if (!name) { toast('Merci d\'indiquer votre prénom', true); return; }
   if (!selService) { toast('Choisissez une prestation', true); return; }
 
-  var btn = document.getElementById('submit-btn');
+  btn = btn || document.querySelector('.panel.on .kfoot .go');
+  var label = btn.textContent;
   btn.disabled = true; btn.textContent = 'Enregistrement…';
 
   api('/api/queue/checkin', {
@@ -712,7 +821,8 @@ function submitForm() {
       email: mail || null,
       service_id: selService,
       barber_id: selBarber,
-      extras: selExtras
+      extras: selExtras,
+      products: selProducts.map(function (id) { return { id: id, quantity: 1 }; })
     }
   }).then(function (r) {
     var e = r.entry;
@@ -720,7 +830,8 @@ function submitForm() {
     var b = e.barber_id ? barbers.find(function (x) { return x.id === e.barber_id; }) : null;
     document.getElementById('t-service').textContent =
       e.service.name + (e.extras.length ? ' + ' + e.extras.map(function (x) { return x.name; }).join(', ') : '') +
-      ' · ' + (b ? b.name : 'Premier disponible');
+      ' · ' + (b ? b.name : 'Premier disponible') +
+      (selProducts.length ? ' · Produit' + (selProducts.length > 1 ? 's' : '') + ' : ' + selProducts.map(function (id) { var x = prodById(id); return x ? x.name : ''; }).filter(Boolean).join(', ') : '');
     document.getElementById('t-num').textContent = e.position;
     document.getElementById('t-wait').textContent = formatMinutes(e.estimated_wait_min);
     document.getElementById('t-note').innerHTML = mail
@@ -731,15 +842,15 @@ function submitForm() {
   }).catch(function (err) {
     toast(err.message, true);
   }).finally(function () {
-    btn.disabled = false; btn.textContent = 'Confirmer';
+    btn.disabled = false; btn.textContent = label;
   });
 }
 
 function resetForm() {
   document.getElementById('f-name').value = '';
   document.getElementById('f-mail').value = '';
-  selExtras = []; selBarber = null; selService = null;
-  document.querySelectorAll('#svc-grid .item-card, #extras-grid .item-card').forEach(function (c) { c.classList.remove('sel'); c.setAttribute('aria-pressed', 'false'); });
+  selExtras = []; selProducts = []; selBarber = null; selService = null;
+  document.querySelectorAll('#svc-grid .item-card, #extras-grid .item-card, #products-grid .item-card').forEach(function (c) { c.classList.remove('sel'); c.setAttribute('aria-pressed', 'false'); });
   document.querySelectorAll('.svc-card').forEach(function (c) { c.classList.remove('sel'); });
   renderTotals(); renderBarberGrid();
   show('p-home');

@@ -114,11 +114,10 @@ const visible = (w, id) => w.document.getElementById(id).style.display !== 'none
   check('caisse : plus aucune ancienne puce ni carte de texte', !d.querySelector('.aa-chip, .aa-chips, #pa-step-service .aa-card'));
 
   console.log('\n[C] Borne : prestations et supplements en cartes de vitrine');
-  const kHtml = '<body><input id="f-name" value="Adel"><button id="step1-next-btn" disabled></button><div class="item-grid" id="svc-grid"></div><div class="item-grid" id="extras-grid"></div><span id="tot-dur"></span><span id="tot-price"></span></body>';
+  const kHtml = '<body><input id="f-name" value="Adel"><button id="step1-next-btn" disabled></button><div class="item-grid" id="svc-grid"></div><div class="item-grid" id="extras-grid"></div><div id="extras-search"><input id="extras-q"></div><div id="extras-empty"></div><div id="products-search"><input id="products-q"></div><div id="products-empty"></div><div class="item-grid" id="products-grid"></div><span class="tot-dur" id="tot-dur"></span><span class="tot-price" id="tot-price"></span></body>';
   w = world(kHtml);
   w.services = CATALOG.services; w.extras = CATALOG.extras.slice(0, 4); w.barbers = [{ id: 'b1', name: 'Alice', disabled_service_ids: [], disabled_extra_ids: ['e2'] }];
-  w.eval('var selBarber = null, selService = null, selExtras = [];\n' + ['iconForItem', 'renderFormOptions', 'selectService', 'updateStep1NextState', 'toggleExtra', 'renderTotals'].map(n => fnSrc(kiosk, n)).join('\n') +
-    '\nfunction svcById(id) { return services.find(function (s) { return s.id === id; }); } function extById(id) { return extras.find(function (e) { return e.id === id; }); }');
+  w.eval('var selBarber = null, selService = null, selExtras = [], products = [], selProducts = [], kSvc = [], kExt = [];\n' + fnSrc(app, 'barberItems') + '\n' + ['iconForItem', 'renderFormOptions', 'kioskListCfg', 'selectService', 'updateStep1NextState', 'updateStep1Label', 'toggleExtra', 'renderTotals'].map(n => fnSrc(kiosk, n)).join('\n') + '\n' + kiosk.split('\n').filter(l => /^function (svcById|extById|prodById)\(/.test(l)).join('\n'));
   w.eval("selBarber = 'b1';"); w.renderFormOptions(); d = w.document;
   sv = [...d.querySelectorAll('#svc-grid .item-card')];
   check('prestations en cartes de vitrine : image entiere EN HAUT, texte DESSOUS ; plus d\'ancien rendu texte-sur-photo', sv.length === 2 && sv[0].classList.contains('has-photo') && sv[0].children[0].classList.contains('item-media') && !d.querySelector('#svc-grid .photo-bg, #svc-grid .overlay'));
@@ -139,7 +138,7 @@ const visible = (w, id) => w.document.getElementById(id).style.display !== 'none
   check('prestation choisie devenue indisponible avec ce coiffeur : desélectionnée (pas de choix invalide envoye)', w.eval('selService') === null && d.querySelectorAll('#svc-grid .item-card.sel').length === 0);
   w.eval("barbers[0].disabled_service_ids = ['sv1','sv2'];"); w.renderFormOptions();
   check('aucune prestation disponible : message clair', /Aucune prestation disponible/.test(d.getElementById('svc-grid').textContent));
-  check('remise a zero apres un envoi : le code vide aussi les cartes (.item-card), plus les anciennes puces', /querySelectorAll\('#svc-grid \.item-card, #extras-grid \.item-card'\)\.forEach\(function \(c\) \{ c\.classList\.remove\('sel'\)/.test(kiosk) && !/xchip/.test(kiosk));
+  check('remise a zero apres un envoi : le code vide aussi les cartes (.item-card), plus les anciennes puces', /querySelectorAll\('#svc-grid \.item-card, #extras-grid \.item-card(, #products-grid \.item-card)?'\)\.forEach\(function \(c\) \{ c\.classList\.remove\('sel'\)/.test(kiosk) && !/xchip/.test(kiosk));
 
   console.log('\n[D] Fichiers partages et coherence');
   check('le style des cartes (.item-card, .item-grid.compact) et celui de la barre dans une fenetre sont dans app.css', /\.item-grid\.compact \{/.test(css) && /\.modal-box \.step-bar \{ position: sticky; bottom: -26px/.test(css) && /\.item-card\.has-photo \.item-media \{[^}]*background-size: contain/.test(css));

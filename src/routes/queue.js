@@ -345,6 +345,20 @@ router.post('/manual-client/import-log', requireAdmin, wrap(async (req, res) => 
 router.post('/checkin', signupRateLimiter('queue-checkin', { max: 12, windowMs: 15 * 60 * 1000, blockMs: 15 * 60 * 1000 }), wrap(async (req, res) => {
   const { client_name, email, phone, service_id, barber_id, extras } = req.body;
   if (!client_name) return res.status(400).json({ error: 'Le nom est requis' });
+  // Produits proposés à la borne avant la confirmation (même règle que pour un RDV en ligne : produit du salon,
+  // actif et non « caisse seulement »). Une ligne invalide est ignorée, la quantité est bornée à 1-99.
+  const rawProducts = Array.isArray(req.body.products) ? req.body.products : [];
+  let productSelections = [];
+  if (rawProducts.length) {
+    const productIds = rawProducts.map((p) => p && p.id).filter(Boolean);
+    const [prodRows] = productIds.length
+      ? await pool.query('SELECT id FROM products WHERE id IN (?) AND salon_id = ? AND active = 1 AND deleted_at IS NULL AND online_bookable = 1', [productIds, req.salon.id])
+      : [[]];
+    const validIds = new Set(prodRows.map((r) => r.id));
+    productSelections = rawProducts
+      .filter((p) => p && validIds.has(p.id))
+      .map((p) => ({ id: p.id, quantity: Math.min(99, Math.max(1, Number(p.quantity) || 1)) }));
+  }
   if (!service_id) return res.status(400).json({ error: 'La prestation est requise' });
   const [[service]] = await pool.query('SELECT id FROM services WHERE id = ? AND salon_id = ? AND active = 1', [service_id, req.salon.id]);
   if (!service) return res.status(400).json({ error: 'Prestation indisponible dans ce salon' });
@@ -405,6 +419,9 @@ router.post('/checkin', signupRateLimiter('queue-checkin', { max: 12, windowMs: 
     const values = extras.map((extraId) => [id, extraId]);
     await pool.query('INSERT INTO queue_extras (queue_id, extra_id) VALUES ?', [values]);
   }
+  if (productSelections.length) {
+    await pool.query('INSERT INTO queue_products (queue_id, product_id, quantity) VALUES ?', [productSelections.map((p) => [id, p.id, p.quantity])]);
+  }
 
   // Synchronise avec l'agenda "Rendez-vous" : un client venu sans RDV
   // (check-in direct à la borne) apparaît aussi dans le calendrier, à
@@ -430,6 +447,9 @@ router.post('/checkin', signupRateLimiter('queue-checkin', { max: 12, windowMs: 
         'INSERT INTO appointment_extras (appointment_id, extra_id) VALUES ?',
         [extras.map((extraId) => [apptId, extraId])]
       );
+    }
+    if (productSelections.length) {
+      await pool.query('INSERT INTO appointment_products (appointment_id, product_id, quantity) VALUES ?', [productSelections.map((p) => [apptId, p.id, p.quantity])]);
     }
   } catch (err) {
     // La file d'attente ne doit jamais échouer à cause de l'agenda —
