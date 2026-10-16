@@ -6290,7 +6290,7 @@ function renderDayTimelineHtml(dateStr, dayAppts) {
     // visible mais pas cliquable pour ajouter un RDV - juste un message,
     // au lieu d'ouvrir un formulaire pour un coiffeur qui ne prend pas
     // de RDV en ligne.
-    var trackClick = b.bookable
+    var trackClick = b.bookable && !rdvIsSalonClosed(dateStr)
       ? ' onclick="openAdminAddAppointment(\'' + dateStr + '\',\'' + bid + '\')"'
       : (bid === 'unassigned' ? '' : ' onclick="event.stopPropagation();notifySansRdvOnly(this)" data-barber-name="' + esc(b.name) + '"');
     return '<div class="timeline-row">' +
@@ -6614,6 +6614,10 @@ function aaOpenGroup() {
 }
 
 function openAdminAddAppointment(dateStr, preselectedBarberId) {
+  if (rdvIsSalonClosed(dateStr)) {
+    toast('Salon fermé ce jour : impossible de créer un rendez-vous.', true);
+    return;
+  }
   var rdvBarbers = barbers.filter(function (b) { return isBookableForAdmin(b, dateStr); });
   var when = new Date(dateStr + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' });
   var preBarber = preselectedBarberId && rdvBarbers.find(function (b) { return b.id === preselectedBarberId; });
