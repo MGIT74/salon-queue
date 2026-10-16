@@ -276,6 +276,13 @@ router.put('/:id/schedule', requireAdmin, wrap(async (req, res) => {
     return res.status(400).json({ error: 'Planning incomplet ou invalide : aucun horaire modifié' });
   }
 
+  const validHour = (v) => /^([01]\d|2[0-3]):[0-5]\d$/.test(String(v || ''));
+  const breakListToCheck = Array.isArray(req.body.breaks) ? req.body.breaks : [];
+  if (list.some(x => !validHour(x.start_time) || !validHour(x.end_time)) ||
+      breakListToCheck.some(x => !Number.isInteger(Number(x.weekday)) || Number(x.weekday) < 0 || Number(x.weekday) > 6 ||
+        !validHour(x.start_time) || !validHour(x.end_time) || x.start_time >= x.end_time)) {
+    return res.status(400).json({ error: 'Horaires ou pauses invalides : aucune modification' });
+  }
   let rows = [], breakRows = [];
   const conn = await pool.getConnection();
   try {
