@@ -1314,3 +1314,8 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'queue' AND column_name = 'balance_paid_at');
 SET @sql := IF(@c = 0, "ALTER TABLE queue ADD COLUMN balance_paid_at DATETIME NULL", 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Changement d'email client : l'ancienne adresse reste active jusqu'à validation.
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'clients' AND column_name = 'pending_email');
+SET @sql := IF(@c = 0, 'ALTER TABLE clients ADD COLUMN pending_email VARCHAR(255) NULL', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
