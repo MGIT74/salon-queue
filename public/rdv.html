@@ -690,6 +690,7 @@ function showHalf(half) {
 }
 
 function loadSlots() {
+  if (!selService) return; // Ne pas demander de disponibilités avant le choix de la prestation.
   selDate = document.getElementById('rdv-date').value;
   selSlot = null;
   document.getElementById('date-next-btn').disabled = true;
@@ -960,7 +961,7 @@ if (!checkForCancelLink()) {
       }
       if ((!maxDate || candidate <= maxDate) && candidate !== input.value) {
         input.value = candidate;
-        input.dispatchEvent(new Event('change', { bubbles: true }));
+        if (selService) input.dispatchEvent(new Event('change', { bubbles: true }));
       }
       if (input.value) { shown = new Date(input.value + 'T12:00:00'); shown.setDate(1); }
       render();
