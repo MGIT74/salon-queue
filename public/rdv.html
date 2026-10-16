@@ -201,12 +201,13 @@
     <div class="gift-summary-items" id="gift-summary-items"></div>
   </div>
 
-  <section class="panel on" id="p-barber">
+  <section class="panel" id="p-barber">
+    <button class="back" id="barber-back-btn" onclick="openWho()">‹ Retour</button>
     <div class="eyebrow" id="barber-eyebrow">Choisissez votre coiffeur</div>
     <div class="svc-grid" id="barber-grid"></div>
   </section>
 
-  <section class="panel flow" id="p-group">
+  <section class="panel flow on" id="p-group">
     <div class="flow-top" id="gb-top"></div>
     <div class="flow-body" id="gb-body"></div>
     <div class="step-bar" id="gb-bar"></div>
@@ -215,6 +216,7 @@
   <section class="panel" id="p-group-contact">
     <button class="back" onclick="show('p-group')">‹ Retour</button>
     <div class="eyebrow" id="group-contact-summary"></div>
+    <div class="login-hint">Vous avez un compte ? <a href="#" onclick="goLogin(event)">Se connecter</a><span>Pas de compte ? Réservez quand même : vous recevrez un email de confirmation avec un lien pour annuler.</span></div>
     <div class="fld"><label for="grp-name">Votre prénom</label><input id="grp-name" type="text" autocomplete="given-name"></div>
     <div class="fld"><label for="grp-email">Email — pour la confirmation</label><input id="grp-email" type="email" autocomplete="email"></div>
     <div class="fld"><label for="grp-phone">Téléphone</label><input id="grp-phone" type="tel" autocomplete="tel"></div>
@@ -309,6 +311,7 @@
   <section class="panel" id="p-contact">
     <button class="back" onclick="show('p-datetime')">‹ Retour</button>
     <div class="eyebrow" id="contact-summary"></div>
+    <div class="login-hint">Vous avez un compte ? <a href="#" onclick="goLogin(event)">Se connecter</a><span>Pas de compte ? Réservez quand même : vous recevrez un email de confirmation avec un lien pour annuler.</span></div>
     <div class="flow-recap" data-recap></div>
     <div class="fld"><label for="rdv-name">Prénom</label><input id="rdv-name" type="text" autocomplete="given-name"></div>
     <div class="fld"><label for="rdv-email">Email — pour la confirmation</label><input id="rdv-email" type="email" autocomplete="email"></div>
@@ -344,9 +347,12 @@
 </div>
 
 <script src="/app.js?v=26"></script>
-<script src="/group-booking.js?v=16"></script>
+<script src="/group-booking.js?v=17"></script>
 <style>
-body.staff-mode .gift-summary-box,body.staff-mode .theme-btn{display:none!important}
+body.staff-mode .gift-summary-box,body.staff-mode .theme-btn,body.staff-mode .login-hint{display:none!important}
+.login-hint{background:var(--fill);border-radius:14px;padding:12px 14px;margin:0 0 18px;font-size:14.5px;font-weight:600}
+.login-hint a{color:var(--blue);text-decoration:none;margin-left:4px}
+.login-hint span{display:block;font-weight:400;font-size:13px;color:var(--grey);margin-top:4px;line-height:1.45}
 .gb-done{padding:10px 0;border-bottom:1px solid var(--sep)}.gb-done:last-child{border:none}.gb-done b{display:block}.gb-done span{color:var(--grey);font-size:14px}
 </style>
 <script>
@@ -477,6 +483,7 @@ function loadCatalog() {
     applyAccentColor(r[4].accent_color);
     document.title = 'Rendez-vous — ' + salonName;
     document.getElementById('salon-mark').textContent = salonName.toUpperCase();
+    rdvBufferMin = Number(r[4].rdv_buffer_min) || 0;
     renderBarberGrid();
     renderServiceGrid();
     if (STAFF_BRIDGE) { enterStaffMode(); return; }
@@ -490,7 +497,10 @@ function loadCatalog() {
       var btn = document.querySelector('#svc-grid .item-card[data-id="' + preselectService + '"]');
       if (btn) { btn.classList.add('sel'); btn.setAttribute('aria-pressed', 'true'); }
       document.getElementById('service-next-btn').disabled = false;
+      show('p-barber');   // « Réserver à nouveau » : directement le choix du coiffeur
+      return;
     }
+    if (document.getElementById('p-group').classList.contains('on')) openWho();
   });
 }
 
@@ -500,7 +510,6 @@ function renderBarberGrid() {
   document.getElementById('barber-grid').innerHTML = giftTile + barbers.map(function (b) {
     return barberTileHtml(b, selBarber === b.id, "selectBarber(this, '" + b.id + "')");
   }).join('');
-  if (barbers.length) document.getElementById('barber-grid').insertAdjacentHTML('beforeend', GroupBooking.tileHtml('openGroupBooking()'));
 
   if (barbers.length === 0) {
     document.getElementById('barber-grid').innerHTML = giftTile + '<div class="empty">Aucun coiffeur ne prend de RDV en ligne pour le moment — présentez-vous directement au salon.</div>';
@@ -831,11 +840,16 @@ function startNewBooking() {
   // Après une annulation (arrivée directe via le lien de l'email), le
   // catalogue n'a jamais été chargé — loadCatalog() gère aussi bien ce
   // cas que le retour depuis une réservation classique (déjà chargée).
-  loadCatalog().then(function () { show('p-barber'); }).catch(function (e) { toast(e.message, true); });
+  loadCatalog().then(function () { openWho(); }).catch(function (e) { toast(e.message, true); });
 }
 
 /* ---------- Reservation a plusieurs ---------- */
-var groupCtl = null, groupPeople = null, groupPayload = null;
+var groupCtl = null, groupPeople = null, groupPayload = null, rdvBufferMin = 0;
+
+// Premier ecran : « Pour qui est le rendez-vous ? » (Juste moi -> reservation normale, Plusieurs personnes -> parcours groupe).
+function openWho() { openGroupBooking(true); }
+// Connexion facultative : la page compte du salon (connexion, ou creation de compte).
+function goLogin(e) { if (e) e.preventDefault(); window.location.href = '/compte.html' + (SALON_SLUG ? '?salon=' + encodeURIComponent(SALON_SLUG) : ''); }
 
 function staffAccount() { var c = STAFF_BRIDGE && STAFF_BRIDGE.client; return c && c.account_id ? c : null; }
 function staffClientName() { return (STAFF_BRIDGE && STAFF_BRIDGE.client && STAFF_BRIDGE.client.name) || 'Le client'; }
@@ -856,12 +870,13 @@ function enterStaffMode() {
   openGroupBooking();
 }
 
-function openGroupBooking() {
+function openGroupBooking(startOnWho) {
   if (!groupCtl) {
     groupCtl = GroupBooking.create({
       zones: { top: document.getElementById('gb-top'), body: document.getElementById('gb-body'), bar: document.getElementById('gb-bar') }, api: api,
       services: servicesAll, extras: extrasAll, barbers: barbers,
-      eur: eur, toast: toast, continueLabel: 'Continuer',
+      eur: eur, toast: toast, continueLabel: 'Continuer', bufferMin: rdvBufferMin,
+      onSolo: STAFF_BRIDGE ? null : function () { show('p-barber'); },
       selfChip: STAFF_BRIDGE ? staffClientName() : null, selfName: STAFF_BRIDGE ? staffClientName() : null,
       // Mode salon + client avec un compte : ses proches enregistrés (enfants…) sont proposés, et la case
       // « Enregistrer dans ses proches » ajoute le prénom à son compte (il le retrouve dans son espace client).
@@ -872,7 +887,7 @@ function openGroupBooking() {
       } : null,
       saveLabel: staffAccount() ? 'Enregistrer ce prénom dans les proches de ' + staffClientName() : null,
       whoSub: STAFF_BRIDGE ? 'Cochez les personnes à inscrire : le client et/ou ses accompagnants (enfants, amis…).' : null,
-      onExit: function () { if (STAFF_BRIDGE) STAFF_BRIDGE.close(); else show('p-barber'); },
+      onExit: STAFF_BRIDGE ? function () { STAFF_BRIDGE.close(); } : null,
       onContinue: function (people, payload) {
         groupPeople = people; groupPayload = payload;
         var self = people[0];
@@ -880,7 +895,8 @@ function openGroupBooking() {
         show('p-group-contact');
       }
     });
-  } else groupCtl.reset();
+  } else { groupCtl.setCatalog({ services: servicesAll, extras: extrasAll, barbers: barbers }); groupCtl.reset(); }
+  if (!startOnWho && !STAFF_BRIDGE) groupCtl.openMulti();
   show('p-group');
 }
 

@@ -42,48 +42,71 @@ let JSDOM; try { ({ JSDOM } = require('jsdom')); } catch (e) { console.log('jsdo
       const times = ['10:00', '10:20', '10:40', '11:00']; const held = q.get('held') || '';
       const slots = []; (bid ? [bid] : ['b1']).forEach((b) => times.forEach((t) => { if (held.indexOf(b + '|') === 0 && t === '10:00') return; slots.push({ time: t, barber_id: b }); }));
       return Promise.resolve({ slots }); };
-    let done = null;
-    GB2.create({ mount: document.getElementById('m'), api, services, extras, barbers, relatives: [{ id: 'r1', name: 'Lucas' }], eur: (c) => c / 100 + '€', onContinue: (p, payload) => { done = payload; } });
+    let done = null, solo = 0;
+    GB2.create({ mount: document.getElementById('m'), api, services, extras, barbers, relatives: [{ id: 'r1', name: 'Lucas' }], eur: (c) => c / 100 + '€',
+      today: () => '2030-01-10', onSolo: () => { solo++; }, onContinue: (p, payload) => { done = payload; } });
     const m = document.getElementById('m'), wait = (ms) => new Promise((r) => setTimeout(r, ms));
     const click = (el) => el.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
     const clickEl = (sel) => { const e = m.querySelector(sel); assert(e, 'introuvable : ' + sel); click(e); };
     const eyebrow = () => (m.querySelector('.eyebrow') || {}).textContent || '';
-    assert(/Qui vient/.test(eyebrow()) && m.querySelector('[data-act=who-self].on') && m.querySelector('[data-act=who-rel]')); ok('premier écran « Qui vient ? » : Moi coché par défaut + proches');
-    clickEl('[data-act=who-rel]'); clickEl('[data-act=who-next]');
-    assert(/Choisissez le coiffeur/.test(eyebrow())); ok('on enchaîne sur les étapes de la réservation normale');
-    assert(!m.querySelector('[data-pick=barber][data-id=""]'), 'plus de premier disponible'); assert(m.querySelector('[data-act=next]').disabled);
-    clickEl('[data-pick=barber][data-barber-id="b1"], [data-pick=barber][data-id="b1"]'); clickEl('[data-act=next]');
-    assert(/Prestation/.test(eyebrow())); ok('coiffeur → prestation (une étape par écran)');
-    clickEl('[data-pick=service][data-id=s1]'); clickEl('[data-act=next]');
-    assert(/Suppléments/.test(eyebrow())); clickEl('[data-act=next]');
-    assert(/Date et heure/.test(eyebrow())); ok('prestation → suppléments → date et heure');
-    await wait(60);
-    assert(m.querySelector('.slot-btn')); clickEl('.slot-btn[data-time="10:00"]'); clickEl('[data-act=next]');
-    assert(/Lucas — Choisissez le coiffeur/.test(eyebrow())); ok('après « Valider », on passe à la personne suivante');
-    assert(!m.querySelector('[data-pick=barber].sel'), 'rien de pré-sélectionné');
-    clickEl('[data-pick=barber][data-barber-id="b1"], [data-pick=barber][data-id="b1"]'); clickEl('[data-act=next]');
-    assert(!m.querySelector('[data-pick=service].sel')); ok('la 2e personne repart vide');
-    clickEl('[data-pick=service][data-id=s2]'); clickEl('[data-act=next]'); clickEl('[data-act=next]');
-    await wait(400);
-    assert(calls.some((u) => /held=b1%7C/.test(u)), 'held envoyé'); ok('ses créneaux tiennent compte de la 1re personne (held)');
-    assert(m.querySelector('.gb-chip.sugg'), 'raccourci'); ok('raccourci « à la suite » affiché');
-    assert(m.querySelectorAll('.gb-pills').length === 2 && m.querySelector('[data-act=pill-barber]') && m.querySelector('[data-act=rm]')); ok('pastilles cliquables et croix de retrait dans la colonne de droite');
-    assert(m.querySelectorAll('.gb-pill.dur').length === 2 && /40 min|30 min|15 min/.test(m.querySelector('.gb-pill.dur').textContent)); ok('durée estimée affichée pour chaque personne (pastille)');
-    clickEl('.gb-chip.sugg[data-act=sugg]'); clickEl('[data-act=next]');
-    assert(/plusieurs personnes/.test(eyebrow()) && m.querySelectorAll('.gb-row').length === 2); ok('récapitulatif des 2 personnes');
-    const pills = m.querySelectorAll('[data-act=pill-barber]'); click(pills[pills.length - 1]);
-    assert(m.querySelector('.gb-menu')); clickEl('.gb-menu button[data-id="b2"]'); await wait(60);
-    assert(/Lucas — Date et heure/.test(eyebrow())); assert(!m.querySelector('.slot-btn.sel')); ok('changer de coiffeur depuis la pastille efface le créneau et rouvre les horaires');
-    clickEl('.slot-btn'); clickEl('[data-act=next]');
-    const before = m.querySelectorAll('.gb-recap-person').length; clickEl('[data-act=rm]');
-    assert(m.querySelectorAll('.gb-recap-person').length === before - 1); ok('la croix retire la personne du récapitulatif');
-    const btn = m.querySelector('[data-act=continue]'); assert(btn && !btn.disabled, 'continuer actif avec 1 personne'); click(btn); await wait(20);
-    assert(done && done.length === 1 && done[0].service_id === 's2'); ok('réservation possible pour un seul proche (sans « Moi »)');
+    const goBtn = () => m.querySelector('.step-bar .go');
+
+    assert(/Pour qui est le rendez-vous/.test(eyebrow()) && m.querySelector('[data-act=solo]') && m.querySelector('[data-act=multi]') && !m.querySelector('[data-act=who-self]'));
+    ok('1er écran « Pour qui est le rendez-vous ? » : Juste moi / Plusieurs personnes');
+    clickEl('[data-act=solo]'); assert(solo === 1); ok('« Juste moi » repart sur la réservation normale');
+    clickEl('[data-act=multi]');
+    assert(m.querySelector('[data-act=who-self].on') && m.querySelector('[data-act=who-rel]')); ok('« Plusieurs personnes » : Moi coché par défaut + proches');
+    clickEl('[data-act=who-rel]'); assert(/2 personnes/.test(goBtn().textContent)); clickEl('[data-act=who-next]');
+
+    assert(/Que faites-vous/.test(eyebrow()) && m.querySelectorAll('.gb-pb').length === 2 && goBtn().disabled);
+    ok('« Que fait chacun ? » : barre des personnes, rien de choisi');
+    clickEl('[data-pick=service][data-id=s1]');
+    assert(/Suivant : Lucas/.test(goBtn().textContent) && !goBtn().disabled); clickEl('[data-act=person-next]');
+    assert(/Que fait Lucas/.test(eyebrow()) && m.querySelector('.gb-pb.done') && m.querySelector('[data-act=copy]'));
+    ok('on passe à la personne suivante, avec « Même chose que ... »');
+    clickEl('[data-act=copy]'); assert(m.querySelector('[data-pick=service][data-id=s1].sel, [data-pick=service].sel'));
+    assert(/Choisir l'horaire/.test(goBtn().textContent)); ok('« Même chose que » recopie la prestation');
+    clickEl('[data-act=person-next]'); await wait(80);
+
+    assert(/Quand venez-vous/.test(eyebrow()) && m.querySelectorAll('.gb-day').length === 14);
+    const plans = () => [...m.querySelectorAll('.gb-plan')].map((x) => x.textContent.replace(/\s+/g, ' '));
+    assert(/10:00 → 11:10/.test(plans()[0]), plans()[0]); ok('horaires proposés « les uns après les autres » (10:00 → 11:10)');
+    clickEl('[data-act=plan-mode][data-mode=same]'); await wait(80);
+    assert(/10:00 → 10:30/.test(plans()[0]) && /Karim/.test(plans()[0]) && /Léo/.test(plans()[0]), plans()[0]); ok('« En même temps » : même heure, deux coiffeurs différents');
+    assert(goBtn().disabled); clickEl('.gb-plan'); assert(!goBtn().disabled); ok('choisir un horaire active « Continuer »');
+    clickEl('[data-act=to-recap]');
+    assert(/On vérifie ensemble/.test(eyebrow()) && m.querySelectorAll('.gb-row').length === 2); ok('récapitulatif des 2 personnes');
+
+    clickEl('.gb-row:last-child [data-act=edit]'); assert(/Que fait Lucas/.test(eyebrow()) && /Valider/.test(goBtn().textContent));
+    clickEl('[data-pick=service][data-id=s2]'); assert(/Choisir l'horaire/.test(goBtn().textContent)); ok('modifier une prestation efface l’horaire choisi');
+    clickEl('[data-act=person-next]'); await wait(80);
+    clickEl('[data-act=sep]'); await wait(80);
+    assert(/Date et heure/.test(eyebrow()) && m.querySelector('.slot-btn')); clickEl('.slot-btn[data-time="10:00"]'); clickEl('[data-act=dt-next]'); await wait(200);
+    assert(/Lucas — Date et heure/.test(eyebrow())); assert(calls.some((u) => /held=b1%7C/.test(u)), 'held envoyé');
+    ok('« Choisir l’heure de chacun séparément » : personne par personne, en tenant compte des autres (held)');
+    assert(m.querySelector('.gb-chip.sugg')); clickEl('.gb-chip.sugg[data-act=sugg]'); clickEl('[data-act=dt-next]');
+    assert(/On vérifie ensemble/.test(eyebrow())); ok('raccourci « à la suite » puis retour au récapitulatif');
+    clickEl('.gb-row [data-act=rm]'); assert(m.querySelectorAll('.gb-row').length === 1); ok('la croix retire une personne');
+    const btn = m.querySelector('[data-act=continue]'); assert(btn && !btn.disabled); click(btn); await wait(20);
+    assert(done && done.length === 1); ok('réservation possible pour une seule personne restante');
+
+    // logique pure des horaires proposes
+    const o = (t, b, d) => ({ time: t, min: +t.slice(0, 2) * 60 + +t.slice(3), barberId: b, dur: d });
+    const opts = [[o('10:00', 'a', 30), o('10:00', 'b', 30)], [o('10:30', 'a', 20), o('10:30', 'b', 20)]];
+    assert.strictEqual(GB.buildPlans(opts, 'seq', 0)[0].items.map((x) => x.time + x.barberId).join(), '10:00a,10:30a');
+    assert.strictEqual(GB.buildPlans(opts, 'seq', 15)[0].items.map((x) => x.time + x.barberId).join(), '10:00a,10:30b');
+    assert.strictEqual(GB.buildPlans([[o('10:00', 'a', 30)], [o('10:00', 'a', 30)]], 'same', 0).length, 0);
+    ok('buildPlans : même coiffeur à la suite, marge tampon respectée, jamais deux personnes en même temps chez le même coiffeur');
   }
   const rdv = fs.readFileSync(path.join(root, 'public/rdv.html'), 'utf8'), cmp = fs.readFileSync(path.join(root, 'public/compte.html'), 'utf8');
   for (const [f, h] of [['rdv', rdv], ['compte', cmp]]) {
     assert(/group-booking\.js/.test(h) && /GroupBooking\.create/.test(h) && /appointments\/group/.test(h), f); }
   assert(/cancel-group/.test(rdv) && /get\('all'\)/.test(rdv)); assert(/relatives/.test(cmp) && /person_name/.test(cmp));
   ok('rdv.html / compte.html branchés (groupe, annulation groupée, proches, prénom sur les RDV)');
+  assert(/<section class="panel flow on" id="p-group">/.test(rdv) && /onSolo: STAFF_BRIDGE \? null/.test(rdv) && !/GroupBooking\.tileHtml/.test(rdv) && !/GroupBooking\.tileHtml/.test(cmp));
+  assert(/onSolo: function \(\) \{ show\('p-book-barber'\); \}/.test(cmp) && /openBookGroup\(true\)/.test(cmp));
+  ok('« Pour qui est le rendez-vous ? » en premier écran (rdv.html et Mon compte), plus de tuile dans la grille des coiffeurs');
+  assert((rdv.match(/class="login-hint"/g) || []).length === 2 && /function goLogin\(e\)[^\n]*compte\.html/.test(rdv) && /staff-mode \.login-hint\{display:none/.test(rdv.replace(/,body\.staff-mode /g, ' ').replace(/body\.staff-mode \.gift-summary-box /, 'staff-mode ')) || /body\.staff-mode[^{]*\.login-hint\{display:none/.test(rdv));
+  ok('réservation sans compte : « Vous avez un compte ? Se connecter » sur les deux formulaires (caché en mode salon)');
   console.log('\n' + n + ' vérifications OK');
 })().catch((e) => { console.error('ECHEC', e); process.exit(1); });

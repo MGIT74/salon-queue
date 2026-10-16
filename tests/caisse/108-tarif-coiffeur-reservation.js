@@ -92,7 +92,7 @@ async function call(method, url, headers, body) {
   check('sans coiffeur (premier disponible) : catalogue tel quel', ctx.barberItems(null, 'services', cat).length === 2);
   const pages = ['rdv.html', 'compte.html', 'dashboard.html', 'caisse.html', 'poste.html'].map((f) => [f, fs.readFileSync(path.join(__dirname, '../../public', f), 'utf8')]);
   pages.forEach(([f, s]) => check(f + ' : utilise l\'offre du coiffeur (barberItems)', /barberItems\(/.test(s)));
-  check('group-booking.js : prestations et prix par coiffeur', /barberItems\(offerBarber\(p\), 'services'/.test(fs.readFileSync(path.join(__dirname, '../../public/group-booking.js'), 'utf8')));
+  check('group-booking.js : prestations et prix par coiffeur', /function svcList\(p\) \{ return itemsFor\(offerBarber\(p\), 'services'\)/.test(fs.readFileSync(path.join(__dirname, '../../public/group-booking.js'), 'utf8')));
 
   sql(`DELETE FROM appointments WHERE scheduled_at LIKE '${DAY}%'; DELETE FROM barber_service_prices WHERE barber_id='b2'; DELETE FROM barber_service_exclusions WHERE barber_id='b2';
        DELETE FROM services WHERE id IN ('t108x','t108i','t108d');`);

@@ -115,7 +115,7 @@ node tests/caisse/81-fiche-coiffeur-page.js  # Fiche coiffeur en page + cartes
 node tests/caisse/82-onglets-pastille-fondu.js  # Onglets partout : pastille qui glisse + fondu
 node tests/caisse/83-groupe-reservation-api.js  # Reservation a plusieurs : API (groupe, annulation groupee)
 node tests/caisse/84-proches-compte-api.js  # Mes proches : CRUD du compte client
-node tests/caisse/85-reservation-groupe-interface.js  # Reservation a plusieurs : interface (jsdom si dispo)
+node tests/caisse/85-reservation-groupe-interface.js  # Reservation a plusieurs : Pour qui ? > Que fait chacun ? > horaires proposes pour le groupe > recap ; connexion facultative
 node tests/caisse/86-import-csv-clients.js  # Import CSV clients : lecture du fichier + route en lot (base simulee)
 node tests/caisse/87-import-rdv.js  # Import de RDV (CSV type Bookly) : lecture, rapprochement coiffeurs/prestations, route (base simulee)
 node tests/caisse/88-selecteur-periode.js  # Selecteur de periode Du/Au (raccourcis, calendrier a deux mois, compatibilite champs d'origine)

@@ -1,10 +1,9 @@
-/* Reservation a plusieurs (un parent + ses enfants, des amis...) - module commun a rdv.html et compte.html.
+/* Reservation a plusieurs (un parent + ses enfants, des amis...) - module commun a rdv.html, compte.html et au mode salon.
  *
- * Meme deroule que la reservation normale, une etape par ecran (coiffeur > prestation > supplements > date/heure), repete pour chaque personne.
- * Chaque personne a SA prestation, SON coiffeur (le meme que les autres ou un autre) et SON horaire. Des raccourcis
- * « A la suite de Lucas » / « En meme temps que Lucas » proposent le bon creneau en un clic. Les creneaux deja
- * retenus par les autres personnes sont envoyes au serveur (parametre « held ») : deux personnes ne peuvent pas se
- * chevaucher chez le meme coiffeur, meme avant que quoi que ce soit soit enregistre.
+ * Parcours guide en 4 ecrans : « Pour qui ? » (juste moi / plusieurs personnes) > « Que fait chacun ? » (prestation, coiffeur,
+ * supplements, personne par personne, avec « Meme chose que ... ») > « Quand venez-vous ? » (UNE date pour tout le groupe et des
+ * horaires complets proposes : les uns apres les autres, ou en meme temps) > « On verifie ensemble ». L'heure de chacun peut
+ * toujours etre choisie separement. Deux personnes ne se chevauchent jamais chez le meme coiffeur (parametre « held » cote serveur).
  *
  * Partie « logique » pure (testee sous Node) + partie interface (create). */
 (function (root, factory) {
@@ -126,6 +125,34 @@
     '.gb-ok{color:var(--blue);font-weight:600;font-size:14px;margin:10px 0 14px}' +
     '.gb-warn{color:var(--orange);font-size:13px;margin:6px 0}' +
     '.gb-save{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--grey);margin:4px 0 16px}' +
+    '.gb-choices{display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:22px}@media(min-width:700px){.gb-choices{grid-template-columns:1fr 1fr}}' +
+    '.gb-choice{display:flex;align-items:center;gap:14px;text-align:left;border:2px solid var(--sep);background:var(--card);color:var(--ink);border-radius:18px;padding:16px;font-family:inherit;cursor:pointer}' +
+    '.gb-choice b{display:block;font-size:17px}.gb-choice em{display:block;font-style:normal;font-size:13.5px;color:var(--grey);margin-top:2px}' +
+    '.gb-choice-ic{width:48px;height:48px;border-radius:50%;background:var(--fill);display:flex;align-items:center;justify-content:center;flex:none}' +
+    '.gb-choice.on{border-color:var(--blue);background:var(--blue-soft)}.gb-choice.on .gb-choice-ic{background:var(--blue);color:#fff}' +
+    '.gb-label{font-size:13px;font-weight:650;color:var(--grey);letter-spacing:.04em;text-transform:uppercase;margin:18px 0 10px}' +
+    '.gb-pbar{display:flex;gap:8px;overflow-x:auto;margin:10px 0 14px;padding-bottom:2px}' +
+    '.gb-pb{display:flex;align-items:center;gap:8px;border:none;background:var(--fill);color:var(--ink);border-radius:999px;padding:6px 14px 6px 6px;font-family:inherit;cursor:pointer;flex:none;text-align:left}' +
+    '.gb-pb .gb-av{width:30px;height:30px;font-size:13px}.gb-pb-n{font-size:14px;font-weight:650}.gb-pb-s{font-size:12px;color:var(--grey)}' +
+    '.gb-pb.cur{background:var(--blue-soft);box-shadow:inset 0 0 0 2px var(--blue)}.gb-pb .gb-av.on{background:var(--blue);color:#fff}' +
+    '.gb-av.ok{background:var(--green,#2f9e60);color:#fff}' +
+    '.gb-copy{display:inline-flex;align-items:center;border:1px dashed var(--grey);background:var(--fill);color:var(--ink);border-radius:999px;padding:9px 14px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:14px}' +
+    '.gb-barbers{display:flex;flex-wrap:wrap;gap:8px}' +
+    '.gb-bchip{border:none;background:var(--fill);color:var(--ink);border-radius:999px;padding:9px 15px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer}.gb-bchip.on{background:var(--blue);color:#fff}.gb-bchip:disabled{opacity:.35;cursor:default}' +
+    '.gb-link{border:none;background:none;color:var(--blue);font-family:inherit;font-size:14.5px;font-weight:600;cursor:pointer;padding:12px 0;text-align:left}' +
+    '.gb-days{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:12px}' +
+    '.gb-day{flex:none;width:56px;border:none;background:var(--fill);color:var(--ink);border-radius:12px;padding:7px 0;font-family:inherit;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:1px}' +
+    '.gb-day span{font-size:11px;color:var(--grey)}.gb-day b{font-size:17px}.gb-day.on{background:var(--blue);color:#fff}.gb-day.on span{color:rgba(255,255,255,.8)}' +
+    '.gb-mode{margin-bottom:4px}' +
+    '.gb-plan{display:flex;flex-direction:column;gap:5px;width:100%;text-align:left;border:none;background:var(--fill);color:var(--ink);border-radius:16px;padding:14px 16px;margin-bottom:10px;font-family:inherit;cursor:pointer}' +
+    '.gb-plan.on{background:var(--blue-soft);box-shadow:inset 0 0 0 2px var(--blue)}.gb-plan-h{font-size:17px;font-weight:700}' +
+    '.gb-plan-r{font-size:14px;color:var(--grey)}.gb-plan-r b{display:inline-block;min-width:52px;color:var(--ink)}' +
+    '@media(min-width:1100px){.wrap.page-flow .gb-when{display:grid;grid-template-columns:minmax(280px,360px) minmax(0,1fr);gap:32px;align-items:start}.wrap.page-flow .gb-days{flex-wrap:wrap;overflow:visible}.wrap.page-flow .gb-when-plans .gb-mode{margin-top:0}}' +
+    '.gb-sum-head{font-size:13px;font-weight:650;color:var(--grey);letter-spacing:.04em;text-transform:uppercase;margin-bottom:10px}' +
+    '.gb-sum{display:grid;grid-template-columns:46px minmax(0,1fr) auto;gap:8px;align-items:baseline;padding:6px 0}.gb-sum.on{color:var(--blue)}' +
+    '.gb-sum-t{font-weight:700;font-size:14px}.gb-sum-n b{display:block;font-size:14.5px}.gb-sum-n em{display:block;font-style:normal;font-size:12.5px;color:var(--grey)}.gb-sum-p{font-size:14px;font-weight:600}' +
+    '@media(max-width:899px){.gb-sum,.gb-sum-head{display:none}}' +
+    '.gb-row-t{font-weight:700;font-size:16px;min-width:50px}.gb-row-p{font-weight:600;font-size:14.5px;white-space:nowrap}' +
     '.gb-input{width:100%;box-sizing:border-box;border:1px solid var(--sep);background:var(--fill);color:var(--ink);border-radius:12px;padding:13px 14px;font-family:inherit;font-size:16px}';
 
   function injectStyle() {
@@ -144,46 +171,101 @@
     return '<button type="button" class="svc-card barber-tile' + (sel ? ' sel' : '') + '" data-barber-id="' + esc(b.id) + '"><span class="name">' + esc(b.name) + '</span></button>';
   }
 
+  /* ---------- Horaires proposes pour tout le groupe (logique pure, testee sous Node) ----------
+   * opts[i] : creneaux possibles de la personne i, [{ time:'10:00', min:600, barberId:'b1', dur:30 }] (un par coiffeur possible).
+   * mode 'seq' : les uns apres les autres (la suivante commence a la fin de la precedente, 45 min d'attente au plus) ;
+   * mode 'same' : tout le monde a la meme heure, chacun chez un coiffeur different.
+   * Jamais deux personnes qui se chevauchent chez le meme coiffeur (marge tampon comprise). Jusqu'a « max » horaires,
+   * espaces dans la journee (90 min pour « a la suite », 60 min pour « en meme temps »). */
+  function overlapsBusy(busy, b, s, e, buf) {
+    return (busy[b] || []).some(function (r) { return s < r[1] + buf && e + buf > r[0]; });
+  }
+  function planSeq(opts, T, buf) {
+    var busy = {}, res = [], tReq = T, prevB = null;
+    for (var i = 0; i < opts.length; i++) {
+      var cands = opts[i].filter(function (o) { return (i === 0 ? o.min === T : o.min >= tReq) && !overlapsBusy(busy, o.barberId, o.min, o.min + o.dur, buf); });
+      if (!cands.length) return null;
+      var best = cands[0];
+      cands.forEach(function (c) { if (c.min < best.min || (c.min === best.min && c.barberId === prevB && best.barberId !== prevB)) best = c; });
+      if (i > 0 && best.min - tReq > 45) return null;
+      (busy[best.barberId] = busy[best.barberId] || []).push([best.min, best.min + best.dur]);
+      res.push(best); tReq = best.min + best.dur; prevB = best.barberId;
+    }
+    return res;
+  }
+  function planSame(opts, T, buf) {
+    var busy = {}, res = [];
+    function rec(i) {
+      if (i === opts.length) return true;
+      var cands = opts[i].filter(function (o) { return o.min === T; });
+      for (var k = 0; k < cands.length; k++) {
+        var o = cands[k];
+        if (overlapsBusy(busy, o.barberId, o.min, o.min + o.dur, buf)) continue;
+        (busy[o.barberId] = busy[o.barberId] || []).push([o.min, o.min + o.dur]); res.push(o);
+        if (rec(i + 1)) return true;
+        res.pop(); busy[o.barberId].pop();
+      }
+      return false;
+    }
+    return rec(0) ? res : null;
+  }
+  function buildPlans(opts, mode, bufferMin, max) {
+    max = max || 3; var buf = Number(bufferMin) || 0;
+    if (!opts.length || opts.some(function (o) { return !o.length; })) return [];
+    var starts = []; opts[0].forEach(function (o) { if (starts.indexOf(o.min) === -1) starts.push(o.min); }); starts.sort(function (a, b) { return a - b; });
+    var out = [], last = -1e9, gap = mode === 'same' ? 60 : 90;
+    for (var i = 0; i < starts.length && out.length < max; i++) {
+      var T = starts[i]; if (out.length && T < last + gap) continue;
+      var items = mode === 'same' ? planSame(opts, T, buf) : planSeq(opts, T, buf);
+      if (!items) continue;
+      var end = 0; items.forEach(function (it) { end = Math.max(end, it.min + it.dur); });
+      out.push({ start: pad(T), end: pad(end), items: items.map(function (it) { return { time: it.time, barberId: it.barberId, dur: it.dur }; }) });
+      last = T;
+    }
+    return out;
+  }
+
   /**
-   * cfg : { mount, api(path), services, extras, barbers, relatives, createRelative(name), onContinue(people, payload), onExit(),
-   *         eur, toast, continueLabel, today() }
+   * cfg : { mount|zones, api(path), services, extras, barbers, relatives, createRelative(name), onContinue(people, payload), onExit(),
+   *         onSolo() (premier ecran « Pour qui ? » : « Juste moi » repart sur la reservation normale), bufferMin,
+   *         eur, toast, continueLabel, today(), selfChip, selfName, whoSub, saveLabel }
+   *
+   * Deroule (une etape par ecran) : Pour qui ? > Que fait chacun ? (prestation + coiffeur + supplements, personne par personne)
+   * > Quand venez-vous ? (une date, des horaires complets proposes pour tout le groupe) > On verifie ensemble > coordonnees (page).
    */
   function create(cfg) {
     injectStyle();
-    var people = [], uid = 0, view = 'who', cur = null, fromWho = false, menuFor = null, wsel = null;
-    // Trois zones (en-tete / liste / colonne de droite) : fournies par la page (cfg.zones, mises en page comme la reservation normale),
-    // sinon creees dans cfg.mount.
+    var people = [], uid = 0, view = 'who', cur = null, wsel = null, editing = false, sepMode = false;
+    var plan = { date: null, mode: 'seq', loading: false, list: null, chosen: -1, req: 0 }, slotCache = {};
     var zones = cfg.zones;
     if (!zones) {
       cfg.mount.innerHTML = '<div class="gb"><div class="flow-top"></div><div class="flow-body"></div><div class="step-bar"></div></div>';
       zones = { top: cfg.mount.querySelector('.flow-top'), body: cfg.mount.querySelector('.flow-body'), bar: cfg.mount.querySelector('.step-bar') };
     }
     var el = { contains: function (n) { return zones.top.contains(n) || zones.body.contains(n) || zones.bar.contains(n); },
-               addEventListener: function (t, f) { [zones.top, zones.body, zones.bar].forEach(function (z) { z.addEventListener(t, f); }); },
-               querySelector: function (q) { return zones.top.querySelector(q) || zones.body.querySelector(q) || zones.bar.querySelector(q); } };
+               addEventListener: function (t, f) { [zones.top, zones.body, zones.bar].forEach(function (z) { z.addEventListener(t, f); }); } };
     var eur = cfg.eur || function (c) { return (c / 100).toFixed(2) + ' €'; };
     var today = function () { return cfg.today ? cfg.today() : (typeof salonToday === 'function' ? salonToday() : new Date().toISOString().slice(0, 10)); };
-    var STEPS = ['barber', 'service', 'extras', 'datetime'];
 
     function newPerson(init) {
       var p = { uid: ++uid, isSelf: false, name: '', relativeId: null, saveRelative: false, serviceId: '', extraIds: [], pref: '', date: today(), slots: null, slot: null,
-                loading: false, req: 0, half: 'morning', note: '', suggestions: [], barberSlots: {} };
+                loading: false, req: 0, half: 'morning', note: '', suggestions: [], barberSlots: {}, showExtras: false };
       for (var k in (init || {})) p[k] = init[k];
       return p;
     }
     function label(p) { return p.isSelf ? (cfg.selfName || 'Vous') : (String(p.name || '').trim() || 'Personne ' + (people.indexOf(p) + 1)); }
     function shortName(p) { return p.isSelf ? (cfg.selfName || 'vous') : label(p); }
     function barberName(id) { var b = byId(cfg.barbers, id); return b ? b.name : ''; }
-    // Offre du coiffeur de cette personne (celui du creneau retenu, sinon celui choisi) : ses prestations, son tarif.
     function offerBarber(p) { var bid = (p.slot && p.slot.barberId) || p.pref; return bid ? byId(cfg.barbers, bid) : null; }
-    function svcList(p) { return typeof barberItems === 'function' ? barberItems(offerBarber(p), 'services', cfg.services) : cfg.services; }
-    function extList(p) { return typeof barberItems === 'function' ? barberItems(offerBarber(p), 'extras', cfg.extras) : cfg.extras; }
+    function itemsFor(b, kind) { var list = kind === 'services' ? cfg.services : cfg.extras; return typeof barberItems === 'function' ? barberItems(b, kind, list) : list; }
+    function svcList(p) { return itemsFor(offerBarber(p), 'services'); }
+    function extList(p) { return itemsFor(offerBarber(p), 'extras'); }
     function fmtDate(d) { try { return new Date(d + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }); } catch (e) { return d; } }
     function complete(p) { return !!(p.serviceId && p.slot && (p.isSelf || String(p.name || '').trim())); }
-    function stepsFor(p) { return STEPS.filter(function (s) { return s !== 'extras' || (cfg.extras && cfg.extras.length); }).concat(p.isSelf ? [] : []); }
+    function fmtMin(m) { return typeof formatMinutes === 'function' ? formatMinutes(m) : m + ' min'; }
 
-    function newWho() { return { self: true, rels: {}, extra: [], draft: '', draftSave: false }; }
-    function reset() { people = []; cur = null; fromWho = false; menuFor = null; wsel = newWho(); view = 'who'; paint(); }
+    function newWho() { return { multi: !cfg.onSolo, self: true, rels: {}, extra: [], draft: '', draftSave: false }; }
+    function reset() { slotCache = {}; people = []; cur = null; editing = false; sepMode = false; wsel = newWho(); plan = { date: null, mode: 'seq', loading: false, list: null, chosen: -1, req: 0 }; view = 'who'; paint(); }
     function whoCount() { return (wsel.self ? 1 : 0) + Object.keys(wsel.rels).filter(function (k) { return wsel.rels[k]; }).length + wsel.extra.length; }
     function addWhoName() {
       var n = String(wsel.draft || '').trim(); if (!n) return;
@@ -192,7 +274,6 @@
       else if (!wsel.extra.some(function (x) { return x.name.toLowerCase() === low; })) wsel.extra.push({ name: n, save: !!wsel.draftSave });
       wsel.draft = ''; paint();
     }
-    // Construit (ou met a jour, sans perdre ce qui est deja choisi) la liste des personnes depuis l'ecran « Qui vient ? ».
     function applyWho() {
       var next = [];
       function keep(match, init) { var f = people.filter(match)[0]; next.push(f || newPerson(init)); }
@@ -202,12 +283,10 @@
       people = next.slice(0, MAX_PEOPLE);
     }
     function personByUid(u) { for (var i = 0; i < people.length; i++) if (String(people[i].uid) === String(u)) return people[i]; return null; }
-    function nextIncomplete(after) {
-      for (var i = after + 1; i < people.length; i++) if (!complete(people[i])) return people[i];
-      return null;
-    }
+    function firstWithout(pred) { for (var i = 0; i < people.length; i++) if (pred(people[i])) return people[i]; return null; }
+    function invalidateTimes() { people.forEach(function (p) { p.slot = null; p.slots = null; }); plan.list = null; plan.chosen = -1; }
 
-    /* ---------- Creneaux ---------- */
+    /* ---------- Creneaux d'UNE personne (choix « separement », ou un creneau pris entre-temps) ---------- */
     function slotsUrl(p, barber, held) {
       return '/api/appointments/availability?date=' + p.date + '&service_id=' + p.serviceId + '&extras=' + p.extraIds.join(',') +
         (barber ? '&barber_id=' + barber : '') + (held ? '&held=' + encodeURIComponent(held) : '');
@@ -241,162 +320,250 @@
       });
     }
 
-    /* ---------- Rendu ---------- */
-    // Trois zones comme la reservation normale : en-tete (retour + titre), liste qui defile, colonne de droite (recapitulatif + bouton).
-    function back(label2) { return '<button type="button" class="back" data-act="back">‹ ' + (label2 || 'Retour') + '</button>'; }
-    function goBtn(text, disabled, act) { return '<button type="button" class="go" data-act="' + (act || 'next') + '"' + (disabled ? ' disabled' : '') + '>' + text + '</button>'; }
-    function fmtMin(m) { return typeof formatMinutes === 'function' ? formatMinutes(m) : m + ' min'; }
-
-    // Recapitulatif detaille : un bloc par personne (meme habillage que celui de la reservation normale) + total.
-    function recapHtml() {
-      var html = '', cents = 0;
-      people.forEach(function (p) {
-        var s = byId(svcList(p), p.serviceId), who = label(p) + (p.isSelf ? '' : '');
-        var b = p.slot ? barberName(p.slot.barberId) : (p.pref ? barberName(p.pref) : '');
-        var menu = '';
-        if (menuFor === p.uid) menu = '<div class="gb-menu">' + cfg.barbers.map(function (bb) {
-          return '<button type="button" data-act="set-barber" data-uid="' + p.uid + '" data-id="' + esc(bb.id) + '"' + (String(bb.id) === String(p.slot ? p.slot.barberId : p.pref) ? ' class="on"' : '') + '>' + esc(bb.name) + '</button>'; }).join('') + '</div>';
-        var pills = '<button type="button" class="gb-pill who" data-act="pill-who" data-uid="' + p.uid + '" title="Modifier"><i>' + esc(who.charAt(0).toUpperCase()) + '</i>' + esc(who) + '</button>' +
-          (b ? '<button type="button" class="gb-pill" data-act="pill-barber" data-uid="' + p.uid + '" title="Changer de coiffeur">' + ic('scissors') + esc(b) + ic('chev') + '</button>' : '') +
-          (p.slot ? '<button type="button" class="gb-pill" data-act="pill-date" data-uid="' + p.uid + '" title="Changer la date ou l\'heure">' + ic('calendar') + esc(fmtDate(p.date)) + ' · <b>' + esc(p.slot.time) + '</b></button>' : '') +
-          (s ? '<span class="gb-pill dur" title="Durée estimée">' + ic('clock') + esc(fmtMin(personDuration(p, svcList, extList))) + '</span>' : '') +
-          '<button type="button" class="gb-pill-x" data-act="rm" data-uid="' + p.uid + '" title="Retirer ' + esc(who) + '" aria-label="Retirer ' + esc(who) + '">' + ic('x') + '</button>' + menu;
-        var rows = '';
-        function row(k, n, meta, price) { rows += '<div class="recap-row"><span class="recap-k">' + k + '</span><span class="recap-n">' + esc(n) + (meta ? ' <em>' + esc(meta) + '</em>' : '') + '</span><span class="recap-p">' + price + '</span></div>'; }
-        if (s) {
-          row('Prestation', s.name, Number(s.duration_min) > 0 ? fmtMin(s.duration_min) : '', eur(Number(s.price_cents) || 0));
-          (p.extraIds || []).forEach(function (id) { var x = byId(extList(p), id); if (x) row('Supplément', x.name, Number(x.duration_min) > 0 ? '+' + fmtMin(x.duration_min) : '', '+' + eur(Number(x.price_cents) || 0)); });
-        }
-        cents += personPrice(p, svcList, extList);
-        html += '<div class="gb-recap-person' + (p === cur && view !== 'recap' ? ' on' : '') + '"><div class="gb-pills">' + pills + '</div>' +
-          (rows ? '<div class="recap-list">' + rows + '</div>' : '') + '</div>';
+    /* ---------- Horaires du groupe ---------- */
+    function candBarbers(p) {
+      if (p.pref) { var b = byId(cfg.barbers, p.pref); return b ? [b] : []; }
+      return cfg.barbers.filter(function (b) {
+        if ((b.disabled_service_ids || []).indexOf(p.serviceId) !== -1) return false;
+        return !(p.extraIds || []).some(function (x) { return (b.disabled_extra_ids || []).indexOf(x) !== -1; });
       });
-      return html + '<div class="recap-total"><span>Total · ' + people.length + ' personne' + (people.length > 1 ? 's' : '') + '</span><span><strong>' + eur(cents) + '</strong></span></div>';
+    }
+    function durFor(p, b) { return personDuration(p, itemsFor(b, 'services'), itemsFor(b, 'extras')); }
+    function fetchTimes(p, b, date) {
+      var key = [date, p.serviceId, p.extraIds.join(','), b.id].join('|');
+      if (slotCache[key]) return Promise.resolve(slotCache[key]);
+      return cfg.api('/api/appointments/availability?date=' + date + '&service_id=' + p.serviceId + '&extras=' + p.extraIds.join(',') + '&barber_id=' + b.id)
+        .then(function (r) { slotCache[key] = (r.slots || []).map(function (s) { return s.time; }); return slotCache[key]; })
+        .catch(function () { return []; });
+    }
+    function loadPlans() {
+      var token = ++plan.req, date = plan.date, opts = people.map(function () { return []; }), jobs = [];
+      plan.loading = true; plan.list = null; plan.chosen = -1; paint();
+      people.forEach(function (p, i) {
+        candBarbers(p).forEach(function (b) {
+          jobs.push(fetchTimes(p, b, date).then(function (times) {
+            var d = durFor(p, b);
+            times.forEach(function (t) { opts[i].push({ time: t, min: toMin(t), barberId: String(b.id), dur: d }); });
+          }));
+        });
+      });
+      Promise.all(jobs).then(function () {
+        if (token !== plan.req) return;
+        plan.list = buildPlans(opts, people.length > 1 ? plan.mode : 'seq', cfg.bufferMin, 3); plan.loading = false;
+        // Les horaires deja choisis correspondent a une proposition : elle reste cochee.
+        plan.list.forEach(function (pl, k) {
+          if (pl.items.every(function (it, i) { var p = people[i]; return p.slot && p.date === date && p.slot.time === it.time && String(p.slot.barberId) === it.barberId; })) plan.chosen = k;
+        });
+        paint();
+      });
+    }
+    function pickPlan(k) {
+      var pl = plan.list && plan.list[k]; if (!pl) return;
+      people.forEach(function (p, i) { p.date = plan.date; p.slot = { time: pl.items[i].time, barberId: pl.items[i].barberId }; p.slots = null; p.alert = ''; });
+      plan.chosen = k; paint();
+    }
+
+    /* ---------- Rendu ---------- */
+    function back() { return '<button type="button" class="back" data-act="back">‹ Retour</button>'; }
+    function goBtn(text, disabled, act) { return '<button type="button" class="go" data-act="' + (act || 'next') + '"' + (disabled ? ' disabled' : '') + '>' + text + '</button>'; }
+    function av(p, cls) { return '<span class="gb-av' + (cls ? ' ' + cls : '') + '">' + esc(label(p).charAt(0).toUpperCase()) + '</span>'; }
+    var ICON_ONE = '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg>';
+    var ICON_MANY = '<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M17.5 14.2c2.3.3 3.5 2.2 3.5 5.8"/></svg>';
+    var CHECK = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7"/></svg>';
+
+    // Colonne de droite (ordinateur) / bas d'ecran (telephone) : le groupe, prestation et heure de chacun, le total.
+    function barHtml() {
+      if (!people.length) return '';
+      var cents = 0, rows = people.map(function (p) {
+        var s = byId(svcList(p), p.serviceId), price = s ? personPrice(p, svcList, extList) : 0; cents += price;
+        var b = p.slot ? barberName(p.slot.barberId) : (p.pref ? barberName(p.pref) : '');
+        return '<div class="gb-sum' + (p === cur && (view === 'person' || view === 'datetime') ? ' on' : '') + '"><span class="gb-sum-t">' + (p.slot ? esc(p.slot.time) : '') + '</span>' +
+          '<span class="gb-sum-n"><b>' + esc(label(p)) + '</b><em>' + (s ? esc(s.name) + (b ? ' · ' + esc(b) : '') : 'à choisir') + '</em></span>' +
+          '<span class="gb-sum-p">' + (s ? eur(price) : '') + '</span></div>';
+      }).join('');
+      var day = people[0].slot ? fmtDate(people[0].date) : '';
+      return '<div class="gb-sum-head">' + (day ? esc(day) : 'Votre groupe') + '</div>' + rows +
+        '<div class="recap-total"><span>Total · ' + people.length + ' personne' + (people.length > 1 ? 's' : '') + '</span><span><strong>' + eur(cents) + '</strong></span></div>';
+    }
+    function peopleBar() {
+      return '<div class="gb-pbar">' + people.map(function (p) {
+        var st = p === cur ? 'cur' : (p.serviceId ? 'done' : 'todo');
+        var s = byId(svcList(p), p.serviceId);
+        return '<button type="button" class="gb-pb ' + st + '" data-act="goto" data-uid="' + p.uid + '">' +
+          (st === 'done' ? '<span class="gb-av ok">' + CHECK + '</span>' : av(p, st === 'cur' ? 'on' : '')) +
+          '<span class="gb-pb-n">' + esc(label(p)) + '</span><span class="gb-pb-s">' + (st === 'cur' ? 'en cours' : s ? esc(s.name) : 'à faire') + '</span></button>';
+      }).join('') + '</div>';
+    }
+    function dayStrip() {
+      var out = '', d0 = new Date(today() + 'T12:00:00');
+      for (var i = 0; i < 14; i++) {
+        var d = new Date(d0); d.setDate(d0.getDate() + i);
+        var iso = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        out += '<button type="button" class="gb-day' + (iso === plan.date ? ' on' : '') + '" data-act="plan-day" data-date="' + iso + '"><span>' +
+          esc(d.toLocaleDateString('fr-FR', { weekday: 'short' })) + '</span><b>' + d.getDate() + '</b><span>' + esc(d.toLocaleDateString('fr-FR', { month: 'short' })) + '</span></button>';
+      }
+      return '<div class="gb-days">' + out + '</div>';
     }
 
     function views() {
       if (view === 'who') {
-        var chips = '<button type="button" class="gb-who' + (wsel.self ? ' on' : '') + '" data-act="who-self"><i>' + esc((cfg.selfChip || 'Moi').charAt(0)) + '</i>' + esc(cfg.selfChip || 'Moi') + '</button>';
-        (cfg.relatives || []).forEach(function (r) { chips += '<button type="button" class="gb-who' + (wsel.rels[r.id] ? ' on' : '') + '" data-act="who-rel" data-id="' + esc(r.id) + '"><i>' + esc(String(r.name).charAt(0).toUpperCase()) + '</i>' + esc(r.name) + '</button>'; });
-        wsel.extra.forEach(function (x, i) { chips += '<button type="button" class="gb-who on" data-act="who-del" data-i="' + i + '" title="Retirer"><i>' + esc(x.name.charAt(0).toUpperCase()) + '</i>' + esc(x.name) + ic('x') + '</button>'; });
-        var n = whoCount();
-        return { top: back() + '<div class="eyebrow">Qui vient au salon ?</div><p class="step-sub">' + (cfg.whoSub || 'Cochez les personnes à inscrire. Vous n\'êtes pas obligé de réserver pour vous.') + '</p>',
-          body: '<div class="gb-whos">' + chips + '</div>' +
+        var cards = cfg.onSolo ? '<div class="gb-choices">' +
+          '<button type="button" class="gb-choice" data-act="solo"><span class="gb-choice-ic">' + ICON_ONE + '</span><span><b>Juste moi</b><em>Un rendez-vous pour une personne</em></span></button>' +
+          '<button type="button" class="gb-choice' + (wsel.multi ? ' on' : '') + '" data-act="multi"><span class="gb-choice-ic">' + ICON_MANY + '</span><span><b>Plusieurs personnes</b><em>Enfants, amis, famille — jusqu\'à ' + MAX_PEOPLE + '</em></span></button></div>' : '';
+        var n = whoCount(), body = cards;
+        if (wsel.multi) {
+          var chips = '<button type="button" class="gb-who' + (wsel.self ? ' on' : '') + '" data-act="who-self"><i>' + esc((cfg.selfChip || 'Moi').charAt(0)) + '</i>' + esc(cfg.selfChip || 'Moi') + '</button>';
+          (cfg.relatives || []).forEach(function (r) { chips += '<button type="button" class="gb-who' + (wsel.rels[r.id] ? ' on' : '') + '" data-act="who-rel" data-id="' + esc(r.id) + '"><i>' + esc(String(r.name).charAt(0).toUpperCase()) + '</i>' + esc(r.name) + '</button>'; });
+          wsel.extra.forEach(function (x, i) { chips += '<button type="button" class="gb-who on" data-act="who-del" data-i="' + i + '" title="Retirer"><i>' + esc(x.name.charAt(0).toUpperCase()) + '</i>' + esc(x.name) + ic('x') + '</button>'; });
+          body += '<div class="gb-label">Qui vient ?</div>' + (cfg.whoSub ? '<p class="step-sub">' + esc(cfg.whoSub) + '</p>' : '') + '<div class="gb-whos">' + chips + '</div>' +
             '<div class="fld"><label for="gb-who-name">Ajouter quelqu\'un d\'autre</label><div class="gb-addrow"><input id="gb-who-name" maxlength="60" autocomplete="off" placeholder="Prénom" value="' + esc(wsel.draft) + '"><button type="button" class="gb-mini" data-act="who-add">Ajouter</button></div></div>' +
-            (cfg.createRelative ? '<label class="gb-save"><input type="checkbox" data-act="who-save"' + (wsel.draftSave ? ' checked' : '') + '> ' + esc(cfg.saveLabel || 'Enregistrer ce prénom dans « Mes proches »') + '</label>' : ''),
-          go: goBtn('Suivant', n < 1, 'who-next'), hint: n < 1 ? 'Choisissez au moins une personne.' : n > MAX_PEOPLE ? 'Maximum ' + MAX_PEOPLE + ' personnes.' : '' };
+            (cfg.createRelative ? '<label class="gb-save"><input type="checkbox" data-act="who-save"' + (wsel.draftSave ? ' checked' : '') + '> ' + esc(cfg.saveLabel || 'Enregistrer ce prénom dans « Mes proches »') + '</label>' : '');
+        }
+        return { top: (cfg.onExit ? back() : '') + '<div class="eyebrow">' + (cfg.onSolo ? 'Pour qui est le rendez-vous ?' : 'Qui vient au salon ?') + '</div>',
+          body: body,
+          go: wsel.multi ? goBtn(n > 1 ? 'Continuer avec ' + n + ' personnes' : 'Continuer', n < 1 || n > MAX_PEOPLE, 'who-next') : '',
+          hint: !wsel.multi ? '' : n < 1 ? 'Choisissez au moins une personne.' : n > MAX_PEOPLE ? 'Maximum ' + MAX_PEOPLE + ' personnes.' : '' };
+      }
+      if (view === 'person') {
+        var p = cur, prev = null;
+        for (var j = people.indexOf(p) - 1; j >= 0 && !prev; j--) if (people[j].serviceId) prev = people[j];
+        if (!prev) prev = firstWithout(function (o) { return o !== p && o.serviceId; });
+        var bodyP = '';
+        if (prev && (prev.serviceId !== p.serviceId || String(prev.pref) !== String(p.pref))) {
+          var ps = byId(svcList(prev), prev.serviceId);
+          bodyP += '<button type="button" class="gb-copy" data-act="copy" data-uid="' + prev.uid + '">Même chose que ' + esc(label(prev)) + (ps ? ' (' + esc(ps.name) + ')' : '') + '</button>';
+        }
+        bodyP += '<div class="item-grid">' + svcList(p).map(function (it) { return itemCard('services', it, String(p.serviceId) === String(it.id)).replace('<button', '<button data-pick="service"'); }).join('') + '</div>';
+        bodyP += '<div class="gb-label">Coiffeur</div><div class="gb-barbers"><button type="button" class="gb-bchip' + (!p.pref ? ' on' : '') + '" data-act="pref" data-id="">Peu importe</button>' +
+          cfg.barbers.map(function (b) {
+            var off = p.serviceId && (b.disabled_service_ids || []).indexOf(p.serviceId) !== -1;
+            return '<button type="button" class="gb-bchip' + (String(p.pref) === String(b.id) ? ' on' : '') + '" data-act="pref" data-id="' + esc(b.id) + '"' + (off ? ' disabled title="Ne fait pas cette prestation"' : '') + '>' + esc(b.name) + '</button>';
+          }).join('') + '</div>';
+        var exts = extList(p);
+        if (exts.length) {
+          if (p.showExtras || p.extraIds.length) bodyP += '<div class="gb-label">Suppléments (facultatif)</div><div class="item-grid">' + exts.map(function (it) { return itemCard('extras', it, p.extraIds.indexOf(String(it.id)) !== -1).replace('<button', '<button data-pick="extra"'); }).join('') + '</div>';
+          else bodyP += '<button type="button" class="gb-link" data-act="show-extras">+ Ajouter un supplément (facultatif)</button>';
+        }
+        var nx = editing ? null : firstWithout(function (o) { return o !== p && !o.serviceId; });
+        var who = p.isSelf ? (cfg.selfName ? 'Que fait ' + esc(cfg.selfName) + ' ?' : 'Que faites-vous ?') : 'Que fait ' + esc(label(p)) + ' ?';
+        return { top: back() + (people.length > 1 ? peopleBar() : '') + '<div class="eyebrow">' + who + '</div>', body: bodyP,
+          go: goBtn(nx ? 'Suivant : ' + esc(label(nx)) + ' ›' : (editing && p.slot ? 'Valider' : 'Choisir l\'horaire'), !p.serviceId, 'person-next') };
+      }
+      if (view === 'when') {
+        var plans = '';
+        if (plan.loading || !plan.list) plans = '<div class="empty">Recherche des horaires…</div>';
+        else if (!plan.list.length) plans = '<div class="empty">Aucun horaire pour tout le groupe ce jour-là. Essayez une autre date' + (people.length > 1 ? ', l\'autre option ci-dessus,' : '') + ' ou choisissez l\'heure de chacun séparément.</div>';
+        else plans = plan.list.map(function (pl, k) {
+          return '<button type="button" class="gb-plan' + (plan.chosen === k ? ' on' : '') + '" data-act="plan-pick" data-i="' + k + '"><span class="gb-plan-h">' + esc(pl.start) + ' → ' + esc(pl.end) + '</span>' +
+            pl.items.map(function (it, i) { var s = byId(itemsFor(byId(cfg.barbers, it.barberId), 'services'), people[i].serviceId);
+              return '<span class="gb-plan-r"><b>' + esc(it.time) + '</b>' + esc(label(people[i])) + (s ? ' · ' + esc(s.name) : '') + ' · ' + esc(barberName(it.barberId)) + '</span>'; }).join('') + '</button>';
+        }).join('');
+        var mode = people.length > 1 ? '<div class="half-toggle gb-mode"><button type="button" class="' + (plan.mode === 'seq' ? 'sel' : '') + '" data-act="plan-mode" data-mode="seq">Les uns après les autres</button><button type="button" class="' + (plan.mode === 'same' ? 'sel' : '') + '" data-act="plan-mode" data-mode="same">En même temps</button></div>' : '';
+        return { top: back() + '<div class="eyebrow">Quand venez-vous ?</div><p class="step-sub">Une seule date pour tout le groupe.</p>',
+          body: '<div class="gb-when"><div class="gb-when-cal">' + dayStrip() +
+            '<div class="fld"><label for="gb-plan-date">Autre date</label><input id="gb-plan-date" type="date" min="' + today() + '" value="' + esc(plan.date) + '"></div></div>' +
+            '<div class="gb-when-plans">' + mode + '<div class="gb-label">Horaires proposés' + (people.length > 1 ? ' pour les ' + people.length : '') + '</div>' + plans +
+            '<button type="button" class="gb-link" data-act="sep">' + (people.length > 1 ? 'Choisir l\'heure de chacun séparément' : 'Voir tous les créneaux') + '</button></div></div>',
+          go: goBtn('Continuer', !people.every(complete), 'to-recap') };
       }
       if (view === 'recap') {
         var ready = people.length > 0 && people.every(complete);
-        var used = {}; people.forEach(function (p) { if (p.relativeId) used[p.relativeId] = true; });
+        var used = {}; people.forEach(function (o) { if (o.relativeId) used[o.relativeId] = true; });
         var rels = (cfg.relatives || []).filter(function (r) { return !used[r.id]; });
-        var body = '<div class="gb-rows">';
-        people.forEach(function (p, i) {
-          var s = byId(svcList(p), p.serviceId);
-          var line = complete(p) ? esc(s.name) + (barberName(p.slot.barberId) ? ' · ' + esc(barberName(p.slot.barberId)) : '') + '<br>' + esc(fmtDate(p.date)) + ' à ' + esc(p.slot.time) : '<span class="todo">À compléter</span>';
-          body += '<div class="gb-row" data-i="' + i + '"><span class="gb-av">' + esc(label(p).charAt(0).toUpperCase()) + '</span><div class="gb-info"><b>' + esc(label(p)) + '</b><span>' + line + '</span></div>' +
-            '<button type="button" class="gb-mini" data-act="edit">' + (complete(p) ? 'Modifier' : 'Compléter') + '</button>' +
-            '<button type="button" class="gb-mini x" data-act="remove" aria-label="Retirer">' + ic('x') + '</button>' + '</div>';
+        var dates = {}; people.forEach(function (o) { if (o.slot) dates[o.date] = true; });
+        var bodyR = (Object.keys(dates).length === 1 ? '<div class="gb-label">' + esc(fmtDate(Object.keys(dates)[0])) + '</div>' : '') + '<div class="gb-rows">';
+        people.slice().sort(function (a, b) { return ((a.date || '') + (a.slot ? a.slot.time : '99')).localeCompare((b.date || '') + (b.slot ? b.slot.time : '99')); }).forEach(function (o) {
+          var s = byId(svcList(o), o.serviceId);
+          var line = s ? esc(s.name) + (o.slot ? ' · ' + esc(barberName(o.slot.barberId)) : '') + (o.slot && Object.keys(dates).length > 1 ? ' · ' + esc(fmtDate(o.date)) : '') : '<span class="todo">À compléter</span>';
+          bodyR += '<div class="gb-row"><span class="gb-row-t">' + (o.slot ? esc(o.slot.time) : '—') + '</span><div class="gb-info"><b>' + esc(label(o)) + '</b><span>' + line + '</span></div>' +
+            '<span class="gb-row-p">' + (s ? eur(personPrice(o, svcList, extList)) : '') + '</span>' +
+            '<button type="button" class="gb-mini" data-act="edit" data-uid="' + o.uid + '">Modifier</button>' +
+            '<button type="button" class="gb-mini x" data-act="rm" data-uid="' + o.uid + '" aria-label="Retirer ' + esc(label(o)) + '">' + ic('x') + '</button></div>';
         });
-        body += '</div>';
+        bodyR += '</div>';
         if (people.length < MAX_PEOPLE) {
-          if (rels.length) body += '<div class="gb-chips">' + rels.map(function (r) { return '<button type="button" class="gb-chip" data-act="add-rel" data-id="' + esc(r.id) + '">+ ' + esc(r.name) + '</button>'; }).join('') + '</div>';
-          body += '<button type="button" class="gb-addbtn" data-act="add">+ Ajouter une personne</button>';
-        } else body += '<div class="gb-empty">Maximum ' + MAX_PEOPLE + ' personnes par réservation.</div>';
-        return { top: back() + '<div class="eyebrow">Réserver pour plusieurs personnes</div><p class="step-sub">Chaque personne a sa prestation, son coiffeur et son horaire : à la suite, en même temps ou décalés.</p>',
-                 body: body, go: goBtn(esc(cfg.continueLabel || 'Continuer'), !ready, 'continue'),
-                 hint: !people.length ? 'Ajoutez au moins une personne.' : !ready ? 'Complétez chaque personne (prestation et horaire).' : '' };
+          if (rels.length) bodyR += '<div class="gb-chips">' + rels.map(function (r) { return '<button type="button" class="gb-chip" data-act="add-rel" data-id="' + esc(r.id) + '">+ ' + esc(r.name) + '</button>'; }).join('') + '</div>';
+          bodyR += '<button type="button" class="gb-addbtn" data-act="add">+ Ajouter une personne</button>';
+        }
+        return { top: back() + '<div class="eyebrow">On vérifie ensemble</div>', body: bodyR,
+          go: goBtn(esc(cfg.continueLabel || 'Continuer'), !ready, 'continue'), hint: !ready ? 'Complétez chaque personne (prestation et horaire).' : '' };
       }
-      var p = cur, who = p.isSelf ? '' : esc(label(p)) + ' — ';
-      if (view === 'name') return { top: back() + '<div class="eyebrow">Qui vient avec vous ?</div>',
-        body: '<div class="fld"><label for="gb-name">Prénom</label><input id="gb-name" maxlength="60" autocomplete="off" value="' + esc(p.name) + '"></div>' +
-          (cfg.createRelative ? '<label class="gb-save"><input type="checkbox" data-act="save"' + (p.saveRelative ? ' checked' : '') + '> Ajouter ce prénom à « Mes proches »</label>' : ''),
-        go: goBtn('Suivant', !String(p.name || '').trim()) };
-      if (view === 'barber') return { top: back() + '<div class="eyebrow">' + who + 'Choisissez le coiffeur</div>',
-        body: '<div class="svc-grid">' +
-          cfg.barbers.map(function (b) { return barberCard(b, String(p.pref) === String(b.id)).replace('<button', '<button data-pick="barber"'); }).join('') + '</div>', go: goBtn('Suivant', !p.pref) };
-      if (view === 'service') return { top: back() + '<div class="eyebrow">' + who + 'Prestation</div>',
-        body: '<div class="item-grid">' + svcList(p).map(function (it) { return itemCard('services', it, String(p.serviceId) === String(it.id)).replace('<button', '<button data-pick="service"'); }).join('') + '</div>',
-        go: goBtn('Suivant', !p.serviceId) };
-      if (view === 'extras') return { top: back() + '<div class="eyebrow">' + who + 'Suppléments (optionnels)</div><p class="step-sub">Personnalisez la prestation : touchez pour ajouter.</p>',
-        body: '<div class="item-grid">' + extList(p).map(function (it) { return itemCard('extras', it, p.extraIds.indexOf(String(it.id)) !== -1).replace('<button', '<button data-pick="extra"'); }).join('') + '</div>', go: goBtn('Suivant', false) };
-      // date et heure
-      var morning = (p.slots || []).filter(function (s) { return s.time < '12:00'; }), aft = (p.slots || []).filter(function (s) { return s.time >= '12:00'; });
-      var body2 = '<div class="fld"><label for="gb-date">Date</label><input id="gb-date" type="date" min="' + today() + '" value="' + esc(p.date) + '"></div>';
-      if (p.suggestions && p.suggestions.length) body2 += '<div class="gb-chips">' + p.suggestions.map(function (sg) {
+      if (view === 'name') return { top: back() + '<div class="eyebrow">Qui vient en plus ?</div>',
+        body: '<div class="fld"><label for="gb-name">Prénom</label><input id="gb-name" maxlength="60" autocomplete="off" value="' + esc(cur.name) + '"></div>' +
+          (cfg.createRelative ? '<label class="gb-save"><input type="checkbox" data-act="save"' + (cur.saveRelative ? ' checked' : '') + '> ' + esc(cfg.saveLabel || 'Ajouter ce prénom à « Mes proches »') + '</label>' : ''),
+        go: goBtn('Suivant', !String(cur.name || '').trim(), 'name-next') };
+      // datetime : l'heure d'UNE personne (choix « separement », ou creneau pris entre-temps)
+      var q = cur, whoQ = q.isSelf ? '' : esc(label(q)) + ' — ';
+      var morning = (q.slots || []).filter(function (s) { return s.time < '12:00'; }), aft = (q.slots || []).filter(function (s) { return s.time >= '12:00'; });
+      var body2 = '<div class="fld"><label for="gb-date">Date</label><input id="gb-date" type="date" min="' + today() + '" value="' + esc(q.date) + '"></div>';
+      if (q.suggestions && q.suggestions.length) body2 += '<div class="gb-chips">' + q.suggestions.map(function (sg) {
         return '<button type="button" class="gb-chip sugg" data-act="sugg" data-time="' + esc(sg.time) + '" data-barber="' + esc(sg.barberId) + '">' + (sg.kind === 'after' ? ic('next') + 'À la suite de ' : ic('same') + 'En même temps que ') + esc(sg.name) + ' · ' + esc(sg.time) + (barberName(sg.barberId) ? ' · ' + esc(barberName(sg.barberId)) : '') + '</button>'; }).join('') + '</div>';
-      body2 += '<div class="eyebrow" style="margin-top:20px">Créneaux disponibles</div>';
-      if (morning.length && aft.length) body2 += '<div class="half-toggle" style="margin-bottom:14px"><button type="button" class="' + (p.half === 'morning' ? 'sel' : '') + '" data-act="half" data-half="morning">Matin</button><button type="button" class="' + (p.half === 'afternoon' ? 'sel' : '') + '" data-act="half" data-half="afternoon">Après-midi</button></div>';
-      var list = (morning.length && aft.length) ? (p.half === 'morning' ? morning : aft) : (p.slots || []);
-      body2 += '<div class="slots-grid">' + (p.loading || !p.slots ? '<div class="empty">Chargement…</div>' : !list.length ? '<div class="empty">Aucun créneau disponible ce jour-là</div>' :
-        list.map(function (s) { var on = p.slot && p.slot.time === s.time && String(p.slot.barberId) === String(s.barber_id);
+      body2 += '<div class="gb-label">Créneaux disponibles</div>';
+      if (morning.length && aft.length) body2 += '<div class="half-toggle" style="margin-bottom:14px"><button type="button" class="' + (q.half === 'morning' ? 'sel' : '') + '" data-act="half" data-half="morning">Matin</button><button type="button" class="' + (q.half === 'afternoon' ? 'sel' : '') + '" data-act="half" data-half="afternoon">Après-midi</button></div>';
+      var list = (morning.length && aft.length) ? (q.half === 'morning' ? morning : aft) : (q.slots || []);
+      body2 += '<div class="slots-grid">' + (q.loading || !q.slots ? '<div class="empty">Chargement…</div>' : !list.length ? '<div class="empty">Aucun créneau disponible ce jour-là</div>' :
+        list.map(function (s) { var on = q.slot && q.slot.time === s.time && String(q.slot.barberId) === String(s.barber_id);
           return '<button type="button" class="slot-btn' + (on ? ' sel' : '') + '" data-act="slot" data-time="' + esc(s.time) + '" data-barber="' + esc(s.barber_id) + '">' + esc(s.time) + '</button>'; }).join('')) + '</div>';
-      if (p.note || p.alert) body2 += '<div class="gb-warn">' + esc(p.alert || p.note) + '</div>';
-      return { top: back() + '<div class="eyebrow">' + who + 'Date et heure</div>', body: body2, go: goBtn('Valider', !p.slot) };
+      if (q.note || q.alert) body2 += '<div class="gb-warn">' + esc(q.alert || q.note) + '</div>';
+      return { top: back() + (people.length > 1 ? peopleBar() : '') + '<div class="eyebrow">' + whoQ + 'Date et heure</div>', body: body2, go: goBtn('Valider', !q.slot, 'dt-next') };
     }
 
     function paint() {
       var v = views(), keep = zones.body.scrollTop;
       zones.top.innerHTML = v.top; zones.body.innerHTML = v.body;
-      zones.bar.innerHTML = '<div class="flow-recap">' + recapHtml() + '</div>' + v.go + (v.hint ? '<div class="gb-empty">' + v.hint + '</div>' : '');
+      var sum = (view === 'who' && !people.length) ? '' : barHtml();
+      zones.bar.innerHTML = (sum ? '<div class="flow-recap">' + sum + '</div>' : '') + (v.go || '') + (v.hint ? '<div class="gb-empty">' + v.hint + '</div>' : '');
       zones.body.scrollTop = keep;
     }
 
     /* ---------- Navigation ---------- */
     function go(v) {
-      // Date jamais dans le passé (fuseau du salon) : une fiche ouverte avant minuit repart sur aujourd'hui.
       if (v === 'datetime' && cur && (!cur.date || cur.date < today())) { cur.date = today(); cur.slot = null; }
-      view = v; menuFor = null; paint(); if (v === 'datetime') loadSlots(cur);
+      if (v === 'when') { if (!plan.date || plan.date < today()) plan.date = (people[0] && people[0].slot && people[0].date >= today()) ? people[0].date : today(); }
+      view = v; paint();
+      if (v === 'datetime') loadSlots(cur);
+      if (v === 'when') loadPlans();
     }
-    function firstStep(p) { return p.isSelf || p.name || p.relativeId ? 'barber' : 'name'; }
-    function nextStep() {
-      if (view === 'name') return go('barber');
-      var seq = stepsFor(cur), i = seq.indexOf(view);
-      if (i < seq.length - 1) return go(seq[i + 1]);
-      // fin de la personne : si on enchaine depuis « Qui vient ? », on passe a la suivante, sinon retour au recapitulatif
-      var nx = fromWho ? nextIncomplete(people.indexOf(cur)) : null;
-      if (nx) { cur = nx; return go('barber'); }
-      fromWho = false; go('recap');
+    function afterPerson() {
+      if (editing) { editing = false; return people.every(complete) ? go('recap') : go('when'); }
+      var nx = firstWithout(function (o) { return !o.serviceId; });
+      if (nx) { cur = nx; return go('person'); }
+      return go('when');
     }
-    function prevStep() {
-      var seq = stepsFor(cur), i = seq.indexOf(view);
-      if (fromWho && view === 'barber') {
+    function backFrom() {
+      if (view === 'who') return cfg.onExit && cfg.onExit();
+      if (view === 'person') {
+        if (editing) { editing = false; return go(people.every(complete) ? 'recap' : 'when'); }
         var k = people.indexOf(cur);
-        if (k <= 0) { fromWho = false; return go('who'); }
-        cur = people[k - 1]; return go('datetime');
+        if (k > 0) { cur = people[k - 1]; return go('person'); }
+        return go('who');
       }
-      if (view === 'barber' && !cur.isSelf && !cur.relativeId) return go('name');
-      if (i > 0) return go(seq[i - 1]);
-      // premiere etape : on quitte la personne
-      if (!complete(cur) && !cur.isSelf) people.splice(people.indexOf(cur), 1);
-      if (people.length === 1 && !complete(people[0]) && cur.isSelf) { if (cfg.onExit) cfg.onExit(); return; }
-      go('recap');
+      if (view === 'when') { cur = people[people.length - 1]; return go('person'); }
+      if (view === 'recap') return go('when');
+      if (view === 'name') { if (!String(cur.name || '').trim()) people.splice(people.indexOf(cur), 1); return go(people.length ? 'recap' : 'who'); }
+      if (view === 'datetime') {
+        if (sepMode) { var i2 = people.indexOf(cur); if (i2 > 0) { cur = people[i2 - 1]; return go('datetime'); } sepMode = false; return go('when'); }
+        return go('recap');
+      }
     }
     function addPerson(init) {
       if (people.length >= MAX_PEOPLE) return;
-      var prev = people[people.length - 1], np = newPerson(init || {});
-      if (prev) np.date = prev.date;
-      people.push(np); cur = np; go(firstStep(np));
+      var np = newPerson(init || {}); if (people[0]) np.date = people[0].date;
+      people.push(np); cur = np; editing = false;
+      return go(np.name ? 'person' : 'name');
     }
+    function markChanged(p) { p.slot = null; p.slots = null; plan.list = null; plan.chosen = -1; }
 
     el.addEventListener('click', function (e) {
-      var t = e.target.closest ? e.target.closest('[data-act],[data-pick]') : null; if (!t || !el.contains(t)) return;
+      var t = e.target.closest ? e.target.closest('[data-act],[data-pick]') : null; if (!t || !el.contains(t) || t.disabled) return;
       var pick = t.getAttribute('data-pick'), act = t.getAttribute('data-act');
       if (pick) {
-        var id = t.getAttribute('data-id') != null && pick !== 'barber' ? t.getAttribute('data-id') : (t.getAttribute('data-barber-id') || t.getAttribute('data-id') || '');
-        if (pick === 'barber') {
-          if (String(cur.pref) !== String(id)) {
-            cur.pref = id; cur.slot = null; cur.slots = null;
-            // Ce coiffeur ne fait pas la prestation / un supplement deja choisi : on les retire.
-            if (cur.serviceId && !byId(svcList(cur), cur.serviceId)) cur.serviceId = '';
-            cur.extraIds = cur.extraIds.filter(function (x) { return byId(extList(cur), x); });
-          }
-          paint(); return;
-        }
-        if (pick === 'service') { if (String(cur.serviceId) !== String(id)) { cur.serviceId = id; cur.slot = null; cur.slots = null; } paint(); return; }
-        if (pick === 'extra') { var k = cur.extraIds.indexOf(String(id)); if (k === -1) cur.extraIds.push(String(id)); else cur.extraIds.splice(k, 1); cur.slot = null; cur.slots = null; paint(); return; }
+        var id = t.getAttribute('data-id') || '';
+        if (pick === 'service') { if (String(cur.serviceId) !== String(id)) { cur.serviceId = id; markChanged(cur); } return paint(); }
+        if (pick === 'extra') { var k = cur.extraIds.indexOf(String(id)); if (k === -1) cur.extraIds.push(String(id)); else cur.extraIds.splice(k, 1); markChanged(cur); return paint(); }
       }
-      var row = t.closest('.gb-row'), i = row ? Number(row.getAttribute('data-i')) : -1;
+      if (act === 'solo') return cfg.onSolo && cfg.onSolo();
+      if (act === 'multi') { wsel.multi = true; return paint(); }
       if (act === 'who-self') { wsel.self = !wsel.self; return paint(); }
       if (act === 'who-rel') { var rid = t.getAttribute('data-id'); wsel.rels[rid] = !wsel.rels[rid]; return paint(); }
       if (act === 'who-del') { wsel.extra.splice(Number(t.getAttribute('data-i')), 1); return paint(); }
@@ -404,43 +571,54 @@
       if (act === 'who-next') {
         if (whoCount() < 1) return;
         if (whoCount() > MAX_PEOPLE) { if (cfg.toast) cfg.toast('Maximum ' + MAX_PEOPLE + ' personnes.', true); return; }
-        applyWho(); fromWho = true; cur = nextIncomplete(-1) || people[0]; return go('barber');
+        applyWho(); editing = false; cur = firstWithout(function (o) { return !o.serviceId; }) || people[0]; return go('person');
       }
-      if (act === 'pill-who') { var pw = personByUid(t.getAttribute('data-uid')); if (pw) { cur = pw; go('barber'); } return; }
-      if (act === 'pill-date') { var pd = personByUid(t.getAttribute('data-uid')); if (pd && pd.serviceId) { cur = pd; go('datetime'); } return; }
-      if (act === 'pill-barber') { var pb = personByUid(t.getAttribute('data-uid')); menuFor = menuFor === (pb && pb.uid) ? null : (pb && pb.uid); return paint(); }
-      if (act === 'set-barber') {
-        var ps = personByUid(t.getAttribute('data-uid')), bid = t.getAttribute('data-id'); menuFor = null;
-        if (!ps) return paint();
-        if (String(ps.pref) !== String(bid) || (ps.slot && String(ps.slot.barberId) !== String(bid))) { ps.pref = bid; ps.slot = null; ps.slots = null; ps.suggestions = []; }
-        if (ps.serviceId) { cur = ps; return go('datetime'); }   // les creneaux du nouveau coiffeur se rechargent
+      if (act === 'goto') { var pg = personByUid(t.getAttribute('data-uid')); if (pg) { cur = pg; return go('person'); } return; }
+      if (act === 'copy') { var src = personByUid(t.getAttribute('data-uid')); if (src) { cur.serviceId = src.serviceId; cur.extraIds = src.extraIds.slice(); cur.pref = src.pref; markChanged(cur); } return paint(); }
+      if (act === 'pref') {
+        var bid = t.getAttribute('data-id') || '';
+        if (String(cur.pref) !== bid) {
+          cur.pref = bid; markChanged(cur);
+          if (cur.serviceId && !byId(svcList(cur), cur.serviceId)) cur.serviceId = '';
+          cur.extraIds = cur.extraIds.filter(function (x) { return byId(extList(cur), x); });
+        }
         return paint();
       }
+      if (act === 'show-extras') { cur.showExtras = true; return paint(); }
+      if (act === 'person-next') return afterPerson();
+      if (act === 'name-next') return go('person');
+      if (act === 'plan-day') { plan.date = t.getAttribute('data-date'); return loadPlans(); }
+      if (act === 'plan-mode') { plan.mode = t.getAttribute('data-mode'); return loadPlans(); }
+      if (act === 'plan-pick') return pickPlan(Number(t.getAttribute('data-i')));
+      if (act === 'sep') { sepMode = true; people.forEach(function (o) { o.date = plan.date; }); cur = people[0]; return go('datetime'); }
+      if (act === 'to-recap') return go('recap');
+      if (act === 'dt-next') {
+        if (sepMode) { var i3 = people.indexOf(cur); if (i3 < people.length - 1) { var nxt = people[i3 + 1]; nxt.date = cur.date; cur = nxt; return go('datetime'); } sepMode = false; }
+        return go('recap');
+      }
+      if (act === 'edit') { var pe = personByUid(t.getAttribute('data-uid')); if (pe) { cur = pe; editing = true; return go('person'); } return; }
       if (act === 'rm') {
         var pr = personByUid(t.getAttribute('data-uid')); if (!pr) return;
-        people.splice(people.indexOf(pr), 1); menuFor = null;
-        if (!people.length) { fromWho = false; wsel = newWho(); return go('who'); }
-        if (cur === pr) { cur = people[0]; fromWho = false; return go('recap'); }
+        people.splice(people.indexOf(pr), 1);
+        if (!people.length) { wsel = newWho(); wsel.multi = true; return go('who'); }
         return paint();
       }
-      if (act === 'back') return view === 'who' ? (cfg.onExit && cfg.onExit()) : view === 'recap' ? (cfg.onExit && cfg.onExit()) : prevStep();
-      if (act === 'next') return nextStep();
+      if (act === 'back') return backFrom();
       if (act === 'add') return addPerson();
       if (act === 'add-rel') { var r = byId(cfg.relatives || [], t.getAttribute('data-id')); if (r) addPerson({ name: r.name, relativeId: r.id }); return; }
-      if (act === 'edit') { cur = people[i]; return go('barber'); }
-      if (act === 'remove') { people.splice(i, 1); return paint(); }
       if (act === 'continue') return doContinue();
       if (act === 'half') { cur.half = t.getAttribute('data-half'); return paint(); }
-      if (act === 'slot' || act === 'sugg') { cur.slot = { time: t.getAttribute('data-time'), barberId: t.getAttribute('data-barber') }; cur.note = ''; cur.alert = ''; return paint(); }
+      if (act === 'slot' || act === 'sugg') { cur.slot = { time: t.getAttribute('data-time'), barberId: t.getAttribute('data-barber') }; cur.note = ''; cur.alert = ''; plan.chosen = -1; return paint(); }
     });
     el.addEventListener('keydown', function (e) { if (e.key === 'Enter' && e.target.id === 'gb-who-name') { e.preventDefault(); addWhoName(); } });
     el.addEventListener('input', function (e) {
       if (e.target.id === 'gb-who-name') wsel.draft = e.target.value;
-      if (e.target.id === 'gb-name') { cur.name = e.target.value; var b = zones.bar.querySelector('[data-act=next]'); if (b) b.disabled = !cur.name.trim(); }
+      if (e.target.id === 'gb-name') { cur.name = e.target.value; var b = zones.bar.querySelector('[data-act=name-next]'); if (b) b.disabled = !cur.name.trim(); }
     });
     el.addEventListener('change', function (e) {
       var t = e.target;
       if (t.id === 'gb-date') { cur.date = (t.value && t.value >= today()) ? t.value : today(); t.value = cur.date; cur.slot = null; loadSlots(cur); }
+      if (t.id === 'gb-plan-date') { plan.date = (t.value && t.value >= today()) ? t.value : today(); loadPlans(); }
       if (t.getAttribute && t.getAttribute('data-act') === 'save') cur.saveRelative = t.checked;
       if (t.getAttribute && t.getAttribute('data-act') === 'who-save') wsel.draftSave = t.checked;
     });
@@ -456,9 +634,11 @@
     return {
       reset: reset,
       getPeople: function () { return people; },
-      focusPerson: function (i, msg) { var q = people[i]; if (!q) return; q.slot = null; q.alert = msg || ''; cur = q; fromWho = false; go('datetime'); },
+      // Choix direct de « Plusieurs personnes » (ex. depuis une tuile) : l'ecran « Qui vient ? » s'ouvre deja deplie.
+      openMulti: function () { reset(); wsel.multi = true; paint(); },
+      focusPerson: function (i, msg) { var q = people[i]; if (!q) return; q.slot = null; q.alert = msg || ''; cur = q; sepMode = false; editing = false; go('datetime'); },
       setRelatives: function (list) { cfg.relatives = list || []; if (view === 'recap' || view === 'who') paint(); },
-      setCatalog: function (c) { cfg.services = c.services || cfg.services; cfg.extras = c.extras || cfg.extras; cfg.barbers = c.barbers || cfg.barbers; }
+      setCatalog: function (c) { cfg.services = c.services || cfg.services; cfg.extras = c.extras || cfg.extras; cfg.barbers = c.barbers || cfg.barbers; slotCache = {}; }
     };
   }
 
@@ -469,5 +649,5 @@
       '<span class="name">Plusieurs personnes</span><span class="meta">Enfants, amis…</span></button>';
   }
 
-  return { tileHtml: tileHtml, MAX_PEOPLE: MAX_PEOPLE, personDuration: personDuration, personPrice: personPrice, heldParam: heldParam, computeSuggestions: computeSuggestions, buildPayload: buildPayload, create: create };
+  return { buildPlans: buildPlans, tileHtml: tileHtml, MAX_PEOPLE: MAX_PEOPLE, personDuration: personDuration, personPrice: personPrice, heldParam: heldParam, computeSuggestions: computeSuggestions, buildPayload: buildPayload, create: create };
 });

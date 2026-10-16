@@ -512,6 +512,7 @@
     <div class="gift-summary-items" id="gift-summary-items"></div>
   </div>
   <section class="panel" id="p-book-barber">
+    <button class="back" onclick="openBookGroup(true)">‹ Retour</button>
     <div class="eyebrow" id="bk-barber-eyebrow">Choisissez votre coiffeur</div>
     <div class="svc-grid" id="bk-barber-grid"></div>
   </section>
@@ -678,7 +679,7 @@
 
 <script src="/app.js?v=26"></script>
 <script src="/autorefresh.js?v=2"></script>
-<script src="/group-booking.js?v=16"></script>
+<script src="/group-booking.js?v=17"></script>
 <style>
 .gb-done{padding:10px 0;border-bottom:1px solid var(--sep)}.gb-done:last-child{border:none}.gb-done b{display:block}.gb-done span{color:var(--grey);font-size:14px}
 #relatives-list{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
@@ -1053,13 +1054,15 @@ function deleteRelative(id) {
 }
 
 /* ---------- Reservation a plusieurs ---------- */
-var bookGroupCtl = null, bookGroupPayload = null;
-function openBookGroup() {
+var bookGroupCtl = null, bookGroupPayload = null, bookBufferMin = 0;
+// startOnWho : premier ecran « Pour qui est le rendez-vous ? » (Juste moi -> reservation normale).
+function openBookGroup(startOnWho) {
   if (!bookGroupCtl) {
     bookGroupCtl = GroupBooking.create({
       zones: { top: document.getElementById('bkgb-top'), body: document.getElementById('bkgb-body'), bar: document.getElementById('bkgb-bar') }, api: apiForBooking,
       services: bookServicesAll, extras: bookExtrasAll, barbers: bookBarbers, relatives: myRelatives,
-      eur: eur, toast: toast, continueLabel: 'Continuer', onExit: function () { show('p-book-barber'); },
+      eur: eur, toast: toast, continueLabel: 'Continuer', bufferMin: bookBufferMin,
+      onSolo: function () { show('p-book-barber'); },
       createRelative: function (name) {
         return api('/api/client-auth/relatives', { method: 'POST', body: { name: name } }).then(function (r) {
           if (!myRelatives.some(function (x) { return x.id === r.item.id; })) myRelatives.push(r.item);
@@ -1076,6 +1079,7 @@ function openBookGroup() {
     bookGroupCtl.setCatalog({ services: bookServicesAll, extras: bookExtrasAll, barbers: bookBarbers });
     bookGroupCtl.setRelatives(myRelatives); bookGroupCtl.reset();
   }
+  if (!startOnWho) bookGroupCtl.openMulti();
   show('p-book-group');
 }
 function submitBookGroup() {
@@ -1244,7 +1248,8 @@ function apiForBooking(path, opts) {
 
 function goBook(afterLoad) {
   var finish = function () {
-    show('p-book-barber');
+    // « Réserver à nouveau » (afterLoad) : directement le choix du coiffeur ; sinon « Pour qui est le rendez-vous ? ».
+    if (afterLoad) show('p-book-barber'); else openBookGroup(true);
     showFooter('nav-book');
     if (afterLoad) afterLoad();
   };
@@ -1257,6 +1262,7 @@ function goBook(afterLoad) {
     apiForBooking('/api/settings/public').catch(function () { return {}; })
   ]).then(function (r) {
     bookGiftTileImage = (r[4] && r[4].gift_tile_image_url) || '';
+    bookBufferMin = Number(r[4] && r[4].rdv_buffer_min) || 0;
     bookServicesAll = bookServices = r[0].items;
     bookExtrasAll = bookExtras = r[1].items;
     bookProducts = r[2].items.filter(function (p) { return p.online_bookable !== 0; }); // « caisse seulement » : jamais proposé en ligne
@@ -1275,7 +1281,6 @@ function renderBookBarberGrid() {
   document.getElementById('bk-barber-grid').innerHTML = giftTile + bookBarbers.map(function (b) {
     return barberTileHtml(b, selBookBarber === b.id, "selectBookBarber(this, '" + b.id + "')");
   }).join('');
-  if (bookBarbers.length) document.getElementById('bk-barber-grid').insertAdjacentHTML('beforeend', GroupBooking.tileHtml('openBookGroup()'));
   if (bookBarbers.length === 0) {
     document.getElementById('bk-barber-grid').innerHTML = giftTile + '<div class="empty">Aucun coiffeur ne prend de RDV en ligne pour le moment — présentez-vous directement au salon.</div>';
   }
