@@ -205,6 +205,14 @@ async function computeSlotsForBarber(barberId, dateStr, durationMin, rdvSettings
   );
   if (!schedule) return [];
 
+  // Fermeture exceptionnelle du salon : aucun créneau, quel que soit le coiffeur.
+  const [[salonClosure]] = await pool.query(
+    `SELECT id FROM salon_closures WHERE salon_id = (SELECT salon_id FROM barbers WHERE id = ?)
+       AND start_date <= ? AND end_date >= ? LIMIT 1`,
+    [barberId, dateStr, dateStr]
+  );
+  if (salonClosure) return [];
+
   const [[onLeave]] = await pool.query(
     'SELECT id FROM barber_leaves WHERE barber_id = ? AND ? BETWEEN start_date AND end_date',
     [barberId, dateStr]
