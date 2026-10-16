@@ -360,6 +360,15 @@ async function sendClientVerificationEmail(salonId, to, verifyUrl, options = {})
   });
 }
 
+async function sendAdminEmailVerification(salonId, to, url) {
+  const { tx, from, salon } = await getTransport(salonId, { force: true });
+  const subject = 'Confirmez votre nouvelle adresse email — ' + salon;
+  const msg = 'Vous avez demandé à modifier l’adresse email de votre compte administrateur. Cliquez sur le lien suivant dans les 15 minutes pour confirmer. Si vous n’êtes pas à l’origine de cette demande, ignorez cet email.';
+  await tx.sendMail({ from, to, subject,
+    text: msg + '\\n\\n' + url,
+    html: '<p>' + h(msg) + '</p><p><a href="' + h(url) + '">Confirmer mon adresse email</a></p>' });
+}
+
 async function sendClientSecurityNotice(salonId, to, subject, message) {
   const { tx, from, salon } = await getTransport(salonId, { force: true });
   await tx.sendMail({ from, to, subject: subject + ' — ' + salon,
@@ -440,5 +449,5 @@ async function sendCustomClientEmail(salonId, to, clientName, subject, message) 
 module.exports = {
   sendTurnSoon, sendTest, sendGiftConfirmation, sendGiftCodeRenewed, sendLoyaltyActivation, sendAppointmentConfirmation, sendGroupAppointmentConfirmation,
   sendAppointmentReminder, sendAppointmentCancelledByAdmin, sendAppointmentRescheduled,
-  sendClientVerificationEmail, sendClientPasswordReset, sendClientSecurityNotice, sendSalonClosureNotice, sendCustomClientEmail, invalidateTransport, emailsPaused, forceSend
+  sendClientVerificationEmail, sendClientPasswordReset, sendClientSecurityNotice, sendAdminEmailVerification, sendSalonClosureNotice, sendCustomClientEmail, invalidateTransport, emailsPaused, forceSend
 };
