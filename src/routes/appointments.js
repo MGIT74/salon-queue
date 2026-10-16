@@ -708,6 +708,8 @@ async function createGroupBooking(req, res, staff) {
 
   for (let i = 0; i < norm.people.length; i++) {
     const p = norm.people[i];
+    if (!validBookingDate(p.date) || !validBookingTime(p.time)) return fail(400, i, 'Date ou heure invalide.');
+    if (await isSalonClosedOnDate(req.salon.id, p.date)) return fail(409, i, 'Salon fermé ce jour : rendez-vous impossible.');
     if (`${p.date} ${p.time}:00` < nowStr) return fail(400, i, 'Le créneau de ' + p.name + ' est déjà passé, choisissez une date/heure à venir.');
     if (!staff && isBeyondAdvanceWindow(p.date, rdvSettings)) return fail(400, i, 'La date de ' + p.name + ' est trop éloignée, choisissez une date plus proche.');
 
@@ -838,6 +840,14 @@ router.post('/cancel-group', wrap(async (req, res) => {
  * est TOUJOURS requis explicitement (pas de "premier disponible"
  * automatique comme pour le grand public).
  */
+async function isSalonClosedOnDate(salonId, dateStr) {
+  const [[closed]] = await pool.query(
+    'SELECT id FROM salon_closures WHERE salon_id = ? AND start_date <= ? AND end_date >= ? LIMIT 1',
+    [salonId, dateStr, dateStr]
+  );
+  return !!closed;
+}
+
 router.post('/admin-create', requireAdminOrBarber, wrap(withBookingLock(async (req, res) => {
   const { client_name, email, phone, service_id, extras, date, time } = req.body;
   // Un coiffeur connecté (PIN) ne peut créer un RDV que pour le coiffeur
@@ -851,6 +861,8 @@ router.post('/admin-create', requireAdminOrBarber, wrap(withBookingLock(async (r
   if (!service_id || !date || !time) return res.status(400).json({ error: 'Prestation, date et créneau requis' });
   if (!validBookingDate(date) || !validBookingTime(time)) return res.status(400).json({ error: 'Date ou heure invalide' });
   if (String(client_name).length > 255 || (email && String(email).length > 255)) return res.status(400).json({ error: 'Nom ou email trop long' });
+
+  if (await isSalonClosedOnDate(req.salon.id, date)) return res.status(409).json({ error: 'Salon fermé ce jour : prise de rendez-vous impossible.' });
 
   const rawProducts = Array.isArray(req.body.products) ? req.body.products : [];
   let productSelections = [];
@@ -1147,6 +1159,8 @@ router.put('/:id/reschedule', requireAdminOrBarber, wrap(withBookingLock(async (
   const { date, time, barber_id } = req.body;
   if (!date || !time) return res.status(400).json({ error: 'Date et créneau requis' });
   if (!validBookingDate(date) || !validBookingTime(time)) return res.status(400).json({ error: 'Date ou heure invalide' });
+
+  if (await isSalonClosedOnDate(req.salon.id, date)) return res.status(409).json({ error: 'Salon fermé ce jour : déplacement impossible.' });
 
   const [[appt]] = await pool.query(
     `SELECT a.*, s.name AS service_name, s.duration_min FROM appointments a
