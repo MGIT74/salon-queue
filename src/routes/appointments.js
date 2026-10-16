@@ -8,7 +8,7 @@ const { signupRateLimiter } = require('../middleware/rateLimiter');
 // 30 réservations par heure et par adresse IP, largement au-dessus d'un usage normal (une famille).
 const bookingRateLimiter = signupRateLimiter('rdv-booking', { max: 30, windowMs: 60 * 60 * 1000, blockMs: 30 * 60 * 1000 });
 const crypto = require('crypto');
-const { pool, utcIso, getSettings } = require('../db');
+const { pool, utcIso, getSettings, getCaisseLock } = require('../db');
 const requireAdmin = require('../middleware/auth');
 const requireAdminOrBarber = require('../middleware/barberAuth');
 const { logActivity } = require('../lib/activityLog');
@@ -18,6 +18,25 @@ const { wrap } = require('../lib/wrap');
 const groupBooking = require('../lib/groupBooking');
 
 const router = express.Router();
+// Bloque les nouvelles réservations lorsque la journée du salon est fermée.
+// Vérification serveur : le calendrier/timeline seul ne suffit pas.
+async function requireOpenDayForBooking(req, res, next) {
+  try {
+    const settings = await getSettings(req.salon.id);
+    const lock = await getCaisseLock(req.salon.id, settings);
+    if (lock) {
+      return res.status(423).json({
+        error: lock.message || 'La journée est fermée : aucune nouvelle réservation possible.',
+        code: 'SALON_DAY_CLOSED',
+        reason: lock.reason
+      });
+    }
+    return next();
+  } catch (err) {
+    return next(err);
+  }
+}
+
 
 // Même alphabet que generateGiftCode() dans sales.js (sans caractères
 // ambigus à l'oral/à l'écrit) - dupliqué ici plutôt que partagé pour
@@ -478,7 +497,7 @@ router.get('/lookup', requireAdminOrBarber, wrap(async (req, res) => {
  * Création d'un rendez-vous — public, comme le check-in kiosk. Si
  * pour AUJOURD'HUI, promeut immédiatement en entrée de file.
  */
-router.post('/', bookingRateLimiter, wrap(withBookingLock(async (req, res) => {
+router.post('/', bookingRateLimiter, requireOpenDayForBooking, wrap(withBookingLock(async (req, res) => {
   const { client_name, email, phone, service_id, barber_id, extras, date, time, gift_id } = req.body;
   const clientNote = req.body.client_note ? String(req.body.client_note).slice(0, 500) : null;
   if (!client_name) return res.status(400).json({ error: 'Le nom est requis' });
@@ -644,14 +663,14 @@ router.post('/', bookingRateLimiter, wrap(withBookingLock(async (req, res) => {
  * deja poses pour les precedentes (deux personnes ne peuvent pas se chevaucher chez le meme coiffeur).
  * Le rendez-vous reste au nom d'email/telephone du client qui reserve (annulation, fidelite).
  */
-router.post('/group', bookingRateLimiter, wrap(withBookingLock((req, res) => createGroupBooking(req, res, false))));
+router.post('/group', bookingRateLimiter, requireOpenDayForBooking, wrap(withBookingLock((req, res) => createGroupBooking(req, res, false))));
 
 /**
  * Même réservation à plusieurs, faite par le SALON (dashboard, caisse, Mon poste) : email facultatif
  * (confirmation envoyée seulement s'il est renseigné), pas de délai minimum ni de fenêtre maximale,
  * coiffeur au choix pour chaque personne.
  */
-router.post('/admin-group', requireAdminOrBarber, wrap(withBookingLock((req, res) => createGroupBooking(req, res, true))));
+router.post('/admin-group', requireAdminOrBarber, requireOpenDayForBooking, wrap(withBookingLock((req, res) => createGroupBooking(req, res, true))));
 
 async function createGroupBooking(req, res, staff) {
   const { client_name, email, phone } = req.body;
@@ -798,7 +817,7 @@ router.post('/cancel-group', wrap(async (req, res) => {
  * est TOUJOURS requis explicitement (pas de "premier disponible"
  * automatique comme pour le grand public).
  */
-router.post('/admin-create', requireAdminOrBarber, wrap(withBookingLock(async (req, res) => {
+router.post('/admin-create', requireAdminOrBarber, requireOpenDayForBooking, wrap(withBookingLock(async (req, res) => {
   const { client_name, email, phone, service_id, extras, date, time } = req.body;
   // Un coiffeur connecté (PIN) ne peut créer un RDV que pour le coiffeur
   // actif (lui-même par défaut, ou celui désigné par bulle depuis la
