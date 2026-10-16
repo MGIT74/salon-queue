@@ -10,6 +10,7 @@ const { verifyOwnerPassword } = require('../middleware/auth');
 const requireAdminOrBarber = require('../middleware/barberAuth');
 const { logActivity } = require('../lib/activityLog');
 const { wrap } = require('../lib/wrap');
+const { isBlocked, recordFailure, recordSuccess, signupRateLimiter } = require('../middleware/rateLimiter');
 
 const router = express.Router();
 
@@ -85,7 +86,17 @@ router.get('/', wrap(async (req, res) => {
   // (dashboard.html envoie toujours ce mot de passe) - sans bloquer la
   // requête dans le cas contraire, juste sans ces deux champs.
   const given = req.get('X-Admin-Password') || '';
+  const authKey = 'queue-admin:' + req.salon.owner_id + ':' + (req.ip || 'unknown');
+  const blockedFor = given ? isBlocked(authKey) : 0;
+  if (blockedFor) {
+    res.set('Retry-After', String(blockedFor));
+    return res.status(429).json({ error: 'Trop de tentatives de connexion' });
+  }
   const isAdmin = given && await verifyOwnerPassword(req.salon, given);
+  if (given) {
+    if (isAdmin) recordSuccess(authKey);
+    else recordFailure(authKey);
+  }
   if (!isAdmin) {
     rows = rows.map((r) => {
       const { email, phone, note, gift_card, ...rest } = r;
@@ -331,10 +342,19 @@ router.post('/manual-client/import-log', requireAdmin, wrap(async (req, res) => 
 }));
 
 // --- Public : check-in à la borne ---------------------------------------
-router.post('/checkin', wrap(async (req, res) => {
+router.post('/checkin', signupRateLimiter('queue-checkin', { max: 12, windowMs: 15 * 60 * 1000, blockMs: 15 * 60 * 1000 }), wrap(async (req, res) => {
   const { client_name, email, phone, service_id, barber_id, extras } = req.body;
   if (!client_name) return res.status(400).json({ error: 'Le nom est requis' });
   if (!service_id) return res.status(400).json({ error: 'La prestation est requise' });
+  const [[service]] = await pool.query('SELECT id FROM services WHERE id = ? AND salon_id = ? AND active = 1', [service_id, req.salon.id]);
+  if (!service) return res.status(400).json({ error: 'Prestation indisponible dans ce salon' });
+  if (extras !== undefined && !Array.isArray(extras)) return res.status(400).json({ error: 'Suppléments invalides' });
+  if (Array.isArray(extras) && extras.length) {
+    const [validExtras] = await pool.query('SELECT id FROM extras WHERE salon_id = ? AND active = 1 AND id IN (?)', [req.salon.id, extras]);
+    if (validExtras.length !== new Set(extras).size || validExtras.length !== extras.length) {
+      return res.status(400).json({ error: 'Supplément indisponible dans ce salon' });
+    }
+  }
 
   // Un même cadeau ne peut pas servir à créer plusieurs entrées actives
   // à la fois dans la file (le code ne marque rien comme "utilisé" tant
