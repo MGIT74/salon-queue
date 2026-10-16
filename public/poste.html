@@ -34,9 +34,6 @@
 <style>
   html.auth-checking #login-screen { display: none; }
 
-  .poste-tl-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12.5px; color: var(--grey); margin: 4px 0 8px; }
-  .poste-tl-legend span { display: inline-flex; align-items: center; gap: 6px; }
-  .poste-tl-legend i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
   /* Agenda : même planning du jour (timeline par coiffeur) que le tableau de bord et la caisse. */
   /* --- Planning du jour (timeline), utilisée dans l'Agenda --- */
   .timeline-scroll { overflow-x: auto; width: 100%; max-width: 100%; }
@@ -1042,7 +1039,7 @@ function renderCalWeek() {
 function renderCalDay() {
   document.getElementById('cal-month-label').textContent =
     calAnchor.toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
-  document.getElementById('cal-day-view').innerHTML = rdvClosureBanner(ymd(calAnchor)) + posteAddBtnHtml(ymd(calAnchor)) + renderAgendaTimeline(ymd(calAnchor));
+  document.getElementById('cal-day-view').innerHTML = posteAddBtnHtml(ymd(calAnchor)) + renderAgendaTimeline(ymd(calAnchor));
 }
 
 function selectCalDay(dateStr) {
@@ -1122,6 +1119,8 @@ function posteTimelineBarbers(appts) {
 }
 
 function renderAgendaTimeline(dateStr) {
+  // Salon fermé ce jour : pas de planning, le message rouge (posteAddBtnHtml) suffit.
+  if (rdvIsSalonClosed(dateStr)) return '';
   var d = new Date(dateStr + 'T00:00:00');
   var appts = apptsForRange(d, d);
   appts.forEach(function (a) { calApptById[a.id] = a; });
@@ -1201,11 +1200,7 @@ function renderAgendaTimeline(dateStr) {
     '<span>' + Math.round(effZoom * 100) + '%</span>' +
     '<button type="button" onclick="event.stopPropagation();adjustAgendaZoom(1)" title="Zoomer">+</button>' +
     '</div></div>';
-  var legend = '<div class="poste-tl-legend">' + rowsBarbers.map(function (b) {
-    return '<span><i style="background:' + stableColorForId(b.id) + '"></i>' + esc(me && b.id === me.id ? b.name + ' (moi)' : b.name) + '</span>';
-  }).join('') + '</div>';
-
-  return legend + zoomCtrl + '<div class="timeline-scroll"><div class="timeline-inner' + (compact ? ' compact' : '') + (effZoom === 0 ? ' fit' : '') + '" ' +
+  return zoomCtrl + '<div class="timeline-scroll"><div class="timeline-inner' + (compact ? ' compact' : '') + (effZoom === 0 ? ' fit' : '') + '" ' +
     'data-date="' + dateStr + '" data-range-start="' + rangeStart + '" data-range-end="' + rangeEnd + '" style="min-width:' + innerWidth + 'px">' +
     '<div class="timeline-hours">' + hoursHtml + '</div>' + minuteGridHtml + rowsHtml + nowLineHtml +
     '</div></div>';
