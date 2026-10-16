@@ -276,7 +276,10 @@ router.put('/:id/schedule', requireAdmin, wrap(async (req, res) => {
     return res.status(400).json({ error: 'Planning incomplet ou invalide : aucun horaire modifié' });
   }
 
-  await pool.query('DELETE FROM barber_schedules WHERE barber_id = ?', [req.params.id]);
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+  await conn.query('DELETE FROM barber_schedules WHERE barber_id = ?', [req.params.id]);
 
   // On garde une ligne par jour même désactivé (active=0), pas seulement
   // les jours actifs : ça permet de distinguer "jamais configuré du
@@ -289,7 +292,7 @@ router.put('/:id/schedule', requireAdmin, wrap(async (req, res) => {
     .map((s) => [crypto.randomUUID(), req.params.id, Number(s.weekday), s.start_time, s.end_time, s.active ? 1 : 0]);
 
   if (rows.length) {
-    await pool.query(
+    await conn.query(
       'INSERT INTO barber_schedules (id, barber_id, weekday, start_time, end_time, active) VALUES ?',
       [rows]
     );
@@ -299,15 +302,23 @@ router.put('/:id/schedule', requireAdmin, wrap(async (req, res) => {
   // remplace tout à chaque sauvegarde, plusieurs pauses possibles par
   // jour (weekday peut se répéter dans la liste).
   const breakList = Array.isArray(req.body.breaks) ? req.body.breaks : [];
-  await pool.query('DELETE FROM barber_breaks WHERE barber_id = ?', [req.params.id]);
+  await conn.query('DELETE FROM barber_breaks WHERE barber_id = ?', [req.params.id]);
   const breakRows = breakList
     .filter((b) => b.start_time && b.end_time)
     .map((b) => [crypto.randomUUID(), req.params.id, Number(b.weekday), b.start_time, b.end_time, 1]);
   if (breakRows.length) {
-    await pool.query(
+    await conn.query(
       'INSERT INTO barber_breaks (id, barber_id, weekday, start_time, end_time, active) VALUES ?',
       [breakRows]
     );
+  }
+
+    await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
   }
 
   res.json({ ok: true, saved: rows.length, breaks_saved: breakRows.length });
@@ -836,19 +847,22 @@ router.put('/:id/capabilities', requireAdmin, wrap(async (req, res) => {
   const serviceDurations = req.body.service_durations && typeof req.body.service_durations === 'object' ? req.body.service_durations : {};
   const extraDurations = req.body.extra_durations && typeof req.body.extra_durations === 'object' ? req.body.extra_durations : {};
 
-  await pool.query('DELETE FROM barber_service_exclusions WHERE barber_id = ?', [req.params.id]);
-  await pool.query('DELETE FROM barber_extra_exclusions WHERE barber_id = ?', [req.params.id]);
-  await pool.query('DELETE FROM barber_service_prices WHERE barber_id = ?', [req.params.id]);
-  await pool.query('DELETE FROM barber_extra_prices WHERE barber_id = ?', [req.params.id]);
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+  await conn.query('DELETE FROM barber_service_exclusions WHERE barber_id = ?', [req.params.id]);
+  await conn.query('DELETE FROM barber_extra_exclusions WHERE barber_id = ?', [req.params.id]);
+  await conn.query('DELETE FROM barber_service_prices WHERE barber_id = ?', [req.params.id]);
+  await conn.query('DELETE FROM barber_extra_prices WHERE barber_id = ?', [req.params.id]);
 
   if (disabledServiceIds.length) {
-    await pool.query(
+    await conn.query(
       'INSERT INTO barber_service_exclusions (barber_id, service_id) VALUES ?',
       [disabledServiceIds.map((id) => [req.params.id, id])]
     );
   }
   if (disabledExtraIds.length) {
-    await pool.query(
+    await conn.query(
       'INSERT INTO barber_extra_exclusions (barber_id, extra_id) VALUES ?',
       [disabledExtraIds.map((id) => [req.params.id, id])]
     );
@@ -864,7 +878,7 @@ router.put('/:id/capabilities', requireAdmin, wrap(async (req, res) => {
     .filter(([, price, duration]) => price !== null || duration !== null)
     .map(([serviceId, price, duration]) => [req.params.id, serviceId, price, duration]);
   if (svcRows.length) {
-    await pool.query(
+    await conn.query(
       'INSERT INTO barber_service_prices (barber_id, service_id, price_cents, duration_min) VALUES ?',
       [svcRows]
     );
@@ -876,10 +890,18 @@ router.put('/:id/capabilities', requireAdmin, wrap(async (req, res) => {
     .filter(([, price, duration]) => price !== null || duration !== null)
     .map(([extraId, price, duration]) => [req.params.id, extraId, price, duration]);
   if (extRows.length) {
-    await pool.query(
+    await conn.query(
       'INSERT INTO barber_extra_prices (barber_id, extra_id, price_cents, duration_min) VALUES ?',
       [extRows]
     );
+  }
+
+    await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
   }
 
   res.json({ ok: true });
