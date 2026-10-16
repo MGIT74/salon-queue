@@ -124,7 +124,7 @@ module.exports = async function requireAdminOrBarber(req, res, next) {
   // échec "mot de passe admin" seul compte pour l'enseigne.
   if (barberId && barberPin) {
     recordFailure(pinRlKey);
-  } else {
+  } else if (adminPassword) {
     recordFailure(adminRlKey);
   }
   return res.status(401).json({ error: 'Authentification requise' });
