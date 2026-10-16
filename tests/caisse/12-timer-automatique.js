@@ -1,5 +1,5 @@
-// Filet de securite "timer" : demarrage automatique d'un RDV programme non
-// commence, arret automatique d'une prestation en cours dont la duree prevue
+// Filet de securite "timer" : PLUS de demarrage automatique d'un RDV dont l'heure est
+// passee (le coiffeur le commence ou le marque Absent), arret automatique d'une prestation en cours dont la duree prevue
 // est depassee. Appelle directement autoManageTimersForSalon (le job cron),
 // contre la vraie base - pas de detour par HTTP, on verifie l'etat SQL brut.
 process.env.DB_HOST = process.env.DB_HOST || '127.0.0.1';
@@ -14,20 +14,21 @@ let pass = 0, fail = 0;
 const check = (n, ok, x = '') => { (ok ? pass++ : fail++); console.log((ok ? '  OK   ' : '  ECHEC') + ' ' + n + (x ? '  [' + x + ']' : '')); };
 const row = async (id) => { const [[r]] = await pool.query('SELECT status, start_at, end_at, barber_id FROM queue WHERE id = ?', [id]); return r; };
 const minAgo = (m) => new Date(Date.now() - m * 60000);
+// La base renvoie 'AAAA-MM-JJ HH:MM:SS' en UTC (dateStrings) : a lire comme UTC, quel que soit le fuseau de la machine.
+const utc = (v) => (typeof v === 'string' ? new Date(v.replace(' ', 'T') + 'Z') : new Date(v)).getTime();
 
 (async () => {
   await pool.query("DELETE FROM queue WHERE salon_id = 's1'");
   await pool.query("INSERT INTO barbers (id,salon_id,name,pin_code) VALUES ('b2','s1','Bob','2222') ON DUPLICATE KEY UPDATE name=name");
 
-  console.log('\n[A] Demarrage automatique - RDV programme, heure passee, jamais commence');
+  console.log('\n[A] RDV programme, heure passee, jamais commence : PAS de demarrage automatique');
   await pool.query(
     "INSERT INTO queue (id,salon_id,client_name,barber_id,service_id,status,checkin_at,is_appointment,total_duration_min,total_price_cents) VALUES ('q1','s1','Client RDV','b1','sv1','waiting',?,1,30,2000)",
     [minAgo(10)]
   );
   await autoManageTimersForSalon('s1');
   let r = await row('q1');
-  check('passe en_cours', r.status === 'in_progress', r.status);
-  check('demarre a l\'heure PREVUE du RDV (il y a 10 min), pas a "maintenant"', Math.abs(new Date(r.start_at).getTime() - minAgo(10).getTime()) < 2000, r.start_at);
+  check('reste en attente : c\'est le coiffeur qui le commence ou le marque Absent', r.status === 'waiting' && !r.start_at, r.status);
 
   console.log('\n[B] Client en attente LIBRE (pas de RDV) : jamais demarre tout seul, meme "en retard"');
   await pool.query(
@@ -70,7 +71,7 @@ const minAgo = (m) => new Date(Date.now() - m * 60000);
   await autoManageTimersForSalon('s1');
   r = await row('q5');
   check('passe termine (30 min PREVUES pour "Coupe", 50 ecoulees)', r.status === 'done', r.status);
-  check('heure de fin = heure de debut + duree REELLE du service (30 min, pas "maintenant")', Math.abs(new Date(r.end_at).getTime() - (minAgo(50).getTime() + 30 * 60000)) < 3000, r.end_at);
+  check('heure de fin = heure de debut + duree REELLE du service (30 min, pas "maintenant")', Math.abs(utc(r.end_at) - (minAgo(50).getTime() + 30 * 60000)) < 3000, r.end_at);
 
   console.log('\n[F] Prestation en cours mais PAS ENCORE arrivee a echeance : ne touche a rien');
   await pool.query(
@@ -92,7 +93,7 @@ const minAgo = (m) => new Date(Date.now() - m * 60000);
 
   console.log('\n[H] Deuxieme passage (comme le prochain tick, 1 min plus tard) : deja traites, rien ne change / rien ne casse');
   await autoManageTimersForSalon('s1');
-  check('q1 (rendu waiting plus haut) redemarre proprement au repassage', (await row('q1')).status === 'in_progress');
+  check('q1 (RDV non commence) toujours en attente au repassage', (await row('q1')).status === 'waiting');
   check('q5 (deja termine) reste termine, pas d\'erreur au repassage', (await row('q5')).status === 'done');
 
   await pool.query("DELETE FROM queue WHERE salon_id = 's1'");
