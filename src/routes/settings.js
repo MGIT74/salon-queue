@@ -144,6 +144,24 @@ router.put('/', requireAdmin, wrap(async (req, res) => {
   EDITABLE.forEach((k) => {
     if (req.body[k] !== undefined && req.body[k] !== null) patch[k] = req.body[k];
   });
+  // Validation stricte des réglages numériques pour éviter les boucles infinies
+  // et les valeurs impossibles injectées par une requête API.
+  const limits = {
+    rdv_slot_step_min: [1, 120], rdv_min_lead_min: [0, 10080],
+    rdv_max_advance_days: [0, 730], rdv_buffer_min: [0, 480],
+    rdv_cancel_deadline_min: [0, 10080], rdv_prep_alert_min: [0, 1440],
+    notify_before_min: [0, 10080], caisse_inactivity_seconds: [0, 86400],
+    caisse_reopen_hour: [0, 23], smtp_port: [1, 65535]
+  };
+  for (const [key, bounds] of Object.entries(limits)) {
+    if (patch[key] === undefined) continue;
+    const value = Number(patch[key]);
+    if (!Number.isSafeInteger(value) || value < bounds[0] || value > bounds[1] ||
+        String(patch[key]).trim() === '') {
+      return res.status(400).json({ error: 'Valeur invalide pour ' + key });
+    }
+    patch[key] = String(value);
+  }
   // Champ mot de passe laissé vide = on conserve l'ancien
   if (patch.smtp_pass === '') delete patch.smtp_pass;
 
