@@ -88,7 +88,7 @@ router.get('/', wrap(async (req, res) => {
   const isAdmin = given && await verifyOwnerPassword(req.salon, given);
   if (!isAdmin) {
     rows = rows.map((r) => {
-      const { email, phone, ...rest } = r;
+      const { email, phone, note, gift_card, ...rest } = r;
       return rest;
     });
   }
