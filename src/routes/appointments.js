@@ -1030,7 +1030,7 @@ router.post('/cancel', wrap(async (req, res) => {
   // (appt.salon_id), pas req.salon - cette route est publique, le
   // salon envoyé par le client ne fait pas forcément foi.
   const rdvSettings = await getSettings(appt.salon_id);
-  if (String(appt.scheduled_at).replace('T', ' ').slice(0, 19) <= nowParisDatetimeString(rdvSettings.timezone)) {
+  if ((appt.scheduled_at instanceof Date ? appt.scheduled_at.toISOString().slice(0, 19).replace('T', ' ') : String(appt.scheduled_at).replace('T', ' ').slice(0, 19)) <= nowParisDatetimeString(rdvSettings.timezone)) {
     return res.status(403).json({ error: 'Un rendez-vous passé ne peut plus être annulé en ligne.' });
   }
   const deadlineMin = Number(rdvSettings.rdv_cancel_deadline_min) || 0;
