@@ -49,7 +49,7 @@ router.put('/schedule', requireAdmin, wrap(async (req, res) => {
 // Dates indisponibles exposées sans authentification pour le calendrier client.
 router.get('/public-closures', wrap(async (req, res) => {
   const [rows] = await pool.query(
-    'SELECT start_date, end_date FROM salon_closures WHERE salon_id = ? AND end_date >= CURDATE() ORDER BY start_date',
+    'SELECT DATE_FORMAT(start_date, \'%Y-%m-%d\') AS start_date, DATE_FORMAT(end_date, \'%Y-%m-%d\') AS end_date FROM salon_closures WHERE salon_id = ? AND end_date >= CURDATE() ORDER BY start_date',
     [req.salon.id]
   );
   const fmt = (d) => d instanceof Date ? [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('-') : String(d).slice(0, 10);
