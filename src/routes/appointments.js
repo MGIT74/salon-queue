@@ -1046,12 +1046,13 @@ router.post('/cancel', wrap(async (req, res) => {
   // (appt.salon_id), pas req.salon - cette route est publique, le
   // salon envoyé par le client ne fait pas forcément foi.
   const rdvSettings = await getSettings(appt.salon_id);
-  if ((appt.scheduled_at instanceof Date ? appt.scheduled_at.toISOString().slice(0, 19).replace('T', ' ') : String(appt.scheduled_at).replace('T', ' ').slice(0, 19)) <= nowParisDatetimeString(rdvSettings.timezone)) {
+  const scheduledLocal = appt.scheduled_at instanceof Date ? appt.scheduled_at.toISOString().slice(0, 19).replace('T', ' ') : String(appt.scheduled_at).replace('T', ' ').slice(0, 19);
+  if (scheduledLocal <= nowParisDatetimeString(rdvSettings.timezone)) {
     return res.status(403).json({ error: 'Un rendez-vous passé ne peut plus être annulé en ligne.' });
   }
   const deadlineMin = Number(rdvSettings.rdv_cancel_deadline_min) || 0;
   if (deadlineMin > 0) {
-    const minutesUntil = (new Date(appt.scheduled_at.replace(' ', 'T') + 'Z') - new Date(nowParisDatetimeString(rdvSettings.timezone).replace(' ', 'T') + 'Z')) / 60000;
+    const minutesUntil = (new Date(scheduledLocal.replace(' ', 'T') + 'Z') - new Date(nowParisDatetimeString(rdvSettings.timezone).replace(' ', 'T') + 'Z')) / 60000;
     if (minutesUntil < deadlineMin) {
       return res.status(403).json({ error: "Trop tard pour annuler ce rendez-vous en ligne, contactez directement le salon." });
     }
