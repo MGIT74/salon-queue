@@ -304,9 +304,23 @@ function isBeyondAdvanceWindow(dateStr, rdvSettings) {
  * Disponibilité — un coiffeur précis, ou "n'importe lequel" (union
  * des créneaux de tous les coiffeurs en mode RDV).
  */
+function validBookingDate(date) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date || ''))) return false;
+  const d = new Date(date + 'T00:00:00Z');
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === date;
+}
+function validBookingTime(time) {
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(String(time || ''));
+}
+
 router.get('/availability', wrap(async (req, res) => {
   const { date, service_id, barber_id } = req.query;
   if (!date || !service_id) return res.status(400).json({ error: 'date et service_id requis' });
+  if (!validBookingDate(date)) return res.status(400).json({ error: 'Date invalide' });
+  if (barber_id) {
+    const [[owned]] = await pool.query('SELECT id FROM barbers WHERE id = ? AND salon_id = ? AND active = 1', [barber_id, req.salon.id]);
+    if (!owned) return res.status(404).json({ error: 'Coiffeur introuvable' });
+  }
 
   const rdvSettings = await getSettings(req.salon.id);
   if (isBeyondAdvanceWindow(date, rdvSettings)) {
@@ -485,6 +499,8 @@ router.post('/', bookingRateLimiter, wrap(withBookingLock(async (req, res) => {
   if (!client_name) return res.status(400).json({ error: 'Le nom est requis' });
   if (!email) return res.status(400).json({ error: "L'email est requis pour la confirmation" });
   if (!service_id || !date || !time) return res.status(400).json({ error: 'Prestation, date et créneau requis' });
+  if (!validBookingDate(date) || !validBookingTime(time)) return res.status(400).json({ error: 'Date ou heure invalide' });
+  if (String(client_name).length > 255 || String(email).length > 255) return res.status(400).json({ error: 'Nom ou email trop long' });
 
   // Produits choisis d'avance (ex: une boisson) - jamais d'impact sur la
   // duree/le creneau, juste une liste a retrouver au moment d'encaisser.
