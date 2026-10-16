@@ -85,7 +85,7 @@ async function appointmentsAffected(salonId, from, to) {
 }
 router.get('/closures/preview', requireAdmin, wrap(async (req, res) => {
   const { start_date, end_date } = req.query;
-  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(start_date || '') || !/^\\d{4}-\\d{2}-\\d{2}$/.test(end_date || '') || start_date > end_date)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(start_date || '') || !/^\d{4}-\d{2}-\d{2}$/.test(end_date || '') || start_date > end_date)
     return res.status(400).json({ error: 'Dates invalides' });
   const items = await appointmentsAffected(req.salon.id, start_date, end_date);
   res.json({ ok: true, count: items.length, items });
@@ -94,7 +94,7 @@ router.get('/closures/preview', requireAdmin, wrap(async (req, res) => {
 router.post('/closures', requireAdmin, wrap(async (req, res) => {
   const { start_date, end_date, reason, send_email, custom_message } = req.body;
   if (!start_date || !end_date) return res.status(400).json({ error: 'Dates de début et de fin requises' });
-  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(start_date) || !/^\\d{4}-\\d{2}-\\d{2}$/.test(end_date) || start_date > end_date) return res.status(400).json({ error: 'Période de fermeture invalide' });
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(start_date) || !/^\d{4}-\d{2}-\d{2}$/.test(end_date) || start_date > end_date) return res.status(400).json({ error: 'Période de fermeture invalide' });
 
   const affected = await appointmentsAffected(req.salon.id, start_date, end_date);
   if (affected.length && req.body.confirm_existing_appointments !== true)
