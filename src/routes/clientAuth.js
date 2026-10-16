@@ -11,6 +11,7 @@ const { loginRateLimiter, signupRateLimiter } = require('../middleware/rateLimit
 const { nowParisDatetimeString } = require('./appointments');
 const { wrap } = require('../lib/wrap');
 
+const { guardPasswordAttempt, failPasswordAttempt, clearPasswordAttempt } = require('../middleware/rateLimiter');
 const router = express.Router();
 
 // base_url contient déjà ?salon=xxx si l'espace client est ouvert pour
@@ -346,9 +347,13 @@ router.put('/me', requireClient, wrap(async (req, res) => {
   }
 
   if (new_password) {
+    const passwordAttemptKeys = await guardPasswordAttempt(req, res, 'client-password-change', req.clientAccount.id);
+    if (!passwordAttemptKeys) return;
     if (!current_password || !(await verifyPassword(current_password, req.clientAccount.password_hash))) {
+      await failPasswordAttempt(passwordAttemptKeys);
       return res.status(403).json({ error: 'Mot de passe actuel incorrect' });
     }
+    await clearPasswordAttempt(passwordAttemptKeys);
     if (new_password.length < 6) return res.status(400).json({ error: 'Le nouveau mot de passe doit contenir au moins 6 caractères' });
     sets.push('password_hash = ?'); params.push(await hashPassword(new_password));
     req.passwordChanged = true;
