@@ -625,7 +625,8 @@ function showPrompt(message, opts) {
       '<div class="modal-actions">' +
       '<button class="btn btn-soft" id="modal-cancel-btn">Annuler</button>' +
       // Bouton d'action en plus (ex. « Ouvrir tiroir » à la clôture) : agit sans fermer la fenêtre.
-      (opts.extraLabel ? '<button class="btn btn-soft" id="modal-extra-btn">' + esc(opts.extraLabel) + '</button>' : '') +
+      (opts.extraLabel ? '<button class="btn btn-soft" id="modal-extra-btn" style="display:inline-flex;align-items:center;justify-content:center;gap:7px">' +
+        (opts.extraIcon || '') + esc(opts.extraLabel) + '</button>' : '') +   // extraIcon : SVG fixe du code, jamais une saisie
       '<button class="btn ' + (opts.danger ? 'modal-danger-btn' : 'btn-primary') + '" id="modal-confirm-btn">' +
       esc(opts.confirmLabel || 'Valider') + '</button>' +
       '</div>'

@@ -992,7 +992,7 @@
   </div>
 </div>
 
-<script src="/app.js?v=24"></script>
+<script src="/app.js?v=25"></script>
 <script src="/staff-group.js?v=5"></script>
 <script src="/autorefresh.js?v=2"></script>
 <script>requireSalonInUrl("Pour utiliser la caisse, ouvrez le lien de votre salon.");</script>
@@ -3070,7 +3070,9 @@ function startCaisseClosing() {
       'Fond de caisse actuellement dans le tiroir (en euros) — cet argent reste en caisse, il ne fait pas partie des ventes.',
       { title: 'Fond de caisse', defaultValue: (suggestedFloat / 100).toFixed(2), confirmLabel: 'Continuer',
         // Pour compter le fond de caisse : ouvre le tiroir sans quitter la fenêtre.
-        extraLabel: 'Ouvrir tiroir', onExtra: function () { openCashDrawer(); } }
+        // Même bouton que « Ouvrir la caisse » du ticket (même icône, même action).
+        extraLabel: 'Ouvrir la caisse', onExtra: function () { openCashDrawer(); },
+        extraIcon: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;opacity:.8"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M2 11h20M9 15h6"/></svg>' }
     ).then(function (floatInput) {
     if (floatInput === null) return;
     var floatCents = Math.round(parseFloat(floatInput.replace(',', '.')) * 100);
