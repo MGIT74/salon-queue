@@ -616,7 +616,7 @@ router.post('/:id/cancel', requireAdminOrBarber, wrap(async (req, res) => {
 // --- Coiffeur : modifier prestation et suppléments en cours de route -----
 router.put('/:id', requireAdminOrBarber, wrap(async (req, res) => {
   const [[existing]] = await pool.query(
-    'SELECT barber_id, status, client_name, email, phone FROM queue WHERE id = ? AND salon_id = ?',
+    'SELECT barber_id, status, client_name, email, phone, prepaid_at, balance_paid_at FROM queue WHERE id = ? AND salon_id = ?',
     [req.params.id, req.salon.id]
   );
   if (!existing) return res.status(404).json({ error: 'Client introuvable' });
@@ -630,7 +630,10 @@ router.put('/:id', requireAdminOrBarber, wrap(async (req, res) => {
     'SELECT id FROM sales WHERE salon_id = ? AND queue_id = ? LIMIT 1',
     [req.salon.id, req.params.id]
   );
-  if (paidSale) return res.status(409).json({ error: 'Passage déjà encaissé : modification interdite. Contactez le gérant.' });
+  // Exception : un client payé D'AVANCE et pas encore terminé peut recevoir un supplément pendant sa coupe ;
+  // la différence est réglée à la fin (« reste à payer », cf. sales.js balance).
+  const prepaidOpen = existing.prepaid_at && !existing.balance_paid_at && (existing.status === 'waiting' || existing.status === 'in_progress');
+  if (paidSale && !prepaidOpen) return res.status(409).json({ error: 'Passage déjà encaissé : modification interdite. Contactez le gérant.' });
   if (service_id) {
     const [[validService]] = await pool.query('SELECT id FROM services WHERE id = ? AND salon_id = ?', [service_id, req.salon.id]);
     if (!validService) return res.status(400).json({ error: 'Prestation invalide pour ce salon' });

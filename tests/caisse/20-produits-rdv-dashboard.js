@@ -5,6 +5,7 @@
 // fonctions de fenetre modale (app.js) et le vrai serveur pour les creneaux.
 const { JSDOM } = require('jsdom');
 const fs = require('fs');
+const CLOSURES = (s) => 'var rdvSalonClosures = [];\n' + (s.match(/^function rdvIsSalonClosed\(.*$/m) || [''])[0];  // fermetures exceptionnelles (aucune ici)
 const path = require('path');
 const { execSync } = require('child_process');
 const BASE = 'http://127.0.0.1:3999';
@@ -53,7 +54,7 @@ const check = (n, ok, x = '') => { (ok ? pass++ : fail++); console.log((ok ? '  
   const fnStart = src.indexOf('function openAdminAddAppointment');
   const fnEnd = src.indexOf('\nfunction ', fnStart + 10);
   w.eval(fs.readFileSync(path.join(__dirname, '../../public/staff-group.js'), 'utf8'));
-  w.eval(src.slice(fnStart, fnEnd));
+  w.eval(CLOSURES(src) + '\n' + src.slice(fnStart, fnEnd));
 
   console.log('\n[A] La nouvelle etape Produits existe entre Supplements et Creneau');
   const today = new Date().toISOString().slice(0, 10);

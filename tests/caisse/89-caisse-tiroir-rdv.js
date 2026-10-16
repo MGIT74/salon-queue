@@ -120,6 +120,7 @@ let JSDOM = null; try { JSDOM = require('jsdom').JSDOM; } catch (_) { /* absent 
   const fq = (sql) => {
     sql = sql.replace(/\s+/g, ' ');
     if (/FROM client_notes/.test(sql)) return [[]];
+    if (/FROM salon_closures/.test(sql)) return [[]];   // aucune fermeture exceptionnelle
     if (/WHERE a.salon_id = \? AND \(a.id = \? OR a.promoted_queue_id = \?\)/.test(sql)) return [[row]];
     if (/FROM appointments a JOIN services s ON s.id = a.service_id WHERE a.id = \? AND a.salon_id = \?/.test(sql)) return [[Object.assign({ duration_min: 30, cancel_token: 't' }, row)]];
     throw new Error('SQL non prevu ' + sql.slice(0, 80));

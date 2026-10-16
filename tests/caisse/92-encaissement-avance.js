@@ -62,6 +62,8 @@ const pending = async () => (await api('GET', '/api/queue/pending-payment')).bod
   r = await sale('q1', [barbe], { balance: true });
   check('reste a payer encaisse une seule fois (409)', r.status === 409, r.body);
   check('deux ventes rattachees au passage (avance + reste) = 28 EUR', sql("SELECT CONCAT(COUNT(*),'|',SUM(total_price_cents)) FROM sales WHERE queue_id='q1'") === '2|2800');
+  r = await api('PUT', '/api/queue/q1', { extras: [] });
+  check('passage solde : plus aucune modification possible (409)', r.status === 409, r.body);
 
   console.log('\n[D] Sans supplement : rien a payer a la fin');
   add('q4', 'Denis', 'b1', 1);

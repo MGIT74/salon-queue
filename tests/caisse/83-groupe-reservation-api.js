@@ -33,6 +33,7 @@ function fakeQuery(sql, params) {
   if (/SELECT id, name FROM barbers WHERE id IN/.test(sql)) return [params[0].map((id) => ({ id, name: BARBERS[id] }))];
   if (/FROM barber_schedules/.test(sql)) return [[{ start_time: '09:00:00', end_time: '19:00:00' }]];
   if (/FROM barber_leaves/.test(sql)) return [[]];
+  if (/FROM salon_closures/.test(sql)) return [[]];   // aucune fermeture exceptionnelle
   if (/FROM barber_breaks/.test(sql)) return [[]];
   if (/SELECT timer_enabled FROM barbers/.test(sql)) return [[{ timer_enabled: 1 }]];
   if (/FROM queue WHERE barber_id/.test(sql)) return [[]];

@@ -12,6 +12,7 @@ const caisse = fs.readFileSync(path.join(__dirname, '../../public/caisse.html'),
 let pass = 0, fail = 0;
 const check = (n, ok, x = '') => { (ok ? pass++ : fail++); console.log((ok ? '  OK   ' : '  ECHEC') + ' ' + n + (x ? '  [' + x + ']' : '')); };
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+const CLOSURES = (s) => 'var rdvSalonClosures = [];\n' + (s.match(/^function rdvIsSalonClosed\(.*$/m) || [''])[0];  // fermetures exceptionnelles (aucune ici)
 function fnSrc(src, name) { const i = src.indexOf('function ' + name + '('); if (i === -1) throw new Error('introuvable: ' + name); const j = src.indexOf('\nfunction ', i + 10); return src.slice(i, j === -1 ? undefined : j); }
 const varsBlock = dash.slice(dash.indexOf('var rdvSlotStepMin = 15;'), dash.indexOf('})();', dash.indexOf('installTimelineAutoScroll')) + 5);
 
@@ -25,7 +26,7 @@ function makeWin() {
   w.minutesFromScheduledAt = (a) => Number(a.scheduled_at.slice(11, 13)) * 60 + Number(a.scheduled_at.slice(14, 16));
   w.esc = (x) => String(x); w.nowSalonDatetimeString = () => today + ' 10:30:00';
   w.timelineZoom = 1;
-  w.eval(varsBlock + '\n' + fnSrc(dash, 'renderDayTimelineHtml') + '\n' + fnSrc(dash, 'rerenderAllTimelines') + '\n' + fnSrc(dash, 'adjustTimelineZoom'));
+  w.eval(varsBlock + '\n' + CLOSURES(dash) + '\n' + fnSrc(dash, 'renderDayTimelineHtml') + '\n' + fnSrc(dash, 'rerenderAllTimelines') + '\n' + fnSrc(dash, 'adjustTimelineZoom'));
   w.__today = today;
   return w;
 }

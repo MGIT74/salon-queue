@@ -11,6 +11,7 @@ const check = (n, ok, x = '') => { (ok ? pass++ : fail++); console.log((ok ? '  
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 const fnSrc = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i === -1) throw new Error('introuvable: ' + name); const j = src.indexOf('\n}\n', i); return src.slice(i, j + 3); };
 const IMG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+const CLOSURES = (s) => 'var rdvSalonClosures = [];\n' + (s.match(/^function rdvIsSalonClosed\(.*$/m) || [''])[0];  // fermetures exceptionnelles (aucune ici)
 const SHARED = ['esc', 'normText', 'vitrineIcon', 'vitrineBaseIcon', 'extraIcon', 'productIcon', 'groupItems', 'vitrineCardHtml', 'vitrineRender', 'vitrineSummary', 'vitrineFilter', 'vitrineSelectOne', 'vitrineToggle', 'vitrineSearchHtml', 'formatMinutes', '_lockBodyScroll', '_unlockBodyScroll', '_buildModal', '_closeModal', 'vitrineFlow', 'vitrineRecapHtml'];
 const VARS = ['VITRINE_PLUS_SVG', 'VITRINE_CHECK_SVG', 'VITRINE_CHECK_SM_SVG'].map(n => app.match(new RegExp('^var ' + n + ' = .*;$', 'm'))[0]).join('\n');
 
@@ -40,7 +41,7 @@ const visible = (w, id) => w.document.getElementById(id).style.display !== 'none
   console.log('\n[A] Tableau de bord - menu RDV : assistant "Ajouter un RDV" (depuis le calendrier)');
   let w = world();
   setup(w, { barbers: [{ id: 'b1', name: 'Alice' }, { id: 'b2', name: 'Bob' }], isBookableForAdmin: () => true });
-  w.eval(fnSrc(dash, 'openAdminAddAppointment') + '\nvar aaBarbersPreselected = null;');
+  w.eval(CLOSURES(dash) + '\n' + fnSrc(dash, 'openAdminAddAppointment') + '\nvar aaBarbersPreselected = null;');
   w.openAdminAddAppointment('2026-10-08', 'b1');
   let d = w.document;
   check('1re etape : le client (nom, puis une ou plusieurs personnes)', visible(w, 'aa-step-client') && !visible(w, 'aa-step-service'));
@@ -75,7 +76,7 @@ const visible = (w, id) => w.document.getElementById(id).style.display !== 'none
 
   console.log('\n[B] Mon poste : assistant "Ajouter un RDV" (le coiffeur, pour lui-meme)');
   w = world(); setup(w, { me: { id: 'b1', name: 'Alice' } });   // "me" : le coiffeur connecte a Mon poste
-  w.eval(fnSrc(poste, 'openPosteAddAppointment'));
+  w.eval(CLOSURES(poste) + '\n' + fnSrc(poste, 'openPosteAddAppointment'));
   w.openPosteAddAppointment('2026-10-08'); d = w.document;
   check('Mon poste : 1re etape = le client (comme le dashboard et la caisse)', visible(w, 'pa-step-client') && !visible(w, 'pa-step-service'));
   d.getElementById('pa-name').value = 'Karim'; w.paStartSolo();
