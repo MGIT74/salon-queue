@@ -13,6 +13,7 @@ const { wrap } = require('../lib/wrap');
 const { getPendingRecount } = require('../lib/pendingRecount');
 const { withCashLock, HttpError } = require('../lib/cashLock');
 
+const { guardPasswordAttempt, failPasswordAttempt, clearPasswordAttempt } = require('../middleware/rateLimiter');
 const router = express.Router();
 
 // --- Salons de la même enseigne (même propriétaire) ----------------------
@@ -301,13 +302,16 @@ router.post('/email/verify', requireAdmin, wrap(async (req, res) => {
 
 router.put('/password', requireAdmin, wrap(async (req, res) => {
   const { current_password, new_password } = req.body;
+  const passwordAttemptKeys = await guardPasswordAttempt(req, res, 'owner-password-change', req.ownerId);
+  if (!passwordAttemptKeys) return;
   if (!current_password) return res.status(400).json({ error: 'Mot de passe actuel obligatoire' });
   if (typeof new_password !== 'string' || new_password.length < 8) return res.status(400).json({ error: 'Le nouveau mot de passe doit contenir au moins 8 caractères' });
   const [[owner]] = await pool.query('SELECT email, password_hash, admin_password FROM owners WHERE id = ?', [req.ownerId]);
   if (!owner) return res.status(404).json({ error: 'Compte introuvable' });
   const valid = owner.password_hash ? await verifyPassword(current_password, owner.password_hash) :
     (owner.admin_password ? require('../lib/password').timingSafeStringEqual(current_password, owner.admin_password.trim()) : false);
-  if (!valid) return res.status(403).json({ error: 'Mot de passe actuel incorrect' });
+  if (!valid) { await failPasswordAttempt(passwordAttemptKeys); return res.status(403).json({ error: 'Mot de passe actuel incorrect' }); }
+  await clearPasswordAttempt(passwordAttemptKeys);
   const hash = await hashPassword(new_password);
   await pool.query('UPDATE owners SET password_hash = ?, admin_password = NULL WHERE id = ?', [hash, req.ownerId]);
   logActivity(req.salon.id, 'account_edit', 'Mot de passe administrateur modifié');
