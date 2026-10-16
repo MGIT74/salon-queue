@@ -9288,6 +9288,17 @@ function openAddSalonClosure() {
   );
 
   // Aperçu non destructif des RDV : actualisé à chaque changement de date.
+  // Actualiser les fermetures depuis le serveur, même si la page est restée ouverte.
+  api('/api/salon-calendar/closures').then(function(r) {
+    if (!overlay.isConnected) return;
+    salonClosuresItems = r.items || [];
+    ascRefreshAppointments();
+  }).catch(function(e) {
+    if (!overlay.isConnected) return;
+    overlay.querySelector('#asc-effective-period').textContent = 'Impossible de vérifier les fermetures existantes : ' + e.message;
+    overlay.querySelector('#asc-effective-period').style.display = 'block';
+    overlay.querySelector('#asc-save-btn').disabled = true;
+  });
   var ascPreviewTimer = null;
   var ascPreviewRequest = 0;
   function ascRefreshAppointments() {
@@ -9300,7 +9311,19 @@ function openAddSalonClosure() {
     var saveButton = overlay.querySelector('#asc-save-btn');
     var today = nowSalonDatetimeString().slice(0, 10);
     var fullyPast = !!(to && to < today);
-    saveButton.disabled = fullyPast;
+    var effectiveFrom = from && from < today ? today : from;
+    var conflict = (salonClosuresItems || []).find(function(c) {
+      return effectiveFrom && to && c.start_date <= to && c.end_date >= effectiveFrom;
+    });
+    saveButton.disabled = fullyPast || !!conflict;
+    if (conflict) {
+      info.style.display = 'block';
+      info.textContent = 'Période déjà fermée du ' + conflict.start_date.split('-').reverse().join('/') +
+        ' au ' + conflict.end_date.split('-').reverse().join('/') +
+        '. Choisissez une période sans chevauchement.';
+      target.innerHTML = '<strong style="color:var(--red)">Cette plage est déjà déclarée comme fermeture.</strong>';
+      return;
+    }
     if (fullyPast) {
       info.style.display = 'block';
       info.textContent = 'Cette période est entièrement passée : fermeture impossible.';
@@ -9371,6 +9394,11 @@ function openAddSalonClosure() {
     if (!from || !to) { errEl.textContent = 'Les 2 dates sont requises'; errEl.style.display = 'block'; return; }
     if (to < from) { errEl.textContent = 'La date de fin doit être après la date de début'; errEl.style.display = 'block'; return; }
     if (to < nowSalonDatetimeString().slice(0, 10)) { errEl.textContent = 'Impossible de créer une fermeture entièrement passée'; errEl.style.display = 'block'; return; }
+    var effectiveFrom = from < nowSalonDatetimeString().slice(0, 10) ? nowSalonDatetimeString().slice(0, 10) : from;
+    if ((salonClosuresItems || []).some(function(c) { return c.start_date <= to && c.end_date >= effectiveFrom; })) {
+      errEl.textContent = 'Cette plage chevauche une fermeture déjà enregistrée. Choisissez d’autres dates.';
+      errEl.style.display = 'block'; return;
+    }
 
     var sendEmail = overlay.querySelector('#asc-send-email-switch').classList.contains('on');
     var customMessage = (sendEmail && ascMsgType === 'custom') ? overlay.querySelector('#asc-custom-text').value.trim() : '';
