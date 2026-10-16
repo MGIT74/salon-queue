@@ -1330,3 +1330,12 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'owners' AND column_name = 'email_change_expires');
 SET @sql := IF(@c = 0, 'ALTER TABLE owners ADD COLUMN email_change_expires DATETIME NULL', 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Compteurs de tentatives persistants et partagés entre instances.
+CREATE TABLE IF NOT EXISTS security_attempts (
+  attempt_key VARCHAR(191) PRIMARY KEY,
+  failure_count INT NOT NULL DEFAULT 0,
+  first_at DATETIME(3) NOT NULL,
+  blocked_until DATETIME(3) NULL,
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
