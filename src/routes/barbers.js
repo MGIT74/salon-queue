@@ -270,6 +270,11 @@ router.put('/:id/schedule', requireAdmin, wrap(async (req, res) => {
   if (!owned) return res.status(404).json({ error: 'Coiffeur introuvable' });
 
   const list = Array.isArray(req.body.schedules) ? req.body.schedules : [];
+  const days = list.map(s => Number(s.weekday));
+  if (list.length !== 7 || new Set(days).size !== 7 || days.some(d => !Number.isInteger(d) || d < 0 || d > 6) ||
+      list.some(s => !/^\d{2}:\d{2}$/.test(s.start_time || '') || !/^\d{2}:\d{2}$/.test(s.end_time || '') || s.start_time >= s.end_time || typeof s.active !== 'boolean')) {
+    return res.status(400).json({ error: 'Planning incomplet ou invalide : aucun horaire modifié' });
+  }
 
   await pool.query('DELETE FROM barber_schedules WHERE barber_id = ?', [req.params.id]);
 
