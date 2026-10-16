@@ -1017,12 +1017,22 @@ router.post('/cancel', wrap(async (req, res) => {
     'SELECT id, salon_id, status, scheduled_at, promoted_queue_id, gift_card_id FROM appointments WHERE cancel_token = ?', [token]
   );
   if (!appt) return res.status(404).json({ error: 'Rendez-vous introuvable' });
-  if (appt.status === 'cancelled') return res.status(409).json({ error: 'Ce rendez-vous est déjà annulé' });
+  if (appt.status !== 'confirmed') return res.status(409).json({ error: 'Ce rendez-vous ne peut plus être annulé en ligne. Contactez le salon.' });
+  if (appt.promoted_queue_id) {
+    const [[paid]] = await pool.query(
+      'SELECT id FROM sales WHERE salon_id = ? AND queue_id = ? LIMIT 1',
+      [appt.salon_id, appt.promoted_queue_id]
+    );
+    if (paid) return res.status(409).json({ error: 'Ce rendez-vous a déjà été encaissé. Contactez le salon pour gérer son annulation et un éventuel remboursement.' });
+  }
 
   // Délai limite d'annulation : recherché via le salon RÉEL du RDV
   // (appt.salon_id), pas req.salon - cette route est publique, le
   // salon envoyé par le client ne fait pas forcément foi.
   const rdvSettings = await getSettings(appt.salon_id);
+  if (String(appt.scheduled_at).replace('T', ' ').slice(0, 19) <= nowParisDatetimeString(rdvSettings.timezone)) {
+    return res.status(403).json({ error: 'Un rendez-vous passé ne peut plus être annulé en ligne.' });
+  }
   const deadlineMin = Number(rdvSettings.rdv_cancel_deadline_min) || 0;
   if (deadlineMin > 0) {
     const minutesUntil = (new Date(appt.scheduled_at.replace(' ', 'T') + 'Z') - new Date(nowParisDatetimeString(rdvSettings.timezone).replace(' ', 'T') + 'Z')) / 60000;
