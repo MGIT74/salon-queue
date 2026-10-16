@@ -633,6 +633,8 @@ function showPrompt(message, opts) {
     );
     var input = overlay.querySelector('#modal-prompt-input');
     var extraBtn = overlay.querySelector('#modal-extra-btn');
+    // 3 boutons : fenêtre plus large pour que chaque libellé tienne sur une ligne.
+    if (extraBtn) overlay.querySelector('.modal-box').classList.add('modal-3btn');
     if (extraBtn && opts.onExtra) extraBtn.onclick = function () { opts.onExtra(); };
     var errEl = overlay.querySelector('#modal-prompt-error');
     setTimeout(function () { input.focus(); input.select(); }, 50);

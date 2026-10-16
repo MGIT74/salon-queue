@@ -710,3 +710,11 @@ body .tfx > button { transition: color .25s ease, transform .1s ease; }
   .wrap.page-flow .dt-split { display: grid; grid-template-columns: minmax(300px, 390px) minmax(0, 1fr); gap: 36px; align-items: start; }
   .wrap.page-flow .dt-split .dt-slots > .eyebrow:first-child { margin-top: 0 !important; margin-bottom: 8px; }
 }
+
+/* Fenêtre de saisie à 3 boutons (ex. Fond de caisse : Annuler · Ouvrir la caisse · Continuer) : plus large, libellés sur une ligne. */
+.modal-box.modal-3btn { max-width: 600px; }
+.modal-box.modal-3btn .modal-actions .btn { white-space: nowrap; padding-left: 10px; padding-right: 10px; }
+@media (max-width: 520px) {
+  .modal-box.modal-3btn .modal-actions { flex-wrap: wrap; }
+  .modal-box.modal-3btn .modal-actions #modal-extra-btn { order: -1; flex-basis: 100%; }
+}
