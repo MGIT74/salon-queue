@@ -849,6 +849,8 @@ router.post('/admin-create', requireAdminOrBarber, wrap(withBookingLock(async (r
   if (!client_name) return res.status(400).json({ error: 'Le nom est requis' });
   if (!barber_id) return res.status(400).json({ error: 'Le coiffeur est requis' });
   if (!service_id || !date || !time) return res.status(400).json({ error: 'Prestation, date et créneau requis' });
+  if (!validBookingDate(date) || !validBookingTime(time)) return res.status(400).json({ error: 'Date ou heure invalide' });
+  if (String(client_name).length > 255 || (email && String(email).length > 255)) return res.status(400).json({ error: 'Nom ou email trop long' });
 
   const rawProducts = Array.isArray(req.body.products) ? req.body.products : [];
   let productSelections = [];
@@ -882,6 +884,7 @@ router.post('/admin-create', requireAdminOrBarber, wrap(withBookingLock(async (r
     extraDuration = rows.reduce((a, r) => a + r.duration_min, 0);
     extraNames = rows.map((r) => r.name);
   }
+  if (extraIds.length && (new Set(extraIds).size !== extraIds.length || extraNames.length !== extraIds.length)) return res.status(400).json({ error: 'Supplément invalide ou hors salon' });
   const durationMin = service.duration_min + extraDuration;
 
   // Le coiffeur demandé doit appartenir à CE salon - protection
@@ -1135,6 +1138,7 @@ router.post('/:id/admin-cancel', requireAdminOrBarber, wrap(async (req, res) => 
 router.put('/:id/reschedule', requireAdminOrBarber, wrap(withBookingLock(async (req, res) => {
   const { date, time, barber_id } = req.body;
   if (!date || !time) return res.status(400).json({ error: 'Date et créneau requis' });
+  if (!validBookingDate(date) || !validBookingTime(time)) return res.status(400).json({ error: 'Date ou heure invalide' });
 
   const [[appt]] = await pool.query(
     `SELECT a.*, s.name AS service_name, s.duration_min FROM appointments a
