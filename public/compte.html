@@ -1527,6 +1527,7 @@ function showBookHalf(half) {
 }
 
 function loadBookSlots() {
+  if (!selBookService) return; // Ne pas demander de disponibilités avant le choix de la prestation.
   selBookDate = document.getElementById('bk-date').value;
   selBookSlot = null;
   document.getElementById('bk-date-next-btn').disabled = true;
@@ -1815,7 +1816,7 @@ function guardMissingSalon() {
       }
       if ((!maxDate || candidate <= maxDate) && candidate !== input.value) {
         input.value = candidate;
-        input.dispatchEvent(new Event('change', { bubbles: true }));
+        if (selBookService) input.dispatchEvent(new Event('change', { bubbles: true }));
       }
       if (input.value) { shown = new Date(input.value + 'T12:00:00'); shown.setDate(1); }
       render();
