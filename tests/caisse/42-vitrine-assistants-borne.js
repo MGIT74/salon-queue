@@ -99,7 +99,7 @@ const visible = (w, id) => w.document.getElementById(id).style.display !== 'none
 
   console.log('\n[B2] Caisse : assistant "Ajouter un RDV" depuis l\'Agenda (meme assistant que Mon poste)');
   w = world(); setup(w, { me: { id: 'b1', name: 'Alice' }, allBarbers: [{ id: 'b1', name: 'Alice' }], catalog: CATALOG });
-  w.eval(PASTDAY + '\n' + fnSrc(caisse, 'openCaisseAddAppointment'));
+  w.eval(CLOSURES(caisse) + '\n' + PASTDAY + '\n' + fnSrc(caisse, 'openCaisseAddAppointment'));
   w.openCaisseAddAppointment(FUTURE, 'b1'); d = w.document;
   d.getElementById('pa-name').value = 'Karim'; w.paStartSolo();
   sv = [...d.querySelectorAll('#pa-service-grid .item-card')];

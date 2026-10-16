@@ -110,7 +110,7 @@ const toMin = (s) => Number(s.slice(0, 2)) * 60 + Number(s.slice(3));
   console.log('\n[F] Caisse (Agenda) : meme logique, relue a chaque chargement de l\'Agenda');
   check('meme boucle "une heure a chaque pas"', /for \(var t = rangeStart; t <= rangeEnd; t \+= stepMin\)/.test(caisse) && /rdvSlotStepMin > 0 \? rdvSlotStepMin : 15/.test(caisse));
   check('meme grille (un trait par pas + un par heure) et meme largeur sans chevauchement', /background-size:' \+ stepPct \+ '% 100%, ' \+ hourPct/.test(caisse) && /fitPerHour = Math\.max\(90, labelsPerHour \* TIMELINE_LABEL_PX\)/.test(caisse));
-  check('pas lu dans les reglages PUBLICS, AVANT le rendu (dans le meme Promise.all que les RDV)', /function loadRdvSlotStep\(\)[\s\S]*settings\/public/.test(caisse) && /loadRdvSlotStep\(\)\s*\]\)/.test(caisse));
+  check('pas lu dans les reglages PUBLICS, AVANT le rendu (dans le meme Promise.all que les RDV)', /function loadRdvSlotStep\(\)[\s\S]*settings\/public/.test(caisse) && /loadRdvSlotStep\(\),?\s*(rdvLoadSalonClosures\(\)\s*)?\]\)/.test(caisse));
   check('zoom de la caisse part de la valeur affichee', /Math\.max\(0, Math\.min\(2\.5, \+\(base \+ delta \* 0\.2\)/.test(caisse) && /timeline-inner\.compact \.timeline-hours span:not\(\.h\) \{ display: none; \}/.test(caisse));
   for (const [n, src] of [['dashboard', dash], ['caisse', caisse]]) {
     check(n + ' : heures pleines en gras + 2 couches de traits (fin par pas, marque par heure)', /\.timeline-hours span\.h \{/.test(src) && /rgba\(128,128,128,\.38\) 1px/.test(src));

@@ -2791,6 +2791,7 @@
 </div>
 
 <script src="/app.js?v=23"></script>
+<script src="/autorefresh.js?v=2"></script>
 <script src="/staff-group.js?v=5"></script>
 <script src="/daterange.js?v=4"></script>
 <script>
@@ -6433,6 +6434,14 @@ function adjustTimelineZoom(delta) {
  * ouvert - fait avancer le trait "maintenant" et récupère les nouveaux
  * RDV du jour sans action de l'utilisateur.
  */
+// Onglet Rendez-vous : calendrier relu discrètement (15 s sans toucher l'écran) - RDV pris en ligne, en caisse
+// ou au poste, fermetures... Jamais avec une fenêtre ou un tiroir ouvert.
+if (window.AutoRefresh) AutoRefresh.start(function () {
+  var tab = document.getElementById('t-rdv');
+  if (!tab || !tab.classList.contains('on')) return;
+  calMonthCache = {}; return loadCalendarPeriod();
+}, { idleMs: 15000, busy: function () { return !!document.querySelector('.modal-overlay, .client-drawer-backdrop.on'); } });
+
 function startCalendarNowRefresh() {
   stopCalendarNowRefresh();
   calNowRefreshTimer = setInterval(updateTimelineNowLines, 30000);

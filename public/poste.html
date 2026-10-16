@@ -380,6 +380,7 @@
 </div>
 
 <script src="/app.js?v=23"></script>
+<script src="/autorefresh.js?v=2"></script>
 <script src="/staff-group.js?v=5"></script>
 <script>requireSalonInUrl("Pour utiliser votre poste, ouvrez le lien de votre salon.");</script>
 <script>
@@ -542,12 +543,20 @@ function gotoHome() {
   document.getElementById('nav-agenda').classList.remove('on');
 }
 
+// Actualisation discrète de l'Agenda (15 s sans toucher l'écran), comme la caisse : jamais avec une fenêtre ouverte.
+if (window.AutoRefresh) AutoRefresh.start(function () {
+  var ag = document.getElementById('p-agenda');
+  if (!ag || ag.style.display === 'none' || !calBooted) return;
+  calMonthCache = {}; return loadAgendaPeriod();
+}, { idleMs: 15000, busy: function () { return !!document.querySelector('.modal-overlay'); } });
+
 function gotoAgenda() {
   document.getElementById('p-home').style.display = 'none';
   document.getElementById('p-agenda').style.display = 'block';
   document.getElementById('nav-home').classList.remove('on');
   document.getElementById('nav-agenda').classList.add('on');
-  if (!calBooted) { calBooted = true; loadAgendaPeriod(); }
+  // Toujours relu en ouvrant l'Agenda : RDV pris ailleurs, fermetures ajoutées par l'admin...
+  calBooted = true; calMonthCache = {}; loadAgendaPeriod();
 }
 
 /* ---------- Application ---------- */

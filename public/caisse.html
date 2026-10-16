@@ -223,6 +223,10 @@
   }
   .cal-expand-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; font-size: 14.5px; text-transform: capitalize; }
   .cal-weekday { text-align: center; font-size: 12px; color: var(--grey); font-weight: 600; padding: 6px 0 10px; }
+.cal-day.salon-closed{background:rgba(128,128,128,.13);box-shadow:inset 0 0 0 1px rgba(150,150,150,.27)}
+.cal-day.salon-closed .cal-day-num{text-decoration:line-through;opacity:.65}
+.cal-day.salon-closed::after{content:'Fermé';display:block;font-size:10px;font-weight:700;color:var(--red,#e65c5c);margin-top:2px}
+.salon-closure-banner{padding:10px 13px;border-radius:9px;margin:0 0 12px;background:rgba(160,100,100,.13);color:var(--red,#e65c5c);font-weight:650;font-size:13px}
   .cal-day {
     min-height: 56px; border-radius: 10px; cursor: pointer;
     background: var(--card); box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 0 0 1px var(--sep);
@@ -1941,6 +1945,13 @@ function neededMonthKeys() {
   return keys.filter(function (k, i) { return keys.indexOf(k) === i; });
 }
 
+// Fermetures exceptionnelles du salon (Réglages > Calendrier) : mêmes règles que l'admin et Mon poste.
+var rdvSalonClosures = [];
+function rdvIsSalonClosed(dateStr) { return rdvSalonClosures.some(function (c) { return dateStr >= c.start_date && dateStr <= c.end_date; }); }
+function rdvLoadSalonClosures() {
+  return barberApi('/api/salon-calendar/public-closures').then(function (r) { rdvSalonClosures = r.items || []; }).catch(function () { rdvSalonClosures = []; });
+}
+
 function loadAgendaPeriod() {
   var keys = neededMonthKeys();
   var toFetch = keys.filter(function (k) { return !calMonthCache[k]; });
@@ -1955,7 +1966,8 @@ function loadAgendaPeriod() {
       barberApi('/api/queue?include_done=1').then(function (r) { queue = r.queue; }),
       // Le pas des creneaux gouverne l'echelle de la frise : lu AVANT le rendu pour ne jamais afficher
       // une echelle au mauvais pas, meme une fraction de seconde.
-      loadRdvSlotStep()
+      loadRdvSlotStep(),
+      rdvLoadSalonClosures()
     ])
   ).then(function () {
     if (calViewMode === 'month') renderCalMonth();
@@ -2035,6 +2047,7 @@ function renderCalMonth() {
       var dateStr = calAnchor.getFullYear() + '-' + String(calAnchor.getMonth() + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
       var classes = 'cal-day' + (dateStr === todayStr ? ' today' : '') + (dateStr === calSelectedDate ? ' selected' : '');
       if (isPastDay(dateStr)) classes += ' past';
+      if (rdvIsSalonClosed(dateStr)) classes += ' salon-closed';
       return '<div class="' + classes + '"' + (isPastDay(dateStr) ? '' : ' onclick="selectCalDay(\'' + dateStr + '\')"') + '>' +
         '<div class="cal-day-num">' + d + '</div>' +
         calDayDotsHtml(byDay[dateStr] || []) +
@@ -2083,6 +2096,7 @@ function renderCalWeek() {
     var dateStr = ymd(d);
     var classes = 'cal-day' + (dateStr === todayStr ? ' today' : '') + (dateStr === calSelectedDate ? ' selected' : '');
     if (isPastDay(dateStr)) classes += ' past';
+    if (rdvIsSalonClosed(dateStr)) classes += ' salon-closed';
     cells += '<div class="' + classes + '"' + (isPastDay(dateStr) ? '' : ' onclick="selectCalDay(\'' + dateStr + '\')"') + '>' +
       '<div class="cal-day-num">' + d.getDate() + '</div>' +
       calDayDotsHtml(byDay[dateStr] || []) +
@@ -2159,6 +2173,8 @@ function loadRdvSlotStep() {
 }
 
 function renderAgendaTimeline(dateStr) {
+  // Salon fermé ce jour : pas de planning, juste le message (comme Mon poste).
+  if (rdvIsSalonClosed(dateStr)) return '<div class="salon-closure-banner" style="text-align:center">Salon fermé — aucun rendez-vous ne peut être ajouté ce jour.</div>';
   var d = new Date(dateStr + 'T00:00:00');
   var appts = apptsForRange(d, d);
   if (activeBarberId) appts = appts.filter(function (a) { return a.barber_id === activeBarberId; });
@@ -2777,6 +2793,10 @@ function paOpenGroup() {
 function openCaisseAddAppointment(dateStr, barberId) {
   if (isPastDay(dateStr)) {
     toast('Date passée : impossible de prendre un rendez-vous ce jour-là.', true);
+    return;
+  }
+  if (rdvIsSalonClosed(dateStr)) {
+    toast('Salon fermé ce jour : impossible de créer un rendez-vous.', true);
     return;
   }
   var barber = allBarbers.find(function (b) { return b.id === barberId; });

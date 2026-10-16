@@ -34,5 +34,14 @@ console.log('\n[C] Calendrier : jours passes grises et non cliquables');
   check(f + ' : pas de clic sur un jour passe', (s.match(new RegExp("\\(isPastDay\\(dateStr\\) \\? '' : ' onclick=\"" + fn + "\\(", 'g')) || []).length === 2);
 });
 
+console.log('\n[D] Synchronisation des agendas');
+const caisse = read('caisse.html');
+check('caisse : fermetures exceptionnelles chargees avec l\'agenda', /function rdvLoadSalonClosures\(\)/.test(caisse) && /loadRdvSlotStep\(\),\s*rdvLoadSalonClosures\(\)/.test(caisse));
+check('caisse : jours fermes marques « Fermé » (Mois et Semaine)', (caisse.match(/if \(rdvIsSalonClosed\(dateStr\)\) classes \+= ' salon-closed';/g) || []).length === 2 && /\.cal-day\.salon-closed::after/.test(caisse));
+check('caisse : jour ferme = message seul, assistant refuse', /function renderAgendaTimeline\(dateStr\) \{\n[^\n]*\n  if \(rdvIsSalonClosed\(dateStr\)\) return '<div class="salon-closure-banner"/.test(caisse) && /function openCaisseAddAppointment\(dateStr, barberId\) \{[\s\S]{0,200}if \(rdvIsSalonClosed\(dateStr\)\)/.test(caisse));
+const poste = read('poste.html'), dash = read('dashboard.html');
+check('Mon poste : agenda relu a chaque ouverture et actualise tout seul (15 s sans toucher)', /calBooted = true; calMonthCache = \{\}; loadAgendaPeriod\(\);/.test(poste) && /autorefresh\.js/.test(poste) && /AutoRefresh\.start\(function \(\) \{\n  var ag = document\.getElementById\('p-agenda'\)/.test(poste));
+check('admin > Rendez-vous : calendrier actualise tout seul (15 s sans toucher)', /autorefresh\.js/.test(dash) && /var tab = document\.getElementById\('t-rdv'\);[\s\S]{0,120}calMonthCache = \{\}; return loadCalendarPeriod\(\);/.test(dash));
+
 console.log('\nRESULTAT : ' + pass + ' verifications reussies, ' + fail + ' echec(s)');
 process.exit(fail ? 1 : 0);
