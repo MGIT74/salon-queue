@@ -1319,3 +1319,14 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'clients' AND column_name = 'pending_email');
 SET @sql := IF(@c = 0, 'ALTER TABLE clients ADD COLUMN pending_email VARCHAR(255) NULL', 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Vérification différée du changement d'email administrateur.
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'owners' AND column_name = 'pending_email');
+SET @sql := IF(@c = 0, 'ALTER TABLE owners ADD COLUMN pending_email VARCHAR(255) NULL', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'owners' AND column_name = 'email_change_token');
+SET @sql := IF(@c = 0, 'ALTER TABLE owners ADD COLUMN email_change_token VARCHAR(64) NULL', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'owners' AND column_name = 'email_change_expires');
+SET @sql := IF(@c = 0, 'ALTER TABLE owners ADD COLUMN email_change_expires DATETIME NULL', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
