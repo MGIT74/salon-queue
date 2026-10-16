@@ -29,7 +29,7 @@
   html.auth-checking #p-login { display: none !important; }
   html.auth-checking #auth-layout { display: none !important; }
 </style>
-<link rel="stylesheet" href="/app.css?v=33">
+<link rel="stylesheet" href="/app.css?v=34">
 <script>
   // Applique tout de suite la couleur du salon si on l'a déjà vue lors
   // d'une visite précédente (cache localStorage par salon), plutôt que
@@ -500,6 +500,7 @@
     <div class="msg" id="password-msg"></div>
   </section>
   <!-- Réservation intégrée -->
+  <div class="grp-banner" id="grp-banner" style="display:none"></div>
   <div class="gift-summary-box" id="gift-summary-box" style="display:none">
     <div class="gift-summary-tag">🎁 Carte cadeau</div>
     <div class="gift-summary-barber" id="gift-summary-barber-row">
@@ -512,7 +513,7 @@
     <div class="gift-summary-items" id="gift-summary-items"></div>
   </div>
   <section class="panel" id="p-book-barber">
-    <button class="back" onclick="openBookGroup(true)">‹ Retour</button>
+    <button class="back" onclick="bookBarberBack()">‹ Retour</button>
     <div class="eyebrow" id="bk-barber-eyebrow">Choisissez votre coiffeur</div>
     <div class="svc-grid" id="bk-barber-grid"></div>
   </section>
@@ -523,8 +524,20 @@
     <div class="step-bar" id="bkgb-bar"></div>
   </section>
 
+  <section class="panel" id="p-book-cart">
+    <div class="eyebrow">Votre panier</div>
+    <p class="step-sub" id="bk-cart-sub"></p>
+    <div class="cart-list" id="bk-cart-list"></div>
+    <div class="cart-add fld" id="bk-cart-add">
+      <input id="bk-cart-add-name" type="text" placeholder="Ajouter une personne (prénom)" autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();bkCartAddPerson();}">
+      <button type="button" onclick="bkCartAddPerson()">Ajouter</button>
+    </div>
+    <div class="cart-total" id="bk-cart-total"></div>
+    <button class="go" id="bk-cart-next-btn" onclick="bkCartNext()">Continuer</button>
+  </section>
+
   <section class="panel" id="p-book-group-confirm">
-    <button class="back" onclick="show('p-book-group')">‹ Retour</button>
+    <button class="back" onclick="show(bkGrp ? 'p-book-cart' : 'p-book-group')">‹ Retour</button>
     <div class="eyebrow" id="bk-group-summary"></div>
     <div class="fld"><label for="bk-group-note">Note pour le salon (allergie, préférence… optionnel)</label><textarea id="bk-group-note" rows="3" style="width:100%;font-family:inherit;font-size:15px;padding:12px;border-radius:12px;border:1px solid var(--sep);background:var(--card);color:var(--ink);resize:vertical"></textarea></div>
     <button class="go" id="bk-group-btn" onclick="submitBookGroup()">Confirmer les rendez-vous</button>
@@ -679,7 +692,7 @@
 
 <script src="/app.js?v=26"></script>
 <script src="/autorefresh.js?v=2"></script>
-<script src="/group-booking.js?v=17"></script>
+<script src="/group-booking.js?v=18"></script>
 <style>
 .gb-done{padding:10px 0;border-bottom:1px solid var(--sep)}.gb-done:last-child{border:none}.gb-done b{display:block}.gb-done span{color:var(--grey);font-size:14px}
 #relatives-list{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
@@ -741,6 +754,7 @@ function show(id) {
   document.querySelector('.wrap').style.display = isAuthScreen ? 'none' : 'block';
   window.scrollTo(0, 0);
   renderGiftSummaryBox();
+  if (typeof renderBkGrpBanner === 'function') renderBkGrpBanner(id);
   var backBtn = document.getElementById('bk-datetime-back-btn');
   var cancelBtn = document.getElementById('bk-datetime-cancel-btn');
   if (backBtn && cancelBtn) {
@@ -1057,12 +1071,14 @@ function deleteRelative(id) {
 var bookGroupCtl = null, bookGroupPayload = null, bookBufferMin = 0;
 // startOnWho : premier ecran « Pour qui est le rendez-vous ? » (Juste moi -> reservation normale).
 function openBookGroup(startOnWho) {
+  if (bkGrp) bkSoloMode();
   if (!bookGroupCtl) {
     bookGroupCtl = GroupBooking.create({
       zones: { top: document.getElementById('bkgb-top'), body: document.getElementById('bkgb-body'), bar: document.getElementById('bkgb-bar') }, api: apiForBooking,
       services: bookServicesAll, extras: bookExtrasAll, barbers: bookBarbers, relatives: myRelatives,
       eur: eur, toast: toast, continueLabel: 'Continuer', bufferMin: bookBufferMin,
-      onSolo: function () { show('p-book-barber'); },
+      onSolo: function () { bkSoloMode(); show('p-book-barber'); },
+      onPeople: function (people) { bkCartStart(people); },
       createRelative: function (name) {
         return api('/api/client-auth/relatives', { method: 'POST', body: { name: name } }).then(function (r) {
           if (!myRelatives.some(function (x) { return x.id === r.item.id; })) myRelatives.push(r.item);
@@ -1082,6 +1098,140 @@ function openBookGroup(startOnWho) {
   if (!startOnWho) bookGroupCtl.openMulti();
   show('p-book-group');
 }
+/* ---------- Reservation a plusieurs : une personne a la fois, puis un panier (meme principe que rdv.html) ---------- */
+var bkGrp = null;   // { people: [{ name, isSelf, relativeId }], cart: [], current, editIndex, date }
+
+function bkSoloMode() {
+  bkGrp = null;
+  document.getElementById('bk-barber-eyebrow').textContent = 'Choisissez votre coiffeur';
+  document.getElementById('bk-date-next-btn').textContent = 'Suivant';
+  renderBookBarberGrid();
+}
+
+function bkCartStart(people) {
+  bkGrp = { people: people.map(function (p) { return { name: p.isSelf ? 'Moi' : p.name, isSelf: p.isSelf, relativeId: p.relativeId }; }), cart: [], current: 0, editIndex: -1, date: null };
+  bkCartBeginPerson(0);
+}
+
+function bkResetSelection() {
+  selBookBarber = null; selBookService = null; selBookExtras = []; selBookProducts = []; selBookDate = null; selBookSlot = null; activeBookGift = null;
+  document.getElementById('bk-date').value = '';
+  document.getElementById('bk-date-next-btn').disabled = true;
+  document.getElementById('bk-slots-grid').innerHTML = '<div class="empty">Choisissez une date</div>';
+  applyBookBarberOffer();
+  renderBookBarberGrid();
+}
+
+function bkCartBeginPerson(i, entry) {
+  bkGrp.current = i;
+  bkGrp.editIndex = entry ? bkGrp.cart.indexOf(entry) : -1;
+  bkResetSelection();
+  if (entry) {
+    selBookBarber = entry.barber_id; applyBookBarberOffer(); renderBookBarberGrid();
+    selBookService = entry.service_id; selBookExtras = entry.extras.slice(); selBookProducts = entry.products.slice();
+    renderBookServiceGrid(); updateBookItemsSummary('extras'); updateBookItemsSummary('products');
+    document.getElementById('bk-date').value = entry.date;
+  }
+  var me = bkGrp.people[i].isSelf;
+  document.getElementById('bk-barber-eyebrow').textContent = me ? 'Choisissez votre coiffeur' : 'Choisissez le coiffeur de ' + bkGrp.people[i].name;
+  document.getElementById('bk-date-next-btn').textContent = me ? 'Valider pour moi' : 'Valider pour ' + bkGrp.people[i].name;
+  show('p-book-barber');
+}
+
+function renderBkGrpBanner(panelId) {
+  var el = document.getElementById('grp-banner');
+  if (!el) return;
+  var steps = ['p-book-barber', 'p-book-service', 'p-book-extras', 'p-book-products', 'p-book-datetime'];
+  if (!bkGrp || steps.indexOf(panelId) === -1) { el.style.display = 'none'; return; }
+  var p = bkGrp.people[bkGrp.current];
+  el.innerHTML = '<span class="grp-who">' + (p.isSelf ? '<b>Votre rendez-vous</b>' : 'Rendez-vous de <b>' + esc(p.name) + '</b>') + '</span>' +
+    '<span class="grp-step">' + (bkGrp.current + 1) + ' sur ' + bkGrp.people.length + '</span>' +
+    (bkGrp.cart.length ? '<button type="button" class="grp-cart-btn" onclick="show(\'p-book-cart\')">Panier · ' + bkGrp.cart.length + '</button>' : '');
+  el.style.display = '';
+}
+
+function bookBarberBack() {
+  if (!bkGrp) return openBookGroup(true);
+  if (bkGrp.cart.length) return show('p-book-cart');
+  show('p-book-group');
+}
+
+function bkCartAddCurrent() {
+  var b = bookBarbers.find(function (x) { return String(x.id) === String(selBookSlot.barberId); });
+  var svc = barberItems(b, 'services', bookServicesAll).find(function (x) { return String(x.id) === String(selBookService); });
+  var ex = barberItems(b, 'extras', bookExtrasAll).filter(function (x) { return selBookExtras.indexOf(x.id) !== -1; });
+  var pr = bookProducts.filter(function (x) { return selBookProducts.indexOf(x.id) !== -1; });
+  var p = bkGrp.people[bkGrp.current];
+  var e = {
+    person: bkGrp.current, name: p.name, isSelf: p.isSelf, relativeId: p.relativeId,
+    barber_id: selBookSlot.barberId, barber_name: b ? b.name : '',
+    service_id: selBookService, service_name: svc ? svc.name : '', extras: ex.map(function (x) { return x.id; }), extra_names: ex.map(function (x) { return x.name; }),
+    products: pr.map(function (x) { return x.id; }), product_names: pr.map(function (x) { return x.name; }),
+    date: selBookDate, time: selBookSlot.time,
+    dur: (svc ? Number(svc.duration_min) || 0 : 0) + ex.reduce(function (t, x) { return t + (Number(x.duration_min) || 0); }, 0),
+    price_cents: (svc ? Number(svc.price_cents) || 0 : 0) + ex.reduce(function (t, x) { return t + (Number(x.price_cents) || 0); }, 0) + pr.reduce(function (t, x) { return t + (Number(x.price_cents) || 0); }, 0)
+  };
+  if (bkGrp.editIndex >= 0 && bkGrp.cart[bkGrp.editIndex]) bkGrp.cart[bkGrp.editIndex] = e; else bkGrp.cart.push(e);
+  bkGrp.editIndex = -1;
+  if (!bkGrp.date) bkGrp.date = e.date;
+  renderBkCart();
+  show('p-book-cart');
+}
+
+function bkCartNextPerson() {
+  for (var i = 0; i < bkGrp.people.length; i++) if (!bkGrp.cart.some(function (e) { return e.person === i; })) return i;
+  return -1;
+}
+
+function renderBkCart() {
+  bkGrp.cart.sort(function (a, b) { return a.person - b.person; });
+  document.getElementById('bk-cart-list').innerHTML = GroupBooking.cartRowsHtml(bkGrp.cart, eur, 'bkCart');
+  var todo = bkGrp.people.filter(function (p, i) { return !bkGrp.cart.some(function (e) { return e.person === i; }); });
+  document.getElementById('bk-cart-sub').textContent = todo.length
+    ? bkGrp.cart.length + ' sur ' + bkGrp.people.length + ' — reste : ' + todo.map(function (p) { return p.name; }).join(', ')
+    : (bkGrp.cart.length > 1 ? 'Tout le monde a son rendez-vous. Vérifiez puis terminez.' : 'Vérifiez puis terminez.');
+  var total = bkGrp.cart.reduce(function (t, e) { return t + (e.price_cents || 0); }, 0);
+  document.getElementById('bk-cart-total').innerHTML = bkGrp.cart.length ? '<span>Total</span><b>' + eur(total) + '</b>' : '';
+  document.getElementById('bk-cart-add').style.display = bkGrp.people.length < GroupBooking.MAX_PEOPLE ? '' : 'none';
+  var next = bkCartNextPerson(), btn = document.getElementById('bk-cart-next-btn');
+  btn.textContent = next === -1 ? 'Terminer' : (bkGrp.people[next].isSelf ? 'Continuer pour moi' : 'Continuer pour ' + bkGrp.people[next].name);
+  btn.disabled = next === -1 && !bkGrp.cart.length;
+}
+
+function bkCartNext() {
+  var next = bkCartNextPerson();
+  if (next !== -1) return bkCartBeginPerson(next);
+  if (!bkGrp.cart.length) return;
+  document.getElementById('bk-group-summary').textContent = bkGrp.cart.length + ' rendez-vous — ' + bkGrp.cart.map(function (e) { return e.name + ' ' + e.time; }).join(', ');
+  show('p-book-group-confirm');
+}
+
+function bkCartEdit(i) { var e = bkGrp.cart[i]; if (e) bkCartBeginPerson(e.person, e); }
+
+function bkCartRemove(i) {
+  var e = bkGrp.cart[i]; if (!e) return;
+  bkGrp.cart.splice(i, 1);
+  bkGrp.people.splice(e.person, 1);
+  bkGrp.cart.forEach(function (x) { if (x.person > e.person) x.person--; });
+  if (!bkGrp.people.length) { bkGrp = null; return openBookGroup(true); }
+  renderBkCart();
+}
+
+function bkCartAddPerson() {
+  var inp = document.getElementById('bk-cart-add-name'), n = inp.value.trim();
+  if (!n) return;
+  if (bkGrp.people.length >= GroupBooking.MAX_PEOPLE) { toast('Maximum ' + GroupBooking.MAX_PEOPLE + ' personnes.', true); return; }
+  bkGrp.people.push({ name: n, isSelf: false, relativeId: null });
+  inp.value = '';
+  renderBkCart();
+}
+
+function bkCartRedoTime(i) {
+  var e = bkGrp.cart[i];
+  bkCartBeginPerson(e.person, e);
+  goToBookDateStep();
+}
+
 function submitBookGroup() {
   var btn = document.getElementById('bk-group-btn');
   btn.disabled = true; btn.textContent = 'Enregistrement…';
@@ -1090,7 +1240,7 @@ function submitBookGroup() {
     return apiForBooking('/api/appointments/group', {
       method: 'POST',
       body: { client_name: me.profile.name, email: me.profile.email, phone: me.profile.phone || null,
-              client_note: note || null, people: bookGroupPayload,
+              client_note: note || null, people: bkGrp ? GroupBooking.cartPayload(bkGrp.cart) : bookGroupPayload,
               base_url: window.location.origin + '/rdv.html' + (bookSalonSlug ? '?salon=' + bookSalonSlug : '') }
     });
   }).then(function (r) {
@@ -1099,10 +1249,14 @@ function submitBookGroup() {
       return '<div class="gb-done"><b>' + esc(a.name) + '</b><span>' + esc(when) + ' — ' + esc(a.service_name || '') + (a.barber_name ? ' · ' + esc(a.barber_name) : '') + '</span></div>';
     }).join('');
     document.getElementById('bk-group-note').value = '';
+    bkSoloMode();
     show('p-book-group-confirmed'); hideFooter();
   }).catch(function (e) {
     toast(e.message, true);
-    if (e.data && typeof e.data.person_index === 'number' && e.data.person_index >= 0 && bookGroupCtl) { bookGroupCtl.focusPerson(e.data.person_index, e.message); show('p-book-group'); }
+    if (e.data && typeof e.data.person_index === 'number' && e.data.person_index >= 0) {
+      if (bkGrp && bkGrp.cart[e.data.person_index]) bkCartRedoTime(e.data.person_index);
+      else if (bookGroupCtl) { bookGroupCtl.focusPerson(e.data.person_index, e.message); show('p-book-group'); }
+    }
   }).finally(function () { btn.disabled = false; btn.textContent = 'Confirmer les rendez-vous'; });
 }
 
@@ -1248,6 +1402,7 @@ function apiForBooking(path, opts) {
 
 function goBook(afterLoad) {
   var finish = function () {
+    if (bkGrp) bkSoloMode();
     // « Réserver à nouveau » (afterLoad) : directement le choix du coiffeur ; sinon « Pour qui est le rendez-vous ? ».
     if (afterLoad) show('p-book-barber'); else openBookGroup(true);
     showFooter('nav-book');
@@ -1276,7 +1431,8 @@ function goBook(afterLoad) {
 }
 
 function renderBookBarberGrid() {
-  var giftTile = giftTileHtml(bookGiftTileImage, 'openBookGiftCodeScreen()');
+  // Pas de carte cadeau pendant une reservation a plusieurs (un cadeau = un rendez-vous pour une personne).
+  var giftTile = (typeof bkGrp !== 'undefined' && bkGrp) ? '' : giftTileHtml(bookGiftTileImage, 'openBookGiftCodeScreen()');
 
   document.getElementById('bk-barber-grid').innerHTML = giftTile + bookBarbers.map(function (b) {
     return barberTileHtml(b, selBookBarber === b.id, "selectBookBarber(this, '" + b.id + "')");
@@ -1540,6 +1696,7 @@ function goToBookProductsStep() {
 function goToBookDateStep() {
   if (!selBookService) { toast('Choisissez une prestation', true); return; }
   var today = salonToday();
+  if (bkGrp && bkGrp.date && !document.getElementById('bk-date').value) document.getElementById('bk-date').value = bkGrp.date;
   document.getElementById('bk-date').min = today;
   if (!document.getElementById('bk-date').value || document.getElementById('bk-date').value < today) document.getElementById('bk-date').value = today;
   show('p-book-datetime');
@@ -1575,6 +1732,9 @@ function loadBookSlots() {
 
   var url = '/api/appointments/availability?date=' + selBookDate + '&service_id=' + selBookService +
     '&extras=' + selBookExtras.join(',') + (selBookBarber ? '&barber_id=' + selBookBarber : '');
+  // Réservation à plusieurs : les créneaux déjà dans le panier ce jour-là ne sont plus proposés (même coiffeur).
+  var held = bkGrp ? GroupBooking.cartHeld(bkGrp.cart, selBookDate, bkGrp.editIndex) : '';
+  if (held) url += '&held=' + encodeURIComponent(held);
 
   var toggleEl = document.getElementById('bk-half-toggle');
   document.getElementById('bk-slots-grid').innerHTML = '<div class="empty">Chargement…</div>';
@@ -1608,6 +1768,7 @@ function selectBookSlot(btn) {
 
 function goToBookConfirmStep() {
   if (!selBookSlot) { toast('Choisissez un créneau', true); return; }
+  if (bkGrp) return bkCartAddCurrent();
   var s = bookServices.find(function (x) { return x.id === selBookService; });
   var extraNames = selBookExtras.map(function (id) { return bookExtras.find(function (e) { return e.id === id; }).name; });
   var when = new Date(selBookDate + 'T' + selBookSlot.time).toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' }) + ' à ' + selBookSlot.time;

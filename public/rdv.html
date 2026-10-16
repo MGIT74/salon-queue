@@ -18,7 +18,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Prendre rendez-vous</title>
-<link rel="stylesheet" href="/app.css?v=33">
+<link rel="stylesheet" href="/app.css?v=34">
 <script>
   // Adresse SANS ?salon=... : on masque la page le temps de savoir si la plateforme heberge plusieurs salons
   // (voir guardMissingSalon) - pour ne jamais montrer, meme une fraction de seconde, un formulaire sans salon.
@@ -189,6 +189,8 @@
     <h1>Prendre rendez-vous</h1>
   </div>
 
+  <div class="grp-banner" id="grp-banner" style="display:none"></div>
+
   <div class="gift-summary-box" id="gift-summary-box" style="display:none">
     <div class="gift-summary-tag">🎁 Carte cadeau</div>
     <div class="gift-summary-barber" id="gift-summary-barber-row">
@@ -202,7 +204,7 @@
   </div>
 
   <section class="panel" id="p-barber">
-    <button class="back" id="barber-back-btn" onclick="openWho()">‹ Retour</button>
+    <button class="back" id="barber-back-btn" onclick="barberBack()">‹ Retour</button>
     <div class="eyebrow" id="barber-eyebrow">Choisissez votre coiffeur</div>
     <div class="svc-grid" id="barber-grid"></div>
   </section>
@@ -213,8 +215,20 @@
     <div class="step-bar" id="gb-bar"></div>
   </section>
 
+  <section class="panel" id="p-cart">
+    <div class="eyebrow">Votre panier</div>
+    <p class="step-sub" id="cart-sub"></p>
+    <div class="cart-list" id="cart-list"></div>
+    <div class="cart-add fld" id="cart-add">
+      <input id="cart-add-name" type="text" placeholder="Ajouter une personne (prénom)" autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();cartAddPerson();}">
+      <button type="button" onclick="cartAddPerson()">Ajouter</button>
+    </div>
+    <div class="cart-total" id="cart-total"></div>
+    <button class="go" id="cart-next-btn" onclick="cartNext()">Continuer</button>
+  </section>
+
   <section class="panel" id="p-group-contact">
-    <button class="back" onclick="show('p-group')">‹ Retour</button>
+    <button class="back" onclick="show(grp ? 'p-cart' : 'p-group')">‹ Retour</button>
     <div class="eyebrow" id="group-contact-summary"></div>
     <div class="login-hint">Vous avez un compte ? <a href="#" onclick="goLogin(event)">Se connecter</a><span>Pas de compte ? Réservez quand même : vous recevrez un email de confirmation avec un lien pour annuler.</span></div>
     <div class="fld"><label for="grp-name">Votre prénom</label><input id="grp-name" type="text" autocomplete="given-name"></div>
@@ -347,7 +361,7 @@
 </div>
 
 <script src="/app.js?v=26"></script>
-<script src="/group-booking.js?v=17"></script>
+<script src="/group-booking.js?v=18"></script>
 <style>
 body.staff-mode .gift-summary-box,body.staff-mode .theme-btn,body.staff-mode .login-hint{display:none!important}
 .login-hint{background:var(--fill);border-radius:14px;padding:12px 14px;margin:0 0 18px;font-size:14.5px;font-weight:600}
@@ -412,6 +426,7 @@ function show(id) {
   document.querySelectorAll('.panel').forEach(function (p) { p.classList.remove('on'); });
   document.getElementById(id).classList.add('on');
   renderGiftSummaryBox();
+  renderGrpBanner(id);
   // Un cadeau fixe déjà la prestation et les suppléments - revenir en
   // arrière depuis l'étape date/heure ne doit surtout pas permettre de
   // rouvrir l'étape suppléments et d'en ajouter un en plus du cadeau.
@@ -505,7 +520,8 @@ function loadCatalog() {
 }
 
 function renderBarberGrid() {
-  var giftTile = giftTileHtml(giftTileImageUrl, 'openGiftCodeScreen()');
+  // Pas de carte cadeau pendant une reservation a plusieurs (un cadeau = un rendez-vous pour une personne).
+  var giftTile = (typeof grp !== 'undefined' && grp) ? '' : giftTileHtml(giftTileImageUrl, 'openGiftCodeScreen()');
 
   document.getElementById('barber-grid').innerHTML = giftTile + barbers.map(function (b) {
     return barberTileHtml(b, selBarber === b.id, "selectBarber(this, '" + b.id + "')");
@@ -705,6 +721,7 @@ function goToProductsStep() {
 function goToDateStep() {
   if (!selService) { toast('Choisissez une prestation', true); return; }
   var today = salonToday();
+  if (grp && grp.date && !document.getElementById('rdv-date').value) document.getElementById('rdv-date').value = grp.date;
   document.getElementById('rdv-date').min = today;
   if (!document.getElementById('rdv-date').value || document.getElementById('rdv-date').value < today) document.getElementById('rdv-date').value = today;
   show('p-datetime');
@@ -741,6 +758,9 @@ function loadSlots() {
 
   var url = '/api/appointments/availability?date=' + selDate + '&service_id=' + selService +
     '&extras=' + selExtras.join(',') + (selBarber ? '&barber_id=' + selBarber : '');
+  // Réservation à plusieurs : les créneaux déjà mis dans le panier ce jour-là ne sont plus proposés (même coiffeur).
+  var held = grp ? GroupBooking.cartHeld(grp.cart, selDate, grp.editIndex) : '';
+  if (held) url += '&held=' + encodeURIComponent(held);
 
   var toggleEl = document.getElementById('half-toggle');
   document.getElementById('slots-grid').innerHTML = '<div class="empty">Chargement…</div>';
@@ -777,6 +797,7 @@ function selectSlot(btn) {
 
 function goToContactStep() {
   if (!selSlot) { toast('Choisissez un créneau', true); return; }
+  if (grp) return cartAddCurrent();
   var s = services.find(function (x) { return x.id === selService; });
   var extraNames = selExtras.map(function (id) { return extras.find(function (e) { return e.id === id; }).name; });
   var when = new Date(selDate + 'T' + selSlot.time).toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' }) + ' à ' + selSlot.time;
@@ -828,6 +849,7 @@ function submitAppointment() {
 }
 
 function startNewBooking() {
+  soloMode();
   selBarber = null; selService = null; selExtras = []; selProducts = []; selDate = null; selSlot = null; activeGift = null;
   document.getElementById('barber-eyebrow').textContent = 'Choisissez votre coiffeur';
   document.getElementById('rdv-name').value = '';
@@ -871,12 +893,14 @@ function enterStaffMode() {
 }
 
 function openGroupBooking(startOnWho) {
+  if (grp) soloMode();
   if (!groupCtl) {
     groupCtl = GroupBooking.create({
       zones: { top: document.getElementById('gb-top'), body: document.getElementById('gb-body'), bar: document.getElementById('gb-bar') }, api: api,
       services: servicesAll, extras: extrasAll, barbers: barbers,
       eur: eur, toast: toast, continueLabel: 'Continuer', bufferMin: rdvBufferMin,
-      onSolo: STAFF_BRIDGE ? null : function () { show('p-barber'); },
+      onSolo: STAFF_BRIDGE ? null : function () { soloMode(); show('p-barber'); },
+      onPeople: function (people) { cartStart(people); },
       selfChip: STAFF_BRIDGE ? staffClientName() : null, selfName: STAFF_BRIDGE ? staffClientName() : null,
       // Mode salon + client avec un compte : ses proches enregistrés (enfants…) sont proposés, et la case
       // « Enregistrer dans ses proches » ajoute le prénom à son compte (il le retrouve dans son espace client).
@@ -911,7 +935,7 @@ function submitGroup() {
   btn.disabled = true; btn.textContent = 'Enregistrement…';
   (STAFF_BRIDGE ? STAFF_BRIDGE.api : api)(STAFF_BRIDGE ? '/api/appointments/admin-group' : '/api/appointments/group', {
     method: 'POST',
-    body: { client_name: name, email: email, phone: phone, people: groupPayload,
+    body: { client_name: name, email: email, phone: phone, people: grp ? GroupBooking.cartPayload(grp.cart) : groupPayload,
             base_url: window.location.origin + window.location.pathname + (SALON_SLUG ? '?salon=' + SALON_SLUG : '') }
   }).then(function (r) {
     document.getElementById('group-confirm-list').innerHTML = r.appointments.map(function (a) {
@@ -929,8 +953,159 @@ function submitGroup() {
   }).catch(function (e) {
     toast(e.message, true);
     // Un creneau vient d'etre pris : on renvoie directement sur la personne concernee pour qu'elle en choisisse un autre.
-    if (e.data && typeof e.data.person_index === 'number' && e.data.person_index >= 0 && groupCtl) { groupCtl.focusPerson(e.data.person_index, e.message); show('p-group'); }
+    if (e.data && typeof e.data.person_index === 'number' && e.data.person_index >= 0) {
+      if (grp && grp.cart[e.data.person_index]) cartRedoTime(e.data.person_index);
+      else if (groupCtl) { groupCtl.focusPerson(e.data.person_index, e.message); show('p-group'); }
+    }
   }).finally(function () { btn.disabled = false; btn.textContent = 'Confirmer les rendez-vous'; });
+}
+
+/* ---------- Reservation a plusieurs : une personne a la fois, puis un panier ----------
+   Apres « Qui vient ? », chaque personne refait exactement la reservation normale (coiffeur > prestation > supplements >
+   produits > date et heure). « Valider pour X » la met dans le panier ; le bouton du panier enchaine sur la personne
+   suivante (« Continuer pour Tom »), puis « Terminer » : coordonnees une seule fois, un seul envoi, un seul email. */
+var grp = null;   // { people: [{ name, isSelf, relativeId }], cart: [], current: index dans people, editIndex: index dans cart | -1, date }
+
+// Retour a la reservation pour une seule personne (libelles d'origine, tuile cadeau).
+function soloMode() {
+  grp = null;
+  document.getElementById('barber-eyebrow').textContent = 'Choisissez votre coiffeur';
+  document.getElementById('date-next-btn').textContent = 'Suivant';
+  renderBarberGrid();
+}
+
+function grpLabel(p) { return p.isSelf ? (STAFF_BRIDGE ? staffClientName() : 'Moi') : p.name; }
+
+function cartStart(people) {
+  grp = { people: people.map(function (p) { return { name: p.isSelf ? (STAFF_BRIDGE ? staffClientName() : 'Moi') : p.name, isSelf: p.isSelf, relativeId: p.relativeId }; }), cart: [], current: 0, editIndex: -1, date: null };
+  cartBeginPerson(0);
+}
+
+function resetSelection() {
+  selBarber = null; selService = null; selExtras = []; selProducts = []; selDate = null; selSlot = null; activeGift = null;
+  document.getElementById('rdv-date').value = '';
+  document.getElementById('date-next-btn').disabled = true;
+  document.getElementById('slots-grid').innerHTML = '<div class="empty">Choisissez une date</div>';
+  applyBarberOffer();
+  renderBarberGrid();
+}
+
+function cartBeginPerson(i, entry) {
+  grp.current = i;
+  grp.editIndex = entry ? grp.cart.indexOf(entry) : -1;
+  resetSelection();
+  if (entry) {
+    // « Modifier » : on repart des choix deja faits pour cette personne.
+    selBarber = entry.barber_id; applyBarberOffer(); renderBarberGrid();
+    selService = entry.service_id; selExtras = entry.extras.slice(); selProducts = entry.products.slice();
+    renderServiceGrid(); updateItemsSummary('extras'); updateItemsSummary('products');
+    document.getElementById('service-next-btn').disabled = !selService;
+    document.getElementById('rdv-date').value = entry.date;
+  }
+  var me = grp.people[i].isSelf && !STAFF_BRIDGE;
+  document.getElementById('barber-eyebrow').textContent = me ? 'Choisissez votre coiffeur' : 'Choisissez le coiffeur de ' + grp.people[i].name;
+  document.getElementById('date-next-btn').textContent = me ? 'Valider pour moi' : 'Valider pour ' + grp.people[i].name;
+  show('p-barber');
+}
+
+function renderGrpBanner(panelId) {
+  var el = document.getElementById('grp-banner');
+  var steps = ['p-barber', 'p-service', 'p-extras', 'p-products', 'p-datetime'];
+  if (!grp || steps.indexOf(panelId) === -1) { el.style.display = 'none'; return; }
+  var p = grp.people[grp.current];
+  el.innerHTML = '<span class="grp-who">' + (p.isSelf && !STAFF_BRIDGE ? '<b>Votre rendez-vous</b>' : 'Rendez-vous de <b>' + esc(p.name) + '</b>') + '</span>' +
+    '<span class="grp-step">' + (grp.current + 1) + ' sur ' + grp.people.length + '</span>' +
+    (grp.cart.length ? '<button type="button" class="grp-cart-btn" onclick="show(\'p-cart\')">Panier · ' + grp.cart.length + '</button>' : '');
+  el.style.display = '';
+}
+
+function barberBack() {
+  if (!grp) return openWho();
+  if (grp.cart.length) return show('p-cart');
+  show('p-group');   // retour a « Qui vient ? », avec les personnes deja cochees
+}
+
+function cartEntryFromSelection() {
+  var b = barbers.find(function (x) { return String(x.id) === String(selSlot.barberId); });
+  var svc = barberItems(b, 'services', servicesAll).find(function (x) { return String(x.id) === String(selService); });
+  var ex = barberItems(b, 'extras', extrasAll).filter(function (x) { return selExtras.indexOf(x.id) !== -1; });
+  var pr = products.filter(function (x) { return selProducts.indexOf(x.id) !== -1; });
+  var p = grp.people[grp.current];
+  return {
+    person: grp.current, name: p.name, isSelf: p.isSelf, relativeId: p.relativeId,
+    barber_id: selSlot.barberId, barber_name: b ? b.name : '',
+    service_id: selService, service_name: svc ? svc.name : '', extras: ex.map(function (x) { return x.id; }), extra_names: ex.map(function (x) { return x.name; }),
+    products: pr.map(function (x) { return x.id; }), product_names: pr.map(function (x) { return x.name; }),
+    date: selDate, time: selSlot.time,
+    dur: (svc ? Number(svc.duration_min) || 0 : 0) + ex.reduce(function (t, x) { return t + (Number(x.duration_min) || 0); }, 0),
+    price_cents: (svc ? Number(svc.price_cents) || 0 : 0) + ex.reduce(function (t, x) { return t + (Number(x.price_cents) || 0); }, 0) + pr.reduce(function (t, x) { return t + (Number(x.price_cents) || 0); }, 0)
+  };
+}
+
+function cartAddCurrent() {
+  var e = cartEntryFromSelection();
+  if (grp.editIndex >= 0 && grp.cart[grp.editIndex]) grp.cart[grp.editIndex] = e; else grp.cart.push(e);
+  grp.editIndex = -1;
+  if (!grp.date) grp.date = e.date;
+  renderCart();
+  show('p-cart');
+}
+
+function cartNextPerson() {
+  for (var i = 0; i < grp.people.length; i++) if (!grp.cart.some(function (e) { return e.person === i; })) return i;
+  return -1;
+}
+
+function renderCart() {
+  grp.cart.sort(function (a, b) { return a.person - b.person; });
+  document.getElementById('cart-list').innerHTML = GroupBooking.cartRowsHtml(grp.cart, eur, 'cart');
+  var todo = grp.people.filter(function (p, i) { return !grp.cart.some(function (e) { return e.person === i; }); });
+  document.getElementById('cart-sub').textContent = todo.length
+    ? grp.cart.length + ' sur ' + grp.people.length + ' — reste : ' + todo.map(function (p) { return p.name; }).join(', ')
+    : (grp.cart.length > 1 ? 'Tout le monde a son rendez-vous. Vérifiez puis terminez.' : 'Vérifiez puis terminez.');
+  var total = grp.cart.reduce(function (t, e) { return t + (e.price_cents || 0); }, 0);
+  document.getElementById('cart-total').innerHTML = grp.cart.length ? '<span>Total</span><b>' + eur(total) + '</b>' : '';
+  document.getElementById('cart-add').style.display = grp.people.length < GroupBooking.MAX_PEOPLE ? '' : 'none';
+  var next = cartNextPerson(), btn = document.getElementById('cart-next-btn');
+  btn.textContent = next === -1 ? 'Terminer' : (grp.people[next].isSelf && !STAFF_BRIDGE ? 'Continuer pour moi' : 'Continuer pour ' + grp.people[next].name);
+  btn.disabled = next === -1 && !grp.cart.length;
+}
+
+function cartNext() {
+  var next = cartNextPerson();
+  if (next !== -1) return cartBeginPerson(next);
+  if (!grp.cart.length) return;
+  document.getElementById('group-contact-summary').textContent = grp.cart.length + (grp.cart.length > 1 ? ' rendez-vous — ' : ' rendez-vous — ') +
+    grp.cart.map(function (e) { return e.name + ' ' + e.time; }).join(', ');
+  show('p-group-contact');
+}
+
+function cartEdit(i) { var e = grp.cart[i]; if (e) cartBeginPerson(e.person, e); }
+
+function cartRemove(i) {
+  var e = grp.cart[i]; if (!e) return;
+  // Retirer = cette personne ne vient plus : on l'enleve du groupe.
+  grp.cart.splice(i, 1);
+  grp.people.splice(e.person, 1);
+  grp.cart.forEach(function (x) { if (x.person > e.person) x.person--; });
+  if (!grp.people.length) { grp = null; return openWho(); }
+  renderCart();
+}
+
+function cartAddPerson() {
+  var inp = document.getElementById('cart-add-name'), n = inp.value.trim();
+  if (!n) return;
+  if (grp.people.length >= GroupBooking.MAX_PEOPLE) { toast('Maximum ' + GroupBooking.MAX_PEOPLE + ' personnes.', true); return; }
+  grp.people.push({ name: n, isSelf: false, relativeId: null });
+  inp.value = '';
+  renderCart();
+}
+
+// Un creneau a ete pris entre-temps : on renvoie seulement cette personne choisir une autre heure.
+function cartRedoTime(i) {
+  var e = grp.cart[i];
+  cartBeginPerson(e.person, e);
+  goToDateStep();
 }
 
 /* ---------- Annulation ---------- */

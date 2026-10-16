@@ -541,6 +541,7 @@ input[type="date"] { -webkit-appearance: none; appearance: none; }
   .wrap.page-flow:has(.panel.flow.on) { height: min(92vh, 900px); }
   .wrap.page-flow .rdv-header { flex: none; padding: 30px 32px 0; margin-bottom: 22px; }
   .wrap.page-flow .gift-summary-box { flex: none; margin: 0 32px 16px; }
+  .wrap.page-flow .grp-banner { flex: none; margin: 0 32px 16px; }
   .wrap.page-flow .panel.on { padding: 0 32px 32px; }
   .wrap.page-flow .panel.flow.on { padding: 0; display: grid; grid-template-columns: minmax(0, 1fr) 340px; grid-template-rows: auto minmax(0, 1fr); flex: 1 1 auto; min-height: 0; }
   .wrap.page-flow .panel.flow > .flow-top { display: block; grid-column: 1; grid-row: 1; padding: 0 32px 8px; }
@@ -718,3 +719,32 @@ body .tfx > button { transition: color .25s ease, transform .1s ease; }
   .modal-box.modal-3btn .modal-actions { flex-wrap: wrap; }
   .modal-box.modal-3btn .modal-actions #modal-extra-btn { order: -1; flex-basis: 100%; }
 }
+
+/* ===== Reservation a plusieurs : bandeau « Rendez-vous de Tom · 2 sur 3 » et panier (rdv.html, compte.html) ===== */
+.grp-banner { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: var(--blue-soft); color: var(--ink);
+  border-radius: 14px; padding: 11px 14px; margin: 0 0 16px; font-size: 15px; }
+.grp-banner .grp-who b { font-weight: 700; }
+.grp-banner .grp-step { font-size: 13px; color: var(--grey); font-weight: 600; }
+.grp-banner .grp-cart-btn { margin-left: auto; border: none; background: var(--card); color: var(--accent); font: inherit; font-size: 14px;
+  font-weight: 600; border-radius: 999px; padding: 6px 12px; cursor: pointer; }
+.cart-list { display: flex; flex-direction: column; background: var(--fill); border-radius: 16px; overflow: hidden; margin-bottom: 14px; }
+.cart-list:empty { display: none; }
+.cart-row { display: grid; grid-template-columns: 74px minmax(0, 1fr) auto; grid-template-areas: "when what price" "when acts acts";
+  column-gap: 12px; row-gap: 6px; padding: 14px 16px; border-bottom: 1px solid var(--sep); }
+.cart-row:last-child { border-bottom: none; }
+.cart-when { grid-area: when; display: flex; flex-direction: column; }
+.cart-when b { font-size: 17px; font-variant-numeric: tabular-nums; }
+.cart-when span { font-size: 12px; color: var(--grey); line-height: 1.3; }
+.cart-what { grid-area: what; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.cart-what b { font-size: 16px; }
+.cart-what span, .cart-what em { font-size: 13.5px; color: var(--grey); font-style: normal; }
+.cart-price { grid-area: price; font-weight: 600; font-variant-numeric: tabular-nums; }
+.cart-acts { grid-area: acts; display: flex; align-items: center; gap: 8px; }
+.cart-edit { border: none; background: none; color: var(--accent); font: inherit; font-size: 14px; font-weight: 600; padding: 0; cursor: pointer; }
+.cart-rm { margin-left: auto; border: none; background: none; color: var(--grey); padding: 4px; cursor: pointer; display: inline-flex; }
+.cart-rm .gb-ic { width: 18px; height: 18px; }
+.cart-add { display: flex; gap: 8px; margin-bottom: 14px; }
+.cart-add input { flex: 1; min-width: 0; width: auto; }
+.cart-add button { border: none; background: var(--fill-2); color: var(--ink); font: inherit; font-weight: 600; border-radius: 12px; padding: 0 16px; cursor: pointer; }
+.cart-total { display: flex; justify-content: space-between; align-items: baseline; font-size: 17px; padding: 4px 2px 16px; }
+.cart-total:empty { display: none; }

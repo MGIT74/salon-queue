@@ -1,6 +1,9 @@
 /* Reservation a plusieurs (un parent + ses enfants, des amis...) - module commun a rdv.html, compte.html et au mode salon.
  *
- * Parcours guide en 4 ecrans : « Pour qui ? » (juste moi / plusieurs personnes) > « Que fait chacun ? » (prestation, coiffeur,
+ * Parcours utilise par les pages : « Pour qui ? » (juste moi / plusieurs personnes) > « Qui vient ? », puis la page reprend la main
+ * (cfg.onPeople) et refait la reservation normale pour chaque personne, avec un panier commun (cartHeld / cartPayload / cartRowsHtml).
+ *
+ * Ancien parcours guide (encore disponible sans onPeople) en 4 ecrans : « Pour qui ? » (juste moi / plusieurs personnes) > « Que fait chacun ? » (prestation, coiffeur,
  * supplements, personne par personne, avec « Meme chose que ... ») > « Quand venez-vous ? » (UNE date pour tout le groupe et des
  * horaires complets proposes : les uns apres les autres, ou en meme temps) > « On verifie ensemble ». L'heure de chacun peut
  * toujours etre choisie separement. Deux personnes ne se chevauchent jamais chez le meme coiffeur (parametre « held » cote serveur).
@@ -571,7 +574,13 @@
       if (act === 'who-next') {
         if (whoCount() < 1) return;
         if (whoCount() > MAX_PEOPLE) { if (cfg.toast) cfg.toast('Maximum ' + MAX_PEOPLE + ' personnes.', true); return; }
-        applyWho(); editing = false; cur = firstWithout(function (o) { return !o.serviceId; }) || people[0]; return go('person');
+        applyWho(); editing = false;
+        // Parcours « une personne a la fois » : la page reprend la main avec la liste des personnes, et refait pour
+        // chacune la reservation normale (coiffeur > prestation > supplements > produits > date) avant un panier commun.
+        if (cfg.onPeople) return savePendingRelatives().then(function () {
+          cfg.onPeople(people.map(function (q) { return { uid: q.uid, isSelf: q.isSelf, name: label(q), relativeId: q.relativeId || null }; }));
+        });
+        cur = firstWithout(function (o) { return !o.serviceId; }) || people[0]; return go('person');
       }
       if (act === 'goto') { var pg = personByUid(t.getAttribute('data-uid')); if (pg) { cur = pg; return go('person'); } return; }
       if (act === 'copy') { var src = personByUid(t.getAttribute('data-uid')); if (src) { cur.serviceId = src.serviceId; cur.extraIds = src.extraIds.slice(); cur.pref = src.pref; markChanged(cur); } return paint(); }
@@ -623,6 +632,12 @@
       if (t.getAttribute && t.getAttribute('data-act') === 'who-save') wsel.draftSave = t.checked;
     });
 
+    function savePendingRelatives() {
+      var todo = people.filter(function (p) { return !p.isSelf && p.saveRelative && !p.relativeId && String(p.name || '').trim() && cfg.createRelative; });
+      return Promise.all(todo.map(function (p) {
+        return cfg.createRelative(String(p.name).trim()).then(function (item) { if (item) p.relativeId = item.id; }).catch(function () {});
+      }));
+    }
     function doContinue() {
       var todo = people.filter(function (p) { return !p.isSelf && p.saveRelative && !p.relativeId && String(p.name || '').trim() && cfg.createRelative; });
       Promise.all(todo.map(function (p) {
@@ -642,6 +657,36 @@
     };
   }
 
+  /* ---------- Panier « une personne a la fois » (rdv.html, compte.html) ----------
+     Une ligne de panier : { name, isSelf, relativeId, barber_id, barber_name, service_id, service_name, extras[], extra_names[],
+     products[], product_names[], date, time, dur, price_cents }. */
+  // Creneaux deja retenus dans le panier ce jour-la (sauf la personne en cours) : la disponibilite ne les propose plus.
+  function cartHeld(cart, date, exceptIndex) {
+    return (cart || []).filter(function (e, i) { return i !== exceptIndex && e && e.date === date && e.barber_id && e.dur > 0; })
+      .map(function (e) { return e.barber_id + '|' + e.date + '|' + e.time + '|' + e.dur; }).join(',');
+  }
+  // Envoi au serveur (/api/appointments/group ou /admin-group) : une personne par ligne, dans l'ordre du panier.
+  function cartPayload(cart) {
+    return (cart || []).map(function (e) {
+      return { name: e.isSelf ? '' : e.name, service_id: e.service_id, extras: (e.extras || []).slice(),
+               products: (e.products || []).map(function (id) { return { id: id, quantity: 1 }; }),
+               barber_id: e.barber_id, date: e.date, time: e.time };
+    });
+  }
+  function cartDate(d) { try { return new Date(d + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }); } catch (e) { return d; } }
+  // Lignes du panier : qui, quand, quoi, avec qui, combien ; « Modifier » / retirer. eur : formateur de prix.
+  function cartRowsHtml(cart, eur, fnPrefix) {
+    return (cart || []).map(function (e, i) {
+      var what = e.service_name + (e.extra_names && e.extra_names.length ? ' + ' + e.extra_names.join(', ') : '');
+      var prod = e.product_names && e.product_names.length ? '<em>Produit' + (e.product_names.length > 1 ? 's' : '') + ' : ' + esc(e.product_names.join(', ')) + '</em>' : '';
+      return '<div class="cart-row"><div class="cart-when"><b>' + esc(e.time) + '</b><span>' + esc(cartDate(e.date)) + '</span></div>' +
+        '<div class="cart-what"><b>' + esc(e.name) + '</b><span>' + esc(what) + (e.barber_name ? ' · ' + esc(e.barber_name) : '') + '</span>' + prod + '</div>' +
+        '<div class="cart-price">' + eur(e.price_cents || 0) + '</div>' +
+        '<div class="cart-acts"><button type="button" class="cart-edit" onclick="' + fnPrefix + 'Edit(' + i + ')">Modifier</button>' +
+        '<button type="button" class="cart-rm" aria-label="Retirer ' + esc(e.name) + '" onclick="' + fnPrefix + 'Remove(' + i + ')">' + ic('x') + '</button></div></div>';
+    }).join('');
+  }
+
   /** Tuile « plusieurs personnes » des grilles de coiffeurs (meme habillage que « Utiliser un cadeau »). */
   function tileHtml(onclick) {
     return '<button type="button" class="svc-card barber-tile group-tile" onclick="' + onclick + '">' +
@@ -649,5 +694,5 @@
       '<span class="name">Plusieurs personnes</span><span class="meta">Enfants, amis…</span></button>';
   }
 
-  return { buildPlans: buildPlans, tileHtml: tileHtml, MAX_PEOPLE: MAX_PEOPLE, personDuration: personDuration, personPrice: personPrice, heldParam: heldParam, computeSuggestions: computeSuggestions, buildPayload: buildPayload, create: create };
+  return { cartHeld: cartHeld, cartPayload: cartPayload, cartRowsHtml: cartRowsHtml, buildPlans: buildPlans, tileHtml: tileHtml, MAX_PEOPLE: MAX_PEOPLE, personDuration: personDuration, personPrice: personPrice, heldParam: heldParam, computeSuggestions: computeSuggestions, buildPayload: buildPayload, create: create };
 });
