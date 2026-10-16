@@ -484,7 +484,12 @@ router.post('/gift-cards/:id/redeem', requireAdminOrBarber, wrap(async (req, res
       return res.status(409).json({ error: 'Le cadeau ou le passage a déjà été utilisé' });
     }
     await conn.commit();
-    await earnLoyaltyPoint(req.salon.id, queueRow);
+    // La fidélité ne doit pas invalider un paiement cadeau déjà confirmé.
+    try {
+      await earnLoyaltyPoint(req.salon.id, queueRow);
+    } catch (loyaltyError) {
+      console.error('Gift redemption loyalty error:', loyaltyError);
+    }
     res.json({ ok: true });
   } catch (err) {
     await conn.rollback();
