@@ -9296,25 +9296,41 @@ function openAddSalonClosure() {
     var customMessage = (sendEmail && ascMsgType === 'custom') ? overlay.querySelector('#asc-custom-text').value.trim() : '';
 
     var btn = overlay.querySelector('#asc-save-btn');
-    btn.disabled = true; btn.textContent = 'Ajout…';
-
-    api('/api/salon-calendar/closures', {
-      method: 'POST',
-      body: {
-        start_date: from, end_date: to,
-        reason: overlay.querySelector('#asc-reason').value.trim(),
-        send_email: sendEmail,
-        custom_message: customMessage
-      }
-    }).then(function (r) {
-      _closeModal(overlay);
-      if (r.email) toast('Fermeture ajoutée — email envoyé à ' + r.email.sent + '/' + r.email.total + ' client(s)');
-      else toast('Fermeture ajoutée');
-      loadSalonClosures();
-    }).catch(function (e) {
-      btn.disabled = false; btn.textContent = 'Ajouter';
-      errEl.textContent = e.message; errEl.style.display = 'block';
-    });
+    btn.disabled = true; btn.textContent = 'Vérification des rendez-vous…';
+    var reason = overlay.querySelector('#asc-reason').value.trim();
+    api('/api/salon-calendar/closures/preview?start_date=' + encodeURIComponent(from) + '&end_date=' + encodeURIComponent(to))
+      .then(function(preview) {
+        var affected = preview.items || [];
+        var confirmed = Promise.resolve(true);
+        if (affected.length) {
+          var details = affected.map(function(a) {
+            return a.scheduled_at.slice(8,10) + '/' + a.scheduled_at.slice(5,7) + ' à ' + a.scheduled_at.slice(11,16) +
+              ' — ' + a.client_name + ' — ' + (a.service_name || 'Prestation') +
+              ' (' + (a.barber_name || 'Coiffeur non attribué') + ')' + (a.email ? ' · ' + a.email : ' · Pas d’email');
+          }).join('\\n');
+          confirmed = showConfirm(affected.length + ' rendez-vous déjà prévus sur ces dates :\\n\\n' + details +
+            '\\n\\nLa fermeture empêchera de nouvelles réservations mais ne supprimera PAS ces rendez-vous. ' +
+            'Vous devrez contacter les clients ou annuler leurs RDV séparément. ' +
+            (sendEmail ? 'L’option email actuelle prévient tous les clients du salon, pas uniquement ceux de cette liste.' : 'Aucun email ne sera envoyé.') +
+            '\\n\\nConfirmer quand même la fermeture ?',
+            { title: 'Rendez-vous pendant la fermeture', danger: true, confirmLabel: 'Confirmer la fermeture' });
+        }
+        return Promise.resolve(confirmed).then(function(ok) {
+          if (!ok) return null;
+          return api('/api/salon-calendar/closures', { method: 'POST', body: {
+            start_date: from, end_date: to, reason: reason, send_email: sendEmail,
+            custom_message: customMessage, confirm_existing_appointments: affected.length > 0
+          }});
+        });
+      }).then(function(r) {
+        if (!r) return;
+        _closeModal(overlay);
+        if (r.email) toast('Fermeture ajoutée — email envoyé à ' + r.email.sent + '/' + r.email.total + ' client(s)');
+        else toast('Fermeture ajoutée');
+        loadSalonClosures();
+      }).catch(function(e) {
+        errEl.textContent = e.message; errEl.style.display = 'block';
+      }).finally(function() { btn.disabled = false; btn.textContent = 'Ajouter'; });
   };
 }
 
