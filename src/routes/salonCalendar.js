@@ -118,6 +118,13 @@ router.post('/closures', requireAdmin, wrap(async (req, res) => {
   const today = await closureToday(req.salon.id);
   if (end_date < today) return res.status(400).json({ error: 'Impossible de créer une fermeture entièrement passée' });
   const effectiveStart = start_date < today ? today : start_date;
+  const [overlapping] = await pool.query(
+    'SELECT id FROM salon_closures WHERE salon_id = ? AND start_date <= ? AND end_date >= ? LIMIT 1',
+    [req.salon.id, end_date, effectiveStart]
+  );
+  if (overlapping.length) return res.status(409).json({
+    error: 'Une fermeture existe déjà sur cette période. Choisissez une plage sans chevauchement.'
+  });
   const affected = await appointmentsAffected(req.salon.id, effectiveStart, end_date);
   if (affected.length && req.body.confirm_existing_appointments !== true)
     return res.status(409).json({ error: 'Des rendez-vous existent sur cette période. Confirmation explicite requise.', count: affected.length, items: affected });
