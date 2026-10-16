@@ -499,7 +499,7 @@ router.post('/:id/start', requireAdminOrBarber, wrap(async (req, res) => {
   }
 
   await pool.query(
-    "UPDATE queue SET status = 'in_progress', start_at = NOW(), barber_id = COALESCE(?, barber_id) WHERE id = ? AND salon_id = ?",
+    "UPDATE queue SET status = 'in_progress', start_at = NOW(), barber_id = COALESCE(?, barber_id) WHERE id = ? AND salon_id = ? AND status = 'waiting'",
     [barberId, req.params.id, req.salon.id]
   );
   // Répercute le coiffeur finalement retenu sur l'entrée d'agenda liée
@@ -554,7 +554,7 @@ router.post('/:id/quick-finish', requireAdminOrBarber, wrap(async (req, res) => 
   }
 
   await pool.query(
-    "UPDATE queue SET status = 'done', end_at = NOW(), barber_id = COALESCE(?, barber_id) WHERE id = ? AND salon_id = ?",
+    "UPDATE queue SET status = 'done', end_at = NOW(), barber_id = COALESCE(?, barber_id) WHERE id = ? AND salon_id = ? AND status = 'waiting'",
     [barberId, req.params.id, req.salon.id]
   );
   if (barberId) {
@@ -583,7 +583,7 @@ router.post('/:id/finish', requireAdminOrBarber, wrap(async (req, res) => {
     }
   }
   await pool.query(
-    "UPDATE queue SET status = 'done', end_at = NOW() WHERE id = ? AND salon_id = ?",
+    "UPDATE queue SET status = 'done', end_at = NOW() WHERE id = ? AND salon_id = ? AND status = 'in_progress'",
     [req.params.id, req.salon.id]
   );
   await recompute(req.salon.id);
@@ -606,7 +606,7 @@ router.post('/:id/cancel', requireAdminOrBarber, wrap(async (req, res) => {
     }
   }
   await pool.query(
-    "UPDATE queue SET status = 'cancelled' WHERE id = ? AND salon_id = ?",
+    "UPDATE queue SET status = 'cancelled' WHERE id = ? AND salon_id = ? AND status IN ('waiting','in_progress')",
     [req.params.id, req.salon.id]
   );
   await recompute(req.salon.id);
