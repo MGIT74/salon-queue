@@ -1,6 +1,6 @@
 const express = require('express');
 const crypto = require('crypto');
-const { pool } = require('../db');
+const { pool, getSettings } = require('../db');
 const requireAdmin = require('../middleware/auth');
 const requireAdminOrBarber = require('../middleware/barberAuth');
 const { sendSalonClosureNotice } = require('../lib/mailer');
@@ -72,6 +72,11 @@ router.get('/closures', requireAdmin, wrap(async (req, res) => {
 
 // Contrôle préalable : rendez-vous déjà confirmés sur la période demandée.
 async function appointmentsAffected(salonId, from, to) {
+  const settings = await getSettings(salonId);
+  const timezone = settings.timezone || 'Europe/Paris';
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date());
+  const part = (type) => parts.find(p => p.type === type).value;
+  const nowLocal = part('year') + '-' + part('month') + '-' + part('day') + ' ' + part('hour') + ':' + part('minute') + ':00';
   const [rows] = await pool.query(`SELECT a.id, a.client_name, a.email, a.phone,
     DATE_FORMAT(a.scheduled_at, '%Y-%m-%d %H:%i') AS scheduled_at,
     s.name AS service_name, b.name AS barber_name
@@ -79,8 +84,9 @@ async function appointmentsAffected(salonId, from, to) {
     LEFT JOIN barbers b ON b.id = a.barber_id
     WHERE a.salon_id = ? AND a.scheduled_at >= CONCAT(?, ' 00:00:00')
       AND a.scheduled_at < DATE_ADD(?, INTERVAL 1 DAY)
+      AND a.scheduled_at >= ?
       AND a.status NOT IN ('cancelled', 'completed', 'no_show')
-    ORDER BY a.scheduled_at, a.client_name`, [salonId, from, to]);
+    ORDER BY a.scheduled_at, a.client_name`, [salonId, from, to, nowLocal]);
   return rows;
 }
 router.get('/closures/preview', requireAdmin, wrap(async (req, res) => {
@@ -100,28 +106,14 @@ router.post('/closures', requireAdmin, wrap(async (req, res) => {
   if (affected.length && req.body.confirm_existing_appointments !== true)
     return res.status(409).json({ error: 'Des rendez-vous existent sur cette période. Confirmation explicite requise.', count: affected.length, items: affected });
 
-  // Préparer les destinataires AVANT l'insertion : une erreur SQL ne doit
-  // jamais créer une fermeture partielle suivie d'une erreur HTTP 500.
-  let recipients = [];
-  if (send_email) {
-    const [rows] = await pool.query(
-      `SELECT LOWER(email) AS email_lower, MIN(client_name) AS client_name
-       FROM (
-         SELECT c.email AS email, c.name AS client_name
-         FROM clients c INNER JOIN salons sl ON sl.owner_id = c.owner_id
-         WHERE sl.id = ? AND c.email IS NOT NULL AND c.email <> ''
-         UNION ALL
-         SELECT q.email, q.client_name FROM queue q
-         WHERE q.salon_id = ? AND q.email IS NOT NULL AND q.email <> ''
-         UNION ALL
-         SELECT a.email, a.client_name FROM appointments a
-         WHERE a.salon_id = ? AND a.email IS NOT NULL AND a.email <> ''
-       ) AS all_known
-       GROUP BY LOWER(email)`,
-      [req.salon.id, req.salon.id, req.salon.id]
-    );
-    recipients = rows;
-  }
+  // Prévenir uniquement les clients ayant un rendez-vous futur concerné,
+  // jamais tous les contacts historiques ni les rendez-vous déjà passés.
+  const recipients = send_email ? Array.from(new Map(
+    affected.filter(a => a.email && a.email.trim()).map(a => [
+      a.email.trim().toLowerCase(),
+      { email_lower: a.email.trim().toLowerCase(), client_name: a.client_name }
+    ])
+  ).values()) : [];
 
   const id = crypto.randomUUID();
   await pool.query(
