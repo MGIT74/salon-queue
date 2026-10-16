@@ -9303,17 +9303,27 @@ function openAddSalonClosure() {
         var affected = preview.items || [];
         var confirmed = Promise.resolve(true);
         if (affected.length) {
-          var details = affected.map(function(a) {
-            return a.scheduled_at.slice(8,10) + '/' + a.scheduled_at.slice(5,7) + ' à ' + a.scheduled_at.slice(11,16) +
-              ' — ' + a.client_name + ' — ' + (a.service_name || 'Prestation') +
-              ' (' + (a.barber_name || 'Coiffeur non attribué') + ')' + (a.email ? ' · ' + a.email : ' · Pas d’email');
-          }).join('\\n');
-          confirmed = showConfirm(affected.length + ' rendez-vous déjà prévus sur ces dates :\\n\\n' + details +
-            '\\n\\nLa fermeture empêchera de nouvelles réservations mais ne supprimera PAS ces rendez-vous. ' +
-            'Vous devrez contacter les clients ou annuler leurs RDV séparément. ' +
-            (sendEmail ? 'L’option email actuelle prévient tous les clients du salon, pas uniquement ceux de cette liste.' : 'Aucun email ne sera envoyé.') +
-            '\\n\\nConfirmer quand même la fermeture ?',
-            { title: 'Rendez-vous pendant la fermeture', danger: true, confirmLabel: 'Confirmer la fermeture' });
+          confirmed = new Promise(function(resolve) {
+            var rows = affected.map(function(a) {
+              var date = esc(a.scheduled_at.slice(8,10) + '/' + a.scheduled_at.slice(5,7) + '/' + a.scheduled_at.slice(0,4));
+              var time = esc(a.scheduled_at.slice(11,16));
+              return '<div style="display:grid;grid-template-columns:85px minmax(0,1fr);gap:12px;padding:12px 2px;border-bottom:1px solid var(--border,rgba(128,128,128,.18))">' +
+                '<div style="font-size:13px;font-weight:700;color:var(--blue)">' + date + '<div style="color:var(--ink);font-size:17px;margin-top:3px">' + time + '</div></div>' +
+                '<div style="min-width:0"><strong style="font-size:14px">' + esc(a.client_name || 'Client') + '</strong>' +
+                '<div style="font-size:13px;color:var(--muted);margin-top:3px">' + esc(a.service_name || 'Prestation') + ' · ' + esc(a.barber_name || 'Coiffeur non attribué') + '</div>' +
+                '<div style="font-size:12px;color:var(--muted);overflow-wrap:anywhere;margin-top:3px">' + esc(a.email || 'Pas d’adresse email') + '</div></div></div>';
+            }).join('');
+            var confirmOverlay = _buildModal(
+              '<div class="modal-title">Rendez-vous pendant la fermeture</div>' +
+              '<p style="color:var(--muted);margin:4px 0 14px">' + affected.length + ' rendez-vous prévus du ' + esc(from.split('-').reverse().join('/')) + ' au ' + esc(to.split('-').reverse().join('/')) + '</p>' +
+              '<div style="max-height:310px;overflow-y:auto;padding:0 12px;border:1px solid var(--border,rgba(128,128,128,.2));border-radius:12px;margin-bottom:14px">' + rows + '</div>' +
+              '<p style="font-size:13px;line-height:1.5;color:var(--muted);margin-bottom:12px">La fermeture bloquera les nouvelles réservations, mais <strong>ne supprimera pas ces rendez-vous</strong>. Il faudra les gérer séparément.</p>' +
+              '<p style="font-size:12px;color:var(--muted);margin-bottom:18px">' + (sendEmail ? 'L’email de fermeture sera envoyé à tous les clients connus du salon.' : 'Aucun email ne sera envoyé.') + '</p>' +
+              '<div class="modal-actions"><button type="button" class="btn btn-soft" id="asc-review-cancel">Retour</button><button type="button" class="btn btn-primary" id="asc-review-confirm">Confirmer la fermeture</button></div>'
+            );
+            confirmOverlay.querySelector('#asc-review-cancel').onclick = function(){_closeModal(confirmOverlay);resolve(false);};
+            confirmOverlay.querySelector('#asc-review-confirm').onclick = function(){_closeModal(confirmOverlay);resolve(true);};
+          });
         }
         return Promise.resolve(confirmed).then(function(ok) {
           if (!ok) return null;
