@@ -5734,8 +5734,11 @@ function toggleBarberTimer(id, el) {
 }
 
 function saveSchedule(id) {
-  var box = document.querySelector('[data-barber="' + id + '"]');
-  var schedules = Array.prototype.map.call(box.querySelectorAll('.day-row'), function (row) {
+  var box = document.getElementById('bp-tabbody-' + id);
+  if (!box || (barberDetailTab[id] || 'horaires') !== 'horaires') { toast('Onglet horaires introuvable : aucune modification enregistrée', true); return; }
+  var dayRows = box.querySelectorAll('.day-row');
+  if (dayRows.length !== 7) { toast('Les 7 jours du planning sont requis : aucune modification enregistrée', true); return; }
+  var schedules = Array.prototype.map.call(dayRows, function (row) {
     var times = row.querySelector('.day-row-times').querySelectorAll('input[type="time"]');
     return {
       weekday: Number(row.dataset.day),
@@ -5752,6 +5755,7 @@ function saveSchedule(id) {
       breaks.push({ weekday: weekday, start_time: times[0].value, end_time: times[1].value });
     });
   });
+  if (schedules.some(function(x){ return !x.start_time || !x.end_time || x.start_time >= x.end_time; })) { toast('Vérifiez les heures de début et de fin', true); return; }
   api('/api/barbers/' + id + '/schedule', { method: 'PUT', body: { schedules: schedules, breaks: breaks } })
     .then(loadBarbers).then(function () { toast('Horaires enregistrés'); })
     .catch(function (e) { toast(e.message, true); });
