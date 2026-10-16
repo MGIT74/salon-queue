@@ -303,6 +303,10 @@
     display: flex; align-items: center; justify-content: center;
   }
 </style>
+<style>
+/* Calendrier client : jours de fermeture grisés et impossibles à sélectionner. */
+.closure-calendar{position:relative;max-width:380px}.closure-calendar input[type=date]{display:none}.closure-cal-head{display:flex;align-items:center;justify-content:space-between;margin:10px 0}.closure-cal-head button{border:1px solid #ddd;border-radius:8px;background:transparent;padding:8px 12px;cursor:pointer}.closure-cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}.closure-cal-grid button{border:0;border-radius:8px;min-height:38px;background:transparent;cursor:pointer;color:inherit}.closure-cal-grid button.selected{background:#222;color:#fff}.closure-cal-grid button:disabled{background:#eee;color:#999;cursor:not-allowed;opacity:.65}.closure-cal-grid span{text-align:center;font-size:12px;padding:8px 0;color:#888}.closure-cal-grid button:not(:disabled):hover{outline:1px solid #888}
+</style>
 </head>
 <body>
 <div id="no-salon" role="alert"><div class="box"><h1>Lien incomplet</h1><p>Cette adresse ne précise pas de salon. Pour accéder à votre espace client, utilisez le lien fourni par votre salon.</p></div></div>
@@ -579,7 +583,7 @@
       Annuler l'utilisation du cadeau
     </button>
     <div class="flow-recap" data-recap></div>
-    <div class="fld"><label for="bk-date">Date</label><input id="bk-date" type="date" onchange="loadBookSlots()"></div>
+    <div class="fld"><label for="bk-date">Date</label><div class="closure-calendar" id="bk-date-calendar"><input id="bk-date" type="date" onchange="loadBookSlots()"><div class="closure-cal-head"><button type="button" id="bk-date-prev" aria-label="Mois précédent">‹</button><strong id="bk-date-month"></strong><button type="button" id="bk-date-next" aria-label="Mois suivant">›</button></div><div class="closure-cal-grid" id="bk-date-grid"></div><p style="font-size:12px;color:#888;margin-top:8px">Les dates grisées sont indisponibles ou correspondent à une fermeture du salon.</p></div></div>
     <div class="eyebrow" style="margin-top:20px">Créneaux disponibles</div>
     <div id="bk-half-toggle" class="half-toggle" style="display:none;margin-bottom:14px">
       <button id="bk-half-morning" onclick="showBookHalf('morning')">Matin</button>
@@ -1761,6 +1765,44 @@ function guardMissingSalon() {
   window.addEventListener('resize', sync);
   window.addEventListener('orientationchange', sync);
   sync();
+})();
+</script>
+<script>
+(function(){
+  var input = document.getElementById('bk-date');
+  var grid = document.getElementById('bk-date-grid');
+  var monthTitle = document.getElementById('bk-date-month');
+  var closed = [];
+  var today = (typeof salonToday === 'function' ? salonToday() : new Date().toISOString().slice(0,10));
+  var shown = new Date(today + 'T12:00:00'); shown.setDate(1);
+  function pad(n){ return String(n).padStart(2,'0'); }
+  function iso(y,m,d){ return y+'-'+pad(m)+'-'+pad(d); }
+  function render(){
+    today = (typeof salonToday === 'function' ? salonToday() : new Date().toISOString().slice(0,10));
+    var y=shown.getFullYear(), m=shown.getMonth();
+    monthTitle.textContent = shown.toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+    grid.innerHTML='';
+    ['L','M','M','J','V','S','D'].forEach(function(day){var x=document.createElement('span');x.textContent=day;grid.appendChild(x);});
+    var offset=(new Date(y,m,1).getDay()+6)%7;
+    for(var k=0;k<offset;k++){grid.appendChild(document.createElement('span'));}
+    var count=new Date(y,m+1,0).getDate();
+    for(var d=1;d<=count;d++){
+      (function(day){var value=iso(y,m+1,day),button=document.createElement('button');button.type='button';button.textContent=day;
+      var unavailable=value<today || (input.max && value>input.max) || closed.some(function(c){return value>=c.start_date && value<=c.end_date;});
+      button.disabled=unavailable;button.className=value===input.value?'selected':'';
+      button.setAttribute('aria-label',value);if(unavailable)button.title='Date indisponible';
+      button.onclick=function(){input.value=value;input.dispatchEvent(new Event('change',{bubbles:true}));render();};grid.appendChild(button);})(d);
+    }
+    document.getElementById('bk-date-prev').disabled=iso(y,m+1,1)<today.slice(0,7)+'-01';
+  }
+  document.getElementById('bk-date-prev').onclick=function(){shown.setMonth(shown.getMonth()-1);render();};
+  document.getElementById('bk-date-next').onclick=function(){shown.setMonth(shown.getMonth()+1);render();};
+  input.addEventListener('change',render);
+  fetch('/api/salon-calendar/public-closures'+location.search.split('#')[0],{credentials:'same-origin'})
+    .then(function(r){if(!r.ok)throw Error('closures');return r.json();})
+    .then(function(r){closed=r.items||[];if(closed.some(function(c){return input.value>=c.start_date&&input.value<=c.end_date;})){input.value='';input.dispatchEvent(new Event('change'));}render();})
+    .catch(function(){render();});
+  render();
 })();
 </script>
 </body>
