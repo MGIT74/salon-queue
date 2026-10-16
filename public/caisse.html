@@ -229,6 +229,9 @@
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
     padding: 6px 2px;
   }
+  /* Jour passé : grisé et non cliquable (plus de prise de RDV), comme le calendrier de réservation en ligne. */
+  .cal-day.past { opacity: .35; cursor: default; }
+  .cal-day.past:hover { filter: none; }
   .cal-day.empty { background: none; cursor: default; }
   .cal-day.today { box-shadow: inset 0 0 0 2px var(--blue); }
   .cal-day.selected { background: var(--blue); }
@@ -2031,7 +2034,8 @@ function renderCalMonth() {
       if (d === null) return '<div class="cal-day empty"></div>';
       var dateStr = calAnchor.getFullYear() + '-' + String(calAnchor.getMonth() + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
       var classes = 'cal-day' + (dateStr === todayStr ? ' today' : '') + (dateStr === calSelectedDate ? ' selected' : '');
-      return '<div class="' + classes + '" onclick="selectCalDay(\'' + dateStr + '\')">' +
+      if (isPastDay(dateStr)) classes += ' past';
+      return '<div class="' + classes + '"' + (isPastDay(dateStr) ? '' : ' onclick="selectCalDay(\'' + dateStr + '\')"') + '>' +
         '<div class="cal-day-num">' + d + '</div>' +
         calDayDotsHtml(byDay[dateStr] || []) +
         '</div>';
@@ -2078,7 +2082,8 @@ function renderCalWeek() {
     var d = addDays(start, i);
     var dateStr = ymd(d);
     var classes = 'cal-day' + (dateStr === todayStr ? ' today' : '') + (dateStr === calSelectedDate ? ' selected' : '');
-    cells += '<div class="' + classes + '" onclick="selectCalDay(\'' + dateStr + '\')">' +
+    if (isPastDay(dateStr)) classes += ' past';
+    cells += '<div class="' + classes + '"' + (isPastDay(dateStr) ? '' : ' onclick="selectCalDay(\'' + dateStr + '\')"') + '>' +
       '<div class="cal-day-num">' + d.getDate() + '</div>' +
       calDayDotsHtml(byDay[dateStr] || []) +
       '</div>';

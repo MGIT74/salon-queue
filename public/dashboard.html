@@ -1016,6 +1016,9 @@
     position: relative; transition: filter .15s ease; padding: 6px 2px;
   }
   .cal-day:hover { filter: brightness(1.15); }
+  /* Jour passé : grisé et non cliquable (plus de prise de RDV), comme le calendrier de réservation en ligne. */
+  .cal-day.past { opacity: .35; cursor: default; }
+  .cal-day.past:hover { filter: none; }
   .cal-day.empty { background: none; cursor: default; }
   .cal-day.today { box-shadow: inset 0 0 0 2px var(--blue); }
   .cal-day.selected { background: var(--blue); }
@@ -6555,8 +6558,9 @@ function renderMonthView() {
         return '<span class="cal-dot" style="background:' + (rdvBarberColors[bid] || '#888') + '"></span>';
       }).join('');
       var classes = 'cal-day' + (dateStr === todayStr ? ' today' : '') + (dateStr === calSelectedDate ? ' selected' : '');
+      if (isPastDay(dateStr)) classes += ' past';
       if (rdvIsSalonClosed(dateStr)) classes += ' salon-closed';
-      return '<div class="' + classes + '" onclick="selectCalendarDay(\'' + dateStr + '\')">' +
+      return '<div class="' + classes + '"' + (isPastDay(dateStr) ? '' : ' onclick="selectCalendarDay(\'' + dateStr + '\')"') + '>' +
         '<div class="cal-day-num">' + day + '</div>' +
         (dots ? '<div class="cal-dots">' + dots + '</div>' : '') +
         '</div>';
@@ -6911,8 +6915,9 @@ function renderWeekView() {
       return '<span class="cal-dot" style="background:' + (rdvBarberColors[bid] || '#888') + '"></span>';
     }).join('');
     var classes = 'cal-day' + (dateStr === todayStr ? ' today' : '') + (dateStr === calSelectedDate ? ' selected' : '');
+    if (isPastDay(dateStr)) classes += ' past';
       if (rdvIsSalonClosed(dateStr)) classes += ' salon-closed';
-    cells += '<div class="' + classes + '" onclick="selectCalendarDay(\'' + dateStr + '\')">' +
+    cells += '<div class="' + classes + '"' + (isPastDay(dateStr) ? '' : ' onclick="selectCalendarDay(\'' + dateStr + '\')"') + '>' +
       '<div class="cal-day-num">' + d.getDate() + '</div>' +
       (dots ? '<div class="cal-dots">' + dots + '</div>' : '') +
       '</div>';

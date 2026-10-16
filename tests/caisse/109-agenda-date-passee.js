@@ -27,5 +27,12 @@ check('admin : lignes du planning non cliquables un jour passe', /var trackClick
 check('poste : lignes non cliquables et pas de bouton « + Ajouter » un jour passe', /var trackClick = \(rdvIsSalonClosed\(dateStr\) \|\| isPastDay\(dateStr\)\) \? ''/.test(read('poste.html')) && /if \(isPastDay\(dateStr\)\) return '';/.test(fnBody(read('poste.html'), 'posteAddBtnHtml')));
 check('caisse : lignes non cliquables et pas de bouton « + Ajouter » un jour passe', /var trackClick = \(bid === 'unassigned' \|\| isPastDay\(dateStr\)\) \? ''/.test(read('caisse.html')) && /if \(activeBarberId && !isPastDay\(dateStr\)\)/.test(read('caisse.html')));
 
+console.log('\n[C] Calendrier : jours passes grises et non cliquables');
+[['dashboard.html', 'selectCalendarDay'], ['poste.html', 'selectCalDay'], ['caisse.html', 'selectCalDay']].forEach(([f, fn]) => {
+  const s = read(f);
+  check(f + ' : classe « past » (grise) sur les jours passes, en Mois et en Semaine', (s.match(/if \(isPastDay\(dateStr\)\) classes \+= ' past';/g) || []).length === 2 && /\.cal-day\.past \{ opacity: \.35; cursor: default; \}/.test(s));
+  check(f + ' : pas de clic sur un jour passe', (s.match(new RegExp("\\(isPastDay\\(dateStr\\) \\? '' : ' onclick=\"" + fn + "\\(", 'g')) || []).length === 2);
+});
+
 console.log('\nRESULTAT : ' + pass + ' verifications reussies, ' + fail + ' echec(s)');
 process.exit(fail ? 1 : 0);

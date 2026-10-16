@@ -247,6 +247,9 @@
     position: relative; transition: filter .15s ease; padding: 6px 2px;
   }
   .cal-day:hover { filter: brightness(1.15); }
+  /* Jour passé : grisé et non cliquable (plus de prise de RDV), comme le calendrier de réservation en ligne. */
+  .cal-day.past { opacity: .35; cursor: default; }
+  .cal-day.past:hover { filter: none; }
   .cal-day.empty { background: none; cursor: default; }
   .cal-day.today { box-shadow: inset 0 0 0 2px var(--blue); }
   .cal-day.selected { background: var(--blue); }
@@ -1051,8 +1054,9 @@ function renderCalMonth() {
       if (d === null) return '<div class="cal-day empty"></div>';
       var dateStr = calAnchor.getFullYear() + '-' + String(calAnchor.getMonth() + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
       var classes = 'cal-day' + (dateStr === todayStr ? ' today' : '') + (dateStr === calSelectedDate ? ' selected' : '');
+      if (isPastDay(dateStr)) classes += ' past';
       if (rdvIsSalonClosed(dateStr)) classes += ' salon-closed';
-      return '<div class="' + classes + '" onclick="selectCalDay(\'' + dateStr + '\')">' +
+      return '<div class="' + classes + '"' + (isPastDay(dateStr) ? '' : ' onclick="selectCalDay(\'' + dateStr + '\')"') + '>' +
         '<div class="cal-day-num">' + d + '</div>' + calDayDotsHtml(byDay[dateStr] || []) + '</div>';
     }).join('') + '</div>';
     var selectedInThisWeek = calSelectedDate && weekDays.some(function (d) {
@@ -1095,8 +1099,9 @@ function renderCalWeek() {
   for (var i = 0; i < 7; i++) {
     var d = addDays(start, i), dateStr = ymd(d);
     var classes = 'cal-day' + (dateStr === todayStr ? ' today' : '') + (dateStr === calSelectedDate ? ' selected' : '');
+    if (isPastDay(dateStr)) classes += ' past';
       if (rdvIsSalonClosed(dateStr)) classes += ' salon-closed';
-    cells += '<div class="' + classes + '" onclick="selectCalDay(\'' + dateStr + '\')">' +
+    cells += '<div class="' + classes + '"' + (isPastDay(dateStr) ? '' : ' onclick="selectCalDay(\'' + dateStr + '\')"') + '>' +
       '<div class="cal-day-num">' + d.getDate() + '</div>' + calDayDotsHtml(byDay[dateStr] || []) + '</div>';
   }
   var html = '<div class="cal-grid cal-week-row">' + cells + '</div>';
