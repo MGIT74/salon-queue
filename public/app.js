@@ -624,11 +624,15 @@ function showPrompt(message, opts) {
       ' value="' + esc(opts.defaultValue || '') + '" placeholder="' + esc(opts.placeholder || '') + '">' +
       '<div class="modal-actions">' +
       '<button class="btn btn-soft" id="modal-cancel-btn">Annuler</button>' +
+      // Bouton d'action en plus (ex. « Ouvrir tiroir » à la clôture) : agit sans fermer la fenêtre.
+      (opts.extraLabel ? '<button class="btn btn-soft" id="modal-extra-btn">' + esc(opts.extraLabel) + '</button>' : '') +
       '<button class="btn ' + (opts.danger ? 'modal-danger-btn' : 'btn-primary') + '" id="modal-confirm-btn">' +
       esc(opts.confirmLabel || 'Valider') + '</button>' +
       '</div>'
     );
     var input = overlay.querySelector('#modal-prompt-input');
+    var extraBtn = overlay.querySelector('#modal-extra-btn');
+    if (extraBtn && opts.onExtra) extraBtn.onclick = function () { opts.onExtra(); };
     var errEl = overlay.querySelector('#modal-prompt-error');
     setTimeout(function () { input.focus(); input.select(); }, 50);
 
