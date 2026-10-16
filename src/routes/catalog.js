@@ -8,6 +8,11 @@ const { annotateItems, normalizeVatRateId } = require('../lib/vat');
 
 const router = express.Router();
 
+function invalidCatalogNumber(value, min, max) {
+  const n = Number(value);
+  return value === null || value === '' || !Number.isSafeInteger(n) || n < min || n > max;
+}
+
 const TABLE_LABEL = { services: 'Prestation', extras: 'Supplément', products: 'Produit' };
 
 // L'interface normale (uploadCatalogImage côté dashboard) ne génère
@@ -153,7 +158,8 @@ async function uniqueId(table, base) {
 
   router.post('/' + table, requireAdmin, wrap(async (req, res) => {
     const { name, duration_min, price_cents, sort_order } = req.body;
-    if (!name) return res.status(400).json({ error: 'Le nom est requis' });
+    if (!name || String(name).length > 255) return res.status(400).json({ error: 'Nom requis (255 caractères maximum)' });
+    if (invalidCatalogNumber(price_cents ?? 0, 0, 100000000) || invalidCatalogNumber(duration_min ?? 0, 0, 1440)) return res.status(400).json({ error: 'Prix ou durée invalide' });
     const id = await uniqueId(table, slugify(name));
     const { salon } = req;
     const vatId = await normalizeVatRateId(salon.id, req.body.vat_rate_id);
@@ -172,6 +178,10 @@ async function uniqueId(table, base) {
   }));
 
   router.put('/' + table + '/:id', requireAdmin, wrap(async (req, res) => {
+    if (req.body.name !== undefined && (!String(req.body.name).trim() || String(req.body.name).length > 255)) return res.status(400).json({ error: 'Nom invalide' });
+    for (const [key, min, max] of [['price_cents', 0, 100000000], ['duration_min', 0, 1440]]) {
+      if (req.body[key] !== undefined && invalidCatalogNumber(req.body[key], min, max)) return res.status(400).json({ error: 'Valeur invalide : ' + key });
+    }
     const sets = [];
     const params = [];
     if (req.body.name !== undefined) { sets.push('name = ?'); params.push(req.body.name); }
@@ -234,7 +244,8 @@ router.get('/products', wrap(async (req, res) => {
 
 router.post('/products', requireAdmin, wrap(async (req, res) => {
   const { name, price_cents, category, sort_order } = req.body;
-  if (!name) return res.status(400).json({ error: 'Le nom est requis' });
+  if (!name || String(name).length > 255) return res.status(400).json({ error: 'Nom requis (255 caractères maximum)' });
+  if (invalidCatalogNumber(price_cents ?? 0, 0, 100000000)) return res.status(400).json({ error: 'Prix invalide' });
   const stockEnabled = req.body.stock_enabled ? 1 : 0;
   const stockQuantity = Math.max(0, Number(req.body.stock_quantity) || 0);
   // Vide -> NULL (jamais une chaine vide, pour laisser plusieurs produits
@@ -263,6 +274,8 @@ router.post('/products', requireAdmin, wrap(async (req, res) => {
 }));
 
 router.put('/products/:id', requireAdmin, wrap(async (req, res) => {
+  if (req.body.name !== undefined && (!String(req.body.name).trim() || String(req.body.name).length > 255)) return res.status(400).json({ error: 'Nom invalide' });
+  if (req.body.price_cents !== undefined && invalidCatalogNumber(req.body.price_cents, 0, 100000000)) return res.status(400).json({ error: 'Prix invalide' });
   const sets = [];
   const params = [];
   if (req.body.name !== undefined) { sets.push('name = ?'); params.push(req.body.name); }
