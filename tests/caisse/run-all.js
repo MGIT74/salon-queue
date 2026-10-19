@@ -131,7 +131,8 @@ const suite = [
   ['108-tarif-coiffeur-reservation.js', false, ['exit']],
   ['109-agenda-date-passee.js', false, ['exit']],
   ['110-borne-produits-mise-en-page.js', false, ['exit']],
-  ['111-groupe-une-personne-a-la-fois.js', false, ['exit']]
+  ['111-groupe-une-personne-a-la-fois.js', false, ['exit']],
+  ['112-fermetures-calendrier-annuel.js', false, ['exit']]
 ];
 
 let bad = 0;

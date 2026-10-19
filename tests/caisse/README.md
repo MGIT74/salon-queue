@@ -142,4 +142,5 @@ node tests/caisse/108-tarif-coiffeur-reservation.js  # Tarif propre a chaque coi
 node tests/caisse/109-agenda-date-passee.js  # Agendas admin / Mon poste / caisse : un jour passe se consulte mais n'est plus proposable a une prise de RDV
 node tests/caisse/110-borne-produits-mise-en-page.js  # Borne : produits proposes avant la confirmation (caisse + agenda), barre du bas fixe meme avec beaucoup de prestations
 node tests/caisse/111-groupe-une-personne-a-la-fois.js  # RDV a plusieurs : reservation normale personne par personne, panier « Continuer pour Tom » / « Terminer », creneaux retenus
+node tests/caisse/112-fermetures-calendrier-annuel.js  # Reglages : fermetures du salon dans le meme calendrier annuel que les conges (cocher / decocher des jours)
 ```

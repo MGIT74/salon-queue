@@ -49,7 +49,7 @@ c2.barbers = [{ active: 1, on_leave_today: false }];
 vm.runInContext('updateLeaveKpi()', c2);
 check('aucun conge : 0 et carre neutre (non rouge)', el['dash-kpi-leave'].textContent === 0 && el['dash-kpi-leave-box'].none === true);
 check('le carre est dans l\'en-tete du dashboard, avec une icone', /id="dash-kpi-leave-box"[\s\S]{0,400}<svg[\s\S]{0,600}id="dash-kpi-leave"/.test(dash));
-check('calendrier des conges : liste et carre se rafraichissent a la fermeture de la bulle (apres un changement)', /if \(st\.dirty\) \{ st\.dirty = false; loadBarbers\(\); \}/.test(dash));
+check('calendrier des conges : liste et carre se rafraichissent a la fermeture de la bulle (apres un changement)', /if \(st\.dirty\) \{ st\.dirty = false; (if \(id !== 'salon'\) )?loadBarbers\(\); \}/.test(dash));
 
 console.log('\n' + pass + ' OK, ' + fail + ' ECHEC');
 process.exit(fail ? 1 : 0);

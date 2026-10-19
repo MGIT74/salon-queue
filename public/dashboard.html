@@ -1376,6 +1376,12 @@
   .lv-day.today { font-weight: 800; color: var(--accent); }
   .lv-day.off { background: #ffc107; color: #fff; font-weight: 600; box-shadow: inset 0 0 0 .5px rgba(255,255,255,.55); }
   .lv-day.sel, .lv-day.off.sel { background: var(--accent); color: #fff; }
+  /* Calendrier des fermetures du salon : jours fermés en rouge, jours passés non modifiables */
+  .lv-salon .lv-day.off { background: var(--red); }
+  .lv-day.past { opacity: .4; cursor: default; }
+  .lv-day.past:hover { background: var(--card); }
+  .lv-salon .lv-day.off.past:hover { background: var(--red); }
+  .lv-reason { font-size: 13px; color: var(--grey); margin: 8px 0 0 27px; }
   .lv-sum { text-align: center; color: var(--grey); font-size: 13px; margin-top: 18px; }
   .lv-bubble { position: absolute; z-index: 20; width: 300px; max-width: 100%; box-sizing: border-box; background: var(--card); color: var(--ink); border: 1px solid var(--sep); border-radius: 12px; padding: 14px 16px 12px; box-shadow: 0 10px 32px rgba(0,0,0,.18); }
   .lv-bubble::before { content: ''; position: absolute; top: -7px; left: var(--arrow-x, 50%); width: 12px; height: 12px; margin-left: -6px; background: var(--card); border-left: 1px solid var(--sep); border-top: 1px solid var(--sep); transform: rotate(45deg); }
@@ -2442,9 +2448,10 @@
       <button class="btn btn-primary" style="margin-top:6px" onclick="saveSalonSchedule()">Enregistrer les horaires</button>
 
       <h4 style="font-size:14.5px;font-weight:600;margin:26px 0 4px">Fermetures exceptionnelles</h4>
-      <p class="hint">Jours fériés, fermeture urgente... Le salon entier est fermé sur cette période, quel que soit le coiffeur.</p>
+      <p class="hint">Jours fériés, fermeture urgente... Le salon entier est fermé ces jours-là, quel que soit le coiffeur. Cliquez sur un jour, ou <strong>glissez la souris</strong> sur les jours voulus, puis cochez « Salon fermé ». <span class="lv-touch-hint">Sur téléphone : appuyez un instant sur un jour, puis glissez.</span></p>
+      <div class="lv-year lv-salon" id="leaves-list-salon" style="margin-bottom:22px"><div class="empty">Chargement…</div></div>
+      <div class="grp-label" id="salon-closures-list-lbl" style="display:none">Fermetures prévues</div>
       <div id="salon-closures-list" style="margin-bottom:16px"></div>
-      <button class="btn btn-soft" onclick="openAddSalonClosure()">+ Ajouter une fermeture</button>
       </div>
     </div>
 
@@ -5460,6 +5467,14 @@ function lvAddDays(iso, n) { var t = new Date(iso + 'T00:00:00Z'); t.setUTCDate(
 // Map jour -> { repeat, note } pour les congés d'un coiffeur
 function lvDayMap(id) {
   var map = {};
+  // Calendrier des fermetures du salon (Reglages) : meme calendrier que les conges, sur les fermetures exceptionnelles.
+  if (id === 'salon') {
+    (salonClosuresItems || []).forEach(function (c) {
+      var d = String(c.start_date).slice(0, 10), end = String(c.end_date).slice(0, 10), n = 0;
+      while (d <= end && n++ < 6000) { map[d] = { closure: c.id, note: c.reason || 'Fermeture exceptionnelle' }; d = lvAddDays(d, 1); }
+    });
+    return map;
+  }
   (barberLeaves[id] || []).forEach(function (l) {
     var d = String(l.start_date).slice(0, 10), end = String(l.end_date).slice(0, 10), n = 0;
     while (d <= end && n++ < 6000) { map[d] = { repeat: Boolean(Number(l.repeat_yearly)), note: l.note || '' }; d = lvAddDays(d, 1); }
@@ -5487,7 +5502,7 @@ function renderLeavesList(id) {
     for (var d = 1; d <= nDays; d++) {
       var iso = lvIso(st.year, m, d), info = map[iso];
       if (info) count++;
-      var cls = 'lv-day' + (info ? ' off' : '') + (sel[iso] ? ' sel' : '') + (iso === todayIso ? ' today' : '');
+      var cls = 'lv-day' + (info ? ' off' : '') + (sel[iso] ? ' sel' : '') + (iso === todayIso ? ' today' : '') + (id === 'salon' && iso < todayIso ? ' past' : '');
       cells += '<button type="button" class="' + cls + '" data-d="' + iso + '"' + (info && info.note ? ' title="' + esc(info.note) + '"' : '') + '>' + d + '</button>';
     }
     var tail = (7 - ((lead + nDays) % 7)) % 7;
@@ -5501,7 +5516,9 @@ function renderLeavesList(id) {
     '<span class="lv-ny">' + st.year + '</span>' +
     '<button type="button" class="lv-nbtn" data-nav="1" aria-label="Année suivante">›</button></div>' +
     '<div class="lv-months">' + months + '</div>' +
-    '<div class="lv-sum">' + (count ? count + ' jour' + (count > 1 ? 's' : '') + ' de congé en ' + st.year : 'Aucun congé en ' + st.year) + '</div>' +
+    '<div class="lv-sum">' + (id === 'salon'
+      ? (count ? count + ' jour' + (count > 1 ? 's' : '') + ' de fermeture en ' + st.year : 'Aucune fermeture en ' + st.year)
+      : (count ? count + ' jour' + (count > 1 ? 's' : '') + ' de congé en ' + st.year : 'Aucun congé en ' + st.year)) + '</div>' +
     '<div class="lv-bubble" id="lv-bubble-' + id + '" style="display:none"></div>';
   lvBind(id, box);
   if (st.sel.length && !st.dragging) lvShowBubble(id);
@@ -5517,7 +5534,7 @@ function lvBind(id, box) {
     if (e.button !== 0) return;
     if (e.target.closest('.lv-bubble')) return;
     var cell = e.target.closest('.lv-day');
-    if (!cell) return;
+    if (!cell || cell.classList.contains('past')) return;
     e.preventDefault();
     st.dragging = true; st.anchor = cell.getAttribute('data-d'); st.sel = [st.anchor]; st.last = st.anchor; st.px = e.clientX; st.py = e.clientY;
     lvPaintSel(id, box);
@@ -5534,7 +5551,7 @@ function lvBind(id, box) {
     box.addEventListener('touchstart', function (e) {
       if (e.touches.length !== 1 || e.target.closest('.lv-bubble')) return;
       var cell = e.target.closest('.lv-day');
-      if (!cell) return;
+      if (!cell || cell.classList.contains('past')) return;
       var t = e.touches[0];
       start = { x: t.clientX, y: t.clientY, d: cell.getAttribute('data-d') };
       moved = false; st.touchActive = false;
@@ -5586,7 +5603,7 @@ function lvExtendSel(id, box, x, y) {
     var px = x0 + (x - x0) * i / steps, py = y0 + (y - y0) * i / steps;
     var el = document.elementFromPoint(px, py);
     var cell = el && el.closest ? el.closest('.lv-day') : null;
-    if (!cell) continue;
+    if (!cell || cell.classList.contains('past')) continue;
     // Seul le CENTRE de la case compte (on ignore les 22 % de chaque bord) : une diagonale qui frôle le coin d'une case voisine ne la prend plus.
     var r = cell.getBoundingClientRect(), mx = r.width * 0.22, my = r.height * 0.22;
     if (px < r.left + mx || px > r.right - mx || py < r.top + my || py > r.bottom - my) continue;
@@ -5636,6 +5653,15 @@ function lvShowBubble(id) {
   var allRepeat = allOff && st.sel.every(function (d) { return map[d].repeat; });
   st.sel.sort();
   var n = st.sel.length;
+  if (id === 'salon') {
+    var notes = [];
+    st.sel.forEach(function (d) { if (map[d] && notes.indexOf(map[d].note) === -1) notes.push(map[d].note); });
+    bub.innerHTML =
+      '<label class="lv-chk"><input type="checkbox" id="lv-on-salon"' + (allOff ? ' checked' : '') + ' onchange="salonCalApply()"> ' +
+        (n === 1 ? 'Salon fermé ce jour' : 'Salon fermé ces ' + n + ' jours') + '</label>' +
+      (allOff && notes.length ? '<div class="lv-reason">' + esc(notes.join(' · ')) + '</div>' : '') +
+      '<div class="lv-foot"><button type="button" class="btn btn-ghost" onclick="lvClose(\'salon\')">Fermer</button></div>';
+  } else
   bub.innerHTML =
     '<label class="lv-chk"><input type="checkbox" id="lv-on-' + id + '"' + (allOff ? ' checked' : '') + ' onchange="lvApply(\'' + id + '\')"> ' +
       (n === 1 ? 'En congé ce jour' : 'En congé ces ' + n + ' jours') + '</label>' +
@@ -5670,7 +5696,7 @@ function lvClose(id) {
   var box = document.getElementById('leaves-list-' + id);
   if (box) lvPaintSel(id, box);
   // Le badge « En congé » et le compteur du tableau de bord ne se rafraîchissent qu'à la fermeture (la bulle reste stable).
-  if (st.dirty) { st.dirty = false; loadBarbers(); }
+  if (st.dirty) { st.dirty = false; if (id !== 'salon') loadBarbers(); }
 }
 
 // Redimensionne l'image côté navigateur avant envoi (évite de stocker des
@@ -9256,6 +9282,9 @@ function loadSalonClosures() {
 }
 
 function renderSalonClosures() {
+  renderLeavesList('salon');
+  var lbl = document.getElementById('salon-closures-list-lbl');
+  if (lbl) lbl.style.display = salonClosuresItems.length ? '' : 'none';
   var list = document.getElementById('salon-closures-list');
   list.innerHTML = salonClosuresItems.length === 0
     ? '<div class="empty">Aucune fermeture prévue</div>'
@@ -9282,7 +9311,49 @@ function deleteSalonClosure(id) {
     .catch(function (e) { toast(e.message, true); });
 }
 
-function openAddSalonClosure() {
+// Coche « Salon fermé » dans la bulle du calendrier :
+//  - jours ouverts choisis -> la fenetre habituelle s'ouvre deja remplie (motif, rendez-vous concernes, email aux clients) ;
+//  - decoche sur des jours fermes -> ces jours sont rouverts (le reste de la fermeture est conserve, sans email).
+function salonCalApply() {
+  var st = lvState_('salon'), map = lvDayMap('salon');
+  var on = document.getElementById('lv-on-salon').checked;
+  var days = st.sel.slice().sort();
+  if (on) {
+    var open = days.filter(function (d) { return !map[d]; });
+    if (!open.length) return;
+    lvClose('salon');
+    openAddSalonClosure(open[0], open[open.length - 1]);
+    return;
+  }
+  salonReopenDays(days);
+}
+
+function salonReopenDays(days) {
+  var set = {}, today = nowSalonDatetimeString().slice(0, 10);
+  days.forEach(function (d) { set[d] = 1; });
+  var touched = (salonClosuresItems || []).filter(function (c) { return days.some(function (d) { return d >= c.start_date && d <= c.end_date; }); });
+  var chain = Promise.resolve();
+  touched.forEach(function (c) {
+    // Ce qui reste ferme dans cette fermeture une fois les jours choisis retires (seulement aujourd'hui et apres).
+    var runs = [], d = c.start_date < today ? today : c.start_date, cur = null;
+    while (d <= c.end_date) {
+      if (!set[d]) { if (cur && lvAddDays(cur.end, 1) === d) cur.end = d; else { cur = { start: d, end: d }; runs.push(cur); } }
+      d = lvAddDays(d, 1);
+    }
+    chain = chain.then(function () { return api('/api/salon-calendar/closures/' + c.id, { method: 'DELETE' }); }).then(function () {
+      return runs.reduce(function (p, r) {
+        return p.then(function () {
+          return api('/api/salon-calendar/closures', { method: 'POST', body: { start_date: r.start, end_date: r.end, reason: c.reason || '', send_email: false, confirm_existing_appointments: true } });
+        });
+      }, Promise.resolve());
+    });
+  });
+  chain.then(function () { toast(days.length > 1 ? 'Jours rouverts' : 'Jour rouvert'); })
+    .catch(function (e) { toast(e.message, true); })
+    .then(function () { lvClose('salon'); loadSalonClosures(); });
+}
+
+function openAddSalonClosure(presetFrom, presetTo) {
   var todayStr = nowSalonDatetimeString().slice(0, 10);
   // Proposer le premier jour non couvert par une fermeture existante.
   // Les dates restent modifiables manuellement.
@@ -9297,8 +9368,8 @@ function openAddSalonClosure() {
   }
   var overlay = _buildModal(
     '<div class="modal-title">Ajouter une fermeture</div>' +
-    '<div class="fld"><label>Du</label><input type="date" id="asc-from" data-range-to="asc-to" value="' + nextOpen + '"></div>' +
-    '<div class="fld"><label>Au</label><input type="date" id="asc-to" value="' + nextOpen + '"></div>' +
+    '<div class="fld"><label>Du</label><input type="date" id="asc-from" data-range-to="asc-to" value="' + (presetFrom || nextOpen) + '"></div>' +
+    '<div class="fld"><label>Au</label><input type="date" id="asc-to" value="' + (presetTo || presetFrom || nextOpen) + '"></div>' +
     '<div class="fld"><label>Motif (optionnel)</label><input type="text" id="asc-reason" placeholder="Ex: jour férié, fermeture exceptionnelle…"></div>' +
     '<div id="asc-effective-period" style="display:none;margin-bottom:12px;padding:10px 12px;border-radius:10px;background:var(--fill);font-size:13px;color:var(--muted)"></div>' +
     '<div id="asc-appointments-preview" aria-live="polite" style="margin-bottom:14px;padding:12px 14px;border:1px solid var(--border,rgba(128,128,128,.2));border-radius:12px;font-size:13px;color:var(--muted)">Sélectionnez une période pour vérifier les rendez-vous existants.</div>' +
