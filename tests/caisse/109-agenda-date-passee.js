@@ -30,8 +30,8 @@ check('caisse : lignes non cliquables et pas de bouton « + Ajouter » un jour p
 console.log('\n[C] Calendrier : jours passes grises et non cliquables');
 [['dashboard.html', 'selectCalendarDay'], ['poste.html', 'selectCalDay'], ['caisse.html', 'selectCalDay']].forEach(([f, fn]) => {
   const s = read(f);
-  check(f + ' : classe « past » (grise) sur les jours passes, en Mois et en Semaine', (s.match(/if \(isPastDay\(dateStr\)\) classes \+= ' past';/g) || []).length === 2 && /\.cal-day\.past \{ opacity: \.35; cursor: default; \}/.test(s));
-  check(f + ' : pas de clic sur un jour passe', (s.match(new RegExp("\\(isPastDay\\(dateStr\\) \\? '' : ' onclick=\"" + fn + "\\(", 'g')) || []).length === 2);
+  check(f + ' : classe « past » (grisee) sur les jours passes, en Mois et en Semaine', (s.match(/if \(isPastDay\(dateStr\)\) classes \+= ' past';/g) || []).length === 2 && /\.cal-day\.past \{ opacity: \.5; \}/.test(s));
+  check(f + ' : un jour passe reste cliquable pour consulter ses RDV (seule la prise de RDV est bloquee)', !/isPastDay\(dateStr\) \? '' : ' onclick/.test(s) && (s.match(new RegExp("' onclick=\"" + fn + "\\(\\\\'' \\+ dateStr", 'g')) || []).length === 2);
 });
 
 console.log('\n[D] Synchronisation des agendas');

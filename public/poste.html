@@ -248,8 +248,9 @@
   }
   .cal-day:hover { filter: brightness(1.15); }
   /* Jour passé : grisé et non cliquable (plus de prise de RDV), comme le calendrier de réservation en ligne. */
-  .cal-day.past { opacity: .35; cursor: default; }
-  .cal-day.past:hover { filter: none; }
+  /* Jour passe : grise mais toujours cliquable pour consulter ses rendez-vous (la prise de RDV y reste bloquee). */
+  .cal-day.past { opacity: .5; }
+  .cal-day.past .cal-day-num { color: var(--grey); }
   .cal-day.empty { background: none; cursor: default; }
   .cal-day.today { box-shadow: inset 0 0 0 2px var(--blue); }
   .cal-day.selected { background: var(--blue); }
@@ -1065,7 +1066,7 @@ function renderCalMonth() {
       var classes = 'cal-day' + (dateStr === todayStr ? ' today' : '') + (dateStr === calSelectedDate ? ' selected' : '');
       if (isPastDay(dateStr)) classes += ' past';
       if (rdvIsSalonClosed(dateStr)) classes += ' salon-closed';
-      return '<div class="' + classes + '"' + (isPastDay(dateStr) ? '' : ' onclick="selectCalDay(\'' + dateStr + '\')"') + '>' +
+      return '<div class="' + classes + '"' + ' onclick="selectCalDay(\'' + dateStr + '\')"' + '>' +
         '<div class="cal-day-num">' + d + '</div>' + calDayDotsHtml(byDay[dateStr] || []) + '</div>';
     }).join('') + '</div>';
     var selectedInThisWeek = calSelectedDate && weekDays.some(function (d) {
@@ -1110,7 +1111,7 @@ function renderCalWeek() {
     var classes = 'cal-day' + (dateStr === todayStr ? ' today' : '') + (dateStr === calSelectedDate ? ' selected' : '');
     if (isPastDay(dateStr)) classes += ' past';
       if (rdvIsSalonClosed(dateStr)) classes += ' salon-closed';
-    cells += '<div class="' + classes + '"' + (isPastDay(dateStr) ? '' : ' onclick="selectCalDay(\'' + dateStr + '\')"') + '>' +
+    cells += '<div class="' + classes + '"' + ' onclick="selectCalDay(\'' + dateStr + '\')"' + '>' +
       '<div class="cal-day-num">' + d.getDate() + '</div>' + calDayDotsHtml(byDay[dateStr] || []) + '</div>';
   }
   var html = '<div class="cal-grid cal-week-row">' + cells + '</div>';
