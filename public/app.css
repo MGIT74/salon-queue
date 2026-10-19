@@ -725,8 +725,11 @@ body .tfx > button { transition: color .25s ease, transform .1s ease; }
   border-radius: 14px; padding: 11px 14px; margin: 0 0 16px; font-size: 15px; }
 .grp-banner .grp-who b { font-weight: 700; }
 .grp-banner .grp-step { font-size: 13px; color: var(--grey); font-weight: 600; }
-.grp-banner .grp-cart-btn { margin-left: auto; border: none; background: var(--card); color: var(--accent); font: inherit; font-size: 14px;
-  font-weight: 600; border-radius: 999px; padding: 6px 12px; cursor: pointer; }
+.grp-banner .grp-cart-btn { position: relative; margin-left: auto; border: none; background: var(--card); color: var(--ink); width: 42px; height: 42px;
+  border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
+.grp-banner .grp-cart-btn:hover { color: var(--accent); }
+.grp-cart-n { position: absolute; top: -4px; right: -4px; min-width: 20px; height: 20px; padding: 0 5px; box-sizing: border-box; border-radius: 999px;
+  background: var(--red); color: #fff; font-size: 12px; font-weight: 700; line-height: 20px; text-align: center; box-shadow: 0 0 0 2px var(--blue-soft); }
 .cart-list { display: flex; flex-direction: column; background: var(--fill); border-radius: 16px; overflow: hidden; margin-bottom: 14px; }
 .cart-list:empty { display: none; }
 .cart-row { display: grid; grid-template-columns: 74px minmax(0, 1fr) auto; grid-template-areas: "when what price" "when acts acts";

@@ -716,6 +716,14 @@
     }).join('');
   }
 
+  // Bouton panier du bandeau : icone de panier + pastille rouge avec le nombre de rendez-vous.
+  function cartButtonHtml(n, onclick) {
+    return '<button type="button" class="grp-cart-btn" onclick="' + onclick + '" aria-label="Voir le panier (' + n + ' rendez-vous)" title="Voir le panier">' +
+      '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      '<path d="M3 4h2l2.2 10.2a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 1.9-1.4L21 8H6.2"/><circle cx="10" cy="20" r="1.4"/><circle cx="17" cy="20" r="1.4"/></svg>' +
+      '<span class="grp-cart-n">' + n + '</span></button>';
+  }
+
   /** Tuile « plusieurs personnes » des grilles de coiffeurs (meme habillage que « Utiliser un cadeau »). */
   function tileHtml(onclick) {
     return '<button type="button" class="svc-card barber-tile group-tile" onclick="' + onclick + '">' +
@@ -723,5 +731,5 @@
       '<span class="name">Plusieurs personnes</span><span class="meta">Enfants, amis…</span></button>';
   }
 
-  return { peoplePillsHtml: peoplePillsHtml, cartHeld: cartHeld, cartPayload: cartPayload, cartRowsHtml: cartRowsHtml, buildPlans: buildPlans, tileHtml: tileHtml, MAX_PEOPLE: MAX_PEOPLE, personDuration: personDuration, personPrice: personPrice, heldParam: heldParam, computeSuggestions: computeSuggestions, buildPayload: buildPayload, create: create };
+  return { cartButtonHtml: cartButtonHtml, peoplePillsHtml: peoplePillsHtml, cartHeld: cartHeld, cartPayload: cartPayload, cartRowsHtml: cartRowsHtml, buildPlans: buildPlans, tileHtml: tileHtml, MAX_PEOPLE: MAX_PEOPLE, personDuration: personDuration, personPrice: personPrice, heldParam: heldParam, computeSuggestions: computeSuggestions, buildPayload: buildPayload, create: create };
 });

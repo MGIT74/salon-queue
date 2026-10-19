@@ -29,7 +29,7 @@
   html.auth-checking #p-login { display: none !important; }
   html.auth-checking #auth-layout { display: none !important; }
 </style>
-<link rel="stylesheet" href="/app.css?v=35">
+<link rel="stylesheet" href="/app.css?v=36">
 <script>
   // Applique tout de suite la couleur du salon si on l'a déjà vue lors
   // d'une visite précédente (cache localStorage par salon), plutôt que
@@ -693,7 +693,7 @@
 
 <script src="/app.js?v=26"></script>
 <script src="/autorefresh.js?v=2"></script>
-<script src="/group-booking.js?v=21"></script>
+<script src="/group-booking.js?v=22"></script>
 <style>
 .gb-done{padding:10px 0;border-bottom:1px solid var(--sep)}.gb-done:last-child{border:none}.gb-done b{display:block}.gb-done span{color:var(--grey);font-size:14px}
 #relatives-list{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
@@ -1147,7 +1147,7 @@ function renderBkGrpBanner(panelId) {
   var p = bkGrp.people[bkGrp.current];
   el.innerHTML = '<span class="grp-who">' + (p.isSelf ? '<b>Votre rendez-vous</b>' : 'Rendez-vous de <b>' + esc(p.name) + '</b>') + '</span>' +
     '<span class="grp-step">' + (bkGrp.current + 1) + ' sur ' + bkGrp.people.length + '</span>' +
-    (bkGrp.cart.length ? '<button type="button" class="grp-cart-btn" onclick="show(\'p-book-cart\')">Panier · ' + bkGrp.cart.length + '</button>' : '');
+    (bkGrp.cart.length ? GroupBooking.cartButtonHtml(bkGrp.cart.length, "show('p-book-cart')") : '');
   el.innerHTML += '<div class="grp-pills">' + GroupBooking.peoplePillsHtml(bkGrp.people, bkGrp.cart, bkGrp.current, 'bkGrpRemovePerson') + '</div>';
   el.style.display = '';
 }

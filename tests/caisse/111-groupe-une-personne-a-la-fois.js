@@ -34,6 +34,9 @@ const PUB = { 'Content-Type': 'application/json', 'X-Salon-Slug': 'test' };
   const todo = GB.peoplePillsHtml([{ name: 'Moi' }, { name: 'momo' }, { name: 'elo' }], [{ person: 0 }], -1, 'f', true);
   check('panier : seulement les personnes pas encore reservees', !/Moi/.test(todo) && /momo/.test(todo) && /elo/.test(todo));
 
+  const cb = GB.cartButtonHtml(2, "show('p-cart')");
+  check('bouton panier : icone + pastille rouge avec le nombre', /<svg/.test(cb) && /class="grp-cart-n">2</.test(cb) && /show\('p-cart'\)/.test(cb));
+
   console.log('\n[B] « Qui vient ? » rend la main a la page (onPeople)');
   let JSDOM; try { ({ JSDOM } = require('jsdom')); } catch (e) { /* absent */ }
   if (JSDOM) {

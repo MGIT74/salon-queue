@@ -18,7 +18,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Prendre rendez-vous</title>
-<link rel="stylesheet" href="/app.css?v=35">
+<link rel="stylesheet" href="/app.css?v=36">
 <script>
   // Adresse SANS ?salon=... : on masque la page le temps de savoir si la plateforme heberge plusieurs salons
   // (voir guardMissingSalon) - pour ne jamais montrer, meme une fraction de seconde, un formulaire sans salon.
@@ -362,7 +362,7 @@
 </div>
 
 <script src="/app.js?v=26"></script>
-<script src="/group-booking.js?v=21"></script>
+<script src="/group-booking.js?v=22"></script>
 <style>
 body.staff-mode .gift-summary-box,body.staff-mode .theme-btn,body.staff-mode .login-hint{display:none!important}
 .login-hint{background:var(--fill);border-radius:14px;padding:12px 14px;margin:0 0 18px;font-size:14.5px;font-weight:600}
@@ -1017,7 +1017,7 @@ function renderGrpBanner(panelId) {
   var p = grp.people[grp.current];
   el.innerHTML = '<span class="grp-who">' + (p.isSelf && !STAFF_BRIDGE ? '<b>Votre rendez-vous</b>' : 'Rendez-vous de <b>' + esc(p.name) + '</b>') + '</span>' +
     '<span class="grp-step">' + (grp.current + 1) + ' sur ' + grp.people.length + '</span>' +
-    (grp.cart.length ? '<button type="button" class="grp-cart-btn" onclick="show(\'p-cart\')">Panier · ' + grp.cart.length + '</button>' : '');
+    (grp.cart.length ? GroupBooking.cartButtonHtml(grp.cart.length, "show('p-cart')") : '');
   el.innerHTML += '<div class="grp-pills">' + GroupBooking.peoplePillsHtml(grp.people, grp.cart, grp.current, 'grpRemovePerson') + '</div>';
   el.style.display = '';
 }
