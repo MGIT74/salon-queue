@@ -80,6 +80,7 @@ const PUB = { 'Content-Type': 'application/json', 'X-Salon-Slug': 'test' };
   check('rdv.html : pas de carte cadeau pendant un groupe ; retour a une seule personne remet les libelles', /grp\) \? '' : giftTileHtml/.test(rdv) && /function soloMode\(\)/.test(rdv));
   check('rdv.html : creneau pris entre-temps -> on refait seulement l\'heure de cette personne', /cartRedoTime\(e\.data\.person_index\)/.test(rdv));
   check('compte.html : meme parcours (panier, retenus, envoi)', /onPeople: function \(people\) \{ bkCartStart\(people\); \}/.test(cmp) && /if \(bkGrp\) return bkCartAddCurrent\(\);/.test(cmp) && /id="p-book-cart"/.test(cmp) && /GroupBooking\.cartHeld\(bkGrp\.cart/.test(cmp) && /GroupBooking\.cartPayload\(bkGrp\.cart\)/.test(cmp));
+  check('compte.html : le coiffeur est affiche sur les prochains RDV et le dernier passage', /when \+ \(a\.barber_name \? ' · avec ' \+ esc\(a\.barber_name\)/.test(cmp) && /\(v\.barber_name \? ' · avec ' \+ esc\(v\.barber_name\)/.test(cmp));
   const css = fs.readFileSync(path.join(root, 'public/app.css'), 'utf8');
   check('style du bandeau et du panier dans app.css', /\.grp-banner \{/.test(css) && /\.cart-row \{/.test(css));
 

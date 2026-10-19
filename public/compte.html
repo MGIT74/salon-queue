@@ -900,7 +900,7 @@ function renderVisitCard(upcomingList, historyList) {
     return '<div class="card" style="margin-bottom:12px">' +
       '<div class="visit-row" style="cursor:pointer" onclick="toggleVisitDetails(\'up-' + i + '\')">' +
         '<div><div class="name">' + esc(a.service_name || 'Prestation') + (a.person_name ? ' · ' + esc(a.person_name) : '') + '</div>' +
-        '<div class="when">' + when + '</div></div>' +
+        '<div class="when">' + when + (a.barber_name ? ' · avec ' + esc(a.barber_name) : '') + '</div></div>' +
         '<button class="go" style="width:auto;margin:0;padding:10px 16px;font-size:14px;background:var(--red)" onclick="event.stopPropagation();openCancelModal(\'' + a.cancel_token + '\')">Annuler</button>' +
       '</div>' +
       '<div id="details-up-' + i + '" style="display:none;margin-top:14px;padding-top:14px;border-top:1px solid rgba(128,128,128,.25);font-size:13.5px;color:var(--grey);line-height:1.9">' +
@@ -921,7 +921,7 @@ function renderVisitCard(upcomingList, historyList) {
     ? historyList.map(function (v) {
         return '<div class="card" style="margin-bottom:12px"><div class="visit-row"><div><div class="name">' + esc(v.service_name || 'Prestation') + '</div>' +
           '<div class="when">' + new Date(v.checkin_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' }) +
-          ' · ' + esc(STATUS_LABEL[v.status] || v.status) + '</div></div>' +
+          (v.barber_name ? ' · avec ' + esc(v.barber_name) : '') + ' · ' + esc(STATUS_LABEL[v.status] || v.status) + '</div></div>' +
           '<button class="go" style="width:auto;margin:0;padding:10px 16px;font-size:14px" onclick="rebook(\'' + v.salon_slug + '\',\'' + v.service_id + '\',\'' + (v.barber_id || '') + '\')">Réserver à nouveau</button></div></div>';
       }).join('')
     : '<div class="card"><div class="lbl">Aucun passage trouvé pour le moment.</div></div>';
