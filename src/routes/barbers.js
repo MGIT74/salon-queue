@@ -760,6 +760,29 @@ router.post('/:id/leaves', requireAdmin, wrap(async (req, res) => {
   res.json({ ok: true, item: { id, start_date, end_date, note: note || null } });
 }));
 
+// Avant de cocher des jours de conge : rendez-vous a venir de CE coiffeur sur ces jours (meme controle que pour une
+// fermeture du salon). Rien n'est annule : l'ecran les liste pour que le salon les gere.
+router.post('/:id/leaves/preview', requireAdmin, wrap(async (req, res) => {
+  const dates = Array.isArray(req.body.dates) ? Array.from(new Set(req.body.dates.map(String))) : [];
+  if (!dates.length || dates.length > 500 || !dates.every(leaveDays.isDate)) return res.status(400).json({ error: 'Jours invalides' });
+  const [[owned]] = await pool.query('SELECT id FROM barbers WHERE id = ? AND salon_id = ?', [req.params.id, req.salon.id]);
+  if (!owned) return res.status(404).json({ error: 'Coiffeur introuvable' });
+  const settings = await getSettings(req.salon.id);
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: settings.timezone || 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date());
+  const part = (t) => parts.find((p) => p.type === t).value;
+  const nowLocal = part('year') + '-' + part('month') + '-' + part('day') + ' ' + part('hour') + ':' + part('minute') + ':00';
+  const [rows] = await pool.query(
+    `SELECT a.id, a.client_name, a.email, a.phone, DATE_FORMAT(a.scheduled_at, '%Y-%m-%d %H:%i') AS scheduled_at,
+            s.name AS service_name, b.name AS barber_name
+     FROM appointments a LEFT JOIN services s ON s.id = a.service_id LEFT JOIN barbers b ON b.id = a.barber_id
+     WHERE a.salon_id = ? AND a.barber_id = ? AND DATE(a.scheduled_at) IN (?) AND a.scheduled_at >= ?
+       AND a.status NOT IN ('cancelled', 'completed', 'no_show')
+     ORDER BY a.scheduled_at, a.client_name`,
+    [req.salon.id, req.params.id, dates, nowLocal]
+  );
+  res.json({ ok: true, count: rows.length, items: rows });
+}));
+
 // Calendrier annuel : { dates: ['2026-02-28', ...], on: true|false, repeat: true|false } - coche / decoche des JOURS.
 // La base reste en plages ; on relit tout, on applique, on recompresse (dans une transaction).
 router.post('/:id/leaves/days', requireAdmin, wrap(async (req, res) => {

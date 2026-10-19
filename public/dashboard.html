@@ -5666,6 +5666,7 @@ function lvShowBubble(id) {
     '<label class="lv-chk"><input type="checkbox" id="lv-on-' + id + '"' + (allOff ? ' checked' : '') + ' onchange="lvApply(\'' + id + '\')"> ' +
       (n === 1 ? 'En congé ce jour' : 'En congé ces ' + n + ' jours') + '</label>' +
     '<label class="lv-chk lv-sub' + (allOff ? '' : ' dis') + '"><input type="checkbox" id="lv-rep-' + id + '"' + (allRepeat ? ' checked' : '') + (allOff ? '' : ' disabled') + ' onchange="lvApply(\'' + id + '\')"> Répéter chaque année</label>' +
+    '<div class="lv-reason" id="lv-check-' + id + '" style="display:none"></div>' +
     '<div class="lv-foot"><button type="button" class="btn btn-ghost" onclick="lvClose(\'' + id + '\')">Fermer</button></div>';
   bub.style.display = 'block';
   // Ancrage sous le dernier jour sélectionné
@@ -5684,7 +5685,53 @@ function lvApply(id) {
   var on = document.getElementById('lv-on-' + id).checked;
   var repEl = document.getElementById('lv-rep-' + id);
   var rep = on && repEl.checked;
-  api('/api/barbers/' + id + '/leaves/days', { method: 'POST', body: { dates: st.sel, on: on, repeat: rep } })
+  var map = lvDayMap(id), days = st.sel.slice();   // copie : un clic dans la fenetre de controle referme la bulle
+  var newDays = on ? days.filter(function (d) { return !map[d]; }) : [];
+  // Nouveaux jours de conge : on verifie d'abord les rendez-vous deja pris avec ce coiffeur ces jours-la.
+  if (newDays.length) {
+    var box = document.getElementById('lv-check-' + id);
+    if (box) { box.style.display = 'block'; box.textContent = 'Vérification des rendez-vous…'; }
+    return api('/api/barbers/' + id + '/leaves/preview', { method: 'POST', body: { dates: newDays } })
+      .then(function (r) {
+        if (!(r.items || []).length) return lvSaveDays(id, days, on, rep);
+        return lvConfirmAppointments(id, r.items).then(function (ok) {
+          if (ok) return lvSaveDays(id, days, on, rep);
+          renderLeavesList(id);   // retour : la case se decoche, rien n'est enregistre
+        });
+      })
+      .catch(function (e) { toast(e.message, true); renderLeavesList(id); });
+  }
+  lvSaveDays(id, days, on, rep);
+}
+
+// Meme fenetre que pour une fermeture du salon : la liste des rendez-vous concernes, rien n'est annule automatiquement.
+function lvConfirmAppointments(id, items) {
+  var b = (barbers || []).find(function (x) { return String(x.id) === String(id); });
+  return new Promise(function (resolve) {
+    var rows = items.map(function (a) {
+      var date = esc(a.scheduled_at.slice(8, 10) + '/' + a.scheduled_at.slice(5, 7) + '/' + a.scheduled_at.slice(0, 4));
+      var time = esc(a.scheduled_at.slice(11, 16));
+      return '<div style="display:grid;grid-template-columns:85px minmax(0,1fr);gap:12px;padding:12px 2px;border-bottom:1px solid var(--border,rgba(128,128,128,.18))">' +
+        '<div style="font-size:13px;font-weight:700;color:var(--blue)">' + date + '<div style="color:var(--ink);font-size:17px;margin-top:3px">' + time + '</div></div>' +
+        '<div style="min-width:0"><strong style="font-size:14px">' + esc(a.client_name || 'Client') + '</strong>' +
+        '<div style="font-size:13px;color:var(--muted);margin-top:3px">' + esc(a.service_name || 'Prestation') + '</div>' +
+        '<div style="font-size:12px;color:var(--muted);overflow-wrap:anywhere;margin-top:3px">' + esc(a.phone || a.email || 'Contact non renseigné') + '</div></div></div>';
+    }).join('');
+    var ov = _buildModal(
+      '<div class="modal-title">Rendez-vous pendant le congé</div>' +
+      '<p style="color:var(--muted);margin:4px 0 14px">' + items.length + ' rendez-vous ' + (b ? 'avec ' + esc(b.name) + ' ' : '') + 'sur ces jours</p>' +
+      '<div style="max-height:310px;overflow-y:auto;padding:0 12px;border:1px solid var(--border,rgba(128,128,128,.2));border-radius:12px;margin-bottom:14px">' + rows + '</div>' +
+      '<p style="font-size:13px;line-height:1.5;color:var(--muted);margin-bottom:18px">Le congé bloquera les nouvelles réservations avec ce coiffeur, mais <strong>ne supprimera pas ces rendez-vous</strong>. Il faudra les déplacer ou prévenir les clients.</p>' +
+      '<div class="modal-actions"><button type="button" class="btn btn-soft" id="lv-review-cancel">Retour</button><button type="button" class="btn btn-primary" id="lv-review-confirm">Confirmer le congé</button></div>'
+    );
+    ov.querySelector('#lv-review-cancel').onclick = function () { _closeModal(ov); resolve(false); };
+    ov.querySelector('#lv-review-confirm').onclick = function () { _closeModal(ov); resolve(true); };
+  });
+}
+
+function lvSaveDays(id, dates, on, rep) {
+  var st = lvState_(id);
+  return api('/api/barbers/' + id + '/leaves/days', { method: 'POST', body: { dates: dates, on: on, repeat: rep } })
     .then(function (r) { barberLeaves[id] = r.items; st.dirty = true; renderLeavesList(id); })
     .catch(function (e) { toast(e.message, true); renderLeavesList(id); });
 }
