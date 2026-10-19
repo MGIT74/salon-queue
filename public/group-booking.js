@@ -133,6 +133,18 @@
     '.gb-choice b{display:block;font-size:17px}.gb-choice em{display:block;font-style:normal;font-size:13.5px;color:var(--grey);margin-top:2px}' +
     '.gb-choice-ic{width:48px;height:48px;border-radius:50%;background:var(--fill);display:flex;align-items:center;justify-content:center;flex:none}' +
     '.gb-choice.on{border-color:var(--blue);background:var(--blue-soft)}.gb-choice.on .gb-choice-ic{background:var(--blue);color:#fff}' +
+    // Premier ecran « Pour qui ? » (seulement les 2 cartes) : centre, sans colonne de droite ni ligne verticale.
+    '.gb-choice{transition:border-color .15s ease,background .15s ease,transform .1s ease}.gb-choice:hover{border-color:var(--blue)}.gb-choice:active{transform:scale(.98)}' +
+    '.gb-pick>.step-bar{display:none!important}' +
+    '.gb-pick .flow-top,.gb-pick .flow-body{text-align:center}' +
+    '.gb-pick .eyebrow{font-size:21px;font-weight:700;color:var(--ink);letter-spacing:-.01em;margin:0 0 22px}' +
+    '.gb-pick .gb-choices{max-width:640px;margin:0 auto}' +
+    '.gb-pick .gb-choice{flex-direction:column;justify-content:center;text-align:center;gap:12px;padding:30px 20px;min-height:190px}' +
+    '.gb-pick .gb-choice-ic{width:64px;height:64px}.gb-pick .gb-choice-ic svg{width:30px;height:30px}' +
+    '.gb-pick .gb-choice b{font-size:19px}.gb-pick .gb-choice em{margin-top:4px}' +
+    '@media(min-width:900px){.wrap.page-flow:has(.panel.gb-pick.on){height:auto}' +
+    '.wrap.page-flow .panel.flow.gb-pick.on{display:flex!important;flex-direction:column;justify-content:center;padding:6px 32px 52px}' +
+    '.wrap.page-flow .panel.flow.gb-pick.on>.flow-top,.wrap.page-flow .panel.flow.gb-pick.on>.flow-body{padding:0;overflow:visible}}' +
     '.gb-label{font-size:13px;font-weight:650;color:var(--grey);letter-spacing:.04em;text-transform:uppercase;margin:18px 0 10px}' +
     '.gb-pbar{display:flex;gap:8px;overflow-x:auto;margin:10px 0 14px;padding-bottom:2px}' +
     '.gb-pb{display:flex;align-items:center;gap:8px;border:none;background:var(--fill);color:var(--ink);border-radius:999px;padding:6px 14px 6px 6px;font-family:inherit;cursor:pointer;flex:none;text-align:left}' +
@@ -519,6 +531,8 @@
       var sum = (view === 'who' && !people.length) ? '' : barHtml();
       zones.bar.innerHTML = (sum ? '<div class="flow-recap">' + sum + '</div>' : '') + (v.go || '') + (v.hint ? '<div class="gb-empty">' + v.hint + '</div>' : '');
       zones.body.scrollTop = keep;
+      var host = zones.top.parentNode;
+      if (host && host.classList) host.classList.toggle('gb-pick', view === 'who' && !!cfg.onSolo && !wsel.multi);
     }
 
     /* ---------- Navigation ---------- */
