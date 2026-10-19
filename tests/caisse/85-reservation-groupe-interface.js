@@ -104,7 +104,7 @@ let JSDOM; try { ({ JSDOM } = require('jsdom')); } catch (e) { console.log('jsdo
     assert(/group-booking\.js/.test(h) && /GroupBooking\.create/.test(h) && /appointments\/group/.test(h), f); }
   assert(/cancel-group/.test(rdv) && /get\('all'\)/.test(rdv)); assert(/relatives/.test(cmp) && /person_name/.test(cmp));
   ok('rdv.html / compte.html branchés (groupe, annulation groupée, proches, prénom sur les RDV)');
-  assert(/<section class="panel flow on" id="p-group">/.test(rdv) && /onSolo: STAFF_BRIDGE \? null/.test(rdv) && !/GroupBooking\.tileHtml/.test(rdv) && !/GroupBooking\.tileHtml/.test(cmp));
+  assert(/<section class="panel flow on gb-pick" id="p-group">/.test(rdv) && /onSolo: STAFF_BRIDGE \? null/.test(rdv) && !/GroupBooking\.tileHtml/.test(rdv) && !/GroupBooking\.tileHtml/.test(cmp));
   assert(/onSolo: function \(\) \{ bkSoloMode\(\); show\('p-book-barber'\); \}/.test(cmp) && /openBookGroup\(true\)/.test(cmp));
   ok('« Pour qui est le rendez-vous ? » en premier écran (rdv.html et Mon compte), plus de tuile dans la grille des coiffeurs');
   assert((rdv.match(/class="login-hint"/g) || []).length === 2 && /function goLogin\(e\)[^\n]*compte\.html/.test(rdv) && /staff-mode \.login-hint\{display:none/.test(rdv.replace(/,body\.staff-mode /g, ' ').replace(/body\.staff-mode \.gift-summary-box /, 'staff-mode ')) || /body\.staff-mode[^{]*\.login-hint\{display:none/.test(rdv));

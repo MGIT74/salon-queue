@@ -18,7 +18,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Prendre rendez-vous</title>
-<link rel="stylesheet" href="/app.css?v=36">
+<link rel="stylesheet" href="/app.css?v=37">
 <script>
   // Adresse SANS ?salon=... : on masque la page le temps de savoir si la plateforme heberge plusieurs salons
   // (voir guardMissingSalon) - pour ne jamais montrer, meme une fraction de seconde, un formulaire sans salon.
@@ -209,11 +209,19 @@
     <div class="svc-grid" id="barber-grid"></div>
   </section>
 
-  <section class="panel flow on" id="p-group">
-    <div class="flow-top" id="gb-top"></div>
-    <div class="flow-body" id="gb-body"></div>
+  <!-- Premier ecran deja dans la page (meme rendu que group-booking.js) : au rafraichissement, on voit tout de suite
+       les 2 cartes, sans grande carte vide ni ligne verticale le temps que le salon se charge. -->
+  <section class="panel flow on gb-pick" id="p-group">
+    <div class="flow-top" id="gb-top"><div class="eyebrow">Pour qui est le rendez-vous ?</div></div>
+    <div class="flow-body" id="gb-body"><div class="gb-choices"><button type="button" class="gb-choice" data-act="solo"><span class="gb-choice-ic"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg></span><span><b>Juste moi</b><em>Un rendez-vous pour une personne</em></span></button><button type="button" class="gb-choice" data-act="multi"><span class="gb-choice-ic"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M17.5 14.2c2.3.3 3.5 2.2 3.5 5.8"/></svg></span><span><b>Plusieurs personnes</b><em>Enfants, amis, famille — jusqu'à 6</em></span></button></div></div>
     <div class="step-bar" id="gb-bar"></div>
   </section>
+  <script>
+    // Mode salon (fenetre de l'admin / caisse / Mon poste) : pas de « Pour qui ? », l'ecran « Qui vient au salon ? » arrive au chargement.
+    // Lien d'annulation ou « Réserver à nouveau » : un autre écran va s'ouvrir, on n'affiche pas les 2 cartes entre-temps.
+    try { if (/[?&](cancel|service)=/.test(location.search)) document.getElementById('p-group').classList.remove('on'); } catch (e) {}
+    try { if (/[?&]staff=1(&|$)/.test(location.search)) { var gp = document.getElementById('p-group'); gp.classList.remove('gb-pick'); document.getElementById('gb-top').innerHTML = ''; document.getElementById('gb-body').innerHTML = ''; } } catch (e) {}
+  </script>
 
   <section class="panel" id="p-cart">
     <div class="eyebrow">Votre panier</div>
@@ -362,7 +370,7 @@
 </div>
 
 <script src="/app.js?v=26"></script>
-<script src="/group-booking.js?v=22"></script>
+<script src="/group-booking.js?v=23"></script>
 <style>
 body.staff-mode .gift-summary-box,body.staff-mode .theme-btn,body.staff-mode .login-hint{display:none!important}
 .login-hint{background:var(--fill);border-radius:14px;padding:12px 14px;margin:0 0 18px;font-size:14.5px;font-weight:600}

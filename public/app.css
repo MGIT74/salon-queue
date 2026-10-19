@@ -767,3 +767,28 @@ body .tfx > button { transition: color .25s ease, transform .1s ease; }
 .grp-pill-x:hover { opacity: 1; background: rgba(128,128,128,.18); }
 .grp-pill-x .gb-ic { width: 14px; height: 14px; }
 .grp-pills-todo .grp-pill { background: var(--fill); }
+
+/* ===== Premier ecran « Pour qui est le rendez-vous ? » (2 cartes centrees) =====
+   Ici (et pas dans group-booking.js) pour etre applique des le premier affichage : rdv.html affiche deja ces 2 cartes
+   dans son HTML, avant le chargement du salon - plus de grande carte vide ni de ligne verticale au rafraichissement. */
+.gb-choices{display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:22px}@media(min-width:700px){.gb-choices{grid-template-columns:1fr 1fr}}
+.gb-choice{display:flex;align-items:center;gap:14px;text-align:left;border:2px solid var(--sep);background:var(--card);color:var(--ink);border-radius:18px;padding:16px;font-family:inherit;cursor:pointer}
+.gb-choice b{display:block;font-size:17px}.gb-choice em{display:block;font-style:normal;font-size:13.5px;color:var(--grey);margin-top:2px}
+.gb-choice-ic{width:48px;height:48px;border-radius:50%;background:var(--fill);display:flex;align-items:center;justify-content:center;flex:none}
+.gb-choice{transition:border-color .15s ease,background .15s ease,transform .1s ease}
+.gb-choice:hover{border-color:var(--blue)}
+.gb-choice:active{transform:scale(.98)}
+.gb-pick>.step-bar{display:none!important}
+.gb-pick .flow-top,.gb-pick .flow-body{text-align:center}
+.gb-pick .eyebrow{font-size:21px;font-weight:700;color:var(--ink);letter-spacing:-.01em;margin:0 0 22px}
+.gb-pick .gb-choices{max-width:640px;margin:0 auto}
+.gb-pick .gb-choice{flex-direction:column;justify-content:center;text-align:center;gap:12px;padding:30px 20px;min-height:190px}
+.gb-pick .gb-choice-ic{width:64px;height:64px}
+.gb-pick .gb-choice-ic svg{width:30px;height:30px}
+.gb-pick .gb-choice b{font-size:19px}
+.gb-pick .gb-choice em{margin-top:4px}
+@media(min-width:900px){.wrap.page-flow:has(.panel.gb-pick.on){height:auto}
+.wrap.page-flow .panel.flow.gb-pick.on{display:flex!important;flex-direction:column;justify-content:center;padding:6px 32px 52px}
+.wrap.page-flow .panel.flow.gb-pick.on>.flow-top,.wrap.page-flow .panel.flow.gb-pick.on>.flow-body{padding:0;overflow:visible}
+}
+

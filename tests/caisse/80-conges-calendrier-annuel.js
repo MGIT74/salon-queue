@@ -8,7 +8,7 @@ check('onglet : plus de formulaire Du/Au, un calendrier annuel', /class="lv-year
 check('12 mois, navigation d\'annee (‹ 2026 ›)', /LV_MONTHS = \['janvier'/.test(dash) && /data-nav="-1"/.test(dash) && /data-nav="1"/.test(dash));
 check('glisser la souris : selection de plusieurs jours (mousedown / mousemove / mouseup)', /box\.onmousedown/.test(dash) && /box\.onmousemove/.test(dash) && /document\.addEventListener\('mouseup'/.test(dash));
 check('bulle : « En congé », « Répéter chaque année » (inactive si pas en congé), Fermer', /En congé ce jour/.test(dash) && /Répéter chaque année/.test(dash) && /lvClose\(/.test(dash) && /allOff \? '' : ' disabled'/.test(dash));
-check('un clic sur la case enregistre aussitot (API jours)', /\/leaves\/days', \{ method: 'POST', body: \{ dates: st\.sel, on: on, repeat: rep \}/.test(dash));
+check('un clic sur la case enregistre aussitot (API jours ; verification des rendez-vous d abord si nouveaux jours)', /\/leaves\/days', \{ method: 'POST', body: \{ dates: dates, on: on, repeat: rep \}/.test(dash) && /lvSaveDays\(id, days, on, rep\);/.test(dash));
 check('jours en congé en jaune, aujourd\'hui marque, total de l\'annee', /\.lv-day\.off \{ background: #ffc107/.test(dash) && /jour' \+ \(count > 1 \? 's' : ''\) \+ ' de congé en '/.test(dash));
 check('Echap et clic en dehors ferment la bulle', /e\.key !== 'Escape'/.test(dash) && /!e\.target\.closest\('\.lv-day'\) && !e\.target\.closest\('\.lv-bubble'\)/.test(dash));
 check('serveur : POST /:id/leaves/days (coiffeur du salon, transaction)', /router\.post\('\/:id\/leaves\/days'/.test(br) && /beginTransaction/.test(br) && /owned/.test(br));
