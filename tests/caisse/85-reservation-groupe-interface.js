@@ -55,7 +55,8 @@ let JSDOM; try { ({ JSDOM } = require('jsdom')); } catch (e) { console.log('jsdo
     ok('1er écran « Pour qui est le rendez-vous ? » : Juste moi / Plusieurs personnes');
     clickEl('[data-act=solo]'); assert(solo === 1); ok('« Juste moi » repart sur la réservation normale');
     clickEl('[data-act=multi]');
-    assert(m.querySelector('[data-act=who-self].on') && m.querySelector('[data-act=who-rel]')); ok('« Plusieurs personnes » : Moi coché par défaut + proches');
+    assert(m.querySelector('[data-act=who-self]') && !m.querySelector('[data-act=who-self].on') && m.querySelector('[data-act=who-rel]') && goBtn().disabled); ok('« Plusieurs personnes » : personne coché d\'avance (Moi et proches à cocher)');
+    clickEl('[data-act=who-self]');
     clickEl('[data-act=who-rel]'); assert(/2 personnes/.test(goBtn().textContent)); clickEl('[data-act=who-next]');
 
     assert(/Que faites-vous/.test(eyebrow()) && m.querySelectorAll('.gb-pb').length === 2 && goBtn().disabled);

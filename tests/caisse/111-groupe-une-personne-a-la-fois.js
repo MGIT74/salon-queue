@@ -46,6 +46,8 @@ const PUB = { 'Content-Type': 'application/json', 'X-Salon-Slug': 'test' };
       today: () => '2030-01-10', onSolo: () => {}, onPeople: (p) => { got = p; }, onContinue: () => { cont++; } });
     const m = document.getElementById('m'), click = (s) => m.querySelector(s).dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
     click('[data-act=multi]');
+    check('« Qui vient ? » vide au depart : rien de coche, « Continuer » inactif', !m.querySelector('.gb-who.on') && m.querySelector('[data-act=who-next]').disabled);
+    click('[data-act=who-self]');
     const inp = m.querySelector('#gb-who-name'); inp.value = 'Tom'; inp.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
     click('[data-act=who-add]'); click('[data-act=who-next]');
     await new Promise((r) => setTimeout(r, 30));
@@ -85,6 +87,7 @@ const PUB = { 'Content-Type': 'application/json', 'X-Salon-Slug': 'test' };
   check('rdv.html : pas de carte cadeau pendant un groupe ; retour a une seule personne remet les libelles', /grp\) \? '' : giftTileHtml/.test(rdv) && /function soloMode\(\)/.test(rdv));
   check('rdv.html : creneau pris entre-temps -> on refait seulement l\'heure de cette personne', /cartRedoTime\(e\.data\.person_index\)/.test(rdv));
   check('compte.html : meme parcours (panier, retenus, envoi)', /onPeople: function \(people\) \{ bkCartStart\(people\); \}/.test(cmp) && /if \(bkGrp\) return bkCartAddCurrent\(\);/.test(cmp) && /id="p-book-cart"/.test(cmp) && /GroupBooking\.cartHeld\(bkGrp\.cart/.test(cmp) && /GroupBooking\.cartPayload\(bkGrp\.cart\)/.test(cmp));
+  check('rdv.html (en ligne) : pas de pastille « Moi », on tape les prenoms', /noSelfChip: !STAFF_BRIDGE/.test(rdv));
   check('compte.html : le coiffeur est affiche sur les prochains RDV et le dernier passage', /when \+ \(a\.barber_name \? ' · avec ' \+ esc\(a\.barber_name\)/.test(cmp) && /\(v\.barber_name \? ' · avec ' \+ esc\(v\.barber_name\)/.test(cmp));
   check('enlever une personne a tout moment (bandeau et panier), rdv.html et compte.html', /function grpRemovePerson\(pi\)/.test(rdv) && /peoplePillsHtml\(grp\.people, grp\.cart, grp\.current, 'grpRemovePerson'\)/.test(rdv) && /id="cart-todo"/.test(rdv) &&
     /function bkGrpRemovePerson\(pi\)/.test(cmp) && /'bkGrpRemovePerson'/.test(cmp) && /id="bk-cart-todo"/.test(cmp));

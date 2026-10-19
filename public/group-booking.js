@@ -267,7 +267,8 @@
     function complete(p) { return !!(p.serviceId && p.slot && (p.isSelf || String(p.name || '').trim())); }
     function fmtMin(m) { return typeof formatMinutes === 'function' ? formatMinutes(m) : m + ' min'; }
 
-    function newWho() { return { multi: !cfg.onSolo, self: true, rels: {}, extra: [], draft: '', draftSave: false }; }
+    // Personne n'est coche d'avance : c'est l'utilisateur qui ajoute (ou coche) les personnes qui viennent.
+    function newWho() { return { multi: !cfg.onSolo, self: false, rels: {}, extra: [], draft: '', draftSave: false }; }
     function reset() { slotCache = {}; people = []; cur = null; editing = false; sepMode = false; wsel = newWho(); plan = { date: null, mode: 'seq', loading: false, list: null, chosen: -1, req: 0 }; view = 'who'; paint(); }
     function whoCount() { return (wsel.self ? 1 : 0) + Object.keys(wsel.rels).filter(function (k) { return wsel.rels[k]; }).length + wsel.extra.length; }
     function addWhoName() {
@@ -415,11 +416,12 @@
           '<button type="button" class="gb-choice' + (wsel.multi ? ' on' : '') + '" data-act="multi"><span class="gb-choice-ic">' + ICON_MANY + '</span><span><b>Plusieurs personnes</b><em>Enfants, amis, famille — jusqu\'à ' + MAX_PEOPLE + '</em></span></button></div>' : '';
         var n = whoCount(), body = cards;
         if (wsel.multi) {
-          var chips = '<button type="button" class="gb-who' + (wsel.self ? ' on' : '') + '" data-act="who-self"><i>' + esc((cfg.selfChip || 'Moi').charAt(0)) + '</i>' + esc(cfg.selfChip || 'Moi') + '</button>';
+          // cfg.noSelfChip (reservation en ligne sans compte) : pas de pastille « Moi », on tape simplement les prenoms.
+          var chips = cfg.noSelfChip ? '' : '<button type="button" class="gb-who' + (wsel.self ? ' on' : '') + '" data-act="who-self"><i>' + esc((cfg.selfChip || 'Moi').charAt(0)) + '</i>' + esc(cfg.selfChip || 'Moi') + '</button>';
           (cfg.relatives || []).forEach(function (r) { chips += '<button type="button" class="gb-who' + (wsel.rels[r.id] ? ' on' : '') + '" data-act="who-rel" data-id="' + esc(r.id) + '"><i>' + esc(String(r.name).charAt(0).toUpperCase()) + '</i>' + esc(r.name) + '</button>'; });
           wsel.extra.forEach(function (x, i) { chips += '<button type="button" class="gb-who on" data-act="who-del" data-i="' + i + '" title="Retirer"><i>' + esc(x.name.charAt(0).toUpperCase()) + '</i>' + esc(x.name) + ic('x') + '</button>'; });
-          body += '<div class="gb-label">Qui vient ?</div>' + (cfg.whoSub ? '<p class="step-sub">' + esc(cfg.whoSub) + '</p>' : '') + '<div class="gb-whos">' + chips + '</div>' +
-            '<div class="fld"><label for="gb-who-name">Ajouter quelqu\'un d\'autre</label><div class="gb-addrow"><input id="gb-who-name" maxlength="60" autocomplete="off" placeholder="Prénom" value="' + esc(wsel.draft) + '"><button type="button" class="gb-mini" data-act="who-add">Ajouter</button></div></div>' +
+          body += '<div class="gb-label">Qui vient ?</div>' + (cfg.whoSub ? '<p class="step-sub">' + esc(cfg.whoSub) + '</p>' : '') + (chips ? '<div class="gb-whos">' + chips + '</div>' : '') +
+            '<div class="fld"><label for="gb-who-name">' + (chips ? 'Ajouter quelqu\'un d\'autre' : 'Ajoutez le prénom de chaque personne') + '</label><div class="gb-addrow"><input id="gb-who-name" maxlength="60" autocomplete="off" placeholder="Prénom" value="' + esc(wsel.draft) + '"><button type="button" class="gb-mini" data-act="who-add">Ajouter</button></div></div>' +
             (cfg.createRelative ? '<label class="gb-save"><input type="checkbox" data-act="who-save"' + (wsel.draftSave ? ' checked' : '') + '> ' + esc(cfg.saveLabel || 'Enregistrer ce prénom dans « Mes proches »') + '</label>' : '');
         }
         return { top: (cfg.onExit ? back() : '') + '<div class="eyebrow">' + (cfg.onSolo ? 'Pour qui est le rendez-vous ?' : 'Qui vient au salon ?') + '</div>',

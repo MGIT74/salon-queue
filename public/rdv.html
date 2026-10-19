@@ -362,7 +362,7 @@
 </div>
 
 <script src="/app.js?v=26"></script>
-<script src="/group-booking.js?v=19"></script>
+<script src="/group-booking.js?v=20"></script>
 <style>
 body.staff-mode .gift-summary-box,body.staff-mode .theme-btn,body.staff-mode .login-hint{display:none!important}
 .login-hint{background:var(--fill);border-radius:14px;padding:12px 14px;margin:0 0 18px;font-size:14.5px;font-weight:600}
@@ -902,6 +902,7 @@ function openGroupBooking(startOnWho) {
       eur: eur, toast: toast, continueLabel: 'Continuer', bufferMin: rdvBufferMin,
       onSolo: STAFF_BRIDGE ? null : function () { soloMode(); show('p-barber'); },
       onPeople: function (people) { cartStart(people); },
+      noSelfChip: !STAFF_BRIDGE,
       selfChip: STAFF_BRIDGE ? staffClientName() : null, selfName: STAFF_BRIDGE ? staffClientName() : null,
       // Mode salon + client avec un compte : ses proches enregistrés (enfants…) sont proposés, et la case
       // « Enregistrer dans ses proches » ajoute le prénom à son compte (il le retrouve dans son espace client).
