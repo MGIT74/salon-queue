@@ -29,7 +29,7 @@
   html.auth-checking #p-login { display: none !important; }
   html.auth-checking #auth-layout { display: none !important; }
 </style>
-<link rel="stylesheet" href="/app.css?v=34">
+<link rel="stylesheet" href="/app.css?v=35">
 <script>
   // Applique tout de suite la couleur du salon si on l'a déjà vue lors
   // d'une visite précédente (cache localStorage par salon), plutôt que
@@ -528,6 +528,7 @@
     <div class="eyebrow">Votre panier</div>
     <p class="step-sub" id="bk-cart-sub"></p>
     <div class="cart-list" id="bk-cart-list"></div>
+    <div class="grp-pills grp-pills-todo" id="bk-cart-todo"></div>
     <div class="cart-add fld" id="bk-cart-add">
       <input id="bk-cart-add-name" type="text" placeholder="Ajouter une personne (prénom)" autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();bkCartAddPerson();}">
       <button type="button" onclick="bkCartAddPerson()">Ajouter</button>
@@ -692,7 +693,7 @@
 
 <script src="/app.js?v=26"></script>
 <script src="/autorefresh.js?v=2"></script>
-<script src="/group-booking.js?v=18"></script>
+<script src="/group-booking.js?v=19"></script>
 <style>
 .gb-done{padding:10px 0;border-bottom:1px solid var(--sep)}.gb-done:last-child{border:none}.gb-done b{display:block}.gb-done span{color:var(--grey);font-size:14px}
 #relatives-list{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
@@ -1147,6 +1148,7 @@ function renderBkGrpBanner(panelId) {
   el.innerHTML = '<span class="grp-who">' + (p.isSelf ? '<b>Votre rendez-vous</b>' : 'Rendez-vous de <b>' + esc(p.name) + '</b>') + '</span>' +
     '<span class="grp-step">' + (bkGrp.current + 1) + ' sur ' + bkGrp.people.length + '</span>' +
     (bkGrp.cart.length ? '<button type="button" class="grp-cart-btn" onclick="show(\'p-book-cart\')">Panier · ' + bkGrp.cart.length + '</button>' : '');
+  el.innerHTML += '<div class="grp-pills">' + GroupBooking.peoplePillsHtml(bkGrp.people, bkGrp.cart, bkGrp.current, 'bkGrpRemovePerson') + '</div>';
   el.style.display = '';
 }
 
@@ -1171,7 +1173,9 @@ function bkCartAddCurrent() {
     dur: (svc ? Number(svc.duration_min) || 0 : 0) + ex.reduce(function (t, x) { return t + (Number(x.duration_min) || 0); }, 0),
     price_cents: (svc ? Number(svc.price_cents) || 0 : 0) + ex.reduce(function (t, x) { return t + (Number(x.price_cents) || 0); }, 0) + pr.reduce(function (t, x) { return t + (Number(x.price_cents) || 0); }, 0)
   };
-  if (bkGrp.editIndex >= 0 && bkGrp.cart[bkGrp.editIndex]) bkGrp.cart[bkGrp.editIndex] = e; else bkGrp.cart.push(e);
+  // Une seule ligne par personne : « Modifier » remplace la sienne.
+  var k = -1; bkGrp.cart.forEach(function (x, j) { if (x.person === e.person) k = j; });
+  if (k >= 0) bkGrp.cart[k] = e; else bkGrp.cart.push(e);
   bkGrp.editIndex = -1;
   if (!bkGrp.date) bkGrp.date = e.date;
   renderBkCart();
@@ -1186,6 +1190,8 @@ function bkCartNextPerson() {
 function renderBkCart() {
   bkGrp.cart.sort(function (a, b) { return a.person - b.person; });
   document.getElementById('bk-cart-list').innerHTML = GroupBooking.cartRowsHtml(bkGrp.cart, eur, 'bkCart');
+  var todoHtml = GroupBooking.peoplePillsHtml(bkGrp.people, bkGrp.cart, -1, 'bkGrpRemovePerson', true);
+  document.getElementById('bk-cart-todo').innerHTML = todoHtml ? '<span class="grp-pills-lbl">Pas encore réservé :</span>' + todoHtml : '';
   var todo = bkGrp.people.filter(function (p, i) { return !bkGrp.cart.some(function (e) { return e.person === i; }); });
   document.getElementById('bk-cart-sub').textContent = todo.length
     ? bkGrp.cart.length + ' sur ' + bkGrp.people.length + ' — reste : ' + todo.map(function (p) { return p.name; }).join(', ')
@@ -1208,14 +1214,31 @@ function bkCartNext() {
 
 function bkCartEdit(i) { var e = bkGrp.cart[i]; if (e) bkCartBeginPerson(e.person, e); }
 
-function bkCartRemove(i) {
-  var e = bkGrp.cart[i]; if (!e) return;
-  bkGrp.cart.splice(i, 1);
-  bkGrp.people.splice(e.person, 1);
-  bkGrp.cart.forEach(function (x) { if (x.person > e.person) x.person--; });
-  if (!bkGrp.people.length) { bkGrp = null; return openBookGroup(true); }
+// Une personne ne vient plus : on l'enleve du groupe tout de suite (avec son rendez-vous du panier s'il y en a un),
+// sans devoir finir sa reservation. Si c'etait la personne en cours, on passe a la suivante (ou au panier).
+function bkGrpRemovePerson(pi) {
+  if (!bkGrp || !bkGrp.people[pi]) return;
+  var wasCurrent = pi === bkGrp.current;
+  var onCart = document.getElementById('p-book-cart').classList.contains('on');
+  var editing = bkGrp.editIndex >= 0 ? bkGrp.cart[bkGrp.editIndex] : null;
+  bkGrp.cart = bkGrp.cart.filter(function (e) { return e.person !== pi; });
+  bkGrp.cart.forEach(function (e) { if (e.person > pi) e.person--; });
+  bkGrp.people.splice(pi, 1);
+  if (bkGrp.current > pi) bkGrp.current--;
+  if (!bkGrp.people.length) { bkGrp = null; openBookGroup(true); return; }
+  bkGrp.editIndex = editing ? bkGrp.cart.indexOf(editing) : -1;
+  if (wasCurrent && !onCart) {
+    var next = bkCartNextPerson();
+    if (next !== -1 && !bkGrp.cart.length) return bkCartBeginPerson(next);
+    renderBkCart(); return show('p-book-cart');
+  }
+  if (bkGrp.current >= bkGrp.people.length) bkGrp.current = bkGrp.people.length - 1;
   renderBkCart();
+  var on = document.querySelector('.panel.on');
+  renderBkGrpBanner(on ? on.id : '');
 }
+
+function bkCartRemove(i) { var e = bkGrp.cart[i]; if (e) bkGrpRemovePerson(e.person); }
 
 function bkCartAddPerson() {
   var inp = document.getElementById('bk-cart-add-name'), n = inp.value.trim();

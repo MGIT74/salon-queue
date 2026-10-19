@@ -18,7 +18,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Prendre rendez-vous</title>
-<link rel="stylesheet" href="/app.css?v=34">
+<link rel="stylesheet" href="/app.css?v=35">
 <script>
   // Adresse SANS ?salon=... : on masque la page le temps de savoir si la plateforme heberge plusieurs salons
   // (voir guardMissingSalon) - pour ne jamais montrer, meme une fraction de seconde, un formulaire sans salon.
@@ -219,6 +219,7 @@
     <div class="eyebrow">Votre panier</div>
     <p class="step-sub" id="cart-sub"></p>
     <div class="cart-list" id="cart-list"></div>
+    <div class="grp-pills grp-pills-todo" id="cart-todo"></div>
     <div class="cart-add fld" id="cart-add">
       <input id="cart-add-name" type="text" placeholder="Ajouter une personne (prénom)" autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();cartAddPerson();}">
       <button type="button" onclick="cartAddPerson()">Ajouter</button>
@@ -361,7 +362,7 @@
 </div>
 
 <script src="/app.js?v=26"></script>
-<script src="/group-booking.js?v=18"></script>
+<script src="/group-booking.js?v=19"></script>
 <style>
 body.staff-mode .gift-summary-box,body.staff-mode .theme-btn,body.staff-mode .login-hint{display:none!important}
 .login-hint{background:var(--fill);border-radius:14px;padding:12px 14px;margin:0 0 18px;font-size:14.5px;font-weight:600}
@@ -1016,6 +1017,7 @@ function renderGrpBanner(panelId) {
   el.innerHTML = '<span class="grp-who">' + (p.isSelf && !STAFF_BRIDGE ? '<b>Votre rendez-vous</b>' : 'Rendez-vous de <b>' + esc(p.name) + '</b>') + '</span>' +
     '<span class="grp-step">' + (grp.current + 1) + ' sur ' + grp.people.length + '</span>' +
     (grp.cart.length ? '<button type="button" class="grp-cart-btn" onclick="show(\'p-cart\')">Panier · ' + grp.cart.length + '</button>' : '');
+  el.innerHTML += '<div class="grp-pills">' + GroupBooking.peoplePillsHtml(grp.people, grp.cart, grp.current, 'grpRemovePerson') + '</div>';
   el.style.display = '';
 }
 
@@ -1044,7 +1046,9 @@ function cartEntryFromSelection() {
 
 function cartAddCurrent() {
   var e = cartEntryFromSelection();
-  if (grp.editIndex >= 0 && grp.cart[grp.editIndex]) grp.cart[grp.editIndex] = e; else grp.cart.push(e);
+  // Une seule ligne par personne : « Modifier » remplace la sienne.
+  var k = -1; grp.cart.forEach(function (x, j) { if (x.person === e.person) k = j; });
+  if (k >= 0) grp.cart[k] = e; else grp.cart.push(e);
   grp.editIndex = -1;
   if (!grp.date) grp.date = e.date;
   renderCart();
@@ -1059,6 +1063,9 @@ function cartNextPerson() {
 function renderCart() {
   grp.cart.sort(function (a, b) { return a.person - b.person; });
   document.getElementById('cart-list').innerHTML = GroupBooking.cartRowsHtml(grp.cart, eur, 'cart');
+  var todoEl = document.getElementById('cart-todo');
+  var todoHtml = GroupBooking.peoplePillsHtml(grp.people, grp.cart, -1, 'grpRemovePerson', true);
+  todoEl.innerHTML = todoHtml ? '<span class="grp-pills-lbl">Pas encore réservé :</span>' + todoHtml : '';
   var todo = grp.people.filter(function (p, i) { return !grp.cart.some(function (e) { return e.person === i; }); });
   document.getElementById('cart-sub').textContent = todo.length
     ? grp.cart.length + ' sur ' + grp.people.length + ' — reste : ' + todo.map(function (p) { return p.name; }).join(', ')
@@ -1082,15 +1089,31 @@ function cartNext() {
 
 function cartEdit(i) { var e = grp.cart[i]; if (e) cartBeginPerson(e.person, e); }
 
-function cartRemove(i) {
-  var e = grp.cart[i]; if (!e) return;
-  // Retirer = cette personne ne vient plus : on l'enleve du groupe.
-  grp.cart.splice(i, 1);
-  grp.people.splice(e.person, 1);
-  grp.cart.forEach(function (x) { if (x.person > e.person) x.person--; });
-  if (!grp.people.length) { grp = null; return openWho(); }
+// Une personne ne vient plus : on l'enleve du groupe tout de suite (avec son rendez-vous du panier s'il y en a un),
+// sans devoir finir sa reservation. Si c'etait la personne en cours, on passe a la suivante (ou au panier).
+function grpRemovePerson(pi) {
+  if (!grp || !grp.people[pi]) return;
+  var wasCurrent = pi === grp.current;
+  var onCart = document.getElementById('p-cart').classList.contains('on');
+  var editing = grp.editIndex >= 0 ? grp.cart[grp.editIndex] : null;
+  grp.cart = grp.cart.filter(function (e) { return e.person !== pi; });
+  grp.cart.forEach(function (e) { if (e.person > pi) e.person--; });
+  grp.people.splice(pi, 1);
+  if (grp.current > pi) grp.current--;
+  if (!grp.people.length) { grp = null; openWho(); return; }
+  grp.editIndex = editing ? grp.cart.indexOf(editing) : -1;
+  if (wasCurrent && !onCart) {
+    var next = cartNextPerson();
+    if (next !== -1 && !grp.cart.length) return cartBeginPerson(next);
+    renderCart(); return show('p-cart');
+  }
+  if (grp.current >= grp.people.length) grp.current = grp.people.length - 1;
   renderCart();
+  var on = document.querySelector('.panel.on');
+  renderGrpBanner(on ? on.id : '');
 }
+
+function cartRemove(i) { var e = grp.cart[i]; if (e) grpRemovePerson(e.person); }
 
 function cartAddPerson() {
   var inp = document.getElementById('cart-add-name'), n = inp.value.trim();

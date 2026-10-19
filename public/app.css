@@ -748,3 +748,19 @@ body .tfx > button { transition: color .25s ease, transform .1s ease; }
 .cart-add button { border: none; background: var(--fill-2); color: var(--ink); font: inherit; font-weight: 600; border-radius: 12px; padding: 0 16px; cursor: pointer; }
 .cart-total { display: flex; justify-content: space-between; align-items: baseline; font-size: 17px; padding: 4px 2px 16px; }
 .cart-total:empty { display: none; }
+
+/* Pastilles des personnes du groupe (bandeau et panier), chacune avec une croix « ne vient plus » */
+.grp-pills { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.grp-pills:empty { display: none; }
+.grp-pills-todo { margin: -4px 0 14px; }
+.grp-pills-lbl { font-size: 13px; color: var(--grey); margin-right: 2px; }
+.grp-pill { display: inline-flex; align-items: center; gap: 5px; padding: 4px 4px 4px 11px; border-radius: 999px; background: var(--card);
+  font-size: 13.5px; font-weight: 600; color: var(--ink); box-shadow: inset 0 0 0 1px var(--sep); }
+.grp-pill.cur { background: var(--accent); color: #fff; box-shadow: none; }
+.grp-pill.done { padding-left: 6px; }
+.grp-pill-ok { display: inline-flex; color: var(--green); }
+.grp-pill-ok .gb-ic { width: 15px; height: 15px; }
+.grp-pill-x { border: none; background: none; color: inherit; opacity: .65; padding: 3px; border-radius: 50%; cursor: pointer; display: inline-flex; }
+.grp-pill-x:hover { opacity: 1; background: rgba(128,128,128,.18); }
+.grp-pill-x .gb-ic { width: 14px; height: 14px; }
+.grp-pills-todo .grp-pill { background: var(--fill); }

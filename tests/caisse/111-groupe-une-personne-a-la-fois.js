@@ -29,6 +29,11 @@ const PUB = { 'Content-Type': 'application/json', 'X-Salon-Slug': 'test' };
   const rows = GB.cartRowsHtml(cart, (c) => (c / 100) + ' €', 'cart');
   check('cartRowsHtml : heure, nom, prestation + supplement, coiffeur, produit, prix, Modifier / retirer', /10:00/.test(rows) && /Coupe \+ Soin · Alice/.test(rows) && /Produit : Gel/.test(rows) && /30 €/.test(rows) && /cartEdit\(0\)/.test(rows) && /cartRemove\(1\)/.test(rows));
 
+  const pills = GB.peoplePillsHtml([{ name: 'Moi' }, { name: 'momo' }, { name: 'elo' }], [{ person: 0 }], 1, 'grpRemovePerson');
+  check('pastilles : faite / en cours / a faire, chacune avec sa croix « ne vient plus »', /grp-pill done/.test(pills) && /grp-pill cur/.test(pills) && /grp-pill todo/.test(pills) && /grpRemovePerson\(2\)/.test(pills) && (pills.match(/grp-pill-x/g) || []).length === 3);
+  const todo = GB.peoplePillsHtml([{ name: 'Moi' }, { name: 'momo' }, { name: 'elo' }], [{ person: 0 }], -1, 'f', true);
+  check('panier : seulement les personnes pas encore reservees', !/Moi/.test(todo) && /momo/.test(todo) && /elo/.test(todo));
+
   console.log('\n[B] « Qui vient ? » rend la main a la page (onPeople)');
   let JSDOM; try { ({ JSDOM } = require('jsdom')); } catch (e) { /* absent */ }
   if (JSDOM) {
@@ -81,6 +86,8 @@ const PUB = { 'Content-Type': 'application/json', 'X-Salon-Slug': 'test' };
   check('rdv.html : creneau pris entre-temps -> on refait seulement l\'heure de cette personne', /cartRedoTime\(e\.data\.person_index\)/.test(rdv));
   check('compte.html : meme parcours (panier, retenus, envoi)', /onPeople: function \(people\) \{ bkCartStart\(people\); \}/.test(cmp) && /if \(bkGrp\) return bkCartAddCurrent\(\);/.test(cmp) && /id="p-book-cart"/.test(cmp) && /GroupBooking\.cartHeld\(bkGrp\.cart/.test(cmp) && /GroupBooking\.cartPayload\(bkGrp\.cart\)/.test(cmp));
   check('compte.html : le coiffeur est affiche sur les prochains RDV et le dernier passage', /when \+ \(a\.barber_name \? ' · avec ' \+ esc\(a\.barber_name\)/.test(cmp) && /\(v\.barber_name \? ' · avec ' \+ esc\(v\.barber_name\)/.test(cmp));
+  check('enlever une personne a tout moment (bandeau et panier), rdv.html et compte.html', /function grpRemovePerson\(pi\)/.test(rdv) && /peoplePillsHtml\(grp\.people, grp\.cart, grp\.current, 'grpRemovePerson'\)/.test(rdv) && /id="cart-todo"/.test(rdv) &&
+    /function bkGrpRemovePerson\(pi\)/.test(cmp) && /'bkGrpRemovePerson'/.test(cmp) && /id="bk-cart-todo"/.test(cmp));
   const css = fs.readFileSync(path.join(root, 'public/app.css'), 'utf8');
   check('style du bandeau et du panier dans app.css', /\.grp-banner \{/.test(css) && /\.cart-row \{/.test(css));
 

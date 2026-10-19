@@ -687,6 +687,19 @@
     }).join('');
   }
 
+  // Pastilles des personnes du groupe (bandeau et panier) : faite (coche), en cours, a faire ; chacune avec une croix pour
+  // l'enlever tout de suite si elle ne vient plus. onlyTodo : seulement celles qui n'ont pas encore de rendez-vous.
+  function peoplePillsHtml(people, cart, current, removeFn, onlyTodo) {
+    return (people || []).map(function (p, i) {
+      var done = (cart || []).some(function (e) { return e.person === i; });
+      if (onlyTodo && done) return '';
+      var st = done ? 'done' : (i === current ? 'cur' : 'todo');
+      return '<span class="grp-pill ' + st + '">' + (done ? '<span class="grp-pill-ok">' + ic('same').replace('<path d="M5 9h14M5 15h14"/>', '<path d="M5 12.5l4.2 4.2L19 7"/>') + '</span>' : '') +
+        '<span class="grp-pill-n">' + esc(p.name) + '</span>' +
+        '<button type="button" class="grp-pill-x" aria-label="Retirer ' + esc(p.name) + '" title="Ne vient plus" onclick="' + removeFn + '(' + i + ')">' + ic('x') + '</button></span>';
+    }).join('');
+  }
+
   /** Tuile « plusieurs personnes » des grilles de coiffeurs (meme habillage que « Utiliser un cadeau »). */
   function tileHtml(onclick) {
     return '<button type="button" class="svc-card barber-tile group-tile" onclick="' + onclick + '">' +
@@ -694,5 +707,5 @@
       '<span class="name">Plusieurs personnes</span><span class="meta">Enfants, amis…</span></button>';
   }
 
-  return { cartHeld: cartHeld, cartPayload: cartPayload, cartRowsHtml: cartRowsHtml, buildPlans: buildPlans, tileHtml: tileHtml, MAX_PEOPLE: MAX_PEOPLE, personDuration: personDuration, personPrice: personPrice, heldParam: heldParam, computeSuggestions: computeSuggestions, buildPayload: buildPayload, create: create };
+  return { peoplePillsHtml: peoplePillsHtml, cartHeld: cartHeld, cartPayload: cartPayload, cartRowsHtml: cartRowsHtml, buildPlans: buildPlans, tileHtml: tileHtml, MAX_PEOPLE: MAX_PEOPLE, personDuration: personDuration, personPrice: personPrice, heldParam: heldParam, computeSuggestions: computeSuggestions, buildPayload: buildPayload, create: create };
 });
