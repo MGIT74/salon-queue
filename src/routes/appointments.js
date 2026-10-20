@@ -223,6 +223,13 @@ async function computeSlotsForBarber(barberId, dateStr, durationMin, rdvSettings
   );
   if (onLeave) return [];
 
+  // Jour « sans RDV » choisi pour ce coiffeur (calendrier de l'onglet Congés) : aucun creneau ce jour-la.
+  const [[walkinDay]] = await pool.query(
+    'SELECT id FROM barber_walkin_days WHERE barber_id = ? AND ? BETWEEN start_date AND end_date LIMIT 1',
+    [barberId, dateStr]
+  );
+  if (walkinDay) return [];
+
   const [existing] = await pool.query(
     `SELECT a.scheduled_at, COALESCE(MAX(bsp.duration_min), MAX(s.duration_min)) AS svc_duration,
             COALESCE(SUM(COALESCE(bep.duration_min, e.duration_min)), 0) AS extras_duration,

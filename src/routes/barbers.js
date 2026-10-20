@@ -98,6 +98,14 @@ router.get('/', wrap(async (req, res) => {
     [req.salon.id, todayStr]
   );
 
+  // Jours « sans RDV » en cours ou a venir : affiches dans le calendrier, et la borne propose le coiffeur ces jours-la.
+  const [walkinRows] = await pool.query(
+    `SELECT w.barber_id, w.start_date, w.end_date FROM barber_walkin_days w
+     JOIN barbers b ON b.id = w.barber_id
+     WHERE b.salon_id = ? AND w.end_date >= ? ORDER BY w.start_date`,
+    [req.salon.id, todayStr]
+  );
+
   // Identifiants de prestations/suppléments NON réalisés par ce coiffeur —
   // pas un secret (les catalogues sont déjà publics), utile au kiosk pour
   // filtrer le formulaire une fois le coiffeur choisi.
@@ -121,7 +129,12 @@ router.get('/', wrap(async (req, res) => {
     const myLeaves = leaveRows.filter((l) => l.barber_id === b.id)
       .map((l) => ({ start_date: String(l.start_date).slice(0, 10), end_date: String(l.end_date).slice(0, 10) }));
 
+    const myWalkin = walkinRows.filter((w) => w.barber_id === b.id)
+      .map((w) => ({ start_date: String(w.start_date).slice(0, 10), end_date: String(w.end_date).slice(0, 10) }));
+
     return Object.assign({}, stripSecrets(b), {
+      walkin_days: myWalkin,
+      walkin_today: myWalkin.some((w) => w.start_date <= todayStr && todayStr <= w.end_date),
       leaves: myLeaves,
       on_leave_today: myLeaves.some((l) => l.start_date <= todayStr && todayStr <= l.end_date),
       schedules: schedules.filter((s) => s.barber_id === b.id).sort((a, c) => a.weekday - c.weekday),
@@ -781,6 +794,67 @@ router.post('/:id/leaves/preview', requireAdmin, wrap(async (req, res) => {
     [req.salon.id, req.params.id, dates, nowLocal]
   );
   res.json({ ok: true, count: rows.length, items: rows });
+}));
+
+// ---------- Jours « sans RDV » (meme calendrier que les conges) ----------
+router.get('/:id/walkin-days', requireAdmin, wrap(async (req, res) => {
+  const [[owned]] = await pool.query('SELECT id FROM barbers WHERE id = ? AND salon_id = ?', [req.params.id, req.salon.id]);
+  if (!owned) return res.status(404).json({ error: 'Coiffeur introuvable' });
+  const [rows] = await pool.query(
+    "SELECT id, DATE_FORMAT(start_date, '%Y-%m-%d') AS start_date, DATE_FORMAT(end_date, '%Y-%m-%d') AS end_date, note, repeat_yearly FROM barber_walkin_days WHERE barber_id = ? ORDER BY start_date DESC",
+    [req.params.id]
+  );
+  res.json({ ok: true, items: rows });
+}));
+
+// { dates, on, repeat } : passe ces jours en « sans RDV » (on) ou les remet en RDV (off).
+// Regle : un jour ou le coiffeur a deja des rendez-vous a venir ne peut PAS passer en « sans RDV » ; il reste en RDV
+// et ses rendez-vous sont renvoyes (blocked) pour que le salon les deplace ou les annule d'abord.
+router.post('/:id/walkin-days/days', requireAdmin, wrap(async (req, res) => {
+  const dates = Array.isArray(req.body.dates) ? req.body.dates.map(String) : [];
+  if (!dates.length || dates.length > 500 || !dates.every(leaveDays.isDate)) return res.status(400).json({ error: 'Jours invalides' });
+  const [[owned]] = await pool.query('SELECT id FROM barbers WHERE id = ? AND salon_id = ?', [req.params.id, req.salon.id]);
+  if (!owned) return res.status(404).json({ error: 'Coiffeur introuvable' });
+  const on = Boolean(req.body.on), repeat = on && Boolean(req.body.repeat);
+  const settings = await getSettings(req.salon.id);
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: settings.timezone || 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date());
+  const part = (t) => parts.find((p) => p.type === t).value;
+  const nowLocal = part('year') + '-' + part('month') + '-' + part('day') + ' ' + part('hour') + ':' + part('minute') + ':00';
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [rows] = await conn.query('SELECT start_date, end_date, note, repeat_yearly FROM barber_walkin_days WHERE barber_id = ? FOR UPDATE', [req.params.id]);
+    const before = leaveDays.expand(rows);
+    const map = leaveDays.applyDays(leaveDays.expand(rows), dates, on, repeat, new Date().getUTCFullYear());
+    let blocked = [];
+    if (on) {
+      // Jours ajoutes (y compris les copies « chaque annee ») qui ont deja des rendez-vous a venir : refuses.
+      const added = [...map.keys()].filter((d) => !before.has(d));
+      if (added.length) {
+        const [appts] = await conn.query(
+          `SELECT a.id, a.client_name, a.email, a.phone, DATE_FORMAT(a.scheduled_at, '%Y-%m-%d %H:%i') AS scheduled_at, s.name AS service_name
+           FROM appointments a LEFT JOIN services s ON s.id = a.service_id
+           WHERE a.salon_id = ? AND a.barber_id = ? AND DATE(a.scheduled_at) IN (?) AND a.scheduled_at >= ?
+             AND a.status NOT IN ('cancelled', 'completed', 'no_show')
+           ORDER BY a.scheduled_at`,
+          [req.salon.id, req.params.id, added, nowLocal]
+        );
+        blocked = appts;
+        appts.forEach((a) => map.delete(a.scheduled_at.slice(0, 10)));
+      }
+    }
+    const ranges = leaveDays.compress(map);
+    await conn.query('DELETE FROM barber_walkin_days WHERE barber_id = ?', [req.params.id]);
+    const items = [];
+    for (const r of ranges) {
+      const id = crypto.randomUUID();
+      await conn.query('INSERT INTO barber_walkin_days (id, barber_id, start_date, end_date, note, repeat_yearly) VALUES (?, ?, ?, ?, ?, ?)',
+        [id, req.params.id, r.start_date, r.end_date, r.note, r.repeat_yearly ? 1 : 0]);
+      items.push({ id, start_date: r.start_date, end_date: r.end_date, note: r.note, repeat_yearly: r.repeat_yearly ? 1 : 0 });
+    }
+    await conn.commit();
+    res.json({ ok: true, items: items.reverse(), blocked });
+  } catch (e) { await conn.rollback(); throw e; } finally { conn.release(); }
 }));
 
 // Calendrier annuel : { dates: ['2026-02-28', ...], on: true|false, repeat: true|false } - coche / decoche des JOURS.

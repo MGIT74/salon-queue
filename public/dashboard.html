@@ -1383,6 +1383,14 @@
   .lv-day.past:hover { background: var(--card); }
   .lv-salon .lv-day.off.past:hover { background: var(--red); }
   .lv-reason { font-size: 13px; color: var(--grey); margin: 8px 0 0 27px; }
+  /* Jours « sans RDV » (borne seulement) */
+  .lv-day.walk { background: #f97316; color: #fff; font-weight: 600; box-shadow: inset 0 0 0 .5px rgba(255,255,255,.55); }
+  .lv-day.walk.sel { background: var(--accent); }
+  .lv-sep { height: 1px; background: var(--sep); margin: 12px 0; }
+  .lv-legend { display: flex; justify-content: center; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--grey); margin-top: 8px; }
+  .lv-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .lv-sw { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+  .lv-sw.off { background: #ffc107; } .lv-sw.walk { background: #f97316; }
   .lv-sum { text-align: center; color: var(--grey); font-size: 13px; margin-top: 18px; }
   .lv-bubble { position: absolute; z-index: 20; width: 300px; max-width: 100%; box-sizing: border-box; background: var(--card); color: var(--ink); border: 1px solid var(--sep); border-radius: 12px; padding: 14px 16px 12px; box-shadow: 0 10px 32px rgba(0,0,0,.18); }
   .lv-bubble::before { content: ''; position: absolute; top: -7px; left: var(--arrow-x, 50%); width: 12px; height: 12px; margin-left: -6px; background: var(--card); border-left: 1px solid var(--sep); border-top: 1px solid var(--sep); transform: rotate(45deg); }
@@ -4836,6 +4844,8 @@ function barberStatusChips(b, editable) {
   else if (!b.kiosk_hidden && !b.accepts_appointments) chips += '<span class="bc-chip orange">Sans RDV uniquement</span>';
   else if (b.kiosk_hidden && !b.accepts_appointments) chips += '<span class="bc-chip red">Masqué partout</span>';
   else chips += '<span class="bc-chip green">RDV + sans RDV</span>';
+  // Jour « sans RDV » choisi dans son calendrier (onglet Congés)
+  if (b.walkin_today && b.accepts_appointments) chips += '<span class="bc-chip orange">Sans RDV aujourd\'hui</span>';
   if (editable) {   // dans la fiche : un clic sur la puce change le code
     chips += '<button type="button" class="bc-chip pin" title="' + (b.has_pin ? 'Changer le code PIN' : 'Définir un code PIN') + '" onclick="event.stopPropagation();setBarberPin(\'' + b.id + '\',\'' + esc(b.name).replace(/'/g, "\\'") + '\')">' +
       (b.has_pin ? 'Code PIN' : 'Sans code') +
@@ -5448,11 +5458,21 @@ function renderRevenueChart(box, se, opts) {
   svg.addEventListener('mouseleave', hide);
 }
 
+var barberWalkins = {};   // jours « sans RDV » par coiffeur (meme calendrier que les conges)
 function loadBarberLeaves(id) {
-  api('/api/barbers/' + id + '/leaves').then(function (r) {
-    barberLeaves[id] = r.items;
+  Promise.all([api('/api/barbers/' + id + '/leaves'), api('/api/barbers/' + id + '/walkin-days')]).then(function (r) {
+    barberLeaves[id] = r[0].items;
+    barberWalkins[id] = r[1].items;
     renderLeavesList(id);
   }).catch(function (e) { toast(e.message, true); });
+}
+function lvWalkMap(id) {
+  var map = {};
+  (barberWalkins[id] || []).forEach(function (l) {
+    var d = String(l.start_date).slice(0, 10), end = String(l.end_date).slice(0, 10), n = 0;
+    while (d <= end && n++ < 6000) { map[d] = { repeat: Boolean(Number(l.repeat_yearly)) }; d = lvAddDays(d, 1); }
+  });
+  return map;
 }
 
 /* ---------- Calendrier annuel des congés ----------
@@ -5491,7 +5511,7 @@ function lvState_(id) {
 function renderLeavesList(id) {
   var box = document.getElementById('leaves-list-' + id);
   if (!box) return;
-  var st = lvState_(id), map = lvDayMap(id), todayIso = salonToday();
+  var st = lvState_(id), map = lvDayMap(id), todayIso = salonToday(), walk = id === 'salon' ? {} : lvWalkMap(id), walkCount = 0;
   var sel = {}; st.sel.forEach(function (d) { sel[d] = 1; });
   var count = 0;
   var months = LV_MONTHS.map(function (name, m) {
@@ -5503,7 +5523,8 @@ function renderLeavesList(id) {
     for (var d = 1; d <= nDays; d++) {
       var iso = lvIso(st.year, m, d), info = map[iso];
       if (info) count++;
-      var cls = 'lv-day' + (info ? ' off' : '') + (sel[iso] ? ' sel' : '') + (iso === todayIso ? ' today' : '') + (id === 'salon' && iso < todayIso ? ' past' : '');
+      if (!info && walk[iso]) walkCount++;
+      var cls = 'lv-day' + (info ? ' off' : (walk[iso] ? ' walk' : '')) + (sel[iso] ? ' sel' : '') + (iso === todayIso ? ' today' : '') + (id === 'salon' && iso < todayIso ? ' past' : '');
       cells += '<button type="button" class="' + cls + '" data-d="' + iso + '"' + (info && info.note ? ' title="' + esc(info.note) + '"' : '') + '>' + d + '</button>';
     }
     var tail = (7 - ((lead + nDays) % 7)) % 7;
@@ -5519,7 +5540,9 @@ function renderLeavesList(id) {
     '<div class="lv-months">' + months + '</div>' +
     '<div class="lv-sum">' + (id === 'salon'
       ? (count ? count + ' jour' + (count > 1 ? 's' : '') + ' de fermeture en ' + st.year : 'Aucune fermeture en ' + st.year)
-      : (count ? count + ' jour' + (count > 1 ? 's' : '') + ' de congé en ' + st.year : 'Aucun congé en ' + st.year)) + '</div>' +
+      : (count ? count + ' jour' + (count > 1 ? 's' : '') + ' de congé en ' + st.year : 'Aucun congé en ' + st.year) +
+        (walkCount ? ' · ' + walkCount + ' jour' + (walkCount > 1 ? 's' : '') + ' sans RDV' : '')) + '</div>' +
+    (id === 'salon' ? '' : '<div class="lv-legend"><span><i class="lv-sw off"></i>En congé</span><span><i class="lv-sw walk"></i>Sans RDV (borne seulement)</span></div>') +
     '<div class="lv-bubble" id="lv-bubble-' + id + '" style="display:none"></div>';
   lvBind(id, box);
   if (st.sel.length && !st.dragging) lvShowBubble(id);
@@ -5668,6 +5691,7 @@ function lvShowBubble(id) {
       (n === 1 ? 'En congé ce jour' : 'En congé ces ' + n + ' jours') + '</label>' +
     '<label class="lv-chk lv-sub' + (allOff ? '' : ' dis') + '"><input type="checkbox" id="lv-rep-' + id + '"' + (allRepeat ? ' checked' : '') + (allOff ? '' : ' disabled') + ' onchange="lvApply(\'' + id + '\')"> Répéter chaque année</label>' +
     '<div class="lv-reason" id="lv-check-' + id + '" style="display:none"></div>' +
+    lvWalkHtml(id, map) +
     '<div class="lv-foot"><button type="button" class="btn btn-ghost" onclick="lvClose(\'' + id + '\')">Fermer</button></div>';
   bub.style.display = 'block';
   // Ancrage sous le dernier jour sélectionné
@@ -5706,6 +5730,54 @@ function lvApply(id) {
 }
 
 // Meme fenetre que pour une fermeture du salon : la liste des rendez-vous concernes, rien n'est annule automatiquement.
+// Case « Sans RDV » de la bulle (coiffeurs qui prennent des RDV) : jours ou il n'est plus reservable et passe a la borne.
+function lvWalkHtml(id, map) {
+  var b = (barbers || []).find(function (x) { return String(x.id) === String(id); });
+  if (!b || !b.accepts_appointments) return '';
+  var st = lvState_(id), walk = lvWalkMap(id), n = st.sel.length;
+  var allWalk = st.sel.every(function (d) { return walk[d]; });
+  var allRep = allWalk && st.sel.every(function (d) { return walk[d].repeat; });
+  var anyLeave = st.sel.some(function (d) { return map[d]; });
+  return '<div class="lv-sep"></div>' +
+    '<label class="lv-chk"><input type="checkbox" id="lv-walk-' + id + '"' + (allWalk ? ' checked' : '') + ' onchange="lvApplyWalk(\'' + id + '\')"> ' +
+      (n === 1 ? 'Sans RDV ce jour' : 'Sans RDV ces ' + n + ' jours') + '</label>' +
+    '<label class="lv-chk lv-sub' + (allWalk ? '' : ' dis') + '"><input type="checkbox" id="lv-walkrep-' + id + '"' + (allRep ? ' checked' : '') + (allWalk ? '' : ' disabled') + ' onchange="lvApplyWalk(\'' + id + '\')"> Répéter chaque année</label>' +
+    '<div class="lv-reason">' + (anyLeave ? 'Un jour de congé reste en congé.' : 'Plus de réservation ces jours-là ; le coiffeur apparaît à la borne.') + '</div>';
+}
+
+function lvApplyWalk(id) {
+  var st = lvState_(id), days = st.sel.slice();
+  var on = document.getElementById('lv-walk-' + id).checked;
+  var rep = on && document.getElementById('lv-walkrep-' + id).checked;
+  api('/api/barbers/' + id + '/walkin-days/days', { method: 'POST', body: { dates: days, on: on, repeat: rep } })
+    .then(function (r) {
+      barberWalkins[id] = r.items; st.dirty = true; renderLeavesList(id);
+      if ((r.blocked || []).length) lvShowBlockedWalk(id, r.blocked);
+    })
+    .catch(function (e) { toast(e.message, true); renderLeavesList(id); });
+}
+
+// Jours refuses : le coiffeur y a deja des rendez-vous, ils restent en RDV.
+function lvShowBlockedWalk(id, items) {
+  var b = (barbers || []).find(function (x) { return String(x.id) === String(id); });
+  var days = []; items.forEach(function (a) { var d = a.scheduled_at.slice(0, 10); if (days.indexOf(d) === -1) days.push(d); });
+  var rows = items.map(function (a) {
+    return '<div style="display:grid;grid-template-columns:85px minmax(0,1fr);gap:12px;padding:12px 2px;border-bottom:1px solid var(--border,rgba(128,128,128,.18))">' +
+      '<div style="font-size:13px;font-weight:700;color:var(--blue)">' + esc(a.scheduled_at.slice(8, 10) + '/' + a.scheduled_at.slice(5, 7) + '/' + a.scheduled_at.slice(0, 4)) +
+      '<div style="color:var(--ink);font-size:17px;margin-top:3px">' + esc(a.scheduled_at.slice(11, 16)) + '</div></div>' +
+      '<div style="min-width:0"><strong style="font-size:14px">' + esc(a.client_name || 'Client') + '</strong>' +
+      '<div style="font-size:13px;color:var(--muted);margin-top:3px">' + esc(a.service_name || 'Prestation') + '</div>' +
+      '<div style="font-size:12px;color:var(--muted);overflow-wrap:anywhere;margin-top:3px">' + esc(a.phone || a.email || 'Contact non renseigné') + '</div></div></div>';
+  }).join('');
+  var ov = _buildModal(
+    '<div class="modal-title">' + (days.length > 1 ? days.length + ' jours restent en RDV' : 'Ce jour reste en RDV') + '</div>' +
+    '<p style="color:var(--muted);margin:4px 0 14px">' + (b ? esc(b.name) + ' a' : 'Il y a') + ' déjà ' + items.length + ' rendez-vous ' + (days.length > 1 ? 'ces jours-là' : 'ce jour-là') + '. Déplacez ou annulez ces rendez-vous d\'abord, puis repassez le jour en « Sans RDV ».</p>' +
+    '<div style="max-height:310px;overflow-y:auto;padding:0 12px;border:1px solid var(--border,rgba(128,128,128,.2));border-radius:12px;margin-bottom:16px">' + rows + '</div>' +
+    '<div class="modal-actions"><button type="button" class="btn btn-primary" id="lv-walk-ok">Compris</button></div>'
+  );
+  ov.querySelector('#lv-walk-ok').onclick = function () { _closeModal(ov); };
+}
+
 function lvConfirmAppointments(id, items) {
   var b = (barbers || []).find(function (x) { return String(x.id) === String(id); });
   return new Promise(function (resolve) {

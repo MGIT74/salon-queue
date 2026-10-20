@@ -87,6 +87,20 @@ CREATE TABLE IF NOT EXISTS barber_leaves (
   FOREIGN KEY (barber_id) REFERENCES barbers(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Jours « sans RDV » d'un coiffeur (calendrier de l'onglet Congés) : ces jours-là il n'est plus reservable
+-- et apparait a la borne. Meme structure que barber_leaves (plages, repetition annuelle).
+CREATE TABLE IF NOT EXISTS barber_walkin_days (
+  id CHAR(36) PRIMARY KEY,
+  barber_id CHAR(36) NOT NULL,
+  start_date DATE NOT NULL,
+  end_date DATE NOT NULL,
+  note VARCHAR(255) NULL,
+  repeat_yearly TINYINT(1) NOT NULL DEFAULT 0,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_bwd_barber (barber_id, start_date, end_date),
+  FOREIGN KEY (barber_id) REFERENCES barbers(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- Congé qui se répète chaque année (calendrier annuel des congés).
 SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'barber_leaves' AND column_name = 'repeat_yearly');
 SET @sql := IF(@c = 0, 'ALTER TABLE barber_leaves ADD COLUMN repeat_yearly TINYINT(1) NOT NULL DEFAULT 0', 'SELECT 1');
