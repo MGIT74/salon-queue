@@ -734,6 +734,13 @@ function hasBookableSchedule(b) {
   return schedules.some(function (s) { return s.active; });
 }
 
+/** Coiffeur « sans RDV » ce jour-la (jour coche dans le calendrier de sa fiche) ? Ce jour-la : pas de RDV, borne seulement. */
+function isWalkinOn(b, dateStr) {
+  if (!b) return false;
+  if (!dateStr) return Boolean(b.walkin_today);
+  return (b.walkin_days || []).some(function (w) { return dateStr >= w.start_date && dateStr <= w.end_date; });
+}
+
 /** Coiffeur en conge ce jour-la ? (dateStr "YYYY-MM-DD" ; sans date : aujourd'hui, calcule par le serveur) */
 function isOnLeaveOn(b, dateStr) {
   if (!dateStr) return Boolean(b.on_leave_today);

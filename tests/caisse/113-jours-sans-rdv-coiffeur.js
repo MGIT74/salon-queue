@@ -41,6 +41,9 @@ const call = async (m, u, h, b) => { const r = await fetch(BASE + u, { method: m
   check('jour reste en RDV : creneaux proposes', r.body && r.body.slots.length > 0);
   r = await call('POST', '/api/appointments', PUB, { client_name: 'T113 X', email: 't113@example.com', phone: '0600000001', service_id: 'sv1', barber_id: 'b1', date: D2, time: '11:00', base_url: BASE + '/rdv.html' });
   check('reservation directe refusee par le serveur', r.status >= 400, r);
+  check('message clair : « est en sans RDV ce jour-là »', /sans RDV » ce jour-là/.test((r.body || {}).error || ''), r.body);
+  const rs = await call('POST', '/api/appointments/admin-create', ADMIN, { client_name: 'T113 S', service_id: 'sv1', barber_id: 'b1', date: D2, time: '11:00' });
+  check('ajout par le salon refuse aussi, avec le meme message', rs.status === 409 && /sans RDV » ce jour-là/.test(rs.body.error), rs.body);
   r = await call('POST', '/api/appointments/group', PUB, { client_name: 'T113 G', email: 't113@example.com', phone: '0600000001', people: [{ name: '', service_id: 'sv1', barber_id: 'b1', date: D2, time: '11:00' }], base_url: BASE + '/rdv.html' });
   check('reservation a plusieurs refusee aussi', r.status >= 400, r);
 
@@ -63,6 +66,10 @@ const call = async (m, u, h, b) => { const r = await fetch(BASE + u, { method: m
   check('bulle du calendrier : case « Sans RDV », couleur orange, legende', /'Sans RDV ce jour' : 'Sans RDV ces ' \+ n \+ ' jours'/.test(d) && /\.lv-day\.walk \{ background: #f97316/.test(d) && /Sans RDV \(borne seulement\)/.test(d));
   check('jours refuses : fenetre « reste en RDV » avec les rendez-vous', /function lvShowBlockedWalk\(id, items\)/.test(d) && /Déplacez ou annulez ces rendez-vous d\\'abord/.test(d));
   check('pastille « Sans RDV aujourd\'hui » sur la fiche', /Sans RDV aujourd\\'hui/.test(d));
+  const app = fs.readFileSync(path.join(__dirname, '../../public/app.js'), 'utf8');
+  const c = fs.readFileSync(path.join(__dirname, '../../public/caisse.html'), 'utf8'), po = fs.readFileSync(path.join(__dirname, '../../public/poste.html'), 'utf8');
+  check('agendas admin / caisse / Mon poste : pas d\'ajout de RDV ce jour-la, message explicite', /function isWalkinOn\(b, dateStr\)/.test(app) && /!isWalkinOn\(b, dateStr\)/.test(d) && /data-walkin/.test(d) &&
+    /!isWalkinOn\(rowBarber, dateStr\)/.test(c) && /!isWalkinOn\(b, currentDate\)/.test(c) && /walkDay \?/.test(po));
 
   console.log('\n[F] Plus de type « RDV uniquement / Sans RDV uniquement »');
   check('fiche : plus d\'etiquette de type (seul « Masqué partout » reste)', !/RDV uniquement<\/span>/.test(d) && !/RDV \+ sans RDV/.test(d) && /Masqué partout/.test(d));

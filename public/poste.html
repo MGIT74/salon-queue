@@ -380,7 +380,7 @@
   </button>
 </div>
 
-<script src="/app.js?v=26"></script>
+<script src="/app.js?v=27"></script>
 <script src="/autorefresh.js?v=2"></script>
 <script src="/staff-group.js?v=5"></script>
 <script>requireSalonInUrl("Pour utiliser votre poste, ouvrez le lien de votre salon.");</script>
@@ -1244,7 +1244,10 @@ function renderAgendaTimeline(dateStr) {
         'onclick="event.stopPropagation();openPosteClientDrawer(\'' + it.id + '\')">' +
         '<span class="tb-time">' + esc(it.timeLabel) + '</span><span class="tb-name">' + esc(it.clientName) + '</span></div>';
     }).join('');
-    var trackClick = (rdvIsSalonClosed(dateStr) || isPastDay(dateStr)) ? '' : b.accepts_appointments || (me && b.id === me.id)
+    var walkDay = isWalkinOn((barbers || []).find(function (x) { return x.id === b.id; }), dateStr);
+    var trackClick = (rdvIsSalonClosed(dateStr) || isPastDay(dateStr)) ? ''
+      : walkDay ? ' onclick="toast(\'' + esc(String(b.name).replace(/'/g, '')) + ' est en « sans RDV » ce jour-là : pas de rendez-vous\', true)"'
+      : b.accepts_appointments || (me && b.id === me.id)
       ? ' onclick="openPosteAddAppointment(\'' + dateStr + '\',\'' + b.id + '\')" title="Ajouter un RDV pour ' + esc(b.name) + '"'
       : ' onclick="toast(\'' + esc(String(b.name).replace(/'/g, '')) + ' ne prend pas de RDV en ligne\', true)"';
     return '<div class="timeline-row">' +

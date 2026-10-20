@@ -8,7 +8,7 @@ const check = (n, ok, x = '') => { (ok ? pass++ : fail++); console.log((ok ? '  
 const fnSrc = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i === -1) throw new Error('introuvable: ' + name); const j = src.indexOf('\nfunction ', i + 10); const k = src.indexOf('\n/**', i + 10); const ends = [j, k].filter((x) => x > -1); return src.slice(i, ends.length ? Math.min.apply(null, ends) : undefined); };
 
 const ctx = vm.createContext({});
-vm.runInContext(fnSrc(app, 'hasBookableSchedule') + '\n' + fnSrc(app, 'isOnLeaveOn') + '\n' + fnSrc(dash, 'isBookableForAdmin'), ctx);
+vm.runInContext(fnSrc(app, 'hasBookableSchedule') + '\n' + fnSrc(app, 'isOnLeaveOn') + '\n' + fnSrc(app, 'isWalkinOn') + '\n' + fnSrc(dash, 'isBookableForAdmin'), ctx);
 const base = { accepts_appointments: 1, active: 1, schedules: [{ active: 1 }] };
 const enConge = Object.assign({}, base, { on_leave_today: true, leaves: [{ start_date: '2026-10-05', end_date: '2026-10-12' }] });
 const futur = Object.assign({}, base, { on_leave_today: false, leaves: [{ start_date: '2026-10-20', end_date: '2026-10-25' }] });

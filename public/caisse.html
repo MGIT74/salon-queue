@@ -993,7 +993,7 @@
   </div>
 </div>
 
-<script src="/app.js?v=26"></script>
+<script src="/app.js?v=27"></script>
 <script src="/staff-group.js?v=5"></script>
 <script src="/autorefresh.js?v=2"></script>
 <script>requireSalonInUrl("Pour utiliser la caisse, ouvrez le lien de votre salon.");</script>
@@ -2290,9 +2290,9 @@ function renderAgendaTimeline(dateStr) {
     // coiffeur qui ne prend pas de RDV en ligne.
     var rowBarber = bid !== 'unassigned' && allBarbers.find(function (x) { return x.id === bid; });
     var trackClick = (bid === 'unassigned' || isPastDay(dateStr)) ? ''
-      : (rowBarber && rowBarber.accepts_appointments)
+      : (rowBarber && rowBarber.accepts_appointments && !isWalkinOn(rowBarber, dateStr))
         ? ' onclick="openCaisseAddAppointment(\'' + dateStr + '\',\'' + bid + '\')" title="Cliquer pour ajouter un RDV"'
-        : ' onclick="event.stopPropagation();notifySansRdvOnly(this)" data-barber-name="' + esc(b.name) + '"';
+        : ' onclick="event.stopPropagation();notifySansRdvOnly(this)" data-barber-name="' + esc(b.name) + '"' + (rowBarber && isWalkinOn(rowBarber, dateStr) ? ' data-walkin="1"' : '');
     return '<div class="timeline-row">' +
       '<div class="timeline-row-label" title="' + esc(b.name) + '"><span class="dot" style="background:' + color + '"></span></div>' +
       '<div class="timeline-row-track"' + trackClick + '>' + blocksHtml + '</div>' +
@@ -2356,7 +2356,7 @@ function renderAgendaTimeline(dateStr) {
 
 /** Sur une ligne de coiffeur qui ne prend pas de RDV en ligne. */
 function notifySansRdvOnly(el) {
-  toast((el.dataset.barberName || 'Ce coiffeur') + ' ne prend pas de RDV en ligne (sans-rdv uniquement)', true);
+  toast((el.dataset.barberName || 'Ce coiffeur') + (el.dataset.walkin ? ' est en « sans RDV » ce jour-là : pas de rendez-vous' : ' ne prend pas de RDV en ligne (sans-rdv uniquement)'), true);
 }
 
 /** Déplace juste la ligne "maintenant", sans reconstruire le reste. */
@@ -2622,7 +2622,7 @@ function adReschedule() {
   if (!a || !adIsUpcoming(a)) return;
   var currentDate = String(a.scheduled_at).slice(0, 10);
   var rdvBarbers = allBarbers.filter(function (b) {
-    return b.id === a.barber_id || Boolean(b.accepts_appointments && b.active !== 0 && hasBookableSchedule(b) && !isOnLeaveOn(b, currentDate));
+    return b.id === a.barber_id || Boolean(b.accepts_appointments && b.active !== 0 && hasBookableSchedule(b) && !isOnLeaveOn(b, currentDate) && !isWalkinOn(b, currentDate));
   });
 
   var overlay = _buildModal(

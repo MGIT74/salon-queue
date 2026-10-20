@@ -192,6 +192,14 @@ async function getBarberBusyMinutesToday(barberId) {
  * aujourd'hui uniquement) sa charge réelle de file d'attente sans RDV
  * en ce moment même.
  */
+// Message clair quand un creneau est refuse parce que le coiffeur est « sans RDV » ce jour-la (calendrier de sa fiche).
+async function walkinRefusal(barberId, dateStr) {
+  const [[w]] = await pool.query(
+    `SELECT b.name FROM barber_walkin_days w JOIN barbers b ON b.id = w.barber_id
+     WHERE w.barber_id = ? AND ? BETWEEN w.start_date AND w.end_date LIMIT 1`, [barberId, dateStr]);
+  return w ? (w.name + ' est en « sans RDV » ce jour-là : pas de rendez-vous possible.') : null;
+}
+
 async function computeSlotsForBarber(barberId, dateStr, durationMin, rdvSettings, opts) {
   rdvSettings = rdvSettings || {};
   opts = opts || {};
@@ -577,7 +585,7 @@ router.post('/', bookingRateLimiter, wrap(withBookingLock(async (req, res) => {
     if (!offer.ok) return res.status(offer.status).json({ error: offer.error });
     durationMin = offer.durationMin;
     const slots = await computeSlotsForBarber(finalBarberId, date, durationMin, rdvSettings);
-    if (!slots.includes(time)) return res.status(409).json({ error: "Ce créneau n'est plus disponible" });
+    if (!slots.includes(time)) return res.status(409).json({ error: (await walkinRefusal(finalBarberId, date)) || "Ce créneau n'est plus disponible" });
   }
 
   const id = crypto.randomUUID();
@@ -735,7 +743,7 @@ async function createGroupBooking(req, res, staff) {
       if (!offer.ok) return fail(offer.status, i, offer.error + ' (' + p.name + ').');
       durationMin = offer.durationMin;
       const slots = await computeSlotsForBarber(barberId, p.date, durationMin, rdvSettings, staff ? { skipLead: true } : {});
-      if (!slots.includes(p.time)) return fail(409, i, "Le créneau de " + p.name + " n'est plus disponible (" + p.time + ").");
+      if (!slots.includes(p.time)) return fail(409, i, (await walkinRefusal(barberId, p.date)) || ("Le créneau de " + p.name + " n'est plus disponible (" + p.time + ")."));
     } else {
       const [barbers] = await pool.query('SELECT id FROM barbers WHERE salon_id = ? AND active = 1 AND accepts_appointments = 1', [req.salon.id]);
       for (const b of barbers) {
@@ -907,7 +915,7 @@ router.post('/admin-create', requireAdminOrBarber, wrap(withBookingLock(async (r
   // idé par le staff. Le pas des créneaux et la marge tampon restent
   // appliqués (évite un vrai conflit d'agenda).
   const slots = await computeSlotsForBarber(barber_id, date, durationMin, rdvSettings, { skipLead: true });
-  if (!slots.includes(time)) return res.status(409).json({ error: "Ce créneau n'est plus disponible" });
+  if (!slots.includes(time)) return res.status(409).json({ error: (await walkinRefusal(barber_id, date)) || "Ce créneau n'est plus disponible" });
 
   const id = crypto.randomUUID();
   const cancelToken = crypto.randomBytes(24).toString('hex');
@@ -1211,7 +1219,7 @@ router.put('/:id/reschedule', requireAdminOrBarber, wrap(withBookingLock(async (
   const productSelections = productLinks.map((p) => ({ id: p.product_id, quantity: p.quantity }));
 
   const slots = await computeSlotsForBarber(finalBarberId, date, durationMin, rdvSettings, { skipLead: true, excludeAppointmentId: appt.id });
-  if (!slots.includes(time)) return res.status(409).json({ error: "Ce créneau n'est plus disponible" });
+  if (!slots.includes(time)) return res.status(409).json({ error: (await walkinRefusal(finalBarberId, date)) || "Ce créneau n'est plus disponible" });
 
   const newScheduledAt = date + ' ' + time + ':00';
   const today = nowInParis(rdvSettings.timezone).dateStr;

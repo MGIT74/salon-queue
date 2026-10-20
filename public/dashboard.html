@@ -2806,7 +2806,7 @@
   </div>
 </div>
 
-<script src="/app.js?v=26"></script>
+<script src="/app.js?v=27"></script>
 <script src="/autorefresh.js?v=2"></script>
 <script src="/staff-group.js?v=5"></script>
 <script src="/daterange.js?v=4"></script>
@@ -3724,7 +3724,7 @@ function cancelAppointmentByAdmin() {
  */
 function isBookableForAdmin(b, dateStr) {
   // dateStr (YYYY-MM-DD) : le jour du planning / du RDV. Un coiffeur en conge ce jour-la n'a aucun creneau : on ne le propose pas.
-  return Boolean(b.accepts_appointments && b.active && hasBookableSchedule(b) && (typeof dateStr !== 'string' || !isOnLeaveOn(b, dateStr)));
+  return Boolean(b.accepts_appointments && b.active && hasBookableSchedule(b) && (typeof dateStr !== 'string' || (!isOnLeaveOn(b, dateStr) && !isWalkinOn(b, dateStr))));
 }
 
 /**
@@ -6358,6 +6358,10 @@ function renderDayTimelineHtml(dateStr, dayAppts) {
   barbers.filter(function (b) { return isBookableForAdmin(b, dateStr); }).forEach(function (b) {
     byBarber[b.id] = { name: b.name, items: [], bookable: true };
   });
+  // Coiffeur « sans RDV » ce jour-la : sa ligne reste visible, un clic explique pourquoi on ne peut pas ajouter de RDV.
+  barbers.filter(function (b) { return b.active && isWalkinOn(b, dateStr) && !isOnLeaveOn(b, dateStr) && !byBarber[b.id]; }).forEach(function (b) {
+    byBarber[b.id] = { name: b.name, items: [], bookable: false, walkin: true };
+  });
   dayAppts.forEach(function (a) {
     var key = a.barber_id || 'unassigned';
     // Un coiffeur peut avoir des RDV deja enregistres puis etre passe en
@@ -6419,7 +6423,7 @@ function renderDayTimelineHtml(dateStr, dayAppts) {
       ? ''
       : b.bookable
       ? ' onclick="openAdminAddAppointment(\'' + dateStr + '\',\'' + bid + '\')"'
-      : (bid === 'unassigned' ? '' : ' onclick="event.stopPropagation();notifySansRdvOnly(this)" data-barber-name="' + esc(b.name) + '"');
+      : (bid === 'unassigned' ? '' : ' onclick="event.stopPropagation();notifySansRdvOnly(this)" data-barber-name="' + esc(b.name) + '"' + (b.walkin ? ' data-walkin="1"' : ''));
     return '<div class="timeline-row">' +
       '<div class="timeline-row-label" title="' + esc(b.name) + '"><span class="dot" style="background:' + color + '"></span></div>' +
       '<div class="timeline-row-track"' + trackClick + '>' + blocksHtml + '</div>' +
@@ -6486,7 +6490,7 @@ function renderDayTimelineHtml(dateStr, dayAppts) {
 
 /** Sur une ligne de coiffeur qui ne prend pas de RDV en ligne. */
 function notifySansRdvOnly(el) {
-  toast((el.dataset.barberName || 'Ce coiffeur') + ' ne prend pas de RDV en ligne (sans-rdv uniquement)', true);
+  toast((el.dataset.barberName || 'Ce coiffeur') + (el.dataset.walkin ? ' est en « sans RDV » ce jour-là : pas de rendez-vous' : ' ne prend pas de RDV en ligne (sans-rdv uniquement)'), true);
 }
 
 /**

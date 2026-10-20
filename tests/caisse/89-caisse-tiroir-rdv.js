@@ -26,7 +26,7 @@ let JSDOM = null; try { JSDOM = require('jsdom').JSDOM; } catch (_) { /* absent 
     w.renderNext = () => calls.push(['renderNext']); w.renderActive = () => {};
     w.toggleNextDetail = (id) => calls.push(['toggle', id]);
     w.eur = (c) => (c / 100).toFixed(2) + ' €'; w.formatMinutes = (m) => m + ' min';
-    w.hasBookableSchedule = () => true; w.isOnLeaveOn = () => false;
+    w.hasBookableSchedule = () => true; w.isOnLeaveOn = () => false; w.isWalkinOn = () => false;
     w.queue = [{ id: 'q-rdv', is_appointment: 1 }, { id: 'q-walk', is_appointment: 0 }];
     w.allBarbers = [{ id: 'b1', name: 'Thomas', accepts_appointments: 1, active: 1 }, { id: 'b2', name: 'Ibrahim', accepts_appointments: 1, active: 1 }];
     w._buildModal = (inner) => { const o = doc.createElement('div'); o.innerHTML = '<div class="modal-box">' + inner + '</div>'; doc.body.appendChild(o); return o; };
