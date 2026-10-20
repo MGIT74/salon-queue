@@ -4840,12 +4840,10 @@ function leaveBadgeHtml(b) {
 function barberStatusChips(b, editable) {
   var chips = '';
   if (!b.active) chips += '<span class="bc-chip off">Inactif</span>';
-  if (b.kiosk_hidden && b.accepts_appointments) chips += '<span class="bc-chip blue">RDV uniquement</span>';
-  else if (!b.kiosk_hidden && !b.accepts_appointments) chips += '<span class="bc-chip orange">Sans RDV uniquement</span>';
-  else if (b.kiosk_hidden && !b.accepts_appointments) chips += '<span class="bc-chip red">Masqué partout</span>';
-  else chips += '<span class="bc-chip green">RDV + sans RDV</span>';
+  // Plus d'etiquette de type (RDV / sans RDV) : tous les coiffeurs prennent des RDV, les jours sans RDV se cochent dans leur calendrier.
+  if (b.kiosk_hidden && !b.accepts_appointments) chips += '<span class="bc-chip red">Masqué partout</span>';
   // Jour « sans RDV » choisi dans son calendrier (onglet Congés)
-  if (b.walkin_today && b.accepts_appointments) chips += '<span class="bc-chip orange">Sans RDV aujourd\'hui</span>';
+  if (b.walkin_today) chips += '<span class="bc-chip orange">Sans RDV aujourd\'hui</span>';
   if (editable) {   // dans la fiche : un clic sur la puce change le code
     chips += '<button type="button" class="bc-chip pin" title="' + (b.has_pin ? 'Changer le code PIN' : 'Définir un code PIN') + '" onclick="event.stopPropagation();setBarberPin(\'' + b.id + '\',\'' + esc(b.name).replace(/'/g, "\\'") + '\')">' +
       (b.has_pin ? 'Code PIN' : 'Sans code') +
@@ -5918,40 +5916,17 @@ function saveSchedule(id) {
     .catch(function (e) { toast(e.message, true); });
 }
 
-function openAddBarberChoice() {
-  var overlay = _buildModal(
-    '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px">' +
-    '<div class="modal-title" style="margin-bottom:0">Nouveau coiffeur</div>' +
-    '<button id="aab-close-x" style="background:var(--fill);border:none;width:30px;height:30px;border-radius:50%;color:var(--grey);font-size:14px;cursor:pointer;flex-shrink:0;margin-left:10px">✕</button>' +
-    '</div>' +
-    '<button class="aab-choice" id="aab-online" style="width:100%;display:flex;align-items:center;gap:14px;padding:16px;border:none;border-radius:14px;background:var(--fill);color:var(--ink);font-family:inherit;cursor:pointer;margin-bottom:10px;text-align:left">' +
-      '<span style="display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;background:var(--blue);color:#fff;flex-shrink:0">' +
-        '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5.5" width="16" height="15" rx="2.5"/><path d="M4 9.5h16"/><path d="M8 3.5v3.5M16 3.5v3.5"/></svg>' +
-      '</span>' +
-      '<span><strong style="display:block;font-size:15px">RDV en ligne</strong><span class="hint" style="margin:2px 0 0">Prend des rendez-vous programmés à l\'avance</span></span>' +
-    '</button>' +
-    '<button class="aab-choice" id="aab-walkin" style="width:100%;display:flex;align-items:center;gap:14px;padding:16px;border:none;border-radius:14px;background:var(--fill);color:var(--ink);font-family:inherit;cursor:pointer;text-align:left">' +
-      '<span style="display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;background:var(--orange, #f97316);color:#fff;flex-shrink:0">' +
-        '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="13" cy="4" r="1.5"/><path d="M9.5 21l2-6-1.5-1.5.5-4.5 3-1 2 2.5 2.5 1"/><path d="M14.5 21l-1-5"/></svg>' +
-      '</span>' +
-      '<span><strong style="display:block;font-size:15px">Sans RDV</strong><span class="hint" style="margin:2px 0 0">Coupe les clients au fur et à mesure, sur place</span></span>' +
-    '</button>'
-  );
+// « + Ajouter un coiffeur » : juste son nom (plus de choix RDV / sans RDV ; ses jours sans RDV se cochent dans son calendrier).
+function openAddBarberChoice() { addBarber(); }
 
-  overlay.querySelector('#aab-close-x').onclick = function () { _closeModal(overlay); };
-  overlay.querySelector('#aab-online').onclick = function () { _closeModal(overlay); addBarber('online'); };
-  overlay.querySelector('#aab-walkin').onclick = function () { _closeModal(overlay); addBarber('walkin'); };
-}
-
-function addBarber(mode) {
-  var teamLabel = mode === 'walkin' ? 'Sans RDV' : 'RDV en ligne';
-  showPrompt('', { title: 'Nouveau coiffeur — équipe ' + teamLabel, placeholder: 'Nom du coiffeur' }).then(function (name) {
+function addBarber() {
+  showPrompt('', { title: 'Nouveau coiffeur', placeholder: 'Nom du coiffeur' }).then(function (name) {
     if (!name) return;
     var pin = String(Math.floor(1000 + Math.random() * 9000));
-    api('/api/barbers', { method: 'POST', body: { name: name, pin_code: pin, mode: mode } })
+    api('/api/barbers', { method: 'POST', body: { name: name, pin_code: pin, mode: 'online' } })
       .then(loadBarbers)
       .then(function () {
-        toast('Coiffeur ajouté à l\'équipe ' + teamLabel);
+        toast('Coiffeur ajouté');
         return showAlert(
           name + ' peut se connecter sur /poste.html avec le code : ' + pin + '\n\nNotez-le maintenant — il ne sera plus jamais affiché ensuite (vous pourrez en générer un nouveau depuis sa fiche si besoin).',
           { title: 'Code PIN généré' }

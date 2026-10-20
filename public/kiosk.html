@@ -512,7 +512,7 @@ function updateStep1Label() {
 function refresh() {
   return Promise.all([api('/api/queue'), api('/api/barbers')]).then(function (r) {
     queue = r[0].queue;
-    // Jour « sans RDV » choisi dans son calendrier : le coiffeur est propose a la borne ce jour-la, meme s'il est en « RDV uniquement ».
+    // Jour « sans RDV » choisi dans son calendrier : le coiffeur est propose a la borne ce jour-la, meme s'il est masque d'habitude.
     barbers = r[1].items.filter(function (b) { return (!b.kiosk_hidden || b.walkin_today) && !b.on_break_now && !b.outside_hours_now && !isOnLeaveOn(b); });
     renderBoard(); renderBarberGrid();
   }).catch(function (err) { toast(err.message, true); });

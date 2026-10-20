@@ -168,10 +168,13 @@ router.post('/', requireAdmin, wrap(async (req, res) => {
     walkin: { accepts_appointments: 0, kiosk_hidden: 0 },
     online: { accepts_appointments: 1, kiosk_hidden: 1 }
   };
-  if (!modeMap[req.body.mode]) {
+  // Plus de choix d'equipe a la creation : un coiffeur prend des RDV, et ses jours « sans RDV » se cochent dans
+  // son calendrier (onglet Congés). 'walkin' reste accepte pour les anciens appels.
+  const mode = req.body.mode === undefined || req.body.mode === null || req.body.mode === '' ? 'online' : req.body.mode;
+  if (!modeMap[mode]) {
     return res.status(400).json({ error: "mode doit être 'walkin' ou 'online'" });
   }
-  const { accepts_appointments, kiosk_hidden } = modeMap[req.body.mode];
+  const { accepts_appointments, kiosk_hidden } = modeMap[mode];
   const id = crypto.randomUUID();
   try {
     await pool.query(

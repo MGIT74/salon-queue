@@ -1353,3 +1353,7 @@ CREATE TABLE IF NOT EXISTS security_attempts (
   blocked_until DATETIME(3) NULL,
   updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Plus de coiffeurs « Sans RDV uniquement » : tous prennent des RDV, et leurs jours sans RDV se cochent dans leur
+-- calendrier (onglet Congés, table barber_walkin_days). Les coiffeurs « Masqué partout » ne bougent pas.
+UPDATE barbers SET accepts_appointments = 1, kiosk_hidden = 1 WHERE accepts_appointments = 0 AND kiosk_hidden = 0;

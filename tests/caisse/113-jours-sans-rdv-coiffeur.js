@@ -64,6 +64,15 @@ const call = async (m, u, h, b) => { const r = await fetch(BASE + u, { method: m
   check('jours refuses : fenetre « reste en RDV » avec les rendez-vous', /function lvShowBlockedWalk\(id, items\)/.test(d) && /Déplacez ou annulez ces rendez-vous d\\'abord/.test(d));
   check('pastille « Sans RDV aujourd\'hui » sur la fiche', /Sans RDV aujourd\\'hui/.test(d));
 
+  console.log('\n[F] Plus de type « RDV uniquement / Sans RDV uniquement »');
+  check('fiche : plus d\'etiquette de type (seul « Masqué partout » reste)', !/RDV uniquement<\/span>/.test(d) && !/RDV \+ sans RDV/.test(d) && /Masqué partout/.test(d));
+  check('« + Ajouter un coiffeur » : juste son nom, coiffeur avec RDV', /function openAddBarberChoice\(\) \{ addBarber\(\); \}/.test(d) && /title: 'Nouveau coiffeur', placeholder/.test(d) && /mode: 'online' \}/.test(d));
+  r = await call('POST', '/api/barbers', ADMIN, { name: 'T113 Nouveau' });
+  check('serveur : sans type precise, le coiffeur prend des RDV', r.status === 200 && sql(`SELECT CONCAT(accepts_appointments, kiosk_hidden) FROM barbers WHERE name = 'T113 Nouveau'`) === '11', r);
+  const schema = fs.readFileSync(path.join(__dirname, '../../sql/schema.sql'), 'utf8');
+  check('anciens « Sans RDV uniquement » passes en RDV (« Masqué partout » inchange)', /UPDATE barbers SET accepts_appointments = 1, kiosk_hidden = 1 WHERE accepts_appointments = 0 AND kiosk_hidden = 0;/.test(schema));
+  sql(`DELETE FROM barbers WHERE name = 'T113 Nouveau';`);
+
   sql(`DELETE FROM barber_walkin_days WHERE barber_id IN ('b1','b2'); DELETE FROM appointments WHERE client_name LIKE 'T113%';`);
   console.log(`\n${pass} OK, ${fail} ECHEC`);
   process.exit(fail ? 1 : 0);
