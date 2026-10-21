@@ -512,7 +512,7 @@ function api(path, opts) {
     body: opts.body ? JSON.stringify(opts.body) : undefined
   }).then(function (r) {
     return r.json().then(function (data) {
-      if (!r.ok) throw new Error(data.error || 'Erreur ' + r.status);
+      if (!r.ok) { var err = new Error(data.error || 'Erreur ' + r.status); err.data = data; err.status = r.status; throw err; }
       return data;
     });
   });

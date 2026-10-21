@@ -1357,3 +1357,18 @@ CREATE TABLE IF NOT EXISTS security_attempts (
 -- Plus de coiffeurs « Sans RDV uniquement » : tous prennent des RDV, et leurs jours sans RDV se cochent dans leur
 -- calendrier (onglet Congés, table barber_walkin_days). Les coiffeurs « Masqué partout » ne bougent pas.
 UPDATE barbers SET accepts_appointments = 1, kiosk_hidden = 1 WHERE accepts_appointments = 0 AND kiosk_hidden = 0;
+
+-- Coiffeur supprime (bouton « Supprimer ») : la ligne reste pour l'historique (ventes, stats, tickets), mais il
+-- disparait de toutes les listes. Son nom prend la mention « (supprimé) ».
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'barbers' AND column_name = 'deleted_at');
+SET @sql := IF(@c = 0, 'ALTER TABLE barbers ADD COLUMN deleted_at DATETIME NULL', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Codes PIN qui ont deja servi (coiffeur supprime, ou code remplace) : jamais redonnes a un autre coiffeur.
+CREATE TABLE IF NOT EXISTS barber_retired_pins (
+  salon_id CHAR(36) NOT NULL,
+  pin_code VARCHAR(10) NOT NULL,
+  retired_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (salon_id, pin_code),
+  FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -29,7 +29,7 @@ function isSafePhotoUrl(url) {
 
 router.get('/', wrap(async (req, res) => {
   const sql = req.query.all === '1'
-    ? 'SELECT * FROM barbers WHERE salon_id = ? ORDER BY sort_order, name'
+    ? 'SELECT * FROM barbers WHERE salon_id = ? AND deleted_at IS NULL ORDER BY sort_order, name'
     : 'SELECT * FROM barbers WHERE salon_id = ? AND active = 1 ORDER BY sort_order, name';
   const [barbers] = await pool.query(sql, [req.salon.id]);
   const [schedules] = await pool.query(
@@ -151,12 +151,36 @@ router.get('/', wrap(async (req, res) => {
   res.json({ ok: true, items, on_duty: await activeBarberCount(req.salon.id) });
 }));
 
+// ---------- Codes PIN : jamais un code deja utilise, ni un code qui a deja servi (coiffeur supprime / code remplace) ----------
+async function pinUnavailable(salonId, pin, exceptBarberId) {
+  const [[used]] = await pool.query('SELECT id FROM barbers WHERE salon_id = ? AND pin_code = ? AND id <> ? LIMIT 1', [salonId, pin, exceptBarberId || '']);
+  if (used) return 'Ce code PIN est déjà utilisé par un autre coiffeur de ce salon';
+  const [[retired]] = await pool.query('SELECT pin_code FROM barber_retired_pins WHERE salon_id = ? AND pin_code = ?', [salonId, pin]);
+  if (retired) return 'Ce code PIN a déjà servi : par sécurité, il ne peut plus être redonné';
+  return null;
+}
+async function generateFreePin(salonId) {
+  for (let digits = 4; digits <= 6; digits++) {
+    for (let i = 0; i < 60; i++) {
+      const pin = String(crypto.randomInt(10 ** (digits - 1), 10 ** digits));
+      if (!(await pinUnavailable(salonId, pin))) return pin;
+    }
+  }
+  throw new Error('Impossible de générer un code PIN libre');
+}
+async function retirePin(salonId, pin) {
+  if (pin) await pool.query('INSERT IGNORE INTO barber_retired_pins (salon_id, pin_code) VALUES (?, ?)', [salonId, pin]);
+}
+
 router.post('/', requireAdmin, wrap(async (req, res) => {
-  const { name, sort_order, pin_code, photo_url } = req.body;
+  const { name, sort_order, photo_url } = req.body;
+  // pin_code 'auto' : le serveur choisit un code libre (jamais un code deja utilise ou qui a deja servi).
+  let pin_code = req.body.pin_code === 'auto' ? await generateFreePin(req.salon.id) : req.body.pin_code;
   if (!name) return res.status(400).json({ error: 'Le nom est requis' });
   if (pin_code && !/^\d{4,8}$/.test(pin_code)) {
     return res.status(400).json({ error: 'Le code PIN doit contenir entre 4 et 8 chiffres' });
   }
+  if (pin_code) { const why = await pinUnavailable(req.salon.id, pin_code); if (why) return res.status(409).json({ error: why }); }
   if (photo_url && !isSafePhotoUrl(photo_url)) {
     return res.status(400).json({ error: "Format d'image invalide" });
   }
@@ -189,20 +213,26 @@ router.post('/', requireAdmin, wrap(async (req, res) => {
   }
   const [[item]] = await pool.query('SELECT * FROM barbers WHERE id = ?', [id]);
   logActivity(req.salon.id, 'barber_create', 'Coiffeur "' + name + '" ajouté');
-  res.json({ ok: true, item: stripSecrets(item) });
+  res.json({ ok: true, item: stripSecrets(item), pin: req.body.pin_code === 'auto' ? pin_code : undefined });
 }));
 
 router.put('/:id', requireAdmin, wrap(async (req, res) => {
+  const [[current]] = await pool.query('SELECT id, pin_code, deleted_at FROM barbers WHERE id = ? AND salon_id = ?', [req.params.id, req.salon.id]);
+  if (!current) return res.status(404).json({ error: 'Coiffeur introuvable' });
+  if (current.deleted_at) return res.status(410).json({ error: 'Ce coiffeur a été supprimé' });
+  let newPin;
   const sets = [];
   const params = [];
   if (req.body.name !== undefined) { sets.push('name = ?'); params.push(req.body.name); }
   if (req.body.active !== undefined) { sets.push('active = ?'); params.push(req.body.active ? 1 : 0); }
   if (req.body.sort_order !== undefined) { sets.push('sort_order = ?'); params.push(Number(req.body.sort_order) || 0); }
   if (req.body.pin_code !== undefined) {
-    if (req.body.pin_code && !/^\d{4,8}$/.test(req.body.pin_code)) {
+    newPin = req.body.pin_code === 'auto' ? await generateFreePin(req.salon.id) : req.body.pin_code;
+    if (newPin && !/^\d{4,8}$/.test(newPin)) {
       return res.status(400).json({ error: 'Le code PIN doit contenir entre 4 et 8 chiffres' });
     }
-    sets.push('pin_code = ?'); params.push(req.body.pin_code || null);
+    if (newPin) { const why = await pinUnavailable(req.salon.id, newPin, req.params.id); if (why) return res.status(409).json({ error: why }); }
+    sets.push('pin_code = ?'); params.push(newPin || null);
   }
   if (req.body.photo_url !== undefined) {
     if (req.body.photo_url && !isSafePhotoUrl(req.body.photo_url)) {
@@ -258,7 +288,61 @@ router.put('/:id', requireAdmin, wrap(async (req, res) => {
   } else {
     logActivity(req.salon.id, 'barber_edit', label + ' modifié');
   }
-  res.json({ ok: true });
+  // Code remplace : l'ancien ne sera plus jamais redonne.
+  if (req.body.pin_code !== undefined && current.pin_code && current.pin_code !== newPin) await retirePin(req.salon.id, current.pin_code);
+  res.json({ ok: true, pin: req.body.pin_code === 'auto' ? newPin : undefined });
+}));
+
+// ---------- Supprimer un coiffeur (definitif pour le salon, historique conserve) ----------
+// Refuse tant qu'il a des rendez-vous a venir ou des clients dans la file (a deplacer / annuler d'abord).
+// Ses ventes, passages et stats passes restent rattaches a lui (nom suivi de « (supprimé) ») : rien n'est fausse.
+// Ses reglages (horaires, pauses, conges, jours sans RDV, tarifs, prestations) sont retires ; son code PIN est retire
+// pour toujours (il ne peut plus se connecter et le code ne sera jamais redonne).
+router.post('/:id/remove', requireAdmin, wrap(async (req, res) => {
+  const [[b]] = await pool.query('SELECT id, name, pin_code, deleted_at FROM barbers WHERE id = ? AND salon_id = ?', [req.params.id, req.salon.id]);
+  if (!b || b.deleted_at) return res.status(404).json({ error: 'Coiffeur introuvable' });
+  if (String(req.body.confirm_name || '').trim().toLowerCase() !== String(b.name).trim().toLowerCase()) {
+    return res.status(400).json({ error: 'Tapez le nom exact du coiffeur pour confirmer la suppression' });
+  }
+  const settings = await getSettings(req.salon.id);
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: settings.timezone || 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date());
+  const part = (t) => parts.find((p) => p.type === t).value;
+  const nowLocal = part('year') + '-' + part('month') + '-' + part('day') + ' ' + part('hour') + ':' + part('minute') + ':00';
+  const [appointments] = await pool.query(
+    `SELECT a.id, a.client_name, a.email, a.phone, DATE_FORMAT(a.scheduled_at, '%Y-%m-%d %H:%i') AS scheduled_at, s.name AS service_name
+     FROM appointments a LEFT JOIN services s ON s.id = a.service_id
+     WHERE a.salon_id = ? AND a.barber_id = ? AND a.scheduled_at >= ? AND a.status NOT IN ('cancelled', 'completed', 'no_show')
+       AND (a.promoted_queue_id IS NULL OR a.promoted_queue_id NOT IN (SELECT id FROM queue WHERE status IN ('done','cancelled')))
+     ORDER BY a.scheduled_at`,
+    [req.salon.id, b.id, nowLocal]
+  );
+  const [queueRows] = await pool.query(
+    "SELECT id, client_name, status, checkin_at FROM queue WHERE salon_id = ? AND barber_id = ? AND status IN ('waiting','in_progress') ORDER BY checkin_at",
+    [req.salon.id, b.id]
+  );
+  if (appointments.length || queueRows.length) {
+    return res.status(409).json({
+      error: b.name + ' a encore ' + (appointments.length ? appointments.length + ' rendez-vous à venir' : '') + (appointments.length && queueRows.length ? ' et ' : '') +
+        (queueRows.length ? queueRows.length + ' client(s) dans la file' : '') + ' : déplacez-les ou annulez-les d\'abord.',
+      appointments, queue: queueRows
+    });
+  }
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    for (const t of ['barber_schedules', 'barber_breaks', 'barber_leaves', 'barber_walkin_days', 'barber_service_prices', 'barber_extra_prices',
+                     'barber_service_exclusions', 'barber_extra_exclusions', 'ticket_drafts']) {
+      await conn.query(`DELETE FROM ${t} WHERE barber_id = ?`, [b.id]);
+    }
+    if (b.pin_code) await conn.query('INSERT IGNORE INTO barber_retired_pins (salon_id, pin_code) VALUES (?, ?)', [req.salon.id, b.pin_code]);
+    await conn.query(
+      "UPDATE barbers SET active = 0, deleted_at = NOW(), pin_code = NULL, accepts_appointments = 0, kiosk_hidden = 1, name = ? WHERE id = ?",
+      [String(b.name).slice(0, 80) + ' (supprimé)', b.id]
+    );
+    await conn.commit();
+  } catch (e) { await conn.rollback(); throw e; } finally { conn.release(); }
+  logActivity(req.salon.id, 'barber_delete', 'Coiffeur "' + b.name + '" supprimé (historique conservé)');
+  res.json({ ok: true, deleted: true });
 }));
 
 router.delete('/:id', requireAdmin, wrap(async (req, res) => {

@@ -144,4 +144,5 @@ node tests/caisse/110-borne-produits-mise-en-page.js  # Borne : produits propose
 node tests/caisse/111-groupe-une-personne-a-la-fois.js  # RDV a plusieurs : reservation normale personne par personne, panier « Continuer pour Tom » / « Terminer », creneaux retenus
 node tests/caisse/112-fermetures-calendrier-annuel.js  # Reglages : fermetures du salon dans le meme calendrier annuel que les conges (cocher / decocher des jours)
 node tests/caisse/113-jours-sans-rdv-coiffeur.js  # Coiffeur : jours « sans RDV » dans son calendrier (plus de creneau, visible a la borne, refuse si RDV deja pris)
+node tests/caisse/114-supprimer-coiffeur.js  # Supprimer un coiffeur : bloque si RDV / file, historique garde « (supprimé) », code PIN jamais redonne
 ```

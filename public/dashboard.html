@@ -1302,6 +1302,8 @@
   .bp-power:hover { background: rgba(255,59,48,.22); }
   .bp-power:active { transform: scale(.92); }
   .bp-power.on { background: rgba(52,199,89,.15); color: var(--green); }
+  .bp-delete { margin-top: 14px; border: none; background: none; color: var(--red); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; padding: 4px 8px; border-radius: 8px; }
+  .bp-delete:hover { background: rgba(255,59,48,.12); }
   .bp-power.on:hover { background: rgba(52,199,89,.26); }
   .bp-profile.inactive .bp-ring { filter: grayscale(.7); opacity: .75; }
   .bc-chip.pin { border: none; font-family: inherit; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; transition: background .15s ease, color .15s ease; }
@@ -2806,7 +2808,7 @@
   </div>
 </div>
 
-<script src="/app.js?v=27"></script>
+<script src="/app.js?v=28"></script>
 <script src="/autorefresh.js?v=2"></script>
 <script src="/staff-group.js?v=5"></script>
 <script src="/daterange.js?v=4"></script>
@@ -4976,6 +4978,7 @@ function renderBarberDetail(b) {
       '<button type="button" class="bp-edit" title="Renommer" aria-label="Renommer" onclick="event.stopPropagation();renameBarber(\'' + b.id + '\')">' + ico('<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>') + '</button></div>' +
     '<div class="bp-role">' + (currentSalonName ? esc(currentSalonName) : 'Coiffeur') + '</div>' +
     '<div class="bp-chips">' + leaveBadgeHtml(b) + barberStatusChips(b, true) + '</div>' +
+    '<button type="button" class="bp-delete" onclick="event.stopPropagation();openRemoveBarber(\'' + b.id + '\')">Supprimer ce coiffeur</button>' +
     '</div></aside>';
 
   // Bento : statistiques à gauche, carte profil à droite (même hauteur), puis le panneau d'onglets pleine largeur dessous.
@@ -5858,15 +5861,16 @@ function removeBarberPhoto(id) {
 }
 
 function setBarberPin(id, name) {
-  var pin = String(Math.floor(1000 + Math.random() * 9000));
   showConfirm(
-    'Nouveau code PIN pour ' + name + ' : ' + pin + '\n\nNotez-le maintenant — il ne sera plus jamais affiché ensuite.\nDonnez ce code au coiffeur pour qu\'il se connecte sur /poste.html.',
-    { title: 'Nouveau code PIN', confirmLabel: 'Appliquer ce code' }
+    'Générer un nouveau code PIN pour ' + name + ' ?\n\nL\'ancien code ne fonctionnera plus et ne sera jamais redonné à un autre coiffeur.',
+    { title: 'Nouveau code PIN', confirmLabel: 'Générer le code' }
   ).then(function (ok) {
     if (!ok) return;
-    api('/api/barbers/' + id, { method: 'PUT', body: { pin_code: pin } })
-      .then(loadBarbers)
-      .then(function () { toast('Code PIN mis à jour pour ' + name); })
+    api('/api/barbers/' + id, { method: 'PUT', body: { pin_code: 'auto' } })
+      .then(function (r) {
+        loadBarbers();
+        return showAlert('Nouveau code PIN pour ' + name + ' : ' + r.pin + '\n\nNotez-le maintenant — il ne sera plus jamais affiché ensuite.\nDonnez ce code au coiffeur pour qu\'il se connecte sur /poste.html.', { title: 'Code PIN généré' });
+      })
       .catch(function (e) { toast(e.message, true); });
   });
 }
@@ -5922,9 +5926,10 @@ function openAddBarberChoice() { addBarber(); }
 function addBarber() {
   showPrompt('', { title: 'Nouveau coiffeur', placeholder: 'Nom du coiffeur' }).then(function (name) {
     if (!name) return;
-    var pin = String(Math.floor(1000 + Math.random() * 9000));
-    api('/api/barbers', { method: 'POST', body: { name: name, pin_code: pin, mode: 'online' } })
-      .then(loadBarbers)
+    // Code choisi par le serveur : jamais un code deja utilise ni un code qui a deja servi (coiffeur supprime, code remplace).
+    var pin = '';
+    api('/api/barbers', { method: 'POST', body: { name: name, pin_code: 'auto', mode: 'online' } })
+      .then(function (r) { pin = r.pin; return loadBarbers(); })
       .then(function () {
         toast('Coiffeur ajouté');
         return showAlert(
@@ -5950,6 +5955,55 @@ function archiveBarber(id) {
       .then(loadBarbers).catch(function (e) { toast(e.message, true); });
   });
 }
+// « Supprimer ce coiffeur » : definitif pour le salon, historique conserve (ventes, stats, tickets gardent son nom).
+function openRemoveBarber(id) {
+  var b = barbers.find(function (x) { return x.id === id; });
+  if (!b) return;
+  var ov = _buildModal(
+    '<div class="modal-title">Supprimer ' + esc(b.name) + ' ?</div>' +
+    '<div style="font-size:14px;line-height:1.55;color:var(--muted);margin:4px 0 14px">' +
+      '<div>• Il disparaît de toutes les listes (coiffeurs, borne, réservation, caisse, Mon poste).</div>' +
+      '<div>• Son historique est <strong style="color:var(--ink)">gardé</strong> : ventes, tickets et statistiques passées restent à son nom, avec la mention « (supprimé) ».</div>' +
+      '<div>• Ses horaires, congés et réglages sont retirés ; son code PIN ne fonctionnera plus et ne sera jamais redonné.</div>' +
+      '<div style="margin-top:8px">Pour une absence temporaire, utilisez plutôt le bouton « Désactiver ».</div>' +
+    '</div>' +
+    '<div class="fld"><label for="rmb-name">Tapez « ' + esc(b.name) + ' » pour confirmer</label><input type="text" id="rmb-name" autocomplete="off"></div>' +
+    '<div class="modal-error" id="rmb-error" style="display:none"></div>' +
+    '<div id="rmb-list"></div>' +
+    '<div class="modal-actions"><button type="button" class="btn btn-soft" id="rmb-cancel">Annuler</button>' +
+    '<button type="button" class="btn btn-primary" id="rmb-ok" style="background:var(--red)" disabled>Supprimer définitivement</button></div>'
+  );
+  var input = ov.querySelector('#rmb-name'), ok = ov.querySelector('#rmb-ok'), err = ov.querySelector('#rmb-error');
+  input.oninput = function () { ok.disabled = input.value.trim().toLowerCase() !== String(b.name).trim().toLowerCase(); };
+  ov.querySelector('#rmb-cancel').onclick = function () { _closeModal(ov); };
+  ok.onclick = function () {
+    ok.disabled = true; err.style.display = 'none';
+    api('/api/barbers/' + id + '/remove', { method: 'POST', body: { confirm_name: input.value.trim() } })
+      .then(function () {
+        _closeModal(ov);
+        if (expandedBarberId === id) expandedBarberId = null;
+        toast(b.name + ' supprimé — son historique est conservé');
+        loadBarbers();
+      })
+      .catch(function (e) {
+        err.textContent = e.message; err.style.display = 'block'; ok.disabled = false;
+        // Rendez-vous a venir / clients dans la file : on les liste pour les deplacer ou annuler d'abord.
+        var d = e.data || {}, rows = '';
+        (d.appointments || []).forEach(function (a) {
+          rows += '<div style="padding:9px 0;border-top:1px solid var(--border,rgba(128,128,128,.15));font-size:13.5px"><strong>' +
+            esc(a.scheduled_at.slice(8, 10) + '/' + a.scheduled_at.slice(5, 7) + ' à ' + a.scheduled_at.slice(11, 16)) + ' — ' + esc(a.client_name || 'Client') + '</strong>' +
+            '<div style="color:var(--muted)">' + esc(a.service_name || 'Prestation') + ' · ' + esc(a.phone || a.email || 'Contact non renseigné') + '</div></div>';
+        });
+        (d.queue || []).forEach(function (q) {
+          rows += '<div style="padding:9px 0;border-top:1px solid var(--border,rgba(128,128,128,.15));font-size:13.5px"><strong>File d\'attente — ' + esc(q.client_name || 'Client') + '</strong>' +
+            '<div style="color:var(--muted)">' + (q.status === 'in_progress' ? 'En cours' : 'En attente') + '</div></div>';
+        });
+        ov.querySelector('#rmb-list').innerHTML = rows ? '<div style="max-height:240px;overflow-y:auto;margin:0 0 14px">' + rows + '</div>' : '';
+      });
+  };
+  setTimeout(function () { input.focus(); }, 50);
+}
+
 function restoreBarber(id) {
   api('/api/barbers/' + id, { method: 'PUT', body: { active: true } })
     .then(loadBarbers).catch(function (e) { toast(e.message, true); });
