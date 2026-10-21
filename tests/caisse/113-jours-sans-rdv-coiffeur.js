@@ -1,4 +1,4 @@
-// Jours « sans RDV » d'un coiffeur, choisis dans le calendrier de l'onglet Congés :
+// Jours « sans RDV » d'un coiffeur, choisis dans le calendrier de l'onglet Calendrier :
 // - ces jours-la plus aucun creneau (en ligne, groupe, staff) et le coiffeur apparait a la borne ;
 // - un jour ou il a deja des rendez-vous a venir ne peut PAS passer en « sans RDV » (renvoye dans blocked, reste en RDV) ;
 // - decocher le remet en RDV ; « Répéter chaque année » pose aussi les annees suivantes.
@@ -65,6 +65,7 @@ const call = async (m, u, h, b) => { const r = await fetch(BASE + u, { method: m
   const d = fs.readFileSync(path.join(__dirname, '../../public/dashboard.html'), 'utf8');
   check('bulle du calendrier : case « Sans RDV », couleur orange, legende', /'Sans RDV ce jour' : 'Sans RDV ces ' \+ n \+ ' jours'/.test(d) && /\.lv-day\.walk \{ background: #f97316/.test(d) && /Sans RDV \(borne seulement\)/.test(d));
   check('jours refuses : fenetre « reste en RDV » avec les rendez-vous', /function lvShowBlockedWalk\(id, items\)/.test(d) && /Déplacez ou annulez ces rendez-vous d\\'abord/.test(d));
+  check('onglet de la fiche nomme « Calendrier » (conges + jours sans RDV)', />Calendrier<\/button>' \+/.test(d) && !/'conges\\'\)">Congés</.test(d));
   check('pastille « Sans RDV aujourd\'hui » sur la fiche', /Sans RDV aujourd\\'hui/.test(d));
   const app = fs.readFileSync(path.join(__dirname, '../../public/app.js'), 'utf8');
   const c = fs.readFileSync(path.join(__dirname, '../../public/caisse.html'), 'utf8'), po = fs.readFileSync(path.join(__dirname, '../../public/poste.html'), 'utf8');

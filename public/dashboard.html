@@ -4844,7 +4844,7 @@ function barberStatusChips(b, editable) {
   if (!b.active) chips += '<span class="bc-chip off">Inactif</span>';
   // Plus d'etiquette de type (RDV / sans RDV) : tous les coiffeurs prennent des RDV, les jours sans RDV se cochent dans leur calendrier.
   if (b.kiosk_hidden && !b.accepts_appointments) chips += '<span class="bc-chip red">Masqué partout</span>';
-  // Jour « sans RDV » choisi dans son calendrier (onglet Congés)
+  // Jour « sans RDV » choisi dans son calendrier (onglet Calendrier)
   if (b.walkin_today) chips += '<span class="bc-chip orange">Sans RDV aujourd\'hui</span>';
   if (editable) {   // dans la fiche : un clic sur la puce change le code
     chips += '<button type="button" class="bc-chip pin" title="' + (b.has_pin ? 'Changer le code PIN' : 'Définir un code PIN') + '" onclick="event.stopPropagation();setBarberPin(\'' + b.id + '\',\'' + esc(b.name).replace(/'/g, "\\'") + '\')">' +
@@ -4953,7 +4953,7 @@ function renderBarberDetail(b) {
   var tabs = '<div class="subtabs" id="bp-tabs-' + b.id + '">' +
     '<button data-tab="horaires" class="' + (tab === 'horaires' ? 'on' : '') + '" onclick="switchBarberTab(\'' + b.id + '\',\'horaires\')">Horaires</button>' +
     '<button data-tab="prestations" class="' + (tab === 'prestations' ? 'on' : '') + '" onclick="switchBarberTab(\'' + b.id + '\',\'prestations\')">Prestations</button>' +
-    '<button data-tab="conges" class="' + (tab === 'conges' ? 'on' : '') + '" onclick="switchBarberTab(\'' + b.id + '\',\'conges\')">Congés</button>' +
+    '<button data-tab="conges" class="' + (tab === 'conges' ? 'on' : '') + '" onclick="switchBarberTab(\'' + b.id + '\',\'conges\')">Calendrier</button>' +
     '</div>';
 
   // Carte profil compacte : clic sur la photo = changer la photo (croix rouge = la retirer), crayon à côté du nom = renommer,
@@ -5097,7 +5097,7 @@ function renderStatsCtl(b) {
 }
 
 function renderLeavesTab(b) {
-  return '<p class="hint" style="margin:0 0 12px">Cliquez sur un jour, ou <strong>glissez la souris librement</strong> sur les jours voulus (en ligne, en diagonale, en cercle, comme vous voulez : seuls les jours traversés sont choisis), puis cochez « En congé ». <span class="lv-touch-hint">Sur téléphone : appuyez un instant sur un jour, puis glissez.</span> Les jours en congé ne sont plus proposés à la réservation.</p>' +
+  return '<p class="hint" style="margin:0 0 12px">Cliquez sur un jour, ou <strong>glissez la souris librement</strong> sur les jours voulus (en ligne, en diagonale, en cercle, comme vous voulez : seuls les jours traversés sont choisis), puis cochez « En congé » ou « Sans RDV ». <span class="lv-touch-hint">Sur téléphone : appuyez un instant sur un jour, puis glissez.</span> Les jours en congé ou sans RDV ne sont plus proposés à la réservation ; les jours sans RDV, le coiffeur apparaît à la borne.</p>' +
     '<div class="lv-year" id="leaves-list-' + b.id + '"><div class="empty">Chargement…</div></div>';
 }
 
