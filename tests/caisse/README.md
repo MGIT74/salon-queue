@@ -147,4 +147,5 @@ node tests/caisse/113-jours-sans-rdv-coiffeur.js  # Coiffeur : jours « sans RDV
 node tests/caisse/114-supprimer-coiffeur.js  # Supprimer un coiffeur : bloque si RDV / file, historique garde « (supprimé) », code PIN jamais redonne
 node tests/caisse/115-premier-disponible.js  # « Premier disponible » : le systeme choisit le coiffeur le plus libre (en ligne, compte, groupe, admin), nom affiche apres confirmation ; pas a la borne
 node tests/caisse/116-rdv-indicatif-telephone.js  # Prise de RDV (seul / a plusieurs) : indicatif pays du telephone, comme a la creation de compte
+node tests/caisse/117-site-salon-redirection.js  # Reglages > General : site du salon ; redirection apres une prise de RDV en ligne (rdv.html seulement)
 ```

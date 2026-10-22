@@ -2367,7 +2367,7 @@
   <div class="tab-panel" id="t-settings">
     <div class="card-box">
       <h3>Général</h3>
-      <p class="hint">Le nom affiché sur la borne et dans les emails.</p>
+      <p class="hint">Le nom affiché sur la borne et dans les emails. Le site du salon : après une prise de RDV en ligne, le client y est renvoyé automatiquement.</p>
       <div class="grid2">
         <div class="fld"><label for="set-salon">Nom du salon</label><input id="set-salon" type="text"></div>
         <div class="fld"><label for="set-currency">Devise</label>
@@ -2377,6 +2377,7 @@
           </select>
         </div>
       </div>
+      <div class="fld"><label for="set-website">Site du salon (optionnel)</label><input id="set-website" type="url" inputmode="url" placeholder="https://monsalon.fr"></div>
       <button class="btn btn-primary" style="margin-top:6px" onclick="saveSettings()">Enregistrer</button>
     </div>
 
@@ -9269,6 +9270,7 @@ function loadSettings() {
     document.getElementById('set-salon').value = s.salon_name || '';
     document.getElementById('set-notify').value = s.notify_before_min || 30;
     document.getElementById('set-currency').value = s.currency || 'EUR';
+    document.getElementById('set-website').value = s.salon_website_url || '';
     document.getElementById('set-timezone').value = s.timezone || 'Europe/Paris';
     document.getElementById('set-host').value = s.smtp_host || '';
     document.getElementById('set-port').value = s.smtp_port || 587;
@@ -10018,6 +10020,7 @@ function saveSettings() {
     salon_name: document.getElementById('set-salon').value,
     notify_before_min: document.getElementById('set-notify').value,
     currency: document.getElementById('set-currency').value,
+    salon_website_url: document.getElementById('set-website').value.trim(),
     smtp_host: document.getElementById('set-host').value,
     smtp_port: document.getElementById('set-port').value,
     smtp_user: document.getElementById('set-user').value,

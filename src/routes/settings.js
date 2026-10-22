@@ -25,7 +25,7 @@ const EDITABLE = [
   'email_tpl_turn_soon_subject', 'email_tpl_turn_soon_body',
   'email_tpl_closure_subject', 'email_tpl_closure_body',
   'accent_color', 'login_image_url',
-  'caisse_inactivity_seconds', 'caisse_reopen_hour', 'currency',
+  'caisse_inactivity_seconds', 'caisse_reopen_hour', 'currency', 'salon_website_url',
   'caisse_open_enabled', 'caisse_open_hour', 'caisse_close_enabled', 'caisse_close_hour',
   'rdv_slot_step_min', 'rdv_min_lead_min', 'rdv_max_advance_days',
   'rdv_buffer_min', 'rdv_cancel_deadline_min', 'rdv_prep_alert_min',
@@ -174,6 +174,14 @@ router.put('/', requireAdmin, wrap(async (req, res) => {
   const SAFE_IMAGE_URL = /^(data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=]+|https:\/\/[^\s"'<>]+)$/i;
   if (patch.login_image_url && !SAFE_IMAGE_URL.test(patch.login_image_url)) {
     return res.status(400).json({ error: "Format d'image invalide" });
+  }
+
+  // Site du salon (redirection apres une prise de RDV en ligne) : vide, ou une adresse http(s) - jamais javascript: ou autre.
+  if (patch.salon_website_url !== undefined) {
+    let u = String(patch.salon_website_url).trim();
+    if (u && !/^https?:\/\//i.test(u)) u = 'https://' + u;
+    if (u && (!/^https?:\/\/[^\s"'<>]+\.[^\s"'<>]+$/i.test(u) || u.length > 300)) return res.status(400).json({ error: 'Lien du site invalide (ex. https://monsalon.fr)' });
+    patch.salon_website_url = u;
   }
 
   // Pause des messages aux clients (transition depuis un autre logiciel) : '1' = aucun email ni SMS automatique.
@@ -430,6 +438,7 @@ router.get('/public', wrap(async (req, res) => {
     caisse_inactivity_seconds: s.caisse_inactivity_seconds ? Number(s.caisse_inactivity_seconds) : 15,
     caisse_reopen_hour: s.caisse_reopen_hour || '00:00',
     currency: s.currency || 'EUR',
+    website_url: s.salon_website_url || null,
     rdv_slot_step_min: s.rdv_slot_step_min ? Number(s.rdv_slot_step_min) : 15,
     rdv_min_lead_min: s.rdv_min_lead_min ? Number(s.rdv_min_lead_min) : 0,
     rdv_max_advance_days: s.rdv_max_advance_days ? Number(s.rdv_max_advance_days) : 0,

@@ -142,6 +142,9 @@
   .empty { color: var(--grey); font-size: 14px; padding: 20px 0; text-align: center; }
   .slots-grid > .empty { grid-column: 1 / -1; text-align: left; padding: 8px 0; }
   .confirm-box { text-align: center; padding: 20px 0; }
+  .site-redirect { margin-top: 16px; color: var(--grey); font-size: 13.5px; }
+  .site-redirect .link-btn { background: none; border: 0; padding: 4px; margin-top: 2px; color: var(--blue); font: inherit; font-weight: 600; cursor: pointer; }
+  .site-redirect .link-btn:hover { text-decoration: underline; }
   .confirm-box .check {
     width: 56px; height: 56px; border-radius: 50%; background: var(--green); margin: 0 auto 18px;
     display: flex; align-items: center; justify-content: center;
@@ -266,6 +269,7 @@
       <div id="group-confirm-list" style="text-align:left;margin-top:14px"></div>
       <p style="color:var(--grey);font-size:13.5px;margin-top:14px">Un email récapitulatif vous a été envoyé, avec un lien pour annuler.</p>
       <button class="go" style="margin-top:24px" onclick="startNewBooking()">Prendre un autre rendez-vous</button>
+      <div class="site-redirect" hidden></div>
     </div>
   </section>
 
@@ -375,6 +379,7 @@
       <p style="color:var(--grey);margin-top:10px" id="confirm-details"></p>
       <p style="color:var(--grey);font-size:13.5px;margin-top:14px">Un email de confirmation vous a été envoyé, avec un lien pour annuler si besoin.</p>
       <button class="go" style="margin-top:24px" onclick="startNewBooking()">Prendre un autre rendez-vous</button>
+      <div class="site-redirect" hidden></div>
     </div>
   </section>
 
@@ -406,6 +411,33 @@ body.staff-mode .gift-summary-box,body.staff-mode .theme-btn,body.staff-mode .lo
 </style>
 <script>
 mountThemeButton();
+// Site du salon (Reglages > General) : apres une prise de RDV EN LIGNE, le client y est renvoye apres quelques
+// secondes (le temps de lire la confirmation). Jamais en mode salon (RDV pris par l'equipe depuis la caisse / l'admin).
+var salonWebsite = '', siteRedirectTimer = null;
+var SITE_REDIRECT_SEC = 8;
+function goToSalonSite() {
+  stopSiteRedirect();
+  try { if (window.top !== window) { window.top.location.href = salonWebsite; return; } } catch (e) {}
+  window.location.href = salonWebsite;
+}
+function stopSiteRedirect() {
+  if (siteRedirectTimer) { clearInterval(siteRedirectTimer); siteRedirectTimer = null; }
+  document.querySelectorAll('.site-redirect').forEach(function (el) { el.hidden = true; el.innerHTML = ''; });
+}
+function redirectToSalonSite(panelId) {
+  if (!salonWebsite || STAFF_BRIDGE) return;
+  stopSiteRedirect();
+  var box = document.querySelector('#' + panelId + ' .site-redirect');
+  var left = SITE_REDIRECT_SEC;
+  box.hidden = false;
+  box.innerHTML = '<p>Retour sur le site du salon dans <b class="site-redirect-n">' + left + '</b> s…</p>' +
+    '<button type="button" class="link-btn" onclick="goToSalonSite()">Y aller maintenant</button>';
+  siteRedirectTimer = setInterval(function () {
+    left -= 1;
+    var n = box.querySelector('.site-redirect-n'); if (n) n.textContent = left;
+    if (left <= 0) goToSalonSite();
+  }, 1000);
+}
 // Telephone avec indicatif pays (meme selecteur que la creation de compte) ; +33 par defaut.
 function fillPhone(prefix, phone) {
   var parts = splitPhoneCountry(phone);
@@ -536,6 +568,7 @@ function loadCatalog() {
     var salonName = r[4].salon_name;
     CURRENCY = r[4].currency || 'EUR'; if (r[4].timezone) SALON_TIMEZONE = r[4].timezone;
     giftCardImageUrl = r[4].gift_card_image_url || '';
+    salonWebsite = /^https?:\/\//i.test(r[4].website_url || '') ? r[4].website_url : '';
     giftTileImageUrl = r[4].gift_tile_image_url || '';
     applyAccentColor(r[4].accent_color);
     document.title = 'Rendez-vous — ' + salonName;
@@ -890,7 +923,7 @@ function submitAppointment() {
     var s = services.find(function (x) { return x.id === selService; });
     var when = new Date(selDate + 'T' + selSlot.time).toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' }) + ' à ' + selSlot.time;
     document.getElementById('confirm-details').textContent = when + ' — ' + s.name + (r && r.barber_name ? ' · Votre coiffeur : ' + r.barber_name : '') + (activeGift ? ' (cadeau utilisé — présentez ce cadeau à votre coiffeur)' : '');
-    show('p-confirmed');
+    show('p-confirmed'); redirectToSalonSite('p-confirmed');
   }).catch(function (e) {
     toast(e.message, true);
   }).finally(function () {
@@ -899,6 +932,7 @@ function submitAppointment() {
 }
 
 function startNewBooking() {
+  stopSiteRedirect();
   soloMode();
   selBarber = null; selService = null; selExtras = []; selProducts = []; selDate = null; selSlot = null; activeGift = null;
   document.getElementById('barber-eyebrow').textContent = 'Choisissez votre coiffeur';
@@ -1000,7 +1034,7 @@ function submitGroup() {
       var again = document.querySelector('#p-group-confirmed .confirm-box .go');
       if (again) { again.textContent = 'Fermer'; again.onclick = function () { STAFF_BRIDGE.close(); }; }
     }
-    show('p-group-confirmed');
+    show('p-group-confirmed'); redirectToSalonSite('p-group-confirmed');
   }).catch(function (e) {
     toast(e.message, true);
     // Un creneau vient d'etre pris : on renvoie directement sur la personne concernee pour qu'elle en choisisse un autre.
