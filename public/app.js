@@ -951,7 +951,7 @@ function vitrineCardHtml(kind, it, selected, onclick, opts) {
   if (isSvc) meta = formatMinutes(it.duration_min);
   else if (kind === 'extras' && Number(it.duration_min) > 0) meta = '+' + formatMinutes(it.duration_min);
   else if (kind === 'products' && it.stock_enabled && it.stock_quantity > 0 && (opts.stock || it.stock_quantity <= 3)) meta = opts.stock ? it.stock_quantity + ' en stock' : 'Plus que ' + it.stock_quantity;
-  var price = (kind === 'extras' ? '+' : '') + eur(it.price_cents);
+  var price = (kind === 'extras' ? '+' : '') + (it.price_from ? 'dès ' : '') + eur(it.price_cents);
   var action = (isSvc && !opts.add) ? '' : out ? '<span class="item-out">Épuisé</span>' : '<span class="item-add">' + VITRINE_PLUS_SVG + VITRINE_CHECK_SVG + '</span>';
   var on = !out && selected;
   return '<button type="button" class="item-card' + (it.image_url ? ' has-photo' : '') + (on ? ' sel' : '') + (out ? ' out' : '') + '"' +
@@ -1160,6 +1160,33 @@ function barberTileHtml(b, selected, onclick) {
                  : '<span class="icon">' + esc(String(b.name || '?').charAt(0).toUpperCase()) + '</span>') +
     '<span class="name">' + esc(b.name) + '</span></button>';
 }
+
+/* ---------- « Premier disponible » : le salon choisit le coiffeur ----------
+   Tuile en tete de la grille des coiffeurs (reservation en ligne, Mon compte, groupe, « Ajouter un RDV » du salon). */
+function anyBarberTileHtml(selected, onclick) {
+  return '<button class="svc-card barber-tile any-barber' + (selected ? ' sel' : '') + '" data-barber-id="" onclick="' + onclick + '">' +
+    '<span class="icon any-ic"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+    '<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="m15.5 11 2 2 4-4.5"/></svg></span>' +
+    '<span class="name">Premier disponible</span><span class="meta">On choisit pour vous</span></button>';
+}
+// Catalogue propose en « Premier disponible » : ce qu'au moins un coiffeur fait ; prix le plus bas, « dès » s'ils different.
+function anyBarberItems(barberList, kind, items) {
+  var list = (barberList || []).filter(function (b) { return b && b.accepts_appointments !== 0; });
+  if (!list.length) return items.slice();
+  var out = [];
+  items.forEach(function (it) {
+    var prices = [], durs = [];
+    list.forEach(function (b) {
+      var mine = barberItems(b, kind, [it])[0];
+      if (mine) { prices.push(Number(mine.price_cents) || 0); durs.push(Number(mine.duration_min) || 0); }
+    });
+    if (!prices.length) return;
+    var min = Math.min.apply(null, prices), max = Math.max.apply(null, prices);
+    out.push(Object.assign({}, it, { price_cents: min, price_from: max > min, duration_min: Math.min.apply(null, durs) }));
+  });
+  return out;
+}
+if (typeof window !== 'undefined') { window.anyBarberTileHtml = anyBarberTileHtml; window.anyBarberItems = anyBarberItems; }
 
 /* Tuile « Utiliser un cadeau » des pages de reservation (rdv.html et compte.html) : l'image choisie dans
    Reglages > Marketing (la meme que sur la borne) la remplit, sinon l'icone cadeau par defaut. */

@@ -55,7 +55,7 @@
 .cal-day.salon-closed::after{content:'Fermé';display:block;font-size:10px;font-weight:700;color:var(--red,#e65c5c);margin-top:2px}
 .salon-closure-banner{padding:10px 13px;border-radius:9px;margin:0 0 12px;background:rgba(160,100,100,.13);color:var(--red,#e65c5c);font-weight:650;font-size:13px}
 </style>
-<link rel="stylesheet" href="/app.css?v=37">
+<link rel="stylesheet" href="/app.css?v=38">
 <style>
   .wrap { max-width: none; margin: 0; padding: clamp(16px,1.8vw,28px); }
 
@@ -1302,6 +1302,8 @@
   .bp-power:hover { background: rgba(255,59,48,.22); }
   .bp-power:active { transform: scale(.92); }
   .bp-power.on { background: rgba(52,199,89,.15); color: var(--green); }
+  .aa-card.aa-any { display: flex; flex-direction: column; align-items: center; gap: 2px; background: var(--blue-soft); }
+  .aa-card.aa-any small { font-size: 11.5px; font-weight: 500; color: var(--grey); }
   .bp-delete { margin-top: 14px; border: none; background: none; color: var(--red); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; padding: 4px 8px; border-radius: 8px; }
   .bp-delete:hover { background: rgba(255,59,48,.12); }
   .bp-power.on:hover { background: rgba(52,199,89,.26); }
@@ -2808,7 +2810,7 @@
   </div>
 </div>
 
-<script src="/app.js?v=28"></script>
+<script src="/app.js?v=29"></script>
 <script src="/autorefresh.js?v=2"></script>
 <script src="/staff-group.js?v=5"></script>
 <script src="/daterange.js?v=4"></script>
@@ -6824,6 +6826,7 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
   // Offre du coiffeur choisi (ses prestations, son tarif) - cf. barberItems (app.js).
   function aaOffer(kind) {
     var list = kind === 'services' ? services : extras;
+    if (state.barberId === '' && typeof anyBarberItems === 'function') return anyBarberItems(rdvBarbers, kind, list);   // « Premier disponible »
     var b = state.barberId && barbers.find(function (x) { return String(x.id) === String(state.barberId); });
     return typeof barberItems === 'function' ? barberItems(b, kind, list) : list;
   }
@@ -6848,7 +6851,7 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
     '<div id="aa-step-barber" style="display:none">' +
       '<button class="aa-back" onclick="aaGoStep(\'client\')">‹ Retour</button>' +
       '<div class="aa-step-title">Coiffeur</div>' +
-      '<div class="aa-grid">' + rdvBarbers.map(function (b) {
+      '<div class="aa-grid">' + (rdvBarbers.length > 1 ? '<button class="aa-card aa-any" data-id="" onclick="aaSelectBarber(this)">Premier disponible<small>Le système choisit</small></button>' : '') + rdvBarbers.map(function (b) {
         return '<button class="aa-card" data-id="' + b.id + '" onclick="aaSelectBarber(this)">' + esc(b.name) + '</button>';
       }).join('') + '</div>' +
       (rdvBarbers.length === 0 ? '<p class="hint">Aucun coiffeur disponible pour un RDV en ligne (vérifie le mode RDV, le statut actif, et les horaires dans Coiffeurs).</p>' : '') +
@@ -6907,7 +6910,7 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
     return {
       service: aaOffer('services').find(function (x) { return String(x.id) === String(state.serviceId); }),
       extras: pick(aaOffer('extras'), state.extraIds.map(String)), products: pick(products, state.productIds.map(String)),
-      barber: (function(){var b=(typeof rdvBarbers!=='undefined')&&rdvBarbers.find(function(x){return String(x.id)===String(state.barberId);});return b?b.name:'';})(), when: when, time: state.time
+      barber: state.barberId === '' ? 'Premier disponible' : (function(){var b=(typeof rdvBarbers!=='undefined')&&rdvBarbers.find(function(x){return String(x.id)===String(state.barberId);});return b?b.name:'';})(), when: when, time: state.time
     };
   });
 
@@ -7054,14 +7057,14 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
         client_name: name,
         email: overlay.querySelector('#aa-email').value.trim(),
         phone: overlay.querySelector('#aa-phone').value.trim(),
-        service_id: state.serviceId, barber_id: state.barberId, extras: state.extraIds,
+        service_id: state.serviceId, barber_id: state.barberId || null, extras: state.extraIds,
         products: state.productIds.map(function (id) { return { id: id, quantity: 1 }; }),
         date: dateStr, time: state.time,
         base_url: window.location.origin + '/rdv.html'
       }
-    }).then(function () {
+    }).then(function (r) {
       _closeModal(overlay);
-      toast('RDV ajouté');
+      toast('RDV ajouté' + (state.barberId === '' && r && r.barber_name ? ' avec ' + r.barber_name : ''));
       return refreshQueue();
     }).then(function () {
       Object.keys(calMonthCache).forEach(function (k) { delete calMonthCache[k]; });

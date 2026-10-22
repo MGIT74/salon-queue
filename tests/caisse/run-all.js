@@ -134,7 +134,8 @@ const suite = [
   ['111-groupe-une-personne-a-la-fois.js', false, ['exit']],
   ['112-fermetures-calendrier-annuel.js', false, ['exit']],
   ['113-jours-sans-rdv-coiffeur.js', false, ['exit']],
-  ['114-supprimer-coiffeur.js', false, ['exit']]
+  ['114-supprimer-coiffeur.js', false, ['exit']],
+  ['115-premier-disponible.js', false, ['exit']]
 ];
 
 let bad = 0;

@@ -18,7 +18,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Prendre rendez-vous</title>
-<link rel="stylesheet" href="/app.css?v=37">
+<link rel="stylesheet" href="/app.css?v=38">
 <script>
   // Adresse SANS ?salon=... : on masque la page le temps de savoir si la plateforme heberge plusieurs salons
   // (voir guardMissingSalon) - pour ne jamais montrer, meme une fraction de seconde, un formulaire sans salon.
@@ -369,8 +369,8 @@
   </section>
 </div>
 
-<script src="/app.js?v=28"></script>
-<script src="/group-booking.js?v=23"></script>
+<script src="/app.js?v=29"></script>
+<script src="/group-booking.js?v=24"></script>
 <style>
 body.staff-mode .gift-summary-box,body.staff-mode .theme-btn,body.staff-mode .login-hint{display:none!important}
 .login-hint{background:var(--fill);border-radius:14px;padding:12px 14px;margin:0 0 18px;font-size:14.5px;font-weight:600}
@@ -532,7 +532,9 @@ function renderBarberGrid() {
   // Pas de carte cadeau pendant une reservation a plusieurs (un cadeau = un rendez-vous pour une personne).
   var giftTile = (typeof grp !== 'undefined' && grp) ? '' : giftTileHtml(giftTileImageUrl, 'openGiftCodeScreen()');
 
-  document.getElementById('barber-grid').innerHTML = giftTile + barbers.map(function (b) {
+  // « Premier disponible » en tete (des qu'il y a au moins 2 coiffeurs) : le salon choisit le coiffeur (selBarber = '').
+  var anyTile = barbers.length > 1 ? anyBarberTileHtml(selBarber === '', "selectBarber(this, '')") : '';
+  document.getElementById('barber-grid').innerHTML = giftTile + anyTile + barbers.map(function (b) {
     return barberTileHtml(b, selBarber === b.id, "selectBarber(this, '" + b.id + "')");
   }).join('');
 
@@ -544,8 +546,9 @@ function renderBarberGrid() {
 // Offre du coiffeur choisi : retire ce qu'il ne fait pas, applique son tarif ; un choix devenu impossible est retiré.
 function applyBarberOffer() {
   var b = selBarber && barbers.find(function (x) { return String(x.id) === String(selBarber); });
-  services = barberItems(b, 'services', servicesAll);
-  extras = barberItems(b, 'extras', extrasAll);
+  // « Premier disponible » : ce qu'au moins un coiffeur fait, au prix le plus bas (« dès » si les tarifs different).
+  services = selBarber === '' ? anyBarberItems(barbers, 'services', servicesAll) : barberItems(b, 'services', servicesAll);
+  extras = selBarber === '' ? anyBarberItems(barbers, 'extras', extrasAll) : barberItems(b, 'extras', extrasAll);
   if (selService && !services.some(function (x) { return String(x.id) === String(selService); })) selService = null;
   selExtras = selExtras.filter(function (id) { return extras.some(function (x) { return String(x.id) === String(id); }); });
   renderServiceGrid();
@@ -681,10 +684,14 @@ function itemListConfig(kind) {
 function refreshRecap() {
   function pick(list, ids) { return list.filter(function (x) { return ids.indexOf(String(x.id)) !== -1; }); }
   var b = selBarber && barbers.find(function (x) { return String(x.id) === String(selBarber); });
+  var anyB = selBarber === '';
+  // « Premier disponible » avec une heure choisie : prix du coiffeur que le salon retiendra a cette heure.
+  var priced = anyB && selSlot ? barbers.find(function (x) { return String(x.id) === String(selSlot.barberId); }) : null;
+  var svcList = priced ? barberItems(priced, 'services', servicesAll) : services, extList = priced ? barberItems(priced, 'extras', extrasAll) : extras;
   vitrineRecapFill({
-    service: services.find(function (x) { return String(x.id) === String(selService); }),
-    extras: pick(extras, selExtras.map(String)), products: pick(products, selProducts.map(String)),
-    barber: b ? b.name : '', time: selSlot ? selSlot.time : '',
+    service: svcList.find(function (x) { return String(x.id) === String(selService); }),
+    extras: pick(extList, selExtras.map(String)), products: pick(products, selProducts.map(String)),
+    barber: anyB ? 'Premier disponible' : (b ? b.name : ''), time: selSlot ? selSlot.time : '',
     when: selDate ? new Date(selDate + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' }) : ''
   });
 }
@@ -841,14 +848,15 @@ function submitAppointment() {
       client_name: name, email: email, phone: phone || null,
       service_id: selService, extras: selExtras,
       products: selProducts.map(function (id) { return { id: id, quantity: 1 }; }),
-      barber_id: selSlot.barberId, date: selDate, time: selSlot.time,
+      // « Premier disponible » : le serveur choisit le coiffeur au moment de confirmer.
+      barber_id: selBarber === '' ? null : selSlot.barberId, date: selDate, time: selSlot.time,
       gift_id: activeGift ? activeGift.id : null,
       base_url: window.location.origin + window.location.pathname + (SALON_SLUG ? '?salon=' + SALON_SLUG : '')
     }
-  }).then(function () {
+  }).then(function (r) {
     var s = services.find(function (x) { return x.id === selService; });
     var when = new Date(selDate + 'T' + selSlot.time).toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' }) + ' à ' + selSlot.time;
-    document.getElementById('confirm-details').textContent = when + ' — ' + s.name + (activeGift ? ' (cadeau utilisé — présentez ce cadeau à votre coiffeur)' : '');
+    document.getElementById('confirm-details').textContent = when + ' — ' + s.name + (r && r.barber_name ? ' · Votre coiffeur : ' + r.barber_name : '') + (activeGift ? ' (cadeau utilisé — présentez ce cadeau à votre coiffeur)' : '');
     show('p-confirmed');
   }).catch(function (e) {
     toast(e.message, true);
@@ -1006,7 +1014,7 @@ function cartBeginPerson(i, entry) {
   resetSelection();
   if (entry) {
     // « Modifier » : on repart des choix deja faits pour cette personne.
-    selBarber = entry.barber_id; applyBarberOffer(); renderBarberGrid();
+    selBarber = entry.any ? '' : entry.barber_id; applyBarberOffer(); renderBarberGrid();
     selService = entry.service_id; selExtras = entry.extras.slice(); selProducts = entry.products.slice();
     renderServiceGrid(); updateItemsSummary('extras'); updateItemsSummary('products');
     document.getElementById('service-next-btn').disabled = !selService;
@@ -1044,7 +1052,8 @@ function cartEntryFromSelection() {
   var p = grp.people[grp.current];
   return {
     person: grp.current, name: p.name, isSelf: p.isSelf, relativeId: p.relativeId,
-    barber_id: selSlot.barberId, barber_name: b ? b.name : '',
+    // « Premier disponible » : le coiffeur est choisi a l'envoi ; on garde celui de l'heure pour les creneaux retenus du panier.
+    any: selBarber === '', barber_id: selSlot.barberId, barber_name: selBarber === '' ? 'Premier disponible' : (b ? b.name : ''),
     service_id: selService, service_name: svc ? svc.name : '', extras: ex.map(function (x) { return x.id; }), extra_names: ex.map(function (x) { return x.name; }),
     products: pr.map(function (x) { return x.id; }), product_names: pr.map(function (x) { return x.name; }),
     date: selDate, time: selSlot.time,

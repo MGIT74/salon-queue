@@ -200,6 +200,39 @@ async function walkinRefusal(barberId, dateStr) {
   return w ? (w.name + ' est en « sans RDV » ce jour-là : pas de rendez-vous possible.') : null;
 }
 
+// ---------- « Premier disponible » : le systeme choisit le coiffeur ----------
+// Candidats = coiffeurs qui prennent des RDV et font la prestation, avec leurs creneaux du jour.
+async function anyBarberCandidates(salonId, cat, date, rdvSettings, optsFor) {
+  const [barbers] = await pool.query(
+    'SELECT id FROM barbers WHERE salon_id = ? AND active = 1 AND accepts_appointments = 1 ORDER BY sort_order, name', [salonId]
+  );
+  const out = [];
+  for (const b of barbers) {
+    const offer = await offerFor(b.id, cat);
+    if (!offer.ok) continue;
+    const slots = await computeSlotsForBarber(b.id, date, offer.durationMin, rdvSettings, optsFor ? optsFor(b.id) : {});
+    out.push({ id: b.id, offer, slots });
+  }
+  if (out.length > 1) {
+    // Departage : nombre de RDV sur 7 jours a partir de ce jour (le moins charge d'abord).
+    const [loads] = await pool.query(
+      `SELECT barber_id, COUNT(*) AS n FROM appointments WHERE salon_id = ? AND barber_id IN (?) AND status NOT IN ('cancelled','no_show')
+         AND scheduled_at >= ? AND scheduled_at < DATE_ADD(?, INTERVAL 7 DAY) GROUP BY barber_id`,
+      [salonId, out.map((c) => c.id), date + ' 00:00:00', date + ' 00:00:00']
+    );
+    const byId = Object.fromEntries(loads.map((l) => [l.barber_id, Number(l.n)]));
+    out.forEach((c, i) => { c.week = byId[c.id] || 0; c.order = i; });
+  }
+  return out;
+}
+// Pour UNE heure : parmi les coiffeurs libres, celui qui a le plus de creneaux libres ce jour-la (le moins charge),
+// puis le moins de RDV sur la semaine, puis l'ordre habituel des coiffeurs.
+function chooseAnyBarber(cands, time) {
+  const free = cands.filter((c) => c.slots.includes(time));
+  free.sort((a, b) => (b.slots.length - a.slots.length) || ((a.week || 0) - (b.week || 0)) || ((a.order || 0) - (b.order || 0)));
+  return free[0] || null;
+}
+
 async function computeSlotsForBarber(barberId, dateStr, durationMin, rdvSettings, opts) {
   rdvSettings = rdvSettings || {};
   opts = opts || {};
@@ -367,18 +400,16 @@ router.get('/availability', wrap(async (req, res) => {
     return res.json({ ok: true, slots: slots.map((s) => ({ time: s, barber_id })), duration_min: offer.durationMin, price_cents: offer.priceCents });
   }
 
-  const [barbers] = await pool.query(
-    'SELECT id FROM barbers WHERE salon_id = ? AND active = 1 AND accepts_appointments = 1', [req.salon.id]
-  );
-  const allSlots = {};
-  for (const b of barbers) {
-    const offer = await offerFor(b.id, cat);
-    if (!offer.ok) continue;   // ce coiffeur ne fait pas cette prestation
-    const slots = await computeSlotsForBarber(b.id, date, offer.durationMin, rdvSettings, optsFor(b.id));
-    slots.forEach((s) => { if (!allSlots[s]) allSlots[s] = b.id; });
-  }
-  const merged = Object.keys(allSlots).sort().map((time) => ({ time, barber_id: allSlots[time] }));
-  res.json({ ok: true, slots: merged });
+  // « Premier disponible » : toutes les heures ou au moins un coiffeur est libre ; pour chacune, le coiffeur que le
+  // systeme choisirait (le plus de creneaux libres ce jour-la), avec SON prix et SA duree.
+  const cands = await anyBarberCandidates(req.salon.id, cat, date, rdvSettings, optsFor);
+  const times = Array.from(new Set([].concat(...cands.map((c) => c.slots)))).sort();
+  const merged = times.map((time) => {
+    const c = chooseAnyBarber(cands, time);
+    return { time, barber_id: c.id, price_cents: c.offer.priceCents, duration_min: c.offer.durationMin };
+  });
+  const prices = cands.map((c) => c.offer.priceCents);
+  res.json({ ok: true, slots: merged, any: true, price_min_cents: prices.length ? Math.min(...prices) : null, price_max_cents: prices.length ? Math.max(...prices) : null });
 }));
 
 /**
@@ -562,16 +593,10 @@ router.post('/', bookingRateLimiter, wrap(withBookingLock(async (req, res) => {
   // parmi ceux en mode RDV pour ce créneau precis).
   let finalBarberId = barber_id || null;
   if (!finalBarberId) {
-    const [barbers] = await pool.query(
-      'SELECT id FROM barbers WHERE salon_id = ? AND active = 1 AND accepts_appointments = 1', [req.salon.id]
-    );
-    for (const b of barbers) {
-      const offer = await offerFor(b.id, cat);
-      if (!offer.ok) continue;
-      const slots = await computeSlotsForBarber(b.id, date, offer.durationMin, rdvSettings);
-      if (slots.includes(time)) { finalBarberId = b.id; durationMin = offer.durationMin; break; }
-    }
-    if (!finalBarberId) return res.status(409).json({ error: "Ce créneau n'est plus disponible" });
+    // « Premier disponible » : choisi au moment de confirmer (le plus de creneaux libres ce jour-la).
+    const pick = chooseAnyBarber(await anyBarberCandidates(req.salon.id, cat, date, rdvSettings), time);
+    if (!pick) return res.status(409).json({ error: "Ce créneau n'est plus disponible" });
+    finalBarberId = pick.id; durationMin = pick.offer.durationMin;
   } else {
     // Le coiffeur demandé doit appartenir à CE salon - sans ça, un
     // barber_id d'un autre salon (deviné/connu) était accepté tel
@@ -676,7 +701,8 @@ router.post('/', bookingRateLimiter, wrap(withBookingLock(async (req, res) => {
     await promoteAppointment({ id, salon_id: req.salon.id, barber_id: finalBarberId, client_name, email, phone, service_id, scheduled_at: scheduledAt }, extraIds, productSelections);
   }
 
-  res.json({ ok: true, id });
+  // Le coiffeur retenu (utile surtout en « Premier disponible ») : affiche au client apres confirmation.
+  res.json({ ok: true, id, barber_id: finalBarberId, barber_name: barber ? barber.name : null });
 })));
 
 /**
@@ -745,14 +771,10 @@ async function createGroupBooking(req, res, staff) {
       const slots = await computeSlotsForBarber(barberId, p.date, durationMin, rdvSettings, staff ? { skipLead: true } : {});
       if (!slots.includes(p.time)) return fail(409, i, (await walkinRefusal(barberId, p.date)) || ("Le créneau de " + p.name + " n'est plus disponible (" + p.time + ")."));
     } else {
-      const [barbers] = await pool.query('SELECT id FROM barbers WHERE salon_id = ? AND active = 1 AND accepts_appointments = 1', [req.salon.id]);
-      for (const b of barbers) {
-        const offer = await offerFor(b.id, cat);
-        if (!offer.ok) continue;
-        const slots = await computeSlotsForBarber(b.id, p.date, offer.durationMin, rdvSettings, staff ? { skipLead: true } : {});
-        if (slots.includes(p.time)) { barberId = b.id; durationMin = offer.durationMin; break; }
-      }
-      if (!barberId) return fail(409, i, "Le créneau de " + p.name + " n'est plus disponible (" + p.time + ").");
+      // « Premier disponible » pour cette personne (les RDV deja crees du groupe comptent : ils sont en base).
+      const pick = chooseAnyBarber(await anyBarberCandidates(req.salon.id, cat, p.date, rdvSettings, () => (staff ? { skipLead: true } : {})), p.time);
+      if (!pick) return fail(409, i, "Le créneau de " + p.name + " n'est plus disponible (" + p.time + ").");
+      barberId = pick.id; durationMin = pick.offer.durationMin;
     }
 
     const id = crypto.randomUUID();
@@ -862,10 +884,10 @@ router.post('/admin-create', requireAdminOrBarber, wrap(withBookingLock(async (r
   // actif (lui-même par défaut, ou celui désigné par bulle depuis la
   // caisse partagée) - le coiffeur envoyé dans le corps de la requête
   // est ignoré dans ce cas. L'admin garde le choix libre du coiffeur.
-  const barber_id = req.actingBarberId || req.body.barber_id;
+  // Pas de coiffeur (admin) = « Premier disponible » : le systeme choisit (voir chooseAnyBarber).
+  let barber_id = req.actingBarberId || req.body.barber_id || null;
   const clientNote = req.body.client_note ? String(req.body.client_note).slice(0, 500) : null;
   if (!client_name) return res.status(400).json({ error: 'Le nom est requis' });
-  if (!barber_id) return res.status(400).json({ error: 'Le coiffeur est requis' });
   if (!service_id || !date || !time) return res.status(400).json({ error: 'Prestation, date et créneau requis' });
   if (!validBookingDate(date) || !validBookingTime(time)) return res.status(400).json({ error: 'Date ou heure invalide' });
   if (String(client_name).length > 255 || (email && String(email).length > 255)) return res.status(400).json({ error: 'Nom ou email trop long' });
@@ -901,21 +923,28 @@ router.post('/admin-create', requireAdminOrBarber, wrap(withBookingLock(async (r
   // coiffeur connecté req.barberId est déjà garanti sûr par
   // barberAuth.js (le PIN est vérifié avec salon_id) - reste utile
   // pour le choix libre de l'admin.
-  const [[ownedBarber]] = await pool.query(
-    'SELECT id FROM barbers WHERE id = ? AND salon_id = ? AND active = 1', [barber_id, req.salon.id]
-  );
-  if (!ownedBarber) return res.status(404).json({ error: 'Coiffeur introuvable' });
-  const offer = await offerFor(barber_id, cat);
-  if (!offer.ok) return res.status(offer.status).json({ error: offer.error });
-  const durationMin = offer.durationMin;
+  let durationMin;
+  if (!barber_id) {
+    const pick = chooseAnyBarber(await anyBarberCandidates(req.salon.id, cat, date, rdvSettings, () => ({ skipLead: true })), time);
+    if (!pick) return res.status(409).json({ error: "Aucun coiffeur n'est libre à ce créneau" });
+    barber_id = pick.id; durationMin = pick.offer.durationMin;
+  } else {
+    const [[ownedBarber]] = await pool.query(
+      'SELECT id FROM barbers WHERE id = ? AND salon_id = ? AND active = 1', [barber_id, req.salon.id]
+    );
+    if (!ownedBarber) return res.status(404).json({ error: 'Coiffeur introuvable' });
+    const offer = await offerFor(barber_id, cat);
+    if (!offer.ok) return res.status(offer.status).json({ error: offer.error });
+    durationMin = offer.durationMin;
 
-  // Admin exempté du délai minimum de réservation (rdv_min_lead_min) et
-  // de la fenêtre max à l'avance (pas vérifiée ici du tout) - ce sont
-  // des garde-fous pour le grand public, pas pour un ajout manuel gu
-  // idé par le staff. Le pas des créneaux et la marge tampon restent
-  // appliqués (évite un vrai conflit d'agenda).
-  const slots = await computeSlotsForBarber(barber_id, date, durationMin, rdvSettings, { skipLead: true });
-  if (!slots.includes(time)) return res.status(409).json({ error: (await walkinRefusal(barber_id, date)) || "Ce créneau n'est plus disponible" });
+    // Admin exempté du délai minimum de réservation (rdv_min_lead_min) et
+    // de la fenêtre max à l'avance (pas vérifiée ici du tout) - ce sont
+    // des garde-fous pour le grand public, pas pour un ajout manuel gu
+    // idé par le staff. Le pas des créneaux et la marge tampon restent
+    // appliqués (évite un vrai conflit d'agenda).
+    const slots = await computeSlotsForBarber(barber_id, date, durationMin, rdvSettings, { skipLead: true });
+    if (!slots.includes(time)) return res.status(409).json({ error: (await walkinRefusal(barber_id, date)) || "Ce créneau n'est plus disponible" });
+  }
 
   const id = crypto.randomUUID();
   const cancelToken = crypto.randomBytes(24).toString('hex');
@@ -960,7 +989,8 @@ router.post('/admin-create', requireAdminOrBarber, wrap(withBookingLock(async (r
     );
   }
 
-  res.json({ ok: true, id });
+  const [[assigned]] = await pool.query('SELECT name FROM barbers WHERE id = ?', [barber_id]);
+  res.json({ ok: true, id, barber_id, barber_name: assigned ? assigned.name : null });
 })));
 
 /**

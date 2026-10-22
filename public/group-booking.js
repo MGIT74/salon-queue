@@ -675,7 +675,7 @@
     return (cart || []).map(function (e) {
       return { name: e.isSelf ? '' : e.name, service_id: e.service_id, extras: (e.extras || []).slice(),
                products: (e.products || []).map(function (id) { return { id: id, quantity: 1 }; }),
-               barber_id: e.barber_id, date: e.date, time: e.time };
+               barber_id: e.any ? null : e.barber_id, date: e.date, time: e.time };
     });
   }
   function cartDate(d) { try { return new Date(d + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }); } catch (e) { return d; } }

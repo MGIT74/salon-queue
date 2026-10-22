@@ -792,3 +792,8 @@ body .tfx > button { transition: color .25s ease, transform .1s ease; }
 .wrap.page-flow .panel.flow.gb-pick.on>.flow-top,.wrap.page-flow .panel.flow.gb-pick.on>.flow-body{padding:0;overflow:visible}
 }
 
+
+/* Tuile « Premier disponible » (grille des coiffeurs) */
+.svc-card.any-barber .any-ic { width: 52px; height: 52px; border-radius: 50%; background: var(--accent); color: #fff; display: inline-flex; align-items: center; justify-content: center; }
+.svc-card.any-barber .meta { font-size: 12px; color: var(--grey); }
+.svc-card.any-barber.sel .meta { color: inherit; opacity: .85; }

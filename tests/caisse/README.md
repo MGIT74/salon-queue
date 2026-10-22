@@ -145,4 +145,5 @@ node tests/caisse/111-groupe-une-personne-a-la-fois.js  # RDV a plusieurs : rese
 node tests/caisse/112-fermetures-calendrier-annuel.js  # Reglages : fermetures du salon dans le meme calendrier annuel que les conges (cocher / decocher des jours)
 node tests/caisse/113-jours-sans-rdv-coiffeur.js  # Coiffeur : jours « sans RDV » dans son calendrier (plus de creneau, visible a la borne, refuse si RDV deja pris)
 node tests/caisse/114-supprimer-coiffeur.js  # Supprimer un coiffeur : bloque si RDV / file, historique garde « (supprimé) », code PIN jamais redonne
+node tests/caisse/115-premier-disponible.js  # « Premier disponible » : le systeme choisit le coiffeur le plus libre (en ligne, compte, groupe, admin), nom affiche apres confirmation ; pas a la borne
 ```

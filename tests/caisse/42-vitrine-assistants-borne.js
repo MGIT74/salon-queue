@@ -50,7 +50,7 @@ const visible = (w, id) => w.document.getElementById(id).style.display !== 'none
   check('1re etape : le client (nom, puis une ou plusieurs personnes)', visible(w, 'aa-step-client') && !visible(w, 'aa-step-service'));
   d.getElementById('aa-name').value = 'Karim'; w.aaStartSolo();
   check('coiffeur deja connu (clic sur sa ligne) : apres le client, on saute a l\'etape Prestation', visible(w, 'aa-step-service') && !visible(w, 'aa-step-barber'));
-  check('etape Coiffeur INCHANGEE (cartes de texte .aa-card)', d.querySelectorAll('#aa-step-barber .aa-card').length === 2);
+  check('etape Coiffeur INCHANGEE (cartes de texte .aa-card) + « Premier disponible »', d.querySelectorAll('#aa-step-barber .aa-card:not(.aa-any)').length === 2 && d.querySelectorAll('#aa-step-barber .aa-card.aa-any').length === 1);
   let sv = [...d.querySelectorAll('#aa-service-grid .item-card')];
   check('prestations : cartes de vitrine (compactes), dans l\'ordre du catalogue', sv.length === 2 && sv[0].dataset.id === 'sv1' && d.getElementById('aa-service-grid').classList.contains('compact'));
   check('prestation AVEC photo : image EN HAUT, nom / duree / prix EN DESSOUS (jamais sur le dessin)', sv[0].classList.contains('has-photo') && sv[0].children[0].classList.contains('item-media') && sv[0].children[1].classList.contains('item-body') && sv[0].querySelector('.item-body .item-name').textContent === 'Barbe premium' && sv[0].querySelector('.item-meta').textContent === '20 min' && sv[0].querySelector('.item-price').textContent === '13,00 €');

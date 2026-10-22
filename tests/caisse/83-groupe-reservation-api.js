@@ -34,6 +34,7 @@ function fakeQuery(sql, params) {
   if (/FROM barber_schedules/.test(sql)) return [[{ start_time: '09:00:00', end_time: '19:00:00' }]];
   if (/FROM barber_leaves/.test(sql)) return [[]];
   if (/FROM barber_walkin_days/.test(sql)) return [[]];
+  if (/SELECT barber_id, COUNT\(\*\) AS n FROM appointments/.test(sql)) return [[]];
   if (/FROM salon_closures/.test(sql)) return [[]];   // aucune fermeture exceptionnelle
   if (/FROM barber_(service|extra)_(exclusions|prices)/.test(sql)) return [[]];   // ni exclusion ni tarif perso
   if (/FROM barber_breaks/.test(sql)) return [[]];
