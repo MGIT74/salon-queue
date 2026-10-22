@@ -242,7 +242,20 @@
     <div class="login-hint">Vous avez un compte ? <a href="#" onclick="goLogin(event)">Se connecter</a><span>Pas de compte ? Réservez quand même : vous recevrez un email de confirmation avec un lien pour annuler.</span></div>
     <div class="fld"><label for="grp-name">Votre prénom</label><input id="grp-name" type="text" autocomplete="given-name"></div>
     <div class="fld"><label for="grp-email">Email — pour la confirmation</label><input id="grp-email" type="email" autocomplete="email"></div>
-    <div class="fld"><label for="grp-phone">Téléphone</label><input id="grp-phone" type="tel" autocomplete="tel"></div>
+    <div class="fld"><label for="grp-phone">Téléphone</label>
+      <div style="display:flex;gap:8px">
+        <div class="phone-cc-picker" id="grp-phone-cc-picker">
+          <button type="button" class="phone-cc-btn" onclick="togglePhoneCC('grp')">
+            <span id="grp-phone-cc-flag" class="flag-emoji"></span>
+            <span class="code" id="grp-phone-cc-label">+33</span>
+            <svg class="chev" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <input type="hidden" id="grp-phone-country" value="+33" data-iso="fr">
+          <div class="phone-cc-list" id="grp-phone-cc-list"></div>
+        </div>
+        <input id="grp-phone" type="tel" autocomplete="tel-national" style="flex:1;min-width:0" placeholder="6 12 34 56 78">
+      </div>
+    </div>
     <button class="go" id="group-confirm-btn" onclick="submitGroup()">Confirmer les rendez-vous</button>
   </section>
 
@@ -338,7 +351,20 @@
     <div class="flow-recap" data-recap></div>
     <div class="fld"><label for="rdv-name">Prénom</label><input id="rdv-name" type="text" autocomplete="given-name"></div>
     <div class="fld"><label for="rdv-email">Email — pour la confirmation</label><input id="rdv-email" type="email" autocomplete="email"></div>
-    <div class="fld"><label for="rdv-phone">Téléphone</label><input id="rdv-phone" type="tel" autocomplete="tel"></div>
+    <div class="fld"><label for="rdv-phone">Téléphone</label>
+      <div style="display:flex;gap:8px">
+        <div class="phone-cc-picker" id="rdv-phone-cc-picker">
+          <button type="button" class="phone-cc-btn" onclick="togglePhoneCC('rdv')">
+            <span id="rdv-phone-cc-flag" class="flag-emoji"></span>
+            <span class="code" id="rdv-phone-cc-label">+33</span>
+            <svg class="chev" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <input type="hidden" id="rdv-phone-country" value="+33" data-iso="fr">
+          <div class="phone-cc-list" id="rdv-phone-cc-list"></div>
+        </div>
+        <input id="rdv-phone" type="tel" autocomplete="tel-national" style="flex:1;min-width:0" placeholder="6 12 34 56 78">
+      </div>
+    </div>
     <button class="go" id="confirm-btn" onclick="submitAppointment()">Confirmer le rendez-vous</button>
   </section>
 
@@ -380,6 +406,13 @@ body.staff-mode .gift-summary-box,body.staff-mode .theme-btn,body.staff-mode .lo
 </style>
 <script>
 mountThemeButton();
+// Telephone avec indicatif pays (meme selecteur que la creation de compte) ; +33 par defaut.
+function fillPhone(prefix, phone) {
+  var parts = splitPhoneCountry(phone);
+  setPhoneCCDisplay(prefix, parts.code, parts.code === '+33' ? 'fr' : null);
+  document.getElementById(prefix + '-phone').value = parts.local;
+}
+fillPhone('rdv', ''); fillPhone('grp', '');
 vitrinePageFlow(document.querySelector('.wrap'), ['p-service', 'p-extras', 'p-products', 'p-datetime', 'p-contact']);
 
 var SALON_SLUG = (function () {
@@ -824,7 +857,7 @@ function goToContactStep() {
   if (activeGift) {
     document.getElementById('rdv-name').value = activeGift.recipient_name || '';
     document.getElementById('rdv-email').value = activeGift.recipient_email || '';
-    document.getElementById('rdv-phone').value = activeGift.recipient_phone || '';
+    fillPhone('rdv', activeGift.recipient_phone);
   }
 
   show('p-contact');
@@ -834,7 +867,7 @@ function goToContactStep() {
 function submitAppointment() {
   var name = document.getElementById('rdv-name').value.trim();
   var email = document.getElementById('rdv-email').value.trim();
-  var phone = document.getElementById('rdv-phone').value.trim();
+  var phone = composePhone(document.getElementById('rdv-phone-country').value, document.getElementById('rdv-phone').value);
   if (!name) { toast('Entrez votre prénom', true); return; }
   if (!email) { toast('Entrez votre email', true); return; }
   if (!phone) { toast('Entrez votre téléphone', true); return; }
@@ -871,7 +904,7 @@ function startNewBooking() {
   document.getElementById('barber-eyebrow').textContent = 'Choisissez votre coiffeur';
   document.getElementById('rdv-name').value = '';
   document.getElementById('rdv-email').value = '';
-  document.getElementById('rdv-phone').value = '';
+  fillPhone('rdv', '');
   document.getElementById('rdv-date').value = '';
   document.getElementById('service-next-btn').disabled = true;
   document.getElementById('date-next-btn').disabled = true;
@@ -904,7 +937,7 @@ function enterStaffMode() {
   if (c && c.name) {
     document.getElementById('grp-name').value = c.name;
     document.getElementById('grp-email').value = c.email || '';
-    document.getElementById('grp-phone').value = c.phone || '';
+    fillPhone('grp', c.phone);
   }
   openGroupBooking();
 }
@@ -945,7 +978,7 @@ function openGroupBooking(startOnWho) {
 function submitGroup() {
   var name = document.getElementById('grp-name').value.trim();
   var email = document.getElementById('grp-email').value.trim();
-  var phone = document.getElementById('grp-phone').value.trim();
+  var phone = composePhone(document.getElementById('grp-phone-country').value, document.getElementById('grp-phone').value);
   if (!name) { toast(STAFF_BRIDGE ? 'Entrez le nom du client' : 'Entrez votre prénom', true); return; }
   if (!STAFF_BRIDGE && !email) { toast('Entrez votre email', true); return; }
   if (!STAFF_BRIDGE && !phone) { toast('Entrez votre téléphone', true); return; }
