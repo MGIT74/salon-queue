@@ -101,7 +101,7 @@
 .cal-day.salon-closed::after{content:'Fermé';display:block;font-size:10px;font-weight:700;color:var(--red,#e65c5c);margin-top:2px}
 .salon-closure-banner{padding:10px 13px;border-radius:9px;margin:0 0 12px;background:rgba(160,100,100,.13);color:var(--red,#e65c5c);font-weight:650;font-size:13px}
 </style>
-<link rel="stylesheet" href="/app.css?v=39">
+<link rel="stylesheet" href="/app.css?v=40">
 <style>
   html, body { min-height: 100%; }
   .wrap { max-width: 480px; margin: 0 auto; padding: 20px 18px 40px; }
@@ -380,7 +380,7 @@
   </button>
 </div>
 
-<script src="/app.js?v=31"></script>
+<script src="/app.js?v=32"></script>
 <script src="/autorefresh.js?v=2"></script>
 <script src="/staff-group.js?v=5"></script>
 <script>requireSalonInUrl("Pour utiliser votre poste, ouvrez le lien de votre salon.");</script>
@@ -589,6 +589,8 @@ function refresh() {
     if (reloadCatalog) catalogLoadedAt = Date.now();   // seulement si la lecture a REUSSI : sinon on reessaie au prochain tour
     renderActive();
     renderNext();
+    var meB = (barbers || []).filter(function (b) { return me && b.id === me.id; })[0];
+    if (meB) document.getElementById('my-name').innerHTML = esc(me.name) + barberModeTagHtml(meB);
   }).catch(function (e) { toast(e.message, true); });
 }
 
@@ -673,9 +675,9 @@ function renderActive(force) {
 
   zone.innerHTML =
     '<div class="active-card">' +
-      '<div class="name">' + esc(cur.client_name) + '</div>' +
+      '<div class="name">' + queueSourceIconHtml(cur) + esc(cur.client_name) + '</div>' +
       (cur.is_appointment
-        ? '<div class="hint" style="color:var(--blue);margin:-4px 0 6px">📅 Rendez-vous</div>'
+        ? '<div class="hint" style="color:var(--blue);margin:-4px 0 6px">Rendez-vous</div>'
         : '') +
       (cur.paid_at ? '<div class="hint" style="color:var(--green);font-weight:600;margin:-2px 0 6px">✓ Déjà payé — un supplément ajouté sera à régler à la fin</div>' : '') +
       chipsHtml(cur) +
@@ -783,12 +785,12 @@ function renderNext() {
       ? (prepAlert ? '⏰ Préparez-vous — RDV dans ' + Math.max(minutesUntil, 0) + ' min' : 'RDV à ' + new Date(q.checkin_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }))
       : 'En attente de son tour';
     var appointmentBadge = (q.is_appointment && !isAppointmentNotYet)
-      ? '<div class="meta" style="color:var(--blue)">📅 RDV ' + new Date(q.checkin_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) + '</div>'
+      ? '<div class="meta" style="color:var(--blue)">RDV ' + new Date(q.checkin_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) + '</div>'
       : '';
     return '<div class="next-item" data-id="' + q.id + '">' +
       '<div class="next-card' + (locked ? ' locked' : '') + (prepAlert ? ' prep-alert' : '') + '">' +
         '<div class="next-info" onclick="toggleNextDetail(\'' + q.id + '\')">' +
-          '<div class="name">' + esc(q.client_name) + '</div>' +
+          '<div class="name">' + queueSourceIconHtml(q) + esc(q.client_name) + '</div>' +
           '<div class="meta">' + esc(detail) + '</div>' +
           appointmentBadge +
           (q.paid_at ? '<div class="meta" style="color:var(--green);font-weight:600">✓ Déjà payé</div>' : '') +

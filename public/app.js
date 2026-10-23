@@ -1182,6 +1182,31 @@ function canTakeQueueEntry(q, barberId, barberList) {
 }
 if (typeof window !== 'undefined') { window.takesWalkinsToday = takesWalkinsToday; window.canTakeQueueEntry = canTakeQueueEntry; }
 
+// Icones « RDV » (calendrier) et « sans RDV » (personne qui marche) : les memes que dans l'agenda (sourceBadge).
+function rdvModeIconSvg(walkin, size) {
+  var sz = size || 14;
+  return walkin
+    ? '<svg viewBox="0 0 24 24" width="' + sz + '" height="' + sz + '" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="13" cy="4" r="1.5"/><path d="M9.5 21l2-6-1.5-1.5.5-4.5 3-1 2 2.5 2.5 1"/><path d="M14.5 21l-1-5"/></svg>'
+    : '<svg viewBox="0 0 24 24" width="' + sz + '" height="' + sz + '" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5.5" width="16" height="15" rx="2.5"/><path d="M4 9.5h16"/><path d="M8 3.5v3.5M16 3.5v3.5"/></svg>';
+}
+// Client du Timer : venu sans RDV (borne / ajoute au salon) ou client d'un rendez-vous.
+function queueSourceIconHtml(q) {
+  var walkin = !(q && q.is_appointment);
+  return '<span class="src-ic ' + (walkin ? 'walk' : 'rdv') + '" title="' + (walkin ? 'Sans RDV (passage au salon)' : 'Rendez-vous') + '">' + rdvModeIconSvg(walkin, 15) + '</span>';
+}
+// Pastille d'un coiffeur : petite notification « sans RDV » / « RDV » aujourd'hui.
+function barberModeBadgeHtml(b) {
+  if (!b) return '';
+  var walkin = takesWalkinsToday(b);
+  return '<span class="mode-badge ' + (walkin ? 'walk' : 'rdv') + '" title="' + (walkin ? 'Sans RDV aujourd\'hui' : 'En RDV aujourd\'hui') + '">' + rdvModeIconSvg(walkin, 11) + '</span>';
+}
+// Etiquette a cote du nom : « Sans RDV » / « RDV ».
+function barberModeTagHtml(b) {
+  if (!b) return '';
+  var walkin = takesWalkinsToday(b);
+  return '<span class="mode-tag ' + (walkin ? 'walk' : 'rdv') + '">' + rdvModeIconSvg(walkin, 13) + (walkin ? 'Sans RDV' : 'RDV') + '</span>';
+}
+
 // keepAll : la borne (coiffeurs SANS RDV, qui n'acceptent pas forcement de RDV) prend tous les coiffeurs presents.
 function anyBarberItems(barberList, kind, items, keepAll) {
   var list = (barberList || []).filter(function (b) { return b && (keepAll || b.accepts_appointments !== 0); });
