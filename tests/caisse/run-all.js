@@ -141,7 +141,8 @@ const suite = [
   ['118-borne-plusieurs-premier-disponible.js', false, ['exit']],
   ['119-file-sans-coiffeur-coiffeurs-sans-rdv.js', false, ['exit']],
   ['120-icones-rdv-sans-rdv-timer.js', false, ['exit']],
-  ['121-timer-ordre-glisser.js', false, ['exit']]
+  ['121-timer-ordre-glisser.js', false, ['exit']],
+  ['122-douchette-caisse-focus.js', false, ['exit']]
 ];
 
 let bad = 0;

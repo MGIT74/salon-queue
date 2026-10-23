@@ -3501,6 +3501,28 @@ document.getElementById('panel-caisse').addEventListener('click', function (e) {
   if (!isOwnField) setTimeout(focusScanCatcher, 0);
 });
 
+// Filet de securite : un clic HORS de la zone Caisse (pastille d'un coiffeur, bouton du haut, fenetre fermee...) enlevait
+// le focus du champ invisible, et le scan suivant partait dans le vide, sans aucun message. Desormais, sur l'onglet
+// Caisse, la premiere touche qui arrive alors que personne n'ecrit dans un champ (et qu'aucune fenetre n'est ouverte)
+// redonne le focus au champ du scanner AVANT que le caractere soit tape : il atterrit bien dedans. « Alt » compte aussi
+// (douchettes qui envoient Alt + pave numerique, voir plus haut).
+function scanTargetFree() {
+  var a = document.activeElement;
+  if (a === scanCatcher) return false;
+  if (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.tagName === 'SELECT' || a.isContentEditable)) return false;
+  if (document.querySelector('.appt-drawer-backdrop.on, .history-drawer-backdrop.on, .z-overlay.on, .receipt-overlay.on, .tpe-overlay.on, .modal-overlay, .modal-backdrop')) return false;
+  var login = document.getElementById('login-screen');
+  if (login && login.style.display !== 'none' && login.offsetParent !== null) return false;
+  return document.getElementById('panel-caisse').classList.contains('on');
+}
+document.addEventListener('keydown', function (e) {
+  if (e.ctrlKey || e.metaKey) return;
+  if (!(e.key && e.key.length === 1) && e.key !== 'Alt') return;
+  if (!scanTargetFree()) return;
+  scanCatcher.value = '';
+  scanCatcher.focus();
+}, true);
+
 function handleScannedBarcode(code) {
   var product = catalog.products.find(function (p) { return p.barcode === code; });
   if (!product) {

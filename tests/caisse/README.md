@@ -152,4 +152,5 @@ node tests/caisse/118-borne-plusieurs-premier-disponible.js  # Borne : « Juste 
 node tests/caisse/119-file-sans-coiffeur-coiffeurs-sans-rdv.js  # File : client sans coiffeur (sans RDV) pris seulement par les coiffeurs sans RDV du jour (caisse, Mon poste, serveur)
 node tests/caisse/120-icones-rdv-sans-rdv-timer.js  # Timer : icone RDV / sans RDV devant chaque client ; etiquette RDV / sans RDV a cote du nom du coiffeur
 node tests/caisse/121-timer-ordre-glisser.js  # Timer caisse : glisser les clients sans RDV pour changer leur ordre (les RDV ne bougent pas)
+node tests/caisse/122-douchette-caisse-focus.js  # Caisse : la douchette lit toujours, meme apres un clic sur une pastille de coiffeur (focus du champ invisible)
 ```
