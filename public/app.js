@@ -1194,12 +1194,6 @@ function queueSourceIconHtml(q) {
   var walkin = !(q && q.is_appointment);
   return '<span class="src-ic ' + (walkin ? 'walk' : 'rdv') + '" title="' + (walkin ? 'Sans RDV (passage au salon)' : 'Rendez-vous') + '">' + rdvModeIconSvg(walkin, 15) + '</span>';
 }
-// Pastille d'un coiffeur : petite notification « sans RDV » / « RDV » aujourd'hui.
-function barberModeBadgeHtml(b) {
-  if (!b) return '';
-  var walkin = takesWalkinsToday(b);
-  return '<span class="mode-badge ' + (walkin ? 'walk' : 'rdv') + '" title="' + (walkin ? 'Sans RDV aujourd\'hui' : 'En RDV aujourd\'hui') + '">' + rdvModeIconSvg(walkin, 11) + '</span>';
-}
 // Etiquette a cote du nom : « Sans RDV » / « RDV ».
 function barberModeTagHtml(b) {
   if (!b) return '';
