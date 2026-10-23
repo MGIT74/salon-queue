@@ -678,6 +678,7 @@
                barber_id: e.any ? null : e.barber_id, date: e.date, time: e.time };
     });
   }
+  function fmtDur(m) { return typeof formatMinutes === 'function' ? formatMinutes(m) : m + ' min'; }
   function cartDate(d) { try { return new Date(d + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }); } catch (e) { return d; } }
   // Lignes du panier : qui, quand, quoi, avec qui, combien ; « Modifier » / retirer. eur : formateur de prix.
   function cartRowsHtml(cart, eur, fnPrefix) {
@@ -686,7 +687,7 @@
       var prod = e.product_names && e.product_names.length ? '<em>Produit' + (e.product_names.length > 1 ? 's' : '') + ' : ' + esc(e.product_names.join(', ')) + '</em>' : '';
       return '<div class="cart-row"><div class="cart-when"><b>' + esc(e.time) + '</b><span>' + esc(cartDate(e.date)) + '</span></div>' +
         '<div class="cart-what"><b>' + esc(e.name) + '</b><span>' + esc(what) + (e.barber_name ? ' · ' + esc(e.barber_name) : '') + '</span>' + prod + '</div>' +
-        '<div class="cart-price">' + eur(e.price_cents || 0) + '</div>' +
+        '<div class="cart-price">' + (e.dur ? '<span class="cart-dur">' + esc(fmtDur(e.dur)) + ' · </span>' : '') + eur(e.price_cents || 0) + '</div>' +
         '<div class="cart-acts"><button type="button" class="cart-edit" onclick="' + fnPrefix + 'Edit(' + i + ')">Modifier</button>' +
         '<button type="button" class="cart-rm" aria-label="Retirer ' + esc(e.name) + '" onclick="' + fnPrefix + 'Remove(' + i + ')">' + ic('x') + '</button></div></div>';
     }).join('');

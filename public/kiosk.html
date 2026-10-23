@@ -18,7 +18,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>File d'attente</title>
-<link rel="stylesheet" href="/app.css?v=38">
+<link rel="stylesheet" href="/app.css?v=39">
 <script>
   // Adresse SANS ?salon=... : on masque la page le temps de savoir si la plateforme heberge plusieurs salons
   // (voir requireSalonInUrl dans app.js) - pour ne jamais montrer, meme une fraction de seconde, un ecran sans salon.
@@ -226,6 +226,7 @@
   .k-names .grp-pill { font-size: 16px; padding: 7px 6px 7px 14px; }
   .k-cart .cart-row { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "what price" "acts acts"; }
   .k-cart .cart-what b { font-size: 18px; }
+  .cart-price .cart-dur { font-weight: 500; color: var(--grey); }
   .gt-list { display: flex; flex-direction: column; gap: 8px; text-align: left; }
   .gt-row { display: flex; align-items: center; gap: 12px; background: var(--card); border-radius: 14px; padding: 12px 14px; }
   .gt-row .gt-num { font-size: 28px; font-weight: 700; letter-spacing: -.03em; min-width: 44px; text-align: center; font-variant-numeric: tabular-nums; }
@@ -447,7 +448,7 @@
 </div>
 
 <script src="/app.js?v=30"></script>
-<script src="/group-booking.js?v=24"></script>
+<script src="/group-booking.js?v=25"></script>
 <script>requireSalonInUrl("Pour utiliser cette borne, ouvrez le lien de votre salon.");</script>
 <script>
 mountThemeButton();
@@ -1045,6 +1046,7 @@ function kCartAddCurrent() {
     service_id: selService, service_name: s ? s.name : '', extras: ex.map(function (x) { return x.id; }), extra_names: ex.map(function (x) { return x.name; }),
     products: pr.map(function (x) { return x.id; }), product_names: pr.map(function (x) { return x.name; }),
     price_from: !!(s && s.price_from),
+    dur: (s ? Number(s.duration_min) || 0 : 0) + ex.reduce(function (t, x) { return t + (Number(x.duration_min) || 0); }, 0),
     price_cents: (s ? Number(s.price_cents) || 0 : 0) + ex.reduce(function (t, x) { return t + (Number(x.price_cents) || 0); }, 0) + pr.reduce(function (t, x) { return t + (Number(x.price_cents) || 0); }, 0)
   };
   // Une seule ligne par personne : « Modifier » remplace la sienne.
@@ -1063,7 +1065,7 @@ function renderKCart() {
     var what = e.service_name + (e.extra_names.length ? ' + ' + e.extra_names.join(', ') : '');
     var prod = e.product_names.length ? '<em>Produit' + (e.product_names.length > 1 ? 's' : '') + ' : ' + esc(e.product_names.join(', ')) + '</em>' : '';
     return '<div class="cart-row"><div class="cart-what"><b>' + esc(e.name) + '</b><span>' + esc(what) + ' · ' + esc(e.barber_name) + '</span>' + prod + '</div>' +
-      '<div class="cart-price">' + (e.price_from ? 'dès ' : '') + eur(e.price_cents) + '</div>' +
+      '<div class="cart-price"><span class="cart-dur">' + formatMinutes(e.dur) + ' · </span>' + (e.price_from ? 'dès ' : '') + eur(e.price_cents) + '</div>' +
       '<div class="cart-acts"><button type="button" class="cart-edit" onclick="kCartEdit(' + i + ')">Modifier</button>' +
       '<button type="button" class="cart-rm" aria-label="Retirer ' + esc(e.name) + '" onclick="kRemovePerson(' + e.person + ')"><svg class="gb-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div></div>';
   }).join('');
@@ -1075,7 +1077,8 @@ function renderKCart() {
     : 'Tout le monde est prêt. Vérifiez puis prenez vos places dans la file.';
   var total = grp.cart.reduce(function (t, e) { return t + (e.price_cents || 0); }, 0);
   var from = grp.cart.some(function (e) { return e.price_from; });
-  document.getElementById('kcart-total').innerHTML = grp.cart.length ? '<span>Total</span><b>' + (from ? 'dès ' : '') + eur(total) + '</b>' : '';
+  var totDur = grp.cart.reduce(function (t, e) { return t + (e.dur || 0); }, 0);
+  document.getElementById('kcart-total').innerHTML = grp.cart.length ? '<span>Total</span><b>' + formatMinutes(totDur) + ' · ' + (from ? 'dès ' : '') + eur(total) + '</b>' : '';
   document.getElementById('kcart-add').style.display = grp.people.length < GroupBooking.MAX_PEOPLE ? '' : 'none';
   document.getElementById('kcart-mail-fld').style.display = todo.length ? 'none' : '';
   var next = kCartNextPerson(), btn = document.getElementById('kcart-next-btn');
@@ -1130,7 +1133,8 @@ function kCartNext(btn) {
     document.getElementById('gt-sub').textContent = r.entries.length + ' places dans la file';
     document.getElementById('gt-list').innerHTML = r.entries.map(function (e) {
       var b = e.barber_id ? barbers.find(function (x) { return x.id === e.barber_id; }) : null;
-      var what = e.service.name + (e.extras.length ? ' + ' + e.extras.map(function (x) { return x.name; }).join(', ') : '');
+      var what = e.service.name + (e.extras.length ? ' + ' + e.extras.map(function (x) { return x.name; }).join(', ') : '') +
+        (e.total_duration_min ? ' · ' + formatMinutes(e.total_duration_min) : '');
       return '<div class="gt-row"><div class="gt-num">' + esc(e.position) + '</div><div class="gt-who"><b>' + esc(e.client_name) + '</b><span>' +
         esc(what) + ' · ' + esc(b ? b.name : 'Premier disponible') + '</span></div><div class="gt-wait">' + (e.estimated_wait_min > 0 ? '~' + esc(formatMinutes(e.estimated_wait_min)) : 'Tout de suite') + '</div></div>';
     }).join('');

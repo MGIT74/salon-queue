@@ -27,7 +27,7 @@ const PUB = { 'Content-Type': 'application/json', 'X-Salon-Slug': 'test' };
   const pl = GB.cartPayload(cart);
   check('cartPayload : « Moi » sans prenom (nom du client), produits en quantite 1', pl[0].name === '' && pl[1].name === 'Tom' && pl[0].products[0].id === 'p1' && pl[0].products[0].quantity === 1 && pl[0].extras[0] === 'e1' && pl[1].barber_id === 'b2' && pl[1].time === '11:00', pl);
   const rows = GB.cartRowsHtml(cart, (c) => (c / 100) + ' €', 'cart');
-  check('cartRowsHtml : heure, nom, prestation + supplement, coiffeur, produit, prix, Modifier / retirer', /10:00/.test(rows) && /Coupe \+ Soin · Alice/.test(rows) && /Produit : Gel/.test(rows) && /30 €/.test(rows) && /cartEdit\(0\)/.test(rows) && /cartRemove\(1\)/.test(rows));
+  check('cartRowsHtml : heure, nom, prestation + supplement, coiffeur, produit, prix, Modifier / retirer', /10:00/.test(rows) && /Coupe \+ Soin · Alice/.test(rows) && /Produit : Gel/.test(rows) && /30 €/.test(rows) && /min · /.test(rows) && /cartEdit\(0\)/.test(rows) && /cartRemove\(1\)/.test(rows));
 
   const pills = GB.peoplePillsHtml([{ name: 'Moi' }, { name: 'momo' }, { name: 'elo' }], [{ person: 0 }], 1, 'grpRemovePerson');
   check('pastilles : faite / en cours / a faire, chacune avec sa croix « ne vient plus »', /grp-pill done/.test(pills) && /grp-pill cur/.test(pills) && /grp-pill todo/.test(pills) && /grpRemovePerson\(2\)/.test(pills) && (pills.match(/grp-pill-x/g) || []).length === 3);

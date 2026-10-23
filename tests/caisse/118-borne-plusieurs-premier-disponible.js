@@ -57,6 +57,7 @@ const clean = () => sql(`DELETE FROM appointments WHERE client_name LIKE 'T118%'
   check('cadeau seulement pour une personne seule', /\(grp \? '' : giftTile\)/.test(k));
   check('par personne : coiffeur > prestation > supplements > produits, puis « Valider pour ... »', /function finalLabel\(\) \{ return grp \? 'Valider pour '/.test(k) && /if \(grp\) return kCartAddCurrent\(\);/.test(k));
   check('pastilles avec croix et panier dans le bandeau', /peoplePillsHtml\(grp\.people, grp\.cart, grp\.current, 'kRemovePerson'\)/.test(k) && /cartButtonHtml\(grp\.cart\.length, 'kShowCart\(\)'\)/.test(k));
+  check('durees toujours affichees : chaque personne, total du groupe, ticket', /formatMinutes\(e\.dur\) \+ ' · /.test(k) && /formatMinutes\(totDur\) \+ ' · '/.test(k) && /formatMinutes\(e\.total_duration_min\)/.test(k));
   check('inscription du groupe en une fois', /api\('\/api\/queue\/checkin-group'/.test(k));
   check('« Premier disponible » envoye sans coiffeur (seul ou a plusieurs)', /barber_id: selBarber \|\| null/.test(k) && /barber_id: e\.barber_id \|\| null/.test(k));
   check('« Client suivant » / veille : retour au 1er ecran', /grp = null; kNames = \[\];[\s\S]{0,400}show\('p-who'\);/.test(k));

@@ -741,7 +741,8 @@ body .tfx > button { transition: color .25s ease, transform .1s ease; }
 .cart-what { grid-area: what; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .cart-what b { font-size: 16px; }
 .cart-what span, .cart-what em { font-size: 13.5px; color: var(--grey); font-style: normal; }
-.cart-price { grid-area: price; font-weight: 600; font-variant-numeric: tabular-nums; }
+.cart-price { grid-area: price; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cart-price .cart-dur { font-weight: 500; color: var(--grey); }
 .cart-acts { grid-area: acts; display: flex; align-items: center; gap: 8px; }
 .cart-edit { border: none; background: none; color: var(--accent); font: inherit; font-size: 14px; font-weight: 600; padding: 0; cursor: pointer; }
 .cart-rm { margin-left: auto; border: none; background: none; color: var(--grey); padding: 4px; cursor: pointer; display: inline-flex; }

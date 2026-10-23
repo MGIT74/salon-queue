@@ -29,7 +29,7 @@
   html.auth-checking #p-login { display: none !important; }
   html.auth-checking #auth-layout { display: none !important; }
 </style>
-<link rel="stylesheet" href="/app.css?v=38">
+<link rel="stylesheet" href="/app.css?v=39">
 <script>
   // Applique tout de suite la couleur du salon si on l'a déjà vue lors
   // d'une visite précédente (cache localStorage par salon), plutôt que
@@ -693,7 +693,7 @@
 
 <script src="/app.js?v=30"></script>
 <script src="/autorefresh.js?v=2"></script>
-<script src="/group-booking.js?v=24"></script>
+<script src="/group-booking.js?v=25"></script>
 <style>
 .gb-done{padding:10px 0;border-bottom:1px solid var(--sep)}.gb-done:last-child{border:none}.gb-done b{display:block}.gb-done span{color:var(--grey);font-size:14px}
 #relatives-list{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
@@ -1197,7 +1197,8 @@ function renderBkCart() {
     ? bkGrp.cart.length + ' sur ' + bkGrp.people.length + ' — reste : ' + todo.map(function (p) { return p.name; }).join(', ')
     : (bkGrp.cart.length > 1 ? 'Tout le monde a son rendez-vous. Vérifiez puis terminez.' : 'Vérifiez puis terminez.');
   var total = bkGrp.cart.reduce(function (t, e) { return t + (e.price_cents || 0); }, 0);
-  document.getElementById('bk-cart-total').innerHTML = bkGrp.cart.length ? '<span>Total</span><b>' + eur(total) + '</b>' : '';
+  var totDur = bkGrp.cart.reduce(function (t, e) { return t + (e.dur || 0); }, 0);
+  document.getElementById('bk-cart-total').innerHTML = bkGrp.cart.length ? '<span>Total</span><b>' + formatMinutes(totDur) + ' · ' + eur(total) + '</b>' : '';
   document.getElementById('bk-cart-add').style.display = bkGrp.people.length < GroupBooking.MAX_PEOPLE ? '' : 'none';
   var next = bkCartNextPerson(), btn = document.getElementById('bk-cart-next-btn');
   btn.textContent = next === -1 ? 'Terminer' : (bkGrp.people[next].isSelf ? 'Continuer pour moi' : 'Continuer pour ' + bkGrp.people[next].name);

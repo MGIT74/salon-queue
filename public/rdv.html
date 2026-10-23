@@ -18,7 +18,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Prendre rendez-vous</title>
-<link rel="stylesheet" href="/app.css?v=38">
+<link rel="stylesheet" href="/app.css?v=39">
 <script>
   // Adresse SANS ?salon=... : on masque la page le temps de savoir si la plateforme heberge plusieurs salons
   // (voir guardMissingSalon) - pour ne jamais montrer, meme une fraction de seconde, un formulaire sans salon.
@@ -401,7 +401,7 @@
 </div>
 
 <script src="/app.js?v=30"></script>
-<script src="/group-booking.js?v=24"></script>
+<script src="/group-booking.js?v=25"></script>
 <style>
 body.staff-mode .gift-summary-box,body.staff-mode .theme-btn,body.staff-mode .login-hint{display:none!important}
 .login-hint{background:var(--fill);border-radius:14px;padding:12px 14px;margin:0 0 18px;font-size:14.5px;font-weight:600}
@@ -1156,7 +1156,8 @@ function renderCart() {
     ? grp.cart.length + ' sur ' + grp.people.length + ' — reste : ' + todo.map(function (p) { return p.name; }).join(', ')
     : (grp.cart.length > 1 ? 'Tout le monde a son rendez-vous. Vérifiez puis terminez.' : 'Vérifiez puis terminez.');
   var total = grp.cart.reduce(function (t, e) { return t + (e.price_cents || 0); }, 0);
-  document.getElementById('cart-total').innerHTML = grp.cart.length ? '<span>Total</span><b>' + eur(total) + '</b>' : '';
+  var totDur = grp.cart.reduce(function (t, e) { return t + (e.dur || 0); }, 0);
+  document.getElementById('cart-total').innerHTML = grp.cart.length ? '<span>Total</span><b>' + formatMinutes(totDur) + ' · ' + eur(total) + '</b>' : '';
   document.getElementById('cart-add').style.display = grp.people.length < GroupBooking.MAX_PEOPLE ? '' : 'none';
   var next = cartNextPerson(), btn = document.getElementById('cart-next-btn');
   btn.textContent = next === -1 ? 'Terminer' : (grp.people[next].isSelf && !STAFF_BRIDGE ? 'Continuer pour moi' : 'Continuer pour ' + grp.people[next].name);
