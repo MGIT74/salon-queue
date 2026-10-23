@@ -342,31 +342,33 @@ router.post('/manual-client/import-log', requireAdmin, wrap(async (req, res) => 
 }));
 
 // --- Public : check-in à la borne ---------------------------------------
-router.post('/checkin', signupRateLimiter('queue-checkin', { max: 12, windowMs: 15 * 60 * 1000, blockMs: 15 * 60 * 1000 }), wrap(async (req, res) => {
-  const { client_name, email, phone, service_id, barber_id, extras } = req.body;
-  if (!client_name) return res.status(400).json({ error: 'Le nom est requis' });
+// Une personne a inscrire dans la file : verifie tout AVANT d'ecrire quoi que ce soit (reutilise par l'inscription a
+// plusieurs, ou tout le groupe est verifie avant la premiere ecriture). Renvoie { error, status } ou { data }.
+async function validateCheckin(salonId, body, opts = {}) {
+  const { client_name, email, phone, service_id, barber_id, extras } = body;
+  if (!client_name) return { status: 400, error: 'Le nom est requis' };
   // Produits proposés à la borne avant la confirmation (même règle que pour un RDV en ligne : produit du salon,
   // actif et non « caisse seulement »). Une ligne invalide est ignorée, la quantité est bornée à 1-99.
-  const rawProducts = Array.isArray(req.body.products) ? req.body.products : [];
+  const rawProducts = Array.isArray(body.products) ? body.products : [];
   let productSelections = [];
   if (rawProducts.length) {
     const productIds = rawProducts.map((p) => p && p.id).filter(Boolean);
     const [prodRows] = productIds.length
-      ? await pool.query('SELECT id FROM products WHERE id IN (?) AND salon_id = ? AND active = 1 AND deleted_at IS NULL AND online_bookable = 1', [productIds, req.salon.id])
+      ? await pool.query('SELECT id FROM products WHERE id IN (?) AND salon_id = ? AND active = 1 AND deleted_at IS NULL AND online_bookable = 1', [productIds, salonId])
       : [[]];
     const validIds = new Set(prodRows.map((r) => r.id));
     productSelections = rawProducts
       .filter((p) => p && validIds.has(p.id))
       .map((p) => ({ id: p.id, quantity: Math.min(99, Math.max(1, Number(p.quantity) || 1)) }));
   }
-  if (!service_id) return res.status(400).json({ error: 'La prestation est requise' });
-  const [[service]] = await pool.query('SELECT id FROM services WHERE id = ? AND salon_id = ? AND active = 1', [service_id, req.salon.id]);
-  if (!service) return res.status(400).json({ error: 'Prestation indisponible dans ce salon' });
-  if (extras !== undefined && !Array.isArray(extras)) return res.status(400).json({ error: 'Suppléments invalides' });
+  if (!service_id) return { status: 400, error: 'La prestation est requise' };
+  const [[service]] = await pool.query('SELECT id FROM services WHERE id = ? AND salon_id = ? AND active = 1', [service_id, salonId]);
+  if (!service) return { status: 400, error: 'Prestation indisponible dans ce salon' };
+  if (extras !== undefined && extras !== null && !Array.isArray(extras)) return { status: 400, error: 'Suppléments invalides' };
   if (Array.isArray(extras) && extras.length) {
-    const [validExtras] = await pool.query('SELECT id FROM extras WHERE salon_id = ? AND active = 1 AND id IN (?)', [req.salon.id, extras]);
+    const [validExtras] = await pool.query('SELECT id FROM extras WHERE salon_id = ? AND active = 1 AND id IN (?)', [salonId, extras]);
     if (validExtras.length !== new Set(extras).size || validExtras.length !== extras.length) {
-      return res.status(400).json({ error: 'Supplément indisponible dans ce salon' });
+      return { status: 400, error: 'Supplément indisponible dans ce salon' };
     }
   }
 
@@ -374,53 +376,56 @@ router.post('/checkin', signupRateLimiter('queue-checkin', { max: 12, windowMs: 
   // à la fois dans la file (le code ne marque rien comme "utilisé" tant
   // que le passage n'est pas réellement encaissé) — sans ce garde-fou,
   // un même code pouvait être réutilisé un nombre illimité de fois
-  // avant ce moment-là.
-  const key = clientKey({ email, phone, client_name });
+  // avant ce moment-là. (Pas de cadeau dans une inscription a plusieurs : opts.noGift.)
+  const key = opts.noGift ? null : clientKey({ email, phone, client_name });
   if (key) {
     const [[unusedGift]] = await pool.query(
       'SELECT id FROM gift_cards WHERE salon_id = ? AND used_at IS NULL AND voided_at IS NULL AND ' +
       '(recipient_email = ? OR recipient_phone = ? OR recipient_name = ?) LIMIT 1',
-      [req.salon.id, email || '', phone || '', client_name]
+      [salonId, email || '', phone || '', client_name]
     );
     if (unusedGift) {
       const [existingRows] = await pool.query(
         `SELECT id, client_name, email, phone FROM queue
          WHERE salon_id = ? AND (status IN ('waiting','in_progress') OR (status = 'done' AND paid_at IS NULL))`,
-        [req.salon.id]
+        [salonId]
       );
       const alreadyActive = existingRows.some((r) => clientKey(r) === key);
       if (alreadyActive) {
-        return res.status(409).json({
-          error: 'Ce cadeau est déjà utilisé pour une visite en cours — impossible de le réutiliser tant que celle-ci n\'est pas terminée.'
-        });
+        return { status: 409, error: 'Ce cadeau est déjà utilisé pour une visite en cours — impossible de le réutiliser tant que celle-ci n\'est pas terminée.' };
       }
     }
   }
 
-  const id = crypto.randomUUID();
-
   // Le coiffeur choisi (si précisé) doit appartenir à CE salon - même
   // protection que pour les RDV (appointments.js), sinon un barber_id
   // d'un autre salon (deviné/connu) était accepté tel quel.
-  let checkinBarberId = barber_id || null;
+  // Sans coiffeur = « Premier disponible » : le premier coiffeur libre le prend (ordre d'arrivee, voir /:id/start).
+  const checkinBarberId = barber_id || null;
   if (checkinBarberId) {
     const [[ownedBarber]] = await pool.query(
-      'SELECT id FROM barbers WHERE id = ? AND salon_id = ? AND active = 1', [checkinBarberId, req.salon.id]
+      'SELECT id FROM barbers WHERE id = ? AND salon_id = ? AND active = 1', [checkinBarberId, salonId]
     );
-    if (!ownedBarber) return res.status(404).json({ error: 'Coiffeur introuvable' });
+    if (!ownedBarber) return { status: 404, error: 'Coiffeur introuvable' };
   }
+  return { data: { client_name: String(client_name), email: email || null, phone: phone || null, service_id, barberId: checkinBarberId,
+                   extras: Array.isArray(extras) ? extras : [], products: productSelections } };
+}
 
+// Ecrit une personne (deja verifiee) dans la file + l'agenda. offsetSec : decalage d'heure d'arrivee pour garder
+// l'ordre d'un groupe (heure a la seconde : sans cela, deux personnes inscrites ensemble auraient la meme heure).
+async function insertCheckin(salonId, d, offsetSec = 0) {
+  const id = crypto.randomUUID();
   await pool.query(
-    `INSERT INTO queue (id, salon_id, client_name, email, phone, service_id, barber_id, status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 'waiting')`,
-    [id, req.salon.id, client_name, email || null, phone || null, service_id, checkinBarberId]
+    `INSERT INTO queue (id, salon_id, client_name, email, phone, service_id, barber_id, status, checkin_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 'waiting', DATE_ADD(NOW(), INTERVAL ? SECOND))`,
+    [id, salonId, d.client_name, d.email, d.phone, d.service_id, d.barberId, offsetSec]
   );
-  if (Array.isArray(extras) && extras.length) {
-    const values = extras.map((extraId) => [id, extraId]);
-    await pool.query('INSERT INTO queue_extras (queue_id, extra_id) VALUES ?', [values]);
+  if (d.extras.length) {
+    await pool.query('INSERT INTO queue_extras (queue_id, extra_id) VALUES ?', [d.extras.map((extraId) => [id, extraId])]);
   }
-  if (productSelections.length) {
-    await pool.query('INSERT INTO queue_products (queue_id, product_id, quantity) VALUES ?', [productSelections.map((p) => [id, p.id, p.quantity])]);
+  if (d.products.length) {
+    await pool.query('INSERT INTO queue_products (queue_id, product_id, quantity) VALUES ?', [d.products.map((p) => [id, p.id, p.quantity])]);
   }
 
   // Synchronise avec l'agenda "Rendez-vous" : un client venu sans RDV
@@ -436,32 +441,66 @@ router.post('/checkin', signupRateLimiter('queue-checkin', { max: 12, windowMs: 
     // stockerait l'heure serveur (UTC) dans une colonne "heure locale",
     // et l'agenda (qui affiche scheduled_at tel quel, sans conversion)
     // se déciderait alors avec un décalage selon le fuseau du salon.
-    const settings = await getSettings(req.salon.id);
+    const settings = await getSettings(salonId);
     await pool.query(
       `INSERT INTO appointments (id, salon_id, barber_id, client_name, email, phone, service_id, scheduled_at, status, promoted_queue_id, source)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, 'walkin')`,
-      [apptId, req.salon.id, checkinBarberId, client_name, email || null, phone || null, service_id, nowParisDatetimeString(settings.timezone), id]
+      [apptId, salonId, d.barberId, d.client_name, d.email, d.phone, d.service_id, nowParisDatetimeString(settings.timezone), id]
     );
-    if (Array.isArray(extras) && extras.length) {
-      await pool.query(
-        'INSERT INTO appointment_extras (appointment_id, extra_id) VALUES ?',
-        [extras.map((extraId) => [apptId, extraId])]
-      );
+    if (d.extras.length) {
+      await pool.query('INSERT INTO appointment_extras (appointment_id, extra_id) VALUES ?', [d.extras.map((extraId) => [apptId, extraId])]);
     }
-    if (productSelections.length) {
-      await pool.query('INSERT INTO appointment_products (appointment_id, product_id, quantity) VALUES ?', [productSelections.map((p) => [apptId, p.id, p.quantity])]);
+    if (d.products.length) {
+      await pool.query('INSERT INTO appointment_products (appointment_id, product_id, quantity) VALUES ?', [d.products.map((p) => [apptId, p.id, p.quantity])]);
     }
   } catch (err) {
     // La file d'attente ne doit jamais échouer à cause de l'agenda —
     // on journalise et on continue, le check-in reste prioritaire.
     console.error('[checkin] synchronisation agenda échouée:', err.message);
   }
+  return id;
+}
+
+// Meme compteur pour une personne seule et pour un groupe : un groupe compte comme UNE inscription.
+const checkinLimiter = signupRateLimiter('queue-checkin', { max: 12, windowMs: 15 * 60 * 1000, blockMs: 15 * 60 * 1000 });
+
+router.post('/checkin', checkinLimiter, wrap(async (req, res) => {
+  const v = await validateCheckin(req.salon.id, req.body);
+  if (v.error) return res.status(v.status).json({ error: v.error });
+  const id = await insertCheckin(req.salon.id, v.data);
 
   await recompute(req.salon.id);
 
   const rows = await loadQueue(req.salon.id);
   const me = rows.find((r) => r.id === id);
   res.json({ ok: true, entry: me });
+}));
+
+// Inscription a plusieurs a la borne (un parent et ses enfants, des amis...) : chaque personne a sa propre place dans
+// la file, avec son coiffeur ou « Premier disponible ». Tout le groupe est verifie avant d'inscrire qui que ce soit.
+const MAX_GROUP = 6;
+router.post('/checkin-group', checkinLimiter, wrap(async (req, res) => {
+  const people = Array.isArray(req.body.people) ? req.body.people : [];
+  if (!people.length) return res.status(400).json({ error: 'Ajoutez au moins une personne.' });
+  if (people.length > MAX_GROUP) return res.status(400).json({ error: 'Maximum ' + MAX_GROUP + ' personnes.' });
+  const email = req.body.email ? String(req.body.email).trim().slice(0, 190) : null;
+  const checked = [];
+  for (let i = 0; i < people.length; i++) {
+    const p = people[i] || {};
+    const name = String(p.name == null ? '' : p.name).replace(/\s+/g, ' ').trim().slice(0, 100);
+    if (!name) return res.status(400).json({ error: 'Le prénom de la personne ' + (i + 1) + ' est requis.', person_index: i });
+    const v = await validateCheckin(req.salon.id, { client_name: name, email, phone: null, service_id: p.service_id, barber_id: p.barber_id,
+                                                    extras: p.extras, products: p.products }, { noGift: true });
+    if (v.error) return res.status(v.status).json({ error: name + ' : ' + v.error, person_index: i });
+    checked.push(v.data);
+  }
+  const ids = [];
+  for (let i = 0; i < checked.length; i++) ids.push(await insertCheckin(req.salon.id, checked[i], i));
+
+  await recompute(req.salon.id);
+
+  const rows = await loadQueue(req.salon.id);
+  res.json({ ok: true, entries: ids.map((id) => rows.find((r) => r.id === id)).filter(Boolean) });
 }));
 
 // --- Coiffeur : démarrer, terminer, annuler ------------------------------

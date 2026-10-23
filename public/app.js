@@ -1170,8 +1170,9 @@ function anyBarberTileHtml(selected, onclick) {
     '<span class="name">Premier disponible</span><span class="meta">On choisit pour vous</span></button>';
 }
 // Catalogue propose en « Premier disponible » : ce qu'au moins un coiffeur fait ; prix le plus bas, « dès » s'ils different.
-function anyBarberItems(barberList, kind, items) {
-  var list = (barberList || []).filter(function (b) { return b && b.accepts_appointments !== 0; });
+// keepAll : la borne (coiffeurs SANS RDV, qui n'acceptent pas forcement de RDV) prend tous les coiffeurs presents.
+function anyBarberItems(barberList, kind, items, keepAll) {
+  var list = (barberList || []).filter(function (b) { return b && (keepAll || b.accepts_appointments !== 0); });
   if (!list.length) return items.slice();
   var out = [];
   items.forEach(function (it) {

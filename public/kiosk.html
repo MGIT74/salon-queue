@@ -214,6 +214,28 @@
     .serving { flex: none; }
     .stage { justify-content: flex-start; }
   }
+  /* --- A plusieurs, « Premier disponible » --- */
+  .stage.grp-on { justify-content: flex-start; }
+  .grp-banner { flex: none; }
+  .any-tile .barber-fallback { background: linear-gradient(160deg, var(--accent), color-mix(in srgb, var(--accent) 70%, #000)); color: #fff; }
+  .any-tile .barber-fallback svg { width: 38%; height: 38%; margin-bottom: 18%; }
+  .any-tile .barber-name { color: #fff; }
+  .any-tile .barber-wait, .any-tile .barber-wait.free { color: rgba(255,255,255,.92); }
+  #p-who .eyebrow { text-align: center; }
+  .k-names { margin-bottom: 14px; }
+  .k-names .grp-pill { font-size: 16px; padding: 7px 6px 7px 14px; }
+  .k-cart .cart-row { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "what price" "acts acts"; }
+  .k-cart .cart-what b { font-size: 18px; }
+  .gt-list { display: flex; flex-direction: column; gap: 8px; text-align: left; }
+  .gt-row { display: flex; align-items: center; gap: 12px; background: var(--card); border-radius: 14px; padding: 12px 14px; }
+  .gt-row .gt-num { font-size: 28px; font-weight: 700; letter-spacing: -.03em; min-width: 44px; text-align: center; font-variant-numeric: tabular-nums; }
+  .gt-row .gt-who { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .gt-row .gt-who b { font-size: 16px; }
+  .gt-row .gt-who span { font-size: 13px; color: var(--grey); }
+  .gt-row .gt-wait { font-size: 14px; font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .gb-pick .eyebrow { font-size: clamp(21px,2.2vw,28px); }
+  .gb-pick .gb-choices { max-width: 720px; }
+
   /* --- Écran de veille --- */
   .idle-screen {
     position: fixed; inset: 0; z-index: 200; background: var(--bg);
@@ -259,7 +281,32 @@
 
   <main class="stage">
 
-    <section class="panel on" id="p-home">
+    <div class="grp-banner" id="grp-banner" style="display:none"></div>
+
+    <!-- 1er ecran : pour une personne, ou a plusieurs (memes 2 cartes que la reservation en ligne). -->
+    <section class="panel on gb-pick" id="p-who">
+      <div class="eyebrow">Qui vient se faire coiffer ?</div>
+      <div class="gb-choices">
+        <button type="button" class="gb-choice" onclick="kioskSolo()"><span class="gb-choice-ic"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg></span><span><b>Juste moi</b><em>Je prends ma place dans la file</em></span></button>
+        <button type="button" class="gb-choice" onclick="kioskMulti()"><span class="gb-choice-ic"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M17.5 14.2c2.3.3 3.5 2.2 3.5 5.8"/></svg></span><span><b>Plusieurs personnes</b><em>Enfants, amis, famille — jusqu'à 6</em></span></button>
+      </div>
+    </section>
+
+    <!-- A plusieurs : on tape le prenom de chaque personne (rien d'ajoute d'avance). -->
+    <section class="panel" id="p-names">
+      <button class="back" onclick="show('p-who')">‹ Retour</button>
+      <h1 class="ftitle">Qui vient ?</h1>
+      <p class="hero-sub" style="margin:-8px 0 18px">Ajoutez le prénom de chaque personne — jusqu'à 6.</p>
+      <div class="grp-pills k-names" id="names-pills"></div>
+      <div class="cart-add fld">
+        <input id="names-input" type="text" maxlength="60" placeholder="Prénom" autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();kNameAdd();}">
+        <button type="button" onclick="kNameAdd()">Ajouter</button>
+      </div>
+      <button class="go" id="names-next-btn" onclick="kNamesNext()" disabled>Continuer</button>
+    </section>
+
+    <section class="panel" id="p-home">
+      <button class="back" onclick="homeBack()">‹ Retour</button>
       <div class="eyebrow" id="eyebrow-home">Choisissez votre coiffeur</div>
       <div class="barber-grid" id="barber-grid"></div>
     </section>
@@ -339,7 +386,41 @@
           <span class="lab">Durée · total</span>
           <span class="val"><span class="tot-dur">0</span> min · <span class="tot-price">0,00 €</span></span>
         </div>
-        <button class="go" onclick="submitForm(this)">Confirmer</button>
+        <button class="go" id="products-go-btn" onclick="submitForm(this)">Confirmer</button>
+      </div>
+    </section>
+
+    <!-- A plusieurs : le groupe (une ligne par personne), « Modifier », la croix, ajouter quelqu'un, puis l'inscription. -->
+    <section class="panel" id="p-kcart">
+      <h1 class="ftitle">Votre groupe</h1>
+      <p class="hero-sub" id="kcart-sub" style="margin:-8px 0 16px"></p>
+      <div class="cart-list k-cart" id="kcart-list"></div>
+      <div class="grp-pills grp-pills-todo" id="kcart-todo"></div>
+      <div class="cart-add fld" id="kcart-add">
+        <input id="kcart-add-name" type="text" maxlength="60" placeholder="Ajouter une personne (prénom)" autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();kCartAddPerson();}">
+        <button type="button" onclick="kCartAddPerson()">Ajouter</button>
+      </div>
+      <div class="cart-total" id="kcart-total"></div>
+      <div class="fld" id="kcart-mail-fld"><label for="kcart-mail">Email — pour être prévenu avant votre tour (facultatif)</label>
+        <input id="kcart-mail" type="email" placeholder="vous@exemple.com" autocomplete="email"></div>
+      <button class="go" id="kcart-next-btn" onclick="kCartNext(this)">Continuer</button>
+    </section>
+
+    <!-- A plusieurs : une place dans la file par personne. -->
+    <section class="panel" id="p-gticket">
+      <div class="ticket">
+        <div class="ticket-top"><span class="t-salon-name"></span><span class="tt t-time-now">--:--</span></div>
+        <div class="ticket-body">
+          <div class="t-check"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+          <div class="t-name">C'est noté !</div>
+          <div class="t-service" id="gt-sub"></div>
+          <div class="gt-list" id="gt-list"></div>
+        </div>
+        <div class="perf"></div>
+        <div class="ticket-foot">
+          <p class="t-note" id="gt-note"></p>
+          <button class="next-btn" onclick="resetForm()">Client suivant</button>
+        </div>
       </div>
     </section>
 
@@ -365,7 +446,8 @@
   </main>
 </div>
 
-<script src="/app.js?v=29"></script>
+<script src="/app.js?v=30"></script>
+<script src="/group-booking.js?v=24"></script>
 <script>requireSalonInUrl("Pour utiliser cette borne, ouvrez le lien de votre salon.");</script>
 <script>
 mountThemeButton();
@@ -384,6 +466,7 @@ function prodById(id) { return products.find(function (p) { return p.id === id; 
 function show(id) {
   document.querySelectorAll('.panel').forEach(function (p) { p.classList.remove('on'); });
   document.getElementById(id).classList.add('on');
+  renderGrpBanner(id);
 }
 
 /* ---------- Chargement ---------- */
@@ -404,6 +487,7 @@ function loadCatalog() {
     applyAccentColor(r[2].accent_color);
     document.getElementById('salon-name').textContent = salonName;
     document.getElementById('t-salon').textContent = salonName;
+    document.querySelectorAll('.t-salon-name').forEach(function (el) { el.textContent = salonName; });
 
     renderIdleScreen();
 
@@ -438,8 +522,10 @@ function iconForItem(name) {
 
 function renderFormOptions() {
   var b = selBarber ? barbers.find(function (x) { return x.id === selBarber; }) : null;
-  var availableServices = kSvc = barberItems(b, 'services', services);
-  var availableExtras = kExt = barberItems(b, 'extras', extras);
+  // « Premier disponible » (selBarber === '') : ce qu'au moins un coiffeur present fait, prix « dès » s'ils different.
+  var anyB = selBarber === '';
+  var availableServices = kSvc = anyB ? anyBarberItems(barbers, 'services', services, true) : barberItems(b, 'services', services);
+  var availableExtras = kExt = anyB ? anyBarberItems(barbers, 'extras', extras, true) : barberItems(b, 'extras', extras);
 
   // Si le service choisi n'est plus disponible avec ce coiffeur, on
   // désélectionne pour éviter d'envoyer un choix invalide.
@@ -492,7 +578,7 @@ function goToExtrasStep() {
   if (!name) { toast('Entrez votre prénom', true); return; }
   if (!selService) { toast('Choisissez une prestation', true); return; }
   if (kExt.length) {
-    document.getElementById('extras-next-btn').textContent = products.length ? 'Suivant' : 'Confirmer';
+    document.getElementById('extras-next-btn').textContent = products.length ? 'Suivant' : finalLabel();
     show('p-form-extras');
   } else if (products.length) {
     show('p-form-products');
@@ -506,8 +592,12 @@ function afterExtrasStep(btn) {
 function backFromProducts() { show(kExt.length ? 'p-form-extras' : 'p-form'); }
 function updateStep1Label() {
   var btn = document.getElementById('step1-next-btn');
-  if (btn) btn.textContent = (kExt.length || products.length) ? 'Suivant' : 'Confirmer';
+  if (btn) btn.textContent = (kExt.length || products.length) ? 'Suivant' : finalLabel();
+  var pb = document.getElementById('products-go-btn');
+  if (pb) pb.textContent = finalLabel();
 }
+// Derniere etape : « Confirmer » pour une personne seule ; a plusieurs, on valide la personne en cours (puis le groupe).
+function finalLabel() { return grp ? 'Valider pour ' + grp.people[grp.current].name : 'Confirmer'; }
 
 function refresh() {
   return Promise.all([api('/api/queue'), api('/api/barbers')]).then(function (r) {
@@ -644,7 +734,18 @@ function renderBarberGrid() {
     '<div class="barber-overlay"><div class="barber-name">Utiliser un cadeau</div></div>' +
     '</button>';
 
-  document.getElementById('barber-grid').innerHTML = giftTile + barbers.map(function (b) {
+  // « Premier disponible » : seulement s'il y a au moins 2 coiffeurs sans RDV presents (un seul : rien a choisir).
+  // Le client garde sa place dans la file generale ; le premier coiffeur qui se libere le prend.
+  var anyTile = '';
+  if (barbers.length >= 2) {
+    var aw = waitForBarber(null);
+    anyTile = '<button class="barber-card any-tile" onclick="pickBarberAndGo(\'\')">' +
+      '<div class="barber-fallback"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="m15.5 11 2 2 4-4.5"/></svg></div>' +
+      '<div class="barber-overlay"><div class="barber-name">Premier disponible</div>' +
+      '<div class="barber-wait' + (aw === 0 ? ' free' : '') + '">' + (aw === 0 ? 'Disponible' : formatMinutes(aw)) + '</div></div></button>';
+  }
+  // Le cadeau reste pour une personne seule.
+  document.getElementById('barber-grid').innerHTML = (grp ? '' : giftTile) + anyTile + barbers.map(function (b) {
     var w = waitForBarber(b.id);
     var over = isOverrun(b.id);
     var free = w === 0;
@@ -710,9 +811,11 @@ function pickBarberAndGo(id) {
     return;
   }
 
-  document.getElementById('chosen-barber-note').innerHTML = b
-    ? 'Avec <b>' + esc(b.name) + '</b>'
-    : '';
+  var withWho = b ? 'Avec <b>' + esc(b.name) + '</b>' : (id === '' ? 'Avec le <b>premier coiffeur disponible</b>' : '');
+  document.getElementById('chosen-barber-note').innerHTML = withWho;
+  // A plusieurs : le prenom est deja connu (et l'email est demande une seule fois, a la fin).
+  document.querySelector('#p-form .row2').style.display = grp ? 'none' : '';
+  document.querySelector('#p-form .ftitle').textContent = grp ? 'Que fait ' + grp.people[grp.current].name + ' ?' : 'Vos informations';
   renderFormOptions();
   show('p-form');
 }
@@ -739,7 +842,7 @@ function submitGiftCheckin(b) {
       email: activeGift.recipient_email || null,
       phone: activeGift.recipient_phone || null,
       service_id: serviceItem.item_id,
-      barber_id: selBarber,
+      barber_id: selBarber || null,
       extras: extraItems.map(function (it) { return it.item_id; }).filter(Boolean)
     }
   }).then(function (r) {
@@ -806,6 +909,7 @@ function renderTotals() {
 
 /* ---------- Envoi ---------- */
 function submitForm(btn) {
+  if (grp) return kCartAddCurrent();
   var name = document.getElementById('f-name').value.trim();
   var mail = document.getElementById('f-mail').value.trim();
   if (!name) { toast('Merci d\'indiquer votre prénom', true); return; }
@@ -821,7 +925,7 @@ function submitForm(btn) {
       client_name: name,
       email: mail || null,
       service_id: selService,
-      barber_id: selBarber,
+      barber_id: selBarber || null,
       extras: selExtras,
       products: selProducts.map(function (id) { return { id: id, quantity: 1 }; })
     }
@@ -853,8 +957,196 @@ function resetForm() {
   selExtras = []; selProducts = []; selBarber = null; selService = null;
   document.querySelectorAll('#svc-grid .item-card, #extras-grid .item-card, #products-grid .item-card').forEach(function (c) { c.classList.remove('sel'); c.setAttribute('aria-pressed', 'false'); });
   document.querySelectorAll('.svc-card').forEach(function (c) { c.classList.remove('sel'); });
+  grp = null; kNames = [];
+  document.getElementById('kcart-mail').value = '';
+  document.getElementById('eyebrow-home').textContent = 'Choisissez votre coiffeur';
+  document.querySelector('#p-form .row2').style.display = '';
+  document.querySelector('#p-form .ftitle').textContent = 'Vos informations';
   renderTotals(); renderBarberGrid();
+  show('p-who');
+}
+
+/* ---------- Une personne / plusieurs personnes ---------- */
+var grp = null;     // { people: [{ name }], cart: [ligne], current: index dans people, editIndex: index dans cart | -1 }
+var kNames = [];    // prenoms tapes sur l'ecran « Qui vient ? »
+
+function kioskSolo() {
+  grp = null;
+  document.getElementById('eyebrow-home').textContent = activeGift ? 'Choisissez votre coiffeur pour utiliser votre cadeau' : 'Choisissez votre coiffeur';
+  renderBarberGrid();
   show('p-home');
+}
+function homeBack() {
+  if (activeGift) { activeGift = null; document.getElementById('eyebrow-home').textContent = 'Choisissez votre coiffeur'; }
+  if (!grp) return show('p-who');
+  if (grp.cart.length) { renderKCart(); return show('p-kcart'); }
+  kNames = grp.people.map(function (p) { return p.name; }); grp = null;
+  renderNames(); show('p-names');
+}
+function kioskMulti() { kNames = []; renderNames(); show('p-names'); setTimeout(function () { document.getElementById('names-input').focus(); }, 50); }
+function renderNames() {
+  document.getElementById('names-pills').innerHTML = GroupBooking.peoplePillsHtml(kNames.map(function (n) { return { name: n }; }), [], -1, 'kNameRemove');
+  var n = kNames.length, btn = document.getElementById('names-next-btn');
+  btn.disabled = n < 1;
+  btn.textContent = n > 1 ? 'Continuer avec ' + n + ' personnes' : 'Continuer';
+  var inp = document.getElementById('names-input');
+  inp.disabled = n >= GroupBooking.MAX_PEOPLE;
+  inp.placeholder = n >= GroupBooking.MAX_PEOPLE ? 'Maximum ' + GroupBooking.MAX_PEOPLE + ' personnes' : 'Prénom';
+}
+function kNameAdd() {
+  var inp = document.getElementById('names-input'), n = inp.value.replace(/\s+/g, ' ').trim();
+  if (!n) return;
+  if (kNames.length >= GroupBooking.MAX_PEOPLE) { toast('Maximum ' + GroupBooking.MAX_PEOPLE + ' personnes.', true); return; }
+  kNames.push(n); inp.value = ''; renderNames(); inp.focus();
+}
+function kNameRemove(i) { kNames.splice(i, 1); renderNames(); }
+function kNamesNext() {
+  kNameAdd();   // un prenom tape mais pas encore « Ajouté » compte aussi
+  if (!kNames.length) return;
+  grp = { people: kNames.map(function (n) { return { name: n }; }), cart: [], current: 0, editIndex: -1 };
+  kBeginPerson(0);
+}
+
+// Parcours normal (coiffeur > prestation > supplements > produits) pour UNE personne du groupe.
+function kBeginPerson(i, entry) {
+  grp.current = i;
+  grp.editIndex = entry ? grp.cart.indexOf(entry) : -1;
+  selBarber = null; selService = null; selExtras = []; selProducts = [];
+  document.getElementById('f-name').value = grp.people[i].name;
+  if (entry) { selBarber = entry.barber_id; selService = entry.service_id; selExtras = entry.extras.slice(); selProducts = entry.products.slice(); }
+  renderFormOptions();
+  document.getElementById('eyebrow-home').textContent = 'Choisissez le coiffeur de ' + grp.people[i].name;
+  renderBarberGrid();
+  show('p-home');
+}
+
+function renderGrpBanner(panelId) {
+  var el = document.getElementById('grp-banner');
+  var steps = ['p-home', 'p-form', 'p-form-extras', 'p-form-products'];
+  var on = !!grp && steps.indexOf(panelId) !== -1;
+  document.querySelector('.stage').classList.toggle('grp-on', on);
+  if (!on) { el.style.display = 'none'; return; }
+  var p = grp.people[grp.current];
+  el.innerHTML = '<span class="grp-who">Pour <b>' + esc(p.name) + '</b></span>' +
+    '<span class="grp-step">' + (grp.current + 1) + ' sur ' + grp.people.length + '</span>' +
+    (grp.cart.length ? GroupBooking.cartButtonHtml(grp.cart.length, 'kShowCart()') : '') +
+    '<div class="grp-pills">' + GroupBooking.peoplePillsHtml(grp.people, grp.cart, grp.current, 'kRemovePerson') + '</div>';
+  el.style.display = '';
+}
+function kShowCart() { renderKCart(); show('p-kcart'); }
+
+function kCartAddCurrent() {
+  if (!selService) { toast('Choisissez une prestation', true); return; }
+  var s = svcById(selService), b = selBarber ? barbers.find(function (x) { return x.id === selBarber; }) : null;
+  var ex = selExtras.map(extById).filter(Boolean), pr = selProducts.map(prodById).filter(Boolean);
+  var p = grp.people[grp.current];
+  var e = {
+    person: grp.current, name: p.name, barber_id: selBarber || '', barber_name: b ? b.name : 'Premier disponible',
+    service_id: selService, service_name: s ? s.name : '', extras: ex.map(function (x) { return x.id; }), extra_names: ex.map(function (x) { return x.name; }),
+    products: pr.map(function (x) { return x.id; }), product_names: pr.map(function (x) { return x.name; }),
+    price_from: !!(s && s.price_from),
+    price_cents: (s ? Number(s.price_cents) || 0 : 0) + ex.reduce(function (t, x) { return t + (Number(x.price_cents) || 0); }, 0) + pr.reduce(function (t, x) { return t + (Number(x.price_cents) || 0); }, 0)
+  };
+  // Une seule ligne par personne : « Modifier » remplace la sienne.
+  var k = -1; grp.cart.forEach(function (x, j) { if (x.person === e.person) k = j; });
+  if (k >= 0) grp.cart[k] = e; else grp.cart.push(e);
+  grp.editIndex = -1;
+  kShowCart();
+}
+function kCartNextPerson() {
+  for (var i = 0; i < grp.people.length; i++) if (!grp.cart.some(function (e) { return e.person === i; })) return i;
+  return -1;
+}
+function renderKCart() {
+  grp.cart.sort(function (a, b) { return a.person - b.person; });
+  document.getElementById('kcart-list').innerHTML = grp.cart.map(function (e, i) {
+    var what = e.service_name + (e.extra_names.length ? ' + ' + e.extra_names.join(', ') : '');
+    var prod = e.product_names.length ? '<em>Produit' + (e.product_names.length > 1 ? 's' : '') + ' : ' + esc(e.product_names.join(', ')) + '</em>' : '';
+    return '<div class="cart-row"><div class="cart-what"><b>' + esc(e.name) + '</b><span>' + esc(what) + ' · ' + esc(e.barber_name) + '</span>' + prod + '</div>' +
+      '<div class="cart-price">' + (e.price_from ? 'dès ' : '') + eur(e.price_cents) + '</div>' +
+      '<div class="cart-acts"><button type="button" class="cart-edit" onclick="kCartEdit(' + i + ')">Modifier</button>' +
+      '<button type="button" class="cart-rm" aria-label="Retirer ' + esc(e.name) + '" onclick="kRemovePerson(' + e.person + ')"><svg class="gb-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div></div>';
+  }).join('');
+  var todoHtml = GroupBooking.peoplePillsHtml(grp.people, grp.cart, -1, 'kRemovePerson', true);
+  document.getElementById('kcart-todo').innerHTML = todoHtml ? '<span class="grp-pills-lbl">Reste à choisir :</span>' + todoHtml : '';
+  var todo = grp.people.filter(function (p, i) { return !grp.cart.some(function (e) { return e.person === i; }); });
+  document.getElementById('kcart-sub').textContent = todo.length
+    ? grp.cart.length + ' sur ' + grp.people.length + ' — reste : ' + todo.map(function (p) { return p.name; }).join(', ')
+    : 'Tout le monde est prêt. Vérifiez puis prenez vos places dans la file.';
+  var total = grp.cart.reduce(function (t, e) { return t + (e.price_cents || 0); }, 0);
+  var from = grp.cart.some(function (e) { return e.price_from; });
+  document.getElementById('kcart-total').innerHTML = grp.cart.length ? '<span>Total</span><b>' + (from ? 'dès ' : '') + eur(total) + '</b>' : '';
+  document.getElementById('kcart-add').style.display = grp.people.length < GroupBooking.MAX_PEOPLE ? '' : 'none';
+  document.getElementById('kcart-mail-fld').style.display = todo.length ? 'none' : '';
+  var next = kCartNextPerson(), btn = document.getElementById('kcart-next-btn');
+  btn.textContent = next === -1 ? (grp.cart.length > 1 ? 'Prendre nos ' + grp.cart.length + ' places' : 'Prendre ma place') : 'Continuer pour ' + grp.people[next].name;
+  btn.disabled = next === -1 && !grp.cart.length;
+}
+function kCartEdit(i) { var e = grp.cart[i]; if (e) kBeginPerson(e.person, e); }
+function kCartAddPerson() {
+  var inp = document.getElementById('kcart-add-name'), n = inp.value.replace(/\s+/g, ' ').trim();
+  if (!n) return;
+  if (grp.people.length >= GroupBooking.MAX_PEOPLE) { toast('Maximum ' + GroupBooking.MAX_PEOPLE + ' personnes.', true); return; }
+  grp.people.push({ name: n }); inp.value = '';
+  renderKCart();
+}
+// Une personne ne vient plus : on l'enleve tout de suite (avec ses choix), sans finir son parcours.
+function kRemovePerson(pi) {
+  if (!grp || !grp.people[pi]) return;
+  var wasCurrent = pi === grp.current;
+  var onCart = document.getElementById('p-kcart').classList.contains('on');
+  grp.cart = grp.cart.filter(function (e) { return e.person !== pi; });
+  grp.cart.forEach(function (e) { if (e.person > pi) e.person--; });
+  grp.people.splice(pi, 1);
+  if (grp.current > pi) grp.current--;
+  if (!grp.people.length) { grp = null; kNames = []; renderNames(); return show('p-names'); }
+  if (wasCurrent && !onCart) {
+    var next = kCartNextPerson();
+    if (next !== -1 && !grp.cart.length) return kBeginPerson(next);
+    return kShowCart();
+  }
+  if (grp.current >= grp.people.length) grp.current = grp.people.length - 1;
+  renderKCart();
+  var on = document.querySelector('.panel.on');
+  renderGrpBanner(on ? on.id : '');
+}
+function kCartNext(btn) {
+  var next = kCartNextPerson();
+  if (next !== -1) return kBeginPerson(next);
+  if (!grp.cart.length) return;
+  var mail = document.getElementById('kcart-mail').value.trim();
+  var label = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Enregistrement…';
+  api('/api/queue/checkin-group', {
+    method: 'POST',
+    body: {
+      email: mail || null,
+      people: grp.cart.map(function (e) {
+        return { name: e.name, service_id: e.service_id, barber_id: e.barber_id || null, extras: e.extras,
+                 products: e.products.map(function (id) { return { id: id, quantity: 1 }; }) };
+      })
+    }
+  }).then(function (r) {
+    document.getElementById('gt-sub').textContent = r.entries.length + ' places dans la file';
+    document.getElementById('gt-list').innerHTML = r.entries.map(function (e) {
+      var b = e.barber_id ? barbers.find(function (x) { return x.id === e.barber_id; }) : null;
+      var what = e.service.name + (e.extras.length ? ' + ' + e.extras.map(function (x) { return x.name; }).join(', ') : '');
+      return '<div class="gt-row"><div class="gt-num">' + esc(e.position) + '</div><div class="gt-who"><b>' + esc(e.client_name) + '</b><span>' +
+        esc(what) + ' · ' + esc(b ? b.name : 'Premier disponible') + '</span></div><div class="gt-wait">' + (e.estimated_wait_min > 0 ? '~' + esc(formatMinutes(e.estimated_wait_min)) : 'Tout de suite') + '</div></div>';
+    }).join('');
+    document.getElementById('gt-note').innerHTML = mail
+      ? 'On vous écrit à <b>' + esc(mail) + '</b> avant chaque passage. Vous pouvez sortir, vos places sont gardées.'
+      : 'Sans email, pensez à surveiller l\'écran de la salle d\'attente.';
+    grp = null;
+    show('p-gticket');
+    refresh();
+  }).catch(function (err) {
+    toast(err.message, true);
+    // Une personne pose probleme (prestation retiree entre-temps...) : on la rouvre directement.
+    if (err.data && typeof err.data.person_index === 'number' && grp.cart[err.data.person_index]) kCartEdit(err.data.person_index);
+  }).finally(function () {
+    btn.disabled = false; btn.textContent = label;
+  });
 }
 
 /* ---------- Horloge ---------- */
@@ -863,6 +1155,7 @@ function tick() {
   var t = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
   document.getElementById('clock').textContent = t;
   document.getElementById('t-time').textContent = t;
+  document.querySelectorAll('.t-time-now').forEach(function (el) { el.textContent = t; });
   renderBoard();
   renderIdleWait();
 }

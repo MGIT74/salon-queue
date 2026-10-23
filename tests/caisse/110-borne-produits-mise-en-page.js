@@ -45,7 +45,7 @@ const PUB = { 'Content-Type': 'application/json', 'X-Salon-Slug': 'test' };
   check('accueil centre sans couper le haut', /\.stage \{ justify-content: safe center; \}/.test(html));
   check('recherche des supplements et produits', /id="extras-q"/.test(html) && /id="products-q"/.test(html));
   check('tarif du coiffeur applique a la borne', /barberItems\(b, 'services', services\)/.test(html));
-  check('bouton : Confirmer quand il n\'y a plus d\'etape', /'Suivant' : 'Confirmer'/.test(html));
+  check('bouton : Confirmer quand il n\'y a plus d\'etape (a plusieurs : « Valider pour ... »)', /'Suivant' : finalLabel\(\)/.test(html) && /: 'Confirmer'; \}/.test(html));
 
   sql(`DELETE FROM queue_products WHERE product_id LIKE 't110%'; DELETE FROM appointment_products WHERE product_id LIKE 't110%';
        DELETE FROM appointments WHERE client_name IN ('Borne110','Borne110b'); DELETE FROM queue_extras WHERE queue_id IN (SELECT id FROM queue WHERE client_name IN ('Borne110','Borne110b'));
