@@ -537,6 +537,40 @@ async function walkinOrderGuard(salonId, row, barberId, forced) {
   return null;
 }
 
+// Timer de la caisse : changer l'ordre des clients SANS RDV qui attendent (glisser-deposer). Les clients recoivent les
+// memes heures d'arrivee qu'avant, dans le nouvel ordre : leur place par rapport aux RDV et aux autres ne bouge pas,
+// seul leur ordre entre eux change (file, borne, ecran TV, « arrive avant » suivent). Un coiffeur connecte par PIN ne
+// deplace que les clients qu'il peut prendre (les siens, et ceux sans coiffeur s'il est sans RDV aujourd'hui).
+router.post('/reorder', requireAdminOrBarber, wrap(async (req, res) => {
+  const ids = Array.isArray(req.body.ids) ? req.body.ids.map(String) : [];
+  if (ids.length < 2 || ids.length > 100 || new Set(ids).size !== ids.length) return res.status(400).json({ error: 'Ordre invalide' });
+  const [rows] = await pool.query(
+    "SELECT id, barber_id, is_appointment, status, DATE_FORMAT(checkin_at, '%Y-%m-%d %H:%i:%s') AS t FROM queue WHERE salon_id = ? AND id IN (?)",
+    [req.salon.id, ids]
+  );
+  if (rows.length !== ids.length) return res.status(404).json({ error: 'Client introuvable' });
+  if (rows.some((r) => r.status !== 'waiting')) return res.status(409).json({ error: 'Un de ces clients n\'attend plus : rafraîchissez la liste.' });
+  if (rows.some((r) => r.is_appointment)) return res.status(400).json({ error: 'Seuls les clients sans RDV peuvent être déplacés.' });
+  if (req.actingBarberId) {
+    const walkin = await takesWalkinsToday(req.salon.id, req.actingBarberId);
+    if (rows.some((r) => (r.barber_id ? r.barber_id !== req.actingBarberId : !walkin))) {
+      return res.status(403).json({ error: 'Vous ne pouvez déplacer que vos propres clients.' });
+    }
+  }
+  // Memes heures, nouvel ordre ; une seconde d'ecart minimum pour que l'ordre soit toujours net.
+  const times = rows.map((r) => r.t).sort();
+  const toSec = (t) => Math.floor(new Date(t.replace(' ', 'T') + 'Z').getTime() / 1000);
+  let prev = -Infinity;
+  for (let i = 0; i < ids.length; i++) {
+    const sec = Math.max(toSec(times[i]), prev + 1);
+    prev = sec;
+    const iso = new Date(sec * 1000).toISOString().slice(0, 19).replace('T', ' ');
+    await pool.query('UPDATE queue SET checkin_at = ? WHERE id = ? AND salon_id = ?', [iso, ids[i], req.salon.id]);
+  }
+  await recompute(req.salon.id);
+  res.json({ ok: true });
+}));
+
 router.post('/:id/start', requireAdminOrBarber, wrap(async (req, res) => {
   const [[row]] = await pool.query(
     'SELECT id, barber_id, checkin_at, status, is_appointment FROM queue WHERE id = ? AND salon_id = ?',

@@ -164,6 +164,16 @@
 
   .section-label { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--grey); margin: 0 0 12px 2px; }
   .next-item { margin-bottom: 10px; }
+  /* Glisser-deposer des clients sans RDV (poignee a gauche) */
+  .next-item { position: relative; }
+  .next-zone-sorting .next-item { transition: transform .2s ease; user-select: none; -webkit-user-select: none; }
+  .next-zone-sorting .next-item.dragging { transition: none; z-index: 5; }
+  .next-item.dragging .next-card { box-shadow: 0 14px 34px rgba(0,0,0,.35), 0 0 0 2px var(--accent, var(--blue)); transform: scale(1.015); opacity: 1; }
+  .next-item.settling { transition: transform .18s ease !important; }
+  .drag-h { display: inline-flex; align-items: center; justify-content: center; align-self: stretch; width: 26px; margin: -10px 0 -10px -8px;
+            color: var(--grey); cursor: grab; touch-action: none; border-radius: 8px; flex-shrink: 0; }
+  .drag-h:hover { color: var(--ink); background: var(--fill); }
+  .next-item.dragging .drag-h { cursor: grabbing; color: var(--accent, var(--blue)); }
   .next-card {
     background: var(--card); border-radius: 16px; padding: 18px;
     box-shadow: var(--shadow); display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;
@@ -1761,10 +1771,13 @@ function renderNext() {
 
   var userIsEditing = zone.contains(document.activeElement) && document.activeElement !== document.body;
   if (userIsEditing && zone.children.length) return;
+  if (timerDrag) return;   // un client est en train d'etre deplace : on ne redessine pas sous le doigt
 
   var mine = queue.filter(function (q) {
     return q.status === 'waiting' && canTakeQueueEntry(q, activeBarberId, allBarbers);
   }).sort(function (a, b) { return new Date(a.checkin_at) - new Date(b.checkin_at); });
+  // Seuls les clients sans RDV se deplacent (les RDV gardent leur heure), et il en faut au moins 2.
+  var canSort = mine.filter(function (q) { return !q.is_appointment; }).length >= 2;
 
   if (mine.length === 0) {
     zone.innerHTML = '<div class="empty">Personne en attente pour ce coiffeur pour le moment</div>';
@@ -1789,8 +1802,11 @@ function renderNext() {
     var appointmentBadge = (q.is_appointment && !isAppointmentNotYet)
       ? '<div class="meta" style="color:var(--blue)">RDV ' + new Date(q.checkin_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) + '</div>'
       : '';
-    return '<div class="next-item" data-id="' + q.id + '">' +
+    var sortable = canSort && !q.is_appointment;
+    return '<div class="next-item" data-id="' + q.id + '"' + (sortable ? ' data-walk="1"' : '') + '>' +
       '<div class="next-card' + (locked ? ' locked' : '') + (prepAlert ? ' prep-alert' : '') + '">' +
+        (sortable ? '<span class="drag-h" title="Glisser pour changer l\'ordre" aria-label="Déplacer ' + esc(q.client_name) + '" onpointerdown="timerDragStart(event, \'' + q.id + '\')">' +
+          '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></span>' : '') +
         '<div class="next-info" onclick="openNextClient(\'' + q.id + '\')">' +
           '<div class="name">' + queueSourceIconHtml(q) + esc(q.client_name) + '</div>' +
           '<div class="meta">' + esc(detail) + '</div>' +
@@ -1819,6 +1835,70 @@ function renderNext() {
       '</div>' +
     '</div>';
   }).join('');
+}
+
+/* ---------- Timer : changer l'ordre des clients sans RDV (glisser-deposer) ----------
+   On attrape la poignee, la carte suit le doigt, les autres clients sans RDV glissent pour faire la place ; au lacher,
+   le nouvel ordre est enregistre (POST /api/queue/reorder) : file, borne et ecran TV suivent. */
+var timerDrag = null;
+function timerDragStart(ev, id) {
+  if (ev.button !== undefined && ev.button !== 0) return;
+  var zone = document.getElementById('next-zone');
+  var items = Array.prototype.slice.call(zone.querySelectorAll('.next-item[data-walk="1"]'));
+  var el = zone.querySelector('.next-item[data-id="' + id + '"]');
+  var from = items.indexOf(el);
+  if (from === -1 || items.length < 2) return;
+  ev.preventDefault();
+  var rects = items.map(function (it) { return it.getBoundingClientRect(); });
+  timerDrag = { id: id, el: el, items: items, from: from, to: from, startY: ev.clientY, tops: rects.map(function (r) { return r.top; }),
+                mids: rects.map(function (r) { return r.top + r.height / 2; }), handle: ev.currentTarget };
+  try { ev.currentTarget.setPointerCapture(ev.pointerId); } catch (e) {}
+  zone.classList.add('next-zone-sorting');
+  el.classList.add('dragging');
+  window.addEventListener('pointermove', timerDragMove);
+  window.addEventListener('pointerup', timerDragEnd);
+  window.addEventListener('pointercancel', timerDragEnd);
+}
+function timerDragMove(ev) {
+  var d = timerDrag; if (!d) return;
+  var dy = ev.clientY - d.startY;
+  d.el.style.transform = 'translateY(' + dy + 'px)';
+  var center = d.mids[d.from] + dy, to = 0, best = Infinity;
+  d.mids.forEach(function (m, i) { var dist = Math.abs(center - m); if (dist < best) { best = dist; to = i; } });
+  d.to = to;
+  d.items.forEach(function (it, k) {
+    if (k === d.from) return;
+    var shift = 0;
+    if (d.from < to && k > d.from && k <= to) shift = d.tops[k - 1] - d.tops[k];
+    else if (to < d.from && k >= to && k < d.from) shift = d.tops[k + 1] - d.tops[k];
+    it.style.transform = shift ? 'translateY(' + shift + 'px)' : '';
+  });
+}
+function timerDragEnd() {
+  var d = timerDrag; if (!d) return;
+  window.removeEventListener('pointermove', timerDragMove);
+  window.removeEventListener('pointerup', timerDragEnd);
+  window.removeEventListener('pointercancel', timerDragEnd);
+  // La carte se pose dans sa nouvelle place, puis on redessine la liste dans le nouvel ordre.
+  d.el.classList.add('settling');
+  d.el.style.transform = d.to === d.from ? '' : 'translateY(' + (d.tops[d.to] - d.tops[d.from]) + 'px)';
+  setTimeout(function () {
+    var zone = document.getElementById('next-zone');
+    zone.classList.remove('next-zone-sorting');
+    d.items.forEach(function (it) { it.style.transform = ''; it.classList.remove('dragging', 'settling'); });
+    timerDrag = null;
+    if (d.to === d.from) return;
+    var ids = d.items.map(function (it) { return it.dataset.id; });
+    ids.splice(d.to, 0, ids.splice(d.from, 1)[0]);
+    // Tout de suite a l'ecran : les memes heures d'arrivee, dans le nouvel ordre (le serveur fait pareil).
+    var entries = ids.map(function (x) { return queue.find(function (q) { return q.id === x; }); }).filter(Boolean);
+    var times = entries.map(function (q) { return q.checkin_at; }).sort(function (a, b) { return new Date(a) - new Date(b); });
+    entries.forEach(function (q, i) { q.checkin_at = times[i]; });
+    renderNext();
+    barberApi('/api/queue/reorder', { method: 'POST', body: { ids: ids } })
+      .then(function () { toast('Ordre mis à jour'); refreshTimer(); })
+      .catch(function (e) { toast(e.message, true); refreshTimer(); });
+  }, 190);
 }
 
 /** Client déjà réglé (encaissé à l'avance) : le coiffeur le voit dans la liste, son tour ne change pas. */
