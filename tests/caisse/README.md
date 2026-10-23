@@ -149,4 +149,5 @@ node tests/caisse/115-premier-disponible.js  # « Premier disponible » : le sys
 node tests/caisse/116-rdv-indicatif-telephone.js  # Prise de RDV (seul / a plusieurs) : indicatif pays du telephone, comme a la creation de compte
 node tests/caisse/117-site-salon-redirection.js  # Reglages > General : site du salon ; redirection apres une prise de RDV en ligne (rdv.html seulement)
 node tests/caisse/118-borne-plusieurs-premier-disponible.js  # Borne : « Juste moi / Plusieurs personnes », groupe inscrit en une fois ; « Premier disponible » des 2 coiffeurs (le premier libre le prend)
+node tests/caisse/119-file-sans-coiffeur-coiffeurs-sans-rdv.js  # File : client sans coiffeur (sans RDV) pris seulement par les coiffeurs sans RDV du jour (caisse, Mon poste, serveur)
 ```

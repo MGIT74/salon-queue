@@ -1170,6 +1170,18 @@ function anyBarberTileHtml(selected, onclick) {
     '<span class="name">Premier disponible</span><span class="meta">On choisit pour vous</span></button>';
 }
 // Catalogue propose en « Premier disponible » : ce qu'au moins un coiffeur fait ; prix le plus bas, « dès » s'ils different.
+// File d'attente : un client SANS coiffeur venu sans RDV (« Premier disponible ») n'est pris que par un coiffeur
+// sans RDV aujourd'hui (mode sans RDV, ou jour « sans RDV » de son calendrier) ; un RDV promu sans coiffeur reste
+// ouvert a tous ; un client avec un coiffeur n'est que pour lui. Meme regle que le serveur (queue.js).
+function takesWalkinsToday(b) { return !!b && (!b.kiosk_hidden || !!b.walkin_today); }
+function canTakeQueueEntry(q, barberId, barberList) {
+  if (!q) return false;
+  if (q.barber_id) return q.barber_id === barberId;
+  if (q.is_appointment) return true;
+  return takesWalkinsToday((barberList || []).filter(function (b) { return b.id === barberId; })[0]);
+}
+if (typeof window !== 'undefined') { window.takesWalkinsToday = takesWalkinsToday; window.canTakeQueueEntry = canTakeQueueEntry; }
+
 // keepAll : la borne (coiffeurs SANS RDV, qui n'acceptent pas forcement de RDV) prend tous les coiffeurs presents.
 function anyBarberItems(barberList, kind, items, keepAll) {
   var list = (barberList || []).filter(function (b) { return b && (keepAll || b.accepts_appointments !== 0); });

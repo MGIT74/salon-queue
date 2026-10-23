@@ -138,7 +138,8 @@ const suite = [
   ['115-premier-disponible.js', false, ['exit']],
   ['116-rdv-indicatif-telephone.js', false, ['exit']],
   ['117-site-salon-redirection.js', false, ['exit']],
-  ['118-borne-plusieurs-premier-disponible.js', false, ['exit']]
+  ['118-borne-plusieurs-premier-disponible.js', false, ['exit']],
+  ['119-file-sans-coiffeur-coiffeurs-sans-rdv.js', false, ['exit']]
 ];
 
 let bad = 0;

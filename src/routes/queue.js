@@ -504,9 +504,42 @@ router.post('/checkin-group', checkinLimiter, wrap(async (req, res) => {
 }));
 
 // --- Coiffeur : démarrer, terminer, annuler ------------------------------
+// Coiffeur « sans RDV » aujourd'hui : mode sans RDV (visible a la borne), ou jour « sans RDV » coche dans son calendrier.
+// Seuls ces coiffeurs prennent les clients de la file sans coiffeur (« Premier disponible ») ; un coiffeur en RDV ne
+// les voit pas et ne peut pas les demarrer. (Un RDV sans coiffeur promu dans la file reste ouvert a tous.)
+async function takesWalkinsToday(salonId, barberId) {
+  if (!barberId) return false;
+  const [[b]] = await pool.query('SELECT kiosk_hidden FROM barbers WHERE id = ? AND salon_id = ?', [barberId, salonId]);
+  if (!b) return false;
+  if (!b.kiosk_hidden) return true;
+  const settings = await getSettings(salonId);
+  const today = nowParisDatetimeString(settings.timezone).slice(0, 10);
+  const [[day]] = await pool.query('SELECT id FROM barber_walkin_days WHERE barber_id = ? AND ? BETWEEN start_date AND end_date LIMIT 1', [barberId, today]);
+  return !!day;
+}
+
+// Demarrer / terminer directement : client sans coiffeur reserve aux coiffeurs sans RDV, puis ordre d'arrivee parmi
+// les clients que CE coiffeur peut prendre. forced : transfert manuel decide par l'admin (contourne les deux regles).
+async function walkinOrderGuard(salonId, row, barberId, forced) {
+  if (forced || !barberId) return null;
+  const walkin = await takesWalkinsToday(salonId, barberId);
+  if (!row.barber_id && !row.is_appointment && !walkin) {
+    return { status: 403, error: 'Ce client attend le premier coiffeur disponible sans RDV : seuls les coiffeurs sans RDV aujourd\'hui peuvent le prendre.' };
+  }
+  const [[earlier]] = await pool.query(
+    `SELECT client_name FROM queue
+     WHERE salon_id = ? AND status = 'waiting' AND id != ? AND checkin_at < ?
+     AND (barber_id = ? OR (barber_id IS NULL AND (is_appointment = 1 OR ?)))
+     ORDER BY checkin_at ASC LIMIT 1`,
+    [salonId, row.id, row.checkin_at, barberId, walkin ? 1 : 0]
+  );
+  if (earlier) return { status: 409, error: earlier.client_name + ' est arrivé avant et doit être pris en premier.' };
+  return null;
+}
+
 router.post('/:id/start', requireAdminOrBarber, wrap(async (req, res) => {
   const [[row]] = await pool.query(
-    'SELECT id, barber_id, checkin_at, status FROM queue WHERE id = ? AND salon_id = ?',
+    'SELECT id, barber_id, checkin_at, status, is_appointment FROM queue WHERE id = ? AND salon_id = ?',
     [req.params.id, req.salon.id]
   );
   if (!row) return res.status(404).json({ error: 'Client introuvable' });
@@ -536,25 +569,13 @@ router.post('/:id/start', requireAdminOrBarber, wrap(async (req, res) => {
     }
 
     // Respect de l'ordre d'arrivée : un client arrivé avant, éligible au
-    // même coiffeur (non-assigné ou assigné à lui), doit être pris en
-    // premier — sauf s'il attend spécifiquement quelqu'un d'autre, ou
+    // même coiffeur (assigné à lui, ou sans coiffeur s'il est sans RDV aujourd'hui),
+    // doit être pris en premier — sauf s'il attend spécifiquement quelqu'un d'autre, ou
     // si c'est un transfert manuel décidé par le staff (force_transfer,
     // réservé à l'admin — un coiffeur seul via son PIN ne peut pas
     // s'auto-attribuer ce contournement).
-    if (!(req.body.force_transfer && !req.barberId)) {
-      const [[earlier]] = await pool.query(
-        `SELECT client_name FROM queue
-         WHERE salon_id = ? AND status = 'waiting' AND id != ? AND checkin_at < ?
-         AND (barber_id IS NULL OR barber_id = ?)
-         ORDER BY checkin_at ASC LIMIT 1`,
-        [req.salon.id, req.params.id, row.checkin_at, barberId]
-      );
-      if (earlier) {
-        return res.status(409).json({
-          error: earlier.client_name + ' est arrivé avant et doit être pris en premier.'
-        });
-      }
-    }
+    const guard = await walkinOrderGuard(req.salon.id, row, barberId, req.body.force_transfer && !req.barberId);
+    if (guard) return res.status(guard.status).json({ error: guard.error });
   }
 
   await pool.query(
@@ -584,7 +605,7 @@ router.post('/:id/start', requireAdminOrBarber, wrap(async (req, res) => {
  */
 router.post('/:id/quick-finish', requireAdminOrBarber, wrap(async (req, res) => {
   const [[row]] = await pool.query(
-    'SELECT id, barber_id, checkin_at, status FROM queue WHERE id = ? AND salon_id = ?',
+    'SELECT id, barber_id, checkin_at, status, is_appointment FROM queue WHERE id = ? AND salon_id = ?',
     [req.params.id, req.salon.id]
   );
   if (!row) return res.status(404).json({ error: 'Client introuvable' });
@@ -597,20 +618,8 @@ router.post('/:id/quick-finish', requireAdminOrBarber, wrap(async (req, res) => 
   }
   const barberId = req.actingBarberId || req.body.barber_id || row.barber_id || null;
 
-  if (barberId && !(req.body.force_transfer && !req.barberId)) {
-    const [[earlier]] = await pool.query(
-      `SELECT client_name FROM queue
-       WHERE salon_id = ? AND status = 'waiting' AND id != ? AND checkin_at < ?
-       AND (barber_id IS NULL OR barber_id = ?)
-       ORDER BY checkin_at ASC LIMIT 1`,
-      [req.salon.id, req.params.id, row.checkin_at, barberId]
-    );
-    if (earlier) {
-      return res.status(409).json({
-        error: earlier.client_name + ' est arrivé avant et doit être pris en premier.'
-      });
-    }
-  }
+  const guard = await walkinOrderGuard(req.salon.id, row, barberId, req.body.force_transfer && !req.barberId);
+  if (guard) return res.status(guard.status).json({ error: guard.error });
 
   await pool.query(
     "UPDATE queue SET status = 'done', end_at = NOW(), barber_id = COALESCE(?, barber_id) WHERE id = ? AND salon_id = ? AND status = 'waiting'",
@@ -715,10 +724,11 @@ router.put('/:id', requireAdminOrBarber, wrap(async (req, res) => {
       'SELECT COUNT(*) AS n FROM queue_extras WHERE queue_id = ?', [req.params.id]
     );
     if (extras.length > currentExtrasCount) {
+      const walkinNow = await takesWalkinsToday(req.salon.id, req.actingBarberId);
       const [[nextWaiting]] = await pool.query(
         `SELECT id FROM queue WHERE salon_id = ? AND status = 'waiting'
-         AND (barber_id IS NULL OR barber_id = ?) LIMIT 1`,
-        [req.salon.id, req.actingBarberId]
+         AND (barber_id = ? OR (barber_id IS NULL AND (is_appointment = 1 OR ?))) LIMIT 1`,
+        [req.salon.id, req.actingBarberId, walkinNow ? 1 : 0]
       );
       if (nextWaiting) {
         return res.status(409).json({

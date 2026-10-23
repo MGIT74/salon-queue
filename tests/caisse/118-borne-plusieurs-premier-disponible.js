@@ -43,6 +43,7 @@ const clean = () => sql(`DELETE FROM appointments WHERE client_name LIKE 'T118%'
   check('coiffeur d\'un autre salon refuse', r.status === 404, r.body);
 
   console.log('\n[C] « Premier disponible » : pris par le premier coiffeur libre, dans l\'ordre d\'arrivee');
+  sql(`UPDATE barbers SET kiosk_hidden = 0, accepts_appointments = 0 WHERE id = 'b2';`);   // Bob sans RDV (seuls eux prennent ces clients)
   const papa = ent[0] && ent[0].id, sami = ent[2] && ent[2].id;
   r = await call('POST', `/api/queue/${sami}/start`, ADMIN, { barber_id: 'b2' });
   check('Bob ne peut pas passer Sami avant Papa (arrive avant, sans coiffeur)', r.status === 409 && /T118 Papa/.test(r.body.error), r.body);
@@ -66,6 +67,7 @@ const clean = () => sql(`DELETE FROM appointments WHERE client_name LIKE 'T118%'
   check('« Client suivant » / veille : retour au 1er ecran', /grp = null; kNames = \[\];[\s\S]{0,400}show\('p-who'\);/.test(k));
 
   clean();
+  sql(`UPDATE barbers SET kiosk_hidden = 1, accepts_appointments = 1 WHERE id = 'b2';`);
   console.log(`\n${pass} OK, ${fail} ECHEC`);
   process.exit(fail ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(1); });

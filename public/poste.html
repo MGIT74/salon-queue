@@ -380,7 +380,7 @@
   </button>
 </div>
 
-<script src="/app.js?v=30"></script>
+<script src="/app.js?v=31"></script>
 <script src="/autorefresh.js?v=2"></script>
 <script src="/staff-group.js?v=5"></script>
 <script>requireSalonInUrl("Pour utiliser votre poste, ouvrez le lien de votre salon.");</script>
@@ -704,7 +704,7 @@ function toggleExtrasPicker() {
 
 function hasNextWaitingForMe() {
   return queue.some(function (q) {
-    return q.status === 'waiting' && (!q.barber_id || q.barber_id === me.id);
+    return q.status === 'waiting' && canTakeQueueEntry(q, me.id, barbers);
   });
 }
 
@@ -763,7 +763,7 @@ function renderNext() {
   if (userIsEditing && zone.children.length) return;
 
   var mine = queue.filter(function (q) {
-    return q.status === 'waiting' && (q.barber_id === me.id || !q.barber_id);
+    return q.status === 'waiting' && canTakeQueueEntry(q, me.id, barbers);
   }).sort(function (a, b) { return new Date(a.checkin_at) - new Date(b.checkin_at); });
 
   if (mine.length === 0) {

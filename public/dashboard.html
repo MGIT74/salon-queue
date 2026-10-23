@@ -2811,7 +2811,7 @@
   </div>
 </div>
 
-<script src="/app.js?v=30"></script>
+<script src="/app.js?v=31"></script>
 <script src="/autorefresh.js?v=2"></script>
 <script src="/staff-group.js?v=5"></script>
 <script src="/daterange.js?v=4"></script>
@@ -4112,6 +4112,8 @@ function startCut(id) {
   // Le coiffeur cible est déjà occupé : on propose un transfert
   // vers un coiffeur libre plutôt que de bloquer sans solution.
   var free = barbers.filter(function (b) { return b.active && busyIds.indexOf(b.id) === -1; });
+  // Client sans coiffeur venu sans RDV : seuls les coiffeurs sans RDV aujourd'hui peuvent le prendre.
+  if (entry && !entry.barber_id && !entry.is_appointment) free = free.filter(takesWalkinsToday);
 
   if (free.length === 0) {
     toast('Tous les coiffeurs sont occupés pour le moment.', true);
@@ -4135,7 +4137,7 @@ function tryStart(id, targetBarberId) {
     .filter(function (q) {
       return q.status === 'waiting' && q.id !== id &&
         new Date(q.checkin_at) < new Date(entry.checkin_at) &&
-        (!q.barber_id || q.barber_id === targetBarberId);
+        canTakeQueueEntry(q, targetBarberId, barbers);
     })
     .sort(function (a, b) { return new Date(a.checkin_at) - new Date(b.checkin_at); })[0];
 
