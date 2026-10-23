@@ -237,6 +237,15 @@
   .gb-pick .eyebrow { font-size: clamp(21px,2.2vw,28px); }
   .gb-pick .gb-choices { max-width: 720px; }
 
+  /* --- Avertissement avant remise a zero --- */
+  .idle-warn { position: fixed; inset: 0; z-index: 190; background: rgba(0,0,0,.55); display: flex; align-items: center; justify-content: center; padding: 24px; }
+  .idle-warn[hidden] { display: none; }
+  .idle-warn-box { background: var(--card); color: var(--ink); border-radius: 24px; padding: clamp(26px,4vh,40px) clamp(24px,3vw,44px); max-width: 460px; width: 100%; text-align: center; box-shadow: var(--shadow); }
+  .idle-warn-n { width: 84px; height: 84px; border-radius: 50%; margin: 0 auto 18px; background: var(--fill); display: flex; align-items: center; justify-content: center;
+                 font-size: 40px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--accent); }
+  .idle-warn-box h2 { font-size: clamp(22px,2.2vw,28px); margin: 0 0 8px; letter-spacing: -.02em; }
+  .idle-warn-box p { color: var(--grey); margin: 0 0 22px; font-size: 15px; line-height: 1.5; }
+
   /* --- Écran de veille --- */
   .idle-screen {
     position: fixed; inset: 0; z-index: 200; background: var(--bg);
@@ -263,6 +272,16 @@
     <div id="idle-logo-text" style="display:none"></div>
   </div>
   <div class="idle-hint">Touchez l'écran pour commencer</div>
+</div>
+
+<!-- Personne ne touche plus l'ecran en pleine inscription : on previent, puis on repart a zero apres 5 s. -->
+<div class="idle-warn" id="idle-warn" hidden>
+  <div class="idle-warn-box" role="alertdialog" aria-labelledby="idle-warn-t">
+    <div class="idle-warn-n" id="idle-warn-n">5</div>
+    <h2 id="idle-warn-t">Vous êtes toujours là ?</h2>
+    <p>Sans action, la borne repart à zéro pour le client suivant.</p>
+    <button type="button" class="go" onclick="stayOnKiosk()">Je continue</button>
+  </div>
 </div>
 
 <div class="kiosk">
@@ -1226,7 +1245,32 @@ function dismissIdleScreen() {
   resetIdleTimer();
 }
 
+// Inactivite : en pleine inscription (pas sur le 1er ecran ni sur un ticket), on previent d'abord pendant 5 s.
+var IDLE_WARN_SEC = 5, idleWarnTimer = null;
+function inKioskFlow() {
+  var on = document.querySelector('.panel.on');
+  return !!on && ['p-who', 'p-ticket', 'p-gticket'].indexOf(on.id) === -1;
+}
+function onIdleTimeout() {
+  if (!inKioskFlow()) return showIdleScreen();
+  var left = IDLE_WARN_SEC, box = document.getElementById('idle-warn');
+  document.getElementById('idle-warn-n').textContent = left;
+  box.hidden = false;
+  clearInterval(idleWarnTimer);
+  idleWarnTimer = setInterval(function () {
+    left -= 1;
+    document.getElementById('idle-warn-n').textContent = Math.max(left, 0);
+    if (left <= 0) { hideIdleWarn(); showIdleScreen(); }
+  }, 1000);
+}
+function hideIdleWarn() {
+  clearInterval(idleWarnTimer); idleWarnTimer = null;
+  document.getElementById('idle-warn').hidden = true;
+}
+function stayOnKiosk() { hideIdleWarn(); resetIdleTimer(); }
+
 function showIdleScreen() {
+  hideIdleWarn();
   resetForm();
   renderIdleWait();
   document.getElementById('idle-screen').classList.remove('off');
@@ -1234,12 +1278,15 @@ function showIdleScreen() {
 
 function resetIdleTimer() {
   if (idleTimeoutId) clearTimeout(idleTimeoutId);
-  idleTimeoutId = setTimeout(showIdleScreen, IDLE_TIMEOUT_MS);
+  idleTimeoutId = setTimeout(onIdleTimeout, IDLE_TIMEOUT_MS);
 }
 
-['click', 'touchstart'].forEach(function (evt) {
+// Toucher l'ecran OU taper au clavier (le clavier de la tablette ne « touche » pas la page) = le client est la.
+['click', 'touchstart', 'keydown', 'input'].forEach(function (evt) {
   document.addEventListener(evt, function (e) {
-    if (document.getElementById('idle-screen').classList.contains('off')) resetIdleTimer();
+    if (!document.getElementById('idle-screen').classList.contains('off')) return;
+    if (idleWarnTimer) hideIdleWarn();
+    resetIdleTimer();
   }, true);
 });
 resetIdleTimer();

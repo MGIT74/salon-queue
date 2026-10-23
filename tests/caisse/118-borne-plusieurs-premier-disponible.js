@@ -3,6 +3,7 @@
 //   puis le groupe est inscrit en UNE fois (une place par personne, dans l'ordre, email commun facultatif) ;
 // - « Premier disponible » seulement s'il y a au moins 2 coiffeurs sans RDV presents ; le client reste sans coiffeur,
 //   le premier coiffeur libre le prend (ordre d'arrivee) ;
+// - inactivite en pleine inscription : « Vous etes toujours la ? » 5 s, puis remise a zero pour le client suivant ;
 // - tout le groupe est verifie avant d'inscrire qui que ce soit ; un groupe compte comme une seule inscription.
 const fs = require('fs'), path = require('path');
 const { execSync } = require('child_process');
@@ -60,6 +61,8 @@ const clean = () => sql(`DELETE FROM appointments WHERE client_name LIKE 'T118%'
   check('durees toujours affichees : chaque personne, total du groupe, ticket', /formatMinutes\(e\.dur\) \+ ' · /.test(k) && /formatMinutes\(totDur\) \+ ' · '/.test(k) && /formatMinutes\(e\.total_duration_min\)/.test(k));
   check('inscription du groupe en une fois', /api\('\/api\/queue\/checkin-group'/.test(k));
   check('« Premier disponible » envoye sans coiffeur (seul ou a plusieurs)', /barber_id: selBarber \|\| null/.test(k) && /barber_id: e\.barber_id \|\| null/.test(k));
+  check('inactivite en pleine inscription : avertissement 5 s puis remise a zero', /var IDLE_WARN_SEC = 5/.test(k) && /if \(!inKioskFlow\(\)\) return showIdleScreen\(\);/.test(k) && /if \(left <= 0\) \{ hideIdleWarn\(\); showIdleScreen\(\); \}/.test(k) && /id="idle-warn"/.test(k));
+  check('toucher ou taper au clavier = le client est la', /\['click', 'touchstart', 'keydown', 'input'\]/.test(k) && /function stayOnKiosk\(\)/.test(k));
   check('« Client suivant » / veille : retour au 1er ecran', /grp = null; kNames = \[\];[\s\S]{0,400}show\('p-who'\);/.test(k));
 
   clean();
