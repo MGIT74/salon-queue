@@ -15,8 +15,8 @@ const CLOSURES = (s) => 'var rdvSalonClosures = [];\n' + (s.match(/^function rdv
 // Jour passe : meme regle que app.js (date du jour = date locale du test)
 const PASTDAY = "function isPastDay(d) { var t = new Date(); return String(d) < t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0'); }";
 const FUTURE = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);   // jamais une date passee (refusee)
-const SHARED = ['esc', 'normText', 'vitrineIcon', 'vitrineBaseIcon', 'extraIcon', 'productIcon', 'groupItems', 'vitrineCardHtml', 'vitrineRender', 'vitrineSummary', 'vitrineFilter', 'vitrineSelectOne', 'vitrineToggle', 'vitrineSearchHtml', 'formatMinutes', '_lockBodyScroll', '_unlockBodyScroll', '_buildModal', '_closeModal', 'vitrineFlow', 'vitrineRecapHtml'];
-const VARS = ['VITRINE_PLUS_SVG', 'VITRINE_CHECK_SVG', 'VITRINE_CHECK_SM_SVG'].map(n => app.match(new RegExp('^var ' + n + ' = .*;$', 'm'))[0]).join('\n');
+const SHARED = ['esc', 'normText', 'vitrineIcon', 'vitrineBaseIcon', 'extraIcon', 'productIcon', 'groupItems', 'vitrineCardHtml', 'vitrineRender', 'vitrineSummary', 'vitrineFilter', 'vitrineSelectOne', 'vitrineToggle', 'vitrineSearchHtml', 'formatMinutes', '_lockBodyScroll', '_unlockBodyScroll', '_buildModal', '_closeModal', 'vitrineFlow', 'vitrineRecapHtml', 'svcParam', 'svcLabel', 'extrasOnlyCardHtml'];
+const VARS = ['VITRINE_PLUS_SVG', 'VITRINE_CHECK_SVG', 'VITRINE_CHECK_SM_SVG', 'EXTRAS_ONLY', 'EXTRAS_ONLY_NAME', 'EXTRAS_ONLY_SERVICE'].map(n => app.match(new RegExp('^var ' + n + ' = .*;$', 'm'))[0]).join('\n');
 
 function world(html) {
   const dom = new JSDOM(html || '<body></body>', { runScripts: 'outside-only', url: 'http://localhost/', pretendToBeVisual: true });
@@ -51,7 +51,7 @@ const visible = (w, id) => w.document.getElementById(id).style.display !== 'none
   d.getElementById('aa-name').value = 'Karim'; w.aaStartSolo();
   check('coiffeur deja connu (clic sur sa ligne) : apres le client, on saute a l\'etape Prestation', visible(w, 'aa-step-service') && !visible(w, 'aa-step-barber'));
   check('etape Coiffeur INCHANGEE (cartes de texte .aa-card) + « Premier disponible »', d.querySelectorAll('#aa-step-barber .aa-card:not(.aa-any)').length === 2 && d.querySelectorAll('#aa-step-barber .aa-card.aa-any').length === 1);
-  let sv = [...d.querySelectorAll('#aa-service-grid .item-card')];
+  let sv = [...d.querySelectorAll('#aa-service-grid .item-card:not(.extras-only-card)')];
   check('prestations : cartes de vitrine (compactes), dans l\'ordre du catalogue', sv.length === 2 && sv[0].dataset.id === 'sv1' && d.getElementById('aa-service-grid').classList.contains('compact'));
   check('prestation AVEC photo : image EN HAUT, nom / duree / prix EN DESSOUS (jamais sur le dessin)', sv[0].classList.contains('has-photo') && sv[0].children[0].classList.contains('item-media') && sv[0].children[1].classList.contains('item-body') && sv[0].querySelector('.item-body .item-name').textContent === 'Barbe premium' && sv[0].querySelector('.item-meta').textContent === '20 min' && sv[0].querySelector('.item-price').textContent === '13,00 €');
   check('prestation SANS photo : icone par defaut (le tableau de bord n\'a pas sa propre fonction : celle du code partage)', !sv[1].classList.contains('has-photo') && sv[1].querySelector('.item-media').textContent.length > 0 && !sv[1].querySelector('.item-media').getAttribute('style'));
@@ -83,7 +83,7 @@ const visible = (w, id) => w.document.getElementById(id).style.display !== 'none
   w.openPosteAddAppointment(FUTURE); d = w.document;
   check('Mon poste : 1re etape = le client (comme le dashboard et la caisse)', visible(w, 'pa-step-client') && !visible(w, 'pa-step-service'));
   d.getElementById('pa-name').value = 'Karim'; w.paStartSolo();
-  sv = [...d.querySelectorAll('#pa-service-grid .item-card')];
+  sv = [...d.querySelectorAll('#pa-service-grid .item-card:not(.extras-only-card)')];
   check('prestations en cartes de vitrine : image en haut, texte dessous ; etape Prestation juste apres le client', sv.length === 2 && visible(w, 'pa-step-service') && sv[0].children[0].classList.contains('item-media') && sv[0].querySelector('.item-body .item-name').textContent === 'Barbe premium');
   w.paSelectService(sv[1]);
   check('choisir : carte marquee et etape Supplements', sv[1].classList.contains('sel') && visible(w, 'pa-step-extras'));
@@ -102,7 +102,7 @@ const visible = (w, id) => w.document.getElementById(id).style.display !== 'none
   w.eval(CLOSURES(caisse) + '\n' + PASTDAY + '\n' + fnSrc(caisse, 'openCaisseAddAppointment'));
   w.openCaisseAddAppointment(FUTURE, 'b1'); d = w.document;
   d.getElementById('pa-name').value = 'Karim'; w.paStartSolo();
-  sv = [...d.querySelectorAll('#pa-service-grid .item-card')];
+  sv = [...d.querySelectorAll('#pa-service-grid .item-card:not(.extras-only-card)')];
   check('caisse : prestations en cartes de vitrine, image en haut et texte dessous, etape Prestation affichee', sv.length === 2 && visible(w, 'pa-step-service') && sv[0].children[0].classList.contains('item-media') && sv[0].querySelector('.item-body .item-name').textContent === 'Barbe premium');
   w.paSelectService(sv[0]);
   ex = [...d.querySelectorAll('#pa-extras-grid .item-card')];
@@ -119,7 +119,7 @@ const visible = (w, id) => w.document.getElementById(id).style.display !== 'none
   w.services = CATALOG.services; w.extras = CATALOG.extras.slice(0, 4); w.barbers = [{ id: 'b1', name: 'Alice', disabled_service_ids: [], disabled_extra_ids: ['e2'] }];
   w.eval('var selBarber = null, selService = null, selExtras = [], products = [], selProducts = [], kSvc = [], kExt = [];\n' + fnSrc(app, 'barberItems') + '\n' + ['iconForItem', 'renderFormOptions', 'kioskListCfg', 'selectService', 'updateStep1NextState', 'updateStep1Label', 'toggleExtra', 'renderTotals'].map(n => fnSrc(kiosk, n)).join('\n') + '\n' + kiosk.split('\n').filter(l => /^function (svcById|extById|prodById)\(/.test(l)).join('\n'));
   w.eval("selBarber = 'b1';"); w.renderFormOptions(); d = w.document;
-  sv = [...d.querySelectorAll('#svc-grid .item-card')];
+  sv = [...d.querySelectorAll('#svc-grid .item-card:not(.extras-only-card)')];
   check('prestations en cartes de vitrine : image entiere EN HAUT, texte DESSOUS ; plus d\'ancien rendu texte-sur-photo', sv.length === 2 && sv[0].classList.contains('has-photo') && sv[0].children[0].classList.contains('item-media') && !d.querySelector('#svc-grid .photo-bg, #svc-grid .overlay'));
   check('l\'icone propre a la borne reste utilisee pour une prestation sans photo', sv[1].querySelector('.item-media').textContent === w.iconForItem('Coupe homme'));
   ex = [...d.querySelectorAll('#extras-grid .item-card')];
@@ -137,7 +137,8 @@ const visible = (w, id) => w.document.getElementById(id).style.display !== 'none
   w.eval("barbers[0].disabled_service_ids = ['sv2'];"); w.renderFormOptions();
   check('prestation choisie devenue indisponible avec ce coiffeur : desélectionnée (pas de choix invalide envoye)', w.eval('selService') === null && d.querySelectorAll('#svc-grid .item-card.sel').length === 0);
   w.eval("barbers[0].disabled_service_ids = ['sv1','sv2'];"); w.renderFormOptions();
-  check('aucune prestation disponible : message clair', /Aucune prestation disponible/.test(d.getElementById('svc-grid').textContent));
+  // Plus aucune prestation mais des supplements : seule la carte « Seulement un supplement » reste (sinon, le message).
+  check('aucune prestation disponible : carte « Seulement un supplement », ou message clair', d.querySelectorAll('#svc-grid .item-card:not(.extras-only-card)').length === 0 && (d.querySelector('#svc-grid .extras-only-card') || /Aucune prestation disponible/.test(d.getElementById('svc-grid').textContent)));
   check('remise a zero apres un envoi : le code vide aussi les cartes (.item-card), plus les anciennes puces', /querySelectorAll\('#svc-grid \.item-card, #extras-grid \.item-card(, #products-grid \.item-card)?'\)\.forEach\(function \(c\) \{ c\.classList\.remove\('sel'\)/.test(kiosk) && !/xchip/.test(kiosk));
 
   console.log('\n[D] Fichiers partages et coherence');

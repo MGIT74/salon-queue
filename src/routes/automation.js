@@ -336,7 +336,7 @@ router.get('/salons/:id/prices', requireAutomationKey, wrap(async (req, res) => 
   if (!salon) return res.status(404).json({ error: 'Salon introuvable ou inactif' });
 
   const [services, extras, products] = await Promise.all([
-    pool.query('SELECT name, duration_min, price_cents FROM services WHERE salon_id = ? AND active = 1 ORDER BY sort_order', [salonId]),
+    pool.query('SELECT name, duration_min, price_cents FROM services WHERE salon_id = ? AND active = 1 AND system_kind IS NULL ORDER BY sort_order', [salonId]),
     pool.query('SELECT name, duration_min, price_cents FROM extras WHERE salon_id = ? AND active = 1 ORDER BY sort_order', [salonId]),
     pool.query('SELECT p.name, COALESCE(c.name, p.category) AS category, p.price_cents, p.stock_enabled, p.stock_quantity FROM products p LEFT JOIN catalog_categories c ON c.id = p.category_id WHERE p.salon_id = ? AND p.active = 1 ORDER BY p.sort_order', [salonId])
   ]);

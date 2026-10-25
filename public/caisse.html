@@ -34,7 +34,7 @@
 <style>
   html.auth-checking #login-screen { display: none; }
 </style>
-<link rel="stylesheet" href="/app.css?v=41">
+<link rel="stylesheet" href="/app.css?v=42">
 <style>
   html, body { min-height: 100%; }
   .wrap { max-width: 1100px; margin: 0 auto; padding: 20px 18px 40px; }
@@ -1003,7 +1003,7 @@
   </div>
 </div>
 
-<script src="/app.js?v=33"></script>
+<script src="/app.js?v=34"></script>
 <script src="/staff-group.js?v=5"></script>
 <script src="/autorefresh.js?v=2"></script>
 <script>requireSalonInUrl("Pour utiliser la caisse, ouvrez le lien de votre salon.");</script>
@@ -1623,7 +1623,7 @@ function updateCaisseNoTimerCard(cur) {
   box.innerHTML =
     '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--fill);border-radius:12px;padding:12px 14px;margin-bottom:14px">' +
       '<div><div style="font-weight:600;font-size:14px">' + esc(cur.client_name) + ' — prestation en cours</div>' +
-      '<div class="hint" style="margin:2px 0 0">' + esc(cur.service.name) + '</div></div>' +
+      '<div class="hint" style="margin:2px 0 0">' + esc(svcLabel(cur.service.name, cur.extras)) + '</div></div>' +
       '<button class="btn btn-green" style="flex-shrink:0" onclick="finishMine(\'' + cur.id + '\')">Terminer</button>' +
     '</div>';
 }
@@ -1641,7 +1641,8 @@ function cutTimerDisplay(cut) {
 }
 
 function chipsHtml(q) {
-  return '<div class="chips"><span class="chip main">' + esc(q.service.name) + '</span>' +
+  // « Supplement seul » : pas de puce de prestation, seulement les supplements.
+  return '<div class="chips">' + (q.service.name === EXTRAS_ONLY_NAME && q.extras.length ? '' : '<span class="chip main">' + esc(q.service.name) + '</span>') +
     q.extras.map(function (x) { return '<span class="chip">+ ' + esc(x.name) + '</span>'; }).join('') + '</div>';
 }
 
@@ -1792,7 +1793,7 @@ function renderNext() {
     // fois) reste respecte comme pour tout le monde.
     var noTimerBarber = Boolean(activeBarber && activeBarber.timer_enabled === 0);
     var locked = somethingActive || i > 0 || (isAppointmentNotYet && !noTimerBarber);
-    var detail = q.service.name + (q.extras.length ? ' + ' + q.extras.map(function (x) { return x.name; }).join(', ') : '');
+    var detail = svcLabel(q.service.name, q.extras);
     var open = Boolean(nextDetailOpen[q.id]);
     var minutesUntil = isAppointmentNotYet ? Math.round((new Date(q.checkin_at) - new Date()) / 60000) : null;
     var prepAlert = isAppointmentNotYet && rdvPrepAlertMin > 0 && minutesUntil <= rdvPrepAlertMin;
@@ -2807,7 +2808,7 @@ function openAgendaWalkInDrawer(id) {
   var startInfo = salonDateAndMinutesOf(q.start_at);
   var hh = String(Math.floor(startInfo.minutes / 60)).padStart(2, '0'), mm = String(startInfo.minutes % 60).padStart(2, '0');
   var barber = q.barber_id && allBarbers.find(function (b) { return b.id === q.barber_id; });
-  var detail = q.service.name + (q.extras && q.extras.length ? ' + ' + q.extras.map(function (x) { return x.name; }).join(', ') : '');
+  var detail = svcLabel(q.service.name, q.extras);
 
   var overlay = _buildModal(
     '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px">' +
@@ -2906,12 +2907,12 @@ function openCaisseAddAppointment(dateStr, barberId) {
 
     '<div id="pa-step-extras" style="display:none">' +
       '<button class="aa-back" onclick="paGoStep(\'service\')">‹ Retour</button>' +
-      '<div class="aa-step-title">Suppléments (optionnels)</div>' +
+      '<div class="aa-step-title" id="pa-extras-title">Suppléments (optionnels)</div>' +
       vitrineSearchHtml('pa-extras', 'Rechercher un supplément', "paFilter('extras')") +
       '<div class="item-grid compact" id="pa-extras-grid"></div>' +
       '<div class="items-empty" id="pa-extras-empty">Aucun résultat</div>' +
       '<div class="step-bar"><div class="step-summary" id="pa-extras-summary"></div>' +
-      '<button class="btn btn-primary" style="width:100%" onclick="paGoStep(\'products\')">Suivant</button></div>' +
+      '<button class="btn btn-primary" style="width:100%" onclick="paExtrasNext()">Suivant</button></div>' +
     '</div>' +
 
     '<div id="pa-step-products" style="display:none">' +
@@ -2949,7 +2950,7 @@ function openCaisseAddAppointment(dateStr, barberId) {
   var flowRefresh = vitrineFlow(overlay, function () {
     function pick(list, ids) { return list.filter(function (x) { return ids.indexOf(String(x.id)) !== -1; }); }
     return {
-      service: svcOffer.find(function (x) { return String(x.id) === String(state.serviceId); }),
+      service: state.serviceId === EXTRAS_ONLY ? EXTRAS_ONLY_SERVICE : svcOffer.find(function (x) { return String(x.id) === String(state.serviceId); }),
       extras: pick(extOffer, state.extraIds.map(String)), products: pick(catalog.products, state.productIds.map(String)),
       barber: (barber ? barber.name : ''), when: when, time: state.time
     };
@@ -2965,7 +2966,8 @@ function openCaisseAddAppointment(dateStr, barberId) {
     if (step === 'datetime') paLoadSlots();
     if (step === 'contact') {
       var s = svcOffer.find(function (x) { return x.id === state.serviceId; });
-      overlay.querySelector('#pa-contact-summary').textContent = when + ' à ' + state.time + ' — ' + (s ? s.name : '');
+      var exN = extOffer.filter(function (x) { return state.extraIds.indexOf(String(x.id)) !== -1; }).map(function (x) { return x.name; });
+      overlay.querySelector('#pa-contact-summary').textContent = when + ' à ' + state.time + ' — ' + (s ? s.name : svcLabel('', exN));
       var c = StaffGroupBooking.readClient(overlay, 'pa') || {};
       overlay.querySelector('#pa-contact-client').textContent = [c.email, c.phone].filter(Boolean).join(' · ') || 'Sans email ni téléphone';
     }
@@ -2986,6 +2988,8 @@ function openCaisseAddAppointment(dateStr, barberId) {
     };
   }
   vitrineRender({ kind: 'services', gridId: 'pa-service-grid', items: svcOffer, chosen: [], onclick: 'paSelectService(this)' });
+  // « Seulement un supplement » : derniere carte (s'il y a des supplements chez ce coiffeur).
+  if (extOffer.length) overlay.querySelector('#pa-service-grid').insertAdjacentHTML('beforeend', extrasOnlyCardHtml(false, 'paSelectService(this)'));
   vitrineRender(paListCfg('extras'));
   vitrineRender(paListCfg('products'));
   window.paFilter = function (kind) { vitrineFilter(paListCfg(kind)); };
@@ -2993,7 +2997,13 @@ function openCaisseAddAppointment(dateStr, barberId) {
   window.paSelectService = function (el) {
     state.serviceId = el.dataset.id;
     vitrineSelectOne(el);
+    overlay.querySelector('#pa-extras-title').textContent = state.serviceId === EXTRAS_ONLY ? 'Quel supplément ? (au moins un)' : 'Suppléments (optionnels)';
     paGoStep('extras');
+  };
+  // « Seulement un supplement » : au moins un supplement avant la suite.
+  window.paExtrasNext = function () {
+    if (state.serviceId === EXTRAS_ONLY && !state.extraIds.length) { toast('Choisissez au moins un supplément', true); return; }
+    paGoStep('products');
   };
 
   window.paToggleExtra = function (el) {
@@ -3578,7 +3588,7 @@ function pendingDelBtn(q) {
 function deleteUnpaidPassage(queueId) {
   var q = pendingPayments.find(function (x) { return x.id === queueId; });
   if (!q) return;
-  var detail = q.service.name + (q.extras.length ? ' + ' + q.extras.map(function (x) { return x.name; }).join(', ') : '');
+  var detail = svcLabel(q.service.name, q.extras);
   showConfirm(
     q.client_name + ' — ' + detail + ' (' + eur(q.total_price_cents) + ') ne sera pas encaissé.',
     { title: 'Supprimer ce passage ?', danger: true, confirmLabel: 'Supprimer' }
@@ -3614,7 +3624,7 @@ function renderPendingList() {
   var firstActiveIndex = pendingPayments.findIndex(function (q) { return !q.deferred; });
 
   list.innerHTML = pendingPayments.map(function (q, i) {
-    var detail = q.service.name + (q.extras.length ? ' + ' + q.extras.map(function (x) { return x.name; }).join(', ') : '');
+    var detail = svcLabel(q.service.name, q.extras);
 
     if (q.deferred) {
       return '<div class="pending-card deferred">' +
@@ -3800,7 +3810,7 @@ function openAdvancePicker() {
     var html = '<div class="modal-title">Encaisser à l\'avance</div>' +
       '<p class="hint" style="margin:0 0 12px">Le client paie maintenant et garde sa place dans la file.</p>' +
       (list.length ? list.map(function (q) {
-        var detail = q.service.name + (q.extras.length ? ' + ' + q.extras.map(function (x) { return x.name; }).join(', ') : '');
+        var detail = svcLabel(q.service.name, q.extras);
         var withGift = Boolean(q.gift_card && q.gift_card.explicit);
         return '<button type="button" class="advance-pick" data-id="' + esc(q.id) + '"' + (withGift ? ' disabled' : '') + '>' +
           '<span><span style="font-weight:600">' + esc(q.client_name) + '</span>' +

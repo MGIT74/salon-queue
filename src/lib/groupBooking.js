@@ -44,13 +44,14 @@ function normalizePeople(body) {
     const p = raw[i] || {};
     const name = cleanName(p.name) || bookerName;
     if (!name) return { error: 'Le prénom de la personne ' + (i + 1) + ' est requis.', index: i };
-    if (!p.service_id) return { error: 'Choisissez une prestation pour ' + name + '.', index: i };
+    // Sans prestation : au moins un supplement (« Supplement seul »).
+    if (!p.service_id && !(Array.isArray(p.extras) && p.extras.length)) return { error: 'Choisissez une prestation ou un supplément pour ' + name + '.', index: i };
     if (!DATE_RE.test(String(p.date || '')) || !TIME_RE.test(String(p.time || ''))) return { error: 'Choisissez un créneau pour ' + name + '.', index: i };
     const extras = Array.isArray(p.extras) ? Array.from(new Set(p.extras.map(String).filter(Boolean))).slice(0, 30) : [];
     const products = (Array.isArray(p.products) ? p.products : []).filter((x) => x && x.id)
       .map((x) => ({ id: String(x.id), quantity: Math.min(99, Math.max(1, Number(x.quantity) || 1)) })).slice(0, 30);
     people.push({
-      name, service_id: String(p.service_id), extras, products,
+      name, service_id: p.service_id ? String(p.service_id) : '', extras, products,
       barber_id: p.barber_id ? String(p.barber_id) : null, date: String(p.date), time: String(p.time)
     });
   }

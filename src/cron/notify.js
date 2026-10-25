@@ -1,4 +1,5 @@
 const cron = require('node-cron');
+const { serviceNameSql } = require('../lib/extrasOnly');
 const { pool, getSettings, parisLocalToUtcDate } = require('../db');
 const { recompute } = require('../lib/queueMath');
 const { autoManageTimersForSalon } = require('./autoTimer');
@@ -58,7 +59,7 @@ async function checkAndNotifyAppointmentsForSalon(salonId) {
   const nowMs = new Date(nowParisDatetimeString(s.timezone).replace(' ', 'T') + 'Z').getTime();
 
   const [rows] = await pool.query(
-    `SELECT a.id, a.client_name, a.email, a.scheduled_at, a.created_at, s.name AS service_name
+    `SELECT a.id, a.client_name, a.email, a.scheduled_at, a.created_at, ${serviceNameSql()} AS service_name
      FROM appointments a
      LEFT JOIN services s ON s.id = a.service_id
      WHERE a.salon_id = ? AND a.status = 'confirmed' AND a.reminder_sent = 0 AND a.email IS NOT NULL`,

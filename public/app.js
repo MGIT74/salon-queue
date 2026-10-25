@@ -1086,7 +1086,8 @@ function vitrineRecapHtml(sel) {
   }
   var s = sel.service;
   cents += Number(s.price_cents) || 0; mins += Number(s.duration_min) || 0;
-  row('Prestation', s.name, Number(s.duration_min) > 0 ? formatMinutes(s.duration_min) : '', eur(Number(s.price_cents) || 0));
+  // « Seulement un supplement » : pas de ligne Prestation, seulement les supplements.
+  if (!s.extras_only) row('Prestation', s.name, Number(s.duration_min) > 0 ? formatMinutes(s.duration_min) : '', eur(Number(s.price_cents) || 0));
   (sel.extras || []).forEach(function (x) {
     cents += Number(x.price_cents) || 0; mins += Number(x.duration_min) || 0;
     row('Supplément', x.name, Number(x.duration_min) > 0 ? '+' + formatMinutes(x.duration_min) : '', '+' + eur(Number(x.price_cents) || 0));
@@ -1149,6 +1150,29 @@ function vitrineFlow(overlay, getSel) {
 function vitrineRecapFill(sel) {
   var html = vitrineRecapHtml(sel);
   document.querySelectorAll('[data-recap]').forEach(function (el) { el.innerHTML = html; });
+}
+
+/* ---------- « Je veux seulement un supplement » (sans prestation) ----------
+   Choix EXTRAS_ONLY a la place d'une prestation : le client passe aux supplements (au moins un), puis la suite est
+   normale. Le serveur utilise une prestation cachee « Supplement seul » (0 min, 0 EUR) : on envoie service_id vide. */
+var EXTRAS_ONLY = '__extras__';
+var EXTRAS_ONLY_NAME = 'Supplément seul';
+var EXTRAS_ONLY_SERVICE = { id: EXTRAS_ONLY, name: 'Seulement un supplément', duration_min: 0, price_cents: 0, extras_only: true };
+function svcParam(id) { return id === EXTRAS_ONLY ? '' : (id || ''); }
+// Libelle d'un passage / RDV : « Soin visage » pour un supplement seul, sinon « Coupe + Soin visage ».
+function svcLabel(name, extras) {
+  var names = (extras || []).map(function (x) { return typeof x === 'string' ? x : (x && x.name); }).filter(Boolean);
+  if ((!name || name === EXTRAS_ONLY_NAME) && names.length) return names.join(', ');
+  return (name || '') + (names.length ? ' + ' + names.join(', ') : '');
+}
+// Derniere carte de la grille des prestations (meme habillage que les autres cartes).
+function extrasOnlyCardHtml(selected, onclick) {
+  return '<button type="button" class="item-card extras-only-card' + (selected ? ' sel' : '') + '" data-id="' + EXTRAS_ONLY + '" data-name="supplement seul"' +
+    ' aria-pressed="' + (selected ? 'true' : 'false') + '" onclick="' + onclick + '">' +
+    '<span class="item-media" aria-hidden="true"><span class="extras-only-ic"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg></span>' +
+    '<span class="item-check">' + VITRINE_CHECK_SM_SVG + '</span></span>' +
+    '<span class="item-body"><span class="item-name">Seulement un supplément</span><span class="item-meta">Sans prestation</span>' +
+    '<span class="item-foot"><span class="item-price">Choisir ensuite</span></span></span></button>';
 }
 
 /* Tuile "coiffeur" des pages de reservation : la photo est affichee ENTIERE (jamais recadree), le nom en dessous.

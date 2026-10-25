@@ -18,7 +18,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>File d'attente</title>
-<link rel="stylesheet" href="/app.css?v=41">
+<link rel="stylesheet" href="/app.css?v=42">
 <script>
   // Adresse SANS ?salon=... : on masque la page le temps de savoir si la plateforme heberge plusieurs salons
   // (voir requireSalonInUrl dans app.js) - pour ne jamais montrer, meme une fraction de seconde, un ecran sans salon.
@@ -466,8 +466,8 @@
   </main>
 </div>
 
-<script src="/app.js?v=33"></script>
-<script src="/group-booking.js?v=25"></script>
+<script src="/app.js?v=34"></script>
+<script src="/group-booking.js?v=26"></script>
 <script>requireSalonInUrl("Pour utiliser cette borne, ouvrez le lien de votre salon.");</script>
 <script>
 mountThemeButton();
@@ -549,16 +549,19 @@ function renderFormOptions() {
 
   // Si le service choisi n'est plus disponible avec ce coiffeur, on
   // désélectionne pour éviter d'envoyer un choix invalide.
-  if (selService && !availableServices.some(function (s) { return s.id === selService; })) {
+  if (selService && selService !== EXTRAS_ONLY && !availableServices.some(function (s) { return s.id === selService; })) {
     selService = null;
   }
+  if (selService === EXTRAS_ONLY && !availableExtras.length) selService = null;
 
   // Retire de la selection les supplements devenus indisponibles avec ce coiffeur
   selExtras = selExtras.filter(function (id) { return availableExtras.some(function (e) { return e.id === id; }); });
 
   // Prestations et supplements : cartes de vitrine partagees (app.js / app.css) - photo ENTIERE ou icone en haut, texte dessous.
   vitrineRender({ kind: 'services', gridId: 'svc-grid', items: availableServices, chosen: selService ? [selService] : [], onclick: "selectService('{id}')" });
-  if (!availableServices.length) document.getElementById('svc-grid').innerHTML = '<div class="empty">Aucune prestation disponible</div>';
+  if (!availableServices.length) document.getElementById('svc-grid').innerHTML = availableExtras.length ? '' : '<div class="empty">Aucune prestation disponible</div>';
+  // « Seulement un supplement » : derniere carte (sans prestation, au moins un supplement ensuite).
+  if (availableExtras.length) document.getElementById('svc-grid').insertAdjacentHTML('beforeend', extrasOnlyCardHtml(selService === EXTRAS_ONLY, "selectService('" + EXTRAS_ONLY + "')"));
   vitrineRender(kioskListCfg('extras'));
   selProducts = selProducts.filter(function (id) { return !!prodById(id); });
   vitrineRender(kioskListCfg('products'));
@@ -597,6 +600,9 @@ function goToExtrasStep() {
   var name = document.getElementById('f-name').value.trim();
   if (!name) { toast('Entrez votre prénom', true); return; }
   if (!selService) { toast('Choisissez une prestation', true); return; }
+  var only = selService === EXTRAS_ONLY;
+  document.querySelector('#p-form-extras .ftitle').textContent = only ? 'Quel supplément ?' : 'Un petit plus ?';
+  document.querySelector('#p-form-extras .hero-sub').textContent = only ? 'Sans prestation : choisissez au moins un supplément.' : 'Suppléments optionnels, en plus de votre prestation.';
   if (kExt.length) {
     document.getElementById('extras-next-btn').textContent = products.length ? 'Suivant' : finalLabel();
     show('p-form-extras');
@@ -607,6 +613,7 @@ function goToExtrasStep() {
   }
 }
 function afterExtrasStep(btn) {
+  if (selService === EXTRAS_ONLY && !selExtras.length) { toast('Choisissez au moins un supplément', true); return; }
   if (products.length) show('p-form-products'); else submitForm(btn);
 }
 function backFromProducts() { show(kExt.length ? 'p-form-extras' : 'p-form'); }
@@ -869,7 +876,7 @@ function submitGiftCheckin(b) {
     var e = r.entry;
     document.getElementById('t-name').textContent = e.client_name;
     document.getElementById('t-service').textContent =
-      e.service.name + (e.extras.length ? ' + ' + e.extras.map(function (x) { return x.name; }).join(', ') : '') +
+      svcLabel(e.service.name, e.extras) +
       ' · ' + (b ? b.name : 'Premier disponible');
     document.getElementById('t-num').textContent = e.position;
     document.getElementById('t-wait').textContent = formatMinutes(e.estimated_wait_min);
@@ -907,7 +914,7 @@ function toggleExtra(id) {
 }
 
 function renderTotals() {
-  var s = svcById(selService);
+  var s = selService === EXTRAS_ONLY ? EXTRAS_ONLY_SERVICE : svcById(selService);
   var dur = 0, cents = 0;
   if (s) {
     dur = s.duration_min + selExtras.reduce(function (a, id) { var e = extById(id); return a + (e ? e.duration_min : 0); }, 0);
@@ -954,7 +961,7 @@ function submitForm(btn) {
     document.getElementById('t-name').textContent = e.client_name;
     var b = e.barber_id ? barbers.find(function (x) { return x.id === e.barber_id; }) : null;
     document.getElementById('t-service').textContent =
-      e.service.name + (e.extras.length ? ' + ' + e.extras.map(function (x) { return x.name; }).join(', ') : '') +
+      svcLabel(e.service.name, e.extras) +
       ' · ' + (b ? b.name : 'Premier disponible') +
       (selProducts.length ? ' · Produit' + (selProducts.length > 1 ? 's' : '') + ' : ' + selProducts.map(function (id) { var x = prodById(id); return x ? x.name : ''; }).filter(Boolean).join(', ') : '');
     document.getElementById('t-num').textContent = e.position;
@@ -1081,7 +1088,7 @@ function kCartNextPerson() {
 function renderKCart() {
   grp.cart.sort(function (a, b) { return a.person - b.person; });
   document.getElementById('kcart-list').innerHTML = grp.cart.map(function (e, i) {
-    var what = e.service_name + (e.extra_names.length ? ' + ' + e.extra_names.join(', ') : '');
+    var what = svcLabel(e.service_name, e.extra_names);
     var prod = e.product_names.length ? '<em>Produit' + (e.product_names.length > 1 ? 's' : '') + ' : ' + esc(e.product_names.join(', ')) + '</em>' : '';
     return '<div class="cart-row"><div class="cart-what"><b>' + esc(e.name) + '</b><span>' + esc(what) + ' · ' + esc(e.barber_name) + '</span>' + prod + '</div>' +
       '<div class="cart-price"><span class="cart-dur">' + formatMinutes(e.dur) + ' · </span>' + (e.price_from ? 'dès ' : '') + eur(e.price_cents) + '</div>' +
@@ -1152,7 +1159,7 @@ function kCartNext(btn) {
     document.getElementById('gt-sub').textContent = r.entries.length + ' places dans la file';
     document.getElementById('gt-list').innerHTML = r.entries.map(function (e) {
       var b = e.barber_id ? barbers.find(function (x) { return x.id === e.barber_id; }) : null;
-      var what = e.service.name + (e.extras.length ? ' + ' + e.extras.map(function (x) { return x.name; }).join(', ') : '') +
+      var what = svcLabel(e.service.name, e.extras) +
         (e.total_duration_min ? ' · ' + formatMinutes(e.total_duration_min) : '');
       return '<div class="gt-row"><div class="gt-num">' + esc(e.position) + '</div><div class="gt-who"><b>' + esc(e.client_name) + '</b><span>' +
         esc(what) + ' · ' + esc(b ? b.name : 'Premier disponible') + '</span></div><div class="gt-wait">' + (e.estimated_wait_min > 0 ? '~' + esc(formatMinutes(e.estimated_wait_min)) : 'Tout de suite') + '</div></div>';

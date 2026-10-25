@@ -1,4 +1,5 @@
 const express = require('express');
+const { serviceNameSql } = require('../lib/extrasOnly');
 const { thresholdsForSalon, rewardsFor } = require('../lib/loyaltyRules');
 const { safeBaseUrl } = require('../lib/safeUrl');
 const crypto = require('crypto');
@@ -220,7 +221,7 @@ router.get('/me', requireClient, wrap(async (req, res) => {
   // (promoted_queue_id) sait qu'il est déjà 'done'.
   const [upcomingRows] = await pool.query(
     `SELECT a.id, a.scheduled_at, a.cancel_token, a.service_id, a.barber_id, a.client_note, a.client_name, a.group_id,
-            s.name AS service_name, COALESCE(bsp.price_cents, s.price_cents) AS service_price_cents,
+            ${serviceNameSql()} AS service_name, COALESCE(bsp.price_cents, s.price_cents) AS service_price_cents,
             bar.name AS barber_name, sl.slug AS salon_slug, sl.name AS salon_name
      FROM appointments a
      JOIN services s ON s.id = a.service_id

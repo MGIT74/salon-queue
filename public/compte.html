@@ -29,7 +29,7 @@
   html.auth-checking #p-login { display: none !important; }
   html.auth-checking #auth-layout { display: none !important; }
 </style>
-<link rel="stylesheet" href="/app.css?v=41">
+<link rel="stylesheet" href="/app.css?v=42">
 <script>
   // Applique tout de suite la couleur du salon si on l'a déjà vue lors
   // d'une visite précédente (cache localStorage par salon), plutôt que
@@ -691,9 +691,9 @@
 
 </div>
 
-<script src="/app.js?v=33"></script>
+<script src="/app.js?v=34"></script>
 <script src="/autorefresh.js?v=2"></script>
-<script src="/group-booking.js?v=25"></script>
+<script src="/group-booking.js?v=26"></script>
 <style>
 .gb-done{padding:10px 0;border-bottom:1px solid var(--sep)}.gb-done:last-child{border:none}.gb-done b{display:block}.gb-done span{color:var(--grey);font-size:14px}
 #relatives-list{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
@@ -1473,8 +1473,9 @@ function applyBookBarberOffer() {
   var b = selBookBarber && bookBarbers.find(function (x) { return String(x.id) === String(selBookBarber); });
   bookServices = selBookBarber === '' ? anyBarberItems(bookBarbers, 'services', bookServicesAll) : barberItems(b, 'services', bookServicesAll);
   bookExtras = selBookBarber === '' ? anyBarberItems(bookBarbers, 'extras', bookExtrasAll) : barberItems(b, 'extras', bookExtrasAll);
-  if (selBookService && !bookServices.some(function (x) { return String(x.id) === String(selBookService); })) selBookService = null;
+  if (selBookService && selBookService !== EXTRAS_ONLY && !bookServices.some(function (x) { return String(x.id) === String(selBookService); })) selBookService = null;
   selBookExtras = selBookExtras.filter(function (id) { return bookExtras.some(function (x) { return String(x.id) === String(id); }); });
+  if (selBookService === EXTRAS_ONLY && !bookExtras.length) selBookService = null;
   renderBookServiceGrid();
 }
 
@@ -1656,6 +1657,9 @@ function confirmCancelBookGift() {
 
 function renderBookServiceGrid() {
   vitrineRender({ kind: 'services', gridId: 'bk-svc-grid', items: bookServices, chosen: selBookService ? [selBookService] : [], onclick: "selectBookService(this,'{id}')" });
+  // « Seulement un supplement » : derniere carte, s'il y a des supplements chez ce coiffeur.
+  if (bookExtras.length) document.getElementById('bk-svc-grid').insertAdjacentHTML('beforeend', extrasOnlyCardHtml(selBookService === EXTRAS_ONLY, "selectBookService(this,'" + EXTRAS_ONLY + "')"));
+  updateBookExtrasStepText();
   renderBookItemList('extras');
   renderBookItemList('products');
   document.getElementById('bk-service-next-btn').disabled = !selBookService;
@@ -1678,7 +1682,7 @@ function refreshBookRecap() {
   var priced = anyB && selBookSlot ? bookBarbers.find(function (x) { return String(x.id) === String(selBookSlot.barberId); }) : null;
   var svcList = priced ? barberItems(priced, 'services', bookServicesAll) : bookServices, extList = priced ? barberItems(priced, 'extras', bookExtrasAll) : bookExtras;
   vitrineRecapFill({
-    service: svcList.find(function (x) { return String(x.id) === String(selBookService); }),
+    service: selBookService === EXTRAS_ONLY ? EXTRAS_ONLY_SERVICE : svcList.find(function (x) { return String(x.id) === String(selBookService); }),
     extras: pick(extList, selBookExtras.map(String)), products: pick(bookProducts, selBookProducts.map(String)),
     barber: anyB ? 'Premier disponible' : (b ? b.name : ''), time: selBookSlot ? selBookSlot.time : '',
     when: selBookDate ? new Date(selBookDate + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' }) : ''
@@ -1694,6 +1698,15 @@ function selectBookService(el, id) {
   selBookService = id;
   vitrineSelectOne(el);
   document.getElementById('bk-service-next-btn').disabled = false;
+  updateBookExtrasStepText();
+}
+// Etape Supplements : « optionnels » apres une prestation, au moins un si « seulement un supplement ».
+function updateBookExtrasStepText() {
+  var only = selBookService === EXTRAS_ONLY;
+  var ey = document.querySelector('#p-book-extras .eyebrow'), sub = document.querySelector('#p-book-extras .step-sub');
+  if (!ey || !sub) return;
+  ey.textContent = only ? 'Choisissez votre supplément' : 'Suppléments (optionnels)';
+  sub.textContent = only ? 'Sans prestation : choisissez au moins un supplément.' : 'Personnalisez votre prestation : touchez pour ajouter.';
 }
 
 function toggleBookExtra(el, id) {
@@ -1719,6 +1732,7 @@ function goToBookExtrasStep() {
 
 function goToBookProductsStep() {
   if (!selBookService) { toast('Choisissez une prestation', true); return; }
+  if (selBookService === EXTRAS_ONLY && !selBookExtras.length) { toast('Choisissez au moins un supplément', true); return; }
   show('p-book-products');
 }
 
@@ -1801,7 +1815,7 @@ function goToBookConfirmStep() {
   var s = bookServices.find(function (x) { return x.id === selBookService; });
   var extraNames = selBookExtras.map(function (id) { return bookExtras.find(function (e) { return e.id === id; }).name; });
   var when = new Date(selBookDate + 'T' + selBookSlot.time).toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' }) + ' à ' + selBookSlot.time;
-  document.getElementById('bk-confirm-summary').textContent = when + ' — ' + s.name + (extraNames.length ? ' + ' + extraNames.join(', ') : '');
+  document.getElementById('bk-confirm-summary').textContent = when + ' — ' + svcLabel(s ? s.name : '', extraNames);
   show('p-book-confirm');
 }
 
@@ -1824,8 +1838,9 @@ function submitBookAppointment() {
     });
   }).then(function (r) {
     var s = bookServices.find(function (x) { return x.id === selBookService; });
+    var exNames = selBookExtras.map(function (id) { var e = bookExtras.find(function (x) { return x.id === id; }); return e ? e.name : ''; });
     var when = new Date(selBookDate + 'T' + selBookSlot.time).toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' }) + ' à ' + selBookSlot.time;
-    document.getElementById('bk-confirm-details').textContent = when + ' — ' + s.name + (r && r.barber_name ? ' · Votre coiffeur : ' + r.barber_name : '') + (activeBookGift ? ' (cadeau utilisé — présentez-le à votre coiffeur)' : '');
+    document.getElementById('bk-confirm-details').textContent = when + ' — ' + (s ? s.name : svcLabel('', exNames)) + (r && r.barber_name ? ' · Votre coiffeur : ' + r.barber_name : '') + (activeBookGift ? ' (cadeau utilisé — présentez-le à votre coiffeur)' : '');
     show('p-book-confirmed');
     selBookBarber = null; selBookService = null; selBookExtras = []; selBookProducts = []; selBookDate = null; selBookSlot = null; activeBookGift = null;
     document.getElementById('bk-barber-eyebrow').textContent = 'Choisissez votre coiffeur';

@@ -1,4 +1,5 @@
 const express = require('express');
+const { serviceNameSql } = require('../lib/extrasOnly');
 const crypto = require('crypto');
 const { pool, getSettings } = require('../db');
 const requireAdmin = require('../middleware/auth');
@@ -89,7 +90,7 @@ async function appointmentsAffected(salonId, from, to) {
   const nowLocal = part('year') + '-' + part('month') + '-' + part('day') + ' ' + part('hour') + ':' + part('minute') + ':00';
   const [rows] = await pool.query(`SELECT a.id, a.client_name, a.email, a.phone,
     DATE_FORMAT(a.scheduled_at, '%Y-%m-%d %H:%i') AS scheduled_at,
-    s.name AS service_name, b.name AS barber_name
+    ${serviceNameSql()} AS service_name, b.name AS barber_name
     FROM appointments a LEFT JOIN services s ON s.id = a.service_id
     LEFT JOIN barbers b ON b.id = a.barber_id
     WHERE a.salon_id = ? AND a.scheduled_at >= CONCAT(?, ' 00:00:00')

@@ -1385,3 +1385,9 @@ CREATE TABLE IF NOT EXISTS server_errors (
   detail TEXT NULL,
   INDEX idx_server_errors_created (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- « Supplément seul » : prestation cachee (0 min, 0 EUR) utilisee quand un client ne reserve que des supplements.
+-- system_kind = 'extras_only' ; jamais affichee dans les listes du catalogue (voir src/lib/extrasOnly.js).
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'services' AND column_name = 'system_kind');
+SET @sql := IF(@c = 0, 'ALTER TABLE services ADD COLUMN system_kind VARCHAR(20) NULL', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;

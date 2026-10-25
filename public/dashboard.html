@@ -55,7 +55,7 @@
 .cal-day.salon-closed::after{content:'Fermé';display:block;font-size:10px;font-weight:700;color:var(--red,#e65c5c);margin-top:2px}
 .salon-closure-banner{padding:10px 13px;border-radius:9px;margin:0 0 12px;background:rgba(160,100,100,.13);color:var(--red,#e65c5c);font-weight:650;font-size:13px}
 </style>
-<link rel="stylesheet" href="/app.css?v=41">
+<link rel="stylesheet" href="/app.css?v=42">
 <style>
   .wrap { max-width: none; margin: 0; padding: clamp(16px,1.8vw,28px); }
 
@@ -2811,7 +2811,7 @@
   </div>
 </div>
 
-<script src="/app.js?v=33"></script>
+<script src="/app.js?v=34"></script>
 <script src="/autorefresh.js?v=2"></script>
 <script src="/staff-group.js?v=5"></script>
 <script src="/daterange.js?v=4"></script>
@@ -3690,7 +3690,8 @@ function toggleMeFilter(barberId) {
 }
 
 function chipsHtml(q) {
-  return '<div class="chips"><span class="chip main">' + esc(q.service.name) + '</span>' +
+  // « Supplement seul » : pas de puce de prestation, seulement les supplements.
+  return '<div class="chips">' + (q.service.name === EXTRAS_ONLY_NAME && q.extras.length ? '' : '<span class="chip main">' + esc(q.service.name) + '</span>') +
     q.extras.map(function (x) { return '<span class="chip add">+ ' + esc(x.name) + '</span>'; }).join('') + '</div>';
 }
 
@@ -4083,7 +4084,7 @@ function renderQueue() {
         return '<div class="active-card-simple">' +
           '<span class="dot-live"></span>' +
           '<div><div class="name">' + esc(b ? b.name : '—') + ' — ' + esc(q.client_name) + '</div>' +
-          '<div class="assigned">' + esc(q.service.name) + (q.extras.length ? ' + ' + q.extras.length + ' supp.' : '') +
+          '<div class="assigned">' + esc(q.service.name === EXTRAS_ONLY_NAME && q.extras.length ? svcLabel(q.service.name, q.extras) : q.service.name + (q.extras.length ? ' + ' + q.extras.length + ' supp.' : '')) +
           (q.paid_at ? ' · <span style="color:var(--green);font-weight:600">✓ Déjà payé</span>' : '') + '</div></div>' +
           '</div>';
       }).join('');
@@ -6834,10 +6835,17 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
     return typeof barberItems === 'function' ? barberItems(b, kind, list) : list;
   }
   function aaApplyOffer() {
-    if (state.serviceId && !aaOffer('services').some(function (x) { return String(x.id) === String(state.serviceId); })) state.serviceId = null;
+    if (state.serviceId && state.serviceId !== EXTRAS_ONLY && !aaOffer('services').some(function (x) { return String(x.id) === String(state.serviceId); })) state.serviceId = null;
     state.extraIds = state.extraIds.filter(function (id) { return aaOffer('extras').some(function (x) { return String(x.id) === String(id); }); });
-    vitrineRender({ kind: 'services', gridId: 'aa-service-grid', items: aaOffer('services'), chosen: state.serviceId ? [state.serviceId] : [], onclick: 'aaSelectService(this)' });
+    if (state.serviceId === EXTRAS_ONLY && !aaOffer('extras').length) state.serviceId = null;
+    aaRenderServices();
     vitrineRender(aaListCfg('extras'));
+  }
+  // Prestations + derniere carte « Seulement un supplement » (s'il y a des supplements chez ce coiffeur).
+  function aaRenderServices() {
+    vitrineRender({ kind: 'services', gridId: 'aa-service-grid', items: aaOffer('services'), chosen: state.serviceId ? [state.serviceId] : [], onclick: 'aaSelectService(this)' });
+    var g = overlay && overlay.querySelector('#aa-service-grid');
+    if (g && aaOffer('extras').length) g.insertAdjacentHTML('beforeend', extrasOnlyCardHtml(state.serviceId === EXTRAS_ONLY, 'aaSelectService(this)'));
   }
 
   var overlay = _buildModal(
@@ -6868,12 +6876,12 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
 
     '<div id="aa-step-extras" style="display:none">' +
       '<button class="aa-back" onclick="aaGoStep(\'service\')">‹ Retour</button>' +
-      '<div class="aa-step-title">Suppléments (optionnels)</div>' +
+      '<div class="aa-step-title" id="aa-extras-title">Suppléments (optionnels)</div>' +
       vitrineSearchHtml('aa-extras', 'Rechercher un supplément', "aaFilter('extras')") +
       '<div class="item-grid compact" id="aa-extras-grid"></div>' +
       '<div class="items-empty" id="aa-extras-empty">Aucun résultat</div>' +
       '<div class="step-bar"><div class="step-summary" id="aa-extras-summary"></div>' +
-      '<button class="btn btn-primary" style="width:100%" onclick="aaGoStep(\'products\')">Suivant</button></div>' +
+      '<button class="btn btn-primary" style="width:100%" onclick="aaExtrasNext()">Suivant</button></div>' +
     '</div>' +
 
     '<div id="aa-step-products" style="display:none">' +
@@ -6911,7 +6919,7 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
   var flowRefresh = vitrineFlow(overlay, function () {
     function pick(list, ids) { return list.filter(function (x) { return ids.indexOf(String(x.id)) !== -1; }); }
     return {
-      service: aaOffer('services').find(function (x) { return String(x.id) === String(state.serviceId); }),
+      service: state.serviceId === EXTRAS_ONLY ? EXTRAS_ONLY_SERVICE : aaOffer('services').find(function (x) { return String(x.id) === String(state.serviceId); }),
       extras: pick(aaOffer('extras'), state.extraIds.map(String)), products: pick(products, state.productIds.map(String)),
       barber: state.barberId === '' ? 'Premier disponible' : (function(){var b=(typeof rdvBarbers!=='undefined')&&rdvBarbers.find(function(x){return String(x.id)===String(state.barberId);});return b?b.name:'';})(), when: when, time: state.time
     };
@@ -6934,7 +6942,8 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
     if (step === 'datetime') aaLoadSlots();
     if (step === 'contact') {
       var s = aaOffer('services').find(function (x) { return x.id === state.serviceId; });
-      overlay.querySelector('#aa-contact-summary').textContent = when + ' à ' + state.time + ' — ' + (s ? s.name : '');
+      var exN = aaOffer('extras').filter(function (x) { return state.extraIds.indexOf(String(x.id)) !== -1; }).map(function (x) { return x.name; });
+      overlay.querySelector('#aa-contact-summary').textContent = when + ' à ' + state.time + ' — ' + (s ? s.name : svcLabel('', exN));
       var c = StaffGroupBooking.readClient(overlay, 'aa') || {};
       overlay.querySelector('#aa-contact-client').textContent = [c.email, c.phone].filter(Boolean).join(' · ') || 'Sans email ni téléphone';
     }
@@ -6962,7 +6971,7 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
       onclick: kind === 'extras' ? 'aaToggleExtra(this)' : 'aaToggleProduct(this)'
     };
   }
-  vitrineRender({ kind: 'services', gridId: 'aa-service-grid', items: aaOffer('services'), chosen: [], onclick: 'aaSelectService(this)' });
+  aaRenderServices();
   vitrineRender(aaListCfg('extras'));
   vitrineRender(aaListCfg('products'));
   window.aaFilter = function (kind) { vitrineFilter(aaListCfg(kind)); };
@@ -6970,7 +6979,14 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
   window.aaSelectService = function (el) {
     state.serviceId = el.dataset.id;
     vitrineSelectOne(el);
+    var only = state.serviceId === EXTRAS_ONLY;
+    overlay.querySelector('#aa-extras-title').textContent = only ? 'Quel supplément ? (au moins un)' : 'Suppléments (optionnels)';
     aaGoStep('extras');
+  };
+  // « Seulement un supplement » : au moins un supplement avant la suite.
+  window.aaExtrasNext = function () {
+    if (state.serviceId === EXTRAS_ONLY && !state.extraIds.length) { toast('Choisissez au moins un supplément', true); return; }
+    aaGoStep('products');
   };
 
   window.aaToggleExtra = function (el) {

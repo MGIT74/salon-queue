@@ -154,4 +154,5 @@ node tests/caisse/120-icones-rdv-sans-rdv-timer.js  # Timer : icone RDV / sans R
 node tests/caisse/121-timer-ordre-glisser.js  # Timer caisse : glisser les clients sans RDV pour changer leur ordre (les RDV ne bougent pas)
 node tests/caisse/122-douchette-caisse-focus.js  # Caisse : la douchette lit toujours, meme apres un clic sur une pastille de coiffeur (focus du champ invisible)
 node tests/caisse/123-journal-erreurs-serveur.js  # Journal des erreurs serveur (super admin › Erreurs) : quand, salon, page, cause ; jamais les donnees clients
+node tests/caisse/124-supplement-seul.js  # « Seulement un supplement » : RDV / file sans prestation (au moins un supplement), partout
 ```

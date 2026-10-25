@@ -10,6 +10,7 @@ const { verifyOwnerPassword } = require('../middleware/auth');
 const requireAdminOrBarber = require('../middleware/barberAuth');
 const { logActivity } = require('../lib/activityLog');
 const { wrap } = require('../lib/wrap');
+const { resolveServiceId } = require('../lib/extrasOnly');
 const { isBlocked, recordFailure, recordSuccess, signupRateLimiter } = require('../middleware/rateLimiter');
 
 const router = express.Router();
@@ -345,8 +346,12 @@ router.post('/manual-client/import-log', requireAdmin, wrap(async (req, res) => 
 // Une personne a inscrire dans la file : verifie tout AVANT d'ecrire quoi que ce soit (reutilise par l'inscription a
 // plusieurs, ou tout le groupe est verifie avant la premiere ecriture). Renvoie { error, status } ou { data }.
 async function validateCheckin(salonId, body, opts = {}) {
-  const { client_name, email, phone, service_id, barber_id, extras } = body;
+  const { client_name, email, phone, barber_id, extras } = body;
   if (!client_name) return { status: 400, error: 'Le nom est requis' };
+  // Sans prestation : au moins un supplement (« Supplement seul », prestation cachee - voir lib/extrasOnly).
+  const resolved = await resolveServiceId(salonId, body.service_id, Array.isArray(extras) ? extras : []);
+  if (resolved.error) return { status: 400, error: resolved.error };
+  const service_id = resolved.id;
   // Produits proposés à la borne avant la confirmation (même règle que pour un RDV en ligne : produit du salon,
   // actif et non « caisse seulement »). Une ligne invalide est ignorée, la quantité est bornée à 1-99.
   const rawProducts = Array.isArray(body.products) ? body.products : [];

@@ -8,6 +8,7 @@
  * pour chaque coiffeur candidat avec offerFor().
  */
 const { pool } = require('../db');
+const { resolveServiceId, EXTRAS_ONLY_KIND } = require('./extrasOnly');
 
 function fail(status, error) { return { ok: false, status, error }; }
 
@@ -15,11 +16,16 @@ async function loadCatalog(salonId, serviceId, extraIds, db) {
   db = db || pool;
   const ids = Array.isArray(extraIds) ? extraIds.map(String).filter(Boolean) : [];
   if (new Set(ids).size !== ids.length) return fail(400, 'Supplément en double');
+  // Pas de prestation + au moins un supplement = « Supplement seul » (prestation cachee, voir lib/extrasOnly).
+  const resolved = await resolveServiceId(salonId, serviceId, ids, db);
+  if (resolved.error) return fail(400, resolved.error);
   const [[service]] = await db.query(
-    'SELECT id, name, duration_min, price_cents FROM services WHERE id = ? AND salon_id = ? AND active = 1 AND deleted_at IS NULL',
-    [serviceId, salonId]
+    'SELECT id, name, duration_min, price_cents, system_kind FROM services WHERE id = ? AND salon_id = ? AND active = 1 AND deleted_at IS NULL',
+    [resolved.id, salonId]
   );
   if (!service) return fail(404, 'Prestation introuvable ou plus proposée');
+  service.extras_only = service.system_kind === EXTRAS_ONLY_KIND;
+  if (service.extras_only && !ids.length) return fail(400, 'Choisissez au moins un supplément.');
   let extras = [];
   if (ids.length) {
     const [rows] = await db.query(

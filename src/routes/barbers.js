@@ -1,4 +1,5 @@
 const express = require('express');
+const { serviceNameSql } = require('../lib/extrasOnly');
 const crypto = require('crypto');
 const { pool, getSettings, parisLocalToUtcDate } = require('../db');
 const { activeBarberCount } = require('../lib/queueMath');
@@ -309,7 +310,7 @@ router.post('/:id/remove', requireAdmin, wrap(async (req, res) => {
   const part = (t) => parts.find((p) => p.type === t).value;
   const nowLocal = part('year') + '-' + part('month') + '-' + part('day') + ' ' + part('hour') + ':' + part('minute') + ':00';
   const [appointments] = await pool.query(
-    `SELECT a.id, a.client_name, a.email, a.phone, DATE_FORMAT(a.scheduled_at, '%Y-%m-%d %H:%i') AS scheduled_at, s.name AS service_name
+    `SELECT a.id, a.client_name, a.email, a.phone, DATE_FORMAT(a.scheduled_at, '%Y-%m-%d %H:%i') AS scheduled_at, ${serviceNameSql()} AS service_name
      FROM appointments a LEFT JOIN services s ON s.id = a.service_id
      WHERE a.salon_id = ? AND a.barber_id = ? AND a.scheduled_at >= ? AND a.status NOT IN ('cancelled', 'completed', 'no_show')
        AND (a.promoted_queue_id IS NULL OR a.promoted_queue_id NOT IN (SELECT id FROM queue WHERE status IN ('done','cancelled')))
@@ -873,7 +874,7 @@ router.post('/:id/leaves/preview', requireAdmin, wrap(async (req, res) => {
   const nowLocal = part('year') + '-' + part('month') + '-' + part('day') + ' ' + part('hour') + ':' + part('minute') + ':00';
   const [rows] = await pool.query(
     `SELECT a.id, a.client_name, a.email, a.phone, DATE_FORMAT(a.scheduled_at, '%Y-%m-%d %H:%i') AS scheduled_at,
-            s.name AS service_name, b.name AS barber_name
+            ${serviceNameSql()} AS service_name, b.name AS barber_name
      FROM appointments a LEFT JOIN services s ON s.id = a.service_id LEFT JOIN barbers b ON b.id = a.barber_id
      WHERE a.salon_id = ? AND a.barber_id = ? AND DATE(a.scheduled_at) IN (?) AND a.scheduled_at >= ?
        AND a.status NOT IN ('cancelled', 'completed', 'no_show')
@@ -919,7 +920,7 @@ router.post('/:id/walkin-days/days', requireAdmin, wrap(async (req, res) => {
       const added = [...map.keys()].filter((d) => !before.has(d));
       if (added.length) {
         const [appts] = await conn.query(
-          `SELECT a.id, a.client_name, a.email, a.phone, DATE_FORMAT(a.scheduled_at, '%Y-%m-%d %H:%i') AS scheduled_at, s.name AS service_name
+          `SELECT a.id, a.client_name, a.email, a.phone, DATE_FORMAT(a.scheduled_at, '%Y-%m-%d %H:%i') AS scheduled_at, ${serviceNameSql()} AS service_name
            FROM appointments a LEFT JOIN services s ON s.id = a.service_id
            WHERE a.salon_id = ? AND a.barber_id = ? AND DATE(a.scheduled_at) IN (?) AND a.scheduled_at >= ?
              AND a.status NOT IN ('cancelled', 'completed', 'no_show')
@@ -992,7 +993,7 @@ router.get('/:id/capabilities', requireAdmin, wrap(async (req, res) => {
   if (!owned) return res.status(404).json({ error: 'Coiffeur introuvable' });
 
   const [services] = await pool.query(
-    'SELECT id, name, price_cents, duration_min FROM services WHERE salon_id = ? AND active = 1 ORDER BY sort_order, name',
+    'SELECT id, name, price_cents, duration_min FROM services WHERE salon_id = ? AND active = 1 AND system_kind IS NULL ORDER BY sort_order, name',
     [req.salon.id]
   );
   const [extras] = await pool.query(

@@ -146,12 +146,19 @@ async function uniqueId(table, base) {
   }
 }
 
+async function isSystemService(id) {
+  const [[row]] = await pool.query('SELECT system_kind FROM services WHERE id = ?', [String(id)]);
+  return !!(row && row.system_kind);
+}
+
 ['services', 'extras'].forEach((table) => {
   // Liste — publique (la borne du salon résolu en a besoin)
   router.get('/' + table, wrap(async (req, res) => {
+    // Prestation cachee « Supplement seul » (lib/extrasOnly) : jamais dans les listes.
+    const hidden = table === 'services' ? ' AND system_kind IS NULL' : '';
     const sql = req.query.all === '1'
-      ? `SELECT * FROM ${table} WHERE salon_id = ? AND deleted_at IS NULL ORDER BY sort_order, name`
-      : `SELECT * FROM ${table} WHERE salon_id = ? AND active = 1 AND deleted_at IS NULL ORDER BY sort_order, name`;
+      ? `SELECT * FROM ${table} WHERE salon_id = ? AND deleted_at IS NULL${hidden} ORDER BY sort_order, name`
+      : `SELECT * FROM ${table} WHERE salon_id = ? AND active = 1 AND deleted_at IS NULL${hidden} ORDER BY sort_order, name`;
     const [rows] = await pool.query(sql, [req.salon.id]);
     res.json({ ok: true, items: await annotateItems(req.salon.id, rows) });
   }));
@@ -178,6 +185,7 @@ async function uniqueId(table, base) {
   }));
 
   router.put('/' + table + '/:id', requireAdmin, wrap(async (req, res) => {
+    if (table === 'services' && await isSystemService(req.params.id)) return res.status(403).json({ error: 'Cette prestation est gérée automatiquement.' });
     if (req.body.name !== undefined && (!String(req.body.name).trim() || String(req.body.name).length > 255)) return res.status(400).json({ error: 'Nom invalide' });
     for (const [key, min, max] of [['price_cents', 0, 100000000], ['duration_min', 0, 1440]]) {
       if (req.body[key] !== undefined && invalidCatalogNumber(req.body[key], min, max)) return res.status(400).json({ error: 'Valeur invalide : ' + key });
@@ -224,6 +232,7 @@ async function uniqueId(table, base) {
   }));
 
   router.delete('/' + table + '/:id', requireAdmin, wrap(async (req, res) => {
+    if (table === 'services' && await isSystemService(req.params.id)) return res.status(403).json({ error: 'Cette prestation est gérée automatiquement.' });
     if (req.query.permanent === '1') return deleteCatalogItem(table, req, res);
     const [[before]] = await pool.query(`SELECT name FROM ${table} WHERE id = ? AND salon_id = ?`, [req.params.id, req.salon.id]);
     await pool.query(`UPDATE ${table} SET active = 0 WHERE id = ? AND salon_id = ?`, [req.params.id, req.salon.id]);

@@ -17,6 +17,7 @@ const { sendAppointmentConfirmation, sendGroupAppointmentConfirmation, sendAppoi
 const { wrap } = require('../lib/wrap');
 const groupBooking = require('../lib/groupBooking');
 const { loadCatalog, offerFor, resolveOffer } = require('../lib/barberOffer');
+const { serviceLabel, serviceNameSql } = require('../lib/extrasOnly');
 
 const router = express.Router();
 
@@ -368,7 +369,8 @@ function validBookingTime(time) {
 
 router.get('/availability', wrap(async (req, res) => {
   const { date, service_id, barber_id } = req.query;
-  if (!date || !service_id) return res.status(400).json({ error: 'date et service_id requis' });
+  // Sans prestation : seulement des supplements (« Supplement seul », voir lib/extrasOnly).
+  if (!date || ((!service_id || service_id === '__extras__') && !req.query.extras)) return res.status(400).json({ error: 'date et service_id requis' });
   if (!validBookingDate(date)) return res.status(400).json({ error: 'Date invalide' });
   if (barber_id) {
     const [[owned]] = await pool.query('SELECT id FROM barbers WHERE id = ? AND salon_id = ? AND active = 1', [barber_id, req.salon.id]);
@@ -486,7 +488,7 @@ router.get('/', requireAdminOrBarber, wrap(async (req, res) => {
   const orderDirection = (req.query.all && !req.query.month) ? 'DESC' : 'ASC';
 
   const [rows] = await pool.query(
-    `SELECT a.*, s.name AS service_name, COALESCE(bsp.duration_min, s.duration_min) AS service_duration_min, b.name AS barber_name,
+    `SELECT a.*, ${serviceNameSql()} AS service_name, COALESCE(bsp.duration_min, s.duration_min) AS service_duration_min, b.name AS barber_name,
             q.status AS queue_status,
             COALESCE((
               SELECT SUM(COALESCE(bep.duration_min, e.duration_min)) FROM appointment_extras ae
@@ -516,7 +518,7 @@ router.get('/lookup', requireAdminOrBarber, wrap(async (req, res) => {
   const id = String(req.query.id || ''), queueId = String(req.query.queue_id || '');
   if (!id && !queueId) return res.status(400).json({ error: 'id ou queue_id requis' });
   const [rows] = await pool.query(
-    `SELECT a.*, s.name AS service_name, COALESCE(bsp.duration_min, s.duration_min) AS service_duration_min, b.name AS barber_name,
+    `SELECT a.*, ${serviceNameSql()} AS service_name, COALESCE(bsp.duration_min, s.duration_min) AS service_duration_min, b.name AS barber_name,
             q.status AS queue_status,
             COALESCE((
               SELECT SUM(COALESCE(bep.duration_min, e.duration_min)) FROM appointment_extras ae
@@ -546,7 +548,7 @@ router.post('/', bookingRateLimiter, wrap(withBookingLock(async (req, res) => {
   const clientNote = req.body.client_note ? String(req.body.client_note).slice(0, 500) : null;
   if (!client_name) return res.status(400).json({ error: 'Le nom est requis' });
   if (!email) return res.status(400).json({ error: "L'email est requis pour la confirmation" });
-  if (!service_id || !date || !time) return res.status(400).json({ error: 'Prestation, date et créneau requis' });
+  if (!date || !time) return res.status(400).json({ error: 'Prestation, date et créneau requis' });
   if (!validBookingDate(date) || !validBookingTime(time)) return res.status(400).json({ error: 'Date ou heure invalide' });
   if (String(client_name).length > 255 || String(email).length > 255) return res.status(400).json({ error: 'Nom ou email trop long' });
 
@@ -640,7 +642,7 @@ router.post('/', bookingRateLimiter, wrap(withBookingLock(async (req, res) => {
   await conn.query(
     `INSERT INTO appointments (id, salon_id, barber_id, client_name, email, phone, service_id, scheduled_at, status, cancel_token, client_note, gift_card_id)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?, ?)`,
-    [id, req.salon.id, finalBarberId, client_name, email, phone || null, service_id, scheduledAt, cancelToken, clientNote, gift_id || null]
+    [id, req.salon.id, finalBarberId, client_name, email, phone || null, service.id, scheduledAt, cancelToken, clientNote, gift_id || null]
   );
   if (extraIds.length) {
     await conn.query(
@@ -685,7 +687,7 @@ router.post('/', bookingRateLimiter, wrap(withBookingLock(async (req, res) => {
     await sendAppointmentConfirmation(req.salon.id, email, {
       clientName: client_name,
       when,
-      serviceName: service.name + (extraNames.length ? ' + ' + extraNames.join(', ') : ''),
+      serviceName: serviceLabel(service.name, extraNames, service.extras_only),
       barberName: barber ? barber.name : null,
       cancelUrl,
       giftNote: gift_id ? 'Ce rendez-vous est réglé avec votre carte cadeau - présentez-vous en salon, rien à payer sur place.' : null
@@ -698,7 +700,7 @@ router.post('/', bookingRateLimiter, wrap(withBookingLock(async (req, res) => {
   // dans la file (verrouillé jusqu'à l'heure prévue côté interface).
   const today = nowInParis(rdvSettings.timezone).dateStr;
   if (date === today) {
-    await promoteAppointment({ id, salon_id: req.salon.id, barber_id: finalBarberId, client_name, email, phone, service_id, scheduled_at: scheduledAt }, extraIds, productSelections);
+    await promoteAppointment({ id, salon_id: req.salon.id, barber_id: finalBarberId, client_name, email, phone, service_id: service.id, scheduled_at: scheduledAt }, extraIds, productSelections);
   }
 
   // Le coiffeur retenu (utile surtout en « Premier disponible ») : affiche au client apres confirmation.
@@ -751,6 +753,7 @@ async function createGroupBooking(req, res, staff) {
     const cat = await loadCatalog(req.salon.id, p.service_id, p.extras);
     if (!cat.ok) return fail(cat.status, i, cat.error + ' (' + p.name + ').');
     const service = cat.service;
+    p.service_id = service.id;   // « Supplement seul » : la prestation cachee
     const extraIds = cat.extras.map((e) => e.id), extraNames = cat.extras.map((e) => e.name);
     let productSelections = [];
     if (p.products.length) {
@@ -785,7 +788,7 @@ async function createGroupBooking(req, res, staff) {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?, ?)`,
       [id, req.salon.id, barberId, p.name, email || null, phone || null, p.service_id, scheduledAt, cancelToken, clientNote, groupId]
     );
-    created.push({ id, cancelToken, person: p, barberId, scheduledAt, serviceName: service.name + (extraNames.length ? ' + ' + extraNames.join(', ') : ''), extraIds, productSelections, durationMin });
+    created.push({ id, cancelToken, person: p, barberId, scheduledAt, serviceName: serviceLabel(service.name, extraNames, service.extras_only), extraIds, productSelections, durationMin });
     if (extraIds.length) await pool.query('INSERT INTO appointment_extras (appointment_id, extra_id) VALUES ?', [extraIds.map((eid) => [id, eid])]);
     if (productSelections.length) await pool.query('INSERT INTO appointment_products (appointment_id, product_id, quantity) VALUES ?', [productSelections.map((x) => [id, x.id, x.quantity])]);
   }
@@ -888,7 +891,7 @@ router.post('/admin-create', requireAdminOrBarber, wrap(withBookingLock(async (r
   let barber_id = req.actingBarberId || req.body.barber_id || null;
   const clientNote = req.body.client_note ? String(req.body.client_note).slice(0, 500) : null;
   if (!client_name) return res.status(400).json({ error: 'Le nom est requis' });
-  if (!service_id || !date || !time) return res.status(400).json({ error: 'Prestation, date et créneau requis' });
+  if (!date || !time) return res.status(400).json({ error: 'Prestation, date et créneau requis' });
   if (!validBookingDate(date) || !validBookingTime(time)) return res.status(400).json({ error: 'Date ou heure invalide' });
   if (String(client_name).length > 255 || (email && String(email).length > 255)) return res.status(400).json({ error: 'Nom ou email trop long' });
 
@@ -953,7 +956,7 @@ router.post('/admin-create', requireAdminOrBarber, wrap(withBookingLock(async (r
   await pool.query(
     `INSERT INTO appointments (id, salon_id, barber_id, client_name, email, phone, service_id, scheduled_at, status, cancel_token, client_note)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?)`,
-    [id, req.salon.id, barber_id, client_name, email || null, phone || null, service_id, scheduledAt, cancelToken, clientNote]
+    [id, req.salon.id, barber_id, client_name, email || null, phone || null, service.id, scheduledAt, cancelToken, clientNote]
   );
   if (extraIds.length) {
     await pool.query('INSERT INTO appointment_extras (appointment_id, extra_id) VALUES ?', [extraIds.map((eid) => [id, eid])]);
@@ -972,7 +975,7 @@ router.post('/admin-create', requireAdminOrBarber, wrap(withBookingLock(async (r
     try {
       await sendAppointmentConfirmation(req.salon.id, email, {
         clientName: client_name, when,
-        serviceName: service.name + (extraNames.length ? ' + ' + extraNames.join(', ') : ''),
+        serviceName: serviceLabel(service.name, extraNames, service.extras_only),
         barberName: barber ? barber.name : null,
         cancelUrl
       });
@@ -984,7 +987,7 @@ router.post('/admin-create', requireAdminOrBarber, wrap(withBookingLock(async (r
   const today = nowInParis(rdvSettings.timezone).dateStr;
   if (date === today) {
     await promoteAppointment(
-      { id, salon_id: req.salon.id, barber_id, client_name, email: email || null, phone, service_id, scheduled_at: scheduledAt },
+      { id, salon_id: req.salon.id, barber_id, client_name, email: email || null, phone, service_id: service.id, scheduled_at: scheduledAt },
       extraIds, productSelections
     );
   }
@@ -1293,7 +1296,7 @@ router.put('/:id/reschedule', requireAdminOrBarber, wrap(withBookingLock(async (
       const cancelUrl = baseUrl + (baseUrl.includes('?') ? '&' : '?') + 'cancel=' + appt.cancel_token;
       await sendAppointmentRescheduled(req.salon.id, appt.email, {
         clientName: appt.client_name, when,
-        serviceName: appt.service_name + (extraLinks.length ? ' + ' + extraLinks.map((e) => e.name).join(', ') : ''),
+        serviceName: serviceLabel(appt.service_name, extraLinks.map((e) => e.name)),
         barberName: barber ? barber.name : null,
         cancelUrl
       });

@@ -23,14 +23,14 @@ function page(services, extras, products) {
   w.eval(fnSrc(app, 'esc'));
   w.formatMinutes = (m) => m + ' min'; w.eur = (c) => (c / 100).toFixed(2) + ' €';
   w.services = services; w.extras = extras || []; w.products = products || [];
-  const vars = ['VITRINE_PLUS_SVG', 'VITRINE_CHECK_SVG', 'VITRINE_CHECK_SM_SVG'].map(n => app.match(new RegExp('^var ' + n + ' = .*;$', 'm'))[0]).join('\n') + '\n';
+  const vars = ['VITRINE_PLUS_SVG', 'VITRINE_CHECK_SVG', 'VITRINE_CHECK_SM_SVG', 'EXTRAS_ONLY', 'EXTRAS_ONLY_NAME', 'EXTRAS_ONLY_SERVICE'].map(n => app.match(new RegExp('^var ' + n + ' = .*;$', 'm'))[0]).join('\n') + '\n';
   w.eval('var selService = null, selExtras = [], selProducts = [];\n' + vars +
-    ['normText', 'vitrineIcon', 'vitrineBaseIcon', 'extraIcon', 'productIcon', 'groupItems', 'vitrineCardHtml', 'vitrineRender', 'vitrineSummary', 'vitrineFilter', 'vitrineSelectOne', 'vitrineToggle'].map(n => fnSrc(app, n)).join('\n') + '\n' +
-    ['iconForItem', 'renderServiceGrid', 'itemListConfig', 'renderItemList', 'updateItemsSummary', 'selectService', 'toggleExtra', 'toggleProduct'].map(n => fnSrc(rdv, n)).join('\n'));
+    ['normText', 'vitrineIcon', 'vitrineBaseIcon', 'extraIcon', 'productIcon', 'groupItems', 'vitrineCardHtml', 'vitrineRender', 'vitrineSummary', 'vitrineFilter', 'vitrineSelectOne', 'vitrineToggle', 'extrasOnlyCardHtml'].map(n => fnSrc(app, n)).join('\n') + '\n' +
+    ['iconForItem', 'updateExtrasStepText', 'renderServiceGrid', 'itemListConfig', 'renderItemList', 'updateItemsSummary', 'selectService', 'toggleExtra', 'toggleProduct'].map(n => fnSrc(rdv, n)).join('\n'));
   w.renderServiceGrid();
   return w;
 }
-const cards = (w) => [...w.document.querySelectorAll('#svc-grid .item-card')];
+const cards = (w) => [...w.document.querySelectorAll('#svc-grid .item-card:not(.extras-only-card)')];   // + la carte « Seulement un supplement »
 
 (async () => {
   console.log('\n[A] Prestations : photo si elle existe, sinon l\'icone par defaut');

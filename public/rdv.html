@@ -18,7 +18,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Prendre rendez-vous</title>
-<link rel="stylesheet" href="/app.css?v=41">
+<link rel="stylesheet" href="/app.css?v=42">
 <script>
   // Adresse SANS ?salon=... : on masque la page le temps de savoir si la plateforme heberge plusieurs salons
   // (voir guardMissingSalon) - pour ne jamais montrer, meme une fraction de seconde, un formulaire sans salon.
@@ -400,8 +400,8 @@
   </section>
 </div>
 
-<script src="/app.js?v=33"></script>
-<script src="/group-booking.js?v=25"></script>
+<script src="/app.js?v=34"></script>
+<script src="/group-booking.js?v=26"></script>
 <style>
 body.staff-mode .gift-summary-box,body.staff-mode .theme-btn,body.staff-mode .login-hint{display:none!important}
 .login-hint{background:var(--fill);border-radius:14px;padding:12px 14px;margin:0 0 18px;font-size:14.5px;font-weight:600}
@@ -615,8 +615,9 @@ function applyBarberOffer() {
   // « Premier disponible » : ce qu'au moins un coiffeur fait, au prix le plus bas (« dès » si les tarifs different).
   services = selBarber === '' ? anyBarberItems(barbers, 'services', servicesAll) : barberItems(b, 'services', servicesAll);
   extras = selBarber === '' ? anyBarberItems(barbers, 'extras', extrasAll) : barberItems(b, 'extras', extrasAll);
-  if (selService && !services.some(function (x) { return String(x.id) === String(selService); })) selService = null;
+  if (selService && selService !== EXTRAS_ONLY && !services.some(function (x) { return String(x.id) === String(selService); })) selService = null;
   selExtras = selExtras.filter(function (id) { return extras.some(function (x) { return String(x.id) === String(id); }); });
+  if (selService === EXTRAS_ONLY && !extras.length) selService = null;
   renderServiceGrid();
   document.getElementById('service-next-btn').disabled = !selService;
 }
@@ -733,6 +734,9 @@ function lookupGiftCode() {
 
 function renderServiceGrid() {
   vitrineRender({ kind: 'services', gridId: 'svc-grid', items: services, chosen: selService ? [selService] : [], onclick: "selectService(this,'{id}')" });
+  // « Seulement un supplement » : derniere carte, s'il y a des supplements chez ce coiffeur.
+  if (extras.length) document.getElementById('svc-grid').insertAdjacentHTML('beforeend', extrasOnlyCardHtml(selService === EXTRAS_ONLY, "selectService(this,'" + EXTRAS_ONLY + "')"));
+  updateExtrasStepText();
   renderItemList('extras');
   renderItemList('products');
 }
@@ -755,7 +759,7 @@ function refreshRecap() {
   var priced = anyB && selSlot ? barbers.find(function (x) { return String(x.id) === String(selSlot.barberId); }) : null;
   var svcList = priced ? barberItems(priced, 'services', servicesAll) : services, extList = priced ? barberItems(priced, 'extras', extrasAll) : extras;
   vitrineRecapFill({
-    service: svcList.find(function (x) { return String(x.id) === String(selService); }),
+    service: selService === EXTRAS_ONLY ? EXTRAS_ONLY_SERVICE : svcList.find(function (x) { return String(x.id) === String(selService); }),
     extras: pick(extList, selExtras.map(String)), products: pick(products, selProducts.map(String)),
     barber: anyB ? 'Premier disponible' : (b ? b.name : ''), time: selSlot ? selSlot.time : '',
     when: selDate ? new Date(selDate + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' }) : ''
@@ -771,6 +775,15 @@ function selectService(el, id) {
   selService = id;
   vitrineSelectOne(el);
   document.getElementById('service-next-btn').disabled = false;
+  updateExtrasStepText();
+}
+// Etape Supplements : « optionnels » apres une prestation, au moins un si « seulement un supplement ».
+function updateExtrasStepText() {
+  var only = selService === EXTRAS_ONLY;
+  var ey = document.querySelector('#p-extras .eyebrow'), sub = document.querySelector('#p-extras .step-sub');
+  if (!ey || !sub) return;
+  ey.textContent = only ? 'Choisissez votre supplément' : 'Suppléments (optionnels)';
+  sub.textContent = only ? 'Sans prestation : choisissez au moins un supplément.' : 'Personnalisez votre prestation : touchez pour ajouter.';
 }
 
 function toggleExtra(el, id) {
@@ -797,6 +810,7 @@ function goToExtrasStep() {
 
 function goToProductsStep() {
   if (!selService) { toast('Choisissez une prestation', true); return; }
+  if (selService === EXTRAS_ONLY && !selExtras.length) { toast('Choisissez au moins un supplément', true); return; }
   show('p-products');
 }
 
@@ -883,7 +897,7 @@ function goToContactStep() {
   var s = services.find(function (x) { return x.id === selService; });
   var extraNames = selExtras.map(function (id) { return extras.find(function (e) { return e.id === id; }).name; });
   var when = new Date(selDate + 'T' + selSlot.time).toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' }) + ' à ' + selSlot.time;
-  document.getElementById('contact-summary').textContent = when + ' — ' + s.name + (extraNames.length ? ' + ' + extraNames.join(', ') : '');
+  document.getElementById('contact-summary').textContent = when + ' — ' + svcLabel(s ? s.name : '', extraNames);
 
   // Cadeau : coordonnées du bénéficiaire déjà connues, pré-remplies
   // mais toujours modifiables (au cas où il faudrait les corriger).
@@ -921,8 +935,9 @@ function submitAppointment() {
     }
   }).then(function (r) {
     var s = services.find(function (x) { return x.id === selService; });
+    var exNames = selExtras.map(function (id) { var e = extras.find(function (x) { return x.id === id; }); return e ? e.name : ''; });
     var when = new Date(selDate + 'T' + selSlot.time).toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' }) + ' à ' + selSlot.time;
-    document.getElementById('confirm-details').textContent = when + ' — ' + s.name + (r && r.barber_name ? ' · Votre coiffeur : ' + r.barber_name : '') + (activeGift ? ' (cadeau utilisé — présentez ce cadeau à votre coiffeur)' : '');
+    document.getElementById('confirm-details').textContent = when + ' — ' + (s ? s.name : svcLabel('', exNames)) + (r && r.barber_name ? ' · Votre coiffeur : ' + r.barber_name : '') + (activeGift ? ' (cadeau utilisé — présentez ce cadeau à votre coiffeur)' : '');
     show('p-confirmed'); redirectToSalonSite('p-confirmed');
   }).catch(function (e) {
     toast(e.message, true);

@@ -683,7 +683,8 @@
   // Lignes du panier : qui, quand, quoi, avec qui, combien ; « Modifier » / retirer. eur : formateur de prix.
   function cartRowsHtml(cart, eur, fnPrefix) {
     return (cart || []).map(function (e, i) {
-      var what = e.service_name + (e.extra_names && e.extra_names.length ? ' + ' + e.extra_names.join(', ') : '');
+      // « Seulement un supplement » : pas de nom de prestation, seulement les supplements.
+      var what = e.service_name ? e.service_name + (e.extra_names && e.extra_names.length ? ' + ' + e.extra_names.join(', ') : '') : (e.extra_names || []).join(', ');
       var prod = e.product_names && e.product_names.length ? '<em>Produit' + (e.product_names.length > 1 ? 's' : '') + ' : ' + esc(e.product_names.join(', ')) + '</em>' : '';
       return '<div class="cart-row"><div class="cart-when"><b>' + esc(e.time) + '</b><span>' + esc(cartDate(e.date)) + '</span></div>' +
         '<div class="cart-what"><b>' + esc(e.name) + '</b><span>' + esc(what) + (e.barber_name ? ' · ' + esc(e.barber_name) : '') + '</span>' + prod + '</div>' +
