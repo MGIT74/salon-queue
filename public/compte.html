@@ -1736,6 +1736,11 @@ function goToBookProductsStep() {
   show('p-book-products');
 }
 
+// Calendrier : jours qui ont au moins un creneau pour ce choix (coiffeur, prestation, supplements).
+window.bkDaysQuery = function () {
+  if (!selBookService) return null;
+  return 'service_id=' + selBookService + '&extras=' + selBookExtras.join(',') + (selBookBarber ? '&barber_id=' + selBookBarber : '');
+};
 function goToBookDateStep() {
   if (!selBookService) { toast('Choisissez une prestation', true); return; }
   var today = salonToday();
@@ -1743,7 +1748,7 @@ function goToBookDateStep() {
   document.getElementById('bk-date').min = today;
   if (!document.getElementById('bk-date').value || document.getElementById('bk-date').value < today) document.getElementById('bk-date').value = today;
   // Groupe : la date commune est gardee ; sinon, aller au premier jour ou le coiffeur choisi est present.
-  if (!(bkGrp && bkGrp.date) && window.bkPickOpenDay) window.bkPickOpenDay();
+  if (window.bkPickOpenDay) window.bkPickOpenDay(!(bkGrp && bkGrp.date));
   show('p-book-datetime');
   loadBookSlots();
 }
@@ -2040,9 +2045,36 @@ function guardMissingSalon() {
     }
     return null;
   }
-  window.bkPickOpenDay = function(){
+  // Jours sans AUCUN creneau pour ce choix (coiffeur absent, journee complete ou terminee...), demandes au serveur
+  // mois par mois : meme calcul que les creneaux affiches, donc meme regle pour tous les coiffeurs.
+  var freeCache = {}, autoPick = 0;
+  function freeKey(){
+    var q = window.bkDaysQuery && window.bkDaysQuery(); if (!q) return null;
+    var y=shown.getFullYear(), m=shown.getMonth();
+    return 'from='+iso(y,m+1,1)+'&to='+iso(y,m+1,new Date(y,m+1,0).getDate())+'&'+q;
+  }
+  function freeDays(){ var k=freeKey(), f=k && freeCache[k]; return f && f !== 'loading' ? f : null; }
+  function ensureFree(){
+    var k=freeKey(); if (!k || freeCache[k]) return;
+    freeCache[k]='loading';
+    api('/api/appointments/availability-days?'+k).then(function(r){
+      var f={}; (r.days||[]).forEach(function(x){ f[x]=1; }); freeCache[k]=f;
+      if (k===freeKey()) { afterFree(); render(); }
+    }).catch(function(){ delete freeCache[k]; });
+  }
+  // A l'etape date : si le jour choisi n'a aucun creneau, aller tout seul au premier jour qui en a (3 mois max).
+  function afterFree(){
+    var f=freeDays(); if (!autoPick || !f) return;
+    if (input.value && f[input.value]) { autoPick=0; return; }
+    var days=Object.keys(f).sort().filter(function(x){ return x >= (input.value || today); });
+    if (days.length) { autoPick=0; input.value=days[0]; input.dispatchEvent(new Event('change',{bubbles:true})); return; }
+    if (autoPick++ < 3) { shown.setMonth(shown.getMonth()+1); return; }
+    autoPick=0; if (input.value) { shown=new Date(input.value+'T12:00:00'); shown.setDate(1); }
+  }
+  window.bkPickOpenDay = function(auto){
+    freeCache = {}; autoPick = auto === false ? 0 : 1;
     var c = firstOpenDay();
-    if (c && c !== input.value) input.value = c;
+    if (autoPick && c && c !== input.value) input.value = c;
     if (input.value) { shown = new Date(input.value + 'T12:00:00'); shown.setDate(1); }
     render();
   };
@@ -2054,16 +2086,17 @@ function guardMissingSalon() {
     ['L','M','M','J','V','S','D'].forEach(function(day){var x=document.createElement('span');x.textContent=day;grid.appendChild(x);});
     var offset=(new Date(y,m,1).getDay()+6)%7;
     for(var k=0;k<offset;k++){grid.appendChild(document.createElement('span'));}
-    var count=new Date(y,m+1,0).getDate();
+    var count=new Date(y,m+1,0).getDate(), free=freeDays();
     for(var d=1;d<=count;d++){
       (function(day){var value=iso(y,m+1,day),button=document.createElement('button');button.type='button';button.textContent=day;
-      var off=!(value<today || (input.max && value>input.max) || isClosed(value)) && barberOff(value);
+      var off=!(value<today || (input.max && value>input.max) || isClosed(value)) && (barberOff(value) || (free && !free[value]));
       var unavailable=value<today || (input.max && value>input.max) || isClosed(value) || off;
       button.disabled=unavailable;button.className=(value===input.value?'selected':'')+(off?' barber-off':'');
-      button.setAttribute('aria-label',value);if(unavailable)button.title=off?'Coiffeur absent ce jour':'Date indisponible';
+      button.setAttribute('aria-label',value);if(unavailable)button.title=off?(barberOff(value)?'Coiffeur absent ce jour':'Aucun créneau ce jour'):'Date indisponible';
       button.onclick=function(){input.value=value;input.dispatchEvent(new Event('change',{bubbles:true}));render();};grid.appendChild(button);})(d);
     }
     document.getElementById('bk-date-prev').disabled=iso(y,m+1,1)<today.slice(0,7)+'-01';
+    ensureFree();
   }
   document.getElementById('bk-date-prev').onclick=function(){shown.setMonth(shown.getMonth()-1);render();};
   document.getElementById('bk-date-next').onclick=function(){shown.setMonth(shown.getMonth()+1);render();};

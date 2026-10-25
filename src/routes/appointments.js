@@ -414,6 +414,44 @@ router.get('/availability', wrap(async (req, res) => {
   res.json({ ok: true, slots: merged, any: true, price_min_cents: prices.length ? Math.min(...prices) : null, price_max_cents: prices.length ? Math.max(...prices) : null });
 }));
 
+// Jours qui ont AU MOINS un creneau (meme calcul que /availability), pour griser dans le calendrier de reservation
+// les jours ou le coiffeur choisi (ou aucun coiffeur, en « Premier disponible ») n'a rien : conge, jour non travaille,
+// jour « sans RDV », journee complete ou deja terminee. ?from=&to= (62 jours max) + service_id/extras/barber_id.
+router.get('/availability-days', wrap(async (req, res) => {
+  const { from, to, service_id, barber_id } = req.query;
+  if (!validBookingDate(from) || !validBookingDate(to) || to < from) return res.status(400).json({ error: 'Periode invalide' });
+  if ((!service_id || service_id === '__extras__') && !req.query.extras) return res.status(400).json({ error: 'service_id requis' });
+  const span = Math.round((new Date(to + 'T00:00:00Z') - new Date(from + 'T00:00:00Z')) / 86400000);
+  if (span > 62) return res.status(400).json({ error: 'Periode trop longue' });
+  if (barber_id) {
+    const [[owned]] = await pool.query('SELECT id FROM barbers WHERE id = ? AND salon_id = ? AND active = 1', [barber_id, req.salon.id]);
+    if (!owned) return res.status(404).json({ error: 'Coiffeur introuvable' });
+  }
+  const rdvSettings = await getSettings(req.salon.id);
+  const cat = await loadCatalog(req.salon.id, service_id, req.query.extras ? String(req.query.extras).split(',').filter(Boolean) : []);
+  if (!cat.ok) return res.status(cat.status).json({ error: cat.error });
+  let ids;
+  if (barber_id) ids = [barber_id];
+  else {
+    const [rows] = await pool.query('SELECT id FROM barbers WHERE salon_id = ? AND active = 1 AND accepts_appointments = 1 ORDER BY sort_order, name', [req.salon.id]);
+    ids = rows.map((r) => r.id);
+  }
+  const offers = [];
+  for (const id of ids) { const offer = await offerFor(id, cat); if (offer.ok) offers.push({ id, offer }); }
+  const todayStr = nowParisDatetimeString(rdvSettings.timezone).slice(0, 10);
+  const days = [];
+  const d = new Date(from + 'T00:00:00Z'), end = new Date(to + 'T00:00:00Z');
+  for (; d <= end; d.setUTCDate(d.getUTCDate() + 1)) {
+    const dateStr = d.toISOString().slice(0, 10);
+    if (dateStr < todayStr || isBeyondAdvanceWindow(dateStr, rdvSettings)) continue;
+    for (const o of offers) {
+      const slots = await computeSlotsForBarber(o.id, dateStr, o.offer.durationMin, rdvSettings, {});
+      if (slots.length) { days.push(dateStr); break; }
+    }
+  }
+  res.json({ ok: true, days });
+}));
+
 /**
  * Liste des rendez-vous à venir (admin) — pour une future vue
  * "Rendez-vous du jour" dans le dashboard.
