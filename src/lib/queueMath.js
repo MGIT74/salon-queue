@@ -171,7 +171,7 @@ async function loadQueue(salonId, statuses, onlyUnpaid) {
  * Nombre de coiffeurs réellement en poste maintenant pour CE salon,
  * d'après leurs horaires. Sans horaire, tous les coiffeurs actifs comptent.
  */
-async function activeBarberCount(salonId) {
+async function dutyBarbers(salonId) {
   // Heure de salon (réglable, Europe/Paris par défaut), jamais l'heure du
   // serveur (UTC) - une simple `new Date()` décalerait la fenêtre "en
   // poste" de 1 à 2h selon le fuseau et la saison, tout au long de la
@@ -187,8 +187,8 @@ async function activeBarberCount(salonId) {
   const weekday = new Date(`${todayStr}T00:00:00Z`).getUTCDay();
   const hhmm = `${g('hour')}:${g('minute')}:${g('second')}`;
 
-  const [[barbers], [schedules], [leaves]] = await Promise.all([
-    pool.query('SELECT id FROM barbers WHERE salon_id = ? AND active = 1', [salonId]),
+  const [[barbers], [schedules], [leaves], [walkinDays]] = await Promise.all([
+    pool.query('SELECT id, kiosk_hidden FROM barbers WHERE salon_id = ? AND active = 1', [salonId]),
     pool.query(
       `SELECT bs.* FROM barber_schedules bs
        JOIN barbers b ON b.id = bs.barber_id
@@ -200,14 +200,22 @@ async function activeBarberCount(salonId) {
        JOIN barbers b ON b.id = bl.barber_id
        WHERE b.salon_id = ? AND ? BETWEEN bl.start_date AND bl.end_date`,
       [salonId, todayStr]
+    ),
+    pool.query(
+      `SELECT w.barber_id FROM barber_walkin_days w
+       JOIN barbers b ON b.id = w.barber_id
+       WHERE b.salon_id = ? AND ? BETWEEN w.start_date AND w.end_date`,
+      [salonId, todayStr]
     )
   ]);
+  const walkinDay = new Set(walkinDays.map((w) => w.barber_id));
+  const tag = (list) => list.map((b) => ({ id: b.id, walkin: !b.kiosk_hidden || walkinDay.has(b.id) }));
 
   const onLeaveIds = new Set(leaves.map((l) => l.barber_id));
   const available = barbers.filter((b) => !onLeaveIds.has(b.id));
 
-  if (available.length === 0) return 1;
-  if (schedules.length === 0) return available.length;
+  if (available.length === 0) return [];
+  if (schedules.length === 0) return tag(available);
 
   const onDuty = available.filter((b) =>
     schedules.some((s) =>
@@ -215,7 +223,12 @@ async function activeBarberCount(salonId) {
     )
   );
 
-  return Math.max(onDuty.length, 1);
+  return tag(onDuty);
+}
+
+/** Nombre de coiffeurs en poste maintenant (au moins 1). */
+async function activeBarberCount(salonId) {
+  return Math.max((await dutyBarbers(salonId)).length, 1);
 }
 
 /**
@@ -225,7 +238,7 @@ async function activeBarberCount(salonId) {
  */
 async function recompute(salonId) {
   const rows = await loadQueue(salonId);
-  const lanes = new Array(await activeBarberCount(salonId)).fill(0);
+  const duty = await dutyBarbers(salonId);
   const now = Date.now();
 
   // Marge minimale affichée tant qu'une coupe est en cours, même en cas de
@@ -233,28 +246,45 @@ async function recompute(salonId) {
   // le coiffeur est déjà libre alors qu'il est encore en train de couper.
   const OVERRUN_BUFFER_MIN = 5;
 
+  // Une « voie » par coiffeur : le temps avant qu'il soit libre. On part de sa coupe en cours, puis on ajoute, dans
+  // l'ordre d'arrivee, les clients qu'il prendra :
+  //  - client qui a choisi un coiffeur : chez CE coiffeur (et pas chez le premier libre du salon) ;
+  //  - client « Premier disponible » venu sans RDV : chez le coiffeur sans RDV (en poste) qui se libere le premier ;
+  //  - RDV sans coiffeur : chez le premier coiffeur en poste qui se libere.
+  // Avant : tous les clients etaient repartis sur TOUS les coiffeurs en poste (meme ceux en RDV), sans tenir compte
+  // du coiffeur choisi : un client qui attendait son coiffeur voyait une attente beaucoup trop courte.
+  const lane = {};
+  duty.forEach((b) => { lane[b.id] = 0; });
   rows.filter((r) => r.status === 'in_progress').forEach((r) => {
     const elapsedMin = r.start_at ? (now - new Date(r.start_at).getTime()) / 60000 : 0;
     const remaining = r.total_duration_min - elapsedMin;
     const left = remaining > 0 ? remaining : OVERRUN_BUFFER_MIN;
-    const i = lanes.indexOf(Math.min(...lanes));
-    lanes[i] += left;
+    if (r.barber_id) lane[r.barber_id] = (lane[r.barber_id] || 0) + left;
   });
+  const walkinIds = duty.filter((b) => b.walkin).map((b) => b.id);
+  const allIds = duty.map((b) => b.id);
+  const earliest = (ids) => ids.reduce((best, id) => (best === null || lane[id] < lane[best] ? id : best), null);
 
   const waiting = rows.filter((r) => r.status === 'waiting');
   const active = rows.filter((r) => r.status === 'in_progress');
   const updates = [];
 
   waiting.forEach((r, idx) => {
-    const i = lanes.indexOf(Math.min(...lanes));
+    let id = r.barber_id || null;
+    if (!id) id = earliest(!r.is_appointment && walkinIds.length ? walkinIds : allIds);
+    let wait = 0;
+    if (id) {
+      if (lane[id] === undefined) lane[id] = 0;   // coiffeur choisi mais pas (encore) en poste
+      wait = lane[id];
+      lane[id] += r.total_duration_min || 0;
+    }
     updates.push({
       id: r.id,
       position: idx + 1,
-      estimated_wait_min: Math.round(lanes[i]),
+      estimated_wait_min: Math.round(wait),
       total_duration_min: r.total_duration_min,
       total_price_cents: r.total_price_cents
     });
-    lanes[i] += r.total_duration_min;
   });
 
   // Les coupes en cours n'ont pas de position, mais leur durée/prix totaux
@@ -281,4 +311,4 @@ async function recompute(salonId) {
   return updates;
 }
 
-module.exports = { loadQueue, recompute, activeBarberCount, clientKey, earnLoyaltyPoint };
+module.exports = { loadQueue, recompute, activeBarberCount, dutyBarbers, clientKey, earnLoyaltyPoint };
