@@ -145,7 +145,8 @@ const suite = [
   ['122-douchette-caisse-focus.js', false, ['exit']],
   ['123-journal-erreurs-serveur.js', false, ['exit']],
   ['124-supplement-seul.js', false, ['exit']],
-  ['125-attente-par-coiffeur.js', false, ['exit']]
+  ['125-attente-par-coiffeur.js', false, ['exit']],
+  ['126-identifiants-longs.js', false, ['exit']]
 ];
 
 let bad = 0;

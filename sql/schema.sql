@@ -269,7 +269,7 @@ CREATE TABLE IF NOT EXISTS client_notes (
 -- Pas de ligne = ce coiffeur applique le tarif par défaut.
 CREATE TABLE IF NOT EXISTS barber_service_prices (
   barber_id CHAR(36) NOT NULL,
-  service_id CHAR(36) NOT NULL,
+  service_id VARCHAR(60) NOT NULL,
   price_cents INT NOT NULL,
   PRIMARY KEY (barber_id, service_id),
   FOREIGN KEY (barber_id) REFERENCES barbers(id) ON DELETE CASCADE,
@@ -278,7 +278,7 @@ CREATE TABLE IF NOT EXISTS barber_service_prices (
 
 CREATE TABLE IF NOT EXISTS barber_extra_prices (
   barber_id CHAR(36) NOT NULL,
-  extra_id CHAR(36) NOT NULL,
+  extra_id VARCHAR(60) NOT NULL,
   price_cents INT NOT NULL,
   PRIMARY KEY (barber_id, extra_id),
   FOREIGN KEY (barber_id) REFERENCES barbers(id) ON DELETE CASCADE,
@@ -350,7 +350,7 @@ CREATE TABLE IF NOT EXISTS sale_items (
   id CHAR(36) PRIMARY KEY,
   sale_id CHAR(36) NOT NULL,
   item_type VARCHAR(20) NOT NULL,
-  item_id CHAR(36) NULL,
+  item_id VARCHAR(60) NULL,
   item_name VARCHAR(255) NOT NULL,
   unit_price_cents INT NOT NULL,
   quantity INT NOT NULL DEFAULT 1,
@@ -492,7 +492,7 @@ CREATE TABLE IF NOT EXISTS appointments (
   client_name VARCHAR(255) NOT NULL,
   email VARCHAR(255) NULL,
   phone VARCHAR(50) NULL,
-  service_id CHAR(36) NOT NULL,
+  service_id VARCHAR(60) NOT NULL,
   scheduled_at DATETIME NOT NULL,
   status VARCHAR(20) NOT NULL DEFAULT 'confirmed',
   cancel_token VARCHAR(64) NULL,
@@ -505,7 +505,7 @@ CREATE TABLE IF NOT EXISTS appointments (
 
 CREATE TABLE IF NOT EXISTS appointment_extras (
   appointment_id CHAR(36) NOT NULL,
-  extra_id CHAR(36) NOT NULL,
+  extra_id VARCHAR(60) NOT NULL,
   PRIMARY KEY (appointment_id, extra_id),
   FOREIGN KEY (appointment_id) REFERENCES appointments(id) ON DELETE CASCADE,
   FOREIGN KEY (extra_id) REFERENCES extras(id) ON DELETE CASCADE
@@ -1391,3 +1391,53 @@ CREATE TABLE IF NOT EXISTS server_errors (
 SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'services' AND column_name = 'system_kind');
 SET @sql := IF(@c = 0, 'ALTER TABLE services ADD COLUMN system_kind VARCHAR(20) NULL', 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Identifiants du catalogue (prestations, supplements) : jusqu'a 60 caracteres (services.id / extras.id VARCHAR(60),
+-- fabriques a partir du nom). Ces colonnes n'en acceptaient que 36 : une prestation au nom long, ou la prestation
+-- cachee « Supplement seul », faisait echouer le RDV (« Data too long for column 'service_id' »).
+-- MariaDB refuse de modifier une colonne liee (cle etrangere) : on retire le lien, on elargit, on remet le lien.
+-- Rejouable sans risque : chaque etape verifie l'etat reel (le lien est remis meme apres un arret en cours de route).
+SET FOREIGN_KEY_CHECKS = 0;
+SET @c := (SELECT CHARACTER_MAXIMUM_LENGTH FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'appointments' AND column_name = 'service_id');
+SET @fk := (SELECT CONSTRAINT_NAME FROM information_schema.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'appointments' AND COLUMN_NAME = 'service_id' AND REFERENCED_TABLE_NAME IS NOT NULL LIMIT 1);
+SET @sql := IF(@c < 60 AND @fk IS NOT NULL, CONCAT('ALTER TABLE appointments DROP FOREIGN KEY ', @fk), 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @sql := IF(@c < 60, 'ALTER TABLE appointments MODIFY service_id VARCHAR(60) NOT NULL', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @fk := (SELECT CONSTRAINT_NAME FROM information_schema.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'appointments' AND COLUMN_NAME = 'service_id' AND REFERENCED_TABLE_NAME IS NOT NULL LIMIT 1);
+SET @sql := IF(@fk IS NULL, 'ALTER TABLE appointments ADD FOREIGN KEY (service_id) REFERENCES services(id) ON DELETE CASCADE', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @c := (SELECT CHARACTER_MAXIMUM_LENGTH FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'appointment_extras' AND column_name = 'extra_id');
+SET @fk := (SELECT CONSTRAINT_NAME FROM information_schema.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'appointment_extras' AND COLUMN_NAME = 'extra_id' AND REFERENCED_TABLE_NAME IS NOT NULL LIMIT 1);
+SET @sql := IF(@c < 60 AND @fk IS NOT NULL, CONCAT('ALTER TABLE appointment_extras DROP FOREIGN KEY ', @fk), 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @sql := IF(@c < 60, 'ALTER TABLE appointment_extras MODIFY extra_id VARCHAR(60) NOT NULL', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @fk := (SELECT CONSTRAINT_NAME FROM information_schema.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'appointment_extras' AND COLUMN_NAME = 'extra_id' AND REFERENCED_TABLE_NAME IS NOT NULL LIMIT 1);
+SET @sql := IF(@fk IS NULL, 'ALTER TABLE appointment_extras ADD FOREIGN KEY (extra_id) REFERENCES extras(id) ON DELETE CASCADE', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @c := (SELECT CHARACTER_MAXIMUM_LENGTH FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'barber_service_prices' AND column_name = 'service_id');
+SET @fk := (SELECT CONSTRAINT_NAME FROM information_schema.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'barber_service_prices' AND COLUMN_NAME = 'service_id' AND REFERENCED_TABLE_NAME IS NOT NULL LIMIT 1);
+SET @sql := IF(@c < 60 AND @fk IS NOT NULL, CONCAT('ALTER TABLE barber_service_prices DROP FOREIGN KEY ', @fk), 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @sql := IF(@c < 60, 'ALTER TABLE barber_service_prices MODIFY service_id VARCHAR(60) NOT NULL', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @fk := (SELECT CONSTRAINT_NAME FROM information_schema.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'barber_service_prices' AND COLUMN_NAME = 'service_id' AND REFERENCED_TABLE_NAME IS NOT NULL LIMIT 1);
+SET @sql := IF(@fk IS NULL, 'ALTER TABLE barber_service_prices ADD FOREIGN KEY (service_id) REFERENCES services(id) ON DELETE CASCADE', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @c := (SELECT CHARACTER_MAXIMUM_LENGTH FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'barber_extra_prices' AND column_name = 'extra_id');
+SET @fk := (SELECT CONSTRAINT_NAME FROM information_schema.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'barber_extra_prices' AND COLUMN_NAME = 'extra_id' AND REFERENCED_TABLE_NAME IS NOT NULL LIMIT 1);
+SET @sql := IF(@c < 60 AND @fk IS NOT NULL, CONCAT('ALTER TABLE barber_extra_prices DROP FOREIGN KEY ', @fk), 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @sql := IF(@c < 60, 'ALTER TABLE barber_extra_prices MODIFY extra_id VARCHAR(60) NOT NULL', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @fk := (SELECT CONSTRAINT_NAME FROM information_schema.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'barber_extra_prices' AND COLUMN_NAME = 'extra_id' AND REFERENCED_TABLE_NAME IS NOT NULL LIMIT 1);
+SET @sql := IF(@fk IS NULL, 'ALTER TABLE barber_extra_prices ADD FOREIGN KEY (extra_id) REFERENCES extras(id) ON DELETE CASCADE', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @c := (SELECT CHARACTER_MAXIMUM_LENGTH FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'sale_items' AND column_name = 'item_id');
+SET @fk := (SELECT CONSTRAINT_NAME FROM information_schema.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sale_items' AND COLUMN_NAME = 'item_id' AND REFERENCED_TABLE_NAME IS NOT NULL LIMIT 1);
+SET @sql := IF(@c < 60 AND @fk IS NOT NULL, CONCAT('ALTER TABLE sale_items DROP FOREIGN KEY ', @fk), 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @sql := IF(@c < 60, 'ALTER TABLE sale_items MODIFY item_id VARCHAR(60) NULL', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET FOREIGN_KEY_CHECKS = 1;
