@@ -756,6 +756,13 @@ function stableColorForId(id) {
   for (var i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
   return DOT_COLORS[hash % DOT_COLORS.length];
 }
+// Couleur d'un coiffeur PARTOUT : celle choisie dans sa fiche, sinon la couleur automatique (meme id = meme couleur).
+// b : le coiffeur, ou son id + la liste ou le chercher.
+function barberColorOf(b, list) {
+  if (b && typeof b !== 'object') b = (list || []).filter(function (x) { return String(x.id) === String(b); })[0] || { id: String(b) };
+  if (!b || !b.id) return 'var(--grey)';
+  return b.color || stableColorForId(String(b.id));
+}
 
 
 /* ---------- Connexion TPE / imprimante (programme de connexion local) ----------

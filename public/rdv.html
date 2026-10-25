@@ -400,7 +400,7 @@
   </section>
 </div>
 
-<script src="/app.js?v=34"></script>
+<script src="/app.js?v=35"></script>
 <script src="/group-booking.js?v=26"></script>
 <style>
 body.staff-mode .gift-summary-box,body.staff-mode .theme-btn,body.staff-mode .login-hint{display:none!important}
@@ -666,7 +666,7 @@ function renderGiftSummaryBox() {
       avatarEl.setAttribute('style', 'background-image:url(\'' + barber.photo_url + '\')');
       avatarEl.textContent = '';
     } else {
-      avatarEl.setAttribute('style', 'background:' + stableColorForId(barber.id));
+      avatarEl.setAttribute('style', 'background:' + barberColorOf(barber));
       avatarEl.textContent = (barber.name || '?').trim().charAt(0).toUpperCase();
     }
     document.getElementById('gift-summary-name').textContent = barber.name;

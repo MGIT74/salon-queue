@@ -2811,7 +2811,7 @@
   </div>
 </div>
 
-<script src="/app.js?v=34"></script>
+<script src="/app.js?v=35"></script>
 <script src="/autorefresh.js?v=2"></script>
 <script src="/staff-group.js?v=5"></script>
 <script src="/daterange.js?v=4"></script>
@@ -3349,7 +3349,7 @@ function renderDashLeaderboard() {
     : rows.map(function (r, i) {
         var avatarStyle = r.photo_url
           ? 'background:url(&quot;' + esc(r.photo_url) + '&quot;) center/cover'
-          : 'background:' + stableColorForId(r.id);
+          : 'background:' + barberColorOf(r.color ? r : r.id, barbers);
         var value = dashLeaderMetric === 'revenue' ? eur(r.revenue_cents)
           : dashLeaderMetric === 'speed' ? r.avg_minutes + ' min'
           : eur(r.product_revenue_cents);

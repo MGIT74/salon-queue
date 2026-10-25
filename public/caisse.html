@@ -1003,7 +1003,7 @@
   </div>
 </div>
 
-<script src="/app.js?v=34"></script>
+<script src="/app.js?v=35"></script>
 <script src="/staff-group.js?v=5"></script>
 <script src="/autorefresh.js?v=2"></script>
 <script>requireSalonInUrl("Pour utiliser la caisse, ouvrez le lien de votre salon.");</script>
@@ -2094,7 +2094,7 @@ function calDayDotsHtml(dayAppts) {
     var bid = a.barber_id || 'unassigned';
     if (seen[bid]) return;
     seen[bid] = true;
-    var color = bid === 'unassigned' ? 'var(--grey)' : stableColorForId(bid);
+    var color = bid === 'unassigned' ? 'var(--grey)' : barberColorOf(bid, allBarbers);   // couleur choisie dans la fiche du coiffeur
     dots.push('<span class="cal-dot" style="background:' + color + '"></span>');
   });
   return dots.length ? '<div class="cal-dots">' + dots.join('') + '</div>' : '';
@@ -2354,7 +2354,7 @@ function renderAgendaTimeline(dateStr) {
 
   var rowsHtml = barberIds.map(function (bid) {
     var b = byBarber[bid];
-    var color = bid === 'unassigned' ? 'var(--grey)' : stableColorForId(bid);
+    var color = bid === 'unassigned' ? 'var(--grey)' : barberColorOf(bid, allBarbers);   // couleur choisie dans la fiche du coiffeur
     var blocksHtml = b.items.map(function (it) {
       var leftPct = ((it.startMin - rangeStart) / (rangeEnd - rangeStart)) * 100;
       var widthPct = (it.durMin / (rangeEnd - rangeStart)) * 100;
