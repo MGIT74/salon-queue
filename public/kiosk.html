@@ -468,6 +468,7 @@
 
 <script src="/app.js?v=34"></script>
 <script src="/group-booking.js?v=26"></script>
+<script src="/queue-sim.js?v=1"></script>
 <script>requireSalonInUrl("Pour utiliser cette borne, ouvrez le lien de votre salon.");</script>
 <script>
 mountThemeButton();
@@ -664,13 +665,22 @@ function renderBoard() {
     // cas, ça tromperait un nouveau client qui arrive sur la borne.
     var mine = waiting.filter(function (w) { return w.barber_id === b.id; });
     if (mine.length > 0) {
-      var totalWait = mine.reduce(function (a, w) { return a + (w.total_duration_min || 0); }, 0);
+      var totalWait = waitForBarber(b.id);   // ses clients, plus les RDV et « Premier disponible » qu'il prendra avant
       return '<div class="serve-row idle"><div class="serve-who"><span class="status"></span><div>' +
              '<div class="serve-barber">' + esc(b.name) + '</div>' +
              '<div class="serve-client">' + mine.length + ' en attente</div></div></div>' +
              '<div class="serve-timer">~' + formatMinutes(totalWait) + '</div></div>';
     }
 
+    // Fauteuil vide mais des clients « Premier disponible » l'attendent deja (il doit les prendre en premier) :
+    // pas « Disponible », son vrai temps.
+    var later = waitForBarber(b.id);
+    if (later >= 1) {
+      return '<div class="serve-row idle"><div class="serve-who"><span class="status"></span><div>' +
+             '<div class="serve-barber">' + esc(b.name) + '</div>' +
+             '<div class="serve-client">Clients en attente</div></div></div>' +
+             '<div class="serve-timer">~' + formatMinutes(later) + '</div></div>';
+    }
     return '<div class="serve-row idle"><div class="serve-who"><span class="status"></span><div>' +
            '<div class="serve-barber">' + esc(b.name) + '</div>' +
            '<div class="serve-client">Poste libre</div></div></div>' +
@@ -691,55 +701,20 @@ function remainingForCut(cur) {
   return remaining > 0 ? remaining : OVERRUN_BUFFER_MIN;
 }
 
-function computeLanes() {
-  var waiting = queue.filter(function (q) { return q.status === 'waiting' && !q.is_appointment; });
-  var active = queue.filter(function (q) { return q.status === 'in_progress'; });
-
-  var lanes = barbers.map(function (b) {
-    var cur = active.find(function (a) { return a.barber_id === b.id; });
-    return remainingForCut(cur);
-  });
-
-  // Les clients qui ont choisi un coiffeur précis restent sur sa voie...
-  barbers.forEach(function (b, i) {
-    waiting.filter(function (w) { return w.barber_id === b.id; })
-      .forEach(function (w) { lanes[i] += (w.total_duration_min || 0); });
-  });
-
-  // ...et ceux en "premier disponible" se répartissent sur la voie la
-  // moins chargée à chaque étape, comme le ferait le salon en pratique.
-  waiting.filter(function (w) { return !w.barber_id; }).forEach(function (w) {
-    var idx = lanes.indexOf(Math.min.apply(null, lanes));
-    lanes[idx] += (w.total_duration_min || 0);
-  });
-
-  return lanes;
+// Temps d'attente : MEME calcul que le serveur (public/queue-sim.js) - une voie par coiffeur present a la borne,
+// coiffeur choisi respecte, « Premier disponible » sur le premier qui se libere, RDV a venir gardes a leur heure.
+// Un coiffeur doit prendre d'abord les clients « Premier disponible » arrives avant (regle de la file) : ils comptent.
+function kioskSim() {
+  return QueueSim.simulate({ now: Date.now(), barbers: barbers.map(function (b) { return { id: b.id, walkin: true }; }), entries: queue });
 }
-
+// Duree d'un nouveau client (pas encore choisie) : la prestation la plus courte du salon.
+function newClientMin() {
+  var d = (services || []).map(function (s) { return Number(s.duration_min) || 0; }).filter(function (x) { return x > 0; });
+  return d.length ? Math.min.apply(null, d) : 15;
+}
 function waitForBarber(barberId) {
-  var waiting = queue.filter(function (q) { return q.status === 'waiting' && !q.is_appointment; });
-  var active = queue.filter(function (q) { return q.status === 'in_progress'; });
-
-  if (!barberId) {
-    if (!barbers.length) return 0;
-    // "Premier disponible" : simule la répartition de TOUTE la file
-    // (assignée ou non) pour estimer un temps réaliste si un nouveau
-    // client rejoint maintenant sans préférence de coiffeur.
-    var lanes = computeLanes();
-    return Math.round(Math.min.apply(null, lanes));
-  }
-
-  // Un coiffeur nommé précisément affiche SON propre temps réel : sa
-  // coupe en cours (s'il en a une) + les clients qui lui sont déjà
-  // spécifiquement assignés. La file "premier disponible" ne lui est
-  // pas réservée tant qu'aucun client n'a explicitement choisi son
-  // nom — sinon un coiffeur au fauteuil vide semblerait "occupé"
-  // alors qu'il peut prendre un nouveau client à l'instant.
-  var mine = waiting.filter(function (q) { return q.barber_id === barberId; });
-  var cur = active.find(function (q) { return q.barber_id === barberId; });
-  var total = mine.reduce(function (a, q) { return a + (q.total_duration_min || 0); }, 0);
-  total += remainingForCut(cur);
-  return Math.round(total);
+  if (!barbers.length) return 0;
+  return kioskSim().nextFor(barberId || null, newClientMin());
 }
 
 function isOverrun(barberId) {
@@ -1223,28 +1198,9 @@ function renderIdleScreen() {
 function renderIdleWait() {
   var el = document.getElementById('idle-wait');
   if (!barbers.length) { el.textContent = ''; return; }
-
-  var active = queue.filter(function (q) { return q.status === 'in_progress'; });
-  var waiting = queue.filter(function (q) { return q.status === 'waiting' && !q.is_appointment; });
-
-  var shortest = null;
-  barbers.forEach(function (b) {
-    var cut = active.find(function (a) { return a.barber_id === b.id; });
-    var mine = waiting.filter(function (w) { return w.barber_id === b.id; });
-    var wait;
-    if (cut) {
-      var elapsedMin = Math.max((Date.now() - new Date(cut.start_at).getTime()) / 60000, 0);
-      var remaining = Math.max((cut.total_duration_min || 0) - elapsedMin, 0);
-      wait = remaining + mine.reduce(function (a, w) { return a + (w.total_duration_min || 0); }, 0);
-    } else if (mine.length) {
-      wait = mine.reduce(function (a, w) { return a + (w.total_duration_min || 0); }, 0);
-    } else {
-      wait = 0;
-    }
-    if (shortest === null || wait < shortest) shortest = wait;
-  });
-
-  el.textContent = shortest === null ? '' : (shortest < 1 ? 'Aucune attente' : '~' + formatMinutes(Math.ceil(shortest)) + ' d\'attente');
+  // Attente d'un nouveau client « Premier disponible » : tient compte de TOUTE la file (clients sans coiffeur compris).
+  var shortest = waitForBarber(null);
+  el.textContent = shortest < 1 ? 'Aucune attente' : '~' + formatMinutes(Math.ceil(shortest)) + ' d\'attente';
 }
 
 function dismissIdleScreen() {

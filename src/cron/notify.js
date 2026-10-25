@@ -17,11 +17,20 @@ async function checkAndNotifyForSalon(salonId) {
 
   const threshold = Number(s.notify_before_min || 30);
 
+  // Client inscrit avec deja moins de N minutes d'attente : il le sait (ticket), pas d'email « bientot ».
+  await pool.query(
+    `UPDATE queue SET notified = 2 WHERE salon_id = ? AND status = 'waiting' AND notified = 0
+     AND estimated_wait_min <= ? AND checkin_at >= DATE_SUB(NOW(), INTERVAL 3 MINUTE)`,
+    [salonId, threshold - MARGIN_MIN]
+  );
+  // (Les clients d'un RDV ont deja leur rappel « N minutes avant » : pas d'email « bientot » en plus.)
+  // Tous les autres des que l'attente passe sous le seuil - meme si l'estimation saute d'un coup (un client part, un
+  // coiffeur finit plus tot) : avant, seule une fenetre de 5 min etait regardee et l'email pouvait ne jamais partir.
   const [rows] = await pool.query(
     `SELECT id, client_name, email, estimated_wait_min FROM queue
-     WHERE salon_id = ? AND status = 'waiting' AND notified = 0 AND email IS NOT NULL
-     AND estimated_wait_min <= ? AND estimated_wait_min >= ?`,
-    [salonId, threshold, threshold - MARGIN_MIN]
+     WHERE salon_id = ? AND status = 'waiting' AND notified = 0 AND email IS NOT NULL AND is_appointment = 0
+     AND estimated_wait_min <= ?`,
+    [salonId, threshold]
   );
 
   for (const c of rows) {

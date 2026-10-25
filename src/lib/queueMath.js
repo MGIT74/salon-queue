@@ -1,4 +1,6 @@
 const { pool, utcIso, getOwnerSettings, getSettings } = require('../db');
+// Meme calcul d'attente que la borne (fichier partage avec le navigateur).
+const QueueSim = require('../../public/queue-sim.js');
 
 // Clé de rapprochement d'un client : email en priorité, sinon téléphone,
 // sinon nom — il n'existe pas de fiche client dédiée dans ce modèle,
@@ -187,7 +189,7 @@ async function dutyBarbers(salonId) {
   const weekday = new Date(`${todayStr}T00:00:00Z`).getUTCDay();
   const hhmm = `${g('hour')}:${g('minute')}:${g('second')}`;
 
-  const [[barbers], [schedules], [leaves], [walkinDays]] = await Promise.all([
+  const [[barbers], [schedules], [leaves], [walkinDays], [breaks]] = await Promise.all([
     pool.query('SELECT id, kiosk_hidden FROM barbers WHERE salon_id = ? AND active = 1', [salonId]),
     pool.query(
       `SELECT bs.* FROM barber_schedules bs
@@ -206,10 +208,21 @@ async function dutyBarbers(salonId) {
        JOIN barbers b ON b.id = w.barber_id
        WHERE b.salon_id = ? AND ? BETWEEN w.start_date AND w.end_date`,
       [salonId, todayStr]
+    ),
+    pool.query(
+      `SELECT br.barber_id, br.end_time FROM barber_breaks br
+       JOIN barbers b ON b.id = br.barber_id
+       WHERE b.salon_id = ? AND br.weekday = ? AND br.active = 1 AND br.start_time <= ? AND ? < br.end_time`,
+      [salonId, weekday, hhmm, hhmm]
     )
   ]);
   const walkinDay = new Set(walkinDays.map((w) => w.barber_id));
-  const tag = (list) => list.map((b) => ({ id: b.id, walkin: !b.kiosk_hidden || walkinDay.has(b.id) }));
+  // En pause maintenant : libre a la fin de la pause (minutes).
+  const toMin = (t) => { const p = String(t).split(':').map(Number); return p[0] * 60 + p[1] + (p[2] || 0) / 60; };
+  const nowMin = toMin(hhmm);
+  const breakLeft = {};
+  breaks.forEach((br) => { breakLeft[br.barber_id] = Math.max(breakLeft[br.barber_id] || 0, toMin(br.end_time) - nowMin); });
+  const tag = (list) => list.map((b) => ({ id: b.id, walkin: !b.kiosk_hidden || walkinDay.has(b.id), freeInMin: breakLeft[b.id] || 0 }));
 
   const onLeaveIds = new Set(leaves.map((l) => l.barber_id));
   const available = barbers.filter((b) => !onLeaveIds.has(b.id));
@@ -241,47 +254,19 @@ async function recompute(salonId) {
   const duty = await dutyBarbers(salonId);
   const now = Date.now();
 
-  // Marge minimale affichée tant qu'une coupe est en cours, même en cas de
-  // dépassement de la durée prévue : afficher "0 min" laisserait croire que
-  // le coiffeur est déjà libre alors qu'il est encore en train de couper.
-  const OVERRUN_BUFFER_MIN = 5;
-
-  // Une « voie » par coiffeur : le temps avant qu'il soit libre. On part de sa coupe en cours, puis on ajoute, dans
-  // l'ordre d'arrivee, les clients qu'il prendra :
-  //  - client qui a choisi un coiffeur : chez CE coiffeur (et pas chez le premier libre du salon) ;
-  //  - client « Premier disponible » venu sans RDV : chez le coiffeur sans RDV (en poste) qui se libere le premier ;
-  //  - RDV sans coiffeur : chez le premier coiffeur en poste qui se libere.
-  // Avant : tous les clients etaient repartis sur TOUS les coiffeurs en poste (meme ceux en RDV), sans tenir compte
-  // du coiffeur choisi : un client qui attendait son coiffeur voyait une attente beaucoup trop courte.
-  const lane = {};
-  duty.forEach((b) => { lane[b.id] = 0; });
-  rows.filter((r) => r.status === 'in_progress').forEach((r) => {
-    const elapsedMin = r.start_at ? (now - new Date(r.start_at).getTime()) / 60000 : 0;
-    const remaining = r.total_duration_min - elapsedMin;
-    const left = remaining > 0 ? remaining : OVERRUN_BUFFER_MIN;
-    if (r.barber_id) lane[r.barber_id] = (lane[r.barber_id] || 0) + left;
-  });
-  const walkinIds = duty.filter((b) => b.walkin).map((b) => b.id);
-  const allIds = duty.map((b) => b.id);
-  const earliest = (ids) => ids.reduce((best, id) => (best === null || lane[id] < lane[best] ? id : best), null);
+  // Temps d'attente : calcul partage avec la borne (public/queue-sim.js) - une voie par coiffeur, coiffeur choisi
+  // respecte, « Premier disponible » sur les coiffeurs sans RDV, RDV a venir gardes a leur heure, pauses en cours.
+  const sim = QueueSim.simulate({ now, barbers: duty, entries: rows });
 
   const waiting = rows.filter((r) => r.status === 'waiting');
   const active = rows.filter((r) => r.status === 'in_progress');
   const updates = [];
 
   waiting.forEach((r, idx) => {
-    let id = r.barber_id || null;
-    if (!id) id = earliest(!r.is_appointment && walkinIds.length ? walkinIds : allIds);
-    let wait = 0;
-    if (id) {
-      if (lane[id] === undefined) lane[id] = 0;   // coiffeur choisi mais pas (encore) en poste
-      wait = lane[id];
-      lane[id] += r.total_duration_min || 0;
-    }
     updates.push({
       id: r.id,
       position: idx + 1,
-      estimated_wait_min: Math.round(wait),
+      estimated_wait_min: sim.waits[r.id] || 0,
       total_duration_min: r.total_duration_min,
       total_price_cents: r.total_price_cents
     });

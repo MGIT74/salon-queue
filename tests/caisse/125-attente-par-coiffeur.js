@@ -41,6 +41,33 @@ const wait = (id) => Number(sql(`SELECT estimated_wait_min FROM queue WHERE id =
   const l2 = await checkin({ client_name: 'T125 Libre2', service_id: 'sv1' });
   check('le suivant attend ce coiffeur (30 min), pas le coiffeur en RDV pourtant libre', l2 && l2.estimated_wait_min === 30, l2 && l2.estimated_wait_min);
 
+  console.log('\n[B] Calcul partage (public/queue-sim.js) : cas difficiles');
+  const Q = require(path.join(__dirname, '../../public/queue-sim.js')), now = Date.now(), M = 60000;
+  let r = Q.simulate({ now, barbers: [{ id: 'M', walkin: true }, { id: 'B', walkin: true }, { id: 'R', walkin: false }], entries: [
+    { id: 'cut', status: 'in_progress', barber_id: 'M', start_at: now - 22 * M, total_duration_min: 30 },
+    { id: 'a1', status: 'waiting', barber_id: 'M', checkin_at: now - 30 * M, total_duration_min: 30 },
+    { id: 'rdv', status: 'waiting', barber_id: 'M', is_appointment: 1, checkin_at: now + 50 * M, total_duration_min: 30 },
+    { id: 'chris', status: 'waiting', barber_id: 'M', checkin_at: now - M, total_duration_min: 30 },
+    { id: 'f1', status: 'waiting', checkin_at: now, total_duration_min: 30 },
+    { id: 'f2', status: 'waiting', checkin_at: now + 1, total_duration_min: 30 }] });
+  check('un RDV a venir garde son heure : le client sans RDV qui n\'a pas le temps passe apres', r.waits.a1 === 8 && r.waits.rdv === 50 && r.waits.chris === 80, r.waits);
+  check('« Premier disponible » jamais chez le coiffeur en RDV', r.waits.f1 === 0 && r.waits.f2 === 30, r.waits);
+  check('nouveau client : chez son coiffeur / premier disponible', r.nextFor('M', 20) === 110 && r.nextFor(null, 20) === 60, [r.nextFor('M', 20), r.nextFor(null, 20)]);
+  r = Q.simulate({ now, barbers: [{ id: 'P', walkin: true, freeInMin: 12 }], entries: [{ id: 'x', status: 'waiting', checkin_at: now, total_duration_min: 20 }] });
+  check('coiffeur en pause : libre a la fin de sa pause', r.waits.x === 12, r.waits);
+  r = Q.simulate({ now, barbers: [{ id: 'O', walkin: true }], entries: [{ id: 'c', status: 'in_progress', barber_id: 'O', start_at: now - 50 * M, total_duration_min: 30 }, { id: 'y', status: 'waiting', checkin_at: now, total_duration_min: 20 }] });
+  check('coupe qui deborde : +5 min de marge (jamais « tout de suite »)', r.waits.y === 5, r.waits);
+  r = Q.simulate({ now, barbers: [{ id: 'K', walkin: true }], entries: [{ id: 'u1', status: 'waiting', checkin_at: now - 5 * M, total_duration_min: 30 }, { id: 'u2', status: 'waiting', checkin_at: now - 4 * M, total_duration_min: 30 }] });
+  check('ecran de veille / tuile : les clients « Premier disponible » deja la comptent', r.nextFor(null, 15) === 60 && r.nextFor('K', 15) === 60, [r.nextFor(null, 15), r.nextFor('K', 15)]);
+
+  console.log('\n[C] Branchements');
+  const fs = require('fs'), rdf = (f) => fs.readFileSync(path.join(__dirname, '../..', f), 'utf8');
+  const k = rdf('public/kiosk.html');
+  check('borne : meme calcul que le serveur', /<script src="\/queue-sim\.js\?v=\d+"><\/script>/.test(k) && /QueueSim\.simulate\(/.test(k) && /var shortest = waitForBarber\(null\);/.test(k));
+  check('serveur : meme calcul', /QueueSim\.simulate\(\{ now, barbers: duty, entries: rows \}\)/.test(rdf('src/lib/queueMath.js')) && /barber_breaks/.test(rdf('src/lib/queueMath.js')));
+  const n = rdf('src/cron/notify.js');
+  check('email « bientot votre tour » : des que l\'attente passe sous le seuil (plus de fenetre de 5 min ratee)', /AND estimated_wait_min <= \?`,\s*\[salonId, threshold\]/.test(n) && /notified = 2/.test(n) && /is_appointment = 0/.test(n));
+
   // remise en etat
   sql(`DELETE FROM appointments WHERE client_name LIKE 'T125%'; DELETE FROM queue WHERE client_name LIKE 'T125%';
        DELETE FROM barber_schedules WHERE barber_id = 't125r'; DELETE FROM barbers WHERE id = 't125r';

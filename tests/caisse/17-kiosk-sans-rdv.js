@@ -24,7 +24,9 @@ const check = (n, ok, x = '') => { (ok ? pass++ : fail++); console.log((ok ? '  
   console.log('\n[B] Le VRAI filtre du kiosque (extrait du fichier) exclut bien le RDV, garde le client libre');
   const src = fs.readFileSync(path.join(__dirname, '../../public/kiosk.html'), 'utf8');
   const n = (src.match(/queue\.filter\(function \(q\) \{ return q\.status === 'waiting' && !q\.is_appointment; \}\)/g) || []).length;
-  check('les 4 filtres du fichier excluent bien is_appointment', n === 4, n + ' occurrence(s)');
+  // Le compteur « en attente » de la borne exclut les RDV. Les TEMPS d'attente, eux, en tiennent compte (un client RDV
+  // arrive, ou un RDV a venir, passe avant un nouveau client) : calcul partage public/queue-sim.js (voir test 125).
+  check('le compteur « en attente » exclut is_appointment ; les temps passent par le calcul partage', n >= 1 && /QueueSim\.simulate\(/.test(src), n + ' occurrence(s)');
 
   // eslint-disable-next-line no-new-func
   const filterFn = new Function('q', "return q.status === 'waiting' && !q.is_appointment;");
