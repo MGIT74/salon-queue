@@ -734,8 +734,8 @@ function lookupGiftCode() {
 
 function renderServiceGrid() {
   vitrineRender({ kind: 'services', gridId: 'svc-grid', items: services, chosen: selService ? [selService] : [], onclick: "selectService(this,'{id}')" });
-  // « Seulement un supplement » : derniere carte, s'il y a des supplements chez ce coiffeur.
-  if (extras.length) document.getElementById('svc-grid').insertAdjacentHTML('beforeend', extrasOnlyCardHtml(selService === EXTRAS_ONLY, "selectService(this,'" + EXTRAS_ONLY + "')"));
+  // « Seulement un supplement » : premiere carte, s'il y a des supplements chez ce coiffeur.
+  if (extras.length) document.getElementById('svc-grid').insertAdjacentHTML('afterbegin', extrasOnlyCardHtml(selService === EXTRAS_ONLY, "selectService(this,'" + EXTRAS_ONLY + "')"));
   updateExtrasStepText();
   renderItemList('extras');
   renderItemList('products');

@@ -62,6 +62,7 @@ const rd = (f) => fs.readFileSync(path.join(__dirname, '../../public', f), 'utf8
     /selService === EXTRAS_ONLY && !selExtras\.length/.test(rd('rdv.html')) && /selBookService === EXTRAS_ONLY && !selBookExtras\.length/.test(rd('compte.html')) &&
     /selService === EXTRAS_ONLY && !selExtras\.length/.test(rd('kiosk.html')) && /state\.serviceId === EXTRAS_ONLY && !state\.extraIds\.length/.test(rd('dashboard.html')) &&
     /state\.serviceId === EXTRAS_ONLY && !state\.extraIds\.length/.test(rd('caisse.html')) && /state\.serviceId === EXTRAS_ONLY && !state\.extraIds\.length/.test(rd('poste.html')));
+  check('carte « Seulement un supplement » en PREMIER dans la grille', ['rdv.html', 'compte.html', 'kiosk.html', 'dashboard.html', 'caisse.html', 'poste.html'].every((f) => /insertAdjacentHTML\('afterbegin', extrasOnlyCardHtml/.test(rd(f)) && !/insertAdjacentHTML\('beforeend', extrasOnlyCardHtml/.test(rd(f))));
   check('Timer / ecran TV : libelle du supplement', /svcLabel\(q\.service\.name, q\.extras\)/.test(rd('caisse.html')) && /svcLabel\(q\.service\.name, q\.extras\)/.test(rd('poste.html')) && /svcLabel\(q\.service\.name, q\.extras\)/.test(rd('display.html')));
 
   sql(`DELETE FROM appointments WHERE client_name LIKE 'T124%'; DELETE FROM queue WHERE client_name LIKE 'T124%'; DELETE FROM extras WHERE id = 't124-soin';`);

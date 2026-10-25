@@ -560,8 +560,8 @@ function renderFormOptions() {
   // Prestations et supplements : cartes de vitrine partagees (app.js / app.css) - photo ENTIERE ou icone en haut, texte dessous.
   vitrineRender({ kind: 'services', gridId: 'svc-grid', items: availableServices, chosen: selService ? [selService] : [], onclick: "selectService('{id}')" });
   if (!availableServices.length) document.getElementById('svc-grid').innerHTML = availableExtras.length ? '' : '<div class="empty">Aucune prestation disponible</div>';
-  // « Seulement un supplement » : derniere carte (sans prestation, au moins un supplement ensuite).
-  if (availableExtras.length) document.getElementById('svc-grid').insertAdjacentHTML('beforeend', extrasOnlyCardHtml(selService === EXTRAS_ONLY, "selectService('" + EXTRAS_ONLY + "')"));
+  // « Seulement un supplement » : premiere carte (sans prestation, au moins un supplement ensuite).
+  if (availableExtras.length) document.getElementById('svc-grid').insertAdjacentHTML('afterbegin', extrasOnlyCardHtml(selService === EXTRAS_ONLY, "selectService('" + EXTRAS_ONLY + "')"));
   vitrineRender(kioskListCfg('extras'));
   selProducts = selProducts.filter(function (id) { return !!prodById(id); });
   vitrineRender(kioskListCfg('products'));

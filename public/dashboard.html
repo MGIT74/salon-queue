@@ -6841,11 +6841,11 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
     aaRenderServices();
     vitrineRender(aaListCfg('extras'));
   }
-  // Prestations + derniere carte « Seulement un supplement » (s'il y a des supplements chez ce coiffeur).
+  // Premiere carte « Seulement un supplement » (s'il y a des supplements chez ce coiffeur).
   function aaRenderServices() {
     vitrineRender({ kind: 'services', gridId: 'aa-service-grid', items: aaOffer('services'), chosen: state.serviceId ? [state.serviceId] : [], onclick: 'aaSelectService(this)' });
     var g = overlay && overlay.querySelector('#aa-service-grid');
-    if (g && aaOffer('extras').length) g.insertAdjacentHTML('beforeend', extrasOnlyCardHtml(state.serviceId === EXTRAS_ONLY, 'aaSelectService(this)'));
+    if (g && aaOffer('extras').length) g.insertAdjacentHTML('afterbegin', extrasOnlyCardHtml(state.serviceId === EXTRAS_ONLY, 'aaSelectService(this)'));
   }
 
   var overlay = _buildModal(

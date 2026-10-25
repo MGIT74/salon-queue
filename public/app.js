@@ -1165,7 +1165,7 @@ function svcLabel(name, extras) {
   if ((!name || name === EXTRAS_ONLY_NAME) && names.length) return names.join(', ');
   return (name || '') + (names.length ? ' + ' + names.join(', ') : '');
 }
-// Derniere carte de la grille des prestations (meme habillage que les autres cartes).
+// Premiere carte de la grille des prestations (meme habillage que les autres cartes).
 function extrasOnlyCardHtml(selected, onclick) {
   return '<button type="button" class="item-card extras-only-card' + (selected ? ' sel' : '') + '" data-id="' + EXTRAS_ONLY + '" data-name="supplement seul"' +
     ' aria-pressed="' + (selected ? 'true' : 'false') + '" onclick="' + onclick + '">' +

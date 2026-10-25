@@ -1455,8 +1455,8 @@ function openPosteAddAppointment(dateStr, barberId) {
     };
   }
   vitrineRender({ kind: 'services', gridId: 'pa-service-grid', items: svcOffer, chosen: [], onclick: 'paSelectService(this)' });
-  // « Seulement un supplement » : derniere carte (s'il y a des supplements chez ce coiffeur).
-  if (extOffer.length) overlay.querySelector('#pa-service-grid').insertAdjacentHTML('beforeend', extrasOnlyCardHtml(false, 'paSelectService(this)'));
+  // « Seulement un supplement » : premiere carte (s'il y a des supplements chez ce coiffeur).
+  if (extOffer.length) overlay.querySelector('#pa-service-grid').insertAdjacentHTML('afterbegin', extrasOnlyCardHtml(false, 'paSelectService(this)'));
   vitrineRender(paListCfg('extras'));
   vitrineRender(paListCfg('products'));
   window.paFilter = function (kind) { vitrineFilter(paListCfg(kind)); };

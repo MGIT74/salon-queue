@@ -1657,8 +1657,8 @@ function confirmCancelBookGift() {
 
 function renderBookServiceGrid() {
   vitrineRender({ kind: 'services', gridId: 'bk-svc-grid', items: bookServices, chosen: selBookService ? [selBookService] : [], onclick: "selectBookService(this,'{id}')" });
-  // « Seulement un supplement » : derniere carte, s'il y a des supplements chez ce coiffeur.
-  if (bookExtras.length) document.getElementById('bk-svc-grid').insertAdjacentHTML('beforeend', extrasOnlyCardHtml(selBookService === EXTRAS_ONLY, "selectBookService(this,'" + EXTRAS_ONLY + "')"));
+  // « Seulement un supplement » : premiere carte, s'il y a des supplements chez ce coiffeur.
+  if (bookExtras.length) document.getElementById('bk-svc-grid').insertAdjacentHTML('afterbegin', extrasOnlyCardHtml(selBookService === EXTRAS_ONLY, "selectBookService(this,'" + EXTRAS_ONLY + "')"));
   updateBookExtrasStepText();
   renderBookItemList('extras');
   renderBookItemList('products');
