@@ -147,7 +147,8 @@ const suite = [
   ['124-supplement-seul.js', false, ['exit']],
   ['125-attente-par-coiffeur.js', false, ['exit']],
   ['126-identifiants-longs.js', false, ['exit']],
-  ['127-couleur-coiffeur-partout.js', false, ['exit']]
+  ['127-couleur-coiffeur-partout.js', false, ['exit']],
+  ['128-jours-coiffeur-absent.js', false, ['exit']]
 ];
 
 let bad = 0;

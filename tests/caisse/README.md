@@ -158,4 +158,5 @@ node tests/caisse/124-supplement-seul.js  # « Seulement un supplement » : RDV 
 node tests/caisse/125-attente-par-coiffeur.js  # Attente estimee : par coiffeur choisi ; « Premier disponible » sur les coiffeurs sans RDV (ticket borne, TV, emails)
 node tests/caisse/126-identifiants-longs.js  # Prestations / supplements au nom long (identifiant > 36 caracteres) : RDV, tarifs coiffeur, ventes
 node tests/caisse/127-couleur-coiffeur-partout.js  # Couleur du coiffeur : celle de sa fiche partout (agenda caisse, classement, avatars)
+node tests/caisse/128-jours-coiffeur-absent.js  # Calendrier RDV : jours ou le coiffeur choisi est absent grises, premier jour disponible choisi
 ```

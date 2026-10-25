@@ -747,6 +747,27 @@ function isOnLeaveOn(b, dateStr) {
   return (b.leaves || []).some(function (l) { return dateStr >= l.start_date && dateStr <= l.end_date; });
 }
 
+/**
+ * Le coiffeur peut-il prendre des RDV ce jour-la ? Non s'il est en conge, en « sans RDV » ce jour-la (calendrier de sa
+ * fiche), ou s'il ne travaille pas ce jour de la semaine (horaires). Sert a griser ces jours dans le calendrier de
+ * reservation, au lieu de laisser le client tomber sur « aucun creneau ».
+ */
+function barberBookableOn(b, dateStr) {
+  if (!b || !dateStr) return true;
+  if (isOnLeaveOn(b, dateStr) || isWalkinOn(b, dateStr)) return false;
+  var schedules = (b.schedules || []).filter(function (s) { return s.active; });
+  if (!schedules.length) return true;   // horaires inconnus : on ne grise pas
+  var wd = new Date(dateStr + 'T12:00:00Z').getUTCDay();
+  return schedules.some(function (s) { return Number(s.weekday) === wd; });
+}
+// Jour a griser pour ce choix : un coiffeur precis, ou « Premier disponible » (grise seulement si AUCUN n'est la).
+function bookingDayBlocked(selectedBarberId, barberList, dateStr) {
+  if (selectedBarberId === null || selectedBarberId === undefined) return false;
+  var list = selectedBarberId === '' ? (barberList || []) : (barberList || []).filter(function (b) { return String(b.id) === String(selectedBarberId); });
+  if (!list.length) return false;
+  return !list.some(function (b) { return barberBookableOn(b, dateStr); });
+}
+
 // Palette de couleurs stables pour associer une couleur à un coiffeur
 // sans champ "color" explicite (bulles, timeline...) - le même id donne
 // toujours la même couleur, sans avoir besoin de la stocker en base.
