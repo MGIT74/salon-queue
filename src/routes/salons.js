@@ -420,6 +420,19 @@ router.get('/activity', requireSuperAdmin, wrap(async (req, res) => {
  * Assistance : ouvre un accès temporaire (10 min) à un salon donné, sans
  * connaître son mot de passe — pour dépanner une enseigne cliente.
  */
+// Journal des erreurs serveur (« Erreur interne du serveur ») : quand, quelle page, quel salon, quelle erreur.
+router.get('/errors', requireSuperAdmin, wrap(async (req, res) => {
+  const [rows] = await pool.query(
+    `SELECT e.id, e.created_at, e.method, e.path, e.message, e.detail, s.name AS salon_name
+     FROM server_errors e LEFT JOIN salons s ON s.id = e.salon_id ORDER BY e.id DESC LIMIT 200`
+  );
+  res.json({ ok: true, items: rows });
+}));
+router.delete('/errors', requireSuperAdmin, wrap(async (req, res) => {
+  await pool.query('DELETE FROM server_errors');
+  res.json({ ok: true });
+}));
+
 router.post('/impersonate', requireSuperAdmin, wrap(async (req, res) => {
   const { salon_id } = req.body;
   if (!salon_id) return res.status(400).json({ error: 'salon_id requis' });

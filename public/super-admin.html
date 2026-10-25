@@ -157,6 +157,20 @@
   .activity-dot.signup { background: var(--blue); }
   .activity-dot.salon_created { background: var(--green); }
   .activity-label { font-size: 14px; font-weight: 500; flex: 1; }
+  .err-head { display: flex; gap: 14px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; margin-bottom: 14px; }
+  .err-intro { margin: 0; color: var(--grey); font-size: 13.5px; max-width: 640px; line-height: 1.5; }
+  .err-actions { display: flex; gap: 8px; }
+  .btn-soft-sm { border: none; background: var(--card); color: var(--ink); font: inherit; font-size: 13px; font-weight: 600; padding: 8px 14px; border-radius: 10px; cursor: pointer; box-shadow: var(--shadow); }
+  .btn-soft-sm.danger { color: var(--red); }
+  .err-row { background: var(--card); border-radius: 12px; box-shadow: var(--shadow); margin-bottom: 8px; overflow: hidden; }
+  .err-row summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 4px 14px; padding: 12px 16px; }
+  .err-row summary::-webkit-details-marker { display: none; }
+  .err-when { font-size: 12.5px; color: var(--grey); font-variant-numeric: tabular-nums; }
+  .err-where { font-size: 13px; font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+  .err-where em { font-style: normal; font-weight: 500; color: var(--grey); }
+  .err-msg { grid-column: 2; font-size: 13px; color: var(--red); overflow-wrap: anywhere; }
+  .err-detail { margin: 0; padding: 12px 16px 14px; border-top: 1px solid var(--sep); font: 12px/1.5 ui-monospace, Menlo, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--ink); }
+  @media (max-width: 640px) { .err-row summary { grid-template-columns: 1fr; } .err-msg { grid-column: 1; } }
   .activity-time { font-size: 12.5px; color: var(--grey); }
 
   .empty { background: var(--card); border-radius: 14px; padding: 30px; text-align: center; color: var(--grey); font-size: 14px; box-shadow: var(--shadow); }
@@ -227,6 +241,7 @@
         <button data-t="email"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg></span> Email plateforme</button>
         <button data-t="sms"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2" width="10" height="20" rx="2.5"/><line x1="11" y1="18" x2="13" y2="18"/></svg></span> SMS</button>
         <button data-t="activity"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="3" width="12" height="18" rx="2"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="12" y2="16"/></svg></span> Journal</button>
+        <button data-t="errors"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span> Erreurs</button>
         <button data-t="ai-chat"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg></span> Assistant IA</button>
         <button data-t="settings"><span class="ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></span> Paramètres</button>
       </nav>
@@ -326,6 +341,14 @@
 
   <div class="tab-panel" id="t-activity">
     <div id="activity-list"><div class="empty">Chargement…</div></div>
+  </div>
+
+  <div class="tab-panel" id="t-errors">
+    <div class="err-head">
+      <p class="err-intro">Chaque « Erreur interne du serveur » vue par un salon est notée ici : quand, quel salon, quelle page, et la cause technique. Touchez une ligne pour voir le détail (à me transmettre).</p>
+      <div class="err-actions"><button class="btn-soft-sm" onclick="loadErrors()">Actualiser</button><button class="btn-soft-sm danger" onclick="clearErrors()">Vider</button></div>
+    </div>
+    <div id="errors-list"><div class="empty">Chargement…</div></div>
   </div>
 
   <div class="tab-panel" id="t-ai-chat">
@@ -472,6 +495,7 @@ document.getElementById('tabs').addEventListener('click', function (e) {
   document.getElementById('t-' + b.dataset.t).classList.add('on');
   if (b.dataset.t === 'overview') loadOverview();
   if (b.dataset.t === 'activity') loadActivity();
+  if (b.dataset.t === 'errors') loadErrors();
   if (b.dataset.t === 'email') loadSmtp();
   if (b.dataset.t === 'ai-chat') loadAiChatOverview();
   if (b.dataset.t === 'sms') loadSmsOverview();
@@ -717,6 +741,26 @@ function loadActivity() {
             '<span class="activity-time">' + when + '</span></div>';
         }).join('');
   }).catch(function (e) { toast(e.message, true); });
+}
+
+function loadErrors() {
+  superApi('/api/super/errors').then(function (r) {
+    document.getElementById('errors-list').innerHTML = r.items.length === 0
+      ? '<div class="empty">Aucune erreur serveur enregistrée</div>'
+      : r.items.map(function (e) {
+          var when = new Date(e.created_at).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+          return '<details class="err-row"><summary><span class="err-when">' + esc(when) + '</span>' +
+            '<span class="err-where">' + esc(e.method + ' ' + e.path) + (e.salon_name ? ' <em>· ' + esc(e.salon_name) + '</em>' : '') + '</span>' +
+            '<span class="err-msg">' + esc(e.message) + '</span></summary>' +
+            '<pre class="err-detail">' + esc(e.detail || '') + '</pre></details>';
+        }).join('');
+  }).catch(function (e) { toast(e.message, true); });
+}
+function clearErrors() {
+  showConfirm('Effacer tout le journal des erreurs ?', { title: 'Vider le journal', danger: true }).then(function (ok) {
+    if (!ok) return;
+    superApi('/api/super/errors', { method: 'DELETE' }).then(function () { toast('Journal vidé'); loadErrors(); }).catch(function (e) { toast(e.message, true); });
+  });
 }
 
 function loadAiChatOverview() {

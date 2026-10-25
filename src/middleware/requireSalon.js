@@ -26,6 +26,7 @@ async function requireExplicitSalon(req, res, next) {
     });
   } catch (err) {
     console.error('[requireExplicitSalon]', err);
+    require('../lib/errorLog').recordServerError(req, err);
     res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 }

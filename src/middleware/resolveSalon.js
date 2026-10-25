@@ -41,6 +41,7 @@ module.exports = async function resolveSalon(req, res, next) {
     next();
   } catch (err) {
     console.error('[resolveSalon]', err);
+    require('../lib/errorLog').recordServerError(req, err);
     res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 };

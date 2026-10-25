@@ -3,10 +3,13 @@
 // messages d'erreur bruts (détails SQL, chemins, structure de la base)
 // n'ont rien à faire dans une réponse HTTP - ils aident un attaquant
 // bien plus qu'un utilisateur.
+const { recordServerError } = require('./errorLog');
+
 function wrap(fn) {
   return function (req, res) {
     fn(req, res).catch((err) => {
       console.error('[api]', req.method, req.originalUrl, '-', err);
+      recordServerError(req, err);   // lisible par le super admin (onglet « Erreurs »)
       res.status(500).json({ error: 'Erreur interne du serveur' });
     });
   };

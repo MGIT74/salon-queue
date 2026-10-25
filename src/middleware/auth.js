@@ -96,6 +96,7 @@ module.exports = async function requireAdmin(req, res, next) {
     return next();
   } catch (err) {
     console.error('[auth]', err);
+    require('../lib/errorLog').recordServerError(req, err);
     res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 };

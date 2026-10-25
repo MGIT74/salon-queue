@@ -1372,3 +1372,16 @@ CREATE TABLE IF NOT EXISTS barber_retired_pins (
   PRIMARY KEY (salon_id, pin_code),
   FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Journal des erreurs serveur (« Erreur interne du serveur ») : lisible par le super admin, sans acces au serveur.
+-- Jamais le contenu de la requete (donnees clients) : seulement la page appelee et l'erreur. Les 500 dernieres.
+CREATE TABLE IF NOT EXISTS server_errors (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  salon_id CHAR(36) NULL,
+  method VARCHAR(10) NOT NULL DEFAULT '',
+  path VARCHAR(300) NOT NULL DEFAULT '',
+  message VARCHAR(1000) NOT NULL DEFAULT '',
+  detail TEXT NULL,
+  INDEX idx_server_errors_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
