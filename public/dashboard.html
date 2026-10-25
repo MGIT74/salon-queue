@@ -187,6 +187,10 @@
   .dash-period .stats-nav { margin: 0; justify-content: flex-start; gap: 12px; }
   .dash-period .stats-period-label { flex: none; white-space: nowrap; }
   .dash-missed-num { color: var(--orange, #f97316); }
+  .dash-missed-detail { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; font-size: 13.5px; color: var(--grey); }
+  .dash-missed-detail div { display: flex; justify-content: space-between; gap: 12px; }
+  .dash-missed-detail b { color: var(--ink); font-weight: 600; white-space: nowrap; }
+  .dash-missed-detail small { display: block; font-size: 12px; opacity: .8; }
   .dash-card-ca .st-delta { margin: 2px 0 10px; }
   .dash-ca-rows { display: flex; flex-direction: column; gap: 6px; }
   .dash-ca-row { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; }
@@ -1728,6 +1732,7 @@
       <div class="dash-card dash-card-missed">
         <div class="dash-card-head"><h3>Manque à gagner</h3></div>
         <div class="dash-big-num dash-missed-num" id="dash-missed-total">—</div>
+        <div class="dash-missed-detail" id="dash-missed-detail"></div>
       </div>
 
       <div class="dash-card dash-card-list">
@@ -3588,6 +3593,12 @@ function loadDashSalon() {
     }
     // Manque à gagner global : temps libre de tous les coiffeurs actifs x leur prix moyen à la minute.
     document.getElementById('dash-missed-total').textContent = eur(r.potential_revenue_cents);
+    // Detail : creneaux libres deja passes + RDV annules / absents (a leur prix reserve).
+    var nMiss = r.missed_appointments || 0;
+    document.getElementById('dash-missed-detail').innerHTML =
+      '<div><span>Créneaux libres</span><b>' + eur(r.free_revenue_cents || 0) + '</b></div>' +
+      '<div><span>RDV annulés / absents' + (nMiss ? ' (' + nMiss + ' RDV)' : '') + '</span><b>' + eur(r.missed_revenue_cents || 0) + '</b></div>' +
+      '<small>Temps déjà passé seulement, au prix moyen des prestations de chaque coiffeur.</small>';
   }).catch(function (e) { toast(e.message, true); });
 }
 
@@ -5423,8 +5434,8 @@ function loadBarberStats(id) {
           tile(r.revenue_per_hour_cents == null ? '—' : eur(r.revenue_per_hour_cents), 'encaissé par heure travaillée', delta(r.revenue_per_hour_cents, pv && pv.revenue_per_hour_cents)) +
           tile(missed, 'RDV ratés', '<div class="st-delta flat">' + (r.no_show_count || 0) + ' absent' + ((r.no_show_count || 0) > 1 ? 's' : '') + ' · ' + (r.cancelled_count || 0) + ' annulé' + ((r.cancelled_count || 0) > 1 ? 's' : '') + (r.appointments_total ? ' sur ' + r.appointments_total + ' RDV' : '') + '</div>') +
           tile(a.free_slots, 'créneaux libres (≈)') +
-          tile(eur(a.potential_revenue_cents), 'manque à gagner estimé' +
-            (a.potential_basis === 'catalog' && a.potential_revenue_cents > 0 ? '<br><span style="opacity:.7;font-size:.9em">d\'après le prix moyen de ses prestations</span>' : ''), '', 'warn')
+          tile(eur(a.potential_revenue_cents), 'manque à gagner' +
+            '<br><span style="opacity:.7;font-size:.9em">créneaux libres ' + eur(a.free_revenue_cents || 0) + ' · annulés/absents ' + eur(a.missed_revenue_cents || 0) + '</span>', '', 'warn')
         ) : '') ;
       renderBarberChart(id, r.series);
     })

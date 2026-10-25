@@ -468,13 +468,14 @@ router.get('/salon-stats', requireAdmin, wrap(async (req, res) => {
   const sum = (a) => a.reduce((x, y) => x + (y || 0), 0);
   const [active] = await pool.query('SELECT id, name FROM barbers WHERE salon_id = ? AND active = 1 ORDER BY name', [req.salon.id]);
   const startSql = toSqlUtc(new Date(start)), endSql = toSqlUtc(new Date(end));
-  let potential = 0, freeSlots = 0, available = 0, booked = 0, catalogBased = false;
+  let potential = 0, freeSlots = 0, available = 0, booked = 0, catalogBased = false, freeCents = 0, missedCents = 0, missedCount = 0;
   const perBarber = [];
   for (const b of active) {
     const c = await barberPeriodCore(req.salon.id, b.id, startSql, endSql, start_date, end_date);
     const a = c.availability;
     if (!a || !a.available_minutes) continue;
     potential += a.potential_revenue_cents; freeSlots += a.free_slots; available += a.available_minutes; booked += c.booked_minutes;
+    freeCents += a.free_revenue_cents; missedCents += a.missed_revenue_cents; missedCount += a.missed_appointments;
     if (a.potential_basis === 'catalog') catalogBased = true;
     perBarber.push({ id: b.id, name: b.name, potential_revenue_cents: a.potential_revenue_cents, occupancy_pct: a.occupancy_pct });
   }
@@ -542,6 +543,7 @@ router.get('/salon-stats', requireAdmin, wrap(async (req, res) => {
     ok: true, series,
     total_cents: sum(series.barber_cents), previous_total_cents: sum(series.previous_cents),
     potential_revenue_cents: potential, free_slots: freeSlots,
+    free_revenue_cents: freeCents, missed_revenue_cents: missedCents, missed_appointments: missedCount,
     occupancy_pct: available > 0 ? Math.round((100 * booked) / available) : 0,
     potential_catalog_based: catalogBased,
     per_barber: perBarber
@@ -680,33 +682,83 @@ async function barberPeriodCore(salonId, barberId, startSql, endSql, start_date,
     d.setUTCDate(d.getUTCDate() + 1);
   }
 
-  const freeMinutes = Math.max(0, availableMinutes - bookedMinutes);
   const occupancyPct = availableMinutes > 0 ? Math.round((100 * bookedMinutes) / availableMinutes) : 0;
-  // Prix moyen par minute : celui réellement encaissé sur la période ; s'il n'y a encore rien d'encaissé (journée
-  // vide, coiffeur qui débute...), on prend le prix moyen à la minute des prestations qu'il propose (ses prix et
-  // durées personnalisés s'il en a, hors prestations qu'il ne fait pas) - sinon le manque à gagner resterait à 0 €.
-  let avgRevenuePerMinute = bookedMinutes > 0 && revenueCents > 0 ? revenueCents / bookedMinutes : 0;
-  let potentialBasis = avgRevenuePerMinute > 0 ? 'sales' : 'none';
-  if (!avgRevenuePerMinute) {
-    const [svc] = await pool.query(
-      `SELECT COALESCE(p.price_cents, s.price_cents) AS price_cents, COALESCE(p.duration_min, s.duration_min) AS duration_min
-       FROM services s
-       LEFT JOIN barber_service_prices p ON p.service_id = s.id AND p.barber_id = ?
-       WHERE s.salon_id = ? AND s.active = 1 AND s.deleted_at IS NULL
-         AND s.id NOT IN (SELECT service_id FROM barber_service_exclusions WHERE barber_id = ?)`,
-      [barberId, salonId, barberId]
-    );
-    const rates = svc.filter((x) => Number(x.duration_min) > 0 && Number(x.price_cents) > 0).map((x) => Number(x.price_cents) / Number(x.duration_min));
-    if (rates.length) { avgRevenuePerMinute = rates.reduce((x, y) => x + y, 0) / rates.length; potentialBasis = 'catalog'; }
+  // ---- Manque à gagner = créneaux libres DÉJÀ PASSÉS + RDV annulés / absents ----
+  // Créneaux libres : heures de travail prévues ÉCOULÉES (rien après maintenant ; ni congés, ni fermetures du salon,
+  // ni pauses) moins le temps occupé, compté avec la durée PRÉVUE des prestations réalisées (pas le chrono, qui peut
+  // être arrêté trop tôt) et moins le temps des RDV ratés (comptés à part, à leur vrai prix, jamais deux fois).
+  // Valorisés au prix moyen à la minute des prestations du coiffeur (ses tarifs et durées à lui).
+  const tz = settings.timezone || 'Europe/Paris';
+  const np = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date());
+  const gp = (t) => np.find((x) => x.type === t).value;
+  const nowDate = `${gp('year')}-${gp('month')}-${gp('day')}`;
+  const nowMin = Number(gp('hour')) * 60 + Number(gp('minute'));
+  const nowLocal = `${nowDate} ${gp('hour')}:${gp('minute')}:00`;
+  const [closures] = await pool.query(
+    'SELECT start_date, end_date FROM salon_closures WHERE salon_id = ? AND end_date >= ? AND start_date <= ?', [salonId, start_date, end_date]);
+  const closureRanges = closures.map((c) => ({ start: String(c.start_date).slice(0, 10), end: String(c.end_date).slice(0, 10) }));
+  let elapsedMinutes = 0;
+  for (const day = new Date(start_date + 'T00:00:00Z'); day <= endD; day.setUTCDate(day.getUTCDate() + 1)) {
+    const dateStr = day.toISOString().slice(0, 10);
+    if (dateStr > nowDate) break;
+    const sched = schedByDay[day.getUTCDay()];
+    if (!sched || isOnLeave(dateStr) || closureRanges.some((c) => dateStr >= c.start && dateStr <= c.end)) continue;
+    const ds = timeToMin(sched.start_time);
+    const de = dateStr === nowDate ? Math.min(timeToMin(sched.end_time), nowMin) : timeToMin(sched.end_time);
+    if (de <= ds) continue;
+    let m = de - ds;
+    (breaksByDay[day.getUTCDay()] || []).forEach((x) => { m -= Math.max(0, Math.min(de, timeToMin(x.end_time)) - Math.max(ds, timeToMin(x.start_time))); });
+    elapsedMinutes += Math.max(0, m);
   }
+  const [[occ]] = await pool.query(
+    `SELECT COALESCE(SUM(COALESCE(NULLIF(total_duration_min, 0), TIMESTAMPDIFF(MINUTE, start_at, end_at), 0)), 0) AS m
+     FROM queue WHERE barber_id = ? AND salon_id = ? AND status IN ('done', 'in_progress') AND start_at >= ? AND start_at < ?`,
+    [barberId, salonId, startSql, endSql]
+  );
+  const occupiedMinutes = Number(occ.m);
+  // RDV ratés dont l'heure est passée : annulés, ou absents (arrivés en file puis marqués absents). Prix et durée
+  // réservés : prestation + suppléments, au tarif du coiffeur.
+  const [lost] = await pool.query(
+    `SELECT COALESCE(bsp.price_cents, s.price_cents) AS svc_price, COALESCE(bsp.duration_min, s.duration_min) AS svc_dur,
+            (SELECT COALESCE(SUM(COALESCE(bep.price_cents, e.price_cents)), 0) FROM appointment_extras ae JOIN extras e ON e.id = ae.extra_id
+               LEFT JOIN barber_extra_prices bep ON bep.extra_id = e.id AND bep.barber_id = a.barber_id WHERE ae.appointment_id = a.id) AS ext_price,
+            (SELECT COALESCE(SUM(COALESCE(bep.duration_min, e.duration_min)), 0) FROM appointment_extras ae JOIN extras e ON e.id = ae.extra_id
+               LEFT JOIN barber_extra_prices bep ON bep.extra_id = e.id AND bep.barber_id = a.barber_id WHERE ae.appointment_id = a.id) AS ext_dur
+     FROM appointments a JOIN services s ON s.id = a.service_id
+     LEFT JOIN barber_service_prices bsp ON bsp.service_id = s.id AND bsp.barber_id = a.barber_id
+     LEFT JOIN queue q ON q.id = a.promoted_queue_id
+     WHERE a.salon_id = ? AND a.barber_id = ? AND a.scheduled_at >= ? AND a.scheduled_at <= ? AND a.scheduled_at <= ?
+       AND (a.status = 'cancelled' OR q.status = 'cancelled')`,
+    [salonId, barberId, start_date + ' 00:00:00', end_date + ' 23:59:59', nowLocal]
+  );
+  const missedCents = lost.reduce((t, x) => t + Number(x.svc_price || 0) + Number(x.ext_price || 0), 0);
+  const missedMinutes = lost.reduce((t, x) => t + Number(x.svc_dur || 0) + Number(x.ext_dur || 0), 0);
+  const freeMinutes = Math.max(0, elapsedMinutes - occupiedMinutes - missedMinutes);
+
+  const [svc] = await pool.query(
+    `SELECT COALESCE(p.price_cents, s.price_cents) AS price_cents, COALESCE(p.duration_min, s.duration_min) AS duration_min
+     FROM services s
+     LEFT JOIN barber_service_prices p ON p.service_id = s.id AND p.barber_id = ?
+     WHERE s.salon_id = ? AND s.active = 1 AND s.deleted_at IS NULL AND s.system_kind IS NULL
+       AND s.id NOT IN (SELECT service_id FROM barber_service_exclusions WHERE barber_id = ?)`,
+    [barberId, salonId, barberId]
+  );
+  const rates = svc.filter((x) => Number(x.duration_min) > 0 && Number(x.price_cents) > 0).map((x) => Number(x.price_cents) / Number(x.duration_min));
+  const avgRevenuePerMinute = rates.length ? rates.reduce((x, y) => x + y, 0) / rates.length : 0;
+  const freeCents = Math.round(freeMinutes * avgRevenuePerMinute);
 
   core.availability = {
     available_minutes: availableMinutes,
+    occupancy_pct: occupancyPct,
+    elapsed_minutes: elapsedMinutes,
+    occupied_minutes: occupiedMinutes,
     free_minutes: freeMinutes,
     free_slots: Math.floor(freeMinutes / slotStepMin),
-    occupancy_pct: occupancyPct,
-    potential_revenue_cents: Math.round(freeMinutes * avgRevenuePerMinute),
-    potential_basis: potentialBasis   // 'sales' (encaissé) | 'catalog' (prix moyen de ses prestations) | 'none'
+    free_revenue_cents: freeCents,          // créneaux libres déjà passés, au prix moyen de ses prestations
+    missed_revenue_cents: missedCents,      // RDV annulés / absents, à leur prix réservé
+    missed_appointments: lost.length,
+    potential_revenue_cents: freeCents + missedCents,
+    potential_basis: rates.length ? 'catalog' : 'none'
   };
   // Productivité : encaissé (prestations + produits) par heure de travail PRÉVUE - compare justement temps plein et mi-temps.
   core.revenue_per_hour_cents = availableMinutes > 0 ? Math.round((totalCents * 60) / availableMinutes) : null;
