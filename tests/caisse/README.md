@@ -159,4 +159,5 @@ node tests/caisse/125-attente-par-coiffeur.js  # Attente estimee : par coiffeur 
 node tests/caisse/126-identifiants-longs.js  # Prestations / supplements au nom long (identifiant > 36 caracteres) : RDV, tarifs coiffeur, ventes
 node tests/caisse/127-couleur-coiffeur-partout.js  # Couleur du coiffeur : celle de sa fiche partout (agenda caisse, classement, avatars)
 node tests/caisse/128-jours-coiffeur-absent.js  # Calendrier RDV : jours ou le coiffeur choisi est absent grises, premier jour disponible choisi
+node tests/caisse/129-admin-adresse-par-menu.js  # Admin : une adresse par menu (/admin/rendez-vous...), retour navigateur, nouvel onglet, anciens liens
 ```

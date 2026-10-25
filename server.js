@@ -93,6 +93,13 @@ app.use(express.static(path.join(__dirname, 'public'), {
   }
 }));
 
+// Admin : chaque menu a sa propre adresse (/admin, /admin/rendez-vous, /admin/reglages...) - c'est la meme page
+// (dashboard.html), qui ouvre le menu de l'adresse. dashboard.html reste accessible (anciens liens, emails).
+app.get(/^\/admin(\/[a-z-]*)?\/?$/, (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+  res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
+});
+
 // Gestion des salons (super admin) — jamais scopée à un salon particulier,
 // donc montée AVANT resolveSalon.
 app.use('/api/super', salonRoutes);

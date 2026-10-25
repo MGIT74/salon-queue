@@ -2926,7 +2926,7 @@ function loadCurrentSalonName() {
       if (SALON_SLUG) {
         // Un salon precis est demande (lien direct/bookmark) — on peut
         // afficher son nom en toute confiance des l'ecran de connexion.
-        document.title = name + ' — Dashboard';
+        if (typeof updateDocTitle === 'function') updateDocTitle(); else document.title = name + ' — Dashboard';
         if (loginEl) loginEl.textContent = name;
       }
       // Une fois connecte (app-screen visible), le nom affiche est
@@ -3187,6 +3187,31 @@ addPasswordToggle('pw');
 
 /* ============ Onglets ============ */
 var VALID_TABS = ['dashboard', 'queue', 'services', 'extras', 'products', 'marketing', 'caisse', 'rdv', 'barbers', 'clients', 'salons', 'account', 'settings'];
+// Chaque menu a sa propre adresse (/admin/rendez-vous?salon=...) : lien a partager, favori, nouvel onglet, bouton
+// retour du navigateur. Le serveur sert cette meme page pour toutes ces adresses (cf. server.js).
+var TAB_PATHS = { dashboard: '', queue: 'file-d-attente', services: 'prestations', extras: 'supplements', products: 'produits',
+  marketing: 'marketing', caisse: 'caisse', rdv: 'rendez-vous', barbers: 'coiffeurs', clients: 'clients', salons: 'mes-salons',
+  account: 'compte', settings: 'reglages' };
+var TAB_TITLES = { dashboard: 'Dashboard', queue: "File d'attente", services: 'Prestations', extras: 'Suppléments', products: 'Produits',
+  marketing: 'Marketing', caisse: 'Caisse', rdv: 'Rendez-vous', barbers: 'Coiffeurs', clients: 'Clients', salons: 'Mes salons',
+  account: 'Compte', settings: 'Réglages' };
+var currentTab = 'dashboard';
+function tabUrl(tab) { var p = TAB_PATHS[tab]; return '/admin' + (p ? '/' + p : '') + location.search; }
+// Menu demande par l'adresse : /admin/<menu>, ou ancien lien dashboard.html#rdv (toujours accepte).
+function tabFromLocation() {
+  var m = location.pathname.match(/^\/admin\/?([^\/]*)\/?$/);
+  if (m) {
+    var slug = decodeURIComponent(m[1] || '');
+    for (var t in TAB_PATHS) if (TAB_PATHS[t] === slug) return t;
+    return 'dashboard';
+  }
+  var h = (location.hash || '').replace('#', '');
+  return VALID_TABS.indexOf(h) !== -1 ? h : 'dashboard';
+}
+function updateDocTitle() {
+  if (!SALON_SLUG && !currentSalonName) return;
+  document.title = (TAB_TITLES[currentTab] || 'Dashboard') + (currentSalonName ? ' — ' + currentSalonName : '');
+}
 
 /**
  * Bascule vers l'onglet demandé (visuel + chargement des données propres
@@ -3283,7 +3308,7 @@ document.getElementById('mobile-expand-panel').addEventListener('click', functio
   toggleMobilePin(b.dataset.t);
 });
 
-function setActiveTab(tabName) {
+function setActiveTab(tabName, how) {
   if (VALID_TABS.indexOf(tabName) === -1) tabName = 'dashboard';
 
   document.querySelectorAll('#tabs button').forEach(function (x) { x.classList.remove('on'); });
@@ -3308,12 +3333,35 @@ function setActiveTab(tabName) {
   if (tabName === 'account') loadOwnerProfile();
   if (tabName === 'dashboard') loadDashboardTab();
 
-  try { history.replaceState(null, '', location.pathname + location.search + '#' + tabName); } catch (e) {}
+  currentTab = tabName;
+  updateDocTitle();
+  // how : 'pop' (bouton retour : l'adresse est deja la bonne), 'replace' (ouverture de la page), sinon nouvelle entree.
+  try {
+    var target = tabUrl(tabName);
+    if (how === 'pop') { /* rien */ }
+    else if (how === 'replace' || location.pathname + location.search === target) history.replaceState({ tab: tabName }, '', target);
+    else history.pushState({ tab: tabName }, '', target);
+  } catch (e) {}
 }
 
+// Bouton retour / avancer du navigateur : revenir au menu de l'adresse.
+window.addEventListener('popstate', function () { setActiveTab(tabFromLocation(), 'pop'); });
+
+// Cmd/Ctrl/Maj + clic ou clic molette sur un menu : l'ouvrir dans un nouvel onglet (meme session de connexion).
+function openTabInNewWindow(e) {
+  var b = e.target.closest('button[data-t]');
+  if (!b || VALID_TABS.indexOf(b.dataset.t) === -1) return false;
+  if (!(e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1)) return false;
+  e.preventDefault();
+  window.open(tabUrl(b.dataset.t), '_blank');
+  return true;
+}
+document.getElementById('tabs').addEventListener('auxclick', function (e) { if (e.button === 1) openTabInNewWindow(e); });
+document.getElementById('tabs').addEventListener('mousedown', function (e) { if (e.button === 1 && e.target.closest('button[data-t]')) e.preventDefault(); });
 document.getElementById('tabs').addEventListener('click', function (e) {
   var b = e.target.closest('button');
   if (!b) return;
+  if (openTabInNewWindow(e)) return;
   if (b.id === 'mobile-more-btn') { toggleMobileExpanded(); return; }
   if (b.classList.contains('mobile-action')) return; // logout()/toggleTheme() déjà sur leur propre onclick
   setActiveTab(b.dataset.t);
@@ -3553,8 +3601,10 @@ function boot() {
     // toujours retomber sur "File d'attente" après un rafraîchissement.
     // Le HTML statique affiche déjà "queue" par défaut, donc on ne fait
     // rien de plus si aucun hash valide n'est présent.
-    var hashTab = (location.hash || '').replace('#', '');
-    if (VALID_TABS.indexOf(hashTab) !== -1 && hashTab !== 'dashboard') setActiveTab(hashTab);
+    // Menu de l'adresse (/admin/rendez-vous, ou ancien dashboard.html#rdv) ; l'adresse est remise au propre.
+    var startTab = tabFromLocation();
+    if (startTab !== 'dashboard') setActiveTab(startTab, 'replace');
+    else { try { history.replaceState({ tab: 'dashboard' }, '', tabUrl('dashboard')); } catch (e) {} updateDocTitle(); }
 
     loadCurrentSalonName();
     loadSalonSwitcher();
