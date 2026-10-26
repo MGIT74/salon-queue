@@ -586,6 +586,11 @@ function selectService(id) {
   if (card) vitrineSelectOne(card);
   updateStep1NextState();
   renderTotals();
+  // « Seulement un supplément » : on passe directement aux supplements des que le prenom est saisi (Retour possible).
+  if (id === EXTRAS_ONLY) {
+    if (document.getElementById('f-name').value.trim()) goToExtrasStep();
+    else document.getElementById('f-name').focus();
+  }
 }
 
 function updateStep1NextState() {

@@ -156,7 +156,8 @@ const suite = [
   ['133-calendrier-sans-scintillement.js', false, ['exit']],
   ['134-zoom-curseur-planning.js', false, ['exit']],
   ['135-poste-tablette.js', false, ['exit']],
-  ['136-groupe-salon-coiffeur-creneaux.js', false, ['exit']]
+  ['136-groupe-salon-coiffeur-creneaux.js', false, ['exit']],
+  ['137-supplement-seul-direct.js', false, ['exit']]
 ];
 
 let bad = 0;

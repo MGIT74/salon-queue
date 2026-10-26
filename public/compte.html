@@ -1826,6 +1826,8 @@ function selectBookService(el, id) {
   vitrineSelectOne(el);
   document.getElementById('bk-service-next-btn').disabled = false;
   updateBookExtrasStepText();
+  // « Seulement un supplément » : rien d'autre a choisir ici, on passe directement aux supplements (Retour possible).
+  if (id === EXTRAS_ONLY) goToBookExtrasStep();
 }
 // Etape Supplements : « optionnels » apres une prestation, au moins un si « seulement un supplement ».
 function updateBookExtrasStepText() {

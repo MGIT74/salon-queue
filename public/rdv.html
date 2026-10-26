@@ -811,6 +811,8 @@ function selectService(el, id) {
   vitrineSelectOne(el);
   document.getElementById('service-next-btn').disabled = false;
   updateExtrasStepText();
+  // « Seulement un supplément » : rien d'autre a choisir ici, on passe directement aux supplements (Retour possible).
+  if (id === EXTRAS_ONLY) goToExtrasStep();
 }
 // Etape Supplements : « optionnels » apres une prestation, au moins un si « seulement un supplement ».
 function updateExtrasStepText() {
