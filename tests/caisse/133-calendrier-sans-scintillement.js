@@ -15,5 +15,11 @@ const rd = (f) => fs.readFileSync(path.join(__dirname, '../../public', f), 'utf8
   const s = rd(f);
   check(f + ' : survol du calendrier sans filtre', !s.includes('.cal-day:hover { filter') && !/\.cal-day \{[^}]*transition: filter/.test(s) && s.includes('.cal-day:not(.empty):not(.selected):hover { background: var(--fill-2); }'));
 });
+const ar = rd('autorefresh.js');
+check('actualisation discrete : une seule par periode d\'inactivite (plus de rechargement chaque seconde)', ar.includes('if (Date.now() - lastRun < idleMs) return;') && ar.includes('running = true; lastRun = Date.now();'));
+['dashboard.html', 'poste.html', 'caisse.html'].forEach((f) => {
+  const s = rd(f);
+  check(f + ' : panneau du jour sans animation quand il est redessine', s.includes("var expandAgain = window.__calExpandDate === dateStr;") && s.includes('.cal-expand-panel.no-anim { animation: none; }') && s.includes('autorefresh.js?v=3'));
+});
 console.log(`\n${pass} OK, ${fail} ECHEC`);
 process.exit(fail ? 1 : 0);

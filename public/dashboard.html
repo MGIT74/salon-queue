@@ -1002,6 +1002,7 @@
 
   .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
   .cal-week-row { margin-bottom: 4px; }
+  .cal-expand-panel.no-anim { animation: none; } /* meme jour redessine (actualisation) : pas d'animation, sinon il clignote */
   .cal-expand-panel {
     background: var(--fill); border-radius: 14px; padding: 16px 18px; margin: 6px 0 10px;
     animation: cal-expand .18s ease; min-width: 0; grid-column: 1 / -1;
@@ -2818,7 +2819,7 @@
 </div>
 
 <script src="/app.js?v=36"></script>
-<script src="/autorefresh.js?v=2"></script>
+<script src="/autorefresh.js?v=3"></script>
 <script src="/staff-group.js?v=5"></script>
 <script src="/daterange.js?v=4"></script>
 <script>
@@ -6845,7 +6846,8 @@ function renderExpandPanel(dateStr, dayAppts) {
   var when = new Date(dateStr + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' });
   dayAppts.forEach(function (a) { calAppointmentById[a.id] = a; });
 
-  return '<div class="cal-expand-panel">' +
+  var expandAgain = window.__calExpandDate === dateStr; window.__calExpandDate = dateStr;
+  return '<div class="cal-expand-panel' + (expandAgain ? ' no-anim' : '') + '">' +
     '<div class="cal-expand-head"><strong style="text-transform:capitalize">' + when + '</strong>' +
     '<button class="btn btn-soft" onclick="event.stopPropagation();selectCalendarDay(null)">Fermer</button></div>' +
     renderDayTimelineHtml(dateStr, dayAppts) +

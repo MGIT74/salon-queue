@@ -20,6 +20,7 @@ let JSDOM = null; try { JSDOM = require('jsdom').JSDOM; } catch (_) { /* absent 
     const stop = w.AutoRefresh.start(() => { n++; return Promise.resolve(); }, { idleMs: 150, tickMs: 20, busy: () => busy });
     await sleep(60); check('pas d\'actualisation avant la fin du delai d\'inactivite', n === 0, n);
     await sleep(200); check('actualisation apres inactivite', n >= 1, n);
+    { const n0 = n; await sleep(100); check('pas d\'actualisation en boucle a chaque tour : une seule par delai', n - n0 <= 1, [n0, n]); }
     // chaque interaction repousse le compteur
     const before = n;
     for (let i = 0; i < 8; i++) { w.document.body.dispatchEvent(new w.Event('pointerdown', { bubbles: true })); await sleep(40); }

@@ -227,6 +227,7 @@
   .cal-view-switch button.on { background: var(--blue); color: #fff; }
   .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
   .cal-week-row { margin-bottom: 4px; }
+  .cal-expand-panel.no-anim { animation: none; } /* meme jour redessine (actualisation) : pas d'animation, sinon il clignote */
   .cal-expand-panel {
     background: var(--card); box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 0 0 1px var(--sep);
     border-radius: 14px; padding: 16px 18px; margin: 6px 0 10px; min-width: 0; grid-column: 1 / -1;
@@ -1005,7 +1006,7 @@
 
 <script src="/app.js?v=36"></script>
 <script src="/staff-group.js?v=5"></script>
-<script src="/autorefresh.js?v=2"></script>
+<script src="/autorefresh.js?v=3"></script>
 <script>requireSalonInUrl("Pour utiliser la caisse, ouvrez le lien de votre salon.");</script>
 <script>
 mountThemeButton();
@@ -2150,7 +2151,8 @@ function renderCalMonth() {
 
 function renderCalExpandPanel(dateStr) {
   var when = new Date(dateStr + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' });
-  return '<div class="cal-expand-panel">' +
+  var expandAgain = window.__calExpandDate === dateStr; window.__calExpandDate = dateStr;
+  return '<div class="cal-expand-panel' + (expandAgain ? ' no-anim' : '') + '">' +
     '<div class="cal-expand-head"><strong style="text-transform:capitalize">' + when + '</strong>' +
     '<button class="btn btn-soft" onclick="event.stopPropagation();selectCalDay(null)">Fermer</button></div>' +
     renderAgendaTimeline(dateStr) +
