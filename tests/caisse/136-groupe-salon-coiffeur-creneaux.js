@@ -11,10 +11,15 @@ check('changer de coiffeur relit les creneaux', /function pickDtBarber\(id\) \{[
 check('affiche a l\'etape date', /renderDtBarbers\(\);\n  if \(window\.rdvPickOpenDay\)/.test(s));
 const app = fs.readFileSync(path.join(__dirname, '../../public/app.js'), 'utf8');
 const c = fs.readFileSync(path.join(__dirname, '../../public/compte.html'), 'utf8'), d = fs.readFileSync(path.join(__dirname, '../../public/dashboard.html'), 'utf8');
-check('pastilles photo des coiffeurs (photo, sinon initiale sur sa couleur)', /function barberAvatarHtml\(b, list, size\)/.test(app) && s.includes('barberAvatarHtml(b, barbers, 30)'));
+check('pastilles photo des coiffeurs (photo, sinon initiale sur sa couleur)', /function barberAvatarHtml\(b, list, size\)/.test(app) && s.includes('barberAvatarHtml(b, barbers, 40)'));
 const vm = require('vm'); const ctx = {}; vm.createContext(ctx); vm.runInContext(app.match(/function anyBarberLabel\([\s\S]*?\n\}\n/)[0], ctx);
 check('Premier disponible + creneau : le coiffeur retenu est affiche', ctx.anyBarberLabel([{ id: 'b1', name: 'Alice' }], 'b1') === 'Alice (premier disponible)' && ctx.anyBarberLabel([], null) === 'Premier disponible');
 check('partout : en ligne, compte client, admin (fenetre et a plusieurs)', s.includes('anyBarberLabel(barbers, selSlot && selSlot.barberId)') && c.includes('anyBarberLabel(bookBarbers, selBookSlot && selBookSlot.barberId)') && (d.match(/anyBarberLabel\(rdvBarbers, state\.slotBarber\)/g) || []).length === 2 && d.includes('state.slotBarber = el.dataset.barber || null;'));
-check('a plusieurs : le coiffeur retenu est mis en evidence dans les pastilles', s.includes("var auto = selBarber === '' && selSlot ? String(selSlot.barberId) : '';") && s.includes("<em>retenu</em>"));
+check('a plusieurs : le coiffeur retenu est mis en evidence (coche sur sa photo)', s.includes("var auto = selBarber === '' && selSlot ? String(selSlot.barberId) : '';") && s.includes('<span class="dt-auto" aria-hidden="true">✓</span>'));
+check('pastilles : la photo seule, le nom en info-bulle (Premier disponible garde son texte)', s.includes("ic + (b ? '' : esc(label))") && s.includes('barberAvatarHtml(b, barbers, 40)'));
+vm.runInContext('function esc(x) { return String(x == null ? \'\' : x).replace(/&/g, \'&amp;\').replace(/</g, \'&lt;\'); }\n' + ['formatMinutes', 'eur'].map((f) => (app.match(new RegExp('function ' + f + '\\([\\s\\S]*?\\n\\}\\n')) || [''])[0]).join('\n') + 'var CURRENCY = "EUR";\n' + app.match(/function vitrineRecapHtml\([\s\S]*?\n\}\n/)[0], ctx);
+const h = ctx.vitrineRecapHtml({ service: { name: 'Barbe', duration_min: 15, price_cents: 1200 }, time: '09:10', cart: [{ name: 'hrlo', label: 'Coupe', time: '08:50', barber: 'C1', price_cents: 2000 }] });
+check('recapitulatif : heure de debut a cote de la prestation', /Barbe <em>15 min · à 09:10<\/em>/.test(h), h);
+check('recapitulatif : les personnes deja validees avec leur heure', /recap-cart[\s\S]*hrlo[\s\S]*Coupe <em>à 08:50 · C1<\/em>/.test(h), h);
 console.log(`\n${pass} OK, ${fail} ECHEC`);
 process.exit(fail ? 1 : 0);

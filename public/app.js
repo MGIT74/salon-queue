@@ -1195,7 +1195,9 @@ function vitrineRecapHtml(sel) {
   var s = sel.service;
   cents += Number(s.price_cents) || 0; mins += Number(s.duration_min) || 0;
   // « Seulement un supplement » : pas de ligne Prestation, seulement les supplements.
-  if (!s.extras_only) row('Prestation', s.name, Number(s.duration_min) > 0 ? formatMinutes(s.duration_min) : '', eur(Number(s.price_cents) || 0));
+  // Heure de debut du RDV a cote de la prestation des qu'un creneau est choisi.
+  var meta = (Number(s.duration_min) > 0 ? formatMinutes(s.duration_min) : '') + (sel.time ? (Number(s.duration_min) > 0 ? ' · ' : '') + 'à ' + sel.time : '');
+  if (!s.extras_only) row('Prestation', s.name, meta, eur(Number(s.price_cents) || 0));
   (sel.extras || []).forEach(function (x) {
     cents += Number(x.price_cents) || 0; mins += Number(x.duration_min) || 0;
     row('Supplément', x.name, Number(x.duration_min) > 0 ? '+' + formatMinutes(x.duration_min) : '', '+' + eur(Number(x.price_cents) || 0));
@@ -1207,7 +1209,13 @@ function vitrineRecapHtml(sel) {
   var ctx = [];
   if (sel.barber) ctx.push(esc(sel.barber));
   if (sel.when) ctx.push(esc(sel.when) + (sel.time ? ' à ' + esc(sel.time) : ''));
-  return (ctx.length ? '<div class="recap-ctx">' + ctx.join(' · ') + '</div>' : '') +
+  // RDV a plusieurs : les personnes deja validees, chacune avec son heure de debut.
+  var cartHtml = (sel.cart || []).map(function (c) {
+    return '<div class="recap-row recap-cart"><span class="recap-k">' + esc(c.name) + '</span><span class="recap-n">' + esc(c.label) +
+      ' <em>à ' + esc(c.time) + (c.barber ? ' · ' + esc(c.barber) : '') + '</em></span><span class="recap-p">' + eur(Number(c.price_cents) || 0) + '</span></div>';
+  }).join('');
+  return (cartHtml ? '<div class="recap-list recap-cart-list">' + cartHtml + '</div>' : '') +
+    (ctx.length ? '<div class="recap-ctx">' + ctx.join(' · ') + '</div>' : '') +
     '<div class="recap-list">' + rows + '</div>' +
     '<div class="recap-total"><span>Total</span><span>' + (mins ? formatMinutes(mins) + ' · ' : '') + '<strong>' + eur(cents) + '</strong></span></div>';
 }

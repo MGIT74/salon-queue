@@ -822,3 +822,6 @@ body .tfx > button { transition: color .25s ease, transform .1s ease; }
 .timeline-zoom-range::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; margin-top: -6px; border-radius: 50%; background: var(--blue); border: 2px solid var(--card); box-shadow: 0 1px 3px rgba(0,0,0,.3); }
 .timeline-zoom-range::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--blue); border: 2px solid var(--card); }
 .timeline-zoom-range:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 999px; }
+/* RDV a plusieurs : personnes deja validees au-dessus du recapitulatif, avec leur heure */
+.recap-cart-list { padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px dashed var(--sep); }
+.recap-cart .recap-k { color: var(--ink); text-transform: none; letter-spacing: 0; font-size: 12.5px; }

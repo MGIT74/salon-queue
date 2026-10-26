@@ -18,7 +18,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Prendre rendez-vous</title>
-<link rel="stylesheet" href="/app.css?v=43">
+<link rel="stylesheet" href="/app.css?v=44">
 <script>
   // Adresse SANS ?salon=... : on masque la page le temps de savoir si la plateforme heberge plusieurs salons
   // (voir guardMissingSalon) - pour ne jamais montrer, meme une fraction de seconde, un formulaire sans salon.
@@ -415,7 +415,7 @@
   </section>
 </div>
 
-<script src="/app.js?v=39"></script>
+<script src="/app.js?v=40"></script>
 <script src="/group-booking.js?v=27"></script>
 <style>
 body.staff-mode .gift-summary-box,body.staff-mode .theme-btn,body.staff-mode .login-hint{display:none!important}
@@ -428,7 +428,11 @@ body.staff-mode .gift-summary-box,body.staff-mode .theme-btn,body.staff-mode .lo
 .dt-barber.on{background:var(--blue);border-color:var(--blue);color:#fff}
 .dt-barber.on .b-any{background:rgba(255,255,255,.22);color:#fff}
 .dt-barber.auto{border-color:var(--blue);box-shadow:0 0 0 2px var(--blue-soft)}
-.dt-barber em{font-style:normal;font-size:11.5px;font-weight:700;color:var(--blue);background:var(--blue-soft);border-radius:999px;padding:2px 8px}
+.dt-barber-pic{position:relative;padding:0;min-height:0;width:48px;height:48px;justify-content:center;border-radius:50%;border:2px solid transparent;background:none}
+.dt-barber-pic.on{background:none;border-color:var(--blue);box-shadow:0 0 0 2px var(--blue-soft)}
+.dt-barber-pic.auto{border-color:var(--blue)}
+.dt-auto{position:absolute;right:-3px;bottom:-3px;width:18px;height:18px;border-radius:50%;background:var(--blue);color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;border:2px solid var(--card)}
+.dt-barber-row{align-items:center}
 .login-hint{background:var(--fill);border-radius:14px;padding:12px 14px;margin:0 0 18px;font-size:14.5px;font-weight:600}
 .login-hint a{color:var(--blue);text-decoration:none;margin-left:4px}
 .login-hint span{display:block;font-weight:400;font-size:13px;color:var(--grey);margin-top:4px;line-height:1.45}
@@ -788,7 +792,11 @@ function refreshRecap() {
     service: selService === EXTRAS_ONLY ? EXTRAS_ONLY_SERVICE : svcList.find(function (x) { return String(x.id) === String(selService); }),
     extras: pick(extList, selExtras.map(String)), products: pick(products, selProducts.map(String)),
     barber: anyB ? anyBarberLabel(barbers, selSlot && selSlot.barberId) : (b ? b.name : ''), time: selSlot ? selSlot.time : '',
-    when: selDate ? new Date(selDate + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' }) : ''
+    when: selDate ? new Date(selDate + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' }) : '',
+    cart: grp ? grp.cart.filter(function (c) { return c.person !== grp.current; }).map(function (c) {
+      return { name: c.name || (c.isSelf ? 'Vous' : ''), time: c.time, price_cents: c.price_cents,
+        label: svcLabel(c.service_name, c.extra_names), barber: c.any ? anyBarberLabel(barbers, c.barber_id) : c.barber_name };
+    }) : []
   });
 }
 document.addEventListener('click', function () { setTimeout(refreshRecap, 0); });
@@ -1187,11 +1195,13 @@ function renderDtBarbers() {
   // Premier disponible + un creneau choisi : le coiffeur retenu par le systeme pour cette heure est mis en evidence.
   var auto = selBarber === '' && selSlot ? String(selSlot.barberId) : '';
   var chip = function (id, label, b, on) {
-    var ic = b ? barberAvatarHtml(b, barbers, 30)
+    var ic = b ? barberAvatarHtml(b, barbers, 40)
       : '<span class="b-avatar b-any" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 11l2 2 4-4"/></svg></span>';
     var isAuto = b && auto && String(b.id) === auto;
-    return '<button type="button" class="dt-barber' + (on ? ' on' : '') + (isAuto ? ' auto' : '') + '" onclick="pickDtBarber(\'' + id + '\')"' +
-      (isAuto ? ' title="Retenu pour ce créneau"' : '') + '>' + ic + esc(label) + (isAuto ? '<em>retenu</em>' : '') + '</button>';
+    // Coiffeur : sa photo seule (ou son initiale sur sa couleur), le nom en info-bulle - prend moins de place.
+    return '<button type="button" class="dt-barber' + (b ? ' dt-barber-pic' : '') + (on ? ' on' : '') + (isAuto ? ' auto' : '') + '" onclick="pickDtBarber(\'' + id + '\')"' +
+      ' title="' + esc(label + (isAuto ? ' — retenu pour ce créneau' : '')) + '" aria-label="' + esc(label + (isAuto ? ', retenu pour ce créneau' : '')) + '">' +
+      ic + (b ? '' : esc(label)) + (isAuto ? '<span class="dt-auto" aria-hidden="true">✓</span>' : '') + '</button>';
   };
   box.innerHTML = '<div class="eyebrow" style="margin-top:0">Coiffeur</div><div class="dt-barber-row">' +
     (list.length > 1 ? chip('', 'Premier disponible', null, selBarber === '') : '') +
