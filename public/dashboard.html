@@ -2820,7 +2820,7 @@
   </div>
 </div>
 
-<script src="/app.js?v=38"></script>
+<script src="/app.js?v=39"></script>
 <script src="/autorefresh.js?v=3"></script>
 <script src="/staff-group.js?v=5"></script>
 <script src="/daterange.js?v=4"></script>
@@ -6978,7 +6978,7 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
     return {
       service: state.serviceId === EXTRAS_ONLY ? EXTRAS_ONLY_SERVICE : aaOffer('services').find(function (x) { return String(x.id) === String(state.serviceId); }),
       extras: pick(aaOffer('extras'), state.extraIds.map(String)), products: pick(products, state.productIds.map(String)),
-      barber: state.barberId === '' ? 'Premier disponible' : (function(){var b=(typeof rdvBarbers!=='undefined')&&rdvBarbers.find(function(x){return String(x.id)===String(state.barberId);});return b?b.name:'';})(), when: when, time: state.time
+      barber: state.barberId === '' ? anyBarberLabel(rdvBarbers, state.slotBarber) : (function(){var b=(typeof rdvBarbers!=='undefined')&&rdvBarbers.find(function(x){return String(x.id)===String(state.barberId);});return b?b.name:'';})(), when: when, time: state.time
     };
   });
 
@@ -7007,7 +7007,7 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
       if (group) return;
       var s = aaOffer('services').find(function (x) { return x.id === state.serviceId; });
       var exN = aaOffer('extras').filter(function (x) { return state.extraIds.indexOf(String(x.id)) !== -1; }).map(function (x) { return x.name; });
-      var bName = state.barberId === '' ? 'Premier disponible' : ((rdvBarbers.find(function (x) { return String(x.id) === String(state.barberId); }) || {}).name || '');
+      var bName = state.barberId === '' ? anyBarberLabel(rdvBarbers, state.slotBarber) : ((rdvBarbers.find(function (x) { return String(x.id) === String(state.barberId); }) || {}).name || '');
       overlay.querySelector('#aa-contact-summary').textContent = when + ' à ' + state.time + ' — ' + (s ? s.name : svcLabel('', exN)) + (bName ? ' · ' + bName : '');
     }
   };
@@ -7101,7 +7101,7 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
     var list = slotsByHalf[currentHalf];
     slotsEl.innerHTML = list.length
       ? list.map(function (s) {
-          return '<button class="aa-slot" data-time="' + s.time + '" onclick="aaSelectSlot(this)">' + s.time + '</button>';
+          return '<button class="aa-slot" data-time="' + s.time + '" data-barber="' + (s.barber_id || '') + '" onclick="aaSelectSlot(this)">' + s.time + '</button>';
         }).join('')
       : '<span class="hint" style="margin:0">Aucun créneau ' + (currentHalf === 'morning' ? 'le matin' : "l'après-midi") + '</span>';
   }
@@ -7143,6 +7143,7 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
 
   window.aaSelectSlot = function (el) {
     state.time = el.dataset.time;
+    state.slotBarber = el.dataset.barber || null;   // « Premier disponible » : coiffeur retenu pour cette heure
     overlay.querySelectorAll('#aa-slots .aa-slot').forEach(function (c) { c.classList.remove('sel'); });
     el.classList.add('sel');
     aaGoStep('products');

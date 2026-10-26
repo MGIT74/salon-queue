@@ -415,7 +415,7 @@
   </section>
 </div>
 
-<script src="/app.js?v=38"></script>
+<script src="/app.js?v=39"></script>
 <script src="/group-booking.js?v=27"></script>
 <style>
 body.staff-mode .gift-summary-box,body.staff-mode .theme-btn,body.staff-mode .login-hint{display:none!important}
@@ -423,8 +423,12 @@ body.staff-mode .gift-summary-box,body.staff-mode .theme-btn,body.staff-mode .lo
 #p-group .start-back{display:none}#p-group.gb-pick .start-back{display:block}body.staff-mode .start-back{display:none!important}
 .dt-barbers{margin:0 0 6px}.dt-barber-row{display:flex;flex-wrap:wrap;gap:8px}
 .dt-barber{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 14px;border-radius:999px;border:1.5px solid var(--sep);background:var(--card);color:var(--ink);font:inherit;font-size:14px;font-weight:600;cursor:pointer}
-.dt-barber i{width:9px;height:9px;border-radius:50%;flex:none}
+.dt-barber{padding:0 14px 0 5px;min-height:42px}
+.dt-barber .b-any{width:30px;height:30px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:var(--fill);color:var(--blue);flex:none}
 .dt-barber.on{background:var(--blue);border-color:var(--blue);color:#fff}
+.dt-barber.on .b-any{background:rgba(255,255,255,.22);color:#fff}
+.dt-barber.auto{border-color:var(--blue);box-shadow:0 0 0 2px var(--blue-soft)}
+.dt-barber em{font-style:normal;font-size:11.5px;font-weight:700;color:var(--blue);background:var(--blue-soft);border-radius:999px;padding:2px 8px}
 .login-hint{background:var(--fill);border-radius:14px;padding:12px 14px;margin:0 0 18px;font-size:14.5px;font-weight:600}
 .login-hint a{color:var(--blue);text-decoration:none;margin-left:4px}
 .login-hint span{display:block;font-weight:400;font-size:13px;color:var(--grey);margin-top:4px;line-height:1.45}
@@ -783,7 +787,7 @@ function refreshRecap() {
   vitrineRecapFill({
     service: selService === EXTRAS_ONLY ? EXTRAS_ONLY_SERVICE : svcList.find(function (x) { return String(x.id) === String(selService); }),
     extras: pick(extList, selExtras.map(String)), products: pick(products, selProducts.map(String)),
-    barber: anyB ? 'Premier disponible' : (b ? b.name : ''), time: selSlot ? selSlot.time : '',
+    barber: anyB ? anyBarberLabel(barbers, selSlot && selSlot.barberId) : (b ? b.name : ''), time: selSlot ? selSlot.time : '',
     when: selDate ? new Date(selDate + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' }) : ''
   });
 }
@@ -925,6 +929,7 @@ function selectSlot(btn) {
   document.querySelectorAll('.slot-btn').forEach(function (b) { b.classList.remove('sel'); });
   btn.classList.add('sel');
   selSlot = { time: btn.dataset.time, barberId: btn.dataset.barber };
+  if (typeof staffBarberChoice === 'function' && staffBarberChoice()) renderDtBarbers();
   document.getElementById('date-next-btn').disabled = false;
 }
 
@@ -1179,13 +1184,18 @@ function renderDtBarbers() {
     return selExtras.every(function (id) { return ex.some(function (x) { return String(x.id) === String(id); }); });
   });
   if (selBarber !== '' && !list.some(function (b) { return String(b.id) === String(selBarber); })) selBarber = '';
-  var chip = function (id, label, color, on) {
-    return '<button type="button" class="dt-barber' + (on ? ' on' : '') + '" onclick="pickDtBarber(\'' + id + '\')">' +
-      (color ? '<i style="background:' + color + '"></i>' : '') + esc(label) + '</button>';
+  // Premier disponible + un creneau choisi : le coiffeur retenu par le systeme pour cette heure est mis en evidence.
+  var auto = selBarber === '' && selSlot ? String(selSlot.barberId) : '';
+  var chip = function (id, label, b, on) {
+    var ic = b ? barberAvatarHtml(b, barbers, 30)
+      : '<span class="b-avatar b-any" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 11l2 2 4-4"/></svg></span>';
+    var isAuto = b && auto && String(b.id) === auto;
+    return '<button type="button" class="dt-barber' + (on ? ' on' : '') + (isAuto ? ' auto' : '') + '" onclick="pickDtBarber(\'' + id + '\')"' +
+      (isAuto ? ' title="Retenu pour ce créneau"' : '') + '>' + ic + esc(label) + (isAuto ? '<em>retenu</em>' : '') + '</button>';
   };
   box.innerHTML = '<div class="eyebrow" style="margin-top:0">Coiffeur</div><div class="dt-barber-row">' +
-    (list.length > 1 ? chip('', 'Premier disponible', '', selBarber === '') : '') +
-    list.map(function (b) { return chip(b.id, b.name, barberColorOf(b, barbers), String(selBarber) === String(b.id) || (list.length === 1 && selBarber === '')); }).join('') + '</div>';
+    (list.length > 1 ? chip('', 'Premier disponible', null, selBarber === '') : '') +
+    list.map(function (b) { return chip(b.id, b.name, b, String(selBarber) === String(b.id) || (list.length === 1 && selBarber === '')); }).join('') + '</div>';
   box.style.display = '';
 }
 function pickDtBarber(id) {

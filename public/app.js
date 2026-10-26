@@ -833,6 +833,21 @@ function timelineFitLabels(root) {
   document.addEventListener('click', later, true);   // onglet / jour qui s'affiche
 })();
 
+// « Premier disponible » : des qu'un creneau est choisi, on affiche le coiffeur que le systeme a retenu pour cette
+// heure (celui qui sera reellement reserve), au lieu de « Premier disponible ».
+function anyBarberLabel(list, barberId) {
+  var b = barberId && (list || []).find(function (x) { return String(x.id) === String(barberId); });
+  return b ? b.name + ' (premier disponible)' : 'Premier disponible';
+}
+// Pastille d'un coiffeur : sa photo, sinon son initiale sur sa couleur (comme les bulles de la caisse).
+function barberAvatarHtml(b, list, size) {
+  var px = size || 30, initial = String((b && b.name) || '?').trim().charAt(0).toUpperCase();
+  var style = 'width:' + px + 'px;height:' + px + 'px;border-radius:50%;flex:none;display:inline-flex;align-items:center;justify-content:center;' +
+    'color:#fff;font-weight:700;font-size:' + Math.round(px * 0.42) + 'px;background-size:cover;background-position:center;' +
+    (b && b.photo_url ? "background-image:url('" + esc(b.photo_url) + "')" : 'background:' + barberColorOf(b, list));
+  return '<span class="b-avatar" style="' + style + '" aria-hidden="true">' + (b && b.photo_url ? '' : esc(initial)) + '</span>';
+}
+
 // Palette de couleurs stables pour associer une couleur à un coiffeur
 // sans champ "color" explicite (bulles, timeline...) - le même id donne
 // toujours la même couleur, sans avoir besoin de la stocker en base.

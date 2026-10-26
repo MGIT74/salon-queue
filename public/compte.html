@@ -794,7 +794,7 @@
 
 </div>
 
-<script src="/app.js?v=38"></script>
+<script src="/app.js?v=39"></script>
 <script src="/autorefresh.js?v=3"></script>
 <script src="/group-booking.js?v=27"></script>
 <style>
@@ -1811,7 +1811,7 @@ function refreshBookRecap() {
   vitrineRecapFill({
     service: selBookService === EXTRAS_ONLY ? EXTRAS_ONLY_SERVICE : svcList.find(function (x) { return String(x.id) === String(selBookService); }),
     extras: pick(extList, selBookExtras.map(String)), products: pick(bookProducts, selBookProducts.map(String)),
-    barber: anyB ? 'Premier disponible' : (b ? b.name : ''), time: selBookSlot ? selBookSlot.time : '',
+    barber: anyB ? anyBarberLabel(bookBarbers, selBookSlot && selBookSlot.barberId) : (b ? b.name : ''), time: selBookSlot ? selBookSlot.time : '',
     when: selBookDate ? new Date(selBookDate + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' }) : ''
   });
 }
