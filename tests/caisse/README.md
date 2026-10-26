@@ -169,4 +169,5 @@ node tests/caisse/135-poste-tablette.js  # Mon poste tablette : page elargie, pl
 node tests/caisse/136-groupe-salon-coiffeur-creneaux.js  # RDV a plusieurs (salon) : coiffeur choisi sur l'etape des creneaux
 node tests/caisse/137-supplement-seul-direct.js  # « Seulement un supplement » : un appui = etape Supplements, partout
 node tests/caisse/138-caisse-sans-ligne-supplement-seul.js  # Caisse : pas de ligne « Supplément seul 0,00 € » dans le ticket
+node tests/caisse/139-poste-tiroir-rdv.js  # Poste : tiroir a droite au clic sur un RDV de l'agenda (comme la caisse)
 ```

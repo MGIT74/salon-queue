@@ -343,6 +343,34 @@
     .agenda-cal .cal-nav .cal-month-label { flex: 1; text-align: center; }
   }
 
+  /* --- Tiroir client d'un RDV (même principe que le tiroir client du dashboard) --- */
+  .appt-drawer-backdrop {
+    display: flex; position: fixed; inset: 0; z-index: 300; background: rgba(0,0,0,0.4);
+    opacity: 0; pointer-events: none; transition: opacity .3s ease;
+  }
+  .appt-drawer-backdrop.on { opacity: 1; pointer-events: auto; }
+  .appt-drawer {
+    position: fixed; top: 0; right: 0; bottom: 0; width: min(420px, 92vw);
+    background: var(--card); box-shadow: -10px 0 40px rgba(0,0,0,0.3);
+    transform: translateX(100%); transition: transform .38s cubic-bezier(.32,.72,0,1);
+    z-index: 301; overflow-y: auto; padding: 24px;
+  }
+  .appt-drawer-backdrop.on .appt-drawer { transform: translateX(0); }
+  .appt-drawer-head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 8px; }
+  .appt-drawer-head h2 { font-size: 21px; margin: 0; letter-spacing: -.02em; }
+  .appt-drawer .x { background: var(--fill); border: none; width: 32px; height: 32px; border-radius: 50%; color: var(--grey); font-size: 15px; cursor: pointer; flex-shrink: 0; }
+  .appt-drawer-section { margin-bottom: 22px; }
+  .ad-visit-row { background: var(--fill); border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; }
+  .ad-visit-row .ad-visit-date { font-size: 13.5px; font-weight: 600; }
+  .ad-visit-row .ad-visit-meta { font-size: 12.5px; color: var(--grey); margin-top: 2px; }
+  .ad-visit-count { font-size: 13.5px; color: var(--grey); margin-bottom: 12px; }
+  .appt-drawer-section h3 { font-size: 13px; font-weight: 600; color: var(--grey); text-transform: uppercase; letter-spacing: .04em; margin: 0 0 10px; }
+  .appt-drawer textarea, .appt-drawer .fld input { width: 100%; box-sizing: border-box; padding: 11px 13px; border: 1px solid var(--sep); border-radius: 10px; background: var(--card); color: var(--ink); font-family: inherit; font-size: 14.5px; }
+  .appt-drawer textarea { resize: vertical; }
+  .ad-badge { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--blue-soft); color: var(--accent); margin-bottom: 12px; }
+  .ad-badge.cancelled { background: rgba(196,0,27,.12); color: var(--red); }
+  .ad-badge.done { background: rgba(30,126,52,.14); color: var(--green); }
+  .ad-link-edit { display: flex; align-items: center; gap: 6px; background: none; border: none; color: var(--accent); font-family: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; padding: 0; margin: 0 0 14px; }
 </style>
 </head>
 <body>
@@ -404,6 +432,47 @@
       <!-- Tablette en paysage / ordinateur : le planning du jour choisi a cote du calendrier (voir posteSplit). -->
       <div class="card-box agenda-side" id="cal-side" style="display:none"></div>
       </div>
+    </div>
+  </div>
+</div>
+
+<div class="appt-drawer-backdrop" id="appt-drawer-backdrop" onclick="if(event.target===this) closeApptDrawer()">
+  <div class="appt-drawer">
+    <div class="appt-drawer-head">
+      <h2 id="ad-name">—</h2>
+      <button class="x" onclick="closeApptDrawer()">✕</button>
+    </div>
+    <div id="ad-badge"></div>
+    <button class="ad-link-edit" id="ad-edit-btn" style="display:none" onclick="adToggleEdit()">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+      Modifier
+    </button>
+    <div id="ad-actions" style="display:none;gap:8px;margin:0 0 18px">
+      <button class="btn btn-soft" style="flex:1" onclick="adReschedule()">Déplacer</button>
+      <button class="btn btn-soft" style="flex:1;color:var(--red)" onclick="adCancel()">Annuler le RDV</button>
+    </div>
+    <div class="appt-drawer-section" id="ad-info"></div>
+    <div class="appt-drawer-section" id="ad-edit-section" style="display:none">
+      <div class="fld" style="margin-bottom:8px"><label for="ad-edit-name">Nom</label><input id="ad-edit-name" type="text"></div>
+      <div class="fld" style="margin-bottom:8px"><label for="ad-edit-email">Email</label><input id="ad-edit-email" type="email"></div>
+      <div class="fld" style="margin-bottom:8px"><label for="ad-edit-phone">Téléphone</label><input id="ad-edit-phone" type="tel"></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-primary" onclick="adSaveInfo()">Enregistrer</button>
+        <button class="btn btn-ghost" onclick="adToggleEdit()">Annuler</button>
+      </div>
+    </div>
+    <div class="appt-drawer-section" id="ad-marketing-section" style="display:none">
+      <h3>Marketing</h3>
+      <div id="ad-marketing-content"></div>
+    </div>
+    <div class="appt-drawer-section">
+      <h3>Note interne</h3>
+      <div id="ad-note-box"></div>
+    </div>
+    <div class="appt-drawer-section">
+      <h3>Historique des passages</h3>
+      <div class="ad-visit-count" id="ad-visit-count"></div>
+      <div id="ad-visits"></div>
     </div>
   </div>
 </div>
@@ -592,7 +661,7 @@ if (window.AutoRefresh) AutoRefresh.start(function () {
   var ag = document.getElementById('p-agenda');
   if (!ag || ag.style.display === 'none' || !calBooted) return;
   calMonthCache = {}; return loadAgendaPeriod();
-}, { idleMs: 15000, busy: function () { return !!document.querySelector('.modal-overlay'); } });
+}, { idleMs: 15000, busy: function () { return !!document.querySelector('.modal-overlay, .appt-drawer-backdrop.on'); } });
 
 function gotoAgenda() {
   document.getElementById('p-home').style.display = 'none';
@@ -1635,51 +1704,312 @@ function openPosteAddAppointment(dateStr, barberId) {
   paGoStep('service');   // 1re etape : la prestation
 }
 
-/**
- * Tiroir client simplifié (coiffeur) - infos + note interne
- * modifiable via le même endpoint que la section 'À suivre'. La note
- * n'est modifiable que si ce RDV est déjà une vraie ligne de file
- * (promoted_queue_id posé, ex: RDV du jour même) - un RDV futur pas
- * encore promu n'a encore rien à éditer.
- */
+/** Clic sur un RDV de la frise de l'Agenda : tiroir à droite, comme dans la caisse. */
 function openPosteClientDrawer(id) {
   var a = calApptById[id];
   if (!a) return;
+  openApptDrawer(a);
+}
 
-  var when = new Date(a.scheduled_at.replace(' ', 'T')).toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' }) +
-    ' à ' + a.scheduled_at.slice(11, 16);
+/* ---------- Tiroir client d'un RDV (comme dans le dashboard) ----------
+   Repris de la caisse. S'ouvre à droite au clic sur un RDV de la frise de l'Agenda :
+   le coiffeur peut y modifier les coordonnées, déplacer le RDV, l'annuler et écrire une note interne. */
+var adAppt = null;      // le RDV affiché (forme /api/appointments)
+var adQueueId = null;   // ligne de file liée (RDV du jour déjà promu) - nécessaire pour modifier les coordonnées / la note
+
+function adIsUpcoming(a) {
+  return a.status !== 'cancelled' && a.source !== 'walkin' && a.display_status !== 'completed' && a.display_status !== 'no_show' &&
+    String(a.scheduled_at) > nowSalonDatetimeString();
+}
+
+function adWhenLabel(a) {
+  var d = new Date(String(a.scheduled_at).replace(' ', 'T')).toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' });
+  return d.charAt(0).toUpperCase() + d.slice(1) + ' à ' + String(a.scheduled_at).slice(11, 16);
+}
+
+function adRenderInfo() {
+  var a = adAppt;
+  document.getElementById('ad-name').textContent = a.client_name;
+  var statusHtml = a.status === 'cancelled'
+    ? '<span class="ad-badge cancelled">Annulé</span>'
+    : (a.display_status === 'completed' ? '<span class="ad-badge done">Terminé</span>'
+      : (a.display_status === 'no_show' ? '<span class="ad-badge cancelled">Absent</span>' : '<span class="ad-badge">Confirmé</span>'));
+  document.getElementById('ad-badge').innerHTML = statusHtml;
+  document.getElementById('ad-info').innerHTML =
+    '<div class="detail-row"><span class="detail-label">Quand</span><span class="detail-value" style="text-transform:capitalize">' + esc(adWhenLabel(a)) + '</span></div>' +
+    '<div class="detail-row"><span class="detail-label">Coiffeur</span><span class="detail-value">' + esc(a.barber_name || 'Non assigné') + '</span></div>' +
+    '<div class="detail-row"><span class="detail-label">Prestation</span><span class="detail-value">' + esc(a.service_name || '') + '</span></div>' +
+    (a.email ? '<div class="detail-row"><span class="detail-label">Email</span><span class="detail-value">' + esc(a.email) + '</span></div>' : '') +
+    (a.phone ? '<div class="detail-row"><span class="detail-label">Téléphone</span><span class="detail-value">' + esc(a.phone) + '</span></div>' : '') +
+    (!a.email && !a.phone ? '<div class="hint" style="margin:0">Aucune coordonnée renseignée</div>' : '') +
+    (a.client_note ? '<div class="detail-row" style="flex-direction:column;align-items:flex-start;gap:2px"><span class="detail-label">📝 Note du client (RDV)</span><span class="detail-value" style="font-weight:400">' + esc(a.client_note) + '</span></div>' : '');
+}
+
+
+var AD_STATUS_LABEL = { waiting: 'En attente', in_progress: 'En cours', done: 'Terminé', cancelled: 'Absent / annulé' };
+var AD_STATUS_COLOR = { waiting: 'var(--grey)', in_progress: 'var(--blue)', done: 'var(--green)', cancelled: 'var(--red)' };
+
+function adRenderMarketing(r) {
+  var parts = [];
+  if (r.loyalty && r.loyalty.activated) {
+    parts.push('<div class="detail-row"><span class="detail-label">⭐ Fidélité</span><span class="detail-value">' +
+      r.loyalty.points + ' point' + (r.loyalty.points > 1 ? 's' : '') + '</span></div>' + loyaltyTiersHtml(r.loyalty));
+  } else {
+    parts.push('<div class="hint" style="margin:0 0 4px">Carte de fidélité non activée</div>');
+  }
+  (r.gifts || []).forEach(function (g) {
+    var itemsList = (g.items || []).map(function (it) { return it.quantity + ' × ' + it.item_name; }).join(', ');
+    parts.push('<div class="detail-row" style="flex-direction:column;align-items:flex-start;gap:2px">' +
+      '<span class="detail-label" style="color:' + (g.used_at ? 'var(--grey)' : 'var(--green)') + '">' + (g.used_at ? '🎁 Cadeau utilisé' : '🎁 Cadeau disponible') + ' (' + eur(g.amount_cents) + ')</span>' +
+      '<span class="detail-value" style="font-weight:400">' + esc(itemsList) + '</span></div>');
+  });
+  document.getElementById('ad-marketing-content').innerHTML = parts.join('');
+  document.getElementById('ad-marketing-section').style.display = 'block';
+}
+
+/** Les deux paliers (prestation / produit) : disponible, ou combien de points il manque. */
+function loyaltyTiersHtml(l) {
+  var t = l.thresholds, rw = l.rewards || {};
+  if (!t) return '';
+  var row = function (label, ok, need) {
+    return '<div class="detail-row"><span class="detail-label">' + label + '</span><span class="detail-value" style="color:' + (ok ? 'var(--green)' : 'var(--grey)') + '">' +
+      (ok ? 'Remise disponible' : (need - l.points) + ' point' + (need - l.points > 1 ? 's' : '') + ' avant la remise (' + need + ')') + '</span></div>';
+  };
+  return row('Remise prestation', rw.service, t.service) + row('Remise produit', rw.product, t.product);
+}
+
+function adSourceIcon(v) {
+  var walkin = v.source === 'walkin';
+  return '<span title="' + (walkin ? 'Sans RDV (passage au salon)' : 'RDV en ligne') + '" style="display:inline-flex;vertical-align:middle;color:var(--blue);margin-right:4px">' + (walkin ? '🚶' : '📅') + '</span>';
+}
+
+function adRenderVisits(items) {
+  document.getElementById('ad-visit-count').textContent = items.length + (items.length > 1 ? ' passages au total' : ' passage au total');
+  document.getElementById('ad-visits').innerHTML = items.length === 0
+    ? '<div class="empty">Aucun passage enregistré</div>'
+    : items.slice(0, 4).map(function (v) {
+        var when = new Date(v.checkin_at).toLocaleString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+        var mins = (v.start_at && v.end_at) ? Math.round((new Date(v.end_at) - new Date(v.start_at)) / 60000) : 0;
+        return '<div class="ad-visit-row"><div class="ad-visit-date">' + adSourceIcon(v) + when + '</div>' +
+          '<div class="ad-visit-meta">' + esc(v.service_name || 'Prestation') +
+          (v.total_price_cents ? ' · ' + eur(v.total_price_cents) : '') +
+          ' · <span style="color:' + (AD_STATUS_COLOR[v.status] || 'var(--grey)') + '">' + esc(AD_STATUS_LABEL[v.status] || v.status) + '</span>' +
+          (mins > 0 ? ' · ' + formatMinutes(mins) : '') + '</div></div>';
+      }).join('');
+}
+
+/** Charge fidélité/cadeaux + historique des passages du client du tiroir (comme dans le dashboard). */
+function adLoadDetails(a, queueId) {
+  var token = a.id;
+  document.getElementById('ad-marketing-section').style.display = 'none';
+  document.getElementById('ad-visit-count').textContent = '';
+  document.getElementById('ad-visits').innerHTML = '<div class="hint" style="margin:0">Chargement…</div>';
+  var qs = 'email=' + encodeURIComponent(a.email || '') + '&phone=' + encodeURIComponent(a.phone || '') + '&name=' + encodeURIComponent(a.client_name || '');
+  barberApi('/api/owner/client-marketing?' + qs).then(function (r) {
+    if (adAppt && adAppt.id === token) adRenderMarketing(r);
+  }).catch(function () {});
+  var url = queueId ? '/api/queue/' + queueId + '/client-history' : '/api/queue/client-history-by-contact?' + qs;
+  barberApi(url).then(function (r) {
+    if (adAppt && adAppt.id === token) adRenderVisits(r.items || []);
+  }).catch(function (e) {
+    document.getElementById('ad-visits').innerHTML = '<div class="empty">Historique indisponible</div>';
+  });
+}
+
+function openApptDrawer(a) {
+  adAppt = a;
+  adQueueId = a.promoted_queue_id || null;
+  document.getElementById('ad-edit-section').style.display = 'none';
+  document.getElementById('ad-info').style.display = 'block';
+  // Le crayon n'existe que pour un RDV déjà dans la file (jour J) : avant, il n'y a pas encore de fiche à modifier.
+  document.getElementById('ad-edit-btn').style.display = (adQueueId && a.status !== 'cancelled') ? 'flex' : 'none';
+  document.getElementById('ad-actions').style.display = adIsUpcoming(a) ? 'flex' : 'none';
+  adRenderInfo();
+  var noteBox = document.getElementById('ad-note-box');
+  if (adQueueId) {
+    noteBox.innerHTML =
+      '<textarea id="ad-note" rows="3" placeholder="Ex: préfère dégradé américain, allergie...">' + esc(a.note || '') + '</textarea>' +
+      '<button class="btn btn-soft" style="margin-top:8px" onclick="adSaveNote()">Enregistrer la note</button>';
+  } else {
+    noteBox.innerHTML = '<p class="hint" style="margin:0">Pas encore modifiable — ce RDV entrera dans la file le jour même.</p>';
+  }
+  adLoadDetails(a, adQueueId);
+  document.getElementById('appt-drawer-backdrop').classList.add('on');
+  _lockBodyScroll();
+}
+
+function closeApptDrawer() {
+  var backdrop = document.getElementById('appt-drawer-backdrop');
+  var wasOpen = backdrop.classList.contains('on');
+  backdrop.classList.remove('on');
+  if (wasOpen) _unlockBodyScroll();
+  adAppt = null; adQueueId = null;
+}
+
+/** Rafraîchit l'agenda et la file après une modification. */
+function adRefreshViews() {
+  Object.keys(calMonthCache).forEach(function (k) { delete calMonthCache[k]; });
+  if (calBooted) loadAgendaPeriod();
+  refresh();
+}
+
+function adToggleEdit() {
+  var editing = document.getElementById('ad-edit-section').style.display !== 'none';
+  document.getElementById('ad-edit-section').style.display = editing ? 'none' : 'block';
+  document.getElementById('ad-info').style.display = editing ? 'block' : 'none';
+  if (!editing && adAppt) {
+    document.getElementById('ad-edit-name').value = adAppt.client_name || '';
+    document.getElementById('ad-edit-email').value = adAppt.email || '';
+    document.getElementById('ad-edit-phone').value = adAppt.phone || '';
+  }
+}
+
+function adSaveInfo() {
+  if (!adAppt || !adQueueId) return;
+  var name = document.getElementById('ad-edit-name').value.trim();
+  if (!name) { toast('Le nom est requis', true); return; }
+  var email = document.getElementById('ad-edit-email').value.trim();
+  var phone = document.getElementById('ad-edit-phone').value.trim();
+  barberApi('/api/queue/' + adQueueId, { method: 'PUT', body: { client_name: name, email: email, phone: phone }, actingAs: adAppt.barber_id || undefined })
+    .then(function () {
+      adAppt.client_name = name; adAppt.email = email; adAppt.phone = phone;
+      adRenderInfo(); adToggleEdit();
+      toast('Client mis à jour');
+      adRefreshViews();
+    })
+    .catch(function (e) { toast(e.message, true); });
+}
+
+function adSaveNote() {
+  if (!adAppt || !adQueueId) return;
+  var note = document.getElementById('ad-note').value;
+  barberApi('/api/queue/' + adQueueId + '/note', { method: 'PUT', body: { note: note }, actingAs: adAppt.barber_id || undefined })
+    .then(function () { adAppt.note = note; toast('Note enregistrée'); })
+    .catch(function (e) { toast(e.message, true); });
+}
+
+function adCancel() {
+  var a = adAppt;
+  if (!a) return;
+  // Double confirmation pour une action irréversible et visible du client (email d'annulation envoyé) : une première
+  // confirmation simple, puis une seconde où il faut taper "ANNULER" en toutes lettres - protège d'un clic accidentel sur un écran partagé.
+  showConfirm('Annuler le RDV de ' + a.client_name + ' (' + adWhenLabel(a) + ') ?', { title: 'Annuler ce RDV', danger: true, confirmLabel: 'Continuer' })
+    .then(function (ok) {
+      if (!ok) return;
+      return showPrompt('Tape ANNULER pour confirmer définitivement.', { title: 'Confirmation finale', requireExact: 'ANNULER', danger: true, confirmLabel: 'Annuler le RDV' });
+    })
+    .then(function (confirmed) {
+      if (!confirmed) return;
+      return barberApi('/api/appointments/' + a.id + '/admin-cancel', { method: 'POST', body: {}, actingAs: a.barber_id || undefined })
+        .then(function () {
+          closeApptDrawer();
+          toast('RDV annulé');
+          adRefreshViews();
+        });
+    })
+    .catch(function (e) { if (e) toast(e.message, true); });
+}
+
+/**
+ * Déplace le RDV vers un autre créneau (autre jour, autre heure, éventuellement un autre coiffeur) - prestation et suppléments
+ * inchangés. Le client reçoit un email avec le nouvel horaire. Même parcours que dans le dashboard.
+ */
+function adReschedule() {
+  var a = adAppt;
+  if (!a || !adIsUpcoming(a)) return;
+  var currentDate = String(a.scheduled_at).slice(0, 10);
+  var rdvBarbers = (barbers || []).filter(function (b) {
+    return b.id === a.barber_id || Boolean(b.accepts_appointments && b.active !== 0 && hasBookableSchedule(b) && !isOnLeaveOn(b, currentDate) && !isWalkinOn(b, currentDate));
+  });
 
   var overlay = _buildModal(
     '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px">' +
-    '<div class="modal-title" style="margin-bottom:0">' + esc(a.client_name) + '</div>' +
-    '<button id="pcd-close-x" style="background:var(--fill);border:none;width:30px;height:30px;border-radius:50%;color:var(--grey);font-size:14px;cursor:pointer;flex-shrink:0;margin-left:10px">✕</button>' +
+    '<div class="modal-title" style="margin-bottom:0">Déplacer le RDV de ' + esc(a.client_name) + '</div>' +
+    '<button id="rs-close-x" style="background:var(--fill);border:none;width:30px;height:30px;border-radius:50%;color:var(--grey);font-size:14px;cursor:pointer;flex-shrink:0;margin-left:10px">✕</button>' +
     '</div>' +
-    '<div class="detail-row"><span class="detail-label">Quand</span><span class="detail-value" style="text-transform:capitalize">' + when + '</span></div>' +
-    '<div class="detail-row"><span class="detail-label">Prestation</span><span class="detail-value">' + esc(a.service_name) + '</span></div>' +
-    (a.barber_name ? '<div class="detail-row"><span class="detail-label">Coiffeur</span><span class="detail-value">' + esc(a.barber_name) + (me && a.barber_id === me.id ? ' (moi)' : '') + '</span></div>' : '') +
-    (a.email ? '<div class="detail-row"><span class="detail-label">Email</span><span class="detail-value">' + esc(a.email) + '</span></div>' : '') +
-    (a.phone ? '<div class="detail-row"><span class="detail-label">Téléphone</span><span class="detail-value">' + esc(a.phone) + '</span></div>' : '') +
-    (a.client_note ? '<div class="detail-row" style="flex-direction:column;align-items:flex-start;gap:2px"><span class="detail-label">📝 Note du client (RDV)</span><span class="detail-value" style="font-weight:400">' + esc(a.client_note) + '</span></div>' : '') +
-    '<div style="margin-top:14px">' +
-      '<label style="display:block;font-size:12.5px;font-weight:600;color:var(--grey);margin-bottom:6px">Note interne</label>' +
-      (a.promoted_queue_id && (!a.barber_id || (me && a.barber_id === me.id))
-        ? '<textarea id="pcd-note" rows="2" style="width:100%;padding:11px 13px;border:1px solid var(--sep);border-radius:10px;background:var(--card);color:var(--ink);font-family:inherit;font-size:14px;resize:vertical;margin-bottom:8px">' + esc(a.note || '') + '</textarea>' +
-          '<button class="btn btn-soft" id="pcd-save-note-btn" style="width:100%">Enregistrer la note</button>'
-        : '<p class="hint" style="margin:0">' + (a.barber_id && me && a.barber_id !== me.id ? 'RDV d\'un collègue : sa note interne se modifie depuis son poste.' : 'Pas encore modifiable — ce RDV entrera dans la file le jour même.') + '</p>') +
+    '<div class="fld" style="margin-bottom:10px"><label>Coiffeur</label><select class="modal-input" id="rs-barber">' +
+      rdvBarbers.map(function (b) { return '<option value="' + b.id + '"' + (b.id === a.barber_id ? ' selected' : '') + '>' + esc(b.name) + '</option>'; }).join('') +
+    '</select></div>' +
+    '<div class="fld" style="margin-bottom:10px"><label>Nouvelle date</label><input class="modal-input" type="date" id="rs-date" value="' + currentDate + '"></div>' +
+    '<div class="aa-step-title">Créneau</div>' +
+    '<div id="rs-half-toggle" class="half-toggle" style="display:none;margin-bottom:8px">' +
+      '<button id="rs-half-morning" onclick="adRsShowHalf(\'morning\')">Matin</button>' +
+      '<button id="rs-half-afternoon" onclick="adRsShowHalf(\'afternoon\')">Après-midi</button>' +
+    '</div>' +
+    '<div class="aa-slots" id="rs-slots"><span class="hint" style="margin:0">Chargement…</span></div>' +
+    '<div class="modal-error" id="rs-error" style="display:none"></div>' +
+    '<div class="modal-actions">' +
+    '<button class="btn btn-soft" id="rs-cancel-btn">Annuler</button>' +
+    '<button class="btn btn-primary" id="rs-save-btn" disabled>Enregistrer</button>' +
     '</div>'
   );
 
-  overlay.querySelector('#pcd-close-x').onclick = function () { _closeModal(overlay); };
+  var selectedTime = null;
+  var byHalf = { morning: [], afternoon: [] };
+  var curHalf = 'afternoon';
 
-  var saveBtn = overlay.querySelector('#pcd-save-note-btn');
-  if (saveBtn) {
-    saveBtn.onclick = function () {
-      var note = overlay.querySelector('#pcd-note').value;
-      barberApi('/api/queue/' + a.promoted_queue_id + '/note', { method: 'PUT', body: { note: note } })
-        .then(function () { a.note = note; toast('Note enregistrée'); })
-        .catch(function (e) { toast(e.message, true); });
-    };
+  function renderHalf() {
+    var list = byHalf[curHalf];
+    overlay.querySelector('#rs-slots').innerHTML = list.length
+      ? list.map(function (s) { return '<button class="aa-slot" data-time="' + s.time + '" onclick="adRsSelectSlot(this)">' + s.time + '</button>'; }).join('')
+      : '<span class="hint" style="margin:0">Aucun créneau ' + (curHalf === 'morning' ? 'le matin' : "l'après-midi") + '</span>';
   }
+  window.adRsShowHalf = function (half) {
+    curHalf = half;
+    overlay.querySelector('#rs-half-morning').classList.toggle('sel', half === 'morning');
+    overlay.querySelector('#rs-half-afternoon').classList.toggle('sel', half === 'afternoon');
+    renderHalf();
+  };
+  window.adRsSelectSlot = function (el) {
+    selectedTime = el.dataset.time;
+    overlay.querySelectorAll('#rs-slots .aa-slot').forEach(function (c) { c.classList.remove('sel'); });
+    el.classList.add('sel');
+    overlay.querySelector('#rs-save-btn').disabled = false;
+  };
+
+  function loadSlots() {
+    var slotsEl = overlay.querySelector('#rs-slots'), toggleEl = overlay.querySelector('#rs-half-toggle');
+    var barberId = overlay.querySelector('#rs-barber').value, date = overlay.querySelector('#rs-date').value;
+    selectedTime = null;
+    overlay.querySelector('#rs-save-btn').disabled = true;
+    toggleEl.style.display = 'none';
+    if (!barberId || !date) return;
+    slotsEl.innerHTML = '<span class="hint" style="margin:0">Chargement…</span>';
+    barberApi('/api/appointments/availability?date=' + date + '&service_id=' + a.service_id + '&barber_id=' + barberId + '&exclude_appointment_id=' + a.id, { actingAs: barberId })
+      .then(function (r) {
+        if (!r.slots.length) { slotsEl.innerHTML = '<span class="hint" style="margin:0">Aucun créneau disponible ce jour-là</span>'; return; }
+        byHalf.morning = r.slots.filter(function (s) { return s.time < '12:00'; });
+        byHalf.afternoon = r.slots.filter(function (s) { return s.time >= '12:00'; });
+        if (!byHalf.morning.length) { toggleEl.style.display = 'none'; curHalf = 'afternoon'; renderHalf(); }
+        else { toggleEl.style.display = 'flex'; adRsShowHalf('morning'); }
+      })
+      .catch(function (e) { slotsEl.innerHTML = ''; toast(e.message, true); });
+  }
+
+  overlay.querySelector('#rs-barber').onchange = loadSlots;
+  overlay.querySelector('#rs-date').onchange = loadSlots;
+  loadSlots();
+  overlay.querySelector('#rs-close-x').onclick = function () { _closeModal(overlay); };
+  overlay.querySelector('#rs-cancel-btn').onclick = function () { _closeModal(overlay); };
+  overlay.querySelector('#rs-save-btn').onclick = function () {
+    var errEl = overlay.querySelector('#rs-error');
+    if (!selectedTime) return;
+    barberApi('/api/appointments/' + a.id + '/reschedule', {
+      method: 'PUT',
+      actingAs: a.barber_id || undefined,
+      body: {
+        date: overlay.querySelector('#rs-date').value,
+        time: selectedTime,
+        barber_id: overlay.querySelector('#rs-barber').value,
+        base_url: window.location.origin + '/rdv.html'
+      }
+    }).then(function () {
+      _closeModal(overlay);
+      closeApptDrawer();
+      toast('Rendez-vous déplacé');
+      adRefreshViews();
+    }).catch(function (e) { errEl.textContent = e.message; errEl.style.display = 'block'; });
+  };
 }
 </script>
 </body>
