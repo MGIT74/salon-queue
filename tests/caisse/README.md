@@ -165,4 +165,5 @@ node tests/caisse/131-rdv-ecran-compte.js  # Prise de RDV : premier ecran Se con
 node tests/caisse/132-compte-ordinateur-tablette.js  # Compte client ordinateur/tablette : menu lateral, accueil en colonnes, etapes + recapitulatif
 node tests/caisse/133-calendrier-sans-scintillement.js  # Calendriers sans scintillement (RDV en ligne, compte, admin, poste)
 node tests/caisse/134-zoom-curseur-planning.js  # Planning du jour : zoom par curseur, traits entre les heures toujours visibles
+node tests/caisse/135-poste-tablette.js  # Mon poste tablette : page elargie, planning a cote du calendrier en paysage
 ```

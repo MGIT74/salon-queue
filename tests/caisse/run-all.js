@@ -154,7 +154,8 @@ const suite = [
   ['131-rdv-ecran-compte.js', false, ['exit']],
   ['132-compte-ordinateur-tablette.js', false, ['exit']],
   ['133-calendrier-sans-scintillement.js', false, ['exit']],
-  ['134-zoom-curseur-planning.js', false, ['exit']]
+  ['134-zoom-curseur-planning.js', false, ['exit']],
+  ['135-poste-tablette.js', false, ['exit']]
 ];
 
 let bad = 0;

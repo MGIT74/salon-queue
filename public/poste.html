@@ -213,6 +213,7 @@
   body.has-poste-footer #app-screen { padding-bottom: 84px; }
   body.has-poste-footer .toast { bottom: 100px; }
 
+
   /* --- Agenda : copie conforme du calendrier du menu Rendez-vous (dashboard.html) --- */
   .card-box { background: var(--card); border-radius: 16px; padding: 22px; box-shadow: var(--shadow, 0 1px 2px rgba(0,0,0,0.04), 0 0 0 1px var(--sep));
               margin-bottom: 14px; transition: background .25s ease; }
@@ -306,6 +307,42 @@
   .detail-row:last-of-type { border-bottom: none; }
   .detail-label { font-size: 12.5px; color: var(--grey); flex-shrink: 0; }
   .detail-value { font-size: 13.5px; font-weight: 500; text-align: right; word-break: break-word; }
+
+  /* ===== Tablette (700 px et plus) : plus large, calendrier plus aere. Telephone (moins de 700 px) inchange. ===== */
+  @media (min-width: 700px) {
+    .wrap { max-width: 1180px; padding: 24px 28px 120px; }
+    #p-home { max-width: 820px; margin: 0 auto; }
+    .card-box { padding: 24px; }
+    .cal-nav { flex-wrap: nowrap; justify-content: flex-start; }
+    .cal-nav > .btn:first-child { order: 1; }
+    .cal-nav .cal-month-label { order: 2; font-size: 19px; min-width: 0; }
+    .cal-nav > .btn:last-child { order: 3; }
+    .cal-nav .cal-view-switch { order: 4; margin-left: auto; }
+    .cal-view-switch button { padding: 9px 18px; font-size: 14px; }
+    .cal-grid { gap: 6px; }
+    .cal-week-row { margin-bottom: 6px; }
+    .cal-day { min-height: 82px; border-radius: 12px; }
+    .cal-day-num { font-size: 16px; }
+    .cal-dot { width: 7px; height: 7px; }
+    .cal-weekday { font-size: 13px; }
+    .cal-expand-panel { padding: 20px 22px; }
+    .cal-legend-item { font-size: 14px; }
+  }
+  @media (min-width: 1000px) {
+    .agenda-split { display: grid; grid-template-columns: minmax(380px, 440px) minmax(0, 1fr); gap: 20px; align-items: start; }
+    .agenda-split > .card-box { margin-bottom: 0; }
+    /* Vue Jour : pas de colonne de droite, le planning prend toute la largeur. */
+    .agenda-split:has(> #cal-side[style*="none"]) { grid-template-columns: minmax(0, 1fr); }
+    .agenda-side { position: sticky; top: 16px; min-width: 0; }
+    .agenda-side .cal-expand-panel { background: none; padding: 0; margin: 0; }
+    .agenda-side-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; min-height: 320px; color: var(--grey); font-size: 15px; text-align: center; }
+    .agenda-cal .cal-day { min-height: 62px; }
+    .agenda-cal .cal-nav { flex-wrap: wrap; }
+    .agenda-cal .cal-nav .cal-view-switch { margin-left: 0; width: 100%; order: 4; }
+    .agenda-cal .cal-nav .cal-view-switch button { flex: 1; }
+    .agenda-cal .cal-nav .cal-month-label { flex: 1; text-align: center; }
+  }
+
 </style>
 </head>
 <body>
@@ -344,7 +381,8 @@
       <div id="poste-no-timer-active" style="display:none"></div>
       <div class="cal-barber-picker" id="cal-barber-picker"></div>
 
-      <div class="card-box">
+      <div class="agenda-split">
+      <div class="card-box agenda-cal">
         <div class="cal-nav">
           <button class="btn btn-soft" onclick="calShiftPeriod(-1)">‹</button>
           <div class="cal-month-label" id="cal-month-label"></div>
@@ -362,6 +400,9 @@
         <div id="cal-days"></div>
         <div id="cal-day-view" style="display:none"></div>
         <div class="cal-legend" id="cal-legend"></div>
+      </div>
+      <!-- Tablette en paysage / ordinateur : le planning du jour choisi a cote du calendrier (voir posteSplit). -->
+      <div class="card-box agenda-side" id="cal-side" style="display:none"></div>
       </div>
     </div>
   </div>
@@ -984,6 +1025,7 @@ function setCalView(mode) {
   document.getElementById('cal-weekdays').style.display = mode === 'day' ? 'none' : 'grid';
   document.getElementById('cal-days').style.display = mode === 'day' ? 'none' : 'block';
   document.getElementById('cal-day-view').style.display = mode === 'day' ? 'block' : 'none';
+  if (mode === 'day') renderCalSide();
   loadAgendaPeriod();
 }
 
@@ -1078,10 +1120,32 @@ function renderCalMonth() {
       if (d === null) return false;
       return calAnchor.getFullYear() + '-' + String(calAnchor.getMonth() + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0') === calSelectedDate;
     });
-    if (selectedInThisWeek) html += renderCalExpandPanel(calSelectedDate);
+    if (selectedInThisWeek && !posteSplit()) html += renderCalExpandPanel(calSelectedDate);
   }
   document.getElementById('cal-days').innerHTML = html;
+  renderCalSide();
 }
+
+// Grand ecran (tablette en paysage, 1000 px et plus) : le planning du jour s'affiche a droite du calendrier au lieu
+// de s'inserer sous la semaine. Telephone et tablette en portrait : inchange (planning sous la semaine).
+function posteSplit() { return !!(window.matchMedia && window.matchMedia('(min-width: 1000px)').matches); }
+function renderCalSide() {
+  var side = document.getElementById('cal-side'); if (!side) return;
+  if (!posteSplit() || calViewMode === 'day') { side.style.display = 'none'; side.innerHTML = ''; return; }
+  side.style.display = 'block';
+  side.innerHTML = calSelectedDate ? renderCalExpandPanel(calSelectedDate)
+    : '<div class="agenda-side-empty"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5.5" width="16" height="15" rx="2.5"/><path d="M4 9.5h16"/><path d="M8 3.5v3.5M16 3.5v3.5"/></svg>Touchez un jour pour voir son planning.</div>';
+}
+(function () {
+  var was = null, t = null;
+  window.addEventListener('resize', function () {
+    clearTimeout(t); t = setTimeout(function () {
+      var now = posteSplit(); if (now === was) return; was = now;
+      if (typeof calViewMode === 'undefined') return;
+      if (calViewMode === 'month') renderCalMonth(); else if (calViewMode === 'week') renderCalWeek();
+    }, 150);
+  });
+})();
 
 function renderCalExpandPanel(dateStr) {
   var when = new Date(dateStr + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' });
@@ -1121,8 +1185,9 @@ function renderCalWeek() {
       '<div class="cal-day-num">' + d.getDate() + '</div>' + calDayDotsHtml(byDay[dateStr] || []) + '</div>';
   }
   var html = '<div class="cal-grid cal-week-row">' + cells + '</div>';
-  if (calSelectedDate) html += renderCalExpandPanel(calSelectedDate);
+  if (calSelectedDate && !posteSplit()) html += renderCalExpandPanel(calSelectedDate);
   document.getElementById('cal-days').innerHTML = html;
+  renderCalSide();
 }
 
 function renderCalDay() {
