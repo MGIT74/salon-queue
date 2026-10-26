@@ -149,7 +149,8 @@ const suite = [
   ['126-identifiants-longs.js', false, ['exit']],
   ['127-couleur-coiffeur-partout.js', false, ['exit']],
   ['128-jours-coiffeur-absent.js', false, ['exit']],
-  ['129-admin-adresse-par-menu.js', false, ['exit']]
+  ['129-admin-adresse-par-menu.js', false, ['exit']],
+  ['130-deplacer-rdv-supplement-seul.js', false, ['exit']]
 ];
 
 let bad = 0;

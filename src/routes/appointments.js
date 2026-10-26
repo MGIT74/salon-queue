@@ -387,7 +387,16 @@ router.get('/availability', wrap(async (req, res) => {
   }
 
   // Prestation + suppléments du catalogue, puis durée PROPRE à chaque coiffeur (tarif personnalisé, exclusions).
-  const cat = await loadCatalog(req.salon.id, service_id, req.query.extras ? String(req.query.extras).split(',').filter(Boolean) : []);
+  let extraIds = req.query.extras ? String(req.query.extras).split(',').filter(Boolean) : [];
+  // Déplacement d'un RDV existant : ses suppléments à lui (durée réelle ; un RDV « supplément seul » n'a pas de
+  // prestation, il était refusé avec « Choisissez au moins un supplément »).
+  if (req.query.exclude_appointment_id && !req.query.extras) {
+    const [own] = await pool.query(
+      `SELECT ae.extra_id FROM appointment_extras ae JOIN appointments a ON a.id = ae.appointment_id
+       WHERE ae.appointment_id = ? AND a.salon_id = ?`, [req.query.exclude_appointment_id, req.salon.id]);
+    extraIds = own.map((x) => x.extra_id);
+  }
+  const cat = await loadCatalog(req.salon.id, service_id, extraIds);
   if (!cat.ok) return res.status(cat.status).json({ error: cat.error });
   var slotOpts = req.query.exclude_appointment_id ? { excludeAppointmentId: req.query.exclude_appointment_id } : {};
   // Reservation a plusieurs : creneaux deja retenus par les AUTRES personnes du groupe (cf. lib/groupBooking).
