@@ -1134,6 +1134,10 @@
   .aa-slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px,1fr)); gap: 7px; margin-bottom: 6px; }
   .aa-slot { border: none; background: var(--fill); color: var(--ink); border-radius: 10px; padding: 10px 4px; cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 600; }
   .aa-slot.sel { background: var(--blue); color: #fff; }
+  .aa-group-link { display: inline-flex; align-items: center; gap: 7px; align-self: flex-end; background: var(--fill); border: none; border-radius: 999px; padding: 7px 13px; font-family: inherit; font-size: 13.5px; font-weight: 600; color: var(--ink); cursor: pointer; margin-bottom: 10px; }
+  .aa-group-link:hover { background: var(--fill-2); }
+  #aa-barber-grid .aa-card:not(.aa-any) small { display: block; margin-top: 3px; font-size: 11.5px; font-weight: 500; color: var(--grey); }
+  #aa-barber-grid .aa-card.sel:not(.aa-any) small { color: inherit; opacity: .85; }
   .aa-back { background: none; border: none; padding: 0; font-family: inherit; font-size: 13.5px; color: var(--blue); font-weight: 500; cursor: pointer; margin-bottom: 14px; }
 
   /* Vue jour : une seule colonne, liste verticale */
@@ -6889,7 +6893,8 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
   // Offre du coiffeur choisi (ses prestations, son tarif) - cf. barberItems (app.js).
   function aaOffer(kind) {
     var list = kind === 'services' ? services : extras;
-    if (state.barberId === '' && typeof anyBarberItems === 'function') return anyBarberItems(rdvBarbers, kind, list);   // « Premier disponible »
+    // « Premier disponible », ou coiffeur pas encore choisi (la prestation vient d'abord) : l'offre de tous les coiffeurs.
+    if ((state.barberId === '' || state.barberId === null) && typeof anyBarberItems === 'function') return anyBarberItems(rdvBarbers, kind, list);
     var b = state.barberId && barbers.find(function (x) { return String(x.id) === String(state.barberId); });
     return typeof barberItems === 'function' ? barberItems(b, kind, list) : list;
   }
@@ -6915,20 +6920,15 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
     '<button id="aa-close-x" style="background:var(--fill);border:none;width:30px;height:30px;border-radius:50%;color:var(--grey);font-size:14px;cursor:pointer;flex-shrink:0;margin-left:10px">✕</button>' +
     '</div>' +
 
-    // 1re étape : le client (clients existants proposés dès 3 lettres), puis une ou plusieurs personnes.
-    StaffGroupBooking.clientStepHtml('aa', 'aaStartSolo()', 'aaOpenGroup()') +
 
     '<div id="aa-step-barber" style="display:none">' +
-      '<button class="aa-back" onclick="aaGoStep(\'client\')">‹ Retour</button>' +
+      '<button class="aa-back" onclick="aaGoStep(\'extras\')">‹ Retour</button>' +
       '<div class="aa-step-title">Coiffeur</div>' +
-      '<div class="aa-grid">' + (rdvBarbers.length > 1 ? '<button class="aa-card aa-any" data-id="" onclick="aaSelectBarber(this)">Premier disponible<small>Le système choisit</small></button>' : '') + rdvBarbers.map(function (b) {
-        return '<button class="aa-card" data-id="' + b.id + '" onclick="aaSelectBarber(this)">' + esc(b.name) + '</button>';
-      }).join('') + '</div>' +
-      (rdvBarbers.length === 0 ? '<p class="hint">Aucun coiffeur disponible pour un RDV en ligne (vérifie le mode RDV, le statut actif, et les horaires dans Coiffeurs).</p>' : '') +
+      '<div class="aa-grid" id="aa-barber-grid"></div>' +
     '</div>' +
 
     '<div id="aa-step-service" style="display:none">' +
-      '<button class="aa-back" onclick="aaGoStep(\'' + (preselectedBarberId ? 'client' : 'barber') + '\')">‹ Retour</button>' +
+      '<button type="button" class="aa-group-link" onclick="aaGoStep(\'client\', \'group\')"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M17.5 14.2c2.3.3 3.5 2.2 3.5 5.8"/></svg>Plusieurs personnes ?</button>' +
       '<div class="aa-step-title">Prestation</div>' +
       '<div class="item-grid compact" id="aa-service-grid"></div>' +
     '</div>' +
@@ -6944,17 +6944,17 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
     '</div>' +
 
     '<div id="aa-step-products" style="display:none">' +
-      '<button class="aa-back" onclick="aaGoStep(\'extras\')">‹ Retour</button>' +
+      '<button class="aa-back" onclick="aaGoStep(\'datetime\')">‹ Retour</button>' +
       '<div class="aa-step-title">Un produit à acheter sur place ? (optionnel)</div>' +
       vitrineSearchHtml('aa-products', 'Rechercher un produit', "aaFilter('products')") +
       '<div class="item-grid compact" id="aa-products-grid"></div>' +
       '<div class="items-empty" id="aa-products-empty">Aucun résultat</div>' +
       '<div class="step-bar"><div class="step-summary" id="aa-products-summary"></div>' +
-      '<button class="btn btn-primary" style="width:100%" onclick="aaGoStep(\'datetime\')">Suivant</button></div>' +
+      '<button class="btn btn-primary" style="width:100%" onclick="aaGoStep(\'client\')">Suivant</button></div>' +
     '</div>' +
 
     '<div id="aa-step-datetime" style="display:none">' +
-      '<button class="aa-back" onclick="aaGoStep(\'products\')">‹ Retour</button>' +
+      '<button class="aa-back" onclick="aaGoStep(\'' + (preselectedBarberId ? 'extras' : 'barber') + '\')">‹ Retour</button>' +
       '<div class="aa-step-title">Créneau</div>' +
       '<div id="aa-half-toggle" class="half-toggle" style="display:none;margin-bottom:8px">' +
         '<button id="aa-half-morning" onclick="aaShowHalf(\'morning\')">Matin</button>' +
@@ -6963,16 +6963,14 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
       '<div class="aa-slots" id="aa-slots"><span class="hint" style="margin:0">Chargement…</span></div>' +
     '</div>' +
 
-    '<div id="aa-step-contact" style="display:none">' +
-      '<button class="aa-back" onclick="aaGoStep(\'datetime\')">‹ Retour</button>' +
-      '<div class="aa-step-title" id="aa-contact-summary"></div>' +
-      '<div class="hint" id="aa-contact-client" style="margin:0 0 14px"></div>' +
-      '<div class="modal-error" id="aa-error" style="display:none"></div>' +
-      '<div class="modal-actions">' +
-      '<button class="btn btn-soft" id="aa-cancel-btn">Annuler</button>' +
-      '<button class="btn btn-primary" id="aa-save-btn">Ajouter le RDV</button>' +
-      '</div>' +
-    '</div>'
+    // Derniere etape : le client (clients connus proposes des 3 lettres), puis Enregistrer. Au telephone, on cherche
+    // d'abord la prestation et le creneau, le nom vient a la fin. « Plusieurs personnes » : meme fiche, client d'abord.
+    StaffGroupBooking.clientStepHtml('aa', 'aaStartSolo()', 'aaOpenGroup()')
+      .replace('<div id="aa-step-client">', '<div id="aa-step-client" style="display:none"><button class="aa-back aa-final-only" onclick="aaGoStep(\'products\')">‹ Retour</button>' +
+        '<div class="aa-step-title aa-final-only" id="aa-contact-summary"></div>')
+      .replace('<div class="sgb-who-choice">', '<div class="modal-error aa-final-only" id="aa-error" style="display:none"></div>' +
+        '<div class="modal-actions aa-final-only"><button class="btn btn-soft" id="aa-cancel-btn">Annuler</button>' +
+        '<button class="btn btn-primary" id="aa-save-btn">Ajouter le RDV</button></div><div class="sgb-who-choice">')
   );
   aaGroupCtx = { overlay: overlay, dateStr: dateStr, barberId: preselectedBarberId || null };
   var flowRefresh = vitrineFlow(overlay, function () {
@@ -6984,9 +6982,8 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
     };
   });
 
-  var STEPS = ['client', 'barber', 'service', 'extras', 'products', 'datetime', 'contact'];
+  var STEPS = ['service', 'extras', 'barber', 'datetime', 'products', 'client'];
   attachClientAutocomplete(overlay, 'aa-name', 'aa-email', 'aa-phone', api);
-  setTimeout(function () { var n = overlay.querySelector('#aa-name'); if (n) n.focus(); }, 60);
 
   // Clic sur la ligne d'un coiffeur précis dans le planning : on sait déjà qui, après le client on passe
   // directement à la prestation - exactement le principe déjà en place sur la Caisse.
@@ -6995,30 +6992,60 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
     if (preBtn) preBtn.classList.add('sel');
   }
 
-  window.aaGoStep = function (step) {
+  window.aaGoStep = function (step, mode) {
     STEPS.forEach(function (s) { overlay.querySelector('#aa-step-' + s).style.display = s === step ? 'flex' : 'none'; });
-    overlay.querySelector('#aa-client-pill').style.display = step === 'client' ? 'none' : 'inline-flex';
+    overlay.querySelector('#aa-client-pill').style.display = 'none';
     if (step === 'datetime') aaLoadSlots();
-    if (step === 'contact') {
+    if (step === 'barber') aaRenderBarbers();
+    if (step === 'client') {
+      // Fin du parcours (Enregistrer) ou debut d'un RDV a plusieurs (le client d'abord, pour ses proches).
+      var group = mode === 'group';
+      overlay.querySelectorAll('.aa-final-only').forEach(function (el) { el.style.display = group ? 'none' : ''; });
+      overlay.querySelector('#aa-error').style.display = 'none';
+      overlay.querySelector('#aa-step-client .sgb-who-choice').style.display = group ? '' : 'none';
+      setTimeout(function () { var n = overlay.querySelector('#aa-name'); if (n) n.focus(); }, 60);
+      if (group) return;
       var s = aaOffer('services').find(function (x) { return x.id === state.serviceId; });
       var exN = aaOffer('extras').filter(function (x) { return state.extraIds.indexOf(String(x.id)) !== -1; }).map(function (x) { return x.name; });
-      overlay.querySelector('#aa-contact-summary').textContent = when + ' à ' + state.time + ' — ' + (s ? s.name : svcLabel('', exN));
-      var c = StaffGroupBooking.readClient(overlay, 'aa') || {};
-      overlay.querySelector('#aa-contact-client').textContent = [c.email, c.phone].filter(Boolean).join(' · ') || 'Sans email ni téléphone';
+      var bName = state.barberId === '' ? 'Premier disponible' : ((rdvBarbers.find(function (x) { return String(x.id) === String(state.barberId); }) || {}).name || '');
+      overlay.querySelector('#aa-contact-summary').textContent = when + ' à ' + state.time + ' — ' + (s ? s.name : svcLabel('', exN)) + (bName ? ' · ' + bName : '');
     }
   };
 
-  window.aaStartSolo = function () {
-    if (!StaffGroupBooking.readClient(overlay, 'aa')) return;
-    aaGoStep(preselectedBarberId ? 'service' : 'barber');
-  };
+  window.aaStartSolo = function () { aaGoStep('service'); };
+
+  // Coiffeurs qui font la prestation (et les supplements) choisis, avec LEUR duree et LEUR prix.
+  function bi(b, kind, list) { return typeof barberItems === 'function' ? barberItems(b, kind, list) : list; }
+  function aaEligibleBarbers() {
+    return rdvBarbers.filter(function (b) {
+      var sv = bi(b, 'services', services), ex = bi(b, 'extras', extras);
+      if (state.serviceId !== EXTRAS_ONLY && !sv.some(function (x) { return String(x.id) === String(state.serviceId); })) return false;
+      return state.extraIds.every(function (id) { return ex.some(function (x) { return String(x.id) === String(id); }); });
+    });
+  }
+  function aaBarberOffer(b) {
+    var sv = state.serviceId === EXTRAS_ONLY ? null : bi(b, 'services', services).find(function (x) { return String(x.id) === String(state.serviceId); });
+    var ex = bi(b, 'extras', extras).filter(function (x) { return state.extraIds.indexOf(String(x.id)) !== -1; });
+    var mins = (sv ? Number(sv.duration_min) || 0 : 0), cents = (sv ? Number(sv.price_cents) || 0 : 0);
+    ex.forEach(function (x) { mins += Number(x.duration_min) || 0; cents += Number(x.price_cents) || 0; });
+    return (typeof formatMinutes === 'function' ? formatMinutes(mins) : mins + ' min') + ' · ' + (typeof eur === 'function' ? eur(cents) : '');
+  }
+  function aaRenderBarbers() {
+    var list = aaEligibleBarbers();
+    var grid = overlay.querySelector('#aa-barber-grid');
+    grid.innerHTML = (list.length > 1 ? '<button class="aa-card aa-any' + (state.barberId === '' ? ' sel' : '') + '" data-id="" onclick="aaSelectBarber(this)">Premier disponible<small>Le système choisit</small></button>' : '') +
+      list.map(function (b) {
+        return '<button class="aa-card' + (String(state.barberId) === String(b.id) ? ' sel' : '') + '" data-id="' + b.id + '" onclick="aaSelectBarber(this)">' + esc(b.name) + '<small>' + aaBarberOffer(b) + '</small></button>';
+      }).join('') +
+      (list.length ? '' : '<p class="hint">' + (rdvBarbers.length ? 'Aucun coiffeur ne fait cette prestation ce jour-là.' : 'Aucun coiffeur disponible pour un RDV en ligne (vérifie le mode RDV, le statut actif, et les horaires dans Coiffeurs).') + '</p>');
+  }
 
   window.aaSelectBarber = function (el) {
     state.barberId = el.dataset.id;
     aaApplyOffer();
     overlay.querySelectorAll('#aa-step-barber .aa-card').forEach(function (c) { c.classList.remove('sel'); });
     el.classList.add('sel');
-    aaGoStep('service');
+    aaGoStep('datetime');
   };
 
   // Prestations, supplements et produits : memes cartes de vitrine que la reservation en ligne (code partage dans app.js).
@@ -7045,7 +7072,7 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
   // « Seulement un supplement » : au moins un supplement avant la suite.
   window.aaExtrasNext = function () {
     if (state.serviceId === EXTRAS_ONLY && !state.extraIds.length) { toast('Choisissez au moins un supplément', true); return; }
-    aaGoStep('products');
+    aaGoStep(preselectedBarberId ? 'datetime' : 'barber');
   };
 
   window.aaToggleExtra = function (el) {
@@ -7118,7 +7145,7 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
     state.time = el.dataset.time;
     overlay.querySelectorAll('#aa-slots .aa-slot').forEach(function (c) { c.classList.remove('sel'); });
     el.classList.add('sel');
-    aaGoStep('contact');
+    aaGoStep('products');
   };
 
   overlay.querySelector('#aa-close-x').onclick = function () { _closeModal(overlay); };
@@ -7127,7 +7154,7 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
   overlay.querySelector('#aa-save-btn').onclick = function () {
     var errEl = overlay.querySelector('#aa-error');
     var name = overlay.querySelector('#aa-name').value.trim();
-    if (!name) { aaGoStep('client'); StaffGroupBooking.readClient(overlay, 'aa'); return; }
+    if (!name) { StaffGroupBooking.readClient(overlay, 'aa'); return; }
 
     api('/api/appointments/admin-create', {
       method: 'POST',
@@ -7150,6 +7177,7 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
       renderRdvList();
     }).catch(function (e) { errEl.textContent = e.message; errEl.style.display = 'block'; });
   };
+  aaGoStep('service');   // 1re etape : la prestation
 }
 
 function openClientDrawerForAppointment(id) {

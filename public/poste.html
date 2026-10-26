@@ -298,6 +298,8 @@
   .aa-slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px,1fr)); gap: 7px; margin-bottom: 6px; }
   .aa-slot { border: none; background: var(--fill); color: var(--ink); border-radius: 10px; padding: 10px 4px; cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 600; }
   .aa-slot.sel { background: var(--blue); color: #fff; }
+  .aa-group-link { display: inline-flex; align-items: center; gap: 7px; align-self: flex-end; background: var(--fill); border: none; border-radius: 999px; padding: 7px 13px; font-family: inherit; font-size: 13.5px; font-weight: 600; color: var(--ink); cursor: pointer; margin-bottom: 10px; }
+  .aa-group-link:hover { background: var(--fill-2); }
   .aa-back { background: none; border: none; padding: 0; font-family: inherit; font-size: 13.5px; color: var(--accent); font-weight: 500; cursor: pointer; margin-bottom: 14px; }
 
   .detail-row { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--sep); }
@@ -1361,11 +1363,9 @@ function openPosteAddAppointment(dateStr, barberId) {
     '<button id="pa-close-x" style="background:var(--fill);border:none;width:30px;height:30px;border-radius:50%;color:var(--grey);font-size:14px;cursor:pointer;flex-shrink:0;margin-left:10px">✕</button>' +
     '</div>' +
 
-    // 1re étape : le client (clients existants proposés dès 3 lettres), puis une ou plusieurs personnes - comme le dashboard et la caisse.
-    StaffGroupBooking.clientStepHtml('pa', 'paStartSolo()', 'paOpenGroup()') +
 
     '<div id="pa-step-service" style="display:none">' +
-      '<button class="aa-back" onclick="paGoStep(\'client\')">‹ Retour</button>' +
+      '<button type="button" class="aa-group-link" onclick="paGoStep(\'client\', \'group\')"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M17.5 14.2c2.3.3 3.5 2.2 3.5 5.8"/></svg>Plusieurs personnes ?</button>' +
       '<div class="aa-step-title">Prestation</div>' +
       '<div class="item-grid compact" id="pa-service-grid"></div>' +
     '</div>' +
@@ -1381,17 +1381,17 @@ function openPosteAddAppointment(dateStr, barberId) {
     '</div>' +
 
     '<div id="pa-step-products" style="display:none">' +
-      '<button class="aa-back" onclick="paGoStep(\'extras\')">‹ Retour</button>' +
+      '<button class="aa-back" onclick="paGoStep(\'datetime\')">‹ Retour</button>' +
       '<div class="aa-step-title">Un produit à acheter sur place ? (optionnel)</div>' +
       vitrineSearchHtml('pa-products', 'Rechercher un produit', "paFilter('products')") +
       '<div class="item-grid compact" id="pa-products-grid"></div>' +
       '<div class="items-empty" id="pa-products-empty">Aucun résultat</div>' +
       '<div class="step-bar"><div class="step-summary" id="pa-products-summary"></div>' +
-      '<button class="btn btn-primary" style="width:100%" onclick="paGoStep(\'datetime\')">Suivant</button></div>' +
+      '<button class="btn btn-primary" style="width:100%" onclick="paGoStep(\'client\')">Suivant</button></div>' +
     '</div>' +
 
     '<div id="pa-step-datetime" style="display:none">' +
-      '<button class="aa-back" onclick="paGoStep(\'products\')">‹ Retour</button>' +
+      '<button class="aa-back" onclick="paGoStep(\'extras\')">‹ Retour</button>' +
       '<div class="aa-step-title">Créneau</div>' +
       '<div id="pa-half-toggle" class="half-toggle" style="display:none;margin-bottom:8px">' +
         '<button id="pa-half-morning" onclick="paShowHalf(\'morning\')">Matin</button>' +
@@ -1400,16 +1400,14 @@ function openPosteAddAppointment(dateStr, barberId) {
       '<div class="aa-slots" id="pa-slots"><span class="hint" style="margin:0">Chargement…</span></div>' +
     '</div>' +
 
-    '<div id="pa-step-contact" style="display:none">' +
-      '<button class="aa-back" onclick="paGoStep(\'datetime\')">‹ Retour</button>' +
-      '<div class="aa-step-title" id="pa-contact-summary"></div>' +
-      '<div class="hint" id="pa-contact-client" style="margin:0 0 14px"></div>' +
-      '<div class="modal-error" id="pa-error" style="display:none"></div>' +
-      '<div class="modal-actions">' +
-      '<button class="btn btn-soft" id="pa-cancel-btn">Annuler</button>' +
-      '<button class="btn btn-primary" id="pa-save-btn">Ajouter le RDV</button>' +
-      '</div>' +
-    '</div>'
+    // Derniere etape : le client (clients connus proposes des 3 lettres), puis Enregistrer. Au telephone, on cherche
+    // d'abord la prestation et le creneau, le nom vient a la fin. « Plusieurs personnes » : meme fiche, client d'abord.
+    StaffGroupBooking.clientStepHtml('pa', 'paStartSolo()', 'paOpenGroup()')
+      .replace('<div id="pa-step-client">', '<div id="pa-step-client" style="display:none"><button class="aa-back pa-final-only" onclick="paGoStep(\'products\')">‹ Retour</button>' +
+        '<div class="aa-step-title pa-final-only" id="pa-contact-summary"></div>')
+      .replace('<div class="sgb-who-choice">', '<div class="modal-error pa-final-only" id="pa-error" style="display:none"></div>' +
+        '<div class="modal-actions pa-final-only"><button class="btn btn-soft" id="pa-cancel-btn">Annuler</button>' +
+        '<button class="btn btn-primary" id="pa-save-btn">Ajouter le RDV</button></div><div class="sgb-who-choice">')
   );
   paGroupCtx = { overlay: overlay, dateStr: dateStr };
   var flowRefresh = vitrineFlow(overlay, function () {
@@ -1421,27 +1419,28 @@ function openPosteAddAppointment(dateStr, barberId) {
     };
   });
 
-  var STEPS = ['client', 'service', 'extras', 'products', 'datetime', 'contact'];
+  var STEPS = ['service', 'extras', 'datetime', 'products', 'client'];
   attachClientAutocomplete(overlay, 'pa-name', 'pa-email', 'pa-phone', barberApi);
-  setTimeout(function () { var n = overlay.querySelector('#pa-name'); if (n) n.focus(); }, 60);
 
-  window.paGoStep = function (step) {
+  window.paGoStep = function (step, mode) {
     STEPS.forEach(function (s) { overlay.querySelector('#pa-step-' + s).style.display = s === step ? 'flex' : 'none'; });
-    overlay.querySelector('#pa-client-pill').style.display = step === 'client' ? 'none' : 'inline-flex';
+    overlay.querySelector('#pa-client-pill').style.display = 'none';
     if (step === 'datetime') paLoadSlots();
-    if (step === 'contact') {
+    if (step === 'client') {
+      // Fin du parcours (Enregistrer) ou debut d'un RDV a plusieurs (le client d'abord, pour ses proches).
+      var group = mode === 'group';
+      overlay.querySelectorAll('.pa-final-only').forEach(function (el) { el.style.display = group ? 'none' : ''; });
+      overlay.querySelector('#pa-error').style.display = 'none';
+      overlay.querySelector('#pa-step-client .sgb-who-choice').style.display = group ? '' : 'none';
+      setTimeout(function () { var n = overlay.querySelector('#pa-name'); if (n) n.focus(); }, 60);
+      if (group) return;
       var s = svcOffer.find(function (x) { return x.id === state.serviceId; });
       var exN = extOffer.filter(function (x) { return state.extraIds.indexOf(String(x.id)) !== -1; }).map(function (x) { return x.name; });
       overlay.querySelector('#pa-contact-summary').textContent = when + ' à ' + state.time + ' — ' + (s ? s.name : svcLabel('', exN));
-      var c = StaffGroupBooking.readClient(overlay, 'pa') || {};
-      overlay.querySelector('#pa-contact-client').textContent = [c.email, c.phone].filter(Boolean).join(' · ') || 'Sans email ni téléphone';
     }
   };
 
-  window.paStartSolo = function () {
-    if (!StaffGroupBooking.readClient(overlay, 'pa')) return;
-    paGoStep('service');
-  };
+  window.paStartSolo = function () { paGoStep('service'); };
 
   // Prestations, supplements et produits : memes cartes de vitrine que la reservation en ligne (code partage dans app.js).
   function paListCfg(kind) {
@@ -1468,7 +1467,7 @@ function openPosteAddAppointment(dateStr, barberId) {
   // « Seulement un supplement » : au moins un supplement avant la suite.
   window.paExtrasNext = function () {
     if (state.serviceId === EXTRAS_ONLY && !state.extraIds.length) { toast('Choisissez au moins un supplément', true); return; }
-    paGoStep('products');
+    paGoStep('datetime');
   };
 
   window.paToggleExtra = function (el) {
@@ -1537,7 +1536,7 @@ function openPosteAddAppointment(dateStr, barberId) {
     state.time = el.dataset.time;
     overlay.querySelectorAll('#pa-slots .aa-slot').forEach(function (c) { c.classList.remove('sel'); });
     el.classList.add('sel');
-    paGoStep('contact');
+    paGoStep('products');
   };
 
   overlay.querySelector('#pa-close-x').onclick = function () { _closeModal(overlay); };
@@ -1546,7 +1545,7 @@ function openPosteAddAppointment(dateStr, barberId) {
   overlay.querySelector('#pa-save-btn').onclick = function () {
     var errEl = overlay.querySelector('#pa-error');
     var name = overlay.querySelector('#pa-name').value.trim();
-    if (!name) { paGoStep('client'); StaffGroupBooking.readClient(overlay, 'pa'); return; }
+    if (!name) { StaffGroupBooking.readClient(overlay, 'pa'); return; }
 
     barberApi('/api/appointments/admin-create', {
       method: 'POST',
@@ -1568,6 +1567,7 @@ function openPosteAddAppointment(dateStr, barberId) {
       loadAgendaPeriod();
     }).catch(function (e) { errEl.textContent = e.message; errEl.style.display = 'block'; });
   };
+  paGoStep('service');   // 1re etape : la prestation
 }
 
 /**

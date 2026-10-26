@@ -47,10 +47,9 @@ const visible = (w, id) => w.document.getElementById(id).style.display !== 'none
   w.eval(CLOSURES(dash) + '\n' + PASTDAY + '\n' + fnSrc(dash, 'openAdminAddAppointment') + '\nvar aaBarbersPreselected = null;');
   w.openAdminAddAppointment(FUTURE, 'b1');
   let d = w.document;
-  check('1re etape : le client (nom, puis une ou plusieurs personnes)', visible(w, 'aa-step-client') && !visible(w, 'aa-step-service'));
+  check('1re etape : la prestation (le client vient a la fin, pratique au telephone)', visible(w, 'aa-step-service') && !visible(w, 'aa-step-client'));
   d.getElementById('aa-name').value = 'Karim'; w.aaStartSolo();
-  check('coiffeur deja connu (clic sur sa ligne) : apres le client, on saute a l\'etape Prestation', visible(w, 'aa-step-service') && !visible(w, 'aa-step-barber'));
-  check('etape Coiffeur INCHANGEE (cartes de texte .aa-card) + « Premier disponible »', d.querySelectorAll('#aa-step-barber .aa-card:not(.aa-any)').length === 2 && d.querySelectorAll('#aa-step-barber .aa-card.aa-any').length === 1);
+  check('« Une personne » (depuis la fiche a plusieurs) : retour a la prestation', visible(w, 'aa-step-service') && !visible(w, 'aa-step-barber'));
   let sv = [...d.querySelectorAll('#aa-service-grid .item-card:not(.extras-only-card)')];
   check('prestations : cartes de vitrine (compactes), dans l\'ordre du catalogue', sv.length === 2 && sv[0].dataset.id === 'sv1' && d.getElementById('aa-service-grid').classList.contains('compact'));
   check('prestation AVEC photo : image EN HAUT, nom / duree / prix EN DESSOUS (jamais sur le dessin)', sv[0].classList.contains('has-photo') && sv[0].children[0].classList.contains('item-media') && sv[0].children[1].classList.contains('item-body') && sv[0].querySelector('.item-body .item-name').textContent === 'Barbe premium' && sv[0].querySelector('.item-meta').textContent === '20 min' && sv[0].querySelector('.item-price').textContent === '13,00 €');
@@ -58,6 +57,9 @@ const visible = (w, id) => w.document.getElementById(id).style.display !== 'none
   check('le clic appelle bien aaSelectService(this)', sv[0].getAttribute('onclick') === 'aaSelectService(this)');
   w.aaSelectService(sv[0]);
   check('choisir une prestation : carte marquee (aria-pressed), coche, et on passe aux supplements', sv[0].classList.contains('sel') && sv[0].getAttribute('aria-pressed') === 'true' && visible(w, 'aa-step-extras') && !visible(w, 'aa-step-service'));
+  w.aaGoStep('barber');
+  check('etape Coiffeur (cartes de texte .aa-card) : ceux qui font la prestation, + « Premier disponible »', d.querySelectorAll('#aa-step-barber .aa-card:not(.aa-any)').length === 2 && d.querySelectorAll('#aa-step-barber .aa-card.aa-any').length === 1);
+  w.aaGoStep('extras');
   let ex = [...d.querySelectorAll('#aa-extras-grid .item-card')];
   check('9 supplements en cartes ; recherche affichee (plus de 8) ; prix precede de "+" et duree', ex.length === 9 && d.getElementById('aa-extras-search').style.display === '' && ex[0].querySelector('.item-price').textContent === '+5,00 €' && ex[0].querySelector('.item-meta').textContent === '+10 min');
   check('supplement avec photo : vignette ; sans photo : icone d\'apres le nom (bougie)', ex[4].classList.contains('has-photo') && ex[0].querySelector('.item-media').textContent === '🕯️');
@@ -81,7 +83,7 @@ const visible = (w, id) => w.document.getElementById(id).style.display !== 'none
   w = world(); setup(w, { me: { id: 'b1', name: 'Alice' } });   // "me" : le coiffeur connecte a Mon poste
   w.eval(CLOSURES(poste) + '\n' + PASTDAY + '\n' + fnSrc(poste, 'openPosteAddAppointment'));
   w.openPosteAddAppointment(FUTURE); d = w.document;
-  check('Mon poste : 1re etape = le client (comme le dashboard et la caisse)', visible(w, 'pa-step-client') && !visible(w, 'pa-step-service'));
+  check('Mon poste : 1re etape = la prestation (comme le dashboard et la caisse)', visible(w, 'pa-step-service') && !visible(w, 'pa-step-client'));
   d.getElementById('pa-name').value = 'Karim'; w.paStartSolo();
   sv = [...d.querySelectorAll('#pa-service-grid .item-card:not(.extras-only-card)')];
   check('prestations en cartes de vitrine : image en haut, texte dessous ; etape Prestation juste apres le client', sv.length === 2 && visible(w, 'pa-step-service') && sv[0].children[0].classList.contains('item-media') && sv[0].querySelector('.item-body .item-name').textContent === 'Barbe premium');

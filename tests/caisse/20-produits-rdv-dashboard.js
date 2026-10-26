@@ -67,7 +67,7 @@ const check = (n, ok, x = '') => { (ok ? pass++ : fail++); console.log((ok ? '  
   d.getElementById('aa-step-service').querySelector('.item-card[data-id="sv1"]').click();
   check('etape suivante : Supplements affichee', d.getElementById('aa-step-extras').style.display === 'flex');
   w.aaGoStep('products');
-  check('bouton Retour de l\'etape Produits ramene bien vers Supplements', d.getElementById('aa-step-products').querySelector('.aa-back').getAttribute('onclick') === "aaGoStep('extras')");
+  check('bouton Retour de l\'etape Produits ramene vers le Creneau (produits apres le creneau)', d.getElementById('aa-step-products').querySelector('.aa-back').getAttribute('onclick') === "aaGoStep('datetime')");
   d.getElementById('aa-step-products').querySelector('.item-card[data-id="p1"]').click();
   check('la tuile "Gel" est bien marquee selectionnee', d.getElementById('aa-step-products').querySelector('.item-card[data-id="p1"]').classList.contains('sel'));
   check('le recapitulatif detaille chaque ligne (prestation, supplement, produit) et le total', (function () {
@@ -82,7 +82,9 @@ const check = (n, ok, x = '') => { (ok ? pass++ : fail++); console.log((ok ? '  
   const slotBtn = d.getElementById('aa-slots').querySelector('.aa-slot');
   check('au moins un creneau reel propose par le serveur', Boolean(slotBtn));
   if (slotBtn) slotBtn.click();
-  check('etape suivante : Contact affichee', d.getElementById('aa-step-contact').style.display === 'flex');
+  check('apres le creneau : Produits, puis la fiche client a la fin', d.getElementById('aa-step-products').style.display === 'flex');
+  w.aaGoStep('client');
+  check('derniere etape : le client', d.getElementById('aa-step-client').style.display === 'flex');
   d.getElementById('aa-name').value = 'Test Dashboard Produits';
 
   let capturedBody = null;
