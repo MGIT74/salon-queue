@@ -171,4 +171,5 @@ node tests/caisse/137-supplement-seul-direct.js  # « Seulement un supplement »
 node tests/caisse/138-caisse-sans-ligne-supplement-seul.js  # Caisse : pas de ligne « Supplément seul 0,00 € » dans le ticket
 node tests/caisse/139-poste-tiroir-rdv.js  # Poste : tiroir a droite au clic sur un RDV de l'agenda (comme la caisse)
 node tests/caisse/140-encaissement-groupe.js  # Caisse : encaissement groupe (groupe de RDV, client qui paie pour un autre)
+node tests/caisse/141-dashboard-couleurs-coiffeurs.js  # Dashboard : planning du jour aux couleurs choisies dans Coiffeurs (meme apres rafraichissement)
 ```

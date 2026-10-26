@@ -160,7 +160,8 @@ const suite = [
   ['137-supplement-seul-direct.js', false, ['exit']],
   ['138-caisse-sans-ligne-supplement-seul.js', false, ['exit']],
   ['139-poste-tiroir-rdv.js', false, ['exit']],
-  ['140-encaissement-groupe.js', true, ['exit']]
+  ['140-encaissement-groupe.js', true, ['exit']],
+  ['141-dashboard-couleurs-coiffeurs.js', false, ['exit']]
 ];
 
 let bad = 0;

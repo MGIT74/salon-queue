@@ -3514,7 +3514,13 @@ function loadDashboardTab() {
 
 
   var todayStr = salonToday();
+  // Couleurs choisies dans « Coiffeurs » (pas la couleur par défaut) : chargées AVANT de dessiner le planning,
+  // sinon, juste après un rafraîchissement de page, la frise retombait sur les couleurs automatiques.
   loadSalonScheduleForTimeline().then(function () {
+    return api('/api/barbers?all=1').then(function (b) {
+      (b.items || []).forEach(function (x) { rdvBarberColors[x.id] = x.color || stableColorForId(x.id); rdvBarberPhotos[x.id] = x.photo_url || ''; });
+    }).catch(function () {});
+  }).then(function () {
     return api('/api/appointments?month=' + monthKey(new Date()));
   }).then(function (r) {
     var todayAppts = (r.items || []).filter(function (a) {
