@@ -244,9 +244,10 @@
   .cal-day {
     min-height: 62px; border-radius: 10px; background: var(--fill); cursor: pointer;
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
-    position: relative; transition: filter .15s ease; padding: 6px 2px;
+    position: relative; padding: 6px 2px;
   }
-  .cal-day:hover { filter: brightness(1.15); }
+  /* Survol : simple changement de fond (l'ancien filtre de luminosite faisait scintiller le calendrier). */
+  .cal-day:not(.empty):not(.selected):hover { background: var(--fill-2); }
   /* Jour passé : grisé et non cliquable (plus de prise de RDV), comme le calendrier de réservation en ligne. */
   /* Jour passe : grise mais toujours cliquable pour consulter ses rendez-vous (la prise de RDV y reste bloquee). */
   .cal-day.past { opacity: .5; }

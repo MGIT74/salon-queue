@@ -163,4 +163,5 @@ node tests/caisse/129-admin-adresse-par-menu.js  # Admin : une adresse par menu 
 node tests/caisse/130-deplacer-rdv-supplement-seul.js  # Deplacer un RDV : ses supplements comptent (RDV « supplement seul » deplacable)
 node tests/caisse/131-rdv-ecran-compte.js  # Prise de RDV : premier ecran Se connecter / Creer un compte / Continuer sans compte
 node tests/caisse/132-compte-ordinateur-tablette.js  # Compte client ordinateur/tablette : menu lateral, accueil en colonnes, etapes + recapitulatif
+node tests/caisse/133-calendrier-sans-scintillement.js  # Calendriers sans scintillement (RDV en ligne, compte, admin, poste)
 ```

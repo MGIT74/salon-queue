@@ -152,7 +152,8 @@ const suite = [
   ['129-admin-adresse-par-menu.js', false, ['exit']],
   ['130-deplacer-rdv-supplement-seul.js', false, ['exit']],
   ['131-rdv-ecran-compte.js', false, ['exit']],
-  ['132-compte-ordinateur-tablette.js', false, ['exit']]
+  ['132-compte-ordinateur-tablette.js', false, ['exit']],
+  ['133-calendrier-sans-scintillement.js', false, ['exit']]
 ];
 
 let bad = 0;
