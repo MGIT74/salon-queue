@@ -1354,9 +1354,18 @@ function applyGiftCardDesign() {
   });
 }
 
+// Venu de la prise de RDV en ligne (?book=1) : une fois connecte, on ouvre directement la reservation.
+var WANT_BOOK = (function () { try { return new URLSearchParams(location.search).get('book') === '1'; } catch (e) { return false; } })();
+function clearAuthIntentParams() {
+  try {
+    var u = new URL(location.href); u.searchParams.delete('book'); u.searchParams.delete('signup');
+    history.replaceState({}, '', u.pathname + u.search);
+  } catch (e) {}
+}
 function loadProfile() {
   api('/api/client-auth/me').then(function (d) {
     populateHome(d);
+    if (WANT_BOOK) { WANT_BOOK = false; clearAuthIntentParams(); document.documentElement.classList.remove('auth-checking'); goBook(); return; }
     showHomePanel();
   }).catch(function () {
     localStorage.removeItem('client_token');
@@ -1997,7 +2006,8 @@ function guardMissingSalon() {
   // connectée) restait donc visible par défaut sous le nouveau panneau
   // de connexion, laissant apparaître l'ancien en-tête vide en bas de
   // page.
-  show('p-login');
+  // Venu de la prise de RDV avec « Créer un compte » : directement le formulaire d'inscription.
+  show(params.get('signup') === '1' ? 'p-signup' : 'p-login');
 })();
 </script>
 <script>

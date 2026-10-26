@@ -161,4 +161,5 @@ node tests/caisse/127-couleur-coiffeur-partout.js  # Couleur du coiffeur : celle
 node tests/caisse/128-jours-coiffeur-absent.js  # Calendrier RDV : jours ou le coiffeur choisi est absent grises, premier jour disponible choisi
 node tests/caisse/129-admin-adresse-par-menu.js  # Admin : une adresse par menu (/admin/rendez-vous...), retour navigateur, nouvel onglet, anciens liens
 node tests/caisse/130-deplacer-rdv-supplement-seul.js  # Deplacer un RDV : ses supplements comptent (RDV « supplement seul » deplacable)
+node tests/caisse/131-rdv-ecran-compte.js  # Prise de RDV : premier ecran Se connecter / Creer un compte / Continuer sans compte
 ```

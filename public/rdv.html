@@ -214,7 +214,18 @@
 
   <!-- Premier ecran deja dans la page (meme rendu que group-booking.js) : au rafraichissement, on voit tout de suite
        les 2 cartes, sans grande carte vide ni ligne verticale le temps que le salon se charge. -->
-  <section class="panel flow on gb-pick" id="p-group">
+  <!-- Premier ecran : se connecter, creer un compte, ou reserver sans compte (l'habitude des clients). -->
+  <section class="panel flow on gb-pick" id="p-start">
+    <div class="flow-top"><div class="eyebrow">Comment souhaitez-vous réserver ?</div></div>
+    <div class="flow-body"><div class="gb-choices">
+      <button type="button" class="gb-choice" id="start-login" onclick="goLogin(event, true)"><span class="gb-choice-ic"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4"/><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/></svg></span><span><b id="start-login-title">Se connecter</b><em id="start-login-sub">Vos coordonnées déjà remplies, vos RDV au même endroit</em></span></button>
+      <button type="button" class="gb-choice" id="start-signup" onclick="goSignup(event)"><span class="gb-choice-ic"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10" cy="8" r="3.5"/><path d="M3 20c0-3.9 3.1-7 7-7 1.4 0 2.7.4 3.8 1.1"/><path d="M18 14v6M15 17h6"/></svg></span><span><b>Créer un compte</b><em>Gratuit, en une minute</em></span></button>
+      <button type="button" class="gb-choice" id="start-guest" onclick="startAsGuest()"><span class="gb-choice-ic"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M9 15.5l2 2 4-4"/></svg></span><span><b>Continuer sans compte</b><em>Confirmation et lien d'annulation par email</em></span></button>
+    </div></div>
+  </section>
+
+  <section class="panel flow gb-pick" id="p-group">
+    <button class="back start-back" type="button" onclick="show('p-start')">‹ Retour</button>
     <div class="flow-top" id="gb-top"><div class="eyebrow">Pour qui est le rendez-vous ?</div></div>
     <div class="flow-body" id="gb-body"><div class="gb-choices"><button type="button" class="gb-choice" data-act="solo"><span class="gb-choice-ic"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg></span><span><b>Juste moi</b><em>Un rendez-vous pour une personne</em></span></button><button type="button" class="gb-choice" data-act="multi"><span class="gb-choice-ic"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M17.5 14.2c2.3.3 3.5 2.2 3.5 5.8"/></svg></span><span><b>Plusieurs personnes</b><em>Enfants, amis, famille — jusqu'à 6</em></span></button></div></div>
     <div class="step-bar" id="gb-bar"></div>
@@ -222,8 +233,10 @@
   <script>
     // Mode salon (fenetre de l'admin / caisse / Mon poste) : pas de « Pour qui ? », l'ecran « Qui vient au salon ? » arrive au chargement.
     // Lien d'annulation ou « Réserver à nouveau » : un autre écran va s'ouvrir, on n'affiche pas les 2 cartes entre-temps.
-    try { if (/[?&](cancel|service)=/.test(location.search)) document.getElementById('p-group').classList.remove('on'); } catch (e) {}
-    try { if (/[?&]staff=1(&|$)/.test(location.search)) { var gp = document.getElementById('p-group'); gp.classList.remove('gb-pick'); document.getElementById('gb-top').innerHTML = ''; document.getElementById('gb-body').innerHTML = ''; } } catch (e) {}
+    try { if (/[?&](cancel|service)=/.test(location.search)) document.getElementById('p-start').classList.remove('on'); } catch (e) {}
+    // Client deja connecte (meme navigateur) : une seule carte « Réserver avec mon compte ».
+    try { if (localStorage.getItem('client_token')) { document.getElementById('start-signup').style.display = 'none'; document.getElementById('start-login-title').textContent = 'Réserver avec mon compte'; document.getElementById('start-login-sub').textContent = 'Vous êtes déjà connecté'; } } catch (e) {}
+    try { if (/[?&]staff=1(&|$)/.test(location.search)) { document.getElementById('p-start').classList.remove('on'); var gp = document.getElementById('p-group'); gp.classList.add('on'); gp.classList.remove('gb-pick'); document.getElementById('gb-top').innerHTML = ''; document.getElementById('gb-body').innerHTML = ''; } } catch (e) {}
   </script>
 
   <section class="panel" id="p-cart">
@@ -404,6 +417,8 @@
 <script src="/group-booking.js?v=26"></script>
 <style>
 body.staff-mode .gift-summary-box,body.staff-mode .theme-btn,body.staff-mode .login-hint{display:none!important}
+#p-start .gb-choices{max-width:960px}@media(min-width:760px){#p-start .gb-choices{grid-template-columns:repeat(3,1fr)}}@media(max-width:759px){#p-start .gb-choice{min-height:0;padding:18px 16px;flex-direction:row;text-align:left}#p-start .gb-choice-ic{width:48px;height:48px}}
+#p-group .start-back{display:none}#p-group.gb-pick .start-back{display:block}body.staff-mode .start-back{display:none!important}
 .login-hint{background:var(--fill);border-radius:14px;padding:12px 14px;margin:0 0 18px;font-size:14.5px;font-weight:600}
 .login-hint a{color:var(--blue);text-decoration:none;margin-left:4px}
 .login-hint span{display:block;font-weight:400;font-size:13px;color:var(--grey);margin-top:4px;line-height:1.45}
@@ -590,7 +605,8 @@ function loadCatalog() {
       show('p-barber');   // « Réserver à nouveau » : directement le choix du coiffeur
       return;
     }
-    if (document.getElementById('p-group').classList.contains('on')) openWho();
+    if (document.getElementById('p-start').classList.contains('on')) { openWho(); show('p-start'); }
+    else if (document.getElementById('p-group').classList.contains('on')) openWho();
   });
 }
 
@@ -977,7 +993,16 @@ var groupCtl = null, groupPeople = null, groupPayload = null, rdvBufferMin = 0;
 // Premier ecran : « Pour qui est le rendez-vous ? » (Juste moi -> reservation normale, Plusieurs personnes -> parcours groupe).
 function openWho() { openGroupBooking(true); }
 // Connexion facultative : la page compte du salon (connexion, ou creation de compte).
-function goLogin(e) { if (e) e.preventDefault(); window.location.href = '/compte.html' + (SALON_SLUG ? '?salon=' + encodeURIComponent(SALON_SLUG) : ''); }
+// book : apres connexion, la page compte ouvre directement la prise de RDV.
+function accountUrl(extra) {
+  var q = [];
+  if (SALON_SLUG) q.push('salon=' + encodeURIComponent(SALON_SLUG));
+  if (extra) q.push(extra);
+  return '/compte.html' + (q.length ? '?' + q.join('&') : '');
+}
+function goLogin(e, book) { if (e) e.preventDefault(); window.location.href = accountUrl(book ? 'book=1' : ''); }
+function goSignup(e) { if (e) e.preventDefault(); window.location.href = accountUrl('signup=1&book=1'); }
+function startAsGuest() { show('p-group'); }
 
 function staffAccount() { var c = STAFF_BRIDGE && STAFF_BRIDGE.client; return c && c.account_id ? c : null; }
 function staffClientName() { return (STAFF_BRIDGE && STAFF_BRIDGE.client && STAFF_BRIDGE.client.name) || 'Le client'; }

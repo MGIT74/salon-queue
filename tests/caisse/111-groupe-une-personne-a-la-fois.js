@@ -95,7 +95,7 @@ const PUB = { 'Content-Type': 'application/json', 'X-Salon-Slug': 'test' };
   check('enlever une personne a tout moment (bandeau et panier), rdv.html et compte.html', /function grpRemovePerson\(pi\)/.test(rdv) && /peoplePillsHtml\(grp\.people, grp\.cart, grp\.current, 'grpRemovePerson'\)/.test(rdv) && /id="cart-todo"/.test(rdv) &&
     /function bkGrpRemovePerson\(pi\)/.test(cmp) && /'bkGrpRemovePerson'/.test(cmp) && /id="bk-cart-todo"/.test(cmp));
   check('rafraichissement sans flash : 1er ecran deja dans la page, styles dans app.css, masque en mode salon / annulation / « Réserver à nouveau »',
-    /<section class="panel flow on gb-pick" id="p-group">/.test(rdv) && /data-act="solo"/.test(rdv) && /data-act="multi"/.test(rdv) && /staff=1/.test(rdv) && /\(cancel\|service\)=/.test(rdv) &&
+    /<section class="panel flow on gb-pick" id="p-start">/.test(rdv) && /id="p-group"/.test(rdv) && /data-act="solo"/.test(rdv) && /data-act="multi"/.test(rdv) && /staff=1/.test(rdv) && /\(cancel\|service\)=/.test(rdv) &&
     /\.gb-pick>\.step-bar\{display:none!important\}/.test(fs.readFileSync(path.join(root, 'public/app.css'), 'utf8')));
   const css = fs.readFileSync(path.join(root, 'public/app.css'), 'utf8');
   check('style du bandeau et du panier dans app.css', /\.grp-banner \{/.test(css) && /\.cart-row \{/.test(css));
