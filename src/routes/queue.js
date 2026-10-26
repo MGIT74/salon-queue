@@ -172,7 +172,34 @@ router.get('/pending-payment', requireAdminOrBarber, wrap(async (req, res) => {
     );
     const groupOf = {};
     grp.forEach((g) => { groupOf[g.promoted_queue_id] = g.group_id; });
-    rows = rows.map((r) => Object.assign({}, r, { group_id: groupOf[r.id] || null }));
+    // Membres du groupe PAS ENCORE terminés aujourd'hui (en cours / en attente chez leur coiffeur, ou pas encore
+    // arrivés) : la caisse prévient avant d'encaisser le groupe sans eux.
+    const groupIds = [...new Set(Object.values(groupOf))];
+    const notDoneByGroup = {};
+    if (groupIds.length) {
+      const settings = await getSettings(req.salon.id);
+      const today = nowParisDatetimeString(settings.timezone).slice(0, 10);
+      const [left] = await pool.query(
+        `SELECT a.group_id, a.client_name, b.name AS barber_name, q.status AS queue_status
+         FROM appointments a
+         LEFT JOIN queue q ON q.id = a.promoted_queue_id
+         LEFT JOIN barbers b ON b.id = COALESCE(q.barber_id, a.barber_id)
+         WHERE a.salon_id = ? AND a.group_id IN (?) AND a.status = 'confirmed'
+           AND ((q.id IS NULL AND a.scheduled_at >= ? AND a.scheduled_at < ? + INTERVAL 1 DAY) OR q.status IN ('waiting', 'in_progress'))
+         ORDER BY a.scheduled_at`,
+        [req.salon.id, groupIds, today, today]
+      );
+      left.forEach((m) => {
+        (notDoneByGroup[m.group_id] = notDoneByGroup[m.group_id] || []).push({
+          client_name: m.client_name, barber_name: m.barber_name || null,
+          state: m.queue_status === 'in_progress' ? 'in_progress' : (m.queue_status === 'waiting' ? 'waiting' : 'not_arrived')
+        });
+      });
+    }
+    rows = rows.map((r) => Object.assign({}, r, {
+      group_id: groupOf[r.id] || null,
+      group_not_done: groupOf[r.id] ? (notDoneByGroup[groupOf[r.id]] || []) : []
+    }));
   }
   rows = await attachGiftInfo(rows, req.salon.id);
 

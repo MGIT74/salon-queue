@@ -20,13 +20,16 @@ const seed = () => {
     "('g140a','s1','Ana','sv1','b1','done',NOW(),2000),('g140b','s1','Ben','sv1','b2','done',NOW(),2000)," +
     "('g140c','s1','Cid','sv1','b2','done',NOW(),2000),('g140w','s1','Wil','sv1','b2','waiting',NULL,2000)");
   sql("INSERT INTO appointments (id,salon_id,barber_id,client_name,service_id,scheduled_at,group_id,promoted_queue_id) VALUES " +
-    "('g140x','s1','b1','Ana','sv1',NOW(),'grp140','g140a'),('g140y','s1','b2','Ben','sv1',NOW(),'grp140','g140b')");
+    "('g140x','s1','b1','Ana','sv1',NOW(),'grp140','g140a'),('g140y','s1','b2','Ben','sv1',NOW(),'grp140','g140b')," +
+    "('g140v','s1','b2','Wil','sv1',NOW(),'grp140','g140w')");
 };
 
 (async () => {
   seed();
   let r = await api('GET', '/api/queue/pending-payment');
   check('liste du coiffeur : seulement ses clients, avec le groupe', r.body.items.length === 1 && r.body.items[0].group_id === 'grp140', r.body.items.map((x) => x.client_name));
+  const nd = r.body.items[0].group_not_done || [];
+  check('membre du groupe pas encore termine signale (nom, coiffeur, etat)', nd.length === 1 && nd[0].client_name === 'Wil' && nd[0].barber_name === 'Bob' && nd[0].state === 'waiting', nd);
   r = await api('GET', '/api/queue/pending-payment?all=1');
   const names = r.body.items.map((x) => x.client_name + ':' + (x.group_id || '-')).sort().join(',');
   check('all=1 : tout le salon (client d\'un autre coiffeur compris)', names === 'Ana:grp140,Ben:grp140,Cid:-', names);
@@ -71,6 +74,8 @@ const seed = () => {
 
   const c = fs.readFileSync(path.join(__dirname, '../../public/caisse.html'), 'utf8');
   check('caisse : bouton « Encaisser le groupe » sur la carte', c.includes("usePendingGroupForTicket(\\'' + q.id + '\\')\">Encaisser le groupe ("));
+  check('caisse : carte « Groupe · N personnes · X encore en cours » + qui', c.includes("' encore en cours</span>") && c.includes('function groupNotDoneLabel(m)'));
+  check('caisse : avant d\'encaisser le groupe incomplet, choix « Encaisser sans » / « Attendre »', c.includes("title: 'Groupe pas encore terminé'") && c.includes("cancelLabel: 'Attendre'") && c.includes('if (ok) usePendingGroupForTicket(queueId, true);'));
   check('caisse : « + Payer aussi pour un autre client » (tout le salon)', c.includes('id="ticket-group-add"') && c.includes("barberApi('/api/queue/pending-payment?all=1')"));
   check('caisse : la remise fidelite ne porte que sur les lignes du payeur', c.includes("ticket.findIndex(function (l) { return l.item_type === type && !l.person; })"));
   check('caisse : envoi des personnes du ticket', c.includes('group_queue_ids: saleCtx.groupIds && saleCtx.groupIds.length ? saleCtx.groupIds : undefined'));

@@ -3689,7 +3689,7 @@ function renderPendingList() {
     return '<div class="pending-card' + (isActive ? '' : ' locked') + '"' +
       (isActive && !explicitGift ? ' onclick="usePendingForTicket(\'' + q.id + '\')"' : '') + '>' +
       '<div><div class="name">' + esc(q.client_name) + '</div>' +
-      (mates.length ? '<span class="pending-group solo">Groupe · ' + (mates.length + 1) + ' personnes</span>' : '') +
+      pendingGroupBadgeHtml(q, explicitGift ? [] : mates) +
       '<div class="meta">' + esc(detail) + '</div>' +
       (isActive ? giftNote + loyaltyNote : '<div class="lock-note">En attente de son tour</div>') + '</div>' +
       '<div class="pending-actions">' +
@@ -3815,6 +3815,21 @@ function ticketPersonIds() {
   return [ticketQueueId].concat(ticketGroup.map(function (g) { return g.id; }));
 }
 
+/** Membres du groupe pas encore terminés : « Cid en cours chez Karim ». */
+function groupNotDoneLabel(m) {
+  var where = m.barber_name ? ' chez ' + m.barber_name : '';
+  return m.client_name + (m.state === 'in_progress' ? ' en cours' + where : (m.state === 'waiting' ? ' en attente' + where : ' pas encore arrivé'));
+}
+
+/** Badge du groupe sur la carte : taille du groupe + qui n'a pas encore fini. */
+function pendingGroupBadgeHtml(q, mates) {
+  var left = q.group_not_done || [];
+  if (!mates.length && !left.length) return '';
+  var size = mates.length + left.length + 1;
+  return '<span class="pending-group solo">Groupe · ' + size + ' personnes' +
+    (left.length ? ' · ' + left.length + ' encore en cours</span><div class="lock-note" style="color:var(--orange)">⏳ ' + esc(left.map(groupNotDoneLabel).join(', ')) + '</div>' : '</span>');
+}
+
 /** Autres personnes encore à encaisser du même groupe de RDV que ce passage. */
 function groupMatesOf(q) {
   if (!q || !q.group_id) return [];
@@ -3858,9 +3873,19 @@ function pruneTicketGroup() {
 }
 
 /** « Encaisser tout le groupe » : charge le ticket de ce client puis ajoute les autres membres du groupe de RDV. */
-function usePendingGroupForTicket(queueId) {
+function usePendingGroupForTicket(queueId, confirmed) {
   var q = pendingPayments.find(function (x) { return x.id === queueId; });
   if (!q) return;
+  // Une partie du groupe n'a pas encore fini : on prévient (encaisser sans eux, ou attendre).
+  var left = q.group_not_done || [];
+  if (left.length && !confirmed) {
+    var names = left.map(function (m) { return m.client_name; }).join(', ');
+    showConfirm(left.map(groupNotDoneLabel).join(', ') + ' : pas encore fini. Encaisser le groupe sans ' + (left.length > 1 ? 'eux' : 'cette personne') +
+      ' (' + names + ' sera encaissé plus tard, à part), ou attendre ? Pour attendre, mettez ce client de côté.',
+      { title: 'Groupe pas encore terminé', confirmLabel: 'Encaisser sans ' + (left.length > 1 ? 'eux' : names), cancelLabel: 'Attendre' })
+      .then(function (ok) { if (ok) usePendingGroupForTicket(queueId, true); });
+    return;
+  }
   usePendingForTicket(queueId, true);
   var mates = groupMatesOf(q);
   mates.forEach(function (m) { addPersonToTicket(m.id, true); });
