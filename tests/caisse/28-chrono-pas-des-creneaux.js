@@ -9,6 +9,8 @@ const fs = require('fs');
 const path = require('path');
 const dash = fs.readFileSync(path.join(__dirname, '../../public/dashboard.html'), 'utf8');
 const caisse = fs.readFileSync(path.join(__dirname, '../../public/caisse.html'), 'utf8');
+const appJs = fs.readFileSync(path.join(__dirname, '../../public/app.js'), 'utf8');
+const ZOOMCTRL = appJs.match(/function timelineZoomCtrlHtml\([\s\S]*?\n\}\n/)[0];   // curseur de zoom (app.js)
 let pass = 0, fail = 0;
 const check = (n, ok, x = '') => { (ok ? pass++ : fail++); console.log((ok ? '  OK   ' : '  ECHEC') + ' ' + n + (x ? '  [' + x + ']' : '')); };
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
@@ -28,7 +30,7 @@ function makeWin() {
   w.minutesFromScheduledAt = (a) => Number(a.scheduled_at.slice(11, 13)) * 60 + Number(a.scheduled_at.slice(14, 16));
   w.esc = (x) => String(x); w.nowSalonDatetimeString = () => today + ' 10:30:00';
   w.timelineZoom = 1;
-  w.eval(varsBlock + '\n' + CLOSURES(dash) + '\n' + PASTDAY + '\n' + fnSrc(dash, 'renderDayTimelineHtml') + '\n' + fnSrc(dash, 'rerenderAllTimelines') + '\n' + fnSrc(dash, 'adjustTimelineZoom'));
+  w.eval(ZOOMCTRL + '\n' + varsBlock + '\n' + CLOSURES(dash) + '\n' + PASTDAY + '\n' + fnSrc(dash, 'renderDayTimelineHtml') + '\n' + fnSrc(dash, 'rerenderAllTimelines') + '\n' + fnSrc(dash, 'adjustTimelineZoom'));
   w.__today = today;
   return w;
 }
@@ -74,7 +76,7 @@ const toMin = (s) => Number(s.slice(0, 2)) * 60 + Number(s.slice(3));
     w.adjustTimelineZoom(-1);
     check('"-" sous 100 % : vue resserree (heures pleines seulement)', w.document.querySelector('.timeline-zoom-ctrl span').textContent === '80%' && w.document.querySelector('.timeline-inner').classList.contains('compact'));
     for (let i = 0; i < 8; i++) w.adjustTimelineZoom(-1);
-    check('"-" jusqu\'a 0 % : journee entiere a l\'ecran, bouton "-" desactive', w.document.querySelector('.timeline-zoom-ctrl span').textContent === '0%' && w.document.querySelector('.timeline-inner').classList.contains('fit') && w.document.querySelector('.timeline-zoom-ctrl button').disabled);
+    check('"-" jusqu\'a 0 % : journee entiere a l\'ecran, curseur au minimum', w.document.querySelector('.timeline-zoom-ctrl span').textContent === '0%' && w.document.querySelector('.timeline-inner').classList.contains('fit') && w.document.querySelector('.timeline-zoom-range').value === '0');
     w.adjustTimelineZoom(1);
     check('puis UN seul clic sur "+" : remonte tout de suite a 20% (pas de clics a vide)', w.document.querySelector('.timeline-zoom-ctrl span').textContent === '20%', w.document.querySelector('.timeline-zoom-ctrl span').textContent);
     for (let i = 0; i < 12; i++) w.adjustTimelineZoom(1);

@@ -768,6 +768,36 @@ function bookingDayBlocked(selectedBarberId, barberList, dateStr) {
   return !list.some(function (b) { return barberBookableOn(b, dateStr); });
 }
 
+/* ---------- Zoom des plannings du jour (admin, caisse, Mon poste) : un curseur a glisser ----------
+   De 0 % (toute la journee a l'ecran) a 250 %. Pendant le glissement, seule la largeur des plannings change (aucun
+   redessin : le curseur reste sous le doigt / la souris). Les traits entre les heures restent toujours affiches. */
+function timelineZoomCtrlHtml(zoom) {
+  var pct = Math.round(Math.max(0, zoom) * 100);
+  return '<div class="timeline-zoom-ctrl"><div class="timeline-zoom-ctrl-inner" onclick="event.stopPropagation()">' +
+    '<svg class="tz-ic" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>' +
+    '<input type="range" class="timeline-zoom-range" min="0" max="250" step="5" value="' + pct + '" aria-label="Zoom du planning" ' +
+    'oninput="liveTimelineZoom(this)" onpointerdown="event.stopPropagation()" onclick="event.stopPropagation()">' +
+    '<span class="timeline-zoom-val">' + pct + '%</span></div></div>';
+}
+function liveTimelineZoom(el) {
+  var pct = Math.max(0, Math.min(250, Number(el.value) || 0)), z = pct / 100;
+  window.timelineZoom = z; window.timelineEffectiveZoom = z;
+  document.querySelectorAll('.timeline-inner[data-fit]').forEach(function (inner) {
+    var hours = Number(inner.dataset.hours), fit = Number(inner.dataset.fit), minZoom = Number(inner.dataset.minzoom);
+    var compact = z < minZoom, width = Math.round(hours * fit * z);
+    if (compact) {
+      var avail = (inner.parentElement && inner.parentElement.clientWidth) || 900;
+      var readable = Math.round(hours * fit * minZoom);
+      width = readable <= avail ? 0 : Math.round(avail + (readable - avail) * (z / minZoom));
+    }
+    inner.style.minWidth = width + 'px';
+    inner.classList.toggle('compact', compact);
+    inner.classList.toggle('fit', z === 0);
+  });
+  document.querySelectorAll('.timeline-zoom-range').forEach(function (r) { if (r !== el) r.value = pct; });
+  document.querySelectorAll('.timeline-zoom-val').forEach(function (v) { v.textContent = pct + '%'; });
+}
+
 // Palette de couleurs stables pour associer une couleur à un coiffeur
 // sans champ "color" explicite (bulles, timeline...) - le même id donne
 // toujours la même couleur, sans avoir besoin de la stocker en base.

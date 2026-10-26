@@ -34,7 +34,7 @@
 <style>
   html.auth-checking #login-screen { display: none; }
 </style>
-<link rel="stylesheet" href="/app.css?v=42">
+<link rel="stylesheet" href="/app.css?v=43">
 <style>
   html, body { min-height: 100%; }
   .wrap { max-width: 1100px; margin: 0 auto; padding: 20px 18px 40px; }
@@ -269,8 +269,6 @@
   .timeline-inner.compact .timeline-block { padding: 2px 6px; }
   .timeline-inner.compact .timeline-hours span.h:last-child { transform: translateX(-100%); }
   /* Les traits de chaque pas (5 min...) deviennent trop serres : on ne garde que les traits des heures. */
-  .timeline-inner.compact .timeline-minute-grid { background-image: linear-gradient(to right, transparent 1px, transparent 1px), linear-gradient(to right, rgba(128,128,128,.38) 1px, transparent 1px); }
-  .timeline-zoom-ctrl button:disabled { opacity: .35; cursor: default; }
   .timeline-row { display: flex; align-items: center; min-height: 54px; border-top: 1px solid var(--sep); }
   .timeline-row:first-child { border-top: none; }
   .timeline-row-label { width: 22px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; padding-right: 0; }
@@ -1004,7 +1002,7 @@
   </div>
 </div>
 
-<script src="/app.js?v=36"></script>
+<script src="/app.js?v=37"></script>
 <script src="/staff-group.js?v=5"></script>
 <script src="/autorefresh.js?v=3"></script>
 <script>requireSalonInUrl("Pour utiliser la caisse, ouvrez le lien de votre salon.");</script>
@@ -2423,14 +2421,11 @@ function renderAgendaTimeline(dateStr) {
     innerWidth = readable <= avail ? 0 : Math.round(avail + (readable - avail) * (effZoom / minZoom));
   }
   var zoomPct = Math.round(effZoom * 100);
-  var zoomCtrl = '<div class="timeline-zoom-ctrl"><div class="timeline-zoom-ctrl-inner">' +
-    '<button type="button" onclick="event.stopPropagation();adjustAgendaZoom(-1)" title="Dézoomer"' + (effZoom === 0 ? ' disabled' : '') + '>−</button>' +
-    '<span title="' + (effZoom === 0 ? 'Vue complète de la journée' : '') + '">' + zoomPct + '%</span>' +
-    '<button type="button" onclick="event.stopPropagation();adjustAgendaZoom(1)" title="Zoomer">+</button>' +
-    '</div></div>';
+  var zoomCtrl = timelineZoomCtrlHtml(effZoom);   // curseur de zoom (app.js)
 
   return zoomCtrl + '<div class="timeline-scroll"><div class="timeline-inner' + (compact ? ' compact' : '') + (effZoom === 0 ? ' fit' : '') + '" ' +
     'data-date="' + dateStr + '" data-range-start="' + rangeStart + '" data-range-end="' + rangeEnd + '" ' +
+    'data-hours="' + hourCount + '" data-fit="' + fitPerHour + '" data-minzoom="' + minZoom + '" ' +
     'style="min-width:' + innerWidth + 'px">' +
     '<div class="timeline-hours">' + hoursHtml + '</div>' +
     minuteGridHtml + rowsHtml + nowLineHtml +

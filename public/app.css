@@ -810,3 +810,15 @@ body .tfx > button { transition: color .25s ease, transform .1s ease; }
 .item-card.extras-only-card .item-media { display: flex; align-items: center; justify-content: center; }
 .extras-only-ic { width: 52px; height: 52px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: var(--accent, var(--blue)); color: #fff; }
 .item-card.extras-only-card .item-price { font-weight: 600; color: var(--grey); font-size: 13px; }
+
+/* Curseur de zoom des plannings du jour (admin, caisse, Mon poste) */
+.timeline-zoom-ctrl-inner .tz-ic { color: var(--grey); flex: none; margin-left: 4px; }
+.timeline-zoom-range { width: 150px; height: 20px; margin: 0; accent-color: var(--blue); cursor: pointer; }
+.timeline-zoom-ctrl-inner .timeline-zoom-val { font-size: 11.5px; color: var(--grey); min-width: 38px; text-align: right; font-variant-numeric: tabular-nums; margin-right: 4px; }
+@media (max-width: 600px) { .timeline-zoom-range { width: 110px; } }
+.timeline-zoom-range { -webkit-appearance: none; appearance: none; background: transparent; }
+.timeline-zoom-range::-webkit-slider-runnable-track { height: 4px; border-radius: 999px; background: var(--fill-2); }
+.timeline-zoom-range::-moz-range-track { height: 4px; border-radius: 999px; background: var(--fill-2); }
+.timeline-zoom-range::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; margin-top: -6px; border-radius: 50%; background: var(--blue); border: 2px solid var(--card); box-shadow: 0 1px 3px rgba(0,0,0,.3); }
+.timeline-zoom-range::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--blue); border: 2px solid var(--card); }
+.timeline-zoom-range:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 999px; }
