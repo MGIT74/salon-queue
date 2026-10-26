@@ -220,7 +220,7 @@
     <div class="flow-top"><div class="eyebrow">Comment souhaitez-vous réserver ?</div></div>
     <div class="flow-body"><div class="gb-choices">
       <button type="button" class="gb-choice" id="start-login" onclick="goLogin(event, true)"><span class="gb-choice-ic"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4"/><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/></svg></span><span><b id="start-login-title">Se connecter</b><em id="start-login-sub">Vos coordonnées déjà remplies, vos RDV au même endroit</em></span></button>
-      <button type="button" class="gb-choice" id="start-signup" onclick="goSignup(event)"><span class="gb-choice-ic"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10" cy="8" r="3.5"/><path d="M3 20c0-3.9 3.1-7 7-7 1.4 0 2.7.4 3.8 1.1"/><path d="M18 14v6M15 17h6"/></svg></span><span><b>Créer un compte</b><em>Gratuit, en une minute</em></span></button>
+      <button type="button" class="gb-choice start-popular" id="start-signup" onclick="goSignup(event)"><span class="start-badge">★ Le plus populaire</span><span class="gb-choice-ic"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10" cy="8" r="3.5"/><path d="M3 20c0-3.9 3.1-7 7-7 1.4 0 2.7.4 3.8 1.1"/><path d="M18 14v6M15 17h6"/></svg></span><span><b>Créer un compte</b><em>Gratuit, en une minute</em><span class="start-perk">Profitez de la carte de fidélité</span></span></button>
       <button type="button" class="gb-choice" id="start-guest" onclick="startAsGuest()"><span class="gb-choice-ic"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M9 15.5l2 2 4-4"/></svg></span><span><b>Continuer sans compte</b><em>Confirmation et lien d'annulation par email</em></span></button>
     </div></div>
   </section>
@@ -419,7 +419,14 @@
 <script src="/group-booking.js?v=27"></script>
 <style>
 body.staff-mode .gift-summary-box,body.staff-mode .theme-btn,body.staff-mode .login-hint{display:none!important}
-#p-start .gb-choices{max-width:960px}@media(min-width:760px){#p-start .gb-choices{grid-template-columns:repeat(3,1fr)}}@media(max-width:759px){#p-start .gb-choice{min-height:0;padding:18px 16px;flex-direction:row;text-align:left}#p-start .gb-choice-ic{width:48px;height:48px}}
+#p-start .gb-choices{max-width:960px}
+/* « Créer un compte » mis en avant : bordure accent, badge « Le plus populaire », avantage fidélité. */
+#p-start .gb-choices{overflow:visible}
+#p-start .start-popular{position:relative;border-color:var(--blue);background:var(--blue-soft)}
+#p-start .start-popular .gb-choice-ic{background:var(--blue);color:#fff}
+#p-start .start-badge{position:absolute;top:-12px;left:50%;transform:translateX(-50%);white-space:nowrap;background:var(--blue);color:#fff;font-size:12px;font-weight:700;letter-spacing:.01em;padding:4px 12px;border-radius:999px;box-shadow:0 2px 8px rgba(0,0,0,.18)}
+#p-start .start-perk{display:inline-block;margin-top:8px;font-size:12.5px;font-weight:600;color:var(--blue)}
+@media(max-width:759px){#p-start .start-badge{left:auto;right:14px;transform:none}#p-start .gb-choices{padding-top:6px}}@media(min-width:760px){#p-start .gb-choices{grid-template-columns:repeat(3,1fr)}}@media(max-width:759px){#p-start .gb-choice{min-height:0;padding:18px 16px;flex-direction:row;text-align:left}#p-start .gb-choice-ic{width:48px;height:48px}}
 #p-group .start-back{display:none}#p-group.gb-pick .start-back{display:block}body.staff-mode .start-back{display:none!important}
 .dt-barbers{margin:0 0 6px}.dt-barber-row{display:flex;flex-wrap:wrap;gap:8px}
 .dt-barber{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 14px;border-radius:999px;border:1.5px solid var(--sep);background:var(--card);color:var(--ink);font:inherit;font-size:14px;font-weight:600;cursor:pointer}

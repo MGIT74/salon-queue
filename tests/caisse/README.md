@@ -174,4 +174,5 @@ node tests/caisse/140-encaissement-groupe.js  # Caisse : encaissement groupe (gr
 node tests/caisse/141-dashboard-couleurs-coiffeurs.js  # Dashboard : planning du jour aux couleurs choisies dans Coiffeurs (meme apres rafraichissement)
 node tests/caisse/142-email-creation-compte.js  # Reglages : email de creation de compte client modifiable
 node tests/caisse/143-dashboard-clientele.js  # Dashboard : chiffres clientele (comptes, fidelite, cadeaux, sans compte) + prochains RDV qui defilent
+node tests/caisse/144-rdv-creer-compte-populaire.js  # Prise de RDV : « Creer un compte » mis en avant (le plus populaire, fidelite)
 ```

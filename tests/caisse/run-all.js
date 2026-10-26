@@ -163,7 +163,8 @@ const suite = [
   ['140-encaissement-groupe.js', true, ['exit']],
   ['141-dashboard-couleurs-coiffeurs.js', false, ['exit']],
   ['142-email-creation-compte.js', false, ['exit']],
-  ['143-dashboard-clientele.js', true, ['exit']]
+  ['143-dashboard-clientele.js', true, ['exit']],
+  ['144-rdv-creer-compte-populaire.js', false, ['exit']]
 ];
 
 let bad = 0;
