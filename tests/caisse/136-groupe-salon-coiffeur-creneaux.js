@@ -4,7 +4,7 @@ const fs = require('fs'), path = require('path');
 let pass = 0, fail = 0;
 const check = (n, ok, x = '') => { (ok ? pass++ : fail++); console.log((ok ? '  OK   ' : '  ECHEC') + ' ' + n + (x ? '  [' + String(x).slice(0, 160) + ']' : '')); };
 const s = fs.readFileSync(path.join(__dirname, '../../public/rdv.html'), 'utf8');
-check('salon : la personne commence par la prestation, « Premier disponible » par defaut', /if \(STAFF_BRIDGE\) \{\s*if \(!entry\) \{ selBarber = ''; applyBarberOffer\(\); \}\s*show\('p-service'\);\s*refreshRecap\(\);\s*return;\s*\}\s*show\('p-barber'\);/.test(s));
+check('salon : la personne commence par la prestation, « Premier disponible » par defaut', /if \(STAFF_BRIDGE\) \{\s*if \(!entry\) \{ selBarber = ''; dtAutoSingle = false; applyBarberOffer\(\); \}\s*show\('p-service'\);\s*refreshRecap\(\);\s*return;\s*\}\s*show\('p-barber'\);/.test(s));
 check('en ligne : etape Coiffeur inchangee', /function serviceBack\(\) \{\s*if \(STAFF_BRIDGE && grp\) return barberBack\(\);\s*show\('p-barber'\);/.test(s));
 check('coiffeurs au-dessus des creneaux (seulement ceux qui font la prestation) + Premier disponible', s.includes('id="dt-barbers"') && /function renderDtBarbers\(\)/.test(s) && s.includes("chip('', 'Premier disponible'") && s.includes('function staffBarberChoice() { return !!(STAFF_BRIDGE && grp); }'));
 check('changer de coiffeur relit les creneaux', /function pickDtBarber\(id\) \{[\s\S]*?loadSlots\(\);/.test(s));
@@ -24,5 +24,8 @@ check('recapitulatif : les personnes deja validees avec leur heure', /recap-cart
 const h2 = ctx.vitrineRecapHtml({ who: 'bob', service: { name: 'Barbe', duration_min: 15, price_cents: 1200 }, cart: [{ name: 'plonco', label: 'Coupe', time: '09:30', barber: 'C1', price_cents: 2000 }] });
 check('recapitulatif a plusieurs : la personne en cours nommee + total du groupe', /<b[^>]*>bob<\/b>/.test(h2) && /Total \(2 personnes\)[\s\S]*32,00/.test(h2), h2);
 check('changer de personne (Modifier) : recapitulatif mis a jour', /show\('p-service'\);\s*refreshRecap\(\);/.test(s));
+check('seulement les coiffeurs qui travaillent le jour choisi', s.includes("if (day && typeof barberBookableOn === 'function' && !barberBookableOn(b, day)) return false;"));
+check('un seul coiffeur ce jour-la : pas de « Premier disponible », il est choisi ; retour a Premier disponible un autre jour', s.includes('if (list.length === 1 && String(selBarber) !== String(list[0].id)) { selBarber = list[0].id; dtAutoSingle = true;') && s.includes("else if (list.length > 1 && dtAutoSingle) { selBarber = '';") && s.includes("(list.length > 1 ? chip('', 'Premier disponible'"));
+check('changer de jour met a jour les coiffeurs', /function loadSlots\(\) \{\s*if \(!selService\) return;[^\n]*\n\s*if \(typeof staffBarberChoice === 'function' && staffBarberChoice\(\)\) renderDtBarbers\(\);/.test(s));
 console.log(`\n${pass} OK, ${fail} ECHEC`);
 process.exit(fail ? 1 : 0);

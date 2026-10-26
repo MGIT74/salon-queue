@@ -892,6 +892,7 @@ function showHalf(half) {
 
 function loadSlots() {
   if (!selService) return; // Ne pas demander de disponibilités avant le choix de la prestation.
+  if (typeof staffBarberChoice === 'function' && staffBarberChoice()) renderDtBarbers();   // coiffeurs du jour choisi
   selDate = document.getElementById('rdv-date').value;
   selSlot = null;
   document.getElementById('date-next-btn').disabled = true;
@@ -1170,7 +1171,7 @@ function cartBeginPerson(i, entry) {
   // Salon (admin, caisse, Mon poste) : on commence par la prestation ; le coiffeur se choisit sur l'etape des creneaux
   // (« Premier disponible » si on ne touche a rien).
   if (STAFF_BRIDGE) {
-    if (!entry) { selBarber = ''; applyBarberOffer(); }
+    if (!entry) { selBarber = ''; dtAutoSingle = false; applyBarberOffer(); }
     show('p-service');
     refreshRecap();
     return;
@@ -1190,12 +1191,19 @@ function renderDtBarbers() {
   var box = document.getElementById('dt-barbers');
   if (!box) return;
   if (!staffBarberChoice()) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  // Seulement les coiffeurs qui travaillent ce jour-la (horaires, conges, jour « sans RDV »).
+  var day = document.getElementById('rdv-date').value;
   var list = barbers.filter(function (b) {
+    if (day && typeof barberBookableOn === 'function' && !barberBookableOn(b, day)) return false;
     var sv = barberItems(b, 'services', servicesAll), ex = barberItems(b, 'extras', extrasAll);
     if (selService !== EXTRAS_ONLY && !sv.some(function (x) { return String(x.id) === String(selService); })) return false;
     return selExtras.every(function (id) { return ex.some(function (x) { return String(x.id) === String(id); }); });
   });
-  if (selBarber !== '' && !list.some(function (b) { return String(b.id) === String(selBarber); })) selBarber = '';
+  if (selBarber !== '' && !list.some(function (b) { return String(b.id) === String(selBarber); })) { selBarber = ''; applyBarberOffer(); }
+  // Un seul coiffeur ce jour-la : pas de « Premier disponible », c'est lui.
+  if (list.length === 1 && String(selBarber) !== String(list[0].id)) { selBarber = list[0].id; dtAutoSingle = true; applyBarberOffer(); }
+  // Coiffeur impose par un jour a un seul coiffeur : un autre jour avec plusieurs coiffeurs repart sur « Premier disponible ».
+  else if (list.length > 1 && dtAutoSingle) { selBarber = ''; dtAutoSingle = false; applyBarberOffer(); }
   // Premier disponible + un creneau choisi : le coiffeur retenu par le systeme pour cette heure est mis en evidence.
   var auto = selBarber === '' && selSlot ? String(selSlot.barberId) : '';
   var chip = function (id, label, b, on) {
@@ -1212,7 +1220,9 @@ function renderDtBarbers() {
     list.map(function (b) { return chip(b.id, b.name, b, String(selBarber) === String(b.id) || (list.length === 1 && selBarber === '')); }).join('') + '</div>';
   box.style.display = '';
 }
+var dtAutoSingle = false;
 function pickDtBarber(id) {
+  dtAutoSingle = false;
   if (String(selBarber) === String(id)) return;
   selBarber = id;
   applyBarberOffer();
