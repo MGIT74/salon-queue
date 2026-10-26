@@ -27,5 +27,6 @@ check('changer de personne (Modifier) : recapitulatif mis a jour', /show\('p-ser
 check('seulement les coiffeurs qui travaillent le jour choisi', s.includes("if (day && typeof barberBookableOn === 'function' && !barberBookableOn(b, day)) return false;"));
 check('un seul coiffeur ce jour-la : pas de « Premier disponible », il est choisi ; retour a Premier disponible un autre jour', s.includes('if (list.length === 1 && String(selBarber) !== String(list[0].id)) { selBarber = list[0].id; dtAutoSingle = true;') && s.includes("else if (list.length > 1 && dtAutoSingle) { selBarber = '';") && s.includes("(list.length > 1 ? chip('', 'Premier disponible'"));
 check('changer de jour met a jour les coiffeurs', /function loadSlots\(\) \{\s*if \(!selService\) return;[^\n]*\n\s*if \(typeof staffBarberChoice === 'function' && staffBarberChoice\(\)\) renderDtBarbers\(\);/.test(s));
+check('compte client a plusieurs : tout le groupe dans le recapitulatif (heure, coiffeur, total)', c.includes("who: bkGrp && bkGrp.people[bkGrp.current]") && c.includes("cart: bkGrp ? bkGrp.cart.filter(function (c) { return c.person !== bkGrp.current; })") && c.includes("barber: c.any ? anyBarberLabel(bookBarbers, c.barber_id) : c.barber_name"));
 console.log(`\n${pass} OK, ${fail} ECHEC`);
 process.exit(fail ? 1 : 0);

@@ -1812,7 +1812,13 @@ function refreshBookRecap() {
     service: selBookService === EXTRAS_ONLY ? EXTRAS_ONLY_SERVICE : svcList.find(function (x) { return String(x.id) === String(selBookService); }),
     extras: pick(extList, selBookExtras.map(String)), products: pick(bookProducts, selBookProducts.map(String)),
     barber: anyB ? anyBarberLabel(bookBarbers, selBookSlot && selBookSlot.barberId) : (b ? b.name : ''), time: selBookSlot ? selBookSlot.time : '',
-    when: selBookDate ? new Date(selBookDate + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' }) : ''
+    when: selBookDate ? new Date(selBookDate + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' }) : '',
+    // A plusieurs : la personne en cours, et au-dessus les RDV deja valides du groupe (heure, coiffeur) + total du groupe.
+    who: bkGrp && bkGrp.people[bkGrp.current] ? (bkGrp.people[bkGrp.current].isSelf ? 'Moi' : bkGrp.people[bkGrp.current].name) : '',
+    cart: bkGrp ? bkGrp.cart.filter(function (c) { return c.person !== bkGrp.current; }).map(function (c) {
+      return { name: c.isSelf ? 'Moi' : c.name, time: c.time, price_cents: c.price_cents,
+        label: svcLabel(c.service_name, c.extra_names), barber: c.any ? anyBarberLabel(bookBarbers, c.barber_id) : c.barber_name };
+    }) : []
   });
 }
 document.addEventListener('click', function () { setTimeout(refreshBookRecap, 0); });
