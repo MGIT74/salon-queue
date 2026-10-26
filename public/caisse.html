@@ -263,7 +263,7 @@
   .timeline-hours span { position: absolute; top: 0; font-size: 12px; color: var(--grey); white-space: nowrap; transform: translateX(-1px); }
   .timeline-hours span.h { color: var(--ink); font-weight: 600; }
   /* Dezoome sous la largeur lisible (jusqu'a 0 % = journee entiere a l'ecran) : seules les heures pleines restent. */
-  .timeline-inner.compact .timeline-hours span:not(.h) { display: none; }
+  .timeline-hours span.lbl-off { display: none; }   /* libelles intermediaires qui n'ont pas la place (voir timelineFitLabels, app.js) */
   .timeline-inner.compact .timeline-hours span.h { font-size: 11px; }
   /* Vue resserree (jusqu'a 0 %) : l'heure reste affichee au-dessus du nom, exactement comme a 100 %. */
   .timeline-inner.compact .timeline-block { padding: 2px 6px; }
@@ -1002,7 +1002,7 @@
   </div>
 </div>
 
-<script src="/app.js?v=37"></script>
+<script src="/app.js?v=38"></script>
 <script src="/staff-group.js?v=5"></script>
 <script src="/autorefresh.js?v=3"></script>
 <script>requireSalonInUrl("Pour utiliser la caisse, ouvrez le lien de votre salon.");</script>
@@ -2337,7 +2337,7 @@ function renderAgendaTimeline(dateStr) {
   var hoursHtml = '';
   for (var t = rangeStart; t <= rangeEnd; t += stepMin) {
     var tFrac = (t - rangeStart) / (rangeEnd - rangeStart);
-    hoursHtml += '<span' + (t % 60 === 0 ? ' class="h"' : '') + ' style="left: calc(22px + (100% - 22px) * ' + tFrac + ')">' +
+    hoursHtml += '<span data-m="' + t + '"' + (t % 60 === 0 ? ' class="h"' : '') + ' style="left: calc(22px + (100% - 22px) * ' + tFrac + ')">' +
       String(Math.floor(t / 60)).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0') + '</span>';
   }
 
@@ -2425,7 +2425,7 @@ function renderAgendaTimeline(dateStr) {
 
   return zoomCtrl + '<div class="timeline-scroll"><div class="timeline-inner' + (compact ? ' compact' : '') + (effZoom === 0 ? ' fit' : '') + '" ' +
     'data-date="' + dateStr + '" data-range-start="' + rangeStart + '" data-range-end="' + rangeEnd + '" ' +
-    'data-hours="' + hourCount + '" data-fit="' + fitPerHour + '" data-minzoom="' + minZoom + '" ' +
+    'data-hours="' + hourCount + '" data-fit="' + fitPerHour + '" data-minzoom="' + minZoom + '" data-step="' + stepMin + '" ' +
     'style="min-width:' + innerWidth + 'px">' +
     '<div class="timeline-hours">' + hoursHtml + '</div>' +
     minuteGridHtml + rowsHtml + nowLineHtml +

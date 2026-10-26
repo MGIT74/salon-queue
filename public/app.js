@@ -794,9 +794,44 @@ function liveTimelineZoom(el) {
     inner.classList.toggle('compact', compact);
     inner.classList.toggle('fit', z === 0);
   });
+  timelineFitLabels();
   document.querySelectorAll('.timeline-zoom-range').forEach(function (r) { if (r !== el) r.value = pct; });
   document.querySelectorAll('.timeline-zoom-val').forEach(function (v) { v.textContent = pct + '%'; });
 }
+
+// Libelles des minutes (08:05, 08:10...) : on garde le plus fin qui a la place (au moins 44 px entre deux), en multiples
+// du pas : a 70 % on voit encore 08:10 / 08:20..., plus serre 08:15 / 08:30, puis seulement les heures pleines.
+function timelineFitLabels(root) {
+  (root || document).querySelectorAll('.timeline-inner[data-step]').forEach(function (inner) {
+    var start = Number(inner.dataset.rangeStart), end = Number(inner.dataset.rangeEnd), step = Number(inner.dataset.step) || 15;
+    var width = inner.getBoundingClientRect().width - 22;
+    if (!(end > start)) return;
+    if (!(width > 0)) {   // planning pas encore visible (onglet masque) : seules les heures pleines en vue resserree
+      var compact = inner.classList.contains('compact');
+      inner.querySelectorAll('.timeline-hours span[data-m]').forEach(function (sp) { sp.classList.toggle('lbl-off', compact && Number(sp.dataset.m) % 60 !== 0); });
+      return;
+    }
+    var pxPerMin = width / (end - start), every = 60;
+    [step, 10, 15, 20, 30].forEach(function (c) { if (c >= step && c % step === 0 && 60 % c === 0 && c * pxPerMin >= 42 && c < every) every = c; });
+    inner.querySelectorAll('.timeline-hours span[data-m]').forEach(function (sp) {
+      var m = Number(sp.dataset.m);
+      // Le dernier libelle (fermeture) est cale a droite : celui juste avant lui laisse la place.
+      sp.classList.toggle('lbl-off', m % 60 !== 0 && (m % every !== 0 || (end - m) * pxPerMin < 88));
+    });
+  });
+}
+(function () {
+  var pending = false;
+  function later() { if (pending) return; pending = true; requestAnimationFrame(function () { pending = false; timelineFitLabels(); }); }
+  if (window.MutationObserver) new MutationObserver(function (muts) {
+    for (var i = 0; i < muts.length; i++) for (var j = 0; j < muts[i].addedNodes.length; j++) {
+      var n = muts[i].addedNodes[j];
+      if (n.nodeType === 1 && (n.matches('.timeline-inner, .timeline-scroll') || n.querySelector('.timeline-inner'))) { later(); return; }
+    }
+  }).observe(document.documentElement, { childList: true, subtree: true });
+  window.addEventListener('resize', later);
+  document.addEventListener('click', later, true);   // onglet / jour qui s'affiche
+})();
 
 // Palette de couleurs stables pour associer une couleur à un coiffeur
 // sans champ "color" explicite (bulles, timeline...) - le même id donne
