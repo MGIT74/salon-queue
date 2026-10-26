@@ -321,6 +321,102 @@
 .closure-cal-grid button:focus-visible,.closure-cal-head button:focus-visible{outline:2px solid var(--accent,#007aff);outline-offset:2px}
 @media(max-width:420px){.closure-calendar{max-width:100%}.closure-cal-grid{gap:3px}.closure-cal-grid button{height:39px}}
 </style>
+<style>
+/* ===== Ordinateur et tablette (900 px et plus), une fois connecte =====
+   Le menu du bas devient une barre laterale (icones seules sur tablette), l'accueil passe en colonnes et chaque etape de
+   reservation a 3 zones : etapes en haut, contenu au centre, recapitulatif + Suivant a droite (en bas sur tablette).
+   Le telephone (moins de 900 px) garde exactement l'affichage d'avant. */
+.home-cta, .bk-steps { display: none; }
+.home-col { display: contents; }
+.bk-flow > .flow-top, .bk-flow > .flow-body { display: block; }
+.bk-flow > .step-bar.own-bar { position: static; margin: 0; padding: 0; background: none; box-shadow: none; }
+.bk-flow > .step-bar.own-bar .recap-foot { display: none; }
+@media (min-width: 900px) {
+  body.has-footer { --side-w: 84px; }
+  body.has-footer .client-footer.on {
+    top: 0; bottom: 0; right: auto; width: var(--side-w); flex-direction: column; justify-content: flex-start; align-items: stretch;
+    gap: 6px; padding: 24px 12px; border-radius: 0; border-top: none; border-right: 1px solid var(--sep);
+    background: var(--bg); box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none;
+  }
+  [data-theme="dark"] body.has-footer .client-footer.on { background: var(--bg); border-right-color: var(--sep); }
+  body.has-footer .client-footer.on button { flex: none; padding: 10px 4px; border-radius: 14px; font-size: 11px; color: var(--ink); }
+  body.has-footer .client-footer.on button.on { background: var(--fill); color: var(--blue); }
+  body.has-footer .client-footer.on button:hover:not(.on) { background: var(--fill); }
+  body.has-footer .client-footer.on button:last-child { margin-top: auto; color: var(--grey); }
+  body.has-footer .wrap { max-width: 1240px; margin: 0 0 0 var(--side-w); padding: 32px clamp(24px, 3vw, 44px) 48px; }
+  body.has-footer .toast { bottom: 28px; }
+  .rdv-header { text-align: left; margin-bottom: 24px; }
+  .rdv-header h1 { font-size: 30px; font-weight: 700; }
+
+  /* Accueil : bonjour + « Prendre rendez-vous », puis RDV / dernier passage a gauche, fidelite / cadeaux a droite */
+  #p-home.on { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(300px, 1fr); gap: 20px 24px; align-items: start; }
+  #p-home .top-actions { grid-column: 1 / -1; margin: 0 0 4px; }
+  #p-home #home-hello { font-size: 24px !important; font-weight: 700 !important; letter-spacing: -.02em; }
+  #p-home .home-cta { display: block; width: auto; margin: 0; padding: 14px 24px; }
+  #p-home .home-col { display: block; background: var(--card); border-radius: 20px; padding: 22px; min-width: 0; }
+  #p-home .home-col > .eyebrow, #p-home .home-col > #loyalty-section > .eyebrow:first-child { margin-top: 0; }
+  #p-home .home-col > div:not(:empty) + .eyebrow { margin-top: 22px; }
+  #p-home .home-side > .msg { margin-top: 0; }
+  #p-home .home-main { grid-column: 1; grid-row: 2; }
+  #p-home .home-side { grid-column: 2; grid-row: 2; }
+  #p-home .home-main .card, #p-home .home-main .empty { background: var(--fill); }
+  #p-account.on { max-width: 720px; }
+
+  /* Coiffeurs / choix : cartes un peu plus grandes */
+  #p-book-barber .svc-grid { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 14px; }
+
+  /* Etapes */
+  body.bk-stepping .bk-steps { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; margin: 0 0 22px; padding: 0; }
+  .bk-steps li { display: flex; align-items: center; gap: 8px; padding: 6px 14px 6px 6px; border-radius: 999px; font-size: 13.5px; font-weight: 600; color: var(--grey); }
+  .bk-steps li span { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--fill); color: var(--grey); font-size: 12px; }
+  .bk-steps li.done { color: var(--ink); }
+  .bk-steps li.done span, .bk-steps li.cur span { background: var(--blue); color: #fff; }
+  .bk-steps li.cur { background: var(--blue-soft); color: var(--blue); }
+
+  /* Etapes Prestation -> Confirmation : contenu + recapitulatif */
+  .panel.bk-flow.on { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto; gap: 0; }
+  .bk-flow > .flow-body { container-type: inline-size; min-width: 0; }
+  .bk-flow .recap-top { display: none; }
+  .bk-flow > .step-bar, .bk-flow > .step-bar.own-bar {
+    position: sticky; bottom: 16px; z-index: 5; margin: 18px 0 0; padding: 14px 18px; border-radius: 18px;
+    background: var(--card); box-shadow: 0 0 0 1px var(--sep), 0 10px 30px rgba(0,0,0,.18);
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 18px;
+  }
+  .bk-flow > .step-bar.own-bar .recap-foot { display: block; }
+  .bk-flow > .step-bar .flow-recap { margin: 0; padding: 0; background: none; max-height: 110px; overflow-y: auto; }
+  .bk-flow > .step-bar .step-summary { margin: 0; }
+  .bk-flow > .step-bar .go { width: auto; margin: 0; padding: 15px 36px; }
+  .bk-flow .item-grid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 14px; }
+  /* Date : calendrier et creneaux cote a cote des que la place le permet */
+  .closure-calendar { max-width: 420px; }
+  @container (min-width: 640px) {
+    .dt-split { display: grid; grid-template-columns: minmax(300px, 400px) minmax(0, 1fr); gap: 32px; align-items: start; }
+    .dt-split .dt-slots > .eyebrow:first-child { margin-top: 0 !important; }
+  }
+}
+@media (min-width: 1200px) {
+  body.has-footer { --side-w: 232px; }
+  body.has-footer .client-footer.on { padding: 28px 16px; }
+  body.has-footer .client-footer.on button { flex-direction: row; justify-content: flex-start; gap: 12px; padding: 12px 14px; font-size: 15px; font-weight: 500; }
+  body.has-footer .client-footer.on button.on { font-weight: 600; color: var(--ink); }
+  body.has-footer .client-footer.on button.on .ic { color: var(--blue); }
+  /* Recapitulatif a droite, colle pendant le defilement */
+  .panel.bk-flow.on { grid-template-columns: minmax(0, 1fr) 340px; grid-template-rows: auto 1fr; column-gap: 28px; align-items: start; }
+  .bk-flow > .flow-top { grid-column: 1; grid-row: 1; }
+  .bk-flow > .flow-body { grid-column: 1; grid-row: 2; }
+  .bk-flow > .step-bar, .bk-flow > .step-bar.own-bar {
+    grid-column: 2; grid-row: 1 / span 2; position: sticky; top: 24px; bottom: auto; margin: 0; padding: 22px;
+    display: flex; flex-direction: column; align-items: stretch; gap: 14px; box-shadow: none; border-radius: 20px;
+  }
+  .bk-flow > .step-bar .flow-recap { max-height: none; overflow: visible; }
+  .bk-flow > .step-bar .recap-list { max-height: none; overflow: visible; gap: 10px; }
+  .bk-flow > .step-bar .recap-row { grid-template-columns: minmax(0, 1fr) auto; row-gap: 1px; }
+  .bk-flow > .step-bar .recap-k { grid-column: 1 / -1; }
+  .bk-flow > .step-bar .recap-n { white-space: normal; overflow: visible; }
+  .bk-flow > .step-bar .recap-total { font-size: 16px; margin-top: 12px; padding-top: 12px; }
+  .bk-flow > .step-bar .go { width: 100%; padding: 16px; }
+}
+</style>
 </head>
 <body>
 <div id="no-salon" role="alert"><div class="box"><h1>Lien incomplet</h1><p>Cette adresse ne précise pas de salon. Pour accéder à votre espace client, utilisez le lien fourni par votre salon.</p></div></div>
@@ -425,8 +521,10 @@
   <section class="panel" id="p-home">
     <div class="top-actions">
       <div style="font-size:16px;font-weight:600" id="home-hello"></div>
+      <button type="button" class="go home-cta" onclick="goBook()">Prendre rendez-vous</button>
     </div>
 
+    <div class="home-col home-side">
     <div id="loyalty-section">
       <div class="eyebrow">Fidélité</div>
       <div class="card">
@@ -451,12 +549,15 @@
       <div class="eyebrow">Mes cadeaux</div>
       <div id="gift-cards-list"></div>
     </div>
+    </div>
 
+    <div class="home-col home-main">
     <div class="eyebrow" id="upcoming-eyebrow" style="display:none">Vos prochains rendez-vous</div>
     <div id="upcoming-list"></div>
 
     <div class="eyebrow">Dernier passage</div>
     <div id="history-list"></div>
+    </div>
   </section>
 
   <!-- Compte (connecté) : infos + mot de passe -->
@@ -500,6 +601,7 @@
     <div class="msg" id="password-msg"></div>
   </section>
   <!-- Réservation intégrée -->
+  <ol class="bk-steps" id="bk-steps" aria-label="Étapes de la réservation"></ol>
   <div class="grp-banner" id="grp-banner" style="display:none"></div>
   <div class="gift-summary-box" id="gift-summary-box" style="display:none">
     <div class="gift-summary-tag">🎁 Carte cadeau</div>
@@ -614,7 +716,7 @@
     <div class="flow-recap" data-recap></div>
     <div class="dt-split">
       <div class="dt-cal">
-        <div class="fld"><label for="bk-date">Date</label><div class="closure-calendar" id="bk-date-calendar"><input id="bk-date" type="date" onchange="loadBookSlots()"><div class="closure-cal-head"><button type="button" id="bk-date-prev" aria-label="Mois précédent">‹</button><strong id="bk-date-month"></strong><button type="button" id="bk-date-next" aria-label="Mois suivant">›</button></div><div class="closure-cal-grid" id="bk-date-grid"></div><p style="font-size:12px;color:#888;margin-top:8px">Les dates grisées sont indisponibles : salon fermé ou coiffeur absent ce jour-là.</p></div></div>
+        <div class="fld"><label for="bk-date">Date</label><div class="closure-calendar" id="bk-date-calendar"><input id="bk-date" type="date" onchange="loadBookSlots()"><div class="closure-cal-head"><button type="button" id="bk-date-prev" aria-label="Mois précédent">‹</button><strong id="bk-date-month"></strong><button type="button" id="bk-date-next" aria-label="Mois suivant">›</button></div><div class="closure-cal-grid" id="bk-date-grid"></div></div></div>
       </div>
       <div class="dt-slots">
         <div class="eyebrow" style="margin-top:20px">Créneaux disponibles</div>
@@ -755,6 +857,7 @@ function show(id) {
   document.querySelector('.wrap').style.display = isAuthScreen ? 'none' : 'block';
   window.scrollTo(0, 0);
   renderGiftSummaryBox();
+  renderBkSteps(id);
   if (typeof renderBkGrpBanner === 'function') renderBkGrpBanner(id);
   var backBtn = document.getElementById('bk-datetime-back-btn');
   var cancelBtn = document.getElementById('bk-datetime-cancel-btn');
@@ -787,6 +890,20 @@ function show(id) {
       shine.classList.add('play');
     });
   }
+}
+
+// Ordinateur / tablette : barre d'etapes au-dessus de la reservation (une personne a la fois).
+var BK_STEPS = [['p-book-barber', 'Coiffeur'], ['p-book-service', 'Prestation'], ['p-book-extras', 'Suppléments'],
+  ['p-book-products', 'Produits'], ['p-book-datetime', 'Date & heure'], ['p-book-confirm', 'Confirmation']];
+function renderBkSteps(id) {
+  var el = document.getElementById('bk-steps'); if (!el) return;
+  var cur = BK_STEPS.map(function (x) { return x[0]; }).indexOf(id);
+  document.body.classList.toggle('bk-stepping', cur !== -1);
+  if (cur === -1) { el.innerHTML = ''; return; }
+  el.innerHTML = BK_STEPS.map(function (x, i) {
+    var cls = i < cur ? 'done' : (i === cur ? 'cur' : '');
+    return '<li class="' + cls + '"' + (i === cur ? ' aria-current="step"' : '') + '><span>' + (i < cur ? '✓' : (i + 1)) + '</span>' + x[1] + '</li>';
+  }).join('');
 }
 
 function showFooter(activeId) {
@@ -2011,13 +2128,24 @@ function guardMissingSalon() {
 })();
 </script>
 <script>
+/* Etapes Prestation -> Confirmation : en-tete / contenu / recapitulatif + Suivant, pour la mise en page ordinateur et tablette
+   (CSS « Ordinateur et tablette »). Sur telephone, l'affichage reste celui d'avant. */
+(function () {
+  var ids = ['p-book-service', 'p-book-extras', 'p-book-products', 'p-book-datetime', 'p-book-confirm'];
+  vitrinePageFlow(document.createElement('div'), ids);
+  ids.forEach(function (id) { var el = document.getElementById(id); if (el) el.classList.add('bk-flow'); });
+})();
+</script>
+<script>
 /* Mesure la hauteur reelle du menu du bas (Accueil / Reserver / Compte, ou barre "Annuler" du cadeau) pour que la barre
    Suivant des etapes de reservation ne passe jamais dessous : --footer-h = 0 quand aucun menu n'est affiche. */
 (function () {
   function sync() {
     var h = 0;
     document.querySelectorAll('.client-footer, .client-footer-gift-lock').forEach(function (f) {
-      if (getComputedStyle(f).display !== 'none') h = Math.max(h, f.offsetHeight);
+      if (getComputedStyle(f).display === 'none') return;
+      if (f.offsetWidth < window.innerWidth * 0.5) return;   // menu sur le cote (ordinateur, tablette) : rien en bas
+      h = Math.max(h, f.offsetHeight);
     });
     document.documentElement.style.setProperty('--footer-h', h + 'px');
   }
