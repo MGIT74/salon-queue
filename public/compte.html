@@ -187,7 +187,7 @@
     font-size: 11.5px; color: var(--grey); padding: 4px 18px; flex: 1;
   }
   .client-footer button .ic { display: block; }
-  .side-logo { display: none; }
+  .side-brand, .side-logo { display: none; }
   .client-footer button.on { color: var(--blue); font-weight: 600; }
   body.has-footer .wrap { padding-bottom: calc(var(--footer-h, 72px) + 24px); }
   /* Barre Suivant des etapes de reservation : elle se colle AU-DESSUS du menu du bas (hauteur mesuree en JS), jamais dessous. */
@@ -334,20 +334,31 @@
 .bk-flow > .step-bar.own-bar { position: static; margin: 0; padding: 0; background: none; box-shadow: none; }
 .bk-flow > .step-bar.own-bar .recap-foot { display: none; }
 @media (min-width: 900px) {
-  body.has-footer { --side-w: 84px; }
+  /* Menu lateral flottant, meme dessin que la barre laterale de l'admin : carte arrondie, logo + salon en tete,
+     onglet actif sur fond gris, Deconnexion en rouge tout en bas sous une fine ligne. */
+  body.has-footer { --side-w: 92px; --side-gap: clamp(16px, 1.8vw, 28px); }
   body.has-footer .client-footer.on {
-    top: 0; bottom: 0; right: auto; width: var(--side-w); flex-direction: column; justify-content: flex-start; align-items: stretch;
-    gap: 6px; padding: 24px 12px; border-radius: 0; border-top: none; border-right: 1px solid var(--sep);
-    background: var(--bg); box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none;
+    top: 20px; bottom: 20px; left: var(--side-gap); right: auto; width: var(--side-w); flex-direction: column; justify-content: flex-start; align-items: stretch;
+    gap: 2px; padding: 18px 10px; border-radius: 20px; border: none;
+    background: var(--card); box-shadow: var(--shadow); backdrop-filter: none; -webkit-backdrop-filter: none; overflow-y: auto;
   }
-  [data-theme="dark"] body.has-footer .client-footer.on { background: var(--bg); border-right-color: var(--sep); }
-  body.has-footer .client-footer.on button { flex: none; padding: 10px 4px; border-radius: 14px; font-size: 11px; color: var(--ink); }
-  body.has-footer .client-footer.on button.on { background: var(--fill); color: var(--blue); }
+  [data-theme="dark"] body.has-footer .client-footer.on { background: var(--card); }
+  body.has-footer .client-footer.on button { flex: none; padding: 10px 4px; border-radius: 12px; font-size: 11px; font-weight: 500; color: var(--ink); }
+  body.has-footer .client-footer.on button .ic { opacity: .75; }
+  body.has-footer .client-footer.on button.on { background: var(--fill); color: var(--ink); font-weight: 600; }
+  body.has-footer .client-footer.on button.on .ic { opacity: 1; }
+  [data-theme="dark"] body.has-footer .client-footer.on button.on { background: #3a3a3c; }
   body.has-footer .client-footer.on button:hover:not(.on) { background: var(--fill); }
-  body.has-footer .client-footer.on button:last-child { margin-top: auto; color: var(--grey); }
-  /* Logo du salon au-dessus de « Accueil » */
-  body.has-footer .client-footer.on .side-logo.has-logo { display: block; width: 56px; height: 56px; margin: 0 auto 14px; border-radius: 14px; background: center/cover no-repeat; flex: none; }
-  body.has-footer .wrap { max-width: 1240px; margin: 0 0 0 var(--side-w); padding: 32px clamp(24px, 3vw, 44px) 48px; }
+  body.has-footer .client-footer.on #nav-logout { position: relative; margin-top: auto; color: var(--red); }
+  body.has-footer .client-footer.on #nav-logout .ic { opacity: 1; }
+  body.has-footer .client-footer.on #nav-logout:hover { background: rgba(255,59,48,.1); }
+  body.has-footer .client-footer.on #nav-logout::before { content: ''; position: absolute; left: 10px; right: 10px; top: -6px; height: 1px; background: var(--sep); }
+  /* En-tete : logo du salon (et son nom sur grand ecran), separe des onglets par une fine ligne */
+  body.has-footer .client-footer.on .side-brand { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 4px 0 16px; margin-bottom: 12px; border-bottom: 1px solid var(--sep); }
+  body.has-footer .client-footer.on .side-logo.has-logo { display: block; width: 52px; height: 52px; border-radius: 14px; background: center/cover no-repeat; flex: none; }
+  body.has-footer .client-footer.on .side-brand:not(:has(.has-logo)) { display: none; }
+  body.has-footer .client-footer.on .side-salon { display: none; }
+  body.has-footer .wrap { max-width: 1240px; margin: 0 0 0 calc(var(--side-w) + var(--side-gap) + 8px); padding: 32px clamp(24px, 3vw, 44px) 48px; }
   body.has-footer .toast { bottom: 28px; }
   .rdv-header { text-align: left; margin-bottom: 24px; }
   .rdv-header h1 { font-size: 30px; font-weight: 700; }
@@ -399,12 +410,14 @@
   }
 }
 @media (min-width: 1200px) {
-  body.has-footer { --side-w: 232px; }
-  body.has-footer .client-footer.on { padding: 28px 16px; }
-  body.has-footer .client-footer.on .side-logo.has-logo { width: 72px; height: 72px; margin: 0 0 18px 14px; border-radius: 16px; }
-  body.has-footer .client-footer.on button { flex-direction: row; justify-content: flex-start; gap: 12px; padding: 12px 14px; font-size: 15px; font-weight: 500; }
-  body.has-footer .client-footer.on button.on { font-weight: 600; color: var(--ink); }
-  body.has-footer .client-footer.on button.on .ic { color: var(--blue); }
+  body.has-footer { --side-w: 240px; }
+  body.has-footer .client-footer.on { padding: 18px 12px; }
+  body.has-footer .client-footer.on .side-brand { align-items: stretch; padding: 4px 10px 16px; }
+  body.has-footer .client-footer.on .side-brand:not(:has(.has-logo)) { display: flex; }
+  body.has-footer .client-footer.on .side-salon:not(:empty) { display: block; padding: 9px 12px; border-radius: 10px; background: var(--fill); font-size: 13px; font-weight: 500; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  body.has-footer .client-footer.on button { flex-direction: row; justify-content: flex-start; gap: 10px; padding: 11px 14px; font-size: 14.5px; font-weight: 500; }
+  body.has-footer .client-footer.on button.on { font-weight: 600; }
+  body.has-footer .client-footer.on button .ic { width: 20px; height: 20px; }
   /* Recapitulatif a droite, colle pendant le defilement */
   .panel.bk-flow.on { grid-template-columns: minmax(0, 1fr) 340px; grid-template-rows: auto 1fr; column-gap: 28px; align-items: start; }
   .bk-flow > .flow-top { grid-column: 1; grid-row: 1; }
@@ -754,8 +767,9 @@
 </div>
 
 <div class="client-footer" id="client-footer">
-  <!-- Logo du salon en haut du menu lateral (ordinateur / tablette), quand le salon en a un (Reglages). -->
-  <div class="side-logo" id="side-logo" role="img" aria-label="Logo du salon"></div>
+  <!-- En-tete du menu lateral (ordinateur / tablette), comme la barre laterale de l'admin : logo du salon (Reglages)
+       et nom du salon. Cache sur telephone (menu du bas inchange). -->
+  <div class="side-brand"><div class="side-logo" id="side-logo" role="img" aria-label="Logo du salon"></div><div class="side-salon" id="side-salon"></div></div>
   <button id="nav-home" onclick="goHome()">
     <svg class="ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 9.5V19a1 1 0 0 0 1 1H9.5a1 1 0 0 0 1-1v-4a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v4a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1V9.5"/></svg>
     Accueil
@@ -768,7 +782,7 @@
     <svg class="ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20c1.2-4 4-6 7.5-6s6.3 2 7.5 6"/></svg>
     Compte
   </button>
-  <button onclick="doLogout()">
+  <button id="nav-logout" onclick="doLogout()">
     <svg class="ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4H6.5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2H9"/><path d="M16 15.5 20.5 12 16 8.5"/><path d="M20 12H9"/></svg>
     Déconnexion
   </button>
@@ -2080,6 +2094,7 @@ function guardMissingSalon() {
         if (d.salon_name) {
           document.getElementById('salon-mark').textContent = d.salon_name.toUpperCase();
           document.getElementById('salon-mark-app').textContent = d.salon_name.toUpperCase();
+          var sideSalon = document.getElementById('side-salon'); if (sideSalon) sideSalon.textContent = d.salon_name;
         }
         CURRENCY = d.currency || 'EUR'; if (d.timezone) SALON_TIMEZONE = d.timezone;
         applyAccentColor(d.accent_color);

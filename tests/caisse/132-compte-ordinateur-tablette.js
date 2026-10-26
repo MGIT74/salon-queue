@@ -4,7 +4,7 @@ const fs = require('fs'), path = require('path');
 let pass = 0, fail = 0;
 const check = (n, ok, x = '') => { (ok ? pass++ : fail++); console.log((ok ? '  OK   ' : '  ECHEC') + ' ' + n + (x ? '  [' + String(x).slice(0, 160) + ']' : '')); };
 const c = fs.readFileSync(path.join(__dirname, '../../public/compte.html'), 'utf8');
-check('menu du bas -> barre laterale a partir de 900 px, libelles complets a partir de 1200 px', /@media \(min-width: 900px\) \{\s*body\.has-footer \{ --side-w: 84px; \}/.test(c) && /@media \(min-width: 1200px\) \{\s*body\.has-footer \{ --side-w: 232px; \}/.test(c));
+check('menu du bas -> barre laterale a partir de 900 px, libelles complets a partir de 1200 px', /@media \(min-width: 900px\) \{\s*(\/\*[\s\S]*?\*\/\s*)?body\.has-footer \{ --side-w: 92px;/.test(c) && /@media \(min-width: 1200px\) \{\s*body\.has-footer \{ --side-w: 240px; \}/.test(c));
 check('accueil en colonnes, sans changer l\'ordre sur telephone', c.includes('class="home-col home-side"') && c.includes('class="home-col home-main"') && c.includes('.home-col { display: contents; }') && c.indexOf('home-side') < c.indexOf('home-main'));
 check('bouton « Prendre rendez-vous » sur l\'accueil (ordinateur)', c.includes('class="go home-cta" onclick="goBook()"') && c.includes('.home-cta, .bk-steps { display: none; }'));
 check('barre d\'etapes Coiffeur -> Confirmation', c.includes('id="bk-steps"') && /function renderBkSteps\(id\)/.test(c) && c.includes("renderBkSteps(id);"));
