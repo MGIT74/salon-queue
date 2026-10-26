@@ -269,7 +269,8 @@
     function fmtMin(m) { return typeof formatMinutes === 'function' ? formatMinutes(m) : m + ' min'; }
 
     // Personne n'est coche d'avance : c'est l'utilisateur qui ajoute (ou coche) les personnes qui viennent.
-    function newWho() { return { multi: !cfg.onSolo, self: false, rels: {}, extra: [], draft: '', draftSave: false }; }
+    // La 1re personne (le client, ou « Moi » pour le titulaire du compte) est deja cochee : un clic de moins.
+    function newWho() { return { multi: !cfg.onSolo, self: !cfg.noSelfChip, rels: {}, extra: [], draft: '', draftSave: false }; }
     function reset() { slotCache = {}; people = []; cur = null; editing = false; sepMode = false; wsel = newWho(); plan = { date: null, mode: 'seq', loading: false, list: null, chosen: -1, req: 0 }; view = 'who'; paint(); }
     function whoCount() { return (wsel.self ? 1 : 0) + Object.keys(wsel.rels).filter(function (k) { return wsel.rels[k]; }).length + wsel.extra.length; }
     function addWhoName() {
