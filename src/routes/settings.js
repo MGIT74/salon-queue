@@ -1,6 +1,6 @@
 const express = require('express');
 const { pool, getSettings, setSettings, getCaisseLock, getPlatformSettings } = require('../db');
-const { forceSend, sendTest, invalidateTransport, sendAppointmentConfirmation, sendAppointmentReminder, sendAppointmentCancelledByAdmin, sendAppointmentRescheduled, sendTurnSoon, sendSalonClosureNotice } = require('../lib/mailer');
+const { forceSend, sendTest, invalidateTransport, sendAppointmentConfirmation, sendAppointmentReminder, sendAppointmentCancelledByAdmin, sendAppointmentRescheduled, sendTurnSoon, sendSalonClosureNotice, sendClientVerificationEmail } = require('../lib/mailer');
 const requireAdmin = require('../middleware/auth');
 const { logActivity } = require('../lib/activityLog');
 const sms = require('../lib/sms');
@@ -24,6 +24,7 @@ const EDITABLE = [
   'email_tpl_rescheduled_subject', 'email_tpl_rescheduled_body',
   'email_tpl_turn_soon_subject', 'email_tpl_turn_soon_body',
   'email_tpl_closure_subject', 'email_tpl_closure_body',
+  'email_tpl_signup_subject', 'email_tpl_signup_body',
   'accent_color', 'login_image_url',
   'caisse_inactivity_seconds', 'caisse_reopen_hour', 'currency', 'salon_website_url',
   'caisse_open_enabled', 'caisse_open_hour', 'caisse_close_enabled', 'caisse_close_hour',
@@ -397,7 +398,8 @@ router.post('/email-templates/test', requireAdmin, wrap(async (req, res) => {
     cancelled: () => sendAppointmentCancelledByAdmin(req.salon.id, to, sampleInfo),
     rescheduled: () => sendAppointmentRescheduled(req.salon.id, to, sampleInfo),
     'turn-soon': () => sendTurnSoon(req.salon.id, to, sampleInfo.clientName, 12),
-    closure: () => sendSalonClosureNotice(req.salon.id, to, sampleInfo)
+    closure: () => sendSalonClosureNotice(req.salon.id, to, sampleInfo),
+    signup: () => sendClientVerificationEmail(req.salon.id, to, 'https://' + req.get('host') + '/compte.html?salon=' + (req.salon.slug || '') + '&verify=exemple')
   };
 
   const results = {};

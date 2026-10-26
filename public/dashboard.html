@@ -2630,6 +2630,15 @@
           <textarea id="tpl-turn-soon-body" rows="9" placeholder="Bonjour {{client_name}}, votre tour est estimé dans environ {{wait_min}} minutes."></textarea></div>
       </div>
 
+      <div class="email-tpl-block">
+        <h4>Création de compte client (confirmation de l'email)</h4>
+        <p class="hint">Jetons disponibles : {{salon}}, {{verify_url}}. Envoyé juste après l'inscription : {{verify_url}} est le lien qui active le compte, il doit rester dans le message.</p>
+        <div class="fld"><label for="tpl-signup-subject">Sujet</label>
+          <input id="tpl-signup-subject" type="text" placeholder="Confirmez votre adresse email — {{salon}}"></div>
+        <div class="fld"><label for="tpl-signup-body">Message</label>
+          <textarea id="tpl-signup-body" rows="9" placeholder="Bienvenue ! Cliquez sur ce lien pour confirmer votre adresse email : {{verify_url}}"></textarea></div>
+      </div>
+
       <div class="email-tpl-block" style="border-bottom:none;margin-bottom:0;padding-bottom:0">
         <h4>Fermeture exceptionnelle du salon</h4>
         <p class="hint">Jetons disponibles : {{client_name}}, {{when}}, {{reason}}, {{salon}}. Utilisé comme message par défaut lors de l'ajout d'une fermeture (Calendrier), sauf si un message ponctuel est tapé pour cette fermeture précise.</p>
@@ -9952,7 +9961,7 @@ function copyBridgeSetup() {
     .catch(function () { toast('Copie impossible : sélectionnez le texte et Cmd+C', true); });
 }
 
-var EMAIL_TPL_TYPES = ['confirmation', 'reminder', 'cancelled', 'rescheduled', 'turn-soon', 'closure'];
+var EMAIL_TPL_TYPES = ['confirmation', 'reminder', 'cancelled', 'rescheduled', 'turn-soon', 'signup', 'closure'];
 
 /* Textes d'origine de l'app (identiques aux emails envoyes quand rien n'est personnalise). Affiches DANS les champs : on les modifie directement.
    Un texte laisse identique a l'original est enregistre vide : l'app continue d'utiliser son message d'origine (et ses futures ameliorations). */
@@ -9976,6 +9985,10 @@ var EMAIL_TPL_DEFAULTS = {
   'turn-soon': {
     subject: 'Votre tour approche',
     body: "Bonjour {{client_name}},\n\nVotre tour est estimé dans environ {{wait_min}} minutes.\nMerci de revenir vers le salon d'ici là.\n\n{{salon}}"
+  },
+  signup: {
+    subject: 'Confirmez votre adresse email — {{salon}}',
+    body: "Bienvenue ! Cliquez sur ce lien pour confirmer votre adresse email et activer votre compte chez {{salon}} (valable 24 heures) :\n\n{{verify_url}}\n\nSi vous n'êtes pas à l'origine de cette inscription, ignorez simplement cet email."
   },
   closure: {
     subject: 'Fermeture exceptionnelle — {{salon}}',
@@ -10047,6 +10060,10 @@ function saveEmailTemplates() {
     });
   });
   if (bad) { toast('Jeton inconnu : ' + bad + '. Utilisez les pastilles pour insérer les jetons.', true); return; }
+  // Sans le lien, le client ne pourrait pas activer son compte.
+  if (document.getElementById('tpl-signup-body').value.trim() && document.getElementById('tpl-signup-body').value.indexOf('{{verify_url}}') === -1) {
+    toast('Création de compte : gardez {{verify_url}} dans le message (c\'est le lien qui active le compte).', true); return;
+  }
   api('/api/settings', { method: 'PUT', body: body })
     .then(function () { toast('Modèles enregistrés'); })
     .catch(function (e) { toast(e.message, true); });
@@ -10058,6 +10075,7 @@ var EMAIL_TPL_LABELS = {
   cancelled: 'Annulation par le salon',
   rescheduled: "Déplacement d'un RDV",
   'turn-soon': 'Tour approche (file sans RDV)',
+  signup: 'Création de compte client',
   closure: 'Fermeture exceptionnelle du salon'
 };
 

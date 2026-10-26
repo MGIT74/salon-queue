@@ -353,6 +353,24 @@ async function sendAppointmentRescheduled(salonId, to, info) {
 
 async function sendClientVerificationEmail(salonId, to, verifyUrl, options = {}) {
   const { tx, from, salon } = await getTransport(salonId, { force: true });
+  // Création de compte : texte modifiable (Réglages > Notifications email). Le lien est TOUJOURS présent :
+  // sans lui le client ne pourrait jamais activer son compte (ajouté à la fin si le modèle l'a retiré).
+  const s = options.change ? {} : await getSettings(salonId);
+  if (s.email_tpl_signup_subject || s.email_tpl_signup_body) {
+    const tokens = { salon, verify_url: verifyUrl };
+    const defaultBody = `Bienvenue ! Cliquez sur ce lien pour confirmer votre adresse email et activer votre compte chez {{salon}} (valable 24 heures) :\n\n{{verify_url}}\n\nSi vous n'êtes pas à l'origine de cette inscription, ignorez simplement cet email.`;
+    let body = s.email_tpl_signup_body || defaultBody;
+    if (body.indexOf('{{verify_url}}') === -1) body += '\n\n{{verify_url}}';
+    const link = `<a href="${h(verifyUrl)}">${h(verifyUrl)}</a>`;
+    await tx.sendMail({
+      from,
+      to,
+      subject: applyTemplate(s.email_tpl_signup_subject || 'Confirmez votre adresse email — {{salon}}', tokens),
+      text: applyTemplate(body, tokens),
+      html: applyTemplate(body, Object.assign(escTokens(tokens), { verify_url: link })).replace(/\n/g, '<br>')
+    });
+    return;
+  }
   await tx.sendMail({
     from,
     to,
