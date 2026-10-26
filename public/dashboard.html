@@ -162,6 +162,8 @@
   .dash-gauge-label { font-size: 11.5px; color: var(--grey); }
 
   .dash-card-list { overflow: hidden; }
+  /* Prochains RDV : tous les RDV à venir, la liste défile dans la carte (hauteur d'environ 5 lignes). */
+  #dash-rdv-list { max-height: 290px; overflow-y: auto; overscroll-behavior: contain; margin-right: -8px; padding-right: 8px; }
   .dash-rdv-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--sep); }
   .dash-rdv-row:last-child { border-bottom: none; }
   .dash-rdv-ic {
@@ -1697,10 +1699,10 @@
     </div>
 
     <div class="dash-pills">
-      <div class="dash-pill"><span class="dash-pill-dot" style="background:var(--blue)"></span>En attente <b id="dash-pill-wait">0</b></div>
-      <div class="dash-pill"><span class="dash-pill-dot" style="background:var(--green)"></span>Occupation <b id="dash-pill-occ">0 %</b></div>
-      <div class="dash-pill"><span class="dash-pill-dot" style="background:var(--orange)"></span>Au fauteuil <b id="dash-pill-active">0</b></div>
-      <div class="dash-pill"><span class="dash-pill-dot" style="background:var(--ink)"></span>Encaissé aujourd'hui <b id="dash-pill-rev">0,00 €</b></div>
+      <div class="dash-pill" title="Clients qui ont créé leur compte et confirmé leur email"><span class="dash-pill-dot" style="background:var(--blue)"></span>Comptes clients <b id="dash-pill-accounts">–</b></div>
+      <div class="dash-pill" title="Cartes de fidélité activées"><span class="dash-pill-dot" style="background:var(--green)"></span>Cartes fidélité actives <b id="dash-pill-loyalty">–</b></div>
+      <div class="dash-pill" title="Cartes cadeaux vendues, pas encore utilisées"><span class="dash-pill-dot" style="background:var(--orange)"></span>Cartes cadeaux en cours <b id="dash-pill-gifts">–</b></div>
+      <div class="dash-pill" title="Clients venus ou ayant réservé sans compte client"><span class="dash-pill-dot" style="background:var(--grey)"></span>Clients sans compte <b id="dash-pill-noaccount">–</b></div>
     </div>
 
     <!-- Filtre de période GLOBAL du tableau de bord (même sélecteur que la fiche de chaque coiffeur) :
@@ -3484,9 +3486,13 @@ function loadDashboardTab() {
 
   document.getElementById('dash-kpi-barbers').textContent = onDuty;
   updateLeaveKpi();
-  document.getElementById('dash-pill-wait').textContent = waitingCount;
-  document.getElementById('dash-pill-occ').textContent = occupancy + ' %';
-  document.getElementById('dash-pill-active').textContent = activeCount;
+  // Chiffres « clientèle » (comptes, fidélité, cadeaux, sans compte).
+  api('/api/owner/client-stats').then(function (r) {
+    document.getElementById('dash-pill-accounts').textContent = r.accounts;
+    document.getElementById('dash-pill-loyalty').textContent = r.loyalty;
+    document.getElementById('dash-pill-gifts').textContent = r.gifts;
+    document.getElementById('dash-pill-noaccount').textContent = r.without_account;
+  }).catch(function () {});
 
   document.getElementById('dash-catalog-list').innerHTML = [
     { label: 'Prestations', count: services.length, tab: 'services' },
@@ -3515,9 +3521,6 @@ function loadDashboardTab() {
   document.getElementById('dash-gauge-label').textContent = waitingCount > 1 ? 'en attente' : 'en attente';
   }
 
-  api('/api/queue/stats/today').then(function (r) {
-    document.getElementById('dash-pill-rev').textContent = eur(r.revenue_cents);
-  }).catch(function () {});
 
   loadDashSalon();   // filtre global : courbe « Encaissé du salon » + manque à gagner
 
@@ -3553,7 +3556,7 @@ function loadDashboardTab() {
 
     document.getElementById('dash-rdv-list').innerHTML = items.length === 0
       ? '<div class="empty">Aucun rendez-vous à venir</div>'
-      : items.slice(0, 5).map(function (a) {
+      : items.map(function (a) {   // tous les RDV à venir : la liste défile dans la carte
           var when = new Date(a.scheduled_at.replace(' ', 'T')).toLocaleString('fr-FR', {
             day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
           });

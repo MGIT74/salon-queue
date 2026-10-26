@@ -173,4 +173,5 @@ node tests/caisse/139-poste-tiroir-rdv.js  # Poste : tiroir a droite au clic sur
 node tests/caisse/140-encaissement-groupe.js  # Caisse : encaissement groupe (groupe de RDV, client qui paie pour un autre)
 node tests/caisse/141-dashboard-couleurs-coiffeurs.js  # Dashboard : planning du jour aux couleurs choisies dans Coiffeurs (meme apres rafraichissement)
 node tests/caisse/142-email-creation-compte.js  # Reglages : email de creation de compte client modifiable
+node tests/caisse/143-dashboard-clientele.js  # Dashboard : chiffres clientele (comptes, fidelite, cadeaux, sans compte) + prochains RDV qui defilent
 ```

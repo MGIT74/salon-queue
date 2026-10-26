@@ -161,6 +161,36 @@ router.put('/barbers/:id/salon', requireAdmin, wrap(async (req, res) => {
 }));
 
 // --- Clients : tous les salons de l'enseigne, ou un seul ------------------
+/**
+ * Dashboard : 4 chiffres « clientèle » du salon ouvert.
+ * - accounts       : comptes clients créés et confirmés (email vérifié) ;
+ * - loyalty        : cartes de fidélité activées ;
+ * - gifts          : cartes cadeaux en cours (ni utilisées, ni annulées) ;
+ * - without_account: clients venus au salon ou ayant réservé, sans compte client (même clé client que la fidélité :
+ *                    email, sinon téléphone, sinon nom ; un client dont l'email a un compte n'est pas compté).
+ */
+router.get('/client-stats', requireAdmin, wrap(async (req, res) => {
+  const sid = req.salon.id;
+  const [[acc]] = await pool.query('SELECT COUNT(*) AS n FROM clients WHERE salon_id = ? AND email_verified = 1', [sid]);
+  const [[loy]] = await pool.query('SELECT COUNT(*) AS n FROM loyalty_accounts WHERE salon_id = ? AND activated_at IS NOT NULL', [sid]);
+  const [[gif]] = await pool.query('SELECT COUNT(*) AS n FROM gift_cards WHERE salon_id = ? AND used_at IS NULL AND voided_at IS NULL', [sid]);
+  const [accEmails] = await pool.query('SELECT LOWER(TRIM(email)) AS e FROM clients WHERE salon_id = ?', [sid]);
+  const withAccount = new Set(accEmails.map((r) => r.e).filter(Boolean));
+  const [people] = await pool.query(
+    `SELECT client_name, email, phone FROM queue WHERE salon_id = ?
+     UNION SELECT client_name, email, phone FROM appointments WHERE salon_id = ?`,
+    [sid, sid]
+  );
+  const without = new Set();
+  people.forEach((p) => {
+    const email = String(p.email || '').trim().toLowerCase();
+    if (email && withAccount.has(email)) return;
+    const key = clientKey(p);
+    if (key) without.add(key);
+  });
+  res.json({ ok: true, accounts: Number(acc.n), loyalty: Number(loy.n), gifts: Number(gif.n), without_account: without.size });
+}));
+
 router.get('/clients', requireAdmin, wrap(async (req, res) => {
   const salonFilter = req.query.salon; // absent ou 'all' => tous les salons
 
