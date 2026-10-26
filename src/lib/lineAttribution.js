@@ -6,7 +6,7 @@
  * viennent de la file d'attente (queue.barber_id = le coiffeur du passage) : on y applique donc des TRANSFERTS pour les lignes
  * dont le vendeur est un AUTRE coiffeur que celui du passage. Rien n'est compté deux fois : ce qui est retiré à l'un est ajouté à l'autre.
  *
- * Périmètre : uniquement les ventes liées à un passage (sales.queue_id), seules à entrer dans ces statistiques de base.
+ * Périmètre : uniquement les ventes liées à un passage (sales.queue_id, ou sale_items.queue_id pour un ticket groupé), seules à entrer dans ces statistiques de base.
  * Période : la même que les statistiques de base (queue.end_at), pour que les chiffres restent cohérents.
  */
 
@@ -33,7 +33,7 @@ async function serviceLineTransfers(db, salonId, range) {
             COALESCE(SUM(si.unit_price_cents * si.quantity), 0) AS cents
      FROM sale_items si
      JOIN sales s ON s.id = si.sale_id
-     JOIN queue q ON q.id = s.queue_id AND q.status = 'done'
+     JOIN queue q ON q.id = COALESCE(si.queue_id, s.queue_id) AND q.status = 'done'
      LEFT JOIN barbers fb ON fb.id = q.barber_id
      LEFT JOIN barbers tb ON tb.id = si.barber_id
      WHERE s.salon_id = ? AND si.item_type IN ('service', 'extra') AND si.barber_id IS NOT NULL

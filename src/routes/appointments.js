@@ -18,6 +18,7 @@ const { wrap } = require('../lib/wrap');
 const groupBooking = require('../lib/groupBooking');
 const { loadCatalog, offerFor, resolveOffer } = require('../lib/barberOffer');
 const { serviceLabel, serviceNameSql } = require('../lib/extrasOnly');
+const { saleForPassage } = require('../lib/salePassage');
 
 const router = express.Router();
 
@@ -898,7 +899,7 @@ router.post('/cancel-group', wrap(async (req, res) => {
     const minutesUntil = (new Date(scheduledLocal.replace(' ', 'T') + 'Z') - nowMs) / 60000;
     if (minutesUntil <= 0) { kept++; continue; }
     if (m.promoted_queue_id) {
-      const [[paid]] = await pool.query('SELECT id FROM sales WHERE salon_id = ? AND queue_id = ? LIMIT 1', [m.salon_id, m.promoted_queue_id]);
+      const paid = await saleForPassage(pool, m.salon_id, m.promoted_queue_id);
       if (paid) { kept++; continue; }
     }
     if (deadlineMin > 0 && minutesUntil < deadlineMin) { kept++; continue; }
@@ -1138,10 +1139,7 @@ router.post('/cancel', wrap(async (req, res) => {
   if (!appt) return res.status(404).json({ error: 'Rendez-vous introuvable' });
   if (appt.status !== 'confirmed') return res.status(409).json({ error: 'Ce rendez-vous ne peut plus être annulé en ligne. Contactez le salon.' });
   if (appt.promoted_queue_id) {
-    const [[paid]] = await pool.query(
-      'SELECT id FROM sales WHERE salon_id = ? AND queue_id = ? LIMIT 1',
-      [appt.salon_id, appt.promoted_queue_id]
-    );
+    const paid = await saleForPassage(pool, appt.salon_id, appt.promoted_queue_id);
     if (paid) return res.status(409).json({ error: 'Ce rendez-vous a déjà été encaissé. Contactez le salon pour gérer son annulation et un éventuel remboursement.' });
   }
 
@@ -1198,10 +1196,7 @@ router.post('/:id/admin-cancel', requireAdminOrBarber, wrap(async (req, res) => 
   }
 
   if (appt.promoted_queue_id) {
-    const [[paid]] = await pool.query(
-      'SELECT id FROM sales WHERE salon_id = ? AND queue_id = ? LIMIT 1',
-      [req.salon.id, appt.promoted_queue_id]
-    );
+    const paid = await saleForPassage(pool, req.salon.id, appt.promoted_queue_id);
     if (paid) return res.status(409).json({ error: 'Rendez-vous encaissé : une annulation nécessite une procédure de remboursement.' });
   }
 
@@ -1260,10 +1255,7 @@ router.put('/:id/reschedule', requireAdminOrBarber, wrap(withBookingLock(async (
   }
 
   if (appt.promoted_queue_id) {
-    const [[paid]] = await pool.query(
-      'SELECT id FROM sales WHERE salon_id = ? AND queue_id = ? LIMIT 1',
-      [req.salon.id, appt.promoted_queue_id]
-    );
+    const paid = await saleForPassage(pool, req.salon.id, appt.promoted_queue_id);
     if (paid) return res.status(409).json({ error: 'Rendez-vous encaissé : déplacement interdit.' });
   }
 

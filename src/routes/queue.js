@@ -11,6 +11,7 @@ const requireAdminOrBarber = require('../middleware/barberAuth');
 const { logActivity } = require('../lib/activityLog');
 const { wrap } = require('../lib/wrap');
 const { resolveServiceId } = require('../lib/extrasOnly');
+const { PASSAGE_OF_LINE, saleForPassage, passageCountOfSale } = require('../lib/salePassage');
 const { isBlocked, recordFailure, recordSuccess, signupRateLimiter } = require('../middleware/rateLimiter');
 
 const router = express.Router();
@@ -125,9 +126,9 @@ async function withPrepaidBalance(rows) {
   const prepaid = rows.filter((r) => r.prepaid_at);
   if (!prepaid.length) return rows;
   const [paidLines] = await pool.query(
-    `SELECT s.queue_id, si.item_type, si.item_id, si.unit_price_cents, si.quantity FROM sales s
+    `SELECT ${PASSAGE_OF_LINE} AS queue_id, si.item_type, si.item_id, si.unit_price_cents, si.quantity FROM sales s
      JOIN sale_items si ON si.sale_id = s.id
-     WHERE s.queue_id IN (?) AND si.item_type IN ('service', 'extra')`,
+     WHERE ${PASSAGE_OF_LINE} IN (?) AND si.item_type IN ('service', 'extra')`,
     [prepaid.map((r) => r.id)]
   );
   const settled = [];
@@ -161,7 +162,18 @@ async function withPrepaidBalance(rows) {
 router.get('/pending-payment', requireAdminOrBarber, wrap(async (req, res) => {
   let rows = await loadQueue(req.salon.id, ['done'], 'pending');
   rows = await withPrepaidBalance(rows);
-  if (req.actingBarberId) rows = rows.filter((r) => r.barber_id === req.actingBarberId);
+  // all=1 : tout le salon (encaissement groupé : le payeur peut régler le client d'un autre coiffeur).
+  if (req.actingBarberId && req.query.all !== '1') rows = rows.filter((r) => r.barber_id === req.actingBarberId);
+  // Groupe de RDV (pris ensemble) : même group_id, pour proposer « Encaisser tout le groupe ».
+  if (rows.length) {
+    const [grp] = await pool.query(
+      'SELECT promoted_queue_id, group_id FROM appointments WHERE salon_id = ? AND group_id IS NOT NULL AND promoted_queue_id IN (?)',
+      [req.salon.id, rows.map((r) => r.id)]
+    );
+    const groupOf = {};
+    grp.forEach((g) => { groupOf[g.promoted_queue_id] = g.group_id; });
+    rows = rows.map((r) => Object.assign({}, r, { group_id: groupOf[r.id] || null }));
+  }
   rows = await attachGiftInfo(rows, req.salon.id);
 
   // Fidélité : cumulée au niveau du SALON, pas de toute l'enseigne -
@@ -239,7 +251,7 @@ router.delete('/:id/unpaid', requireAdminOrBarber, wrap(async (req, res) => {
       ? 'Ce client a déjà payé (en totalité ou d\'avance) : impossible de le supprimer, faites plutôt un remboursement.'
       : 'Seul un passage terminé et en attente d\'encaissement peut être supprimé.' });
   }
-  const [[sale]] = await pool.query('SELECT id FROM sales WHERE queue_id = ? AND salon_id = ? LIMIT 1', [row.id, req.salon.id]);
+  const sale = await saleForPassage(pool, req.salon.id, row.id);
   if (sale) return res.status(409).json({ error: 'Une vente est déjà liée à ce passage : impossible de le supprimer, faites plutôt un remboursement.' });
 
   const [appts] = await pool.query('SELECT id FROM appointments WHERE promoted_queue_id = ? AND salon_id = ?', [row.id, req.salon.id]);
@@ -733,10 +745,7 @@ router.put('/:id', requireAdminOrBarber, wrap(async (req, res) => {
   }
 
   const { service_id, extras, barber_id, client_name, email, phone } = req.body;
-  const [[paidSale]] = await pool.query(
-    'SELECT id FROM sales WHERE salon_id = ? AND queue_id = ? LIMIT 1',
-    [req.salon.id, req.params.id]
-  );
+  const paidSale = await saleForPassage(pool, req.salon.id, req.params.id);
   // Exception : un client payé D'AVANCE et pas encore terminé peut recevoir un supplément pendant sa coupe ;
   // la différence est réglée à la fin (« reste à payer », cf. sales.js balance).
   const prepaidOpen = existing.prepaid_at && !existing.balance_paid_at && (existing.status === 'waiting' || existing.status === 'in_progress');
@@ -1057,10 +1066,11 @@ router.delete('/:id', requireAdmin, wrap(async (req, res) => {
   // une cloture passee (ticket Z deja imprime, figE), on refuse : les
   // chiffres d'une periode cloturee ne doivent plus jamais changer
   // retroactivement (conformite legale des logiciels de caisse).
-  const [[sale]] = await pool.query(
-    'SELECT id, total_price_cents, created_at FROM sales WHERE queue_id = ? AND salon_id = ?',
-    [req.params.id, req.salon.id]
-  );
+  const sale = await saleForPassage(pool, req.salon.id, req.params.id);
+  // Ticket groupé (une vente pour plusieurs personnes) : supprimer une seule fiche effacerait la vente des autres.
+  if (sale && (sale.queue_id !== req.params.id || await passageCountOfSale(pool, sale.id) > 1)) {
+    return res.status(409).json({ error: 'Impossible de supprimer : ce passage a été réglé dans un ticket groupé (une seule vente pour plusieurs personnes).' });
+  }
   if (sale) {
     const [[closedPeriod]] = await pool.query(
       'SELECT id FROM cash_closings WHERE salon_id = ? AND period_end > ? LIMIT 1',

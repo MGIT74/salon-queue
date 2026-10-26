@@ -53,6 +53,10 @@ const MAX_UNIT_PRICE_CENTS = 10_000_000; // 100 000 €
 
 router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
   const { payment_method, items, queue_id, gift, loyalty_redeem } = req.body;
+  // Encaissement groupé : passages réglés EN PLUS de celui du payeur (groupe de RDV, client qui paie pour un autre).
+  const groupIds = Array.isArray(req.body.group_queue_ids)
+    ? [...new Set(req.body.group_queue_ids.filter((x) => typeof x === 'string' && x && x !== queue_id).map((x) => x.slice(0, 36)))]
+    : [];
   const clientRequestId = (typeof req.body.client_request_id === 'string' && /^[0-9a-fA-F-]{16,64}$/.test(req.body.client_request_id))
     ? req.body.client_request_id : null;
 
@@ -66,6 +70,12 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
   if (items.length > 100) {
     return res.status(400).json({ error: 'Ticket trop long (100 lignes maximum)' });
   }
+  if (groupIds.length) {
+    if (!queue_id) return res.status(400).json({ error: 'Encaissement groupé : le client qui paie est requis.' });
+    if (req.body.balance || gift) return res.status(400).json({ error: 'Encaissement groupé impossible pour un reste à payer ou un cadeau.' });
+    if (groupIds.length > 20) return res.status(400).json({ error: 'Encaissement groupé : 20 personnes maximum.' });
+  }
+  const linePassages = new Set([queue_id].concat(groupIds));
 
   // Un ticket "cadeau" ne peut pas venir d'un encaissement en attente
   // (ça n'aurait pas de sens : un client déjà en train de se faire
@@ -109,7 +119,9 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
       item_name: String(it.item_name || 'Article').slice(0, 255),
       unit_price_cents: unitPrice,
       quantity: qty,
-      barber_id: typeof it.barber_id === 'string' ? it.barber_id : null
+      barber_id: typeof it.barber_id === 'string' ? it.barber_id : null,
+      // Ticket groupé : la personne (passage) de cette ligne - seulement l'un des passages réglés par ce ticket.
+      queue_id: groupIds.length && typeof it.queue_id === 'string' && linePassages.has(it.queue_id) ? it.queue_id : null
     });
   }
 
@@ -185,6 +197,26 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
         queueRow = row;
       }
 
+      // 2 bis. Encaissement groupé : chaque autre personne doit être terminée, pas encore réglée, sans cadeau.
+      // Caisse partagée : un client d'un autre coiffeur peut être réglé ici (le payeur règle pour lui).
+      const groupRows = [];
+      if (groupIds.length && queueRow && queueRow.status !== 'done') throw new HttpError(409, 'Encaissement groupé : seulement des clients dont la prestation est terminée.');
+      for (const gid of groupIds) {
+        const [[g]] = await db.query(
+          'SELECT id, status, paid_at, gift_card_id, client_name, email, phone FROM queue WHERE id = ? AND salon_id = ? FOR UPDATE',
+          [gid, req.salon.id]
+        );
+        if (!g) throw new HttpError(404, 'Un des clients du ticket groupé est introuvable.');
+        if (g.status !== 'done') throw new HttpError(409, g.client_name + " : prestation pas encore terminée, impossible de l'encaisser avec le groupe.");
+        if (g.gift_card_id) throw new HttpError(409, g.client_name + ' vient avec un cadeau : il est réglé par son cadeau.');
+        const [mark] = await db.query(
+          'UPDATE queue SET paid_at = NOW(), prepaid_at = NULL WHERE id = ? AND salon_id = ? AND paid_at IS NULL',
+          [gid, req.salon.id]
+        );
+        if (mark.affectedRows === 0) throw new HttpError(409, g.client_name + " vient d'être encaissé (probablement par un autre appareil).");
+        groupRows.push(g);
+      }
+
       // 3. Coiffeur de la vente. Un id venant du corps de la requête doit
       // appartenir à CE salon (sinon on ignorerait silencieusement une
       // référence vers le coiffeur d'un autre salon).
@@ -252,7 +284,7 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
         total += it.quantity * it.unit_price_cents;
         it.vat_rate = rateForItem(vatList, vatIdByItem[it.item_type + ':' + it.item_id]);
         const lineBarberId = it.barber_id && validLineBarberIds.has(it.barber_id) ? it.barber_id : null;
-        return [crypto.randomUUID(), saleId, it.item_type, it.item_id, it.item_name, it.unit_price_cents, it.quantity, lineBarberId, it.vat_rate];
+        return [crypto.randomUUID(), saleId, it.item_type, it.item_id, it.item_name, it.unit_price_cents, it.quantity, lineBarberId, it.vat_rate, it.queue_id];
       });
       // Paiement partagé : la part en espèces doit être strictement entre 0 et le total (le reste = carte).
       let cashCents = null;
@@ -267,7 +299,7 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
         [saleId, req.salon.id, barberId, payment_method, total, cashCents, ticketNumber, queue_id || null, clientRequestId]
       );
       await db.query(
-        'INSERT INTO sale_items (id, sale_id, item_type, item_id, item_name, unit_price_cents, quantity, barber_id, vat_rate) VALUES ?',
+        'INSERT INTO sale_items (id, sale_id, item_type, item_id, item_name, unit_price_cents, quantity, barber_id, vat_rate, queue_id) VALUES ?',
         [itemRows]
       );
 
@@ -298,7 +330,7 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
       return {
         duplicate: false,
         sale: { id: saleId, total_price_cents: total, payment_method, cash_cents: cashCents, barber_id: barberId, ticket_number: ticketNumber },
-        queueRow, giftInfo, balanceSale
+        queueRow, groupRows, giftInfo, balanceSale
       };
     });
   } catch (err) {
@@ -324,6 +356,8 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
   if (outcome.queueRow && !outcome.balanceSale) {
     // Ce passage vient d'être réellement payé : +1 point de fidélité.
     await earnLoyaltyPoint(req.salon.id, outcome.queueRow);
+    // Ticket groupé : chaque personne réglée garde son point de passage.
+    for (const g of outcome.groupRows || []) await earnLoyaltyPoint(req.salon.id, g);
     // Une récompense de fidélité était appliquée à ce ticket (gagnée à
     // un passage précédent) — on la consomme maintenant.
     // Remise prestation OU produit : retire les points du palier correspondant (s'il est bien atteint).
@@ -405,7 +439,9 @@ router.get('/', requireAdminOrBarber, wrap(async (req, res) => {
   const ids = sales.map((s) => s.id);
   let itemsBySale = {};
   if (ids.length) {
-    const [items] = await pool.query('SELECT * FROM sale_items WHERE sale_id IN (?)', [ids]);
+    // Ticket groupé : nom de la personne de chaque ligne (person_name), pour le réimprimer à l'identique.
+    const [items] = await pool.query(
+      'SELECT si.*, q.client_name AS person_name FROM sale_items si LEFT JOIN queue q ON q.id = si.queue_id WHERE si.sale_id IN (?)', [ids]);
     items.forEach((it) => { (itemsBySale[it.sale_id] = itemsBySale[it.sale_id] || []).push(it); });
   }
 

@@ -1441,3 +1441,12 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 SET @sql := IF(@c < 60, 'ALTER TABLE sale_items MODIFY item_id VARCHAR(60) NULL', 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 SET FOREIGN_KEY_CHECKS = 1;
+
+-- Encaissement groupe : une vente peut regler plusieurs passages (groupe de RDV, client qui paie pour un autre).
+-- sale_items.queue_id = le passage de la personne pour qui est cette ligne (NULL = celui de la vente, sales.queue_id).
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'sale_items' AND column_name = 'queue_id');
+SET @sql := IF(@c = 0, "ALTER TABLE sale_items ADD COLUMN queue_id CHAR(36) NULL", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @idx := (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'sale_items' AND index_name = 'idx_sale_items_queue');
+SET @sql := IF(@idx = 0, 'CREATE INDEX idx_sale_items_queue ON sale_items(queue_id)', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;

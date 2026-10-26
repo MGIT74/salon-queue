@@ -480,6 +480,13 @@
   .appt-drawer-head h2 { font-size: 21px; margin: 0; letter-spacing: -.02em; }
   .appt-drawer .x { background: var(--fill); border: none; width: 32px; height: 32px; border-radius: 50%; color: var(--grey); font-size: 15px; cursor: pointer; flex-shrink: 0; }
   .appt-drawer-section { margin-bottom: 22px; }
+  .ticket-person { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 10px 0 0; padding: 6px 10px; border-radius: 9px; background: var(--fill); font-size: 12.5px; font-weight: 700; }
+  .ticket-person:first-child { margin-top: 0; }
+  .ticket-person .who-pays { font-weight: 600; color: var(--green); }
+  .ticket-person .x { border: none; background: none; color: var(--grey); font-size: 14px; cursor: pointer; padding: 0 2px; }
+  .ticket-group-add { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; margin: 0 0 12px; padding: 9px 12px; border-radius: 10px; border: 1px dashed var(--sep); background: none; color: var(--accent); font: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; }
+  .pending-group.solo { margin: 3px 0 2px; white-space: nowrap; }
+  .pending-group { display: inline-block; font-size: 11.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--blue-soft); color: var(--accent); margin-left: 6px; vertical-align: middle; }
   .ticket-mode { margin: 10px 0 0; padding: 8px 12px; border-radius: 10px; background: var(--fill); color: var(--green); font-size: 13px; font-weight: 600; }
   .advance-pick { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; text-align: left; padding: 12px 14px; margin-bottom: 8px; border-radius: 12px; border: 1px solid var(--sep); background: var(--card); color: var(--ink); font: inherit; cursor: pointer; }
   .advance-pick .meta { font-size: 13px; color: var(--grey); margin-top: 2px; }
@@ -808,6 +815,7 @@
         </div>
         <div id="ticket-mode" class="ticket-mode" style="display:none"></div>
         <div class="ticket-lines" id="ticket-lines"><div class="empty">Aucun article sélectionné</div></div>
+        <button type="button" class="ticket-group-add" id="ticket-group-add" style="display:none" onclick="openGroupPayPicker()">+ Payer aussi pour un autre client</button>
         <div class="ticket-total"><span class="label">Total</span><span class="amount" id="ticket-total">0,00 €</span></div>
 
         <div id="loyalty-section" style="display:none;margin-bottom:14px">
@@ -1024,6 +1032,10 @@ var ticket = []; // { item_type, item_id, item_name, unit_price_cents, quantity 
 var ticketQueueId = null; // coupe d'origine si le ticket vient d'un encaissement en attente
 // 'advance' : client encore dans la file, réglé avant sa coupe ; 'balance' : reste à payer (supplément ajouté après un paiement d'avance).
 var ticketMode = null;
+// Encaissement groupé : autres personnes réglées par CE ticket (groupe de RDV, ou client qui paie pour un autre).
+// [{ id (passage), client_name }]. Leurs lignes portent person / person_name ; celles du payeur n'en ont pas.
+var ticketGroup = [];
+var pendingAll = [];   // « En attente d'encaissement » de TOUT le salon (pour ajouter le client d'un autre coiffeur)
 var ticketModeName = '';
 var ticketDrafts = {}; // { [barberId]: { ticket, ticketQueueId, loyaltyDiscount, loyaltyRewardsAvailable } } - brouillon du ticket en cours de chaque coiffeur, gardé le temps de la session tablette (en mémoire, pas côté serveur)
 var loyaltyRewardsAvailable = null; // remises fidélité débloquées pour le client du ticket : { service: bool, product: bool } (chacune a son propre palier de points)
@@ -1484,6 +1496,7 @@ function saveTicketDraft(barberId) {
   ticketDrafts[barberId] = {
     ticket: ticket,
     ticketQueueId: ticketQueueId,
+    ticketGroup: ticketGroup,
     ticketMode: ticketMode,
     ticketModeName: ticketModeName,
     loyaltyDiscount: loyaltyDiscount,
@@ -1499,6 +1512,7 @@ function loadTicketDraft(barberId) {
   var draft = barberId ? ticketDrafts[barberId] : null;
   ticket = draft ? draft.ticket : [];
   ticketQueueId = draft ? draft.ticketQueueId : null;
+  ticketGroup = draft ? (draft.ticketGroup || []) : [];
   ticketMode = draft ? (draft.ticketMode || null) : null;
   ticketModeName = draft ? (draft.ticketModeName || '') : '';
   loyaltyDiscount = draft ? draft.loyaltyDiscount : null;
@@ -3569,8 +3583,12 @@ function applyCatView() {
  * suivre" dans Mon poste.
  */
 function loadPendingPayments() {
-  barberApi('/api/queue/pending-payment').then(function (r) {
-    pendingPayments = r.items;
+  Promise.all([
+    barberApi('/api/queue/pending-payment'),
+    barberApi('/api/queue/pending-payment?all=1').catch(function () { return { items: [] }; })
+  ]).then(function (r) {
+    pendingPayments = r[0].items;
+    pendingAll = r[1].items || [];
     renderPendingList();
   }).catch(function () {});
 }
@@ -3667,15 +3685,20 @@ function renderPendingList() {
       : '';
     var explicitGift = Boolean(q.gift_card && q.gift_card.explicit);
     var displayAmount = explicitGift ? q.gift_card.amount_cents : q.total_price_cents;
+    var mates = explicitGift ? [] : groupMatesOf(q);
     return '<div class="pending-card' + (isActive ? '' : ' locked') + '"' +
       (isActive && !explicitGift ? ' onclick="usePendingForTicket(\'' + q.id + '\')"' : '') + '>' +
       '<div><div class="name">' + esc(q.client_name) + '</div>' +
+      (mates.length ? '<span class="pending-group solo">Groupe · ' + (mates.length + 1) + ' personnes</span>' : '') +
       '<div class="meta">' + esc(detail) + '</div>' +
       (isActive ? giftNote + loyaltyNote : '<div class="lock-note">En attente de son tour</div>') + '</div>' +
       '<div class="pending-actions">' +
         '<span class="amount">' + eur(displayAmount) + '</span>' +
         (isActive && explicitGift
           ? '<button class="btn btn-primary" onclick="event.stopPropagation();useGiftCard(\'' + q.gift_card.id + '\',\'' + q.id + '\')">Utiliser le cadeau</button>'
+          : '') +
+        (isActive && mates.length
+          ? '<button class="btn btn-primary" onclick="event.stopPropagation();usePendingGroupForTicket(\'' + q.id + '\')">Encaisser le groupe (' + (mates.length + 1) + ')</button>'
           : '') +
         (isActive && !q.loyalty_member
           ? '<button class="btn btn-ghost" onclick="event.stopPropagation();proposeLoyaltyActivation(\'' + q.id + '\')">Activer carte de fidélité</button>'
@@ -3768,7 +3791,115 @@ function ticketServiceLine(q, doneBy) {
   return [{ item_type: 'service', item_id: s.id, item_name: s.name, unit_price_cents: s.price_cents, quantity: 1, barber_id: doneBy }];
 }
 
-function usePendingForTicket(queueId) {
+/** Lignes du ticket d'un passage en attente : prestation (sauf « supplément seul »), suppléments, produits réservés. */
+function pendingTicketLines(q, doneBy) {
+  var lines = ticketServiceLine(q, doneBy);
+  (q.extras || []).forEach(function (e) {
+    lines.push({ item_type: 'extra', item_id: e.id, item_name: e.name, unit_price_cents: e.price_cents, quantity: 1, barber_id: doneBy });
+  });
+  (q.products || []).forEach(function (p) {
+    lines.push({ item_type: 'product', item_id: p.id, item_name: p.name, unit_price_cents: p.price_cents, quantity: p.quantity });
+  });
+  return lines;
+}
+
+/* ---------- Encaissement groupé ----------
+   Un seul ticket et un seul paiement pour plusieurs personnes : tout un groupe de RDV, ou un client qui paie pour
+   un autre (même client d'un autre coiffeur). Chaque ligne garde son coiffeur (CA de chacun juste) et sa personne
+   (reçu détaillé, point de fidélité de chacun). Exclus : cadeau, paiement d'avance / reste à payer. */
+function groupPayEligible(q) {
+  return Boolean(q && !q.prepaid && !(q.gift_card && q.gift_card.explicit));
+}
+
+function ticketPersonIds() {
+  return [ticketQueueId].concat(ticketGroup.map(function (g) { return g.id; }));
+}
+
+/** Autres personnes encore à encaisser du même groupe de RDV que ce passage. */
+function groupMatesOf(q) {
+  if (!q || !q.group_id) return [];
+  return pendingAll.filter(function (x) { return x.id !== q.id && x.group_id === q.group_id && groupPayEligible(x); });
+}
+
+function pendingById(id) {
+  return pendingAll.find(function (x) { return x.id === id; }) || pendingPayments.find(function (x) { return x.id === id; });
+}
+
+/** Ajoute une personne au ticket en cours (le payeur reste celui chargé en premier). */
+function addPersonToTicket(queueId, silent) {
+  var q = pendingById(queueId);
+  if (!q || !ticketQueueId || ticketMode) return false;
+  if (ticketPersonIds().indexOf(q.id) !== -1) return false;
+  if (!groupPayEligible(q)) { toast(q.client_name + ' ne peut pas être ajouté (cadeau ou paiement d\'avance).', true); return false; }
+  var doneBy = q.barber_id || null;
+  pendingTicketLines(q, doneBy).forEach(function (l) {
+    l.person = q.id; l.person_name = q.client_name;
+    ticket.push(l);
+  });
+  ticketGroup.push({ id: q.id, client_name: q.client_name });
+  renderTicket();
+  if (!silent) toast(q.client_name + ' ajouté au ticket');
+  return true;
+}
+
+/** Retire une personne (et ses lignes) du ticket groupé. */
+function removePersonFromTicket(queueId) {
+  if (loyaltyDiscount && ticket[loyaltyDiscount.index] && ticket[loyaltyDiscount.index].person === queueId) loyaltyDiscount = null;
+  var payerDiscountLine = loyaltyDiscount ? ticket[loyaltyDiscount.index] : null;
+  ticket = ticket.filter(function (l) { return l.person !== queueId; });
+  if (payerDiscountLine) loyaltyDiscount.index = ticket.indexOf(payerDiscountLine);
+  ticketGroup = ticketGroup.filter(function (g) { return g.id !== queueId; });
+  renderTicket();
+}
+
+/** Une personne dont toutes les lignes ont été retirées (−) quitte le groupe. */
+function pruneTicketGroup() {
+  ticketGroup = ticketGroup.filter(function (g) { return ticket.some(function (l) { return l.person === g.id; }); });
+}
+
+/** « Encaisser tout le groupe » : charge le ticket de ce client puis ajoute les autres membres du groupe de RDV. */
+function usePendingGroupForTicket(queueId) {
+  var q = pendingPayments.find(function (x) { return x.id === queueId; });
+  if (!q) return;
+  usePendingForTicket(queueId, true);
+  var mates = groupMatesOf(q);
+  mates.forEach(function (m) { addPersonToTicket(m.id, true); });
+  toast('Ticket du groupe chargé (' + (mates.length + 1) + ' personnes) — choisissez le paiement');
+}
+
+/** « + Payer aussi pour un autre client » : tous les clients du salon en attente d'encaissement. */
+function openGroupPayPicker() {
+  if (!ticketQueueId || ticketMode) return;
+  barberApi('/api/queue/pending-payment?all=1').then(function (r) {
+    pendingAll = r.items || [];
+    var payer = pendingById(ticketQueueId);
+    var inTicket = ticketPersonIds();
+    var list = pendingAll.filter(function (x) { return inTicket.indexOf(x.id) === -1 && groupPayEligible(x); });
+    // Les membres de son groupe de RDV d'abord.
+    list.sort(function (a, b) {
+      var ga = payer && payer.group_id && a.group_id === payer.group_id ? 0 : 1, gb = payer && payer.group_id && b.group_id === payer.group_id ? 0 : 1;
+      return ga - gb;
+    });
+    var nameOf = function (id) { var b = allBarbers.find(function (x) { return x.id === id; }); return b ? b.name : ''; };
+    var html = '<div class="modal-title">Payer aussi pour…</div>' +
+      '<p class="hint" style="margin:0 0 12px">' + esc(payer ? payer.client_name : 'Ce client') + ' règle aussi la prestation de la personne choisie : un seul ticket, un seul paiement.</p>' +
+      (list.length ? list.map(function (x) {
+        var sameGroup = payer && payer.group_id && x.group_id === payer.group_id;
+        return '<button type="button" class="advance-pick" data-id="' + esc(x.id) + '">' +
+          '<span><span style="font-weight:600">' + esc(x.client_name) + '</span>' + (sameGroup ? '<span class="pending-group">Son groupe</span>' : '') +
+          '<span class="meta" style="display:block">' + esc(svcLabel(x.service.name, x.extras)) + (x.barber_id ? ' · ' + esc(nameOf(x.barber_id)) : '') + '</span></span>' +
+          '<span style="font-weight:700">' + eur(x.total_price_cents) + '</span></button>';
+      }).join('') : '<div class="empty">Aucun autre client en attente d\'encaissement.</div>') +
+      '<div class="modal-actions"><button class="btn btn-soft" id="gp-close">Fermer</button></div>';
+    var overlay = _buildModal(html);
+    overlay.querySelector('#gp-close').onclick = function () { _closeModal(overlay); };
+    Array.prototype.forEach.call(overlay.querySelectorAll('.advance-pick'), function (b) {
+      b.onclick = function () { _closeModal(overlay); addPersonToTicket(b.getAttribute('data-id')); };
+    });
+  }).catch(function (e) { toast(e.message, true); });
+}
+
+function usePendingForTicket(queueId, quiet) {
   var q = pendingPayments.find(function (x) { return x.id === queueId; });
   if (!q) return;
 
@@ -3787,11 +3918,12 @@ function usePendingForTicket(queueId) {
     ticket.push({ item_type: 'product', item_id: p.id, item_name: p.name, unit_price_cents: p.price_cents, quantity: p.quantity });
   });
   ticketQueueId = queueId;
+  ticketGroup = [];
   ticketMode = null;
   loyaltyRewardsAvailable = q.loyalty_rewards || null;
   loyaltyDiscount = null;
   renderTicket();
-  toast('Ticket de ' + q.client_name + ' chargé — choisissez le paiement');
+  if (!quiet) toast('Ticket de ' + q.client_name + ' chargé — choisissez le paiement');
 }
 
 /* ---------- Encaissement à l'avance ----------
@@ -3845,6 +3977,7 @@ function useAdvanceForTicket(queueId) {
     ticket.push({ item_type: 'product', item_id: p.id, item_name: p.name, unit_price_cents: p.price_cents, quantity: p.quantity });
   });
   ticketQueueId = queueId;
+  ticketGroup = [];
   ticketMode = 'advance';
   ticketModeName = q.client_name;
   loyaltyRewardsAvailable = q.loyalty_rewards || null;
@@ -3862,6 +3995,7 @@ function useBalanceForTicket(queueId) {
     return { item_type: l.item_type, item_id: l.item_id, item_name: l.item_name, unit_price_cents: l.unit_price_cents, quantity: l.quantity, barber_id: doneBy };
   });
   ticketQueueId = queueId;
+  ticketGroup = [];
   ticketMode = 'balance';
   ticketModeName = q.client_name;
   loyaltyRewardsAvailable = 0;
@@ -3988,7 +4122,8 @@ function addToTicket(itemType, itemId, itemName, unitPriceCents, opts) {
 function changeQty(index, delta) {
   ticket[index].quantity += delta;
   if (ticket[index].quantity <= 0) ticket.splice(index, 1);
-  if (!ticket.length) { ticketQueueId = null; ticketMode = null; }
+  pruneTicketGroup();
+  if (!ticket.length) { ticketQueueId = null; ticketMode = null; ticketGroup = []; }
   renderTicket();
 }
 
@@ -3996,6 +4131,7 @@ function clearTicket() {
   if (!ticket.length) return;
   ticket = [];
   ticketQueueId = null;
+  ticketGroup = [];
   ticketMode = null;
   renderTicket();
 }
@@ -4004,10 +4140,7 @@ function ticketTotal() {
   return ticket.reduce(function (a, l) { return a + l.unit_price_cents * l.quantity; }, 0);
 }
 
-function renderTicket(justAddedIndex) {
-  document.getElementById('ticket-lines').innerHTML = ticket.length === 0
-    ? '<div class="empty">Aucun article sélectionné</div>'
-    : ticket.map(function (l, i) {
+function ticketLineHtml(l, i, justAddedIndex) {
         return '<div class="ticket-line' + (i === justAddedIndex ? ' enter' : '') + '">' +
           lineSellerBubbleHtml(l, i) +
           '<div class="name">' + esc(l.item_name) + '</div>' +
@@ -4018,7 +4151,31 @@ function renderTicket(justAddedIndex) {
           '</div>' +
           '<div class="line-price">' + eur(l.unit_price_cents * l.quantity) + '</div>' +
           '</div>';
-      }).join('');
+}
+
+/** Ticket groupé : les lignes rangées par personne (le payeur d'abord), chaque autre personne retirable. */
+function ticketLinesHtml(justAddedIndex) {
+  if (!ticket.length) return '<div class="empty">Aucun article sélectionné</div>';
+  var all = ticket.map(function (l, i) { return { l: l, i: i }; });
+  if (!ticketGroup.length) return all.map(function (x) { return ticketLineHtml(x.l, x.i, justAddedIndex); }).join('');
+  var payer = pendingById(ticketQueueId);
+  var sum = function (rows) { return rows.reduce(function (a, x) { return a + x.l.unit_price_cents * x.l.quantity; }, 0); };
+  var mine = all.filter(function (x) { return !x.l.person || x.l.person === ticketQueueId; });
+  var html = '<div class="ticket-person"><span>' + esc(payer ? payer.client_name : 'Client') + ' <span class="who-pays">· paie</span></span><span>' + eur(sum(mine)) + '</span></div>' +
+    mine.map(function (x) { return ticketLineHtml(x.l, x.i, justAddedIndex); }).join('');
+  ticketGroup.forEach(function (g) {
+    var rows = all.filter(function (x) { return x.l.person === g.id; });
+    html += '<div class="ticket-person"><span>' + esc(g.client_name) + '</span><span>' + eur(sum(rows)) +
+      ' <button type="button" class="x" title="Retirer ' + esc(g.client_name) + ' du ticket" aria-label="Retirer ' + esc(g.client_name) + ' du ticket" onclick="removePersonFromTicket(\'' + g.id + '\')">✕</button></span></div>' +
+      rows.map(function (x) { return ticketLineHtml(x.l, x.i, justAddedIndex); }).join('');
+  });
+  return html;
+}
+
+function renderTicket(justAddedIndex) {
+  document.getElementById('ticket-lines').innerHTML = ticketLinesHtml(justAddedIndex);
+  var addBtn = document.getElementById('ticket-group-add');
+  if (addBtn) addBtn.style.display = ticket.length && ticketQueueId && !ticketMode ? 'flex' : 'none';
 
   var modeEl = document.getElementById('ticket-mode');
   if (modeEl) {
@@ -4104,8 +4261,9 @@ function updateLoyaltyVisibility() {
   var show = ticket.length > 0 && ticketQueueId && ticketMode !== 'balance' && Boolean(lr.service || lr.product);
   section.style.display = show ? 'block' : 'none';
   if (show) {
-    var hasService = ticket.some(function (l) { return l.item_type === 'service'; });
-    var hasProduct = ticket.some(function (l) { return l.item_type === 'product'; });
+    // Ticket groupé : la remise fidélité ne porte que sur les lignes du client qui paie.
+    var hasService = ticket.some(function (l) { return l.item_type === 'service' && !l.person; });
+    var hasProduct = ticket.some(function (l) { return l.item_type === 'product' && !l.person; });
     // Chaque remise n'apparaît que si son propre palier de points est atteint.
     document.getElementById('loyalty-btn-service').style.display = lr.service ? '' : 'none';
     document.getElementById('loyalty-btn-product').style.display = lr.product ? '' : 'none';
@@ -4129,7 +4287,7 @@ function toggleLoyaltyDiscount(type) {
     if (wasType === type) { renderTicket(); return; }
   }
 
-  var idx = ticket.findIndex(function (l) { return l.item_type === type; });
+  var idx = ticket.findIndex(function (l) { return l.item_type === type && !l.person; });
   if (idx === -1) { toast('Aucune ligne ' + (type === 'service' ? 'prestation' : 'produit') + ' dans ce ticket', true); renderTicket(); return; }
 
   var pct = type === 'service' ? marketingSettings.loyalty_service_discount_pct : marketingSettings.loyalty_product_discount_pct;
@@ -4206,10 +4364,15 @@ function pay(method, cashCents) {
   setPayButtonsLocked(true);
 
   var total = ticketTotal();
-  var soldTicket = ticket.slice();
   var linkedQueueId = ticketQueueId;
+  // Ticket groupé : chaque ligne part avec sa personne (queue_id) ; celles du payeur (et ses ajouts) sont à son nom.
+  var groupIds = ticketGroup.map(function (g) { return g.id; });
+  var payerEntry = groupIds.length ? pendingById(ticketQueueId) : null;
+  var soldTicket = !groupIds.length ? ticket.slice() : ticket.map(function (l) {
+    return Object.assign({}, l, l.person ? { queue_id: l.person } : { queue_id: ticketQueueId, person_name: payerEntry ? payerEntry.client_name : '' });
+  });
   var usedLoyalty = loyaltyDiscount ? loyaltyDiscount.type : false; // 'service' ou 'product' : le serveur retire les points de CE palier
-  var saleCtx = { method: method, cashCents: method === 'partage' ? cashCents : null, chargeCents: method === 'partage' ? total - cashCents : total, total: total, soldTicket: soldTicket, linkedQueueId: linkedQueueId, gift: gift, usedLoyalty: usedLoyalty, requestId: newRequestId(), ticketMode: ticketMode, ticketModeName: ticketModeName };
+  var saleCtx = { method: method, cashCents: method === 'partage' ? cashCents : null, chargeCents: method === 'partage' ? total - cashCents : total, total: total, soldTicket: soldTicket, linkedQueueId: linkedQueueId, gift: gift, usedLoyalty: usedLoyalty, requestId: newRequestId(), ticketMode: ticketMode, ticketModeName: ticketModeName, groupIds: groupIds };
 
   if (method === 'cb') {
     startTpePayment(saleCtx);
@@ -4335,6 +4498,7 @@ function finalizeSale(saleCtx) {
     method: 'POST',
     body: {
       payment_method: saleCtx.method, cash_cents: saleCtx.cashCents != null ? saleCtx.cashCents : undefined, items: saleCtx.soldTicket, queue_id: saleCtx.linkedQueueId,
+      group_queue_ids: saleCtx.groupIds && saleCtx.groupIds.length ? saleCtx.groupIds : undefined,
       balance: saleCtx.ticketMode === 'balance' ? true : undefined,
       gift: saleCtx.gift, loyalty_redeem: saleCtx.usedLoyalty, client_request_id: saleCtx.requestId
     }
@@ -4363,12 +4527,14 @@ function finalizeSale(saleCtx) {
     if (saleCtx.method === 'especes' && !tpeBridgeUrl) {
       setTimeout(function () { window.print(); }, 150);
     }
+    if (saleCtx.groupIds && saleCtx.groupIds.length) toast('✓ Ticket groupé encaissé — ' + (saleCtx.groupIds.length + 1) + ' personnes réglées');
     if (saleCtx.ticketMode === 'advance') {
       toast('✓ ' + (saleCtx.ticketModeName || 'Client') + ' a payé d\'avance — il garde sa place dans la file');
       if (typeof refreshTimer === 'function') refreshTimer();
     }
     ticket = [];
     ticketQueueId = null;
+    ticketGroup = [];
     ticketMode = null;
     loyaltyRewardsAvailable = 0;
     loyaltyDiscount = null;
@@ -4518,6 +4684,11 @@ function vatRateFor(line) {
   return Number(vatRates.product) || 0;
 }
 
+/** Ligne du reçu : ticket groupé -> le nom de la personne pour qui est l'article. */
+function receiptItemName(l) {
+  return l.item_name + (l.person_name ? ' (' + l.person_name + ')' : '');
+}
+
 function showReceipt(lines, total, method, opts) {
   opts = opts || {};
   var whenDate = opts.when ? new Date(opts.when) : new Date();
@@ -4544,7 +4715,7 @@ function showReceipt(lines, total, method, opts) {
     '<div class="rsep"></div>';
 
   var itemsHtml = lines.map(function (l) {
-    return '<div class="rline"><span>' + l.quantity + ' × ' + esc(l.item_name) + '</span><span>' + eur(l.unit_price_cents * l.quantity) + '</span></div>';
+    return '<div class="rline"><span>' + l.quantity + ' × ' + esc(receiptItemName(l)) + '</span><span>' + eur(l.unit_price_cents * l.quantity) + '</span></div>';
   }).join('');
 
   var articleCount = lines.reduce(function (n, l) { return n + l.quantity; }, 0);
@@ -4745,7 +4916,7 @@ function buildReceiptText(lines, total, method, o) {
   out.push(sep());
 
   lines.forEach(function (l) {
-    itemLines(l.quantity + ' x ' + l.item_name, money(l.unit_price_cents * l.quantity))
+    itemLines(l.quantity + ' x ' + receiptItemName(l), money(l.unit_price_cents * l.quantity))
       .forEach(function (t) { out.push(t); });
   });
 

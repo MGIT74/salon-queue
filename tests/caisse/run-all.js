@@ -159,7 +159,8 @@ const suite = [
   ['136-groupe-salon-coiffeur-creneaux.js', false, ['exit']],
   ['137-supplement-seul-direct.js', false, ['exit']],
   ['138-caisse-sans-ligne-supplement-seul.js', false, ['exit']],
-  ['139-poste-tiroir-rdv.js', false, ['exit']]
+  ['139-poste-tiroir-rdv.js', false, ['exit']],
+  ['140-encaissement-groupe.js', true, ['exit']]
 ];
 
 let bad = 0;

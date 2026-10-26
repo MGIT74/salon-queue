@@ -13,7 +13,7 @@ check('schema : sale_items.vat_rate (photo du taux)', /table_name = 'sale_items'
 check('migration : liste creee depuis les anciens taux par categorie', /seedFromLegacy/.test(vat) && /vat_rate_service/.test(vat) && /UPDATE \$\{TABLES\[type\]\} SET vat_rate_id/.test(vat));
 check('catalogue : articles renvoient vat_rate / vat_rate_name', /annotateItems/.test(catalog) && /vat_rate_name/.test(vat));
 check('catalogue : creation et modification acceptent vat_rate_id (services, supplements, produits)', (catalog.match(/normalizeVatRateId/g) || []).length >= 5);
-check('ventes : le taux de chaque ligne est enregistre', /vat_rate\) VALUES \?/.test(sales) && /rateForItem/.test(sales));
+check('ventes : le taux de chaque ligne est enregistre', /vat_rate(, queue_id)?\) VALUES \?/.test(sales) && /rateForItem/.test(sales));
 check('ticket Z : utilise le taux photographie', /si\.vat_rate/.test(owner) && /vatRateFor\(it\.item_type, it\.vat_rate\)/.test(owner));
 check('reglages : GET/PUT /vat-rates (admin)', /router\.get\('\/vat-rates', requireAdmin/.test(settings) && /router\.put\('\/vat-rates', requireAdmin/.test(settings));
 check('reglages : nom obligatoire + taux 0-100', /Chaque TVA doit avoir un nom/.test(settings) && /entre 0 et 100/.test(settings));
