@@ -187,6 +187,7 @@
     font-size: 11.5px; color: var(--grey); padding: 4px 18px; flex: 1;
   }
   .client-footer button .ic { display: block; }
+  .side-logo { display: none; }
   .client-footer button.on { color: var(--blue); font-weight: 600; }
   body.has-footer .wrap { padding-bottom: calc(var(--footer-h, 72px) + 24px); }
   /* Barre Suivant des etapes de reservation : elle se colle AU-DESSUS du menu du bas (hauteur mesuree en JS), jamais dessous. */
@@ -344,6 +345,8 @@
   body.has-footer .client-footer.on button.on { background: var(--fill); color: var(--blue); }
   body.has-footer .client-footer.on button:hover:not(.on) { background: var(--fill); }
   body.has-footer .client-footer.on button:last-child { margin-top: auto; color: var(--grey); }
+  /* Logo du salon au-dessus de « Accueil » */
+  body.has-footer .client-footer.on .side-logo.has-logo { display: block; width: 56px; height: 56px; margin: 0 auto 14px; border-radius: 14px; background: center/cover no-repeat; flex: none; }
   body.has-footer .wrap { max-width: 1240px; margin: 0 0 0 var(--side-w); padding: 32px clamp(24px, 3vw, 44px) 48px; }
   body.has-footer .toast { bottom: 28px; }
   .rdv-header { text-align: left; margin-bottom: 24px; }
@@ -398,6 +401,7 @@
 @media (min-width: 1200px) {
   body.has-footer { --side-w: 232px; }
   body.has-footer .client-footer.on { padding: 28px 16px; }
+  body.has-footer .client-footer.on .side-logo.has-logo { width: 72px; height: 72px; margin: 0 0 18px 14px; border-radius: 16px; }
   body.has-footer .client-footer.on button { flex-direction: row; justify-content: flex-start; gap: 12px; padding: 12px 14px; font-size: 15px; font-weight: 500; }
   body.has-footer .client-footer.on button.on { font-weight: 600; color: var(--ink); }
   body.has-footer .client-footer.on button.on .ic { color: var(--blue); }
@@ -750,6 +754,8 @@
 </div>
 
 <div class="client-footer" id="client-footer">
+  <!-- Logo du salon en haut du menu lateral (ordinateur / tablette), quand le salon en a un (Reglages). -->
+  <div class="side-logo" id="side-logo" role="img" aria-label="Logo du salon"></div>
   <button id="nav-home" onclick="goHome()">
     <svg class="ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 9.5V19a1 1 0 0 0 1 1H9.5a1 1 0 0 0 1-1v-4a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v4a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1V9.5"/></svg>
     Accueil
@@ -2081,6 +2087,11 @@ function guardMissingSalon() {
         if (d.login_image_url) {
           var visualPanel = document.getElementById('auth-visual-panel');
           if (visualPanel) visualPanel.style.backgroundImage = 'url("' + d.login_image_url + '")';
+        }
+        var sideLogo = document.getElementById('side-logo');
+        if (sideLogo && d.logo_url) {
+          sideLogo.style.backgroundImage = 'url("' + d.logo_url + '")';
+          sideLogo.classList.add('has-logo');
         }
         if (d.logo_url) {
           var glowIcon = document.getElementById('auth-glow-icon');
