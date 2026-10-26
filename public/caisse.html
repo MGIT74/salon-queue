@@ -3759,6 +3759,15 @@ function toggleDeferPayment(queueId) {
     .catch(function (e) { toast(e.message, true); });
 }
 
+// 1re ligne du ticket : la prestation. Client venu pour un supplement seul (prestation cachee « Supplément seul »,
+// 0 EUR) : pas de ligne « Supplément seul 0,00 € », seulement ses supplements.
+function ticketServiceLine(q, doneBy) {
+  var s = q.service || {};
+  var extrasOnly = (s.system_kind === 'extras_only' || String(s.id || '').indexOf('supplement-seul-') === 0 || s.name === EXTRAS_ONLY_NAME) && (q.extras || []).length;
+  if (extrasOnly) return [];
+  return [{ item_type: 'service', item_id: s.id, item_name: s.name, unit_price_cents: s.price_cents, quantity: 1, barber_id: doneBy }];
+}
+
 function usePendingForTicket(queueId) {
   var q = pendingPayments.find(function (x) { return x.id === queueId; });
   if (!q) return;
@@ -3766,7 +3775,7 @@ function usePendingForTicket(queueId) {
   // Prestation/supplément : réalisés par le coiffeur de la file (modifiable
   // ligne par ligne si un collègue a fait une partie du travail).
   var doneBy = q.barber_id || activeBarberId || null;
-  ticket = [{ item_type: 'service', item_id: q.service.id, item_name: q.service.name, unit_price_cents: q.service.price_cents, quantity: 1, barber_id: doneBy }];
+  ticket = ticketServiceLine(q, doneBy);
   q.extras.forEach(function (e) {
     ticket.push({ item_type: 'extra', item_id: e.id, item_name: e.name, unit_price_cents: e.price_cents, quantity: 1, barber_id: doneBy });
   });
@@ -3828,7 +3837,7 @@ function useAdvanceForTicket(queueId) {
   var q = (queue || []).find(function (x) { return x.id === queueId; });
   if (!q) return;
   var doneBy = q.barber_id || activeBarberId || null;
-  ticket = [{ item_type: 'service', item_id: q.service.id, item_name: q.service.name, unit_price_cents: q.service.price_cents, quantity: 1, barber_id: doneBy }];
+  ticket = ticketServiceLine(q, doneBy);
   q.extras.forEach(function (e) {
     ticket.push({ item_type: 'extra', item_id: e.id, item_name: e.name, unit_price_cents: e.price_cents, quantity: 1, barber_id: doneBy });
   });

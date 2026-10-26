@@ -157,7 +157,8 @@ const suite = [
   ['134-zoom-curseur-planning.js', false, ['exit']],
   ['135-poste-tablette.js', false, ['exit']],
   ['136-groupe-salon-coiffeur-creneaux.js', false, ['exit']],
-  ['137-supplement-seul-direct.js', false, ['exit']]
+  ['137-supplement-seul-direct.js', false, ['exit']],
+  ['138-caisse-sans-ligne-supplement-seul.js', false, ['exit']]
 ];
 
 let bad = 0;
