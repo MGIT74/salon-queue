@@ -1207,6 +1207,7 @@ function vitrineRecapHtml(sel) {
     row('Produit', x.name, '', eur(Number(x.price_cents) || 0));
   });
   var ctx = [];
+  if (sel.who) ctx.push('<b style="color:var(--ink)">' + esc(sel.who) + '</b>');   // a plusieurs : la personne en cours
   if (sel.barber) ctx.push(esc(sel.barber));
   if (sel.when) ctx.push(esc(sel.when) + (sel.time ? ' à ' + esc(sel.time) : ''));
   // RDV a plusieurs : les personnes deja validees, chacune avec son heure de debut.
@@ -1217,7 +1218,11 @@ function vitrineRecapHtml(sel) {
   return (cartHtml ? '<div class="recap-list recap-cart-list">' + cartHtml + '</div>' : '') +
     (ctx.length ? '<div class="recap-ctx">' + ctx.join(' · ') + '</div>' : '') +
     '<div class="recap-list">' + rows + '</div>' +
-    '<div class="recap-total"><span>Total</span><span>' + (mins ? formatMinutes(mins) + ' · ' : '') + '<strong>' + eur(cents) + '</strong></span></div>';
+    (sel.cart && sel.cart.length
+      // A plusieurs : total de tout le groupe (personnes deja validees + personne en cours).
+      ? '<div class="recap-total"><span>Total (' + (sel.cart.length + 1) + ' personnes)</span><span><strong>' +
+          eur(cents + sel.cart.reduce(function (t, c) { return t + (Number(c.price_cents) || 0); }, 0)) + '</strong></span></div>'
+      : '<div class="recap-total"><span>Total</span><span>' + (mins ? formatMinutes(mins) + ' · ' : '') + '<strong>' + eur(cents) + '</strong></span></div>');
 }
 
 /**

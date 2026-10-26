@@ -415,7 +415,7 @@
   </section>
 </div>
 
-<script src="/app.js?v=40"></script>
+<script src="/app.js?v=42"></script>
 <script src="/group-booking.js?v=27"></script>
 <style>
 body.staff-mode .gift-summary-box,body.staff-mode .theme-btn,body.staff-mode .login-hint{display:none!important}
@@ -793,6 +793,7 @@ function refreshRecap() {
     extras: pick(extList, selExtras.map(String)), products: pick(products, selProducts.map(String)),
     barber: anyB ? anyBarberLabel(barbers, selSlot && selSlot.barberId) : (b ? b.name : ''), time: selSlot ? selSlot.time : '',
     when: selDate ? new Date(selDate + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' }) : '',
+    who: grp && grp.people[grp.current] ? (grp.people[grp.current].isSelf && !STAFF_BRIDGE ? 'Vous' : grp.people[grp.current].name) : '',
     cart: grp ? grp.cart.filter(function (c) { return c.person !== grp.current; }).map(function (c) {
       return { name: c.name || (c.isSelf ? 'Vous' : ''), time: c.time, price_cents: c.price_cents,
         label: svcLabel(c.service_name, c.extra_names), barber: c.any ? anyBarberLabel(barbers, c.barber_id) : c.barber_name };
@@ -1169,6 +1170,7 @@ function cartBeginPerson(i, entry) {
   if (STAFF_BRIDGE) {
     if (!entry) { selBarber = ''; applyBarberOffer(); }
     show('p-service');
+    refreshRecap();
     return;
   }
   show('p-barber');
