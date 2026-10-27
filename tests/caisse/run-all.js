@@ -170,7 +170,8 @@ const suite = [
   ['147-timer-commencer-en-avance.js', false, ['exit']],
   ['148-coordonnees-valides.js', false, ['exit']],
   ['149-conge-en-plusieurs-morceaux.js', false, ['exit']],
-  ['150-caisse-agenda-legende.js', false, ['exit']]
+  ['150-caisse-agenda-legende.js', false, ['exit']],
+  ['151-planning-sans-bande-grise.js', false, ['exit']]
 ];
 
 let bad = 0;
