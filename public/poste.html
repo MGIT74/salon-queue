@@ -492,7 +492,7 @@
   </button>
 </div>
 
-<script src="/app.js?v=46"></script>
+<script src="/app.js?v=47"></script>
 <script src="/autorefresh.js?v=3"></script>
 <script src="/staff-group.js?v=6"></script>
 <script>requireSalonInUrl("Pour utiliser votre poste, ouvrez le lien de votre salon.");</script>
@@ -1390,8 +1390,11 @@ function renderAgendaTimeline(dateStr) {
         'onclick="event.stopPropagation();openPosteClientDrawer(\'' + it.id + '\')">' +
         '<span class="tb-time">' + esc(it.timeLabel) + '</span><span class="tb-name">' + esc(it.clientName) + '</span></div>';
     }).join('');
-    var walkDay = isWalkinOn((barbers || []).find(function (x) { return x.id === b.id; }), dateStr);
+    var rowB = (barbers || []).find(function (x) { return x.id === b.id; });
+    var walkDay = isWalkinOn(rowB, dateStr);
+    var offWhy = rowB && !walkDay ? barberOffReason(rowB, dateStr) : '';
     var trackClick = (rdvIsSalonClosed(dateStr) || isPastDay(dateStr)) ? ''
+      : offWhy ? ' onclick="toast(\'' + esc(String(b.name).replace(/'/g, '')) + ' ' + esc(offWhy).replace(/'/g, '') + ' : pas de rendez-vous possible.\', true)"'
       : walkDay ? ' onclick="toast(\'' + esc(String(b.name).replace(/'/g, '')) + ' est en « sans RDV » ce jour-là : pas de rendez-vous\', true)"'
       : b.accepts_appointments || (me && b.id === me.id)
       ? ' onclick="openPosteAddAppointment(\'' + dateStr + '\',\'' + b.id + '\')" title="Ajouter un RDV pour ' + esc(b.name) + '"'
@@ -1490,6 +1493,8 @@ function openPosteAddAppointment(dateStr, barberId) {
   var targetId = barberId || (me && me.id);
   var target = (typeof barbers !== 'undefined' && barbers ? barbers : []).filter(function (b) { return b.id === targetId; })[0] || (me && targetId === me.id ? me : null);
   var forOther = !!(me && targetId !== me.id);
+  var offWhy = target && target.schedules ? barberOffReason(target, dateStr) : '';
+  if (offWhy) { toast(target.name + ' ' + offWhy + ' : pas de rendez-vous possible.', true); return; }
   var state = { serviceId: null, extraIds: [], productIds: [], time: null };
   // Offre du coiffeur du RDV : ses prestations et son tarif personnalisé (barberItems, app.js).
   var svcOffer = typeof barberItems === 'function' ? barberItems(target, 'services', services) : services;

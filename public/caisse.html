@@ -1012,7 +1012,7 @@
   </div>
 </div>
 
-<script src="/app.js?v=46"></script>
+<script src="/app.js?v=47"></script>
 <script src="/staff-group.js?v=6"></script>
 <script src="/autorefresh.js?v=3"></script>
 <script>requireSalonInUrl("Pour utiliser la caisse, ouvrez le lien de votre salon.");</script>
@@ -2393,6 +2393,8 @@ function renderAgendaTimeline(dateStr) {
     // coiffeur qui ne prend pas de RDV en ligne.
     var rowBarber = bid !== 'unassigned' && allBarbers.find(function (x) { return x.id === bid; });
     var trackClick = (bid === 'unassigned' || isPastDay(dateStr)) ? ''
+      : (rowBarber && barberOffReason(rowBarber, dateStr) && !isWalkinOn(rowBarber, dateStr))
+        ? ' onclick="event.stopPropagation();notifySansRdvOnly(this)" data-barber-name="' + esc(b.name) + '" data-off-reason="' + esc(barberOffReason(rowBarber, dateStr)) + '"'
       : (rowBarber && rowBarber.accepts_appointments && !isWalkinOn(rowBarber, dateStr))
         ? ' onclick="openCaisseAddAppointment(\'' + dateStr + '\',\'' + bid + '\')" title="Cliquer pour ajouter un RDV"'
         : ' onclick="event.stopPropagation();notifySansRdvOnly(this)" data-barber-name="' + esc(b.name) + '"' + (rowBarber && isWalkinOn(rowBarber, dateStr) ? ' data-walkin="1"' : '');
@@ -2456,6 +2458,7 @@ function renderAgendaTimeline(dateStr) {
 
 /** Sur une ligne de coiffeur qui ne prend pas de RDV en ligne. */
 function notifySansRdvOnly(el) {
+  if (el.dataset.offReason) { toast((el.dataset.barberName || 'Ce coiffeur') + ' ' + el.dataset.offReason + ' : pas de rendez-vous possible.', true); return; }
   toast((el.dataset.barberName || 'Ce coiffeur') + (el.dataset.walkin ? ' est en « sans RDV » ce jour-là : pas de rendez-vous' : ' ne prend pas de RDV en ligne (sans-rdv uniquement)'), true);
 }
 
@@ -2916,6 +2919,8 @@ function openCaisseAddAppointment(dateStr, barberId) {
     return;
   }
   var barber = allBarbers.find(function (b) { return b.id === barberId; });
+  var offWhy = barber && barberOffReason(barber, dateStr);
+  if (offWhy) { toast(barber.name + ' ' + offWhy + ' : pas de rendez-vous possible.', true); return; }
   var when = new Date(dateStr + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' });
   var state = { serviceId: null, extraIds: [], productIds: [], time: null };
   // Offre de CE coiffeur : ses prestations et son tarif personnalisé (barberItems, app.js).

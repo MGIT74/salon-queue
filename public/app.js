@@ -1705,3 +1705,11 @@ function firstBookableDayFor(b, fromStr, isClosed) {
   }
   return null;
 }
+
+/** Pourquoi on ne peut pas prendre de RDV avec ce coiffeur ce jour-la ('' s'il travaille). */
+function barberOffReason(b, dateStr) {
+  if (!b || !dateStr || barberBookableOn(b, dateStr)) return '';
+  if (isOnLeaveOn(b, dateStr)) return 'est en congé ce jour-là';
+  if (isWalkinOn(b, dateStr)) return 'est en « sans RDV » ce jour-là';
+  return 'ne travaille pas ce jour-là';
+}

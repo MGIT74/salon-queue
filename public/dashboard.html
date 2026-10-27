@@ -2878,7 +2878,7 @@
   </div>
 </div>
 
-<script src="/app.js?v=46"></script>
+<script src="/app.js?v=47"></script>
 <script src="/autorefresh.js?v=3"></script>
 <script src="/staff-group.js?v=6"></script>
 <script src="/daterange.js?v=4"></script>
@@ -3860,7 +3860,8 @@ function cancelAppointmentByAdmin() {
  */
 function isBookableForAdmin(b, dateStr) {
   // dateStr (YYYY-MM-DD) : le jour du planning / du RDV. Un coiffeur en conge ce jour-la n'a aucun creneau : on ne le propose pas.
-  return Boolean(b.accepts_appointments && b.active && hasBookableSchedule(b) && (typeof dateStr !== 'string' || (!isOnLeaveOn(b, dateStr) && !isWalkinOn(b, dateStr))));
+  // Avec une date : il doit aussi TRAVAILLER ce jour-la (conge, jour « sans RDV » ET jour non travaille exclus).
+  return Boolean(b.accepts_appointments && b.active && hasBookableSchedule(b) && (typeof dateStr !== 'string' || barberBookableOn(b, dateStr)));
 }
 
 /**
@@ -6571,6 +6572,11 @@ function renderDayTimelineHtml(dateStr, dayAppts) {
   barbers.filter(function (b) { return isBookableForAdmin(b, dateStr); }).forEach(function (b) {
     byBarber[b.id] = { name: b.name, items: [], bookable: true };
   });
+  // Coiffeur qui prend des RDV mais ABSENT ce jour-la (conge, jour non travaille) : sa ligne reste visible, un clic
+  // explique pourquoi on ne peut pas lui ajouter de RDV (au lieu d'ouvrir la fenetre).
+  barbers.filter(function (b) { return isBookableForAdmin(b) && !byBarber[b.id] && !isWalkinOn(b, dateStr); }).forEach(function (b) {
+    byBarber[b.id] = { name: b.name, items: [], bookable: false, offReason: barberOffReason(b, dateStr) };
+  });
   // Coiffeur « sans RDV » ce jour-la : sa ligne reste visible, un clic explique pourquoi on ne peut pas ajouter de RDV.
   barbers.filter(function (b) { return b.active && isWalkinOn(b, dateStr) && !isOnLeaveOn(b, dateStr) && !byBarber[b.id]; }).forEach(function (b) {
     byBarber[b.id] = { name: b.name, items: [], bookable: false, walkin: true };
@@ -6580,7 +6586,10 @@ function renderDayTimelineHtml(dateStr, dayAppts) {
     // Un coiffeur peut avoir des RDV deja enregistres puis etre passe en
     // "sans-rdv" depuis - sa ligne doit rester visible (pour voir ses
     // RDV existants) mais pas cliquable pour en ajouter un nouveau.
-    if (!byBarber[key]) byBarber[key] = { name: a.barber_name || 'Non assigné', items: [], bookable: false };
+    if (!byBarber[key]) {
+      var ab = barbers.find(function (x) { return x.id === key; });
+      byBarber[key] = { name: a.barber_name || 'Non assigné', items: [], bookable: false, offReason: ab ? barberOffReason(ab, dateStr) : '' };
+    }
     byBarber[key].items.push(a);
   });
   var barberIds = Object.keys(byBarber).sort(function (x, y) { return byBarber[x].name.localeCompare(byBarber[y].name); });
@@ -6636,7 +6645,7 @@ function renderDayTimelineHtml(dateStr, dayAppts) {
       ? ''
       : b.bookable
       ? ' onclick="openAdminAddAppointment(\'' + dateStr + '\',\'' + bid + '\')"'
-      : (bid === 'unassigned' ? '' : ' onclick="event.stopPropagation();notifySansRdvOnly(this)" data-barber-name="' + esc(b.name) + '"' + (b.walkin ? ' data-walkin="1"' : ''));
+      : (bid === 'unassigned' ? '' : ' onclick="event.stopPropagation();notifySansRdvOnly(this)" data-barber-name="' + esc(b.name) + '"' + (b.walkin ? ' data-walkin="1"' : '') + (b.offReason ? ' data-off-reason="' + esc(b.offReason) + '"' : ''));
     return '<div class="timeline-row">' +
       '<div class="timeline-row-label" title="' + esc(b.name) + '"><span class="dot" style="background:' + color + '"></span></div>' +
       '<div class="timeline-row-track"' + trackClick + '>' + blocksHtml + '</div>' +
@@ -6700,6 +6709,7 @@ function renderDayTimelineHtml(dateStr, dayAppts) {
 
 /** Sur une ligne de coiffeur qui ne prend pas de RDV en ligne. */
 function notifySansRdvOnly(el) {
+  if (el.dataset.offReason) { toast((el.dataset.barberName || 'Ce coiffeur') + ' ' + el.dataset.offReason + ' : pas de rendez-vous possible.', true); return; }
   toast((el.dataset.barberName || 'Ce coiffeur') + (el.dataset.walkin ? ' est en « sans RDV » ce jour-là : pas de rendez-vous' : ' ne prend pas de RDV en ligne (sans-rdv uniquement)'), true);
 }
 
@@ -6975,6 +6985,10 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
   }
   // Tous les coiffeurs qui prennent des RDV, MEME absents ce jour-la (signales « indisponible ») ; « Premier
   // disponible » ne compte que ceux presents ce jour-la.
+  // Ligne d'un coiffeur absent ce jour-la (conge, jour non travaille, « sans RDV ») : on le dit, sans ouvrir la fenetre.
+  var preB = preselectedBarberId && barbers.find(function (b) { return b.id === preselectedBarberId; });
+  var preOff = preB && barberOffReason(preB, dateStr);
+  if (preOff) { toast(preB.name + ' ' + preOff + ' : pas de rendez-vous possible.', true); return; }
   var rdvBarbers = barbers.filter(function (b) { return isBookableForAdmin(b); });
   var availBarbers = rdvBarbers.filter(function (b) { return isBookableForAdmin(b, dateStr); });
   var when = new Date(dateStr + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' });

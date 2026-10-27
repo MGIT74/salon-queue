@@ -36,5 +36,10 @@ check('admin : Deplacer -> « indisponible ce jour-là »', d.includes('barberOf
 check('en ligne : calendrier au premier jour disponible du coiffeur choisi', r.includes('window.rdvPickOpenDay = function(auto, fromToday){') && r.includes("if (autoPick && fromToday) input.value = '';") && r.includes("window.rdvPickOpenDay(!(grp && grp.date), true);") && r.includes('window.rdvPickOpenDay(!(grp && grp.date), barberChanged);'));
 check('compte : idem', c.includes('window.bkPickOpenDay = function(auto, fromToday){') && c.includes("window.bkPickOpenDay(!(bkGrp && bkGrp.date), true);") && c.includes('window.bkPickOpenDay(!(bkGrp && bkGrp.date), barberChanged);'));
 check('Deplacer (admin, caisse, poste) : autre coiffeur -> son premier jour disponible', /function firstBookableDayFor\(b, fromStr, isClosed\)/.test(app) && [d, ca, po].every((s) => s.includes("overlay.querySelector('#rs-barber').onchange = function () {") && s.includes('firstBookableDayFor(nb, salonToday()')));
+// Ajouter un RDV a un coiffeur absent ce jour-la (ligne du planning, ou fenetre avec ce coiffeur) : message, pas de fenetre.
+check('outil commun : raison de l\'absence (conge / sans RDV / ne travaille pas)', /function barberOffReason\(b, dateStr\)/.test(app) && app.includes("return 'ne travaille pas ce jour-là';"));
+check('admin : coiffeur absent -> ligne avec message, ajout refuse', d.includes("data-off-reason=\"' + esc(b.offReason) + '\"") && d.includes('if (preOff) { toast(preB.name + \' \' + preOff') && d.includes('barberBookableOn(b, dateStr)));'));
+check('caisse : ajout refuse pour un coiffeur absent', ca.includes("if (offWhy) { toast(barber.name + ' ' + offWhy") && ca.includes('data-off-reason="\' + esc(barberOffReason(rowBarber, dateStr))'));
+check('poste : ajout refuse pour un coiffeur absent', po.includes("if (offWhy) { toast(target.name + ' ' + offWhy") && po.includes(": offWhy ? ' onclick=\"toast("));
 console.log(`\n${pass} OK, ${fail} ECHEC`);
 process.exit(fail ? 1 : 0);
