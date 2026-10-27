@@ -23,7 +23,7 @@ check('pas encore de coiffeur choisi / horaires inconnus : pas grise', !ctx.book
 ['rdv.html', 'compte.html'].forEach((f) => {
   const s = rd(f);
   check(f + ' : calendrier grise les jours ou le coiffeur est absent', /bookingDayBlocked\((selBarber|selBookBarber), (barbers|bookBarbers), value\)/.test(s) && /'Coiffeur absent ce jour'/.test(s));
-  check(f + ' : premier jour disponible choisi a l\'etape date', /PickOpenDay\(!\((grp|bkGrp) && (grp|bkGrp)\.date\)\);\n  show\('p-/.test(s));
+  check(f + ' : premier jour disponible choisi a l\'etape date', /PickOpenDay\(!\((grp|bkGrp) && (grp|bkGrp)\.date\), barberChanged\);\n  show\('p-/.test(s));
 });
 ['rdv.html', 'compte.html'].forEach((f) => {
   check(f + ' : jours sans aucun creneau demandes au serveur (/availability-days)', rd(f).includes("'/api/appointments/availability-days?'") && rd(f).includes("'Aucun créneau ce jour'"));

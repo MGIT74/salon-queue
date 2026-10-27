@@ -415,7 +415,7 @@
   </section>
 </div>
 
-<script src="/app.js?v=45"></script>
+<script src="/app.js?v=46"></script>
 <script src="/group-booking.js?v=27"></script>
 <style>
 body.staff-mode .gift-summary-box,body.staff-mode .theme-btn,body.staff-mode .login-hint{display:none!important}
@@ -868,15 +868,19 @@ window.rdvDaysQuery = function () {
   if (!selService) return null;
   return 'service_id=' + selService + '&extras=' + selExtras.join(',') + (selBarber ? '&barber_id=' + selBarber : '');
 };
+var lastDateBarber = null;   // coiffeur pour lequel le calendrier a deja ete positionne
 function goToDateStep() {
   if (!selService) { toast('Choisissez une prestation', true); return; }
   var today = salonToday();
   if (grp && grp.date && !document.getElementById('rdv-date').value) document.getElementById('rdv-date').value = grp.date;
   document.getElementById('rdv-date').min = today;
   if (!document.getElementById('rdv-date').value || document.getElementById('rdv-date').value < today) document.getElementById('rdv-date').value = today;
-  // Groupe : la date commune est gardee ; sinon, aller au premier jour ou le coiffeur choisi est present.
+  // Groupe : la date commune est gardee ; sinon, aller au premier jour ou le coiffeur choisi est present (depuis
+  // aujourd'hui si le coiffeur a change depuis la derniere fois).
+  var barberChanged = String(selBarber) !== String(lastDateBarber);
+  lastDateBarber = selBarber;
   renderDtBarbers();
-  if (window.rdvPickOpenDay) window.rdvPickOpenDay(!(grp && grp.date));
+  if (window.rdvPickOpenDay) window.rdvPickOpenDay(!(grp && grp.date), barberChanged);
   show('p-datetime');
   loadSlots();
 }
@@ -1272,7 +1276,9 @@ function pickDtBarber(id) {
   applyBarberOffer();
   if (!STAFF_BRIDGE) renderBarberGrid();   // la carte du coiffeur choisi reste a jour si le client revient en arriere
   renderDtBarbers();
-  if (window.rdvPickOpenDay) window.rdvPickOpenDay(!(grp && grp.date));
+  // Le calendrier va au premier jour disponible du coiffeur choisi (ou du premier coiffeur disponible).
+  lastDateBarber = selBarber;
+  if (window.rdvPickOpenDay) window.rdvPickOpenDay(!(grp && grp.date), true);
   loadSlots();
   if (typeof refreshRecap === 'function') refreshRecap();
 }
@@ -1482,10 +1488,14 @@ if (!checkForCancelLink()) {
     if (autoPick++ < 3) { shown.setMonth(shown.getMonth()+1); return; }
     autoPick=0; if (input.value) { shown=new Date(input.value+'T12:00:00'); shown.setDate(1); }
   }
-  window.rdvPickOpenDay = function(auto){
+  // fromToday : nouveau coiffeur (ou « Premier disponible ») -> on repart d'aujourd'hui pour proposer SON premier jour
+  // disponible, au lieu de garder la date choisie pour le coiffeur precedent.
+  window.rdvPickOpenDay = function(auto, fromToday){
     freeCache = {}; autoPick = auto === false ? 0 : 1;
+    if (autoPick && fromToday) input.value = '';
     var c = firstOpenDay();
     if (autoPick && c && c !== input.value) input.value = c;
+    if (!input.value) input.value = today;   // aucun jour libre trouve : on reste sur aujourd'hui (message « indisponible »)
     if (input.value) { shown = new Date(input.value + 'T12:00:00'); shown.setDate(1); }
     render();
   };

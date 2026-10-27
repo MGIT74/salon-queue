@@ -1693,3 +1693,15 @@ function contactProblem(c, opts) {
   else if (!isValidPhoneStr(phone)) return 'Numéro de téléphone invalide (exemple : 06 12 34 56 78).';
   return '';
 }
+
+/** Premier jour (YYYY-MM-DD, a partir de fromStr inclus) ou le coiffeur peut prendre des RDV, sur 6 mois ; null sinon.
+ *  isClosed(dateStr) facultatif : jours de fermeture du salon a sauter. */
+function firstBookableDayFor(b, fromStr, isClosed) {
+  var d = new Date(fromStr + 'T12:00:00');
+  for (var n = 0; n < 183; n++) {
+    var s = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    if (barberBookableOn(b, s) && !(isClosed && isClosed(s))) return s;
+    d.setDate(d.getDate() + 1);
+  }
+  return null;
+}

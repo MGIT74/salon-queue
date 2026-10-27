@@ -831,7 +831,7 @@
 
 </div>
 
-<script src="/app.js?v=45"></script>
+<script src="/app.js?v=46"></script>
 <script src="/autorefresh.js?v=3"></script>
 <script src="/group-booking.js?v=27"></script>
 <style>
@@ -1917,14 +1917,18 @@ window.bkDaysQuery = function () {
   if (!selBookService) return null;
   return 'service_id=' + selBookService + '&extras=' + selBookExtras.join(',') + (selBookBarber ? '&barber_id=' + selBookBarber : '');
 };
+var lastBookDateBarber = null;   // coiffeur pour lequel le calendrier a deja ete positionne
 function goToBookDateStep() {
   if (!selBookService) { toast('Choisissez une prestation', true); return; }
   var today = salonToday();
   if (bkGrp && bkGrp.date && !document.getElementById('bk-date').value) document.getElementById('bk-date').value = bkGrp.date;
   document.getElementById('bk-date').min = today;
   if (!document.getElementById('bk-date').value || document.getElementById('bk-date').value < today) document.getElementById('bk-date').value = today;
-  // Groupe : la date commune est gardee ; sinon, aller au premier jour ou le coiffeur choisi est present.
-  if (window.bkPickOpenDay) window.bkPickOpenDay(!(bkGrp && bkGrp.date));
+  // Groupe : la date commune est gardee ; sinon, aller au premier jour ou le coiffeur choisi est present (depuis
+  // aujourd'hui si le coiffeur a change depuis la derniere fois).
+  var barberChanged = String(selBookBarber) !== String(lastBookDateBarber);
+  lastBookDateBarber = selBookBarber;
+  if (window.bkPickOpenDay) window.bkPickOpenDay(!(bkGrp && bkGrp.date), barberChanged);
   show('p-book-datetime');
   loadBookSlots();
 }
@@ -2052,7 +2056,8 @@ function pickBookDtBarber(id) {
   selBookBarber = id;
   applyBookBarberOffer();
   renderBookBarberGrid();
-  if (window.bkPickOpenDay) window.bkPickOpenDay(!(bkGrp && bkGrp.date));
+  lastBookDateBarber = selBookBarber;
+  if (window.bkPickOpenDay) window.bkPickOpenDay(!(bkGrp && bkGrp.date), true);   // premier jour disponible de ce coiffeur
   loadBookSlots();
   if (typeof refreshBookRecap === 'function') refreshBookRecap();
 }
@@ -2332,10 +2337,13 @@ function guardMissingSalon() {
     if (autoPick++ < 3) { shown.setMonth(shown.getMonth()+1); return; }
     autoPick=0; if (input.value) { shown=new Date(input.value+'T12:00:00'); shown.setDate(1); }
   }
-  window.bkPickOpenDay = function(auto){
+  // fromToday : nouveau coiffeur (ou « Premier disponible ») -> on repart d'aujourd'hui pour proposer SON premier jour.
+  window.bkPickOpenDay = function(auto, fromToday){
     freeCache = {}; autoPick = auto === false ? 0 : 1;
+    if (autoPick && fromToday) input.value = '';
     var c = firstOpenDay();
     if (autoPick && c && c !== input.value) input.value = c;
+    if (!input.value) input.value = today;
     if (input.value) { shown = new Date(input.value + 'T12:00:00'); shown.setDate(1); }
     render();
   };

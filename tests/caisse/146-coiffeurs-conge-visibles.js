@@ -32,5 +32,9 @@ check('admin : pastilles au-dessus des creneaux, changer de coiffeur', d.include
   check(n + ' : Deplacer -> tous les coiffeurs, « indisponible ce jour-là »', src.includes('return b.id === a.barber_id || Boolean(b.accepts_appointments && b.active !== 0 && hasBookableSchedule(b));') && src.includes("' — indisponible ce jour-là'") && src.includes('barberOffSlotsHtml(offB, date, true)'));
 });
 check('admin : Deplacer -> « indisponible ce jour-là »', d.includes('barberOffSlotsHtml(offB, date, true)'));
+// Changer de coiffeur : le calendrier va au premier jour disponible de CE coiffeur (a partir d'aujourd'hui).
+check('en ligne : calendrier au premier jour disponible du coiffeur choisi', r.includes('window.rdvPickOpenDay = function(auto, fromToday){') && r.includes("if (autoPick && fromToday) input.value = '';") && r.includes("window.rdvPickOpenDay(!(grp && grp.date), true);") && r.includes('window.rdvPickOpenDay(!(grp && grp.date), barberChanged);'));
+check('compte : idem', c.includes('window.bkPickOpenDay = function(auto, fromToday){') && c.includes("window.bkPickOpenDay(!(bkGrp && bkGrp.date), true);") && c.includes('window.bkPickOpenDay(!(bkGrp && bkGrp.date), barberChanged);'));
+check('Deplacer (admin, caisse, poste) : autre coiffeur -> son premier jour disponible', /function firstBookableDayFor\(b, fromStr, isClosed\)/.test(app) && [d, ca, po].every((s) => s.includes("overlay.querySelector('#rs-barber').onchange = function () {") && s.includes('firstBookableDayFor(nb, salonToday()')));
 console.log(`\n${pass} OK, ${fail} ECHEC`);
 process.exit(fail ? 1 : 0);

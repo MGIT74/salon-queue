@@ -1012,7 +1012,7 @@
   </div>
 </div>
 
-<script src="/app.js?v=45"></script>
+<script src="/app.js?v=46"></script>
 <script src="/staff-group.js?v=6"></script>
 <script src="/autorefresh.js?v=3"></script>
 <script>requireSalonInUrl("Pour utiliser la caisse, ouvrez le lien de votre salon.");</script>
@@ -2798,7 +2798,13 @@ function adReschedule() {
       .catch(function (e) { slotsEl.innerHTML = ''; toast(e.message, true); });
   }
 
-  overlay.querySelector('#rs-barber').onchange = loadSlots;
+  // Autre coiffeur choisi : la date va a SON premier jour disponible (a partir d'aujourd'hui), puis ses creneaux.
+  overlay.querySelector('#rs-barber').onchange = function () {
+    var nb = allBarbers.find(function (x) { return String(x.id) === String(overlay.querySelector('#rs-barber').value); });
+    var first = nb && firstBookableDayFor(nb, salonToday(), typeof rdvIsSalonClosed === 'function' ? rdvIsSalonClosed : null);
+    if (first) overlay.querySelector('#rs-date').value = first;
+    loadSlots();
+  };
   overlay.querySelector('#rs-date').onchange = loadSlots;
   loadSlots();
   overlay.querySelector('#rs-close-x').onclick = function () { _closeModal(overlay); };

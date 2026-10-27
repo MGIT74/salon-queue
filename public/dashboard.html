@@ -2878,7 +2878,7 @@
   </div>
 </div>
 
-<script src="/app.js?v=45"></script>
+<script src="/app.js?v=46"></script>
 <script src="/autorefresh.js?v=3"></script>
 <script src="/staff-group.js?v=6"></script>
 <script src="/daterange.js?v=4"></script>
@@ -3967,7 +3967,13 @@ function openRescheduleAppointment(id, data) {
     overlay.querySelector('#rs-save-btn').disabled = false;
   };
 
-  overlay.querySelector('#rs-barber').onchange = loadRsSlots;
+  // Autre coiffeur choisi : la date va a SON premier jour disponible (a partir d'aujourd'hui), puis ses creneaux.
+  overlay.querySelector('#rs-barber').onchange = function () {
+    var nb = rdvBarbers.find(function (x) { return String(x.id) === String(overlay.querySelector('#rs-barber').value); });
+    var first = nb && firstBookableDayFor(nb, salonToday(), typeof rdvIsSalonClosed === 'function' ? rdvIsSalonClosed : null);
+    if (first) overlay.querySelector('#rs-date').value = first;
+    loadRsSlots();
+  };
   overlay.querySelector('#rs-date').onchange = loadRsSlots;
   loadRsSlots();
 
