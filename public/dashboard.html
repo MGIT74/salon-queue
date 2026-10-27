@@ -2481,6 +2481,30 @@
     </div>
 
     <div class="card-box">
+      <h3 class="accordion-head" onclick="toggleSettingsAccordion('timer'); renderTimerBarbers()">
+        Timer
+        <svg class="accordion-chevron" id="timer-chevron" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </h3>
+      <div class="accordion-body" id="timer-body" style="display:none">
+      <p class="hint">Pour un client avec rendez-vous, le bouton « Commencer » du Timer (Mon poste et Caisse) se débloque un peu avant l'heure du RDV : le coiffeur peut démarrer la prestation en avance si le client est déjà là.</p>
+      <div class="caisse-hour-row" style="background:transparent;padding:0;margin:4px 0 12px">
+        <div class="caisse-hour-text">
+          <div class="caisse-hour-title" style="font-size:15px;font-weight:600">Pour tout le salon</div>
+          <div class="hint" style="margin:2px 0 0">Commencer jusqu'à <input id="timer-early-min" type="number" min="0" max="240" style="width:72px;display:inline-block;padding:6px 8px;margin:0 4px" value="10"> min avant l'heure du RDV.</div>
+        </div>
+        <div class="switch on" id="timer-early-switch" role="switch" aria-checked="true" tabindex="0" title="Activer / désactiver" onclick="toggleTimerEarlySwitch()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleTimerEarlySwitch();}"></div>
+      </div>
+      <h4 style="font-size:14.5px;font-weight:600;margin:18px 0 4px">Par coiffeur</h4>
+      <p class="hint">Chaque coiffeur suit le réglage du salon, ou a ses propres minutes, ou n'a pas d'avance (« Commencer » à l'heure exacte). Les nouveaux coiffeurs apparaissent ici automatiquement.</p>
+      <div id="timer-barbers"></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
+        <button class="btn btn-primary" onclick="saveTimerSettings()">Enregistrer le timer</button>
+        <button class="btn btn-soft" onclick="timerApplyToAll()">Tout le monde comme le salon</button>
+      </div>
+      </div>
+    </div>
+
+    <div class="card-box">
       <h3 class="accordion-head" onclick="toggleSettingsAccordion('smtp')">
         Envoi des emails (SMTP)
         <svg class="accordion-chevron" id="smtp-chevron" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
@@ -2831,7 +2855,7 @@
   </div>
 </div>
 
-<script src="/app.js?v=43"></script>
+<script src="/app.js?v=44"></script>
 <script src="/autorefresh.js?v=3"></script>
 <script src="/staff-group.js?v=5"></script>
 <script src="/daterange.js?v=4"></script>
@@ -9397,6 +9421,83 @@ function saveTimezone() {
     .catch(function (e) { toast(e.message, true); });
 }
 
+/* ---------- Reglages > Timer : commencer un client avec RDV X min avant son heure ----------
+   Salon : interrupteur + minutes (10 par defaut). Par coiffeur : « Comme le salon », « Personnalise » (ses minutes) ou
+   « Pas d'avance ». La liste suit les coiffeurs du salon (un nouveau coiffeur y apparait tout seul). */
+var timerEarlyBarbers = {};
+function fillTimerSettings(s) {
+  var on = s.timer_early_enabled === undefined || s.timer_early_enabled === null || String(s.timer_early_enabled) !== '0';
+  var sw = document.getElementById('timer-early-switch');
+  sw.classList.toggle('on', on); sw.setAttribute('aria-checked', on ? 'true' : 'false');
+  document.getElementById('timer-early-min').value = (s.timer_early_min === undefined || s.timer_early_min === null || s.timer_early_min === '') ? 10 : s.timer_early_min;
+  try { timerEarlyBarbers = JSON.parse(s.timer_early_barbers || '{}') || {}; } catch (e) { timerEarlyBarbers = {}; }
+  renderTimerBarbers();
+}
+function toggleTimerEarlySwitch() {
+  var sw = document.getElementById('timer-early-switch'), on = !sw.classList.contains('on');
+  sw.classList.toggle('on', on); sw.setAttribute('aria-checked', on ? 'true' : 'false');
+  renderTimerBarbers();
+}
+function timerSalonLabel() {
+  var on = document.getElementById('timer-early-switch').classList.contains('on');
+  return on ? (Number(document.getElementById('timer-early-min').value) || 0) + ' min avant' : "pas d'avance";
+}
+function renderTimerBarbers() {
+  var box = document.getElementById('timer-barbers');
+  if (!box) return;
+  var list = (barbers || []).filter(function (b) { return b.active; });
+  if (!list.length) { box.innerHTML = '<div class="hint">Aucun coiffeur actif.</div>'; return; }
+  box.innerHTML = list.map(function (b) {
+    var cur = timerEarlyBarbers[b.id] || { mode: 'salon' };
+    return '<div class="timer-barber-row" data-id="' + b.id + '" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid var(--sep)">' +
+      '<div style="flex:1 1 140px;min-width:0;font-weight:600">' + esc(b.name) + '</div>' +
+      '<select class="timer-mode" onchange="timerModeChanged(this)" style="flex:0 1 240px;padding:8px 10px;border-radius:10px">' +
+        '<option value="salon"' + (cur.mode === 'salon' ? ' selected' : '') + '>Comme le salon (' + esc(timerSalonLabel()) + ')</option>' +
+        '<option value="custom"' + (cur.mode === 'custom' ? ' selected' : '') + '>Personnalisé</option>' +
+        '<option value="off"' + (cur.mode === 'off' ? ' selected' : '') + '>Pas d\'avance</option>' +
+      '</select>' +
+      '<span class="timer-custom" style="display:' + (cur.mode === 'custom' ? 'inline-flex' : 'none') + ';align-items:center;gap:6px"><input class="timer-min" type="number" min="0" max="240" value="' + (cur.mode === 'custom' ? Number(cur.min) || 0 : (Number(document.getElementById('timer-early-min').value) || 10)) + '" style="width:72px;padding:6px 8px"> min avant</span>' +
+    '</div>';
+  }).join('');
+}
+function timerModeChanged(sel) {
+  var row = sel.closest('.timer-barber-row');
+  row.querySelector('.timer-custom').style.display = sel.value === 'custom' ? 'inline-flex' : 'none';
+}
+function timerCollectBarbers() {
+  var out = {};
+  document.querySelectorAll('#timer-barbers .timer-barber-row').forEach(function (row) {
+    var mode = row.querySelector('.timer-mode').value;
+    if (mode === 'custom') out[row.dataset.id] = { mode: 'custom', min: Number(row.querySelector('.timer-min').value) || 0 };
+    else if (mode === 'off') out[row.dataset.id] = { mode: 'off' };
+  });
+  return out;
+}
+function timerApplyToAll() {
+  document.querySelectorAll('#timer-barbers .timer-mode').forEach(function (sel) { sel.value = 'salon'; timerModeChanged(sel); });
+  toast('Tous les coiffeurs suivent le réglage du salon — pensez à enregistrer');
+}
+function saveTimerSettings() {
+  var min = Number(document.getElementById('timer-early-min').value);
+  if (!Number.isInteger(min) || min < 0 || min > 240) { toast('Minutes du salon : un nombre entre 0 et 240', true); return; }
+  var bad = Array.prototype.some.call(document.querySelectorAll('#timer-barbers .timer-barber-row'), function (row) {
+    if (row.querySelector('.timer-mode').value !== 'custom') return false;
+    var v = Number(row.querySelector('.timer-min').value);
+    return !Number.isInteger(v) || v < 0 || v > 240;
+  });
+  if (bad) { toast('Minutes d\'un coiffeur : un nombre entre 0 et 240', true); return; }
+  var barbersCfg = timerCollectBarbers();
+  api('/api/settings', { method: 'PUT', body: {
+    timer_early_enabled: document.getElementById('timer-early-switch').classList.contains('on') ? '1' : '0',
+    timer_early_min: String(min),
+    timer_early_barbers: barbersCfg
+  } }).then(function () {
+    timerEarlyBarbers = barbersCfg;
+    renderTimerBarbers();
+    toast('Timer enregistré');
+  }).catch(function (e) { toast(e.message, true); });
+}
+
 function renderClientMessagesSwitch(paused) {
   var sw = document.getElementById('client-msg-switch'), note = document.getElementById('client-msg-paused');
   if (!sw) return;
@@ -9451,6 +9552,7 @@ function loadSettings() {
     loadVatRates();
     // Les modeles d'email sont dans cet onglet (Reglages) : on les remplit ICI (avant, seul l'onglet Caisse le faisait).
     fillEmailTemplates(s);
+    fillTimerSettings(s);
   }).catch(function (e) { toast(e.message, true); });
 
   loadSalonSchedule();

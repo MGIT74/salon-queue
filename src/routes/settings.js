@@ -30,6 +30,8 @@ const EDITABLE = [
   'caisse_open_enabled', 'caisse_open_hour', 'caisse_close_enabled', 'caisse_close_hour',
   'rdv_slot_step_min', 'rdv_min_lead_min', 'rdv_max_advance_days',
   'rdv_buffer_min', 'rdv_cancel_deadline_min', 'rdv_prep_alert_min',
+  // Timer : commencer la prestation d'un client avec RDV X min avant son heure (salon + reglage par coiffeur).
+  'timer_early_enabled', 'timer_early_min', 'timer_early_barbers',
   // Informations légales (ticket de caisse) - voir CGI / loi anti-fraude TVA.
   'legal_address', 'legal_phone', 'legal_email', 'legal_website',
   'legal_siret', 'legal_vat_number', 'legal_form', 'legal_share_capital',
@@ -152,7 +154,7 @@ router.put('/', requireAdmin, wrap(async (req, res) => {
     rdv_max_advance_days: [0, 730], rdv_buffer_min: [0, 480],
     rdv_cancel_deadline_min: [0, 10080], rdv_prep_alert_min: [0, 1440],
     notify_before_min: [0, 10080], caisse_inactivity_seconds: [0, 86400],
-    caisse_reopen_hour: [0, 23], smtp_port: [1, 65535]
+    caisse_reopen_hour: [0, 23], smtp_port: [1, 65535], timer_early_min: [0, 240]
   };
   for (const [key, bounds] of Object.entries(limits)) {
     if (patch[key] === undefined) continue;
@@ -163,6 +165,23 @@ router.put('/', requireAdmin, wrap(async (req, res) => {
     }
     patch[key] = String(value);
   }
+  // Timer en avance : interrupteur du salon '0'/'1', et par coiffeur { id: { mode: 'salon'|'custom'|'off', min } }.
+  if (patch.timer_early_enabled !== undefined) patch.timer_early_enabled = (patch.timer_early_enabled === true || String(patch.timer_early_enabled) === '1') ? '1' : '0';
+  if (patch.timer_early_barbers !== undefined) {
+    let raw = patch.timer_early_barbers;
+    if (typeof raw === 'string') { try { raw = JSON.parse(raw || '{}'); } catch (e) { return res.status(400).json({ error: 'Réglage du timer invalide' }); } }
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return res.status(400).json({ error: 'Réglage du timer invalide' });
+    const clean = {};
+    for (const [id, v] of Object.entries(raw).slice(0, 200)) {
+      if (!/^[\w-]{1,64}$/.test(id) || !v || typeof v !== 'object') continue;
+      const mode = ['salon', 'custom', 'off'].includes(v.mode) ? v.mode : 'salon';
+      const min = Number(v.min);
+      if (mode === 'custom' && (!Number.isSafeInteger(min) || min < 0 || min > 240)) return res.status(400).json({ error: 'Minutes du timer invalides (0 à 240)' });
+      if (mode !== 'salon') clean[id] = mode === 'custom' ? { mode, min } : { mode };
+    }
+    patch.timer_early_barbers = JSON.stringify(clean);
+  }
+
   // Champ mot de passe laissé vide = on conserve l'ancien
   if (patch.smtp_pass === '') delete patch.smtp_pass;
 
@@ -447,6 +466,10 @@ router.get('/public', wrap(async (req, res) => {
     rdv_buffer_min: s.rdv_buffer_min ? Number(s.rdv_buffer_min) : 0,
     rdv_cancel_deadline_min: s.rdv_cancel_deadline_min ? Number(s.rdv_cancel_deadline_min) : 0,
     rdv_prep_alert_min: s.rdv_prep_alert_min ? Number(s.rdv_prep_alert_min) : 0,
+    // Timer en avance (par defaut : active, 10 min avant l'heure du RDV).
+    timer_early_enabled: s.timer_early_enabled === undefined ? true : String(s.timer_early_enabled) === '1',
+    timer_early_min: s.timer_early_min === undefined || s.timer_early_min === '' ? 10 : Number(s.timer_early_min),
+    timer_early_barbers: (() => { try { return JSON.parse(s.timer_early_barbers || '{}'); } catch (e) { return {}; } })(),
     accent_color: s.accent_color || null,
     login_image_url: s.login_image_url || null,
     timezone: s.timezone || 'Europe/Paris',

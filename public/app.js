@@ -1652,3 +1652,18 @@ function ensureBarberChipsCss() {
     ".dt-barber-pic.off::after{content:'';position:absolute;right:0;bottom:0;width:12px;height:12px;border-radius:50%;background:var(--red);border:2px solid var(--card)}";
   document.head.appendChild(st);
 }
+
+/* ===== Timer : commencer un client avec RDV un peu avant son heure =====
+   Reglages > Timer : pour tout le salon (active ou non, X min, 10 par defaut) et, pour chaque coiffeur, « comme le
+   salon », ses propres minutes, ou desactive. cfg = reglages publics (/api/settings/public). */
+function timerEarlyMinFor(cfg, barberId) {
+  if (!cfg) return 0;
+  var own = barberId && cfg.timer_early_barbers ? cfg.timer_early_barbers[barberId] : null;
+  if (own && own.mode === 'off') return 0;
+  if (own && own.mode === 'custom') return Math.max(0, Number(own.min) || 0);
+  return cfg.timer_early_enabled === false ? 0 : Math.max(0, Number(cfg.timer_early_min) || 0);
+}
+/** Heure (ms) a partir de laquelle on peut commencer ce client avec RDV. */
+function timerStartAllowedAt(q, cfg, barberId) {
+  return new Date(q.checkin_at).getTime() - timerEarlyMinFor(cfg, barberId) * 60000;
+}

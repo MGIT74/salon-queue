@@ -492,7 +492,7 @@
   </button>
 </div>
 
-<script src="/app.js?v=43"></script>
+<script src="/app.js?v=44"></script>
 <script src="/autorefresh.js?v=3"></script>
 <script src="/staff-group.js?v=5"></script>
 <script>requireSalonInUrl("Pour utiliser votre poste, ouvrez le lien de votre salon.");</script>
@@ -501,6 +501,7 @@ mountThemeButton();
 
 var me = null; // { id, name, pin }
 var rdvPrepAlertMin = 0;
+var timerCfg = null;   // Reglages > Timer (commencer un RDV en avance), lus dans les reglages publics
 var queue = [];
 var barbers = [];
 var extras = [];
@@ -528,6 +529,7 @@ function loadSalonName() {
       var name = d.salon_name || '';
       CURRENCY = d.currency || 'EUR'; if (d.timezone) SALON_TIMEZONE = d.timezone;
       rdvPrepAlertMin = Number(d.rdv_prep_alert_min) || 0;
+      timerCfg = { timer_early_enabled: d.timer_early_enabled, timer_early_min: d.timer_early_min, timer_early_barbers: d.timer_early_barbers || {} };
       applyAccentColor(d.accent_color);
       document.title = name + ' — Mon poste';
       var mark = document.getElementById('salon-mark');
@@ -888,14 +890,18 @@ function renderNext() {
 
   zone.innerHTML = mine.map(function (q, i) {
     var isAppointmentNotYet = Boolean(q.is_appointment) && new Date(q.checkin_at) > new Date();
+    // Reglages > Timer : « Commencer » se debloque X min avant l'heure du RDV (reglage du salon ou du coiffeur).
+    var startAt = q.is_appointment ? timerStartAllowedAt(q, timerCfg, me && me.id) : 0;
+    var tooEarly = isAppointmentNotYet && Date.now() < startAt;
     var noTimerBarber = me.timerEnabled === false;
-    var locked = i > 0 || (isAppointmentNotYet && !noTimerBarber);
+    var locked = i > 0 || (tooEarly && !noTimerBarber);
     var detail = svcLabel(q.service.name, q.extras);
     var open = Boolean(nextDetailOpen[q.id]);
     var minutesUntil = isAppointmentNotYet ? Math.round((new Date(q.checkin_at) - new Date()) / 60000) : null;
     var prepAlert = isAppointmentNotYet && rdvPrepAlertMin > 0 && minutesUntil <= rdvPrepAlertMin;
     var lockNote = isAppointmentNotYet
-      ? (prepAlert ? '⏰ Préparez-vous — RDV dans ' + Math.max(minutesUntil, 0) + ' min' : 'RDV à ' + new Date(q.checkin_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }))
+      ? (prepAlert ? '⏰ Préparez-vous — RDV dans ' + Math.max(minutesUntil, 0) + ' min' : 'RDV à ' + new Date(q.checkin_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })) +
+        (tooEarly && startAt < new Date(q.checkin_at).getTime() ? ' · Commencer dès ' + new Date(startAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : (!tooEarly && !locked ? ' · vous pouvez commencer' : ''))
       : 'En attente de son tour';
     var appointmentBadge = (q.is_appointment && !isAppointmentNotYet)
       ? '<div class="meta" style="color:var(--blue)">RDV ' + new Date(q.checkin_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) + '</div>'
