@@ -178,6 +178,8 @@ node tests/caisse/144-rdv-creer-compte-populaire.js  # Prise de RDV : « Creer u
 node tests/caisse/145-compte-logo-menu.js  # Compte client : logo du salon au-dessus du menu
 node tests/caisse/146-coiffeurs-conge-visibles.js  # RDV en ligne : coiffeurs en conge visibles, indisponible aux creneaux, choix du coiffeur a l'etape date
 node tests/caisse/147-timer-commencer-en-avance.js  # Reglages > Timer : commencer un RDV en avance (salon + par coiffeur)
+node tests/caisse/148-coordonnees-valides.js  # Coordonnees verifiees partout (email, telephone, nom)
 node tests/caisse/146-coiffeurs-conge-visibles.js  # RDV en ligne / compte : coiffeurs en conge visibles, indisponible aux creneaux, choix du coiffeur a l'etape date
 node tests/caisse/147-timer-commencer-en-avance.js  # Reglages > Timer : commencer un RDV en avance (salon + par coiffeur)
+node tests/caisse/148-coordonnees-valides.js  # Coordonnees verifiees partout (email, telephone, nom)
 ```

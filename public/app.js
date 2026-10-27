@@ -1667,3 +1667,29 @@ function timerEarlyMinFor(cfg, barberId) {
 function timerStartAllowedAt(q, cfg, barberId) {
   return new Date(q.checkin_at).getTime() - timerEarlyMinFor(cfg, barberId) * 60000;
 }
+
+/* ===== Coordonnees du client : memes regles que le serveur (src/lib/contact.js) =====
+   email nom@domaine.ext ; telephone +33612345678 / 0612345678 (8 a 15 chiffres a l'international) ; nom 2 lettres min.
+   Un champ vide non obligatoire est accepte ; un champ rempli doit etre valide. Renvoie le message d'erreur, ou ''. */
+function isValidEmailStr(v) {
+  var e = String(v == null ? '' : v).trim();
+  return e.length <= 254 && /^[^\s@<>()[\],;:"]+@[^\s@<>()[\],;:"]+\.[A-Za-z]{2,}$/.test(e) && !/\.\./.test(e);
+}
+function isValidPhoneStr(v) {
+  var s = String(v == null ? '' : v).trim();
+  if (!/^\+?[0-9 ().\-/]+$/.test(s)) return false;
+  var d = s.replace(/\D/g, '');
+  if (s.charAt(0) === '+') return d.indexOf('33') === 0 ? d.length === 11 : (d.length >= 8 && d.length <= 15);
+  if (d.charAt(0) === '0') return d.length === 10;
+  return d.length >= 8 && d.length <= 15;
+}
+function contactProblem(c, opts) {
+  c = c || {}; opts = opts || {};
+  var name = String(c.name == null ? '' : c.name).trim(), email = String(c.email == null ? '' : c.email).trim(), phone = String(c.phone == null ? '' : c.phone).trim();
+  if (opts.nameRequired !== false && (name.length < 2 || !/[A-Za-zÀ-ÖØ-öø-ÿ]/.test(name))) return 'Nom invalide : au moins 2 lettres.';
+  if (!email) { if (opts.emailRequired) return "L'email est requis pour la confirmation."; }
+  else if (!isValidEmailStr(email)) return 'Adresse email invalide (exemple : prenom@gmail.com).';
+  if (!phone) { if (opts.phoneRequired) return 'Le téléphone est requis.'; }
+  else if (!isValidPhoneStr(phone)) return 'Numéro de téléphone invalide (exemple : 06 12 34 56 78).';
+  return '';
+}

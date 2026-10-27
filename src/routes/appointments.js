@@ -19,6 +19,7 @@ const groupBooking = require('../lib/groupBooking');
 const { loadCatalog, offerFor, resolveOffer } = require('../lib/barberOffer');
 const { serviceLabel, serviceNameSql } = require('../lib/extrasOnly');
 const { saleForPassage } = require('../lib/salePassage');
+const { contactError, isValidEmail, isValidPhone } = require('../lib/contact');
 
 const router = express.Router();
 
@@ -599,6 +600,9 @@ router.post('/', bookingRateLimiter, wrap(withBookingLock(async (req, res) => {
   if (!date || !time) return res.status(400).json({ error: 'Prestation, date et créneau requis' });
   if (!validBookingDate(date) || !validBookingTime(time)) return res.status(400).json({ error: 'Date ou heure invalide' });
   if (String(client_name).length > 255 || String(email).length > 255) return res.status(400).json({ error: 'Nom ou email trop long' });
+  // Coordonnees valides (avant : « t » passait pour un email et un telephone).
+  const contactErr = contactError({ name: client_name, email, phone }, { emailRequired: true });
+  if (contactErr) return res.status(400).json({ error: contactErr });
 
   // Produits choisis d'avance (ex: une boisson) - jamais d'impact sur la
   // duree/le creneau, juste une liste a retrouver au moment d'encaisser.
@@ -776,6 +780,8 @@ async function createGroupBooking(req, res, staff) {
   const { client_name, email, phone } = req.body;
   if (!email && !staff) return res.status(400).json({ error: "L'email est requis pour la confirmation" });
   if (!client_name) return res.status(400).json({ error: 'Le nom est requis' });
+  const contactErr = contactError({ name: client_name, email, phone }, { emailRequired: !staff, nameRequired: !staff });
+  if (contactErr) return res.status(400).json({ error: contactErr });
   const clientNote = req.body.client_note ? String(req.body.client_note).slice(0, 500) : null;
 
   const norm = groupBooking.normalizePeople(req.body);
@@ -942,6 +948,9 @@ router.post('/admin-create', requireAdminOrBarber, wrap(withBookingLock(async (r
   if (!date || !time) return res.status(400).json({ error: 'Prestation, date et créneau requis' });
   if (!validBookingDate(date) || !validBookingTime(time)) return res.status(400).json({ error: 'Date ou heure invalide' });
   if (String(client_name).length > 255 || (email && String(email).length > 255)) return res.status(400).json({ error: 'Nom ou email trop long' });
+  // Equipe : email et telephone facultatifs, mais valides s'ils sont saisis.
+  const contactErr = contactError({ name: client_name, email, phone }, { nameRequired: false });
+  if (contactErr) return res.status(400).json({ error: contactErr });
 
   if (await isSalonClosedOnDate(req.salon.id, date)) return res.status(409).json({ error: 'Salon fermé ce jour : prise de rendez-vous impossible.' });
 

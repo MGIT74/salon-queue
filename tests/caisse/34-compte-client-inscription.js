@@ -87,7 +87,7 @@ const E = (n) => `zt-client-${n}@example.com`;
         <div id="signup-err"></div><h1 id="check-title">Vérifiez vos emails</h1><div id="check-msg">Un email de confirmation vient de vous être envoyé. X</div>
         <input id="li-email" value="a@b.fr"><input id="li-pass" value="secret1"><div id="login-err"></div><button id="resend-btn" style="display:none"></button>`, { runScripts: 'outside-only', url: 'http://localhost/' });
       const w = dom.window; w.__calls = []; w.__shown = []; w.SALON_SLUG = 'le-salon';
-      w.composePhone = (c, p) => c + p; w.show = (id) => w.__shown.push(id); w.baseUrl = () => 'http://x/compte.html?salon=le-salon'; w.loadProfile = () => {};
+      w.composePhone = (c, p) => c + p; w.contactProblem = () => ''; w.show = (id) => w.__shown.push(id); w.baseUrl = () => 'http://x/compte.html?salon=le-salon'; w.loadProfile = () => {};
       w.eval(fn('api') + fn('doSignup') + fn('doLogin') + fn('doResendVerification'));
       return w;
     };

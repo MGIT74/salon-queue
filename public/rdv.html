@@ -415,7 +415,7 @@
   </section>
 </div>
 
-<script src="/app.js?v=44"></script>
+<script src="/app.js?v=45"></script>
 <script src="/group-booking.js?v=27"></script>
 <style>
 body.staff-mode .gift-summary-box,body.staff-mode .theme-btn,body.staff-mode .login-hint{display:none!important}
@@ -995,6 +995,8 @@ function submitAppointment() {
   if (!name) { toast('Entrez votre prénom', true); return; }
   if (!email) { toast('Entrez votre email', true); return; }
   if (!phone) { toast('Entrez votre téléphone', true); return; }
+  var cp = contactProblem({ name: name, email: email, phone: phone }, { emailRequired: true, phoneRequired: true });
+  if (cp) { toast(cp, true); return; }
 
   var btn = document.getElementById('confirm-btn');
   btn.disabled = true; btn.textContent = 'Enregistrement…';
@@ -1117,6 +1119,8 @@ function submitGroup() {
   if (!name) { toast(STAFF_BRIDGE ? 'Entrez le nom du client' : 'Entrez votre prénom', true); return; }
   if (!STAFF_BRIDGE && !email) { toast('Entrez votre email', true); return; }
   if (!STAFF_BRIDGE && !phone) { toast('Entrez votre téléphone', true); return; }
+  var cpg = contactProblem({ name: name, email: email, phone: phone }, { emailRequired: !STAFF_BRIDGE, phoneRequired: !STAFF_BRIDGE });
+  if (cpg) { toast(cpg, true); return; }
   var btn = document.getElementById('group-confirm-btn');
   btn.disabled = true; btn.textContent = 'Enregistrement…';
   (STAFF_BRIDGE ? STAFF_BRIDGE.api : api)(STAFF_BRIDGE ? '/api/appointments/admin-group' : '/api/appointments/group', {

@@ -8,6 +8,7 @@ const requireAdminOrBarber = require('../middleware/barberAuth');
 const { hashPassword, verifyPassword } = require('../lib/password');
 const { sendLoyaltyActivation, sendGiftConfirmation, sendClientSecurityNotice, sendAdminEmailVerification } = require('../lib/mailer');
 const { clientKey } = require('../lib/queueMath');
+const { isValidEmail, isValidPhone } = require('../lib/contact');
 const { logActivity } = require('../lib/activityLog');
 const { wrap } = require('../lib/wrap');
 const { getPendingRecount } = require('../lib/pendingRecount');
@@ -558,6 +559,8 @@ router.post('/loyalty-accounts/activate', requireAdminOrBarber, wrap(async (req,
   const phone = String(req.body.client_phone || '').trim();
   if (!clientName) return res.status(400).json({ error: 'Le nom du client est requis' });
   if (!email) return res.status(400).json({ error: "L'email du client est requis pour activer sa carte" });
+  if (!isValidEmail(email)) return res.status(400).json({ error: 'Adresse email invalide (exemple : prenom@gmail.com).' });
+  if (phone && !isValidPhone(phone)) return res.status(400).json({ error: 'Numéro de téléphone invalide (exemple : 06 12 34 56 78).' });
 
   const key = clientKey({ email, phone, client_name: clientName });
   if (!key) return res.status(400).json({ error: 'Impossible d\'identifier ce client' });

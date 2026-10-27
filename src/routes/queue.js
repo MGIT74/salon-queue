@@ -12,6 +12,7 @@ const { logActivity } = require('../lib/activityLog');
 const { wrap } = require('../lib/wrap');
 const { resolveServiceId } = require('../lib/extrasOnly');
 const { PASSAGE_OF_LINE, saleForPassage, passageCountOfSale } = require('../lib/salePassage');
+const { contactError, isValidEmail, isValidPhone } = require('../lib/contact');
 const { isBlocked, recordFailure, recordSuccess, signupRateLimiter } = require('../middleware/rateLimiter');
 
 const router = express.Router();
@@ -300,6 +301,8 @@ router.delete('/:id/unpaid', requireAdminOrBarber, wrap(async (req, res) => {
 router.post('/manual-client', requireAdmin, wrap(async (req, res) => {
   const { client_name, email, phone, service_id } = req.body;
   if (!client_name || !String(client_name).trim()) return res.status(400).json({ error: 'Le nom est requis' });
+  const contactErr = contactError({ name: client_name, email, phone }, { nameRequired: false });
+  if (contactErr) return res.status(400).json({ error: contactErr });
 
   let totalPriceCents = null;
   let totalDurationMin = null;
@@ -387,6 +390,8 @@ router.post('/manual-client/import-log', requireAdmin, wrap(async (req, res) => 
 async function validateCheckin(salonId, body, opts = {}) {
   const { client_name, email, phone, barber_id, extras } = body;
   if (!client_name) return { status: 400, error: 'Le nom est requis' };
+  const contactErr = contactError({ name: client_name, email, phone });
+  if (contactErr) return { status: 400, error: contactErr };
   // Sans prestation : au moins un supplement (« Supplement seul », prestation cachee - voir lib/extrasOnly).
   const resolved = await resolveServiceId(salonId, body.service_id, Array.isArray(extras) ? extras : []);
   if (resolved.error) return { status: 400, error: resolved.error };
@@ -528,6 +533,7 @@ router.post('/checkin-group', checkinLimiter, wrap(async (req, res) => {
   if (!people.length) return res.status(400).json({ error: 'Ajoutez au moins une personne.' });
   if (people.length > MAX_GROUP) return res.status(400).json({ error: 'Maximum ' + MAX_GROUP + ' personnes.' });
   const email = req.body.email ? String(req.body.email).trim().slice(0, 190) : null;
+  if (email && !isValidEmail(email)) return res.status(400).json({ error: 'Adresse email invalide (exemple : prenom@gmail.com).' });
   const checked = [];
   for (let i = 0; i < people.length; i++) {
     const p = people[i] || {};
@@ -772,6 +778,9 @@ router.put('/:id', requireAdminOrBarber, wrap(async (req, res) => {
   }
 
   const { service_id, extras, barber_id, client_name, email, phone } = req.body;
+  // Fiche modifiee : chaque coordonnee saisie doit etre valide (un champ vide reste permis).
+  const contactErr = contactError({ name: client_name, email, phone }, { nameRequired: false });
+  if (contactErr) return res.status(400).json({ error: contactErr });
   const paidSale = await saleForPassage(pool, req.salon.id, req.params.id);
   // Exception : un client payé D'AVANCE et pas encore terminé peut recevoir un supplément pendant sa coupe ;
   // la différence est réglée à la fin (« reste à payer », cf. sales.js balance).

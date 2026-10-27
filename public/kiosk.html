@@ -466,7 +466,7 @@
   </main>
 </div>
 
-<script src="/app.js?v=44"></script>
+<script src="/app.js?v=45"></script>
 <script src="/group-booking.js?v=27"></script>
 <script src="/queue-sim.js?v=1"></script>
 <script>requireSalonInUrl("Pour utiliser cette borne, ouvrez le lien de votre salon.");</script>
@@ -921,6 +921,8 @@ function submitForm(btn) {
   var mail = document.getElementById('f-mail').value.trim();
   if (!name) { toast('Merci d\'indiquer votre prénom', true); return; }
   if (!selService) { toast('Choisissez une prestation', true); return; }
+  var cp = contactProblem({ name: name, email: mail });   // email facultatif, mais valide s'il est saisi
+  if (cp) { toast(cp, true); return; }
 
   btn = btn || document.querySelector('.panel.on .kfoot .go');
   var label = btn.textContent;

@@ -831,7 +831,7 @@
 
 </div>
 
-<script src="/app.js?v=44"></script>
+<script src="/app.js?v=45"></script>
 <script src="/autorefresh.js?v=3"></script>
 <script src="/group-booking.js?v=27"></script>
 <style>
@@ -968,6 +968,8 @@ function doSignup() {
   var errEl = document.getElementById('signup-err');
   errEl.textContent = '';
   if (!phoneRaw) { errEl.textContent = 'Le téléphone est requis'; return; }
+  var cp = contactProblem({ name: name, email: email, phone: phone }, { emailRequired: true, phoneRequired: true });
+  if (cp) { errEl.textContent = cp; return; }
   api('/api/client-auth/signup', { method: 'POST', body: { name: name, email: email, phone: phone, password: password, base_url: baseUrl() } })
     .then(function (d) {
       var sent = !(d && d.email_sent === false);
@@ -2107,6 +2109,8 @@ function saveProfile() {
   var phoneRaw = document.getElementById('pf-phone').value.trim();
   if (!phoneRaw) { errEl.textContent = 'Le téléphone est requis'; return; }
   var phone = composePhone(document.getElementById('pf-phone-country').value, phoneRaw);
+  var cp = contactProblem({ name: document.getElementById('pf-name').value.trim(), email: document.getElementById('pf-email').value.trim(), phone: phone }, { emailRequired: true, phoneRequired: true });
+  if (cp) { errEl.textContent = cp; return; }
   errEl.textContent = '';
   api('/api/client-auth/me', {
     method: 'PUT',

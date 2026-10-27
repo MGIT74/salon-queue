@@ -26,16 +26,16 @@ const rd = (f) => fs.readFileSync(path.join(__dirname, '../../public', f), 'utf8
   console.log('\n[A] Serveur');
   let r = await call('GET', `/api/appointments/availability?date=${DAY}&barber_id=b1&extras=t124-soin`, PUB);
   check('creneaux sans prestation (duree des supplements)', r.status === 200 && r.body.slots.length > 0, r.body);
-  r = await call('POST', '/api/appointments', PUB, { client_name: 'T124 Ligne', email: 't124@example.com', phone: '0600', barber_id: 'b1', extras: ['t124-soin'], date: DAY, time: '10:00' });
+  r = await call('POST', '/api/appointments', PUB, { client_name: 'T124 Ligne', email: 't124@example.com', phone: '0600000000', barber_id: 'b1', extras: ['t124-soin'], date: DAY, time: '10:00' });
   check('RDV en ligne : seulement un supplement', r.status === 200, r.body);
   check('enregistre sur la prestation cachee, avec le supplement', sql(`SELECT CONCAT(a.service_id, '|', ae.extra_id) FROM appointments a JOIN appointment_extras ae ON ae.appointment_id = a.id WHERE a.client_name = 'T124 Ligne'`) === hidden + '|t124-soin');
-  r = await call('POST', '/api/appointments', PUB, { client_name: 'T124 Rien', email: 't@x.fr', phone: '06', barber_id: 'b1', date: DAY, time: '11:00' });
+  r = await call('POST', '/api/appointments', PUB, { client_name: 'T124 Rien', email: 't@x.fr', phone: '0600000000', barber_id: 'b1', date: DAY, time: '11:00' });
   check('ni prestation ni supplement : refuse', r.status === 400 && /au moins un supplément/.test(r.body.error), r.body);
-  r = await call('POST', '/api/appointments', PUB, { client_name: 'T124 Repere', email: 't@x.fr', phone: '06', service_id: '__extras__', barber_id: 'b1', extras: ['t124-soin'], date: DAY, time: '12:00' });
+  r = await call('POST', '/api/appointments', PUB, { client_name: 'T124 Repere', email: 't@x.fr', phone: '0600000000', service_id: '__extras__', barber_id: 'b1', extras: ['t124-soin'], date: DAY, time: '12:00' });
   check('le repere des pages (« __extras__ ») est accepte', r.status === 200, r.body);
   r = await call('POST', '/api/appointments/admin-create', ADMIN, { client_name: 'T124 Admin', barber_id: 'b1', extras: ['t124-soin'], date: DAY, time: '14:00' });
   check('admin / caisse / Mon poste : « Ajouter un RDV »', r.status === 200, r.body);
-  r = await call('POST', '/api/appointments/group', PUB, { client_name: 'T124 G', email: 'g@x.fr', phone: '06', base_url: BASE + '/rdv.html',
+  r = await call('POST', '/api/appointments/group', PUB, { client_name: 'T124 G', email: 'g@x.fr', phone: '0600000000', base_url: BASE + '/rdv.html',
     people: [{ name: 'T124 G1', service_id: '__extras__', extras: ['t124-soin'], barber_id: 'b1', date: DAY, time: '15:00' }, { name: 'T124 G2', service_id: 'sv1', barber_id: 'b1', date: DAY, time: '16:00' }] });
   check('a plusieurs : une personne seulement un supplement, l\'autre une prestation', r.status === 200 && r.body.appointments.length === 2, r.body);
   r = await call('POST', '/api/queue/checkin', PUB, { client_name: 'T124 Borne', extras: ['t124-soin'] });

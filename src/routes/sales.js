@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const { pool, utcIso, getSettings, getCaisseLock, caisseDayStartUtc } = require('../db');
 const { getVatRates, rateForItem, TABLES: VAT_TABLES } = require('../lib/vat');
 const { clientKey, earnLoyaltyPoint } = require('../lib/queueMath');
+const { contactError } = require('../lib/contact');
 const { sendGiftConfirmation } = require('../lib/mailer');
 const requireAdmin = require('../middleware/auth');
 const requireAdminOrBarber = require('../middleware/barberAuth');
@@ -87,6 +88,8 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
     if (!gift.recipient_name || !gift.recipient_phone || !gift.recipient_email) {
       return res.status(400).json({ error: 'Nom, téléphone et email du bénéficiaire sont requis pour un cadeau' });
     }
+    const giftContactErr = contactError({ name: gift.recipient_name, email: gift.recipient_email, phone: gift.recipient_phone }, { emailRequired: true, phoneRequired: true });
+    if (giftContactErr) return res.status(400).json({ error: 'Bénéficiaire du cadeau : ' + giftContactErr });
     // Le coiffeur actif (bulle sélectionnée) au moment de la vente
     // devient le coiffeur DÉSIGNÉ pour ce cadeau - le bénéficiaire
     // n'aura plus à en choisir un lui-même au kiosk/à la réservation en

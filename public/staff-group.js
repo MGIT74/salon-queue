@@ -98,6 +98,9 @@
     if (pick && pick.account_id) { c.account_id = pick.account_id; c.relatives = (pick.relatives || []).slice(); }
     var err = overlay.querySelector('#' + P + '-client-error');
     if (!c.name) { if (err) { err.textContent = 'Le nom du client est requis'; err.style.display = 'block'; } overlay.querySelector('#' + P + '-name').focus(); return null; }
+    // Coordonnees facultatives, mais valides si elles sont saisies (le telephone saisi en 06... ou +33...).
+    var bad = typeof contactProblem === 'function' ? contactProblem(c, { nameRequired: false }) : '';
+    if (bad) { if (err) { err.textContent = bad; err.style.display = 'block'; } return null; }
     if (err) err.style.display = 'none';
     var pill = overlay.querySelector('#' + P + '-client-pill');
     if (pill) pill.querySelector('span').textContent = c.name + (c.phone ? ' · ' + c.phone : '') + (c.account_id ? ' · Compte client' : '');

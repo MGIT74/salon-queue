@@ -1,5 +1,6 @@
 const express = require('express');
 const { serviceNameSql } = require('../lib/extrasOnly');
+const { contactError, isValidEmail, isValidPhone } = require('../lib/contact');
 const { thresholdsForSalon, rewardsFor } = require('../lib/loyaltyRules');
 const { safeBaseUrl } = require('../lib/safeUrl');
 const crypto = require('crypto');
@@ -46,7 +47,8 @@ router.post('/signup', signupRateLimiter('client-signup'), wrap(async (req, res)
   if (!name || !email || !password) return res.status(400).json({ error: 'Nom, email et mot de passe requis' });
   if (!phone) return res.status(400).json({ error: 'Le téléphone est requis' });
   if (password.length < 6) return res.status(400).json({ error: 'Le mot de passe doit contenir au moins 6 caractères' });
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Adresse email invalide' });
+  const contactErr = contactError({ name, email, phone }, { emailRequired: true, phoneRequired: true });
+  if (contactErr) return res.status(400).json({ error: contactErr });
 
   const salonId = req.salon.id;
   const [[existing]] = await pool.query(
@@ -320,13 +322,14 @@ router.put('/me', requireClient, wrap(async (req, res) => {
 
   if (phone !== undefined) {
     if (!String(phone).trim()) return res.status(400).json({ error: 'Le téléphone est requis' });
+    if (!isValidPhone(phone)) return res.status(400).json({ error: 'Numéro de téléphone invalide (exemple : 06 12 34 56 78).' });
     sets.push('phone = ?'); params.push(String(phone).trim());
   }
 
   // Ne jamais modifier l'adresse active avant confirmation du nouvel email.
   if (email && String(email).trim().toLowerCase() !== String(req.clientAccount.email).trim().toLowerCase()) {
     const newEmail = String(email).trim().toLowerCase();
-    if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(newEmail)) return res.status(400).json({ error: 'Adresse email invalide' });
+    if (!isValidEmail(newEmail)) return res.status(400).json({ error: 'Adresse email invalide (exemple : prenom@gmail.com).' });
     const [[existing]] = await pool.query(
       'SELECT id FROM clients WHERE salon_id = ? AND (email = ? OR pending_email = ?) AND id != ?',
       [req.clientAccount.salon_id, newEmail, newEmail, req.clientAccount.id]
