@@ -748,6 +748,28 @@ function isOnLeaveOn(b, dateStr) {
 }
 
 /**
+ * Dernier jour du conge en cours a dateStr, en suivant les conges qui s'enchainent : un conge peut etre enregistre
+ * en plusieurs morceaux (ex. 27-31 oct puis 1-15 nov, ou separes par un jour non travaille). Renvoie '' si pas en conge.
+ */
+function leaveEndFrom(b, dateStr) {
+  var leaves = (b && b.leaves) || [];
+  var cover = function (d) { var e = ''; leaves.forEach(function (l) { if (d >= l.start_date && d <= l.end_date && l.end_date > e) e = l.end_date; }); return e; };
+  var end = cover(dateStr);
+  if (!end) return '';
+  var works = (b.schedules || []).filter(function (s) { return s.active; }).map(function (s) { return Number(s.weekday); });
+  var next = function (d) { var x = new Date(d + 'T12:00:00Z'); x.setUTCDate(x.getUTCDate() + 1); return x.toISOString().slice(0, 10); };
+  for (var guard = 0; guard < 400; guard++) {
+    var d = next(end), skipped = 0;
+    // jours ou il ne travaille pas de toute facon (horaires) : on les saute, au plus une semaine
+    while (works.length && works.indexOf(new Date(d + 'T12:00:00Z').getUTCDay()) === -1 && !cover(d) && skipped < 7) { d = next(d); skipped++; }
+    var e = cover(d);
+    if (!e || e <= end) break;
+    end = e;
+  }
+  return end;
+}
+
+/**
  * Le coiffeur peut-il prendre des RDV ce jour-la ? Non s'il est en conge, en « sans RDV » ce jour-la (calendrier de sa
  * fiche), ou s'il ne travaille pas ce jour de la semaine (horaires). Sert a griser ces jours dans le calendrier de
  * reservation, au lieu de laisser le client tomber sur « aucun creneau ».

@@ -2878,7 +2878,7 @@
   </div>
 </div>
 
-<script src="/app.js?v=47"></script>
+<script src="/app.js?v=48"></script>
 <script src="/autorefresh.js?v=3"></script>
 <script src="/staff-group.js?v=6"></script>
 <script src="/daterange.js?v=4"></script>
@@ -4981,8 +4981,8 @@ var barberLeaves = {};      // { [barberId]: [...] }
 function leaveBadgeHtml(b) {
   if (!b.on_leave_today) return '';
   var t = new Date(), today = t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0');
-  var cur = (b.leaves || []).filter(function (l) { return l.start_date <= today && today <= l.end_date; })[0];
-  var until = cur ? ' · jusqu\'au ' + cur.end_date.slice(8, 10) + '/' + cur.end_date.slice(5, 7) : '';
+  var curEnd = leaveEndFrom(b, today);
+  var until = curEnd ? ' · jusqu\'au ' + curEnd.slice(8, 10) + '/' + curEnd.slice(5, 7) : '';
   return '<span class="leave-badge" title="En congé aujourd\'hui : plus proposé à la réservation">' +
     '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 18 0z"/><path d="M12 12v6.5a2.5 2.5 0 0 0 5 0"/></svg>' +
     'En congé' + until + '</span>';

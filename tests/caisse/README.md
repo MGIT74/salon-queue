@@ -182,4 +182,5 @@ node tests/caisse/148-coordonnees-valides.js  # Coordonnees verifiees partout (e
 node tests/caisse/146-coiffeurs-conge-visibles.js  # RDV en ligne / compte : coiffeurs en conge visibles, indisponible aux creneaux, choix du coiffeur a l'etape date
 node tests/caisse/147-timer-commencer-en-avance.js  # Reglages > Timer : commencer un RDV en avance (salon + par coiffeur)
 node tests/caisse/148-coordonnees-valides.js  # Coordonnees verifiees partout (email, telephone, nom)
+node tests/caisse/149-conge-en-plusieurs-morceaux.js  # Conge en plusieurs morceaux : vraie date de retour
 ```

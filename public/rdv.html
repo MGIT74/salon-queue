@@ -415,7 +415,7 @@
   </section>
 </div>
 
-<script src="/app.js?v=47"></script>
+<script src="/app.js?v=48"></script>
 <script src="/group-booking.js?v=27"></script>
 <style>
 body.staff-mode .gift-summary-box,body.staff-mode .theme-btn,body.staff-mode .login-hint{display:none!important}
@@ -1263,9 +1263,9 @@ function dtBarberLeaveNote(list) {
   var b = selBarber !== '' && list.find(function (x) { return String(x.id) === String(selBarber); });
   if (!b) return '';
   var today = salonToday();
-  var lv = (b.leaves || []).filter(function (l) { return l.start_date <= today && l.end_date >= today; })[0];
-  if (!lv) return '';
-  var end = new Date(lv.end_date + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+  var lvEnd = leaveEndFrom(b, today);
+  if (!lvEnd) return '';
+  var end = new Date(lvEnd + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
   return '<div class="dt-barber-note">' + esc(b.name) + ' est en congé jusqu\'au ' + esc(end) + ' inclus.</div>';
 }
 var dtAutoSingle = false;

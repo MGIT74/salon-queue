@@ -37,7 +37,7 @@ check('API /api/barbers : renvoie on_leave_today et les conges (dates seulement,
 console.log('\n[C] Etiquette rouge (liste des coiffeurs) et carre "En conge" (dashboard)');
 const c2 = vm.createContext({ barbers: [], document: { getElementById: (id) => (el[id] = el[id] || { textContent: '', classList: { toggle: (c, on) => { el[id].none = on; } } }) } });
 var el = {};
-vm.runInContext(fnSrc(dash, 'leaveBadgeHtml') + '\n' + fnSrc(dash, 'updateLeaveKpi'), c2);
+vm.runInContext(fnSrc(app, 'leaveEndFrom') + '\n' + fnSrc(dash, 'leaveBadgeHtml') + '\n' + fnSrc(dash, 'updateLeaveKpi'), c2);
 const t = new Date(), ymd = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 const fin = new Date(t.getTime() + 3 * 864e5);
 const html = c2.leaveBadgeHtml({ on_leave_today: true, leaves: [{ start_date: ymd(t), end_date: ymd(fin) }] });

@@ -831,7 +831,7 @@
 
 </div>
 
-<script src="/app.js?v=47"></script>
+<script src="/app.js?v=48"></script>
 <script src="/autorefresh.js?v=3"></script>
 <script src="/group-booking.js?v=27"></script>
 <style>
@@ -2042,9 +2042,9 @@ function renderBookDtBarbers() {
   var note = '';
   if (sel) {
     var today = salonToday();
-    var lv = (sel.leaves || []).filter(function (l) { return l.start_date <= today && l.end_date >= today; })[0];
-    if (lv) note = '<div class="dt-barber-note">' + esc(sel.name) + ' est en congé jusqu\'au ' +
-      esc(new Date(lv.end_date + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })) + ' inclus.</div>';
+    var lvEnd = leaveEndFrom(sel, today);
+    if (lvEnd) note = '<div class="dt-barber-note">' + esc(sel.name) + ' est en congé jusqu\'au ' +
+      esc(new Date(lvEnd + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })) + ' inclus.</div>';
   }
   box.innerHTML = '<div class="eyebrow" style="margin-top:0">Coiffeur</div><div class="dt-barber-row">' +
     (list.filter(function (b) { return !offOn(b); }).length > 1 ? chip('', 'Premier disponible', null, selBookBarber === '') : '') +
