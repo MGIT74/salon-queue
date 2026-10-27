@@ -165,7 +165,8 @@ const suite = [
   ['142-email-creation-compte.js', false, ['exit']],
   ['143-dashboard-clientele.js', true, ['exit']],
   ['144-rdv-creer-compte-populaire.js', false, ['exit']],
-  ['145-compte-logo-menu.js', false, ['exit']]
+  ['145-compte-logo-menu.js', false, ['exit']],
+  ['146-coiffeurs-conge-visibles.js', false, ['exit']]
 ];
 
 let bad = 0;

@@ -1,4 +1,4 @@
-// Un coiffeur en conge n'est plus propose : page de RDV, Mon compte, borne, planning du tableau de bord et assistant "Ajouter un RDV".
+// Un coiffeur en conge n'est plus propose : borne, planning du tableau de bord et assistant "Ajouter un RDV".
 // Execute les VRAIES fonctions des pages (isOnLeaveOn, isBookableForAdmin, hasBookableSchedule) et verifie le branchement dans chaque page.
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const rd = (f) => fs.readFileSync(path.join(__dirname, '../../' + f), 'utf8');
@@ -26,8 +26,10 @@ check('sans date (deplacement de RDV, filter(isBookableForAdmin)) : pas masque a
 check('un coiffeur sans RDV en ligne reste exclu', ctx.isBookableForAdmin(Object.assign({}, base, { accepts_appointments: 0 }), '2026-10-14') === false);
 
 console.log('\n[B] Branchement dans chaque page');
-check('rdv.html : la liste des coiffeurs exclut ceux en conge', /hasBookableSchedule\(b\) && !isOnLeaveOn\(b\)/.test(rdv));
-check('compte.html (reserver) : idem', /hasBookableSchedule\(b\) && !isOnLeaveOn\(b\)/.test(compte));
+// Depuis : les coiffeurs en conge restent PROPOSES en ligne (leurs jours d'absence sont grises et signales
+// « indisponible » aux creneaux) - voir le test 146.
+check('rdv.html : coiffeurs en conge toujours proposes (jours d\'absence grises)', rdv.includes('barbers = r[3].items.filter(function (b) { return b.accepts_appointments && hasBookableSchedule(b); });'));
+check('compte.html (reserver) : idem', compte.includes('bookBarbers = r[3].items.filter(function (b) { return b.accepts_appointments && hasBookableSchedule(b); });'));
 check('kiosk.html : idem', /!b\.outside_hours_now && !isOnLeaveOn\(b\)/.test(kiosk));
 check('dashboard : lignes du planning ET assistant "Ajouter un RDV" filtrent sur la date du jour affiche', (dash.match(/return isBookableForAdmin\(b, dateStr\)/g) || []).length === 2);
 check('API /api/barbers : renvoie on_leave_today et les conges (dates seulement, sans la note)', /on_leave_today:/.test(api) && /leaves: myLeaves/.test(api) && /SELECT bl\.barber_id, bl\.start_date, bl\.end_date FROM barber_leaves/.test(api) && !/bl\.note/.test(api.slice(api.indexOf('leaveRows'), api.indexOf('leaveRows') + 400)));

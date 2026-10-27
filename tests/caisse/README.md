@@ -176,4 +176,6 @@ node tests/caisse/142-email-creation-compte.js  # Reglages : email de creation d
 node tests/caisse/143-dashboard-clientele.js  # Dashboard : chiffres clientele (comptes, fidelite, cadeaux, sans compte) + prochains RDV qui defilent
 node tests/caisse/144-rdv-creer-compte-populaire.js  # Prise de RDV : « Creer un compte » mis en avant (le plus populaire, fidelite)
 node tests/caisse/145-compte-logo-menu.js  # Compte client : logo du salon au-dessus du menu
+node tests/caisse/146-coiffeurs-conge-visibles.js  # RDV en ligne : coiffeurs en conge visibles, indisponible aux creneaux, choix du coiffeur a l'etape date
+node tests/caisse/146-coiffeurs-conge-visibles.js  # RDV en ligne / compte : coiffeurs en conge visibles, indisponible aux creneaux, choix du coiffeur a l'etape date
 ```

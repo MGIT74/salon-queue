@@ -328,6 +328,22 @@
    Le menu du bas devient une barre laterale (icones seules sur tablette), l'accueil passe en colonnes et chaque etape de
    reservation a 3 zones : etapes en haut, contenu au centre, recapitulatif + Suivant a droite (en bas sur tablette).
    Le telephone (moins de 900 px) garde exactement l'affichage d'avant. */
+/* Coiffeurs au-dessus des creneaux (repris de la prise de RDV en ligne) */
+.dt-barbers{margin:0 0 6px}.dt-barber-row{display:flex;flex-wrap:wrap;gap:8px}
+.dt-barber{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 14px;border-radius:999px;border:1.5px solid var(--sep);background:var(--card);color:var(--ink);font:inherit;font-size:14px;font-weight:600;cursor:pointer}
+.dt-barber{padding:0 14px 0 5px;min-height:42px}
+.dt-barber .b-any{width:30px;height:30px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:var(--fill);color:var(--blue);flex:none}
+.dt-barber.on{background:var(--blue);border-color:var(--blue);color:#fff}
+.dt-barber.on .b-any{background:rgba(255,255,255,.22);color:#fff}
+.dt-barber.auto{border-color:var(--blue);box-shadow:0 0 0 2px var(--blue-soft)}
+.dt-barber-pic{position:relative;padding:0;min-height:0;width:48px;height:48px;justify-content:center;border-radius:50%;border:2px solid transparent;background:none}
+.dt-barber-pic.on{background:none;border-color:var(--blue);box-shadow:0 0 0 2px var(--blue-soft)}
+.dt-barber-pic.auto{border-color:var(--blue)}
+.dt-auto{position:absolute;right:-3px;bottom:-3px;width:18px;height:18px;border-radius:50%;background:var(--blue);color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;border:2px solid var(--card)}
+.dt-barber-row{align-items:center}
+.dt-barber-pic.off{opacity:.45}.dt-barber-pic.off.on{opacity:.7}
+.dt-barber-pic.off::after{content:'';position:absolute;right:0;bottom:0;width:12px;height:12px;border-radius:50%;background:var(--red);border:2px solid var(--card)}
+.dt-barber-note{margin-top:8px;font-size:13px;font-weight:600;color:var(--orange)}
 .home-cta, .bk-steps { display: none; }
 .home-col { display: contents; }
 .bk-flow > .flow-top, .bk-flow > .flow-body { display: block; }
@@ -737,6 +753,7 @@
         <div class="fld"><label for="bk-date">Date</label><div class="closure-calendar" id="bk-date-calendar"><input id="bk-date" type="date" onchange="loadBookSlots()"><div class="closure-cal-head"><button type="button" id="bk-date-prev" aria-label="Mois précédent">‹</button><strong id="bk-date-month"></strong><button type="button" id="bk-date-next" aria-label="Mois suivant">›</button></div><div class="closure-cal-grid" id="bk-date-grid"></div></div></div>
       </div>
       <div class="dt-slots">
+        <div class="dt-barbers" id="bk-dt-barbers" style="display:none;margin-top:20px"></div>
         <div class="eyebrow" style="margin-top:20px">Créneaux disponibles</div>
         <div id="bk-half-toggle" class="half-toggle" style="display:none;margin-bottom:14px">
           <button id="bk-half-morning" onclick="showBookHalf('morning')">Matin</button>
@@ -1592,7 +1609,9 @@ function goBook(afterLoad) {
     bookServicesAll = bookServices = r[0].items;
     bookExtrasAll = bookExtras = r[1].items;
     bookProducts = r[2].items.filter(function (p) { return p.online_bookable !== 0; }); // « caisse seulement » : jamais proposé en ligne
-    bookBarbers = r[3].items.filter(function (b) { return b.accepts_appointments && hasBookableSchedule(b) && !isOnLeaveOn(b); });
+    // Tous les coiffeurs qui prennent des RDV, MEME en conge ou absents aujourd'hui (comme la prise de RDV en ligne) :
+    // leurs jours d'absence sont grises au calendrier et signales « indisponible » a l'etape des creneaux.
+    bookBarbers = r[3].items.filter(function (b) { return b.accepts_appointments && hasBookableSchedule(b); });
     bookCatalogLoaded = true;
     renderBookBarberGrid();
     renderBookServiceGrid();
@@ -1935,6 +1954,17 @@ function loadBookSlots() {
   document.getElementById('bk-date-next-btn').disabled = true;
   if (!selBookDate) return;
 
+  renderBookDtBarbers();   // coiffeurs au-dessus des creneaux (changer sans recommencer)
+  // Coiffeur choisi absent ce jour-la : on le dit clairement (autre jour, ou autre coiffeur juste au-dessus).
+  var offB = selBookBarber ? bookBarbers.find(function (x) { return String(x.id) === String(selBookBarber); }) : null;
+  if (offB && typeof barberBookableOn === 'function' && !barberBookableOn(offB, selBookDate)) {
+    document.getElementById('bk-half-toggle').style.display = 'none';
+    document.getElementById('bk-slots-grid').classList.remove('is-loading');
+    document.getElementById('bk-slots-grid').innerHTML = '<div class="empty" style="grid-column:1/-1">' + esc(offB.name) + ' est indisponible ce jour-là' +
+      (isOnLeaveOn(offB, selBookDate) ? ' (en congé)' : '') + '. Choisissez un autre jour, ou un autre coiffeur ci-dessus.</div>';
+    return;
+  }
+
   var url = '/api/appointments/availability?date=' + selBookDate + '&service_id=' + selBookService +
     '&extras=' + selBookExtras.join(',') + (selBookBarber ? '&barber_id=' + selBookBarber : '');
   // Réservation à plusieurs : les créneaux déjà dans le panier ce jour-là ne sont plus proposés (même coiffeur).
@@ -1975,7 +2005,54 @@ function selectBookSlot(btn) {
   document.querySelectorAll('#bk-slots-grid .slot-btn').forEach(function (b) { b.classList.remove('sel'); });
   btn.classList.add('sel');
   selBookSlot = { time: btn.dataset.time, barberId: btn.dataset.barber };
+  renderBookDtBarbers();
   document.getElementById('bk-date-next-btn').disabled = false;
+}
+
+/* Coiffeurs au-dessus des creneaux (comme la prise de RDV en ligne) : tous ceux qui font la prestation et les supplements
+   choisis, + « Premier disponible ». Un coiffeur absent ce jour-la est estompe (point rouge) ; le choisir indique
+   « indisponible ». Changer de coiffeur relit le calendrier et les creneaux, sans recommencer la reservation. */
+function renderBookDtBarbers() {
+  var box = document.getElementById('bk-dt-barbers');
+  if (!box) return;
+  if (activeBookGift || !selBookService) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  var day = document.getElementById('bk-date').value;
+  var offOn = function (b) { return Boolean(day && typeof barberBookableOn === 'function' && !barberBookableOn(b, day)); };
+  var list = bookBarbers.filter(function (b) {
+    var sv = barberItems(b, 'services', bookServicesAll), ex = barberItems(b, 'extras', bookExtrasAll);
+    if (selBookService !== EXTRAS_ONLY && !sv.some(function (x) { return String(x.id) === String(selBookService); })) return false;
+    return selBookExtras.every(function (id) { return ex.some(function (x) { return String(x.id) === String(id); }); });
+  });
+  var auto = selBookBarber === '' && selBookSlot ? String(selBookSlot.barberId) : '';
+  var chip = function (id, label, b, on) {
+    var ic = b ? barberAvatarHtml(b, bookBarbers, 40)
+      : '<span class="b-avatar b-any" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 11l2 2 4-4"/></svg></span>';
+    var isAuto = b && auto && String(b.id) === auto, off = b && offOn(b);
+    return '<button type="button" class="dt-barber' + (b ? ' dt-barber-pic' : '') + (on ? ' on' : '') + (isAuto ? ' auto' : '') + (off ? ' off' : '') + '" onclick="pickBookDtBarber(\'' + id + '\')"' +
+      ' title="' + esc(label + (isAuto ? ' — retenu pour ce créneau' : '') + (off ? ' — indisponible ce jour-là' : '')) + '" aria-label="' + esc(label + (isAuto ? ', retenu pour ce créneau' : '') + (off ? ', indisponible ce jour-là' : '')) + '">' +
+      ic + (b ? '' : esc(label)) + (isAuto ? '<span class="dt-auto" aria-hidden="true">✓</span>' : '') + '</button>';
+  };
+  var sel = selBookBarber && list.find(function (x) { return String(x.id) === String(selBookBarber); });
+  var note = '';
+  if (sel) {
+    var today = salonToday();
+    var lv = (sel.leaves || []).filter(function (l) { return l.start_date <= today && l.end_date >= today; })[0];
+    if (lv) note = '<div class="dt-barber-note">' + esc(sel.name) + ' est en congé jusqu\'au ' +
+      esc(new Date(lv.end_date + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })) + ' inclus.</div>';
+  }
+  box.innerHTML = '<div class="eyebrow" style="margin-top:0">Coiffeur</div><div class="dt-barber-row">' +
+    (list.length > 1 ? chip('', 'Premier disponible', null, selBookBarber === '') : '') +
+    list.map(function (b) { return chip(b.id, b.name, b, String(selBookBarber) === String(b.id)); }).join('') + '</div>' + note;
+  box.style.display = list.length ? '' : 'none';
+}
+function pickBookDtBarber(id) {
+  if (String(selBookBarber) === String(id)) return;
+  selBookBarber = id;
+  applyBookBarberOffer();
+  renderBookBarberGrid();
+  if (window.bkPickOpenDay) window.bkPickOpenDay(!(bkGrp && bkGrp.date));
+  loadBookSlots();
+  if (typeof refreshBookRecap === 'function') refreshBookRecap();
 }
 
 function goToBookConfirmStep() {

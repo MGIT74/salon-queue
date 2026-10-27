@@ -440,6 +440,9 @@ body.staff-mode .gift-summary-box,body.staff-mode .theme-btn,body.staff-mode .lo
 .dt-barber-pic.auto{border-color:var(--blue)}
 .dt-auto{position:absolute;right:-3px;bottom:-3px;width:18px;height:18px;border-radius:50%;background:var(--blue);color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;border:2px solid var(--card)}
 .dt-barber-row{align-items:center}
+.dt-barber-pic.off{opacity:.45}.dt-barber-pic.off.on{opacity:.7}
+.dt-barber-pic.off::after{content:'';position:absolute;right:0;bottom:0;width:12px;height:12px;border-radius:50%;background:var(--red);border:2px solid var(--card)}
+.dt-barber-note{margin-top:8px;font-size:13px;font-weight:600;color:var(--orange)}
 .login-hint{background:var(--fill);border-radius:14px;padding:12px 14px;margin:0 0 18px;font-size:14.5px;font-weight:600}
 .login-hint a{color:var(--blue);text-decoration:none;margin-left:4px}
 .login-hint span{display:block;font-weight:400;font-size:13px;color:var(--grey);margin-top:4px;line-height:1.45}
@@ -600,7 +603,9 @@ function loadCatalog() {
     servicesAll = services = r[0].items;
     extrasAll = extras = r[1].items;
     products = r[2].items.filter(function (p) { return p.online_bookable !== 0; }); // « caisse seulement » : jamais proposé en ligne
-    barbers = r[3].items.filter(function (b) { return b.accepts_appointments && hasBookableSchedule(b) && !isOnLeaveOn(b); });
+    // Tous les coiffeurs qui prennent des RDV, MEME en conge ou absents aujourd'hui : le client les voit toujours ; leurs
+    // jours d'absence sont grises au calendrier et signales « indisponible » a l'etape des creneaux.
+    barbers = r[3].items.filter(function (b) { return b.accepts_appointments && hasBookableSchedule(b); });
     var salonName = r[4].salon_name;
     CURRENCY = r[4].currency || 'EUR'; if (r[4].timezone) SALON_TIMEZONE = r[4].timezone;
     giftCardImageUrl = r[4].gift_card_image_url || '';
@@ -899,11 +904,22 @@ function showHalf(half) {
 
 function loadSlots() {
   if (!selService) return; // Ne pas demander de disponibilités avant le choix de la prestation.
-  if (typeof staffBarberChoice === 'function' && staffBarberChoice()) renderDtBarbers();   // coiffeurs du jour choisi
+  if (typeof dtBarberChoice === 'function' && dtBarberChoice()) renderDtBarbers();   // coiffeurs (au-dessus des creneaux)
   selDate = document.getElementById('rdv-date').value;
   selSlot = null;
   document.getElementById('date-next-btn').disabled = true;
   if (!selDate) return;
+
+  // Coiffeur choisi absent ce jour-la (conge, jour « sans RDV », jour non travaille) : on le dit clairement, le client
+  // peut changer de jour ou de coiffeur juste au-dessus sans recommencer sa reservation.
+  var offB = !STAFF_BRIDGE && selBarber ? barbers.find(function (x) { return String(x.id) === String(selBarber); }) : null;
+  if (offB && typeof barberBookableOn === 'function' && !barberBookableOn(offB, selDate)) {
+    document.getElementById('half-toggle').style.display = 'none';
+    document.getElementById('slots-grid').classList.remove('is-loading');
+    document.getElementById('slots-grid').innerHTML = '<div class="empty" style="grid-column:1/-1">' + esc(offB.name) + ' est indisponible ce jour-là' +
+      (isOnLeaveOn(offB, selDate) ? ' (en congé)' : '') + '. Choisissez un autre jour, ou un autre coiffeur ci-dessus.</div>';
+    return;
+  }
 
   var url = '/api/appointments/availability?date=' + selDate + '&service_id=' + selService +
     '&extras=' + selExtras.join(',') + (selBarber ? '&barber_id=' + selBarber : '');
@@ -948,7 +964,7 @@ function selectSlot(btn) {
   document.querySelectorAll('.slot-btn').forEach(function (b) { b.classList.remove('sel'); });
   btn.classList.add('sel');
   selSlot = { time: btn.dataset.time, barberId: btn.dataset.barber };
-  if (typeof staffBarberChoice === 'function' && staffBarberChoice()) renderDtBarbers();
+  if (typeof dtBarberChoice === 'function' && dtBarberChoice()) renderDtBarbers();
   document.getElementById('date-next-btn').disabled = false;
 }
 
@@ -1194,38 +1210,55 @@ function serviceBack() {
 // Salon, a plusieurs : coiffeurs proposes au-dessus des creneaux - ceux qui font la prestation et les supplements
 // choisis, plus « Premier disponible ». Changer de coiffeur relit les creneaux tout de suite.
 function staffBarberChoice() { return !!(STAFF_BRIDGE && grp); }
+// En ligne aussi (sauf carte cadeau, dont le coiffeur peut etre impose) : changer de coiffeur sans refaire la reservation.
+function dtBarberChoice() { return staffBarberChoice() || (!STAFF_BRIDGE && !activeGift); }
 function renderDtBarbers() {
   var box = document.getElementById('dt-barbers');
   if (!box) return;
-  if (!staffBarberChoice()) { box.style.display = 'none'; box.innerHTML = ''; return; }
-  // Seulement les coiffeurs qui travaillent ce jour-la (horaires, conges, jour « sans RDV »).
+  if (!dtBarberChoice()) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  var staff = staffBarberChoice();
+  // Salon : seulement les coiffeurs qui travaillent ce jour-la (horaires, conges, jour « sans RDV »).
+  // En ligne : TOUS ceux qui font la prestation ; un coiffeur absent ce jour-la est estompe et marque indisponible.
   var day = document.getElementById('rdv-date').value;
+  var offOn = function (b) { return Boolean(day && typeof barberBookableOn === 'function' && !barberBookableOn(b, day)); };
   var list = barbers.filter(function (b) {
-    if (day && typeof barberBookableOn === 'function' && !barberBookableOn(b, day)) return false;
+    if (staff && offOn(b)) return false;
     var sv = barberItems(b, 'services', servicesAll), ex = barberItems(b, 'extras', extrasAll);
     if (selService !== EXTRAS_ONLY && !sv.some(function (x) { return String(x.id) === String(selService); })) return false;
     return selExtras.every(function (id) { return ex.some(function (x) { return String(x.id) === String(id); }); });
   });
   if (selBarber !== '' && !list.some(function (b) { return String(b.id) === String(selBarber); })) { selBarber = ''; applyBarberOffer(); }
   // Un seul coiffeur ce jour-la : pas de « Premier disponible », c'est lui.
-  if (list.length === 1 && String(selBarber) !== String(list[0].id)) { selBarber = list[0].id; dtAutoSingle = true; applyBarberOffer(); }
+  if (staff && list.length === 1 && String(selBarber) !== String(list[0].id)) { selBarber = list[0].id; dtAutoSingle = true; applyBarberOffer(); }
   // Coiffeur impose par un jour a un seul coiffeur : un autre jour avec plusieurs coiffeurs repart sur « Premier disponible ».
-  else if (list.length > 1 && dtAutoSingle) { selBarber = ''; dtAutoSingle = false; applyBarberOffer(); }
+  else if (staff && list.length > 1 && dtAutoSingle) { selBarber = ''; dtAutoSingle = false; applyBarberOffer(); }
   // Premier disponible + un creneau choisi : le coiffeur retenu par le systeme pour cette heure est mis en evidence.
   var auto = selBarber === '' && selSlot ? String(selSlot.barberId) : '';
   var chip = function (id, label, b, on) {
     var ic = b ? barberAvatarHtml(b, barbers, 40)
       : '<span class="b-avatar b-any" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 11l2 2 4-4"/></svg></span>';
     var isAuto = b && auto && String(b.id) === auto;
+    var off = b && !staff && offOn(b);
     // Coiffeur : sa photo seule (ou son initiale sur sa couleur), le nom en info-bulle - prend moins de place.
-    return '<button type="button" class="dt-barber' + (b ? ' dt-barber-pic' : '') + (on ? ' on' : '') + (isAuto ? ' auto' : '') + '" onclick="pickDtBarber(\'' + id + '\')"' +
-      ' title="' + esc(label + (isAuto ? ' — retenu pour ce créneau' : '')) + '" aria-label="' + esc(label + (isAuto ? ', retenu pour ce créneau' : '')) + '">' +
+    return '<button type="button" class="dt-barber' + (b ? ' dt-barber-pic' : '') + (on ? ' on' : '') + (isAuto ? ' auto' : '') + (off ? ' off' : '') + '" onclick="pickDtBarber(\'' + id + '\')"' +
+      ' title="' + esc(label + (isAuto ? ' — retenu pour ce créneau' : '') + (off ? ' — indisponible ce jour-là' : '')) + '" aria-label="' + esc(label + (isAuto ? ', retenu pour ce créneau' : '') + (off ? ', indisponible ce jour-là' : '')) + '">' +
       ic + (b ? '' : esc(label)) + (isAuto ? '<span class="dt-auto" aria-hidden="true">✓</span>' : '') + '</button>';
   };
   box.innerHTML = '<div class="eyebrow" style="margin-top:0">Coiffeur</div><div class="dt-barber-row">' +
     (list.length > 1 ? chip('', 'Premier disponible', null, selBarber === '') : '') +
-    list.map(function (b) { return chip(b.id, b.name, b, String(selBarber) === String(b.id) || (list.length === 1 && selBarber === '')); }).join('') + '</div>';
-  box.style.display = '';
+    list.map(function (b) { return chip(b.id, b.name, b, String(selBarber) === String(b.id) || (staff && list.length === 1 && selBarber === '')); }).join('') + '</div>' +
+    (staff ? '' : dtBarberLeaveNote(list));
+  box.style.display = list.length ? '' : 'none';
+}
+// En ligne : le coiffeur choisi est en conge en ce moment -> « Adel est en congé jusqu'au 30 octobre ».
+function dtBarberLeaveNote(list) {
+  var b = selBarber !== '' && list.find(function (x) { return String(x.id) === String(selBarber); });
+  if (!b) return '';
+  var today = salonToday();
+  var lv = (b.leaves || []).filter(function (l) { return l.start_date <= today && l.end_date >= today; })[0];
+  if (!lv) return '';
+  var end = new Date(lv.end_date + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+  return '<div class="dt-barber-note">' + esc(b.name) + ' est en congé jusqu\'au ' + esc(end) + ' inclus.</div>';
 }
 var dtAutoSingle = false;
 function pickDtBarber(id) {
@@ -1233,6 +1266,7 @@ function pickDtBarber(id) {
   if (String(selBarber) === String(id)) return;
   selBarber = id;
   applyBarberOffer();
+  if (!STAFF_BRIDGE) renderBarberGrid();   // la carte du coiffeur choisi reste a jour si le client revient en arriere
   renderDtBarbers();
   if (window.rdvPickOpenDay) window.rdvPickOpenDay(!(grp && grp.date));
   loadSlots();
