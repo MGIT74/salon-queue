@@ -255,6 +255,10 @@
   .cal-day-num { font-size: 13px; font-weight: 600; }
   .cal-dots { display: flex; gap: 2px; }
   .cal-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--blue); }
+  /* Legende des couleurs des coiffeurs sous l'agenda (comme dans l'admin) */
+  .cal-legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--sep, rgba(127,127,127,.2)); }
+  .cal-legend-item { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--grey); }
+  .cal-legend-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
 
   /* --- Planning du jour (timeline), utilisée dans l'Agenda --- */
   .timeline-scroll { overflow-x: auto; width: 100%; max-width: 100%; }
@@ -2121,6 +2125,24 @@ function calDayDotsHtml(dayAppts) {
   return dots.length ? '<div class="cal-dots">' + dots.join('') + '</div>' : '';
 }
 
+/** Legende sous l'agenda : chaque coiffeur ayant un RDV sur la periode affichee, avec sa couleur (meme couleur que les points). */
+function calLegendHtml(appts) {
+  var seen = {}, order = [];
+  appts.forEach(function (a) {
+    var bid = a.barber_id || 'unassigned';
+    if (seen[bid]) return;
+    var b = (allBarbers || []).find(function (x) { return String(x.id) === String(bid); });
+    seen[bid] = bid === 'unassigned' ? 'Non assigné' : (a.barber_name || (b && b.name) || 'Coiffeur');
+    order.push(bid);
+  });
+  return '<div class="cal-legend" id="cal-legend">' + (order.length === 0
+    ? '<span class="hint" style="margin:0">Aucun coiffeur avec un RDV sur cette période</span>'
+    : order.map(function (bid) {
+        var color = bid === 'unassigned' ? 'var(--grey)' : barberColorOf(bid, allBarbers);
+        return '<div class="cal-legend-item"><span class="cal-legend-dot" style="background:' + color + '"></span>' + esc(seen[bid]) + '</div>';
+      }).join('')) + '</div>';
+}
+
 function renderCalMonth() {
   document.getElementById('cal-month-label').textContent = monthNames[calAnchor.getMonth()] + ' ' + calAnchor.getFullYear();
 
@@ -2166,6 +2188,7 @@ function renderCalMonth() {
     });
     if (selectedInThisWeek) html += renderCalExpandPanel(calSelectedDate);
   }
+  html += calLegendHtml(monthAppts);
   document.getElementById('cal-days').innerHTML = html;
 }
 
@@ -2209,6 +2232,7 @@ function renderCalWeek() {
 
   var html = '<div class="cal-grid cal-week-row">' + cells + '</div>';
   if (calSelectedDate) html += renderCalExpandPanel(calSelectedDate);
+  html += calLegendHtml(weekAppts);
   document.getElementById('cal-days').innerHTML = html;
 }
 

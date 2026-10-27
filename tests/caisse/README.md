@@ -183,4 +183,5 @@ node tests/caisse/146-coiffeurs-conge-visibles.js  # RDV en ligne / compte : coi
 node tests/caisse/147-timer-commencer-en-avance.js  # Reglages > Timer : commencer un RDV en avance (salon + par coiffeur)
 node tests/caisse/148-coordonnees-valides.js  # Coordonnees verifiees partout (email, telephone, nom)
 node tests/caisse/149-conge-en-plusieurs-morceaux.js  # Conge en plusieurs morceaux : vraie date de retour
+node tests/caisse/150-caisse-agenda-legende.js  # Caisse > Agenda : legende des couleurs des coiffeurs
 ```
