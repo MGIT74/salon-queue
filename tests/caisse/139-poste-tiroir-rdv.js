@@ -9,7 +9,7 @@ check('clic sur un RDV de l\'agenda ouvre le tiroir', /function openPosteClientD
 check('boutons Deplacer / Annuler le RDV', p.includes('onclick="adReschedule()">Déplacer</button>') && p.includes('onclick="adCancel()">Annuler le RDV</button>'));
 const body = (src, f) => (src.match(new RegExp('function ' + f + '\\([^)]*\\) \\{[\\s\\S]*?\\n\\}\\n')) || [''])[0];
 for (const f of ['openApptDrawer', 'closeApptDrawer', 'adCancel', 'adSaveNote', 'adSaveInfo', 'adRenderInfo', 'adLoadDetails']) check('meme code que la caisse : ' + f, body(p, f) && body(p, f) === body(c, f));
-check('deplacer : meme parcours que la caisse (coiffeurs du poste)', body(p, 'adReschedule') === body(c, 'adReschedule').replace('allBarbers.filter', '(barbers || []).filter'));
+check('deplacer : meme parcours que la caisse (coiffeurs du poste)', body(p, 'adReschedule') === body(c, 'adReschedule').split('allBarbers.').join('(barbers || []).'));
 check('apres modification : agenda et file relus', /function adRefreshViews\(\) \{[\s\S]*?loadAgendaPeriod\(\);\s*refresh\(\);/.test(p));
 check('pas d\'actualisation automatique tiroir ouvert', p.includes("document.querySelector('.modal-overlay, .appt-drawer-backdrop.on')"));
 console.log(`\n${pass} OK, ${fail} ECHEC`);

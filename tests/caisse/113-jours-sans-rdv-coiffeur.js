@@ -70,7 +70,7 @@ const call = async (m, u, h, b) => { const r = await fetch(BASE + u, { method: m
   const app = fs.readFileSync(path.join(__dirname, '../../public/app.js'), 'utf8');
   const c = fs.readFileSync(path.join(__dirname, '../../public/caisse.html'), 'utf8'), po = fs.readFileSync(path.join(__dirname, '../../public/poste.html'), 'utf8');
   check('agendas admin / caisse / Mon poste : pas d\'ajout de RDV ce jour-la, message explicite', /function isWalkinOn\(b, dateStr\)/.test(app) && /!isWalkinOn\(b, dateStr\)/.test(d) && /data-walkin/.test(d) &&
-    /!isWalkinOn\(rowBarber, dateStr\)/.test(c) && /!isWalkinOn\(b, currentDate\)/.test(c) && /walkDay \?/.test(po));
+    /!isWalkinOn\(rowBarber, dateStr\)/.test(c) && /barberOffOn\(ob, date\)/.test(c) && /walkDay \?/.test(po));
 
   console.log('\n[F] Plus de type « RDV uniquement / Sans RDV uniquement »');
   check('fiche : plus d\'etiquette de type (seul « Masqué partout » reste)', !/RDV uniquement<\/span>/.test(d) && !/RDV \+ sans RDV/.test(d) && /Masqué partout/.test(d));

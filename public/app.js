@@ -1589,3 +1589,66 @@ function vitrinePageFlow(wrap, panelIds) {
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
   window.addEventListener('load', placeAll);
 })();
+
+/* ===== Choix du coiffeur au-dessus des creneaux, PARTOUT ou l'on prend / ajoute un RDV =====
+   Regle : tous les coiffeurs qui font la prestation (et les supplements) choisis sont proposes, MEME absents ce jour-la
+   (conge, jour « sans RDV », jour non travaille) : estompes avec un point rouge, et « indisponible » a la place des
+   creneaux si on les choisit. On change de coiffeur sans refaire la prise de RDV. Utilise par l'admin, la caisse et le
+   poste (la prise de RDV en ligne et le compte client ont leur propre version, meme dessin). */
+function barberDoesChoice(b, serviceId, extraIds, servicesAll, extrasAll, extrasOnlyId) {
+  var sv = barberItems(b, 'services', servicesAll || []), ex = barberItems(b, 'extras', extrasAll || []);
+  if (serviceId && serviceId !== extrasOnlyId && !sv.some(function (x) { return String(x.id) === String(serviceId); })) return false;
+  return (extraIds || []).every(function (id) { return ex.some(function (x) { return String(x.id) === String(id); }); });
+}
+function barberOffOn(b, dateStr) { return Boolean(b && dateStr && !barberBookableOn(b, dateStr)); }
+/** Message a la place des creneaux quand le coiffeur choisi est absent ce jour-la. */
+function barberOffSlotsHtml(b, dateStr, canChangeDay) {
+  return '<div class="empty barber-off-msg" style="grid-column:1/-1">' + esc(b.name) + ' est indisponible ce jour-là' +
+    (isOnLeaveOn(b, dateStr) ? ' (en congé)' : '') + '. Choisissez ' + (canChangeDay ? 'un autre jour, ou ' : '') + 'un autre coiffeur ci-dessus.</div>';
+}
+/**
+ * Pastilles des coiffeurs. o = { list (coiffeurs proposes), all (pour les couleurs), selected ('' = Premier disponible),
+ * dateStr, onPick (nom de fonction globale appelee avec l'id), slotBarber (coiffeur retenu par « Premier disponible »),
+ * any (proposer « Premier disponible ») }.
+ */
+function barberChipsHtml(o) {
+  ensureBarberChipsCss();
+  var avail = o.list.filter(function (b) { return !barberOffOn(b, o.dateStr); });
+  var showAny = o.any !== false && avail.length > 1;
+  var auto = o.selected === '' && o.slotBarber ? String(o.slotBarber) : '';
+  function chip(id, label, b, on) {
+    var off = b && barberOffOn(b, o.dateStr), isAuto = b && auto && String(b.id) === auto;
+    var ic = b ? barberChipAvatarHtml(b, o.all || o.list)
+      : '<span class="b-avatar b-any" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 11l2 2 4-4"/></svg></span>';
+    var tip = label + (isAuto ? ' — retenu pour ce créneau' : '') + (off ? ' — indisponible ce jour-là' : '');
+    return '<button type="button" class="dt-barber' + (b ? ' dt-barber-pic' : '') + (on ? ' on' : '') + (isAuto ? ' auto' : '') + (off ? ' off' : '') +
+      '" onclick="' + o.onPick + '(\'' + id + '\')" title="' + esc(tip) + '" aria-label="' + esc(tip) + '">' +
+      ic + (b ? '' : esc(label)) + (isAuto ? '<span class="dt-auto" aria-hidden="true">✓</span>' : '') + '</button>';
+  }
+  if (!o.list.length) return '';
+  return '<div class="eyebrow dt-barbers-title">Coiffeur</div><div class="dt-barber-row">' +
+    (showAny ? chip('', 'Premier disponible', null, o.selected === '') : '') +
+    o.list.map(function (b) { return chip(b.id, b.name, b, String(o.selected) === String(b.id)); }).join('') + '</div>';
+}
+// Photo du coiffeur, sinon son initiale sur sa couleur (copie locale : le tableau de bord a sa propre barberAvatarHtml).
+function barberChipAvatarHtml(b, list) {
+  var initial = String(b.name || '?').trim().charAt(0).toUpperCase();
+  var style = 'width:40px;height:40px;border-radius:50%;flex:none;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:17px;background-size:cover;background-position:center;' +
+    (b.photo_url ? "background-image:url('" + esc(b.photo_url) + "')" : 'background:' + barberColorOf(b, list));
+  return '<span class="b-avatar" style="' + style + '" aria-hidden="true">' + (b.photo_url ? '' : esc(initial)) + '</span>';
+}
+function ensureBarberChipsCss() {
+  if (document.getElementById('dt-barber-css')) return;
+  var st = document.createElement('style'); st.id = 'dt-barber-css';
+  st.textContent = '.dt-barbers{margin:0 0 10px}.dt-barbers-title{margin:0 0 8px;font-size:13px;font-weight:600;color:var(--grey)}' +
+    '.dt-barber-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}' +
+    '.dt-barber{display:inline-flex;align-items:center;gap:8px;min-height:42px;padding:0 14px 0 5px;border-radius:999px;border:1.5px solid var(--sep);background:var(--card);color:var(--ink);font:inherit;font-size:14px;font-weight:600;cursor:pointer}' +
+    '.dt-barber .b-any{width:30px;height:30px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:var(--fill);color:var(--blue);flex:none}' +
+    '.dt-barber.on{background:var(--blue);border-color:var(--blue);color:#fff}.dt-barber.on .b-any{background:rgba(255,255,255,.22);color:#fff}' +
+    '.dt-barber-pic{position:relative;padding:0;min-height:0;width:48px;height:48px;justify-content:center;border-radius:50%;border:2px solid transparent;background:none}' +
+    '.dt-barber-pic.on{background:none;border-color:var(--blue);box-shadow:0 0 0 2px var(--blue-soft)}.dt-barber-pic.auto{border-color:var(--blue)}' +
+    '.dt-auto{position:absolute;right:-3px;bottom:-3px;width:18px;height:18px;border-radius:50%;background:var(--blue);color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;border:2px solid var(--card)}' +
+    '.dt-barber-pic.off{opacity:.45}.dt-barber-pic.off.on{opacity:.7}' +
+    ".dt-barber-pic.off::after{content:'';position:absolute;right:0;bottom:0;width:12px;height:12px;border-radius:50%;background:var(--red);border:2px solid var(--card)}";
+  document.head.appendChild(st);
+}

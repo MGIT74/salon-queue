@@ -831,7 +831,7 @@
 
 </div>
 
-<script src="/app.js?v=42"></script>
+<script src="/app.js?v=43"></script>
 <script src="/autorefresh.js?v=3"></script>
 <script src="/group-booking.js?v=27"></script>
 <style>
@@ -2041,7 +2041,7 @@ function renderBookDtBarbers() {
       esc(new Date(lv.end_date + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })) + ' inclus.</div>';
   }
   box.innerHTML = '<div class="eyebrow" style="margin-top:0">Coiffeur</div><div class="dt-barber-row">' +
-    (list.length > 1 ? chip('', 'Premier disponible', null, selBookBarber === '') : '') +
+    (list.filter(function (b) { return !offOn(b); }).length > 1 ? chip('', 'Premier disponible', null, selBookBarber === '') : '') +
     list.map(function (b) { return chip(b.id, b.name, b, String(selBookBarber) === String(b.id)); }).join('') + '</div>' + note;
   box.style.display = list.length ? '' : 'none';
 }

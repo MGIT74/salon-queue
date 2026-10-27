@@ -15,8 +15,8 @@ const CLOSURES = (s) => 'var rdvSalonClosures = [];\n' + (s.match(/^function rdv
 // Jour passe : meme regle que app.js (date du jour = date locale du test)
 const PASTDAY = "function isPastDay(d) { var t = new Date(); return String(d) < t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0'); }";
 const FUTURE = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);   // jamais une date passee (refusee)
-const SHARED = ['esc', 'normText', 'vitrineIcon', 'vitrineBaseIcon', 'extraIcon', 'productIcon', 'groupItems', 'vitrineCardHtml', 'vitrineRender', 'vitrineSummary', 'vitrineFilter', 'vitrineSelectOne', 'vitrineToggle', 'vitrineSearchHtml', 'formatMinutes', '_lockBodyScroll', '_unlockBodyScroll', '_buildModal', '_closeModal', 'vitrineFlow', 'vitrineRecapHtml', 'svcParam', 'svcLabel', 'extrasOnlyCardHtml'];
-const VARS = ['VITRINE_PLUS_SVG', 'VITRINE_CHECK_SVG', 'VITRINE_CHECK_SM_SVG', 'EXTRAS_ONLY', 'EXTRAS_ONLY_NAME', 'EXTRAS_ONLY_SERVICE'].map(n => app.match(new RegExp('^var ' + n + ' = .*;$', 'm'))[0]).join('\n');
+const SHARED = ['esc', 'normText', 'vitrineIcon', 'vitrineBaseIcon', 'extraIcon', 'productIcon', 'groupItems', 'vitrineCardHtml', 'vitrineRender', 'vitrineSummary', 'vitrineFilter', 'vitrineSelectOne', 'vitrineToggle', 'vitrineSearchHtml', 'formatMinutes', '_lockBodyScroll', '_unlockBodyScroll', '_buildModal', '_closeModal', 'vitrineFlow', 'vitrineRecapHtml', 'svcParam', 'svcLabel', 'extrasOnlyCardHtml', 'isOnLeaveOn', 'isWalkinOn', 'barberBookableOn', 'barberOffOn', 'barberOffSlotsHtml', 'barberDoesChoice', 'barberChipsHtml', 'barberChipAvatarHtml', 'ensureBarberChipsCss', 'barberColorOf', 'stableColorForId', 'barberItems', 'hasBookableSchedule'];
+const VARS = ['VITRINE_PLUS_SVG', 'VITRINE_CHECK_SVG', 'VITRINE_CHECK_SM_SVG', 'EXTRAS_ONLY', 'EXTRAS_ONLY_NAME', 'EXTRAS_ONLY_SERVICE', 'DOT_COLORS'].map(n => app.match(new RegExp('^var ' + n + ' = .*;$', 'm'))[0]).join('\n');
 
 function world(html) {
   const dom = new JSDOM(html || '<body></body>', { runScripts: 'outside-only', url: 'http://localhost/', pretendToBeVisual: true });
@@ -80,7 +80,7 @@ const visible = (w, id) => w.document.getElementById(id).style.display !== 'none
   check('plus aucune ancienne puce (.aa-chip) dans la fenetre', !d.querySelector('.aa-chip, .aa-chips'));
 
   console.log('\n[B] Mon poste : assistant "Ajouter un RDV" (le coiffeur, pour lui-meme)');
-  w = world(); setup(w, { me: { id: 'b1', name: 'Alice' } });   // "me" : le coiffeur connecte a Mon poste
+  w = world(); setup(w, { me: { id: 'b1', name: 'Alice' }, barbers: [{ id: 'b1', name: 'Alice', accepts_appointments: 1 }] });   // "me" : le coiffeur connecte a Mon poste
   w.eval(CLOSURES(poste) + '\n' + PASTDAY + '\n' + fnSrc(poste, 'openPosteAddAppointment'));
   w.openPosteAddAppointment(FUTURE); d = w.document;
   check('Mon poste : 1re etape = la prestation (comme le dashboard et la caisse)', visible(w, 'pa-step-service') && !visible(w, 'pa-step-client'));

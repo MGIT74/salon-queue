@@ -492,7 +492,7 @@
   </button>
 </div>
 
-<script src="/app.js?v=42"></script>
+<script src="/app.js?v=43"></script>
 <script src="/autorefresh.js?v=3"></script>
 <script src="/staff-group.js?v=5"></script>
 <script>requireSalonInUrl("Pour utiliser votre poste, ouvrez le lien de votre salon.");</script>
@@ -1491,7 +1491,7 @@ function openPosteAddAppointment(dateStr, barberId) {
 
   var overlay = _buildModal(
     '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px">' +
-    '<div style="min-width:0"><div class="modal-title" style="margin-bottom:0">Ajouter un RDV — ' + (forOther && target ? esc(target.name) + ' — ' : '') + when + '</div>' +
+    '<div style="min-width:0"><div class="modal-title" style="margin-bottom:0">Ajouter un RDV — <span id="pa-title-barber">' + (forOther && target ? esc(target.name) + ' — ' : '') + '</span>' + when + '</div>' +
       StaffGroupBooking.clientPillHtml('pa', "paGoStep('client')") +
     '</div>' +
     '<button id="pa-close-x" style="background:var(--fill);border:none;width:30px;height:30px;border-radius:50%;color:var(--grey);font-size:14px;cursor:pointer;flex-shrink:0;margin-left:10px">✕</button>' +
@@ -1526,6 +1526,7 @@ function openPosteAddAppointment(dateStr, barberId) {
 
     '<div id="pa-step-datetime" style="display:none">' +
       '<button class="aa-back" onclick="paGoStep(\'extras\')">‹ Retour</button>' +
+      '<div class="dt-barbers" id="pa-dt-barbers"></div>' +
       '<div class="aa-step-title">Créneau</div>' +
       '<div id="pa-half-toggle" class="half-toggle" style="display:none;margin-bottom:8px">' +
         '<button id="pa-half-morning" onclick="paShowHalf(\'morning\')">Matin</button>' +
@@ -1642,11 +1643,35 @@ function openPosteAddAppointment(dateStr, barberId) {
     paRenderHalf();
   };
 
+  // Coiffeurs au-dessus des creneaux (meme regle partout) : tous ceux qui font la prestation choisie, meme absents ce
+  // jour-la (estompes, « indisponible ») ; on change de coiffeur sans refaire la prise de RDV.
+  function paEligibleBarbers() {
+    return (barbers || []).filter(function (b) {
+      return b.accepts_appointments && b.active !== 0 && hasBookableSchedule(b) && barberDoesChoice(b, state.serviceId, state.extraIds, services, extras, EXTRAS_ONLY);
+    });
+  }
+  function paRenderDtBarbers() {
+    overlay.querySelector('#pa-dt-barbers').innerHTML = barberChipsHtml({ list: paEligibleBarbers(), all: (barbers || []), selected: targetId, dateStr: dateStr, onPick: 'paPickDtBarber', any: false });
+  }
+  window.paPickDtBarber = function (id) {
+    if (String(targetId) === String(id)) return;
+    targetId = id;
+    target = (barbers || []).find(function (b) { return String(b.id) === String(id); }) || null;
+    svcOffer = barberItems(target, 'services', services);
+    extOffer = barberItems(target, 'extras', extras);
+    state.time = null;
+    forOther = !!(me && targetId !== me.id);
+    var tb = overlay.querySelector('#pa-title-barber'); if (tb) tb.textContent = target ? target.name + ' — ' : '';
+    paLoadSlots();
+  };
+
   function paLoadSlots() {
     var slotsEl = overlay.querySelector('#pa-slots');
     var toggleEl = overlay.querySelector('#pa-half-toggle');
-    slotsEl.innerHTML = '<span class="hint" style="margin:0">Chargement…</span>';
     toggleEl.style.display = 'none';
+    paRenderDtBarbers();
+    if (target && barberOffOn(target, dateStr)) { slotsEl.innerHTML = barberOffSlotsHtml(target, dateStr, false); return; }
+    slotsEl.innerHTML = '<span class="hint" style="margin:0">Chargement…</span>';
     barberApi('/api/appointments/availability?date=' + dateStr + '&service_id=' + state.serviceId + '&barber_id=' + targetId + '&extras=' + state.extraIds.join(','), { actingAs: targetId })
       .then(function (r) {
         if (!r.slots.length) { slotsEl.innerHTML = '<span class="hint" style="margin:0">Aucun créneau disponible ce jour-là</span>'; return; }
@@ -1919,7 +1944,8 @@ function adReschedule() {
   if (!a || !adIsUpcoming(a)) return;
   var currentDate = String(a.scheduled_at).slice(0, 10);
   var rdvBarbers = (barbers || []).filter(function (b) {
-    return b.id === a.barber_id || Boolean(b.accepts_appointments && b.active !== 0 && hasBookableSchedule(b) && !isOnLeaveOn(b, currentDate) && !isWalkinOn(b, currentDate));
+    // Tous les coiffeurs qui prennent des RDV, meme absents ce jour-la (marques « indisponible » selon la date choisie).
+    return b.id === a.barber_id || Boolean(b.accepts_appointments && b.active !== 0 && hasBookableSchedule(b));
   });
 
   var overlay = _buildModal(
@@ -1974,6 +2000,14 @@ function adReschedule() {
     overlay.querySelector('#rs-save-btn').disabled = true;
     toggleEl.style.display = 'none';
     if (!barberId || !date) return;
+    // Coiffeur absent ce jour-la (conge, jour « sans RDV », non travaille) : toujours dans la liste, marque
+    // « indisponible » ; le choisir l'indique a la place des creneaux.
+    overlay.querySelectorAll('#rs-barber option').forEach(function (o) {
+      var ob = (barbers || []).find(function (x) { return String(x.id) === String(o.value); });
+      if (ob) o.textContent = ob.name + (barberOffOn(ob, date) ? ' — indisponible ce jour-là' : '');
+    });
+    var offB = (barbers || []).find(function (x) { return String(x.id) === String(barberId); });
+    if (offB && barberOffOn(offB, date)) { slotsEl.innerHTML = barberOffSlotsHtml(offB, date, true); return; }
     slotsEl.innerHTML = '<span class="hint" style="margin:0">Chargement…</span>';
     barberApi('/api/appointments/availability?date=' + date + '&service_id=' + a.service_id + '&barber_id=' + barberId + '&exclude_appointment_id=' + a.id, { actingAs: barberId })
       .then(function (r) {
