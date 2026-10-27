@@ -2134,7 +2134,7 @@ function calLegendHtml(appts) {
     seen[bid] = bid === 'unassigned' ? 'Non assigné' : (a.barber_name || (b && b.name) || 'Coiffeur');
     order.push(bid);
   });
-  return '<div class="cal-legend" id="cal-legend">' + (order.length === 0
+  return '<div class="cal-legend">' + (order.length === 0
     ? '<span class="hint" style="margin:0">Aucun coiffeur avec un RDV sur cette période</span>'
     : order.map(function (bid) {
         var color = bid === 'unassigned' ? 'var(--grey)' : barberColorOf(bid, allBarbers);
@@ -2238,7 +2238,8 @@ function renderCalWeek() {
 function renderCalDay() {
   document.getElementById('cal-month-label').textContent =
     calAnchor.toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
-  document.getElementById('cal-day-view').innerHTML = renderAgendaTimeline(ymd(calAnchor));
+  document.getElementById('cal-day-view').innerHTML = renderAgendaTimeline(ymd(calAnchor)) +
+    calLegendHtml(apptsForRange(calAnchor, calAnchor).filter(function (a) { return !activeBarberId || a.barber_id === activeBarberId; }));   // meme filtre que la frise
 }
 
 function selectCalDay(dateStr) {

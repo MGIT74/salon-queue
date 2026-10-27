@@ -17,6 +17,8 @@ check('RDV sans coiffeur : « Non assigné » en gris', /background:var\(--grey\
 check('aucun RDV : message', /Aucun coiffeur avec un RDV/.test(ctx.calLegendHtml([])));
 check('affichee en vue Mois', /html \+= calLegendHtml\(monthAppts\);/.test(caisse));
 check('affichee en vue Semaine', /html \+= calLegendHtml\(weekAppts\);/.test(caisse));
+check('affichee en vue Jour (sous la frise)', /renderAgendaTimeline\(ymd\(calAnchor\)\) \+\s*calLegendHtml\(apptsForRange\(calAnchor, calAnchor\)\.filter\(/.test(caisse));
+check('vue Jour : meme filtre que la frise (coiffeur selectionne)', /calLegendHtml\(apptsForRange\(calAnchor, calAnchor\)\.filter\(function \(a\) \{ return !activeBarberId \|\| a\.barber_id === activeBarberId; \}\)\)/.test(caisse));
 check('styles de la legende presents', /\.cal-legend \{/.test(caisse) && /\.cal-legend-dot \{/.test(caisse));
 console.log('\n' + pass + ' OK, ' + fail + ' ECHEC');
 process.exit(fail ? 1 : 0);
