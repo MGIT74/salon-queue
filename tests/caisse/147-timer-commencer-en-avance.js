@@ -17,6 +17,9 @@ check('heure de deblocage = heure du RDV - minutes', ctx.timerStartAllowedAt({ c
   check(n + ' : reglages lus dans les reglages publics', s.includes('timerCfg = { timer_early_enabled: d.timer_early_enabled, timer_early_min: d.timer_early_min, timer_early_barbers: d.timer_early_barbers || {} };'));
 });
 check('reglages : section Timer (salon + liste des coiffeurs automatique + enregistrer + tout le monde)', d.includes("toggleSettingsAccordion('timer')") && d.includes('id="timer-early-switch"') && d.includes('id="timer-barbers"') && /function renderTimerBarbers\(\)[\s\S]*?\(barbers \|\| \[\]\)\.filter\(function \(b\) \{ return b\.active; \}\)/.test(d) && d.includes('function saveTimerSettings()') && d.includes('function timerApplyToAll()'));
+check('reglages : interrupteur Timer par coiffeur = le meme que sa fiche (synchronises)', /'<div class="switch' \+ \(timerOn \? ' on' : ''\) \+ '" role="switch"[\s\S]*?toggleBarberTimer\(/.test(d) && d.includes("id=\"bp-timer-switch-' + b.id + '\"") && d.includes("var fsw = document.getElementById('bp-timer-switch-' + id);"));
+check('fiche du coiffeur : « Commencer un RDV en avance » (meme reglage, enregistre tout de suite)', d.includes("id=\"bp-timer-early-' + b.id + '\"") && d.includes('function timerBarberChanged(id, el)') && d.includes('function timerSyncViews(id)') && d.includes('function loadTimerSettingsOnce()'));
+check('timer coupe : avance grisee', d.includes('.tm-row.timer-off .tm-ctrl { opacity: .45; pointer-events: none; }'));
 (async () => {
   const H = { 'Content-Type': 'application/json', 'X-Salon-Slug': 'test', 'X-Admin-Password': 'adminpw' };
   const pub = async () => (await fetch(BASE + '/api/settings/public', { headers: { 'X-Salon-Slug': 'test' } })).json();

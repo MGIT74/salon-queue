@@ -1420,6 +1420,28 @@
             transition: background .2s ease, transform .15s cubic-bezier(.34,1.56,.64,1); }
   .switch:active { transform: scale(.93); }
   .caisse-hours { display: grid; gap: 10px; margin-bottom: 16px; }
+  /* Reglages > Timer */
+  .tm-salon { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 16px 18px; border-radius: 16px; background: var(--fill); margin: 6px 0 22px; }
+  .tm-salon-ic { width: 44px; height: 44px; border-radius: 12px; background: var(--blue-soft); color: var(--blue); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .tm-salon-text { flex: 1 1 260px; min-width: 0; }
+  .tm-title { font-size: 15px; font-weight: 600; }
+  .tm-sub { font-size: 13.5px; color: var(--grey); margin-top: 4px; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+  .tm-min { width: 68px; padding: 7px 8px; border: 1px solid var(--sep); border-radius: 10px; background: var(--card); color: var(--ink); font: inherit; font-weight: 600; text-align: center; }
+  .tm-save { flex-shrink: 0; }
+  .tm-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 0 0 4px; }
+  .tm-head h4 { font-size: 15px; font-weight: 600; margin: 0; }
+  .tm-all { padding: 8px 14px; font-size: 13px; }
+  .tm-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+  .tm-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--sep); background: var(--card); }
+  .tm-who { display: flex; align-items: center; gap: 12px; flex: 1 1 200px; min-width: 0; }
+  .tm-av { width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; background-size: cover; background-position: center; }
+  .tm-name { font-weight: 600; font-size: 14.5px; }
+  .tm-state { font-size: 12.5px; color: var(--grey); margin-top: 1px; }
+  .tm-state.on { color: var(--green); }
+  .tm-ctrl { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .tm-ctrl select { padding: 8px 10px; border-radius: 10px; border: 1px solid var(--sep); background: var(--fill); color: var(--ink); font: inherit; font-size: 13.5px; }
+  .tm-ctrl .tm-custom { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--grey); }
+  .tm-row.timer-off .tm-ctrl { opacity: .45; pointer-events: none; }
   .caisse-hour-row { display: flex; align-items: center; gap: 14px; padding: 12px 14px; border-radius: 14px; background: var(--fill); }
   .caisse-hour-text { flex: 1; min-width: 0; }
   .caisse-hour-title { font-weight: 600; font-size: 15px; }
@@ -2487,20 +2509,21 @@
       </h3>
       <div class="accordion-body" id="timer-body" style="display:none">
       <p class="hint">Pour un client avec rendez-vous, le bouton « Commencer » du Timer (Mon poste et Caisse) se débloque un peu avant l'heure du RDV : le coiffeur peut démarrer la prestation en avance si le client est déjà là.</p>
-      <div class="caisse-hour-row" style="background:transparent;padding:0;margin:4px 0 12px">
-        <div class="caisse-hour-text">
-          <div class="caisse-hour-title" style="font-size:15px;font-weight:600">Pour tout le salon</div>
-          <div class="hint" style="margin:2px 0 0">Commencer jusqu'à <input id="timer-early-min" type="number" min="0" max="240" style="width:72px;display:inline-block;padding:6px 8px;margin:0 4px" value="10"> min avant l'heure du RDV.</div>
+      <div class="tm-salon">
+        <div class="tm-salon-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9.5 2.5h5"/></svg></div>
+        <div class="tm-salon-text">
+          <div class="tm-title">Pour tout le salon</div>
+          <div class="tm-sub">Commencer jusqu'à <input id="timer-early-min" class="tm-min" type="number" min="0" max="240" value="10" onchange="renderTimerBarbers()"> min avant l'heure du RDV</div>
         </div>
-        <div class="switch on" id="timer-early-switch" role="switch" aria-checked="true" tabindex="0" title="Activer / désactiver" onclick="toggleTimerEarlySwitch()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleTimerEarlySwitch();}"></div>
+        <div class="switch on" id="timer-early-switch" role="switch" aria-checked="true" tabindex="0" title="Activer / désactiver l'avance pour le salon" onclick="toggleTimerEarlySwitch()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleTimerEarlySwitch();}"></div>
+        <button class="btn btn-primary tm-save" onclick="saveTimerSettings()">Enregistrer</button>
       </div>
-      <h4 style="font-size:14.5px;font-weight:600;margin:18px 0 4px">Par coiffeur</h4>
-      <p class="hint">Chaque coiffeur suit le réglage du salon, ou a ses propres minutes, ou n'a pas d'avance (« Commencer » à l'heure exacte). Les nouveaux coiffeurs apparaissent ici automatiquement.</p>
-      <div id="timer-barbers"></div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
-        <button class="btn btn-primary" onclick="saveTimerSettings()">Enregistrer le timer</button>
-        <button class="btn btn-soft" onclick="timerApplyToAll()">Tout le monde comme le salon</button>
+      <div class="tm-head">
+        <h4>Par coiffeur</h4>
+        <button class="btn btn-soft tm-all" onclick="timerApplyToAll()">Tout le monde comme le salon</button>
       </div>
+      <p class="hint" style="margin-top:0">L'interrupteur active ou coupe le Timer du coiffeur (le même que dans sa fiche, Coiffeurs › Horaires) : coupé, « Commencer » devient « Je prends ». Ses minutes d'avance suivent le salon, ou les siennes. Tout est enregistré tout de suite ; les nouveaux coiffeurs apparaissent ici automatiquement.</p>
+      <div id="timer-barbers" class="tm-list"></div>
       </div>
     </div>
 
@@ -5108,11 +5131,16 @@ function renderBarberDetail(b) {
 }
 
 function renderScheduleTab(b) {
+  if (!timerSettingsLoaded) setTimeout(loadTimerSettingsOnce, 0);   // avance du Timer : lue une fois, puis la fiche se met a jour
   var currentColor = b.color || stableColorForId(b.id);
   var timerToggle = '<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;background:var(--fill);border-radius:12px;padding:12px 14px">' +
-    '<div class="switch' + (b.timer_enabled === 0 ? '' : ' on') + '" onclick="toggleBarberTimer(\'' + b.id + '\', this)"></div>' +
+    '<div class="switch' + (b.timer_enabled === 0 ? '' : ' on') + '" id="bp-timer-switch-' + b.id + '" onclick="toggleBarberTimer(\'' + b.id + '\', this)"></div>' +
     '<div><div style="font-weight:600;font-size:14px">Timer / file d\'attente en temps réel</div>' +
-    '<div class="hint" style="margin:2px 0 0">Si désactivé : l\'onglet Timer reste visible (le coiffeur voit toujours ses prochains clients), mais le bouton "Commencer" devient "Je prends" — le client passe directement à l\'encaissement, sans suivi de chrono ni retard pris en compte. La réservation en ligne repasse sur un calcul classique (horaires + durée des prestations). La file d\'attente (check-in sans-rdv) reste utilisable normalement.</div></div>' +
+    '<div class="hint" style="margin:2px 0 0;font-size:13px;color:var(--grey);line-height:1.45">Si désactivé : l\'onglet Timer reste visible (le coiffeur voit toujours ses prochains clients), mais le bouton "Commencer" devient "Je prends" — le client passe directement à l\'encaissement, sans suivi de chrono ni retard pris en compte. La réservation en ligne repasse sur un calcul classique (horaires + durée des prestations). La file d\'attente (check-in sans-rdv) reste utilisable normalement.</div>' +
+    // Avance pour commencer un RDV (meme reglage que Reglages > Timer, synchronise).
+    '<div class="bp-timer-early" style="margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-size:13.5px;font-weight:600">Commencer un RDV en avance :</span>' +
+      '<span class="tm-ctrl" id="bp-timer-early-' + b.id + '">' + (timerSettingsLoaded ? timerEarlyControlHtml(b) : '<span style="font-size:13px;color:var(--grey)">Chargement…</span>') + '</span></div>' +
+    '</div>' +
     '</div>';
 
   var colorPicker = '<div style="margin-bottom:20px">' +
@@ -6009,6 +6037,10 @@ function toggleBarberTimer(id, el) {
       var b = barbers.find(function (x) { return x.id === id; });
       if (b) b.timer_enabled = enabling ? 1 : 0;
       toast(enabling ? 'Timer activé' : 'Timer désactivé');
+      // Meme interrupteur dans la fiche du coiffeur et dans Reglages > Timer : les deux restent a jour.
+      if (typeof renderTimerBarbers === 'function' && document.getElementById('timer-body') && document.getElementById('timer-body').style.display !== 'none') renderTimerBarbers();
+      var fsw = document.getElementById('bp-timer-switch-' + id);
+      if (fsw && fsw !== el) fsw.classList.toggle('on', enabling);
     })
     .catch(function (e) { toast(e.message, true); el.classList.toggle('on'); });
 }
@@ -9424,8 +9456,9 @@ function saveTimezone() {
 /* ---------- Reglages > Timer : commencer un client avec RDV X min avant son heure ----------
    Salon : interrupteur + minutes (10 par defaut). Par coiffeur : « Comme le salon », « Personnalise » (ses minutes) ou
    « Pas d'avance ». La liste suit les coiffeurs du salon (un nouveau coiffeur y apparait tout seul). */
-var timerEarlyBarbers = {};
+var timerEarlyBarbers = {}, timerSettingsLoaded = false;
 function fillTimerSettings(s) {
+  timerSettingsLoaded = true;
   var on = s.timer_early_enabled === undefined || s.timer_early_enabled === null || String(s.timer_early_enabled) !== '0';
   var sw = document.getElementById('timer-early-switch');
   sw.classList.toggle('on', on); sw.setAttribute('aria-checked', on ? 'true' : 'false');
@@ -9433,14 +9466,39 @@ function fillTimerSettings(s) {
   try { timerEarlyBarbers = JSON.parse(s.timer_early_barbers || '{}') || {}; } catch (e) { timerEarlyBarbers = {}; }
   renderTimerBarbers();
 }
+var timerSettingsLoading = null;
+function loadTimerSettingsOnce() {
+  if (timerSettingsLoaded || timerSettingsLoading) return timerSettingsLoading;
+  timerSettingsLoading = api('/api/settings').then(function (r) {
+    fillTimerSettings(r.settings);
+    document.querySelectorAll('[id^="bp-timer-early-"]').forEach(function (el) {
+      var b = (barbers || []).find(function (x) { return 'bp-timer-early-' + x.id === el.id; });
+      if (b) el.innerHTML = timerEarlyControlHtml(b);
+    });
+  }).catch(function () {}).then(function () { timerSettingsLoading = null; });
+  return timerSettingsLoading;
+}
 function toggleTimerEarlySwitch() {
   var sw = document.getElementById('timer-early-switch'), on = !sw.classList.contains('on');
   sw.classList.toggle('on', on); sw.setAttribute('aria-checked', on ? 'true' : 'false');
   renderTimerBarbers();
 }
 function timerSalonLabel() {
-  var on = document.getElementById('timer-early-switch').classList.contains('on');
-  return on ? (Number(document.getElementById('timer-early-min').value) || 0) + ' min avant' : "pas d'avance";
+  var sw = document.getElementById('timer-early-switch'), mi = document.getElementById('timer-early-min');
+  var on = sw ? sw.classList.contains('on') : true;
+  return on ? (Number(mi ? mi.value : 10) || 0) + ' min avant' : "pas d'avance";
+}
+/** Choix « avance » d'un coiffeur (meme controle dans Reglages > Timer et dans sa fiche). */
+function timerEarlyControlHtml(b) {
+  var cur = timerEarlyBarbers[b.id] || { mode: 'salon' };
+  var mi = document.getElementById('timer-early-min');
+  return '<select class="timer-mode" aria-label="Avance de ' + esc(b.name) + '" onchange="timerBarberChanged(\'' + b.id + '\', this)">' +
+      '<option value="salon"' + (cur.mode === 'salon' ? ' selected' : '') + '>Comme le salon (' + esc(timerSalonLabel()) + ')</option>' +
+      '<option value="custom"' + (cur.mode === 'custom' ? ' selected' : '') + '>Personnalisé</option>' +
+      '<option value="off"' + (cur.mode === 'off' ? ' selected' : '') + '>Pas d\'avance</option>' +
+    '</select>' +
+    '<span class="tm-custom" style="display:' + (cur.mode === 'custom' ? 'inline-flex' : 'none') + '"><input class="timer-min tm-min" type="number" min="0" max="240" value="' +
+      (cur.mode === 'custom' ? Number(cur.min) || 0 : (Number(mi ? mi.value : 10) || 10)) + '" onchange="timerBarberChanged(\'' + b.id + '\', this)"> min avant</span>';
 }
 function renderTimerBarbers() {
   var box = document.getElementById('timer-barbers');
@@ -9448,53 +9506,58 @@ function renderTimerBarbers() {
   var list = (barbers || []).filter(function (b) { return b.active; });
   if (!list.length) { box.innerHTML = '<div class="hint">Aucun coiffeur actif.</div>'; return; }
   box.innerHTML = list.map(function (b) {
-    var cur = timerEarlyBarbers[b.id] || { mode: 'salon' };
-    return '<div class="timer-barber-row" data-id="' + b.id + '" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid var(--sep)">' +
-      '<div style="flex:1 1 140px;min-width:0;font-weight:600">' + esc(b.name) + '</div>' +
-      '<select class="timer-mode" onchange="timerModeChanged(this)" style="flex:0 1 240px;padding:8px 10px;border-radius:10px">' +
-        '<option value="salon"' + (cur.mode === 'salon' ? ' selected' : '') + '>Comme le salon (' + esc(timerSalonLabel()) + ')</option>' +
-        '<option value="custom"' + (cur.mode === 'custom' ? ' selected' : '') + '>Personnalisé</option>' +
-        '<option value="off"' + (cur.mode === 'off' ? ' selected' : '') + '>Pas d\'avance</option>' +
-      '</select>' +
-      '<span class="timer-custom" style="display:' + (cur.mode === 'custom' ? 'inline-flex' : 'none') + ';align-items:center;gap:6px"><input class="timer-min" type="number" min="0" max="240" value="' + (cur.mode === 'custom' ? Number(cur.min) || 0 : (Number(document.getElementById('timer-early-min').value) || 10)) + '" style="width:72px;padding:6px 8px"> min avant</span>' +
+    var timerOn = b.timer_enabled !== 0;
+    var color = b.color || stableColorForId(b.id);
+    var av = '<div class="tm-av" style="' + (b.photo_url ? 'background-image:url(&quot;' + esc(b.photo_url) + '&quot;)' : 'background:' + color) + '">' + (b.photo_url ? '' : esc(String(b.name || '?').charAt(0).toUpperCase())) + '</div>';
+    return '<div class="tm-row timer-barber-row' + (timerOn ? '' : ' timer-off') + '" data-id="' + b.id + '">' +
+      '<div class="tm-who">' + av + '<div style="min-width:0"><div class="tm-name">' + esc(b.name) + '</div>' +
+        '<div class="tm-state' + (timerOn ? ' on' : '') + '">' + (timerOn ? 'Timer activé' : 'Timer coupé — « Je prends »') + '</div></div></div>' +
+      '<div class="switch' + (timerOn ? ' on' : '') + '" role="switch" aria-checked="' + timerOn + '" tabindex="0" title="Timer de ' + esc(b.name) + '" onclick="toggleBarberTimer(\'' + b.id + '\', this)" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();toggleBarberTimer(\'' + b.id + '\', this);}"></div>' +
+      '<div class="tm-ctrl">' + timerEarlyControlHtml(b) + '</div>' +
     '</div>';
   }).join('');
 }
-function timerModeChanged(sel) {
-  var row = sel.closest('.timer-barber-row');
-  row.querySelector('.timer-custom').style.display = sel.value === 'custom' ? 'inline-flex' : 'none';
+// Avance d'un coiffeur modifiee (Reglages > Timer ou sa fiche) : enregistree tout de suite, partout a jour.
+function timerBarberChanged(id, el) {
+  var wrap = el.closest('.tm-ctrl, .bp-timer-early');
+  var sel = wrap.querySelector('.timer-mode'), minEl = wrap.querySelector('.timer-min');
+  wrap.querySelector('.tm-custom').style.display = sel.value === 'custom' ? 'inline-flex' : 'none';
+  var next = Object.assign({}, timerEarlyBarbers);
+  if (sel.value === 'custom') {
+    var v = Number(minEl.value);
+    if (!Number.isInteger(v) || v < 0 || v > 240) { toast('Minutes : un nombre entre 0 et 240', true); return; }
+    next[id] = { mode: 'custom', min: v };
+  } else if (sel.value === 'off') next[id] = { mode: 'off' };
+  else delete next[id];
+  api('/api/settings', { method: 'PUT', body: { timer_early_barbers: next } })
+    .then(function () { timerEarlyBarbers = next; timerSyncViews(id); toast('Avance enregistrée'); })
+    .catch(function (e) { toast(e.message, true); });
 }
-function timerCollectBarbers() {
-  var out = {};
-  document.querySelectorAll('#timer-barbers .timer-barber-row').forEach(function (row) {
-    var mode = row.querySelector('.timer-mode').value;
-    if (mode === 'custom') out[row.dataset.id] = { mode: 'custom', min: Number(row.querySelector('.timer-min').value) || 0 };
-    else if (mode === 'off') out[row.dataset.id] = { mode: 'off' };
-  });
-  return out;
+// Reglages > Timer et fiche du coiffeur affichent toujours la meme chose.
+function timerSyncViews(id) {
+  if (document.getElementById('timer-body') && document.getElementById('timer-body').style.display !== 'none') renderTimerBarbers();
+  var fiche = document.getElementById('bp-timer-early-' + id);
+  var b = (barbers || []).find(function (x) { return x.id === id; });
+  if (fiche && b) fiche.innerHTML = timerEarlyControlHtml(b);
 }
 function timerApplyToAll() {
-  document.querySelectorAll('#timer-barbers .timer-mode').forEach(function (sel) { sel.value = 'salon'; timerModeChanged(sel); });
-  toast('Tous les coiffeurs suivent le réglage du salon — pensez à enregistrer');
+  showConfirm('Tous les coiffeurs suivront le réglage du salon (' + timerSalonLabel() + ').', { title: 'Tout le monde comme le salon', confirmLabel: 'Appliquer' }).then(function (ok) {
+    if (!ok) return;
+    api('/api/settings', { method: 'PUT', body: { timer_early_barbers: {} } })
+      .then(function () { timerEarlyBarbers = {}; renderTimerBarbers(); toast('Tous les coiffeurs suivent le salon'); })
+      .catch(function (e) { toast(e.message, true); });
+  });
 }
 function saveTimerSettings() {
   var min = Number(document.getElementById('timer-early-min').value);
   if (!Number.isInteger(min) || min < 0 || min > 240) { toast('Minutes du salon : un nombre entre 0 et 240', true); return; }
-  var bad = Array.prototype.some.call(document.querySelectorAll('#timer-barbers .timer-barber-row'), function (row) {
-    if (row.querySelector('.timer-mode').value !== 'custom') return false;
-    var v = Number(row.querySelector('.timer-min').value);
-    return !Number.isInteger(v) || v < 0 || v > 240;
-  });
-  if (bad) { toast('Minutes d\'un coiffeur : un nombre entre 0 et 240', true); return; }
-  var barbersCfg = timerCollectBarbers();
   api('/api/settings', { method: 'PUT', body: {
     timer_early_enabled: document.getElementById('timer-early-switch').classList.contains('on') ? '1' : '0',
-    timer_early_min: String(min),
-    timer_early_barbers: barbersCfg
+    timer_early_min: String(min)
   } }).then(function () {
-    timerEarlyBarbers = barbersCfg;
+    timerSettingsLoaded = true;
     renderTimerBarbers();
-    toast('Timer enregistré');
+    toast('Réglage du salon enregistré');
   }).catch(function (e) { toast(e.message, true); });
 }
 
