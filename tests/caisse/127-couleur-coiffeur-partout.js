@@ -18,6 +18,6 @@ pages.forEach((f) => rd(f).split('\n').forEach((l, i) => {
 }));
 check('aucun ecran n\'ignore la couleur choisie', bad.length === 0, bad.join(', '));
 const c = rd('caisse.html');
-check('agenda de la caisse (points du mois + frise du jour) : couleur choisie', (c.match(/barberColorOf\(bid, allBarbers\)/g) || []).length === 2);
+check('agenda de la caisse (points du mois + frise du jour + legende) : couleur choisie', (c.match(/barberColorOf\(bid, allBarbers\)/g) || []).length === 3);
 console.log(`\n${pass} OK, ${fail} ECHEC`);
 process.exit(fail ? 1 : 0);
