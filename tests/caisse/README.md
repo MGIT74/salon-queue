@@ -189,4 +189,5 @@ node tests/caisse/152-tiroir-rdv-identique-et-prix.js  # Tiroir RDV identique pa
 node tests/caisse/153-lien-activation-compte.js  # Lien d'activation : message clair, 2e clic, lien expire
 node tests/caisse/154-rdv-non-demarre-en-caisse.js  # RDV jamais demarre : en caisse a la fin du creneau, a verifier (Absent possible)
 node tests/caisse/155-poste-vue-jour.js  # Mon poste > Agenda > Jour : recherche client, coup d'oeil equipe, colonnes
+node tests/caisse/156-caisse-cartes-a-encaisser.js  # Caisse : cartes A encaisser sur 2 lignes, ticket toujours visible
 ```

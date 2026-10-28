@@ -351,10 +351,11 @@
 
   .caisse-layout {
     display: grid; gap: 18px; align-items: start;
-    grid-template-columns: 1fr 340px;
+    /* minmax(0, 1fr) : la colonne de gauche ne peut JAMAIS pousser le ticket hors de l'écran, quoi qu'elle contienne. */
+    grid-template-columns: minmax(0, 1fr) 340px;
     grid-template-areas: "grid ticket";
   }
-  .caisse-grid-col { grid-area: grid; }
+  .caisse-grid-col { grid-area: grid; min-width: 0; }
   .ticket-panel { grid-area: ticket; }
   .pending-section { margin-top: 2px; }
   @media (max-width: 860px) {
@@ -558,24 +559,30 @@
   .empty { background: var(--card); border-radius: 16px; padding: 30px 20px; text-align: center; color: var(--grey); font-size: 14px; box-shadow: var(--shadow); }
 
   .pending-list { margin-bottom: 18px; max-height: 340px; overflow-y: auto; padding-right: 10px; }
+  /* Carte « À encaisser » sur deux lignes : infos + montant en haut, boutons en dessous (ils passent à la ligne). */
   .pending-card {
-    display: flex; align-items: center; justify-content: space-between; gap: 12px;
-    background: var(--card); border-radius: 14px; padding: 14px 16px; margin-bottom: 8px;
+    display: block;
+    background: var(--card); border-radius: 16px; padding: 14px 16px 12px; margin-bottom: 10px;
     box-shadow: var(--shadow); cursor: pointer; transition: opacity .15s ease;
   }
+  .pc-top { display: flex; align-items: flex-start; gap: 16px; }
+  .pc-info { flex: 1; min-width: 0; }
   .pending-card.locked { opacity: .55; cursor: default; }
-  .pending-card .name { font-size: 14.5px; font-weight: 600; }
+  .pending-card .name { font-size: 16px; font-weight: 700; }
   .pending-card .meta { font-size: 12.5px; color: var(--grey); margin-top: 2px; }
-  .pending-card .amount { font-size: 15px; font-weight: 600; flex-shrink: 0; }
-  .pending-card .lock-note { font-size: 11.5px; color: var(--orange); margin-top: 2px; }
+  .pending-card .amount { font-size: 21px; font-weight: 800; flex-shrink: 0; white-space: nowrap; }
+  .pending-card .lock-note { font-size: 12.5px; color: var(--orange); margin-top: 3px; }
   .pending-card.deferred { opacity: .7; }
   .pending-card.deferred .lock-note { color: var(--grey); }
-  .pending-actions { display: flex; gap: 6px; flex-shrink: 0; align-items: center; }
+  .pending-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; border-top: 1px solid var(--sep); margin-top: 12px; padding-top: 10px; }
+  .pending-actions:empty { display: none; }
   /* Corbeille : supprimer un passage qui ne sera pas payé (double confirmation). */
-  .pending-del { width: 34px; height: 34px; border-radius: 50%; border: none; background: transparent; color: var(--red); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: background .15s ease; }
+  .pending-del { margin-left: auto; width: 40px; height: 40px; border-radius: 50%; border: none; background: transparent; color: var(--red); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: background .15s ease; }
   .pending-del:hover, .pending-del:focus-visible { background: var(--red-soft, rgba(255,59,48,.12)); }
   .pending-card.locked .pending-del { opacity: 1; }
-  .pending-actions .btn { padding: 8px 12px; font-size: 12.5px; white-space: nowrap; }
+  .pending-actions .btn { min-height: 40px; padding: 0 16px; font-size: 13.5px; font-weight: 600; white-space: nowrap; border-radius: 999px; }
+  .pending-actions .btn-ghost { background: var(--fill); }
+  .pending-actions .btn-absent { background: transparent; color: var(--red); box-shadow: inset 0 0 0 1px rgba(255,69,58,.55); }
 
   /* --- Reçu imprimable --- */
   .receipt-overlay {
@@ -3692,7 +3699,7 @@ function unstartedNoteHtml(q) {
 }
 function unstartedAbsentBtn(q) {
   return q.auto_unstarted && !q.prepaid
-    ? '<button class="btn btn-ghost" style="color:var(--red)" onclick="event.stopPropagation();markUnstartedAbsent(\'' + q.id + '\')">Absent</button>' : '';
+    ? '<button class="btn btn-absent" onclick="event.stopPropagation();markUnstartedAbsent(\'' + q.id + '\')">Absent</button>' : '';
 }
 function markUnstartedAbsent(queueId) {
   var q = pendingPayments.find(function (x) { return x.id === queueId; });
@@ -3731,11 +3738,11 @@ function renderPendingList() {
 
     if (q.deferred) {
       return '<div class="pending-card deferred">' +
-        '<div><div class="name">' + esc(q.client_name) + '</div>' +
+        '<div class="pc-top"><div class="pc-info"><div class="name">' + esc(q.client_name) + '</div>' +
         '<div class="meta">' + esc(detail) + '</div>' +
         '<div class="lock-note">Mis de côté</div>' + unstartedNoteHtml(q) + '</div>' +
-        '<div class="pending-actions">' +
-          '<span class="amount">' + eur(q.prepaid ? q.balance_due_cents : q.total_price_cents) + '</span>' +
+        '<span class="amount">' + eur(q.prepaid ? q.balance_due_cents : q.total_price_cents) + '</span></div>' +
+          '<div class="pending-actions">' +
           '<button class="btn btn-soft" onclick="event.stopPropagation();toggleDeferPayment(\'' + q.id + '\')">Reprendre</button>' +
           unstartedAbsentBtn(q) +
           (q.prepaid ? '' : pendingDelBtn(q)) +
@@ -3747,13 +3754,13 @@ function renderPendingList() {
       var addedNames = (q.balance_lines || []).map(function (l) { return l.item_name; }).join(', ');
       return '<div class="pending-card' + (isActive ? '' : ' locked') + '"' +
         (isActive ? ' onclick="useBalanceForTicket(\'' + q.id + '\')"' : '') + '>' +
-        '<div><div class="name">' + esc(q.client_name) + '</div>' +
+        '<div class="pc-top"><div class="pc-info"><div class="name">' + esc(q.client_name) + '</div>' +
         '<div class="meta">' + esc(detail) + '</div>' +
         '<div class="lock-note" style="color:var(--green)">✓ Payé d\'avance — reste à payer : ' + esc(addedNames) + '</div>' +
         unstartedNoteHtml(q) +
         (isActive ? '' : '<div class="lock-note">En attente de son tour</div>') + '</div>' +
-        '<div class="pending-actions">' +
-          '<span class="amount">' + eur(q.balance_due_cents) + '</span>' +
+        '<span class="amount">' + eur(q.balance_due_cents) + '</span></div>' +
+          '<div class="pending-actions">' +
           (isActive ? '<button class="btn btn-ghost" onclick="event.stopPropagation();toggleDeferPayment(\'' + q.id + '\')">Mettre de côté</button>' : '') +
         '</div></div>';
     }
@@ -3780,23 +3787,23 @@ function renderPendingList() {
     var earlyN = explicitGift ? 0 : (q.group_not_done || []).filter(function (m) { return m.queue_id && (m.state === 'waiting' || m.state === 'in_progress'); }).length;
     return '<div class="pending-card' + (isActive ? '' : ' locked') + '"' +
       (isActive && !explicitGift ? ' onclick="usePendingForTicket(\'' + q.id + '\')"' : '') + '>' +
-      '<div><div class="name">' + esc(q.client_name) + '</div>' +
+      '<div class="pc-top"><div class="pc-info"><div class="name">' + esc(q.client_name) + '</div>' +
       pendingGroupBadgeHtml(q, explicitGift ? [] : mates) +
       '<div class="meta">' + esc(detail) + '</div>' +
       unstartedNoteHtml(q) +
       (isActive ? giftNote + loyaltyNote : '<div class="lock-note">En attente de son tour</div>') + '</div>' +
-      '<div class="pending-actions">' +
-        '<span class="amount">' + eur(displayAmount) + '</span>' +
+      '<span class="amount">' + eur(displayAmount) + '</span></div>' +
+        '<div class="pending-actions">' +
         (isActive && explicitGift
           ? '<button class="btn btn-primary" onclick="event.stopPropagation();useGiftCard(\'' + q.gift_card.id + '\',\'' + q.id + '\')">Utiliser le cadeau</button>'
           : '') +
         (isActive && (mates.length || earlyN)
           ? '<button class="btn btn-primary" onclick="event.stopPropagation();usePendingGroupForTicket(\'' + q.id + '\')">Encaisser le groupe (' + (mates.length + earlyN + 1) + ')</button>'
           : '') +
+        unstartedAbsentBtn(q) +
         (isActive && !q.loyalty_member
           ? '<button class="btn btn-ghost" onclick="event.stopPropagation();proposeLoyaltyActivation(\'' + q.id + '\')">Activer carte de fidélité</button>'
           : '') +
-        unstartedAbsentBtn(q) +
         (isActive ? '<button class="btn btn-ghost" onclick="event.stopPropagation();toggleDeferPayment(\'' + q.id + '\')">Mettre de côté</button>' : '') +
         pendingDelBtn(q) +
       '</div></div>';
