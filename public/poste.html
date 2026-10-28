@@ -421,7 +421,9 @@
   .pd-card { background: var(--fill); border-radius: 16px; padding: 14px 16px; }
   .pd-card h4 { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--grey); }
   .pd-next { box-shadow: inset 0 0 0 2px var(--blue); cursor: pointer; border: none; text-align: left; color: var(--ink); width: 100%; }
-  .pd-next .pd-next-when { font-size: 12.5px; font-weight: 700; color: var(--blue); }
+  .pd-next .pd-next-when { display: flex; align-items: center; justify-content: space-between; gap: 4px 8px; flex-wrap: wrap; font-size: 12px; font-weight: 700; color: var(--blue); }
+  .pd-next .pd-next-when span { white-space: nowrap; }
+  .pd-next .pd-next-when em { font-style: normal; font-size: 12px; background: var(--blue-soft); color: var(--blue); padding: 3px 8px; border-radius: 99px; white-space: nowrap; flex-shrink: 0; }
   .pd-next .pd-next-name { font-size: 20px; font-weight: 800; margin-top: 2px; }
   .pd-next .pd-next-meta { font-size: 13px; color: var(--grey); margin-top: 2px; }
   .pd-free-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 0; border-top: 1px solid var(--sep); }
@@ -454,7 +456,15 @@
   .pd-block .n { font-size: 13.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
   .pd-block .s { font-size: 12px; opacity: .82; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
   .pd-block .l { margin-left: auto; font-size: 10.5px; font-weight: 700; white-space: nowrap; flex-shrink: 0; }
-  .pd-block.st-done, .pd-block.st-past { background: var(--card); color: var(--grey); }
+  .pd-block.st-done, .pd-block.st-past { opacity: .5; }   /* passé / terminé : garde la couleur du coiffeur, en plus pâle */
+  .pd-block.st-done.pd-hit, .pd-block.st-past.pd-hit { opacity: 1; }
+  .pd-block.tall { flex-direction: column; align-items: flex-start; justify-content: center; gap: 1px; padding-top: 4px; padding-bottom: 4px; }
+  .pd-block.tall .n { max-width: 100%; }
+  .pd-block.tall .l { position: absolute; right: 8px; top: 6px; }
+  .pd-block.tall .t + .n { margin-top: 0; }
+  .pd-block.narrow { padding: 0 5px !important; gap: 3px !important; }
+  .pd-block.narrow .t { display: none; }
+  .pd-block.narrow.tall .t { display: inline; }
   .pd-block.st-absent { background: transparent; color: var(--grey); border: 1px dashed var(--grey); }
   .pd-block.st-absent .n { text-decoration: line-through; }
   .pd-block.st-inprogress .l, .pd-block.is-next .l { background: #fff; color: #111; padding: 2px 7px; border-radius: 99px; }
@@ -466,6 +476,7 @@
   .pd-free { position: absolute; left: 0; right: 0; box-sizing: border-box; border: 1px dashed var(--sep); background: transparent; color: var(--grey); border-radius: 9px; padding: 0 10px; display: flex; align-items: center; gap: 8px; font-size: 12px; cursor: pointer; overflow: hidden; }
   .pd-free b { margin-left: auto; color: var(--blue); font-size: 12px; }
   .pd-free:hover { border-color: var(--blue); }
+  .pd-free.tall { align-items: flex-start; padding-top: 8px; }
   .pd-break { position: absolute; left: 0; right: 0; box-sizing: border-box; border-radius: 8px; background: repeating-linear-gradient(135deg, transparent 0 6px, rgba(127,127,127,.16) 6px 12px); color: var(--grey); font-size: 11.5px; display: flex; align-items: center; padding: 0 10px; pointer-events: none; }
   .pd-now { position: absolute; left: 0; right: 0; border-top: 2px solid var(--red); z-index: 4; pointer-events: none; }
   .pd-now span { position: absolute; left: 0; top: -10px; background: var(--red); color: #fff; font-size: 10.5px; font-weight: 700; padding: 2px 6px; border-radius: 5px; }
@@ -536,6 +547,10 @@
     .pd-mchip { min-width: 17px; height: 17px; padding: 0 4px; border-radius: 9px; font-size: 10px; }
     .pd-mgrid, .pd-mhead { gap: 4px; }
     .pd-wk-head b { font-size: 14px; }
+    .pd-wk-block { justify-content: center; padding: 0 !important; }
+    .pd-wk-block .n { font-size: 11px !important; font-weight: 800; }
+    .pd-block .s { display: none; }
+    .pd-block.tall .s { display: block; }
     .pd-side > .pd-view-card { display: none; }
     .pd-cal { padding: 8px; }
     .pd-cal-scroll { max-height: calc(100vh - 140px); }
@@ -1444,6 +1459,26 @@ try {
   if (_pdz >= 0.8 && _pdz <= 2.6) pdPx = _pdz;
 } catch (e) { /* stockage indisponible : valeurs par defaut */ }
 
+/** RDV qui se chevauchent : côte à côte (comme un agenda), au lieu de se recouvrir. Ajoute lane / lanes à chaque élément. */
+function pdLayout(list) {
+  var sorted = list.slice().sort(function (x, y) { return x.start - y.start || y.end - x.end; });
+  var group = [], groupEnd = -1, ends = [];
+  var flush = function () { group.forEach(function (it) { it.lanes = ends.length; }); group = []; ends = []; };
+  sorted.forEach(function (it) {
+    if (it.start >= groupEnd) { flush(); groupEnd = -1; }
+    var li = ends.findIndex(function (e) { return e <= it.start; });
+    if (li === -1) { li = ends.length; ends.push(it.end); } else ends[li] = it.end;
+    it.lane = li; group.push(it); groupEnd = Math.max(groupEnd, it.end);
+  });
+  flush();
+  return list;
+}
+/** Position horizontale d'un RDV dans sa colonne selon sa voie. */
+function pdLaneCss(it) {
+  if (!it.lanes || it.lanes < 2) return '';
+  var w = 100 / it.lanes;
+  return 'left:calc(' + (it.lane * w).toFixed(3) + '% + ' + (it.lane ? 1 : 0) + 'px);right:auto;width:calc(' + w.toFixed(3) + '% - 2px);';
+}
 function pdIsPhone() { return !!(window.matchMedia && window.matchMedia('(max-width: 699px)').matches); }
 function pdHM(m) { return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); }
 function pdDur(m) { return m >= 60 ? Math.floor(m / 60) + ' h ' + String(m % 60).padStart(2, '0') : m + ' min'; }
@@ -1597,7 +1632,7 @@ function posteDayHtml(dateStr) {
     var inProg = nextIt.st === 'inprogress';
     var when = inProg ? 'En cours' : (isToday ? (nextIt.start - nowMin > 0 ? 'Dans ' + pdDur(nextIt.start - nowMin) : 'Maintenant') : 'Premier RDV du jour');
     side += '<button type="button" class="pd-card pd-next" onclick="pdGoTo(\'' + nextIt.id + '\')">' +
-      '<div class="pd-next-when">Mon prochain client · ' + esc(when) + '</div>' +
+      '<div class="pd-next-when"><span>Mon prochain client</span><em>' + esc(when) + '</em></div>' +
       '<div class="pd-next-name">' + esc(nextIt.a.client_name) + '</div>' +
       '<div class="pd-next-meta">' + pdHM(nextIt.start) + ' – ' + pdHM(nextIt.end) + ' · ' + esc(nextIt.a.service_name || '') + '</div></button>';
   }
@@ -1644,21 +1679,22 @@ function posteDayHtml(dateStr) {
     });
     if (isMe) free.forEach(function (f) {
       var h = Math.round((f[1] - f[0]) * PX) - 3;
-      inner += '<button type="button" class="pd-free" style="top:' + Math.round((f[0] - R0) * PX) + 'px;height:' + h + 'px" onclick="event.stopPropagation();openPosteAddAppointment(\'' + dateStr + '\',\'' + myId + '\')">Libre · ' + pdDur(f[1] - f[0]) + (h >= 18 ? '<b>+ Ajouter</b>' : '') + '</button>';
+      inner += '<button type="button" class="pd-free' + (h >= 44 ? ' tall' : '') + '" style="top:' + Math.round((f[0] - R0) * PX) + 'px;height:' + h + 'px" onclick="event.stopPropagation();openPosteAddAppointment(\'' + dateStr + '\',\'' + myId + '\')">Libre · ' + pdDur(f[1] - f[0]) + (h >= 18 ? '<b>+ Ajouter</b>' : '') + '</button>';
     });
-    items.filter(function (it) { return it.barberId === b.id; }).forEach(function (it) {
+    pdLayout(items.filter(function (it) { return it.barberId === b.id; })).forEach(function (it) {
       var h = Math.max(16, Math.round(it.dur * PX) - 3), a = it.a;
       var isNext = nextIt && it.id === nextIt.id;
       var label = it.st === 'absent' ? 'Absent' : it.st === 'done' ? 'Terminé' : it.st === 'inprogress' ? 'En cours' : isNext ? 'Prochain' : '';
       var showSvc = (isMe || single) && a.service_name;
-      inner += '<button type="button" class="pd-block st-' + it.st + (isNext ? ' is-next' : '') + '" data-id="' + esc(a.id) + '" ' +
+      var narrow = it.lanes > 1;
+      inner += '<button type="button" class="pd-block st-' + it.st + (isNext ? ' is-next' : '') + (narrow ? ' narrow' : '') + (h >= 46 ? ' tall' : '') + '" data-id="' + esc(a.id) + '" ' +
         'data-q="' + esc(normText([a.client_name, a.email, a.phone].join(' ')) + ' ' + String(a.phone || '').replace(/\D/g, '')) + '" ' +
-        'style="top:' + Math.round((it.start - R0) * PX) + 'px;height:' + h + 'px;--c:' + color + ';--fg:' + fg + '" ' +
-        'title="' + esc(pdHM(it.start) + ' — ' + a.client_name + ' — ' + (a.service_name || '') + ' — ' + b.name) + '" ' +
+        'style="top:' + Math.round((it.start - R0) * PX) + 'px;height:' + h + 'px;' + pdLaneCss(it) + '--c:' + color + ';--fg:' + fg + '" ' +
+        'title="' + esc(pdHM(it.start) + ' – ' + pdHM(it.end) + ' — ' + a.client_name + ' — ' + (a.service_name || '') + ' — ' + b.name) + '" ' +
         'onclick="event.stopPropagation();openPosteClientDrawer(\'' + a.id + '\')">' +
         '<span class="t">' + pdHM(it.start) + '</span><span class="n">' + esc(a.client_name) + '</span>' +
-        (showSvc ? '<span class="s">' + esc(a.service_name) + ' · ' + it.dur + ' min</span>' : '') +
-        (label && (isMe || single) ? '<span class="l">' + label + '</span>' : '') + '</button>';
+        (showSvc && !narrow ? '<span class="s">' + esc(a.service_name) + ' · ' + pdDur(it.dur) + '</span>' : '') +
+        (label && (isMe || single) && !narrow ? '<span class="l">' + label + '</span>' : '') + '</button>';
     });
     if (offWhy || walkDay) inner += '<div class="pd-col-off">' + (offWhy ? esc(offWhy.charAt(0).toUpperCase() + offWhy.slice(1)) : 'En « sans RDV » ce jour-là') + '</div>';
     else if (!items.some(function (it) { return it.barberId === b.id; }) && !isMe) inner += '<div class="pd-col-off">Aucun RDV</div>';
@@ -1787,15 +1823,18 @@ function pdWeekHtml(start) {
   var meB = { id: myId, name: me ? me.name : '', accepts_appointments: 1 };
   var cols = days.map(function (d) {
     var inner = '';
-    shown.filter(function (it) { return it.day === d; }).forEach(function (it) {
+    pdLayout(shown.filter(function (it) { return it.day === d; })).forEach(function (it) {
       var color = barberColor(it.barberId), a = it.a;
       var h = Math.max(14, Math.round(it.dur * PX) - 2);
-      inner += '<button type="button" class="pd-block pd-wk-block st-' + it.st + '" data-id="' + esc(a.id) + '" ' +
+      var narrow = it.lanes > 1;
+      inner += '<button type="button" class="pd-block pd-wk-block st-' + it.st + (narrow ? ' narrow' : '') + (h >= 40 && !phone ? ' tall' : '') + '" data-id="' + esc(a.id) + '" ' +
         'data-q="' + esc(normText([a.client_name, a.email, a.phone].join(' ')) + ' ' + String(a.phone || '').replace(/\D/g, '')) + '" ' +
-        'style="top:' + Math.round((it.start - R0) * PX) + 'px;height:' + h + 'px;--c:' + color + ';--fg:' + pdFg(color) + '" ' +
-        'title="' + esc(pdHM(it.start) + ' — ' + a.client_name + ' — ' + (a.service_name || '') + ' — ' + (a.barber_name || '')) + '" ' +
+        'style="top:' + Math.round((it.start - R0) * PX) + 'px;height:' + h + 'px;' + pdLaneCss(it) + '--c:' + color + ';--fg:' + pdFg(color) + '" ' +
+        'title="' + esc(pdHM(it.start) + ' – ' + pdHM(it.end) + ' — ' + a.client_name + ' — ' + (a.service_name || '') + ' — ' + (a.barber_name || '')) + '" ' +
         'onclick="event.stopPropagation();openPosteClientDrawer(\'' + a.id + '\')">' +
-        (phone ? '' : '<span class="t">' + pdHM(it.start) + '</span><span class="n">' + esc(a.client_name) + '</span>') + '</button>';
+        // Telephone : colonnes etroites -> juste l'initiale du client ; ordinateur : heure + nom (le nom passe dessous si la place manque).
+        (phone ? (narrow ? '' : '<span class="n">' + esc(String(a.client_name || '?').charAt(0).toUpperCase()) + '</span>')
+          : '<span class="t">' + pdHM(it.start) + '</span><span class="n">' + esc(a.client_name) + '</span>') + '</button>';
     });
     if (rdvIsSalonClosed(d)) inner += '<div class="pd-col-off">Fermé</div>';
     var nowL = d === todayStr && nowMin >= R0 && nowMin <= R1 ? '<div class="pd-now" style="top:' + Math.round((nowMin - R0) * PX) + 'px"></div>' : '';
@@ -1834,7 +1873,9 @@ function pdMonthHtml() {
     if (its.length && (!busiest || its.length > busiest.n)) busiest = { d: ds, n: its.length };
     var byB = {};
     its.forEach(function (a) { var k = a.barber_id || 'none'; byB[k] = (byB[k] || 0) + 1; });
-    var chips = Object.keys(byB).slice(0, 5).map(function (k) {
+    // Toujours le même ordre d'un jour à l'autre (moi d'abord, puis l'équipe) pour repérer chaque coiffeur au premier coup d'œil.
+    var order = function (k) { if (k === myId) return -1; var i = (barbers || []).findIndex(function (x) { return x.id === k; }); return i === -1 ? 999 : i; };
+    var chips = Object.keys(byB).sort(function (x, y) { return order(x) - order(y); }).slice(0, 5).map(function (k) {
       // Pastille pleine de la couleur du coiffeur, le nombre de RDV dedans : rien à voir avec le numéro du jour.
       var col = k === 'none' ? '#8e8e93' : barberColor(k);
       return '<span class="pd-mchip" style="background:' + col + ';color:' + pdFg(col) + '">' + byB[k] + '</span>';

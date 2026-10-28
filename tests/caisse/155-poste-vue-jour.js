@@ -6,7 +6,7 @@ let pass = 0, fail = 0;
 const check = (n, ok, x = '') => { (ok ? pass++ : fail++); console.log((ok ? '  OK   ' : '  ECHEC') + ' ' + n + (x ? '  [' + x + ']' : '')); };
 const fnSrc = (name) => { const i = poste.indexOf('function ' + name + '('); if (i === -1) throw new Error('introuvable: ' + name); const j = poste.indexOf('\nfunction ', i + 10); const k = poste.indexOf('\n/**', i + 10); return poste.slice(i, Math.min.apply(null, [j, k].filter((x) => x > -1))); };
 const ctx = vm.createContext({});
-vm.runInContext(['pdMin', 'pdHM', 'pdDur', 'pdFg', 'pdState', 'pdBarberDay'].map(fnSrc).join('\n'), ctx);
+vm.runInContext(['pdMin', 'pdHM', 'pdDur', 'pdFg', 'pdState', 'pdBarberDay', 'pdLayout', 'pdLaneCss'].map(fnSrc).join('\n'), ctx);
 
 console.log('\n[A] Logique');
 check('etat : absent / termine / en cours / passe / a venir', ctx.pdState({ display_status: 'no_show' }, 0, true, false, 0) === 'absent' && ctx.pdState({ display_status: 'completed' }, 0, true, false, 0) === 'done'
@@ -38,5 +38,13 @@ check('telephone : une seule colonne (la sienne ou celle touchee)', /if \(pdIsPh
 check('preferences gardees sans casser si le stockage est bloque (try/catch)', /try \{ localStorage\.setItem\('poste_day_only_me'/.test(poste) && /try \{\n  pdOnlyMe = localStorage\.getItem/.test(poste));
 check('Mois / Semaine : planning du jour choisi inchange (renderAgendaTimeline)', /posteAddBtnHtml\(dateStr\) \+\n    renderAgendaTimeline\(dateStr\)/.test(poste) && /function renderAgendaTimeline\(dateStr\)/.test(poste));
 check('mois : chaque jour = seulement les pastilles de couleur des coiffeurs avec leur nombre de RDV (plus de texte)', /'<span class="pd-mchips">' \+ chips \+ '<\/span>'/.test(poste) && !/pd-mcount/.test(poste));
+console.log('\n[D] Finitions (Mois / Semaine / Jour)');
+const L = ctx.pdLayout([{ start: 600, end: 630 }, { start: 615, end: 645 }, { start: 630, end: 660 }, { start: 700, end: 730 }]);
+check('RDV qui se chevauchent : cote a cote (voies), les autres en pleine largeur', L[0].lanes === 2 && L[1].lanes === 2 && L[2].lanes === 2 && L[0].lane === 0 && L[1].lane === 1 && L[2].lane === 0 && L[3].lanes === 1 && ctx.pdLaneCss(L[3]) === '' && /width:calc\(50\.000% - 2px\)/.test(ctx.pdLaneCss(L[1])));
+check('voies utilisees dans le Jour (par coiffeur) et la Semaine (par jour)', /pdLayout\(items\.filter\(function \(it\) \{ return it\.barberId === b\.id; \}\)\)/.test(poste) && /pdLayout\(shown\.filter\(function \(it\) \{ return it\.day === d; \}\)\)/.test(poste) && (poste.match(/pdLaneCss\(it\)/g) || []).length >= 2);
+check('RDV passes / termines : gardent la couleur du coiffeur (plus pales), plus de gris', /\.pd-block\.st-done, \.pd-block\.st-past \{ opacity: \.5; \}/.test(poste) && !/\.pd-block\.st-done, \.pd-block\.st-past \{ background: var\(--card\)/.test(poste));
+check('semaine sur telephone : initiale du client dans le bloc', /String\(a\.client_name \|\| '\?'\)\.charAt\(0\)\.toUpperCase\(\)/.test(poste));
+check('mois : pastilles toujours dans le meme ordre (moi d\'abord, puis l\'equipe)', /Object\.keys\(byB\)\.sort\(function \(x, y\) \{ return order\(x\) - order\(y\); \}\)/.test(poste));
+check('prochain client : libelle + quand (pastille) sans couper le texte', /<span>Mon prochain client<\/span><em>/.test(poste));
 console.log('\n' + pass + ' OK, ' + fail + ' ECHEC');
 process.exit(fail ? 1 : 0);
