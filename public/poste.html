@@ -448,6 +448,15 @@
   .pd-col-head { display: flex; align-items: center; gap: 7px; min-width: 0; font-size: 13.5px; font-weight: 700; }
   .pd-col-head span:last-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .pd-cal-scroll { max-height: calc(100vh - 170px); overflow-y: auto; overflow-x: hidden; margin-top: 6px; padding-top: 9px; }
+  /* Vue Jour : défilement à droite / à gauche quand il y a beaucoup de coiffeurs */
+  .pd-cal-scroll.pd-xs { overflow: auto; padding-top: 0; margin-top: 0; overscroll-behavior-x: contain; }
+  .pd-xs-head { position: sticky; top: 0; z-index: 6; background: var(--fill); padding-top: 4px; padding-bottom: 8px; margin-bottom: 10px; }
+  .pd-gutter { position: sticky; left: 0; width: 48px; height: 100%; z-index: 5; background: var(--fill); }
+  .pd-gutter .pd-hour { left: 0; width: 40px; }
+  /* Un trait entre chaque colonne de coiffeur (agenda et en-têtes) */
+  .pd-cols .pd-col + .pd-col::before { content: ''; position: absolute; left: -5px; top: -10px; bottom: 0; border-left: 1px solid var(--sep); pointer-events: none; }
+  .pd-xs-head .pd-col-head { position: relative; }
+  .pd-xs-head .pd-col-head + .pd-col-head::before { content: ''; position: absolute; left: -5px; top: -4px; bottom: -8px; border-left: 1px solid var(--sep); }
   .pd-grid { position: relative; }
   .pd-line { position: absolute; left: 46px; right: 0; border-top: 1px solid var(--sep); }
   .pd-line.half { border-top-style: dashed; opacity: .55; }
@@ -1646,11 +1655,16 @@ function posteDayHtml(dateStr) {
   if (!cols.length) cols = team;
   var single = cols.length === 1;
 
-  var lines = '';
+  // Chaque colonne garde une largeur minimale : s'il y a beaucoup de coiffeurs, l'agenda défile à droite / à gauche
+  // (les heures restent collées à gauche, les noms restent en haut).
+  var colW = function (b) { return single ? 0 : (b.id === myId ? 300 : 190); };
+  var colStyle = function (b) { return 'flex:' + (b.id === myId && !single ? 1.6 : 1) + ' 0 ' + colW(b) + 'px;min-width:' + colW(b) + 'px'; };
+  var minW = 52 + cols.reduce(function (sum, b) { return sum + colW(b); }, 0) + 8 * Math.max(0, cols.length - 1);
+  var lines = '', hours = '';
   for (var m = R0; m <= R1; m += 30) {
     var y = Math.round((m - R0) * PX);
-    lines += '<div class="pd-line' + (m % 60 ? ' half' : '') + '" style="top:' + y + 'px"></div>' +
-      (m % 60 ? '' : '<div class="pd-hour" style="top:' + y + 'px">' + pdHM(m) + '</div>');
+    lines += '<div class="pd-line' + (m % 60 ? ' half' : '') + '" style="top:' + y + 'px"></div>';
+    if (!(m % 60)) hours += '<div class="pd-hour" style="top:' + y + 'px">' + pdHM(m) + '</div>';
   }
   var colsHtml = cols.map(function (b) {
     var isMe = b.id === myId, color = barberColor(b.id), fg = pdFg(color);
@@ -1682,10 +1696,10 @@ function posteDayHtml(dateStr) {
     });
     if (offWhy || walkDay) inner += '<div class="pd-col-off">' + (offWhy ? esc(offWhy.charAt(0).toUpperCase() + offWhy.slice(1)) : 'En « sans RDV » ce jour-là') + '</div>';
     else if (!items.some(function (it) { return it.barberId === b.id; }) && !isMe) inner += '<div class="pd-col-off">Aucun RDV</div>';
-    return '<div class="pd-col' + (isMe ? ' me' : '') + (past ? ' past' : '') + (closed ? ' closed' : '') + '" data-barber="' + esc(b.id) + '" style="flex:' + (isMe && !single ? 2.2 : 1) + '"' + pdColClickAttr(b, dateStr) + '>' + inner + '</div>';
+    return '<div class="pd-col' + (isMe ? ' me' : '') + (past ? ' past' : '') + (closed ? ' closed' : '') + '" data-barber="' + esc(b.id) + '" style="' + colStyle(b) + '"' + pdColClickAttr(b, dateStr) + '>' + inner + '</div>';
   }).join('');
   var heads = cols.map(function (b) {
-    return '<div class="pd-col-head" style="flex:' + (b.id === myId && !single ? 2.2 : 1) + '">' + pdAvatarHtml(b) + '<span>' + (b.id === myId ? esc(b.name) + ' · moi' : esc(b.name)) + '</span></div>';
+    return '<div class="pd-col-head" style="' + colStyle(b) + '">' + pdAvatarHtml(b) + '<span>' + (b.id === myId ? esc(b.name) + ' · moi' : esc(b.name)) + '</span></div>';
   }).join('');
   var nowHtml = isToday && nowMin >= R0 && nowMin <= R1
     ? '<div class="pd-now" style="top:' + Math.round((nowMin - R0) * PX) + 'px"><span>' + nowStr.slice(11, 16) + '</span></div>' : '';
@@ -1698,9 +1712,10 @@ function posteDayHtml(dateStr) {
       '<span class="pd-zoom"><button type="button" onclick="pdZoom(-1)" aria-label="Réduire l’agenda">−</button><button type="button" onclick="pdZoom(1)" aria-label="Agrandir l’agenda">+</button></span>' +
       (!closed && !past ? '<button type="button" class="btn btn-primary pd-add-top" onclick="openPosteAddAppointment(\'' + dateStr + '\')">' + (pdIsPhone() ? '+ RDV' : '+ Ajouter un RDV') + '</button>' : '') +
     '</span></div>' +
-    '<div class="pd-cal-head">' + heads + '</div>' +
-    '<div class="pd-cal-scroll"><div class="pd-grid" data-date="' + dateStr + '" data-r0="' + R0 + '" data-r1="' + R1 + '" data-px="' + PX + '" data-focus-top="' + focusTop + '" style="height:' + Math.round(SPAN * PX + 12) + 'px">' +
-    lines + '<div class="pd-cols">' + colsHtml + '</div>' + nowHtml + '</div></div></div>';
+    '<div class="pd-cal-scroll pd-xs"><div class="pd-xs-in" style="min-width:' + minW + 'px">' +
+    '<div class="pd-cal-head pd-xs-head">' + heads + '</div>' +
+    '<div class="pd-grid" data-date="' + dateStr + '" data-r0="' + R0 + '" data-r1="' + R1 + '" data-px="' + PX + '" data-focus-top="' + focusTop + '" style="height:' + Math.round(SPAN * PX + 12) + 'px">' +
+    '<div class="pd-gutter">' + hours + '</div>' + lines + '<div class="pd-cols">' + colsHtml + '</div>' + nowHtml + '</div></div></div></div>';
 
   return html + cal;
 }

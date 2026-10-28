@@ -45,5 +45,6 @@ check('voies utilisees dans le Jour (par coiffeur) et la Semaine (par jour)', /p
 check('RDV passes / termines : gardent la couleur du coiffeur (plus pales), plus de gris', /\.pd-block\.st-done, \.pd-block\.st-past \{ opacity: \.5; \}/.test(poste) && !/\.pd-block\.st-done, \.pd-block\.st-past \{ background: var\(--card\)/.test(poste));
 check('semaine sur telephone : initiale du client dans le bloc', /String\(a\.client_name \|\| '\?'\)\.charAt\(0\)\.toUpperCase\(\)/.test(poste));
 check('mois : pastilles toujours dans le meme ordre (moi d\'abord, puis l\'equipe)', /Object\.keys\(byB\)\.sort\(function \(x, y\) \{ return order\(x\) - order\(y\); \}\)/.test(poste));
+check('jour : un trait entre chaque colonne de coiffeur + largeur mini -> defilement a droite / a gauche (heures collees a gauche, noms en haut)', /\.pd-cols \.pd-col \+ \.pd-col::before \{/.test(poste) && /\.pd-cal-scroll\.pd-xs \{ overflow: auto;/.test(poste) && /\.pd-gutter \{ position: sticky; left: 0;/.test(poste) && /\.pd-xs-head \{ position: sticky; top: 0;/.test(poste) && /var colW = function \(b\) \{ return single \? 0 : \(b\.id === myId \? 300 : 190\); \};/.test(poste) && /style="min-width:' \+ minW \+ 'px"/.test(poste));
 console.log('\n' + pass + ' OK, ' + fail + ' ECHEC');
 process.exit(fail ? 1 : 0);
