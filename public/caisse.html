@@ -1969,13 +1969,15 @@ function saveNextNote(id) {
 function cancelMine(id) {
   var q = queue.find(function (x) { return x.id === id; });
   var name = q ? q.client_name : 'ce client';
-  var paidWarn = q && q.paid_at ? ' Attention : il a déjà payé d\'avance, le remboursement n\'est pas automatique.' : '';
+  // Déjà payé d'avance (seul, ou avec le ticket de son groupe) : l'argent reste encaissé, à rendre à la main.
+  var paidAmt = q && q.paid_at && q.total_price_cents ? ' (' + eur(q.total_price_cents) + ')' : '';
+  var paidWarn = q && q.paid_at ? ' Attention : il a déjà payé d\'avance' + paidAmt + ' : rendez-lui cet argent (espèces ou terminal), le remboursement n\'est pas automatique.' : '';
   showConfirm('Marquer ' + name + ' comme absent ? Il sera retiré de la file.' + paidWarn, { title: 'Client absent', danger: true, confirmLabel: 'Marquer absent' })
     .then(function (ok) {
       if (!ok) return;
       barberApi('/api/queue/' + id + '/cancel', { method: 'POST', body: {} })
         .then(refreshTimer)
-        .then(function () { toast('Client marqué absent'); })
+        .then(function () { toast(q && q.paid_at ? name + ' marqué absent — pensez à lui rendre ' + (paidAmt ? paidAmt.slice(2, -1) : 'son paiement') : 'Client marqué absent', !!(q && q.paid_at)); })
         .catch(function (e) { toast(e.message, true); });
     });
 }
@@ -3774,6 +3776,8 @@ function renderPendingList() {
     var explicitGift = Boolean(q.gift_card && q.gift_card.explicit);
     var displayAmount = explicitGift ? q.gift_card.amount_cents : q.total_price_cents;
     var mates = explicitGift ? [] : groupMatesOf(q);
+    // Membres du groupe encore en attente / en cours au salon : réglables maintenant (payés d'avance).
+    var earlyN = explicitGift ? 0 : (q.group_not_done || []).filter(function (m) { return m.queue_id && (m.state === 'waiting' || m.state === 'in_progress'); }).length;
     return '<div class="pending-card' + (isActive ? '' : ' locked') + '"' +
       (isActive && !explicitGift ? ' onclick="usePendingForTicket(\'' + q.id + '\')"' : '') + '>' +
       '<div><div class="name">' + esc(q.client_name) + '</div>' +
@@ -3786,8 +3790,8 @@ function renderPendingList() {
         (isActive && explicitGift
           ? '<button class="btn btn-primary" onclick="event.stopPropagation();useGiftCard(\'' + q.gift_card.id + '\',\'' + q.id + '\')">Utiliser le cadeau</button>'
           : '') +
-        (isActive && mates.length
-          ? '<button class="btn btn-primary" onclick="event.stopPropagation();usePendingGroupForTicket(\'' + q.id + '\')">Encaisser le groupe (' + (mates.length + 1) + ')</button>'
+        (isActive && (mates.length || earlyN)
+          ? '<button class="btn btn-primary" onclick="event.stopPropagation();usePendingGroupForTicket(\'' + q.id + '\')">Encaisser le groupe (' + (mates.length + earlyN + 1) + ')</button>'
           : '') +
         (isActive && !q.loyalty_member
           ? '<button class="btn btn-ghost" onclick="event.stopPropagation();proposeLoyaltyActivation(\'' + q.id + '\')">Activer carte de fidélité</button>'
@@ -3917,7 +3921,7 @@ function pendingGroupBadgeHtml(q, mates) {
   if (!mates.length && !left.length) return '';
   var size = mates.length + left.length + 1;
   return '<span class="pending-group solo">Groupe · ' + size + ' personnes' +
-    (left.length ? ' · ' + left.length + ' encore en cours</span><div class="lock-note" style="color:var(--orange)">⏳ ' + esc(left.map(groupNotDoneLabel).join(', ')) + '</div>' : '</span>');
+    (left.length ? ' · ' + left.length + ' pas encore terminé' + (left.length > 1 ? 's' : '') + '</span><div class="lock-note" style="color:var(--orange)">⏳ ' + esc(left.map(groupNotDoneLabel).join(', ')) + '</div>' : '</span>');
 }
 
 /** Autres personnes encore à encaisser du même groupe de RDV que ce passage. */
@@ -3930,18 +3934,35 @@ function pendingById(id) {
   return pendingAll.find(function (x) { return x.id === id; }) || pendingPayments.find(function (x) { return x.id === id; });
 }
 
+/**
+ * Membres du MÊME groupe de RDV pas encore terminés (en attente ou en cours, donc déjà au salon) qu'on peut
+ * régler maintenant avec le payeur : ils seront « payés d'avance » et garderont leur place dans la file.
+ */
+function groupEarlyMatesOf(q) {
+  if (!q || !q.group_id) return [];
+  return (q.group_not_done || []).filter(function (m) { return m.queue_id && (m.state === 'waiting' || m.state === 'in_progress'); })
+    .map(function (m) { return (queue || []).find(function (x) { return x.id === m.queue_id; }); })
+    .filter(function (x) { return x && !x.paid_at && !(x.gift_card && x.gift_card.explicit); });
+}
+/** Recharge la file (tout le salon) avant d'ajouter des membres pas encore terminés au ticket. */
+function refreshQueueForGroup() {
+  return barberApi('/api/queue').then(function (r) { queue = r.queue || []; return queue; });
+}
+
 /** Ajoute une personne au ticket en cours (le payeur reste celui chargé en premier). */
 function addPersonToTicket(queueId, silent) {
-  var q = pendingById(queueId);
+  // Un membre du groupe pas encore terminé (file d'attente) peut aussi être ajouté : réglé d'avance.
+  var q = pendingById(queueId) || (queue || []).find(function (x) { return x.id === queueId && (x.status === 'waiting' || x.status === 'in_progress'); });
   if (!q || !ticketQueueId || ticketMode) return false;
   if (ticketPersonIds().indexOf(q.id) !== -1) return false;
-  if (!groupPayEligible(q)) { toast(q.client_name + ' ne peut pas être ajouté (cadeau ou paiement d\'avance).', true); return false; }
+  if (!groupPayEligible(q) || q.paid_at) { toast(q.client_name + ' ne peut pas être ajouté (cadeau ou paiement d\'avance).', true); return false; }
+  var early = q.status === 'waiting' || q.status === 'in_progress';
   var doneBy = q.barber_id || null;
   pendingTicketLines(q, doneBy).forEach(function (l) {
     l.person = q.id; l.person_name = q.client_name;
     ticket.push(l);
   });
-  ticketGroup.push({ id: q.id, client_name: q.client_name });
+  ticketGroup.push({ id: q.id, client_name: q.client_name, early: early });
   renderTicket();
   if (!silent) toast(q.client_name + ' ajouté au ticket');
   return true;
@@ -3963,33 +3984,53 @@ function pruneTicketGroup() {
 }
 
 /** « Encaisser tout le groupe » : charge le ticket de ce client puis ajoute les autres membres du groupe de RDV. */
-function usePendingGroupForTicket(queueId, confirmed) {
+function usePendingGroupForTicket(queueId, mode) {
   var q = pendingPayments.find(function (x) { return x.id === queueId; });
   if (!q) return;
-  // Une partie du groupe n'a pas encore fini : on prévient (encaisser sans eux, ou attendre).
   var left = q.group_not_done || [];
-  if (left.length && !confirmed) {
-    var names = left.map(function (m) { return m.client_name; }).join(', ');
-    showConfirm(left.map(groupNotDoneLabel).join(', ') + ' : pas encore fini. Encaisser le groupe sans ' + (left.length > 1 ? 'eux' : 'cette personne') +
-      ' (' + names + ' sera encaissé plus tard, à part), ou attendre ? Pour attendre, mettez ce client de côté.',
-      { title: 'Groupe pas encore terminé', confirmLabel: 'Encaisser sans ' + (left.length > 1 ? 'eux' : names), cancelLabel: 'Attendre' })
-      .then(function (ok) { if (ok) usePendingGroupForTicket(queueId, true); });
+  if (left.length && !mode) {
+    // Une partie du groupe n'a pas encore fini : tout régler maintenant (les autres payés d'avance),
+    // encaisser sans eux, ou attendre.
+    refreshQueueForGroup().catch(function () { return queue; }).then(function () {
+      var early = groupEarlyMatesOf(q);
+      var names = left.map(function (m) { return m.client_name; }).join(', ');
+      var overlay = _buildModal(
+        '<div class="modal-title">Groupe pas encore terminé</div>' +
+        '<p class="hint" style="margin:0 0 14px">' + esc(left.map(groupNotDoneLabel).join(', ')) + ' : pas encore fini.</p>' +
+        (early.length ? '<button type="button" class="btn btn-primary" id="gp-all" style="width:100%;margin-bottom:6px">Encaisser tout le groupe maintenant</button>' +
+          '<p class="hint" style="margin:0 0 12px;font-size:12.5px">' + esc(early.map(function (x) { return x.client_name; }).join(', ')) + ' : payé d\'avance, garde sa place dans la file.</p>' : '') +
+        '<button type="button" class="btn btn-soft" id="gp-without" style="width:100%;margin-bottom:8px">Encaisser sans ' + esc(left.length > 1 ? 'eux' : names) + '</button>' +
+        '<button type="button" class="btn btn-ghost" id="gp-wait" style="width:100%">Attendre</button>' +
+        '<p class="hint" style="margin:10px 0 0;font-size:12.5px">Pour attendre, vous pouvez mettre ce client de côté.</p>');
+      var close = function () { _closeModal(overlay); };
+      overlay.querySelector('#gp-wait').onclick = close;
+      overlay.querySelector('#gp-without').onclick = function () { close(); usePendingGroupForTicket(queueId, 'without'); };
+      var allBtn = overlay.querySelector('#gp-all');
+      if (allBtn) allBtn.onclick = function () { close(); usePendingGroupForTicket(queueId, 'all'); };
+    });
     return;
   }
   usePendingForTicket(queueId, true);
   var mates = groupMatesOf(q);
   mates.forEach(function (m) { addPersonToTicket(m.id, true); });
-  toast('Ticket du groupe chargé (' + (mates.length + 1) + ' personnes) — choisissez le paiement');
+  var early = mode === 'all' ? groupEarlyMatesOf(q) : [];
+  early.forEach(function (m) { addPersonToTicket(m.id, true); });
+  toast('Ticket du groupe chargé (' + (mates.length + early.length + 1) + ' personnes) — choisissez le paiement');
 }
 
 /** « + Payer aussi pour un autre client » : tous les clients du salon en attente d'encaissement. */
 function openGroupPayPicker() {
   if (!ticketQueueId || ticketMode) return;
-  barberApi('/api/queue/pending-payment?all=1').then(function (r) {
+  Promise.all([barberApi('/api/queue/pending-payment?all=1'), refreshQueueForGroup().catch(function () { return queue; })]).then(function (rr) {
+    var r = rr[0];
     pendingAll = r.items || [];
     var payer = pendingById(ticketQueueId);
     var inTicket = ticketPersonIds();
     var list = pendingAll.filter(function (x) { return inTicket.indexOf(x.id) === -1 && groupPayEligible(x); });
+    // Membres de SON groupe pas encore terminés (déjà au salon) : réglables d'avance avec lui.
+    groupEarlyMatesOf(payer).forEach(function (x) {
+      if (inTicket.indexOf(x.id) === -1) list.push(Object.assign({}, x, { group_id: payer.group_id, early: true }));
+    });
     // Les membres de son groupe de RDV d'abord.
     list.sort(function (a, b) {
       var ga = payer && payer.group_id && a.group_id === payer.group_id ? 0 : 1, gb = payer && payer.group_id && b.group_id === payer.group_id ? 0 : 1;
@@ -4002,7 +4043,8 @@ function openGroupPayPicker() {
         var sameGroup = payer && payer.group_id && x.group_id === payer.group_id;
         return '<button type="button" class="advance-pick" data-id="' + esc(x.id) + '">' +
           '<span><span style="font-weight:600">' + esc(x.client_name) + '</span>' + (sameGroup ? '<span class="pending-group">Son groupe</span>' : '') +
-          '<span class="meta" style="display:block">' + esc(svcLabel(x.service.name, x.extras)) + (x.barber_id ? ' · ' + esc(nameOf(x.barber_id)) : '') + '</span></span>' +
+          '<span class="meta" style="display:block">' + esc(svcLabel(x.service.name, x.extras)) + (x.barber_id ? ' · ' + esc(nameOf(x.barber_id)) : '') +
+            (x.early ? ' · ' + (x.status === 'in_progress' ? 'en cours' : 'en attente') + ' — payé d\'avance' : '') + '</span></span>' +
           '<span style="font-weight:700">' + eur(x.total_price_cents) + '</span></button>';
       }).join('') : '<div class="empty">Aucun autre client en attente d\'encaissement.</div>') +
       '<div class="modal-actions"><button class="btn btn-soft" id="gp-close">Fermer</button></div>';
@@ -4280,7 +4322,7 @@ function ticketLinesHtml(justAddedIndex) {
     mine.map(function (x) { return ticketLineHtml(x.l, x.i, justAddedIndex); }).join('');
   ticketGroup.forEach(function (g) {
     var rows = all.filter(function (x) { return x.l.person === g.id; });
-    html += '<div class="ticket-person"><span>' + esc(g.client_name) + '</span><span>' + eur(sum(rows)) +
+    html += '<div class="ticket-person"><span>' + esc(g.client_name) + (g.early ? ' <span class="who-pays" title="Pas encore coiffé : réglé d\'avance, il garde sa place dans la file">· payé d\'avance</span>' : '') + '</span><span>' + eur(sum(rows)) +
       ' <button type="button" class="x" title="Retirer ' + esc(g.client_name) + ' du ticket" aria-label="Retirer ' + esc(g.client_name) + ' du ticket" onclick="removePersonFromTicket(\'' + g.id + '\')">✕</button></span></div>' +
       rows.map(function (x) { return ticketLineHtml(x.l, x.i, justAddedIndex); }).join('');
   });

@@ -202,18 +202,32 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
 
       // 2 bis. Encaissement groupé : chaque autre personne doit être terminée, pas encore réglée, sans cadeau.
       // Caisse partagée : un client d'un autre coiffeur peut être réglé ici (le payeur règle pour lui).
+      // Exception : un membre du MÊME groupe de RDV que le payeur, encore en attente ou en cours (déjà au salon),
+      // peut être réglé avec lui : il est alors « payé d'avance » (comme « Encaisser à l'avance ») et garde sa place.
       const groupRows = [];
       if (groupIds.length && queueRow && queueRow.status !== 'done') throw new HttpError(409, 'Encaissement groupé : seulement des clients dont la prestation est terminée.');
+      let payerGroupId = null;
+      if (groupIds.length && queue_id) {
+        const [[pg]] = await db.query('SELECT group_id FROM appointments WHERE promoted_queue_id = ? AND salon_id = ? AND group_id IS NOT NULL LIMIT 1', [queue_id, req.salon.id]);
+        payerGroupId = pg ? pg.group_id : null;
+      }
       for (const gid of groupIds) {
         const [[g]] = await db.query(
           'SELECT id, status, paid_at, gift_card_id, client_name, email, phone FROM queue WHERE id = ? AND salon_id = ? FOR UPDATE',
           [gid, req.salon.id]
         );
         if (!g) throw new HttpError(404, 'Un des clients du ticket groupé est introuvable.');
-        if (g.status !== 'done') throw new HttpError(409, g.client_name + " : prestation pas encore terminée, impossible de l'encaisser avec le groupe.");
+        let early = false;
+        if (g.status === 'waiting' || g.status === 'in_progress') {
+          const [[mg]] = payerGroupId
+            ? await db.query('SELECT group_id FROM appointments WHERE promoted_queue_id = ? AND salon_id = ? AND group_id = ? LIMIT 1', [gid, req.salon.id, payerGroupId])
+            : [[null]];
+          if (!mg) throw new HttpError(409, g.client_name + " : prestation pas encore terminée et pas du même groupe, impossible de l'encaisser avec ce ticket.");
+          early = true;
+        } else if (g.status !== 'done') throw new HttpError(409, g.client_name + " : prestation pas encore terminée, impossible de l'encaisser avec le groupe.");
         if (g.gift_card_id) throw new HttpError(409, g.client_name + ' vient avec un cadeau : il est réglé par son cadeau.');
         const [mark] = await db.query(
-          'UPDATE queue SET paid_at = NOW(), prepaid_at = NULL WHERE id = ? AND salon_id = ? AND paid_at IS NULL',
+          'UPDATE queue SET paid_at = NOW(), prepaid_at = ' + (early ? 'NOW()' : 'NULL') + ' WHERE id = ? AND salon_id = ? AND paid_at IS NULL',
           [gid, req.salon.id]
         );
         if (mark.affectedRows === 0) throw new HttpError(409, g.client_name + " vient d'être encaissé (probablement par un autre appareil).");

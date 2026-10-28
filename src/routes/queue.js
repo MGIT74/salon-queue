@@ -181,7 +181,7 @@ router.get('/pending-payment', requireAdminOrBarber, wrap(async (req, res) => {
       const settings = await getSettings(req.salon.id);
       const today = nowParisDatetimeString(settings.timezone).slice(0, 10);
       const [left] = await pool.query(
-        `SELECT a.group_id, a.client_name, b.name AS barber_name, q.status AS queue_status
+        `SELECT a.group_id, a.client_name, b.name AS barber_name, q.status AS queue_status, q.id AS queue_id
          FROM appointments a
          LEFT JOIN queue q ON q.id = a.promoted_queue_id
          LEFT JOIN barbers b ON b.id = COALESCE(q.barber_id, a.barber_id)
@@ -192,7 +192,7 @@ router.get('/pending-payment', requireAdminOrBarber, wrap(async (req, res) => {
       );
       left.forEach((m) => {
         (notDoneByGroup[m.group_id] = notDoneByGroup[m.group_id] || []).push({
-          client_name: m.client_name, barber_name: m.barber_name || null,
+          client_name: m.client_name, barber_name: m.barber_name || null, queue_id: m.queue_id || null,
           state: m.queue_status === 'in_progress' ? 'in_progress' : (m.queue_status === 'waiting' ? 'waiting' : 'not_arrived')
         });
       });
