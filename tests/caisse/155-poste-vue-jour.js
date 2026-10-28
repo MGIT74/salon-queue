@@ -6,7 +6,7 @@ let pass = 0, fail = 0;
 const check = (n, ok, x = '') => { (ok ? pass++ : fail++); console.log((ok ? '  OK   ' : '  ECHEC') + ' ' + n + (x ? '  [' + x + ']' : '')); };
 const fnSrc = (name) => { const i = poste.indexOf('function ' + name + '('); if (i === -1) throw new Error('introuvable: ' + name); const j = poste.indexOf('\nfunction ', i + 10); const k = poste.indexOf('\n/**', i + 10); return poste.slice(i, Math.min.apply(null, [j, k].filter((x) => x > -1))); };
 const ctx = vm.createContext({});
-vm.runInContext(['pdMin', 'pdHM', 'pdDur', 'pdFg', 'pdState', 'pdBarberDay', 'pdLayout', 'pdLaneCss'].map(fnSrc).join('\n'), ctx);
+vm.runInContext(['pdMin', 'pdHM', 'pdDur', 'pdFg', 'pdState', 'pdBarberDay', 'pdLayout', 'pdLaneCss', 'pdTimeScale'].map(fnSrc).join('\n'), ctx);
 
 console.log('\n[A] Logique');
 check('etat : absent / termine / en cours / passe / a venir', ctx.pdState({ display_status: 'no_show' }, 0, true, false, 0) === 'absent' && ctx.pdState({ display_status: 'completed' }, 0, true, false, 0) === 'done'
@@ -46,6 +46,11 @@ check('RDV passes / termines : gardent la couleur du coiffeur (plus pales), plus
 check('semaine sur telephone : initiale du client dans le bloc', /String\(a\.client_name \|\| '\?'\)\.charAt\(0\)\.toUpperCase\(\)/.test(poste));
 check('mois : pastilles toujours dans le meme ordre (moi d\'abord, puis l\'equipe)', /Object\.keys\(byB\)\.sort\(function \(x, y\) \{ return order\(x\) - order\(y\); \}\)/.test(poste));
 check('jour : un trait entre chaque colonne de coiffeur + largeur mini -> defilement a droite / a gauche (heures collees a gauche, noms en haut)', /\.pd-cols \.pd-col \+ \.pd-col::before \{/.test(poste) && /\.pd-cal-scroll\.pd-xs \{ overflow: auto;/.test(poste) && /\.pd-gutter \{ position: sticky; left: 0;/.test(poste) && /\.pd-xs-head \{ position: sticky; top: 0;/.test(poste) && /var colW = function \(\) \{ return single \? 0 : 190; \};/.test(poste) && /return 'flex:1 1 ' \+ colW\(b\)/.test(poste) && /style="min-width:' \+ minW \+ 'px"/.test(poste));
-check('zoom : un curseur (Jour et Semaine) a la place des boutons − / +, apercu pendant le glissement, meme heure gardee en haut', (poste.match(/pdZoomSliderHtml\(\) \+/g) || []).length === 2 && !/onclick="pdZoom\(-1\)"/.test(poste) && /type="range" min="0\.8" max="2\.6"/.test(poste) && /oninput="pdZoomPreview\(this\.value\)" onchange="pdSetZoom\(this\.value\)"/.test(poste) && /sc2\.scrollTop = Math\.round\(topMin \* pdPx\)/.test(poste));
+check('zoom : un curseur (Jour et Semaine) a la place des boutons − / +, apercu pendant le glissement, meme heure gardee en haut', (poste.match(/pdZoomSliderHtml\(\) \+/g) || []).length === 2 && !/onclick="pdZoom\(-1\)"/.test(poste) && /type="range" min="0\.8" max="6"/.test(poste) && /oninput="pdZoomPreview\(this\.value\)" onchange="pdSetZoom\(this\.value\)"/.test(poste) && /sc2\.scrollTop = Math\.round\(topMin \* pdPx\)/.test(poste));
+ctx.rdvSlotStepMin = 5;
+const tsA = ctx.pdTimeScale(540, 600, 1.3), tsB = ctx.pdTimeScale(540, 600, 4.5);
+check('heures de l\'agenda selon le « pas des creneaux » (Rendez-vous > Parametres) : 5 min -> 09:30 a petit zoom, 09:05 a grand zoom', /09:30/.test(tsA.hours) && !/09:05/.test(tsA.hours) && !/09:20/.test(tsA.hours) && /09:05/.test(tsB.hours) && /09:55/.test(tsB.hours) && /10:00/.test(tsB.hours) && (poste.match(/= pdTimeScale\(R0, R1, PX\)/g) || []).length === 2 && /max="6" step="0\.1"/.test(poste));
+ctx.rdvSlotStepMin = 15;
+check('pas de 15 min : 09:15 / 09:30 / 09:45 quand la place le permet', /09:15/.test(ctx.pdTimeScale(540, 600, 2).hours) && /09:45/.test(ctx.pdTimeScale(540, 600, 2).hours));
 console.log('\n' + pass + ' OK, ' + fail + ' ECHEC');
 process.exit(fail ? 1 : 0);
