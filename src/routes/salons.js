@@ -222,10 +222,10 @@ router.get('/overview', requireSuperAdmin, wrap(async (req, res) => {
   const [[salons]] = await pool.query('SELECT COUNT(*) AS n FROM salons WHERE active = 1');
   const [[barbersRow]] = await pool.query('SELECT COUNT(*) AS n FROM barbers WHERE active = 1');
   const [[today]] = await pool.query(
-    "SELECT COUNT(*) AS n FROM queue WHERE status = 'done' AND end_at >= CURDATE()"
+    "SELECT COUNT(*) AS n FROM queue WHERE status = 'done' AND NOT (auto_unstarted = 1 AND paid_at IS NULL AND prepaid_at IS NULL) AND end_at >= CURDATE()"
   );
   const [[week]] = await pool.query(
-    "SELECT COUNT(*) AS n FROM queue WHERE status = 'done' AND end_at >= (CURDATE() - INTERVAL 7 DAY)"
+    "SELECT COUNT(*) AS n FROM queue WHERE status = 'done' AND NOT (auto_unstarted = 1 AND paid_at IS NULL AND prepaid_at IS NULL) AND end_at >= (CURDATE() - INTERVAL 7 DAY)"
   );
   const [[signups]] = await pool.query(
     'SELECT COUNT(*) AS n FROM owners WHERE created_at >= (NOW() - INTERVAL 30 DAY)'

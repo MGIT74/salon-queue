@@ -83,14 +83,14 @@ router.get('/salons/:id/daily-report', requireAutomationKey, wrap(async (req, re
 
   const [[revenueRow]] = await pool.query(
     `SELECT COUNT(*) AS done_count, COALESCE(SUM(total_price_cents), 0) AS revenue_cents
-     FROM queue WHERE salon_id = ? AND status = 'done' AND end_at >= CURDATE()`,
+     FROM queue WHERE salon_id = ? AND status = 'done' AND NOT (auto_unstarted = 1 AND paid_at IS NULL AND prepaid_at IS NULL) AND end_at >= CURDATE()`,
     [salonId]
   );
 
   const [[topService]] = await pool.query(
     `SELECT s.name, COUNT(*) AS cnt
      FROM queue q JOIN services s ON s.id = q.service_id
-     WHERE q.salon_id = ? AND q.status = 'done' AND q.end_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+     WHERE q.salon_id = ? AND q.status = 'done' AND NOT (q.auto_unstarted = 1 AND q.paid_at IS NULL AND q.prepaid_at IS NULL) AND q.end_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
      GROUP BY q.service_id, s.name ORDER BY cnt DESC LIMIT 1`,
     [salonId]
   );
@@ -106,7 +106,7 @@ router.get('/salons/:id/daily-report', requireAutomationKey, wrap(async (req, re
   // exact.
   const [[avgDurationRow]] = await pool.query(
     `SELECT AVG(s.duration_min) AS avg_duration FROM queue q JOIN services s ON s.id = q.service_id
-     WHERE q.salon_id = ? AND q.status = 'done' AND q.end_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)`,
+     WHERE q.salon_id = ? AND q.status = 'done' AND NOT (q.auto_unstarted = 1 AND q.paid_at IS NULL AND q.prepaid_at IS NULL) AND q.end_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)`,
     [salonId]
   );
   const durationMin = Math.round(Number(avgDurationRow.avg_duration) || 30);
@@ -148,7 +148,7 @@ router.get('/salons/:id/clients', requireAutomationKey, wrap(async (req, res) =>
   const [rows] = await pool.query(
     `SELECT MAX(client_name) AS client_name, email, MAX(phone) AS phone, MAX(end_at) AS last_visit, COUNT(*) AS visit_count
      FROM queue
-     WHERE salon_id = ? AND status = 'done' AND email IS NOT NULL AND email != ''
+     WHERE salon_id = ? AND status = 'done' AND NOT (auto_unstarted = 1 AND paid_at IS NULL AND prepaid_at IS NULL) AND email IS NOT NULL AND email != ''
      GROUP BY email
      ORDER BY last_visit DESC
      LIMIT 300`,
@@ -181,7 +181,7 @@ router.get('/salons/:id/inactive-clients', requireAutomationKey, wrap(async (req
   const [rows] = await pool.query(
     `SELECT MAX(client_name) AS client_name, email, MAX(phone) AS phone, MAX(end_at) AS last_visit, COUNT(*) AS visit_count
      FROM queue
-     WHERE salon_id = ? AND status = 'done' AND email IS NOT NULL AND email != ''
+     WHERE salon_id = ? AND status = 'done' AND NOT (auto_unstarted = 1 AND paid_at IS NULL AND prepaid_at IS NULL) AND email IS NOT NULL AND email != ''
      GROUP BY email
      HAVING MAX(end_at) < DATE_SUB(NOW(), INTERVAL ? DAY)
      ORDER BY last_visit ASC
@@ -232,7 +232,7 @@ router.post('/salons/:id/send-client-email', requireAutomationKey, wrap(async (r
   // venu dans CE salon - empêche l'outil d'être détourné pour envoyer
   // à des adresses arbitraires.
   const [knownRows] = await pool.query(
-    `SELECT DISTINCT email, client_name FROM queue WHERE salon_id = ? AND status = 'done' AND email IN (?)`,
+    `SELECT DISTINCT email, client_name FROM queue WHERE salon_id = ? AND status = 'done' AND NOT (auto_unstarted = 1 AND paid_at IS NULL AND prepaid_at IS NULL) AND email IN (?)`,
     [salonId, emails]
   );
   const known = new Map(knownRows.map((r) => [r.email.toLowerCase(), r.client_name]));
@@ -403,7 +403,7 @@ router.get('/salons/:id/history', requireAutomationKey, wrap(async (req, res) =>
   const end = req.query.end || todayParis;
   const barberId = req.query.barber_id || null;
 
-  const conditions = ['q.salon_id = ?', "q.status = 'done'", 'q.end_at BETWEEN ? AND ?'];
+  const conditions = ['q.salon_id = ?', "q.status = 'done' AND NOT (q.auto_unstarted = 1 AND q.paid_at IS NULL AND q.prepaid_at IS NULL)", 'q.end_at BETWEEN ? AND ?'];
   const params = [salonId, start + ' 00:00:00', end + ' 23:59:59'];
   if (barberId) { conditions.push('q.barber_id = ?'); params.push(barberId); }
 
@@ -515,14 +515,14 @@ router.get('/salons/:id/revenue', requireAutomationKey, wrap(async (req, res) =>
 
   const [[totalRow]] = await pool.query(
     `SELECT COUNT(*) AS done_count, COALESCE(SUM(total_price_cents), 0) AS revenue_cents
-     FROM queue WHERE salon_id = ? AND status = 'done' AND end_at BETWEEN ? AND ?`,
+     FROM queue WHERE salon_id = ? AND status = 'done' AND NOT (auto_unstarted = 1 AND paid_at IS NULL AND prepaid_at IS NULL) AND end_at BETWEEN ? AND ?`,
     [salonId, start + ' 00:00:00', end + ' 23:59:59']
   );
 
   const [byBarberServices] = await pool.query(
     `SELECT q.barber_id, b.name AS barber_name, COUNT(*) AS done_count, COALESCE(SUM(q.total_price_cents), 0) AS revenue_cents
      FROM queue q LEFT JOIN barbers b ON b.id = q.barber_id
-     WHERE q.salon_id = ? AND q.status = 'done' AND q.end_at BETWEEN ? AND ?
+     WHERE q.salon_id = ? AND q.status = 'done' AND NOT (q.auto_unstarted = 1 AND q.paid_at IS NULL AND q.prepaid_at IS NULL) AND q.end_at BETWEEN ? AND ?
      GROUP BY q.barber_id, b.name`,
     [salonId, start + ' 00:00:00', end + ' 23:59:59']
   );

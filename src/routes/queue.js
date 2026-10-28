@@ -297,6 +297,38 @@ router.delete('/:id/unpaid', requireAdminOrBarber, wrap(async (req, res) => {
   res.json({ ok: true, deleted: true, appointments_deleted: appts.length });
 }));
 
+/**
+ * « Absent » depuis la caisse pour un RDV passé tout seul dans « À encaisser » parce que personne ne l'a
+ * démarré (auto_unstarted = 1) : le client n'est pas venu -> le passage devient « absent » (comme le bouton
+ * Absent du Timer), sort de la caisse et ne compte nulle part. Refusé s'il a déjà payé quoi que ce soit.
+ */
+router.post('/:id/unstarted-absent', requireAdminOrBarber, wrap(async (req, res) => {
+  const [[row]] = await pool.query(
+    'SELECT id, client_name, barber_id, status, paid_at, prepaid_at, auto_unstarted FROM queue WHERE id = ? AND salon_id = ?',
+    [req.params.id, req.salon.id]
+  );
+  if (!row) return res.status(404).json({ error: 'Client introuvable' });
+  if (req.actingBarberId && row.barber_id && row.barber_id !== req.actingBarberId) {
+    return res.status(403).json({ error: "Ce n'est pas votre client." });
+  }
+  if (row.status !== 'done' || !row.auto_unstarted) return res.status(409).json({ error: 'Ce passage a bien été démarré : il ne peut pas être marqué absent ici.' });
+  if (row.paid_at || row.prepaid_at) return res.status(409).json({ error: 'Ce client a déjà payé : impossible de le marquer absent, faites plutôt un remboursement.' });
+  const sale = await saleForPassage(pool, req.salon.id, row.id);
+  if (sale) return res.status(409).json({ error: 'Une vente est déjà liée à ce passage.' });
+  await pool.query(
+    "UPDATE queue SET status = 'cancelled' WHERE id = ? AND salon_id = ? AND status = 'done' AND auto_unstarted = 1 AND paid_at IS NULL",
+    [row.id, req.salon.id]
+  );
+  await recompute(req.salon.id);
+  let who = '';
+  if (req.actingBarberId) {
+    const [[b]] = await pool.query('SELECT name FROM barbers WHERE id = ?', [req.actingBarberId]);
+    if (b) who = ' par ' + b.name;
+  }
+  logActivity(req.salon.id, 'unstarted_absent', 'RDV non démarré de "' + row.client_name + '" marqué absent en caisse' + who);
+  res.json({ ok: true });
+}));
+
 // --- Ajout manuel d'un client (admin uniquement, pas de check-in physique) ---
 router.post('/manual-client', requireAdmin, wrap(async (req, res) => {
   const { client_name, email, phone, service_id } = req.body;
@@ -921,7 +953,7 @@ router.get('/stats/today', requireAdmin, wrap(async (req, res) => {
     [req.salon.id, d.startSql(0)]
   );
   const [[row]] = await pool.query(
-    "SELECT COUNT(*) AS done_count FROM queue WHERE salon_id = ? AND status = 'done' AND end_at >= ?",
+    "SELECT COUNT(*) AS done_count FROM queue WHERE salon_id = ? AND status = 'done' AND NOT (auto_unstarted = 1 AND paid_at IS NULL AND prepaid_at IS NULL) AND end_at >= ?",
     [req.salon.id, d.startSql(0)]
   );
   res.json({ ok: true, done: Number(row.done_count), revenue_cents: Number(sold.revenue_cents), sales_count: Number(sold.sales_count) });
@@ -942,14 +974,14 @@ router.get('/stats/week', requireAdmin, wrap(async (req, res) => {
   for (let i = 6; i >= 0; i--) byDay[sd.shift(-i)] = { date: sd.shift(-i), revenue_cents: 0, done_count: 0 };
   const [saleRows] = await pool.query('SELECT created_at, total_price_cents FROM sales WHERE salon_id = ? AND created_at >= ?', [req.salon.id, sd.startSql(-6)]);
   saleRows.forEach((r) => { const k = sd.dayOf(r.created_at); if (byDay[k]) byDay[k].revenue_cents += Number(r.total_price_cents) || 0; });
-  const [doneRows] = await pool.query("SELECT end_at FROM queue WHERE salon_id = ? AND status = 'done' AND end_at >= ?", [req.salon.id, sd.startSql(-6)]);
+  const [doneRows] = await pool.query("SELECT end_at FROM queue WHERE salon_id = ? AND status = 'done' AND NOT (auto_unstarted = 1 AND paid_at IS NULL AND prepaid_at IS NULL) AND end_at >= ?", [req.salon.id, sd.startSql(-6)]);
   doneRows.forEach((r) => { const k = sd.dayOf(r.end_at); if (byDay[k]) byDay[k].done_count += 1; });
   const days = Object.values(byDay);
 
   const [byRevenueAll] = await pool.query(
     `SELECT b.id, b.name, b.photo_url, COALESCE(SUM(q.total_price_cents), 0) AS revenue_cents, COUNT(*) AS done_count
      FROM queue q JOIN barbers b ON b.id = q.barber_id
-     WHERE q.salon_id = ? AND q.status = 'done' AND q.end_at >= ?
+     WHERE q.salon_id = ? AND q.status = 'done' AND NOT (q.auto_unstarted = 1 AND q.paid_at IS NULL AND q.prepaid_at IS NULL) AND q.end_at >= ?
      GROUP BY b.id ORDER BY revenue_cents DESC`,
     [req.salon.id, todaySql]
   );
@@ -985,7 +1017,7 @@ router.get('/stats/week', requireAdmin, wrap(async (req, res) => {
   const [bySpeed] = await pool.query(
     `SELECT b.id, b.name, b.photo_url, AVG(TIMESTAMPDIFF(MINUTE, q.start_at, q.end_at)) AS avg_minutes, COUNT(*) AS done_count
      FROM queue q JOIN barbers b ON b.id = q.barber_id
-     WHERE q.salon_id = ? AND q.status = 'done' AND q.end_at >= ? AND q.start_at IS NOT NULL
+     WHERE q.salon_id = ? AND q.status = 'done' AND NOT (q.auto_unstarted = 1 AND q.paid_at IS NULL AND q.prepaid_at IS NULL) AND q.end_at >= ? AND q.start_at IS NOT NULL
      GROUP BY b.id ORDER BY avg_minutes ASC LIMIT 3`,
     [req.salon.id, todaySql]
   );

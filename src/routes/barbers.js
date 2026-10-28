@@ -505,7 +505,7 @@ router.get('/salon-stats', requireAdmin, wrap(async (req, res) => {
   // Classement des coiffeurs sur la période : encaissé (prestations + produits), rapidité (durée réelle moyenne), produits.
   const soldMap = await salesRevenueByBarber(pool, req.salon.id, { fromSql: startSql, toSql: endSql });
   const [doneRows] = await pool.query(
-    `SELECT barber_id, COUNT(*) AS n FROM queue WHERE salon_id = ? AND status = 'done' AND end_at >= ? AND end_at < ? GROUP BY barber_id`,
+    `SELECT barber_id, COUNT(*) AS n FROM queue WHERE salon_id = ? AND status = 'done' AND NOT (auto_unstarted = 1 AND paid_at IS NULL AND prepaid_at IS NULL) AND end_at >= ? AND end_at < ? GROUP BY barber_id`,
     [req.salon.id, startSql, endSql]
   );
   const doneBy = Object.fromEntries(doneRows.map((x) => [x.barber_id, Number(x.n)]));
@@ -517,7 +517,7 @@ router.get('/salon-stats', requireAdmin, wrap(async (req, res) => {
   const [bySpeed] = await pool.query(
     `SELECT b.id, b.name, b.photo_url, ROUND(AVG(TIMESTAMPDIFF(MINUTE, q.start_at, q.end_at))) AS avg_minutes, COUNT(*) AS done_count
      FROM queue q JOIN barbers b ON b.id = q.barber_id
-     WHERE q.salon_id = ? AND q.status = 'done' AND q.end_at >= ? AND q.end_at < ? AND q.start_at IS NOT NULL
+     WHERE q.salon_id = ? AND q.status = 'done' AND NOT (q.auto_unstarted = 1 AND q.paid_at IS NULL AND q.prepaid_at IS NULL) AND q.end_at >= ? AND q.end_at < ? AND q.start_at IS NOT NULL
      GROUP BY b.id ORDER BY avg_minutes ASC LIMIT 5`,
     [req.salon.id, startSql, endSql]
   );
@@ -586,7 +586,7 @@ async function barberPeriodCore(salonId, barberId, startSql, endSql, start_date,
     `SELECT COUNT(*) AS done_count, COALESCE(SUM(total_price_cents), 0) AS revenue_cents,
             COALESCE(SUM(TIMESTAMPDIFF(MINUTE, start_at, end_at)), 0) AS booked_minutes
      FROM queue q
-     WHERE barber_id = ? AND salon_id = ? AND status = 'done'
+     WHERE barber_id = ? AND salon_id = ? AND status = 'done' AND NOT (auto_unstarted = 1 AND paid_at IS NULL AND prepaid_at IS NULL)
      AND end_at >= ? AND end_at < ?`,
     [barberId, salonId, startSql, endSql]
   );
@@ -712,7 +712,7 @@ async function barberPeriodCore(salonId, barberId, startSql, endSql, start_date,
   }
   const [[occ]] = await pool.query(
     `SELECT COALESCE(SUM(COALESCE(NULLIF(total_duration_min, 0), TIMESTAMPDIFF(MINUTE, start_at, end_at), 0)), 0) AS m
-     FROM queue WHERE barber_id = ? AND salon_id = ? AND status IN ('done', 'in_progress') AND start_at >= ? AND start_at < ?`,
+     FROM queue WHERE barber_id = ? AND salon_id = ? AND (status = 'in_progress' OR (status = 'done' AND NOT (auto_unstarted = 1 AND paid_at IS NULL AND prepaid_at IS NULL))) AND start_at >= ? AND start_at < ?`,
     [barberId, salonId, startSql, endSql]
   );
   const occupiedMinutes = Number(occ.m);

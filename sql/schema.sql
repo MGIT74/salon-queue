@@ -1329,6 +1329,13 @@ SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = 
 SET @sql := IF(@c = 0, "ALTER TABLE queue ADD COLUMN balance_paid_at DATETIME NULL", 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
+-- RDV jamais demarre (ni « Commencer » ni « Absent ») : a la fin de son creneau prevu, il passe tout seul
+-- « termine » et part dans « A encaisser » avec auto_unstarted = 1 (« Non demarre — a verifier »).
+-- Il ne compte dans les statistiques qu'une fois encaisse ; « Absent » en caisse le retire.
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'queue' AND column_name = 'auto_unstarted');
+SET @sql := IF(@c = 0, "ALTER TABLE queue ADD COLUMN auto_unstarted TINYINT(1) NOT NULL DEFAULT 0", 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
 -- Changement d'email client : l'ancienne adresse reste active jusqu'à validation.
 SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'clients' AND column_name = 'pending_email');
 SET @sql := IF(@c = 0, 'ALTER TABLE clients ADD COLUMN pending_email VARCHAR(255) NULL', 'SELECT 1');

@@ -3684,6 +3684,28 @@ function deleteUnpaidPassage(queueId) {
   }).catch(function (e) { toast(e.message, true); });
 }
 
+/** RDV que personne n'a démarré (ni « Commencer » ni « Absent ») : arrivé tout seul en caisse à la fin de son créneau. */
+function unstartedNoteHtml(q) {
+  return q.auto_unstarted ? '<div class="lock-note" style="color:var(--orange, #c77700)">⚠️ Non démarré — à vérifier : encaissez s\'il est venu, sinon « Absent »</div>' : '';
+}
+function unstartedAbsentBtn(q) {
+  return q.auto_unstarted && !q.prepaid
+    ? '<button class="btn btn-ghost" style="color:var(--red)" onclick="event.stopPropagation();markUnstartedAbsent(\'' + q.id + '\')">Absent</button>' : '';
+}
+function markUnstartedAbsent(queueId) {
+  var q = pendingPayments.find(function (x) { return x.id === queueId; });
+  if (!q) return;
+  showConfirm(q.client_name + ' n\'est pas venu ? Il sera marqué absent et retiré de la caisse (rien n\'est encaissé ni compté).',
+    { title: 'Marquer absent', danger: true, confirmLabel: 'Oui, absent' })
+    .then(function (ok) {
+      if (!ok) return;
+      return barberApi('/api/queue/' + encodeURIComponent(queueId) + '/unstarted-absent', { method: 'POST' }).then(function () {
+        toast(q.client_name + ' marqué absent');
+        loadPendingPayments();
+      });
+    }).catch(function (e) { toast(e.message, true); });
+}
+
 function renderPendingList() {
   var label = document.getElementById('pending-label');
   var list = document.getElementById('pending-list');
@@ -3709,10 +3731,11 @@ function renderPendingList() {
       return '<div class="pending-card deferred">' +
         '<div><div class="name">' + esc(q.client_name) + '</div>' +
         '<div class="meta">' + esc(detail) + '</div>' +
-        '<div class="lock-note">Mis de côté</div></div>' +
+        '<div class="lock-note">Mis de côté</div>' + unstartedNoteHtml(q) + '</div>' +
         '<div class="pending-actions">' +
           '<span class="amount">' + eur(q.prepaid ? q.balance_due_cents : q.total_price_cents) + '</span>' +
           '<button class="btn btn-soft" onclick="event.stopPropagation();toggleDeferPayment(\'' + q.id + '\')">Reprendre</button>' +
+          unstartedAbsentBtn(q) +
           (q.prepaid ? '' : pendingDelBtn(q)) +
         '</div></div>';
     }
@@ -3725,6 +3748,7 @@ function renderPendingList() {
         '<div><div class="name">' + esc(q.client_name) + '</div>' +
         '<div class="meta">' + esc(detail) + '</div>' +
         '<div class="lock-note" style="color:var(--green)">✓ Payé d\'avance — reste à payer : ' + esc(addedNames) + '</div>' +
+        unstartedNoteHtml(q) +
         (isActive ? '' : '<div class="lock-note">En attente de son tour</div>') + '</div>' +
         '<div class="pending-actions">' +
           '<span class="amount">' + eur(q.balance_due_cents) + '</span>' +
@@ -3755,6 +3779,7 @@ function renderPendingList() {
       '<div><div class="name">' + esc(q.client_name) + '</div>' +
       pendingGroupBadgeHtml(q, explicitGift ? [] : mates) +
       '<div class="meta">' + esc(detail) + '</div>' +
+      unstartedNoteHtml(q) +
       (isActive ? giftNote + loyaltyNote : '<div class="lock-note">En attente de son tour</div>') + '</div>' +
       '<div class="pending-actions">' +
         '<span class="amount">' + eur(displayAmount) + '</span>' +
@@ -3767,6 +3792,7 @@ function renderPendingList() {
         (isActive && !q.loyalty_member
           ? '<button class="btn btn-ghost" onclick="event.stopPropagation();proposeLoyaltyActivation(\'' + q.id + '\')">Activer carte de fidélité</button>'
           : '') +
+        unstartedAbsentBtn(q) +
         (isActive ? '<button class="btn btn-ghost" onclick="event.stopPropagation();toggleDeferPayment(\'' + q.id + '\')">Mettre de côté</button>' : '') +
         pendingDelBtn(q) +
       '</div></div>';
