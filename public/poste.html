@@ -415,6 +415,8 @@
   .pd-g-sum small { font-size: 11.5px; color: var(--grey); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .pd-g-day .pd-g-row { grid-template-columns: 30px minmax(0, 1fr) 34px; }
   .pd-g-day .pd-g-name { justify-content: center; }
+  .pd-g-week .pd-g-row { grid-template-columns: 100px minmax(0, 1fr) 34px; }
+  .pd-g-week .pd-g-sum { align-items: center; }
   .pd-g-day .pd-g-name .pd-av { width: 28px; height: 28px; }
   .pd-g-day .pd-g-row.me .pd-g-name .pd-av { box-shadow: 0 0 0 2px var(--fill), 0 0 0 4px var(--blue); }
   .pd-g-day .pd-g-sum { align-items: center; }
@@ -564,7 +566,8 @@
     .pd-g-row { grid-template-columns: 64px minmax(0, 1fr); gap: 8px; }
     .pd-g-sum { display: none; }
     .pd-g-day .pd-g-row { grid-template-columns: 24px minmax(0, 1fr) 28px; }
-    .pd-g-day .pd-g-sum { display: flex; }
+    .pd-g-day .pd-g-sum, .pd-g-week .pd-g-sum { display: flex; }
+    .pd-g-week .pd-g-row { grid-template-columns: 64px minmax(0, 1fr) 28px; }
     .pd-g-day .pd-g-name .pd-av { width: 22px; height: 22px; }
     .pd-g-ic { width: 26px; height: 26px; }
     .pd-g-name .pd-av { width: 20px; height: 20px; font-size: 10px; }
@@ -1813,6 +1816,8 @@ function pdWeekHtml(start) {
     var its = shown.filter(function (it) { return it.day === d; });
     var mineN = all.filter(function (it) { return it.day === d && it.barberId === myId && it.st !== 'absent'; }).length;
     var closed = rdvIsSalonClosed(d), h = 100 / lanes.length;
+    var meRow = (barbers || []).find(function (x) { return x.id === myId; });
+    var wkWalk = !!(meRow && (isWalkinOn(meRow, d) || !meRow.kiosk_hidden)), wkOff = !!(meRow && !isWalkinOn(meRow, d) && barberOffReason(meRow, d));
     var segs = its.map(function (it) {
       var li = Math.max(0, lanes.findIndex(function (b) { return b.id === it.barberId; }));
       return '<span class="pd-g-seg st-' + it.st + '" title="' + esc(pdHM(it.start) + ' ' + it.a.client_name) + '" style="top:calc(' + (li * h).toFixed(2) + '% + 3px);bottom:auto;height:calc(' + h.toFixed(2) + '% - 4px);left:' + pct(it.start) + '%;width:calc(' + (it.dur / SPAN * 100).toFixed(3) + '% - 1px);background:' + barberColor(it.barberId) + '"></span>';
@@ -1822,11 +1827,13 @@ function pdWeekHtml(start) {
       '<span class="pd-g-name"><span class="pd-wd' + (d === todayStr ? ' today' : '') + '">' + PD_WD[i] + ' ' + dd.getDate() + '</span></span>' +
       '<span class="pd-g-bar">' + segs + (closed ? '<span class="pd-g-off">Salon fermé</span>' : (!its.length ? '<span class="pd-g-off">Aucun RDV</span>' : '')) +
         (d === todayStr && nowMin >= R0 && nowMin <= R1 ? '<span class="pd-g-now" style="left:' + pct(nowMin) + '%"></span>' : '') + '</span>' +
-      '<span class="pd-g-sum"><b>' + (closed ? 'Fermé' : its.length + ' RDV') + '</b><small>' + (closed ? '' : (mineN ? mineN + ' pour moi' : 'aucun pour moi')) + '</small></span></button>';
+      // À droite : l'icône RDV ou Sans RDV de l'app (mon mode ce jour-là), le détail en info-bulle.
+      '<span class="pd-g-sum"><span class="pd-g-ic ' + (wkWalk ? 'walk' : 'rdv') + (closed || wkOff ? ' off' : '') + '" title="' + esc(closed ? 'Salon fermé' : ((wkOff ? 'Absent · ' : '') + (wkWalk ? 'Sans RDV' : 'RDV') + ' — ' + its.length + ' RDV · ' + (mineN ? mineN + ' pour moi' : 'aucun pour moi'))) + '">' +
+        rdvModeIconSvg(wkWalk, 16) + '</span></span></button>';
   }).join('');
   var ticks = '';
   for (var t = R0; t <= R1; t += 60) ticks += '<span' + ((t - R0) % 180 ? ' class="minor"' : '') + ' style="left:' + pct(t) + '%">' + pdHM(t) + '</span>';
-  html += '<section class="pd-glance" aria-label="La semaine en un coup d’œil"><div class="pd-glance-head"><strong>La semaine en un coup d’œil</strong>' +
+  html += '<section class="pd-glance pd-g-week" aria-label="La semaine en un coup d’œil"><div class="pd-glance-head"><strong>La semaine en un coup d’œil</strong>' +
     '<span class="pd-legend">' + lanes.map(function (b) { return '<span><i style="background:' + barberColor(b.id) + '"></i>' + (b.id === myId ? 'Moi' : esc(b.name)) + '</span>'; }).join('') + '</span></div>' +
     rows + '<div class="pd-g-row" style="cursor:default;padding-top:0;padding-bottom:0" aria-hidden="true"><span></span><span class="pd-g-ticks">' + ticks + '</span><span class="pd-g-sum"></span></div></section>';
 
