@@ -443,6 +443,9 @@
   .pd-cal { background: var(--fill); border-radius: 18px; padding: 10px 12px 12px; min-width: 0; }
   .pd-cal-tools { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
   .pd-cal-tools .pd-zoom { display: flex; gap: 6px; }
+  .pd-zoom-sl { display: inline-flex; align-items: center; gap: 8px; color: var(--grey); background: var(--card); border-radius: 99px; padding: 0 12px; height: 36px; }
+  .pd-zoom-sl input[type=range] { width: 110px; accent-color: var(--blue); cursor: pointer; margin: 0; }
+  @media (max-width: 699px) { .pd-zoom-sl { padding: 0 10px; gap: 6px; } .pd-zoom-sl input[type=range] { width: 80px; } }
   .pd-cal-tools .pd-zoom button { width: 36px; height: 36px; border-radius: 50%; border: none; background: var(--card); color: var(--ink); font-size: 18px; cursor: pointer; }
   .pd-cal-head { display: flex; gap: 8px; padding: 0 0 8px 52px; border-bottom: 1px solid var(--sep); }
   .pd-col-head { display: flex; align-items: center; gap: 7px; min-width: 0; font-size: 13.5px; font-weight: 700; }
@@ -1657,8 +1660,9 @@ function posteDayHtml(dateStr) {
 
   // Chaque colonne garde une largeur minimale : s'il y a beaucoup de coiffeurs, l'agenda défile à droite / à gauche
   // (les heures restent collées à gauche, les noms restent en haut).
-  var colW = function (b) { return single ? 0 : (b.id === myId ? 300 : 190); };
-  var colStyle = function (b) { return 'flex:' + (b.id === myId && !single ? 1.6 : 1) + ' 0 ' + colW(b) + 'px;min-width:' + colW(b) + 'px'; };
+  // Colonnes proportionnelles : la même largeur pour chaque coiffeur (moi compris).
+  var colW = function () { return single ? 0 : 190; };
+  var colStyle = function (b) { return 'flex:1 1 ' + colW(b) + 'px;min-width:' + colW(b) + 'px'; };
   var minW = 52 + cols.reduce(function (sum, b) { return sum + colW(b); }, 0) + 8 * Math.max(0, cols.length - 1);
   var lines = '', hours = '';
   for (var m = R0; m <= R1; m += 30) {
@@ -1709,7 +1713,7 @@ function posteDayHtml(dateStr) {
     '<div class="pd-cal-tools"><span style="font-size:13px;color:var(--grey)">' + (items.length ? items.length + ' RDV ce jour' : 'Aucun RDV ce jour') + '</span>' +
     '<span class="pd-cal-tools-r">' +
       (pdIsPhone() ? '' : '<span class="pd-seg2" style="min-width:220px"><button type="button" class="' + (pdOnlyMe ? 'on' : '') + '" onclick="pdSetOnlyMe(true)">Moi seulement</button><button type="button" class="' + (pdOnlyMe ? '' : 'on') + '" onclick="pdSetOnlyMe(false)">Équipe</button></span>') +
-      '<span class="pd-zoom"><button type="button" onclick="pdZoom(-1)" aria-label="Réduire l’agenda">−</button><button type="button" onclick="pdZoom(1)" aria-label="Agrandir l’agenda">+</button></span>' +
+      pdZoomSliderHtml() +
       (!closed && !past ? '<button type="button" class="btn btn-primary pd-add-top" onclick="openPosteAddAppointment(\'' + dateStr + '\')">' + (pdIsPhone() ? '+ RDV' : '+ Ajouter un RDV') + '</button>' : '') +
     '</span></div>' +
     '<div class="pd-cal-scroll pd-xs"><div class="pd-xs-in" style="min-width:' + minW + 'px">' +
@@ -1849,7 +1853,7 @@ function pdWeekHtml(start) {
     '<div class="pd-cal-tools"><span style="font-size:13px;color:var(--grey)">' + (shown.length ? shown.length + ' RDV cette semaine' : 'Aucun RDV cette semaine') + '</span>' +
     '<span style="display:flex;align-items:center;gap:10px">' +
       (phone ? '' : '<span class="pd-seg2" style="min-width:220px"><button type="button" class="' + (pdOnlyMe ? 'on' : '') + '" onclick="pdSetOnlyMe(true)">Moi seulement</button><button type="button" class="' + (pdOnlyMe ? '' : 'on') + '" onclick="pdSetOnlyMe(false)">Équipe</button></span>') +
-      '<span class="pd-zoom"><button type="button" onclick="pdZoom(-1)" aria-label="Réduire l’agenda">−</button><button type="button" onclick="pdZoom(1)" aria-label="Agrandir l’agenda">+</button></span></span></div>' +
+      pdZoomSliderHtml() + '</span></div>' +
     '<div class="pd-cal-head pd-wk-heads">' + heads + '</div>' +
     '<div class="pd-cal-scroll"><div class="pd-grid" data-date="" data-r0="' + R0 + '" data-r1="' + R1 + '" data-px="' + PX + '" data-focus-top="' + focusTop + '" style="height:' + Math.round(SPAN * PX + 12) + 'px">' +
     lines + '<div class="pd-cols pd-wk-cols">' + cols + '</div></div></div></div>';
@@ -1901,6 +1905,31 @@ function pdMonthHtml() {
   html += '<div class="pd-cal pd-month"><div class="pd-mhead">' + PD_WD.map(function (w) { return '<span>' + w + '</span>'; }).join('') + '</div>' +
     '<div class="pd-mgrid">' + cells + '</div></div>';
   return html;
+}
+/** Curseur de zoom de l'agenda (Jour et Semaine) : remplace les boutons − / +. */
+function pdZoomSliderHtml() {
+  return '<label class="pd-zoom-sl" title="Zoom de l’agenda">' +
+    '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5M8 11h6"/></svg>' +
+    '<input type="range" min="0.8" max="2.6" step="0.1" value="' + pdPx + '" aria-label="Zoom de l’agenda" oninput="pdZoomPreview(this.value)" onchange="pdSetZoom(this.value)">' +
+    '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5M8 11h6M11 8v6"/></svg></label>';
+}
+/** Pendant qu'on fait glisser le curseur : aperçu immédiat (étirement), le vrai dessin se fait au lâcher. */
+function pdZoomPreview(v) {
+  var g = document.querySelector('#cal-day-view .pd-grid, #cal-days .pd-grid');
+  if (!g) return;
+  g.style.transformOrigin = 'top left';
+  g.style.transform = 'scaleY(' + (Number(v) / pdPx) + ')';
+}
+/** Applique le zoom en gardant la même heure en haut de l'agenda. */
+function pdSetZoom(v) {
+  var nv = Math.max(0.8, Math.min(2.6, +Number(v).toFixed(2)));
+  var sc = document.querySelector('#cal-day-view .pd-cal-scroll, #cal-days .pd-cal-scroll');
+  var topMin = sc ? sc.scrollTop / pdPx : null, left = sc ? sc.scrollLeft : 0;
+  pdPx = nv;
+  try { localStorage.setItem('poste_day_px', String(pdPx)); } catch (e) {}
+  pdRerender();
+  var sc2 = document.querySelector('#cal-day-view .pd-cal-scroll, #cal-days .pd-cal-scroll');
+  if (sc2 && topMin !== null) { sc2.scrollTop = Math.round(topMin * pdPx); sc2.scrollLeft = left; }
 }
 function pdZoom(delta) {
   pdPx = Math.max(0.8, Math.min(2.6, +(pdPx + delta * 0.3).toFixed(2)));
