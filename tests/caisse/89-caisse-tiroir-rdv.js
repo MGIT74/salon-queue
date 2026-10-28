@@ -44,6 +44,10 @@ let JSDOM = null; try { JSDOM = require('jsdom').JSDOM; } catch (_) { /* absent 
     const APPT = { id: 'a1', client_name: 'Tom', email: 't@x.fr', phone: '0600', barber_id: 'b1', barber_name: 'Thomas', service_id: 's1', service_name: 'Coupe',
       scheduled_at: '2026-10-20 14:10:00', status: 'confirmed', display_status: 'confirmed', source: 'online', promoted_queue_id: null, note: '' };
     w.calApptById = { a1: APPT };
+    // Lignes du tiroir partagees (app.js) : les vraies fonctions.
+    const appSrc = fs.readFileSync(__dirname + '/../../public/app.js', 'utf8');
+    const fnSrc = (name) => { const i = appSrc.indexOf('function ' + name + '('); const j = appSrc.indexOf('\nfunction ', i + 10); const k = appSrc.indexOf('\n/**', i + 10); return appSrc.slice(i, Math.min.apply(null, [j, k].filter((x) => x > -1))); };
+    w.eval(['apptWhenLabel', 'apptBadgeHtml', 'apptPricingHtml', 'apptInfoRowsHtml'].map(fnSrc).join('\n'));
     w.eval(code);
     const $ = (id) => doc.getElementById(id), drawer = () => $('appt-drawer-backdrop').classList.contains('on');
     const tick = () => new Promise((r) => setTimeout(r, 20));

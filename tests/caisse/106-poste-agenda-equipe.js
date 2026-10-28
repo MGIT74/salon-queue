@@ -33,7 +33,7 @@ const check = (n, ok, extra) => { (ok ? pass++ : fail++); console.log((ok ? '  O
   check('salon fermé : pas de planning, juste le message rouge', /function renderAgendaTimeline\(dateStr\) \{\n[^\n]*\n  if \(rdvIsSalonClosed\(dateStr\)\) return '';/.test(poste) && /Salon fermé — aucun rendez-vous ne peut être ajouté ce jour/.test(poste));
   check('une ligne par coiffeur qui prend des RDV (moi en premier), clic sur la ligne = RDV pour ce coiffeur', /function posteTimelineBarbers/.test(poste) && /openPosteAddAppointment\(\\'' \+ dateStr \+ '\\',\\'' \+ b\.id \+ '\\'\)/.test(poste));
   check('RDV pour un collègue : son nom dans le titre, créneaux et enregistrement à son nom (en-tête « agit pour »)', /function openPosteAddAppointment\(dateStr, barberId\)/.test(poste) && /X-Acting-As-Barber-Id/.test(poste) && /actingAs: targetId,   \/\/ RDV au nom du coiffeur choisi/.test(poste) && /barber_id: targetId,/.test(poste));
-  check('fiche du RDV (tiroir repris de la caisse) : nom du coiffeur, actions au nom du coiffeur du RDV', /<span class="detail-label">Coiffeur<\/span>/.test(poste) && /actingAs: adAppt\.barber_id \|\| undefined/.test(poste));
+  check('fiche du RDV (tiroir repris de la caisse) : nom du coiffeur, actions au nom du coiffeur du RDV', /document\.getElementById\('ad-info'\)\.innerHTML = apptInfoRowsHtml\(a\);/.test(poste) && /actingAs: adAppt\.barber_id \|\| undefined/.test(poste));
 
   sql(clean);
   console.log('\nRESULTAT : ' + pass + ' verifications reussies, ' + fail + ' echec(s)');

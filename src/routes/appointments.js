@@ -473,9 +473,71 @@ router.get('/availability-days', wrap(async (req, res) => {
  * clientKey() - jamais jointe en SQL direct car ce n'est pas une colonne
  * stricte), même pattern que /api/queue/history.
  */
+/**
+ * Detail du prix de chaque RDV, pour l'afficher dans les tiroirs (admin, caisse, poste) :
+ *  - prestation : tarif PERSONNALISE du coiffeur s'il existe (custom: true), sinon celui du catalogue ;
+ *  - supplements choisis, chacun a son tarif (coiffeur ou catalogue) ;
+ *  - total estime = prestation + supplements ; charged_cents = montant reel de la ligne de file si le RDV y est deja.
+ * Meme regle que barberOffer / queueMath : c'est ce qui est encaisse.
+ */
+async function apptPricing(rows) {
+  const out = {};
+  const ids = rows.map((r) => r.id).filter(Boolean);
+  if (!ids.length) return out;
+  const [svc] = await pool.query(
+    `SELECT a.id, s.price_cents AS cat_price, s.duration_min AS cat_duration, bsp.price_cents AS b_price, bsp.duration_min AS b_duration,
+            s.system_kind, q.total_price_cents AS charged_cents
+     FROM appointments a
+     LEFT JOIN services s ON s.id = a.service_id
+     LEFT JOIN barber_service_prices bsp ON bsp.barber_id = a.barber_id AND bsp.service_id = a.service_id
+     LEFT JOIN queue q ON q.id = a.promoted_queue_id
+     WHERE a.id IN (?)`, [ids]
+  );
+  const [ext] = await pool.query(
+    `SELECT ae.appointment_id, e.name, e.price_cents AS cat_price, e.duration_min AS cat_duration,
+            bep.price_cents AS b_price, bep.duration_min AS b_duration
+     FROM appointment_extras ae
+     JOIN appointments a ON a.id = ae.appointment_id
+     JOIN extras e ON e.id = ae.extra_id
+     LEFT JOIN barber_extra_prices bep ON bep.barber_id = a.barber_id AND bep.extra_id = ae.extra_id
+     WHERE ae.appointment_id IN (?) ORDER BY e.name`, [ids]
+  );
+  const num = (v) => (v === null || v === undefined ? null : Number(v));
+  svc.forEach((r) => {
+    const extrasOnly = Boolean(r.system_kind);
+    const custom = !extrasOnly && (num(r.b_price) !== null || num(r.b_duration) !== null);
+    out[r.id] = {
+      service_price_cents: extrasOnly ? 0 : (num(r.b_price) !== null ? num(r.b_price) : Number(r.cat_price) || 0),
+      service_duration_min: extrasOnly ? 0 : (num(r.b_duration) !== null ? num(r.b_duration) : Number(r.cat_duration) || 0),
+      service_catalog_price_cents: extrasOnly ? 0 : Number(r.cat_price) || 0,
+      service_catalog_duration_min: extrasOnly ? 0 : Number(r.cat_duration) || 0,
+      custom,
+      extras: [],
+      charged_cents: num(r.charged_cents),
+    };
+  });
+  ext.forEach((e) => {
+    const p = out[e.appointment_id];
+    if (!p) return;
+    p.extras.push({
+      name: e.name,
+      price_cents: num(e.b_price) !== null ? num(e.b_price) : Number(e.cat_price) || 0,
+      duration_min: num(e.b_duration) !== null ? num(e.b_duration) : Number(e.cat_duration) || 0,
+      custom: num(e.b_price) !== null || num(e.b_duration) !== null,
+    });
+  });
+  Object.values(out).forEach((p) => {
+    p.total_cents = p.service_price_cents + p.extras.reduce((t, x) => t + x.price_cents, 0);
+    p.total_duration_min = p.service_duration_min + p.extras.reduce((t, x) => t + x.duration_min, 0);
+  });
+  return out;
+}
+
 async function buildApptItems(salonId, rows) {
   const [notes] = await pool.query('SELECT client_key, note FROM client_notes WHERE salon_id = ?', [salonId]);
   const noteByKey = Object.fromEntries(notes.map((n) => [n.client_key, n.note]));
+  // Detail du prix : simple affichage, ne doit jamais empecher de lister les RDV.
+  const pricing = await apptPricing(rows).catch((e) => { console.error('apptPricing', e && e.message); return {}; });
   return rows.map((r) => {
       // Statut affiche : annule reste annule ; termine si la coupe
       // promue en file est marquee "done" ; sinon confirme (a venir,
@@ -497,6 +559,8 @@ async function buildApptItems(salonId, rows) {
         display_status: displayStatus,
         note: noteByKey[clientKey(r)] || '',
         duration_min: (r.service_duration_min || 0) + Number(r.extras_duration_min || 0),
+        // Detail du prix (tiroirs) : prestation au tarif du coiffeur (personnalise ou catalogue) + supplements.
+        pricing: pricing[r.id] || null,
         // Le jeton d'annulation est le secret du lien envoyé AU CLIENT par email : jamais renvoyé au salon.
         cancel_token: undefined
       });

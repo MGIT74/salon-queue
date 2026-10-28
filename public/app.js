@@ -747,6 +747,60 @@ function isOnLeaveOn(b, dateStr) {
   return (b.leaves || []).some(function (l) { return dateStr >= l.start_date && dateStr <= l.end_date; });
 }
 
+/** « Mercredi 28 octobre à 10:50 » pour un RDV (scheduled_at = heure locale du salon). */
+function apptWhenLabel(a) {
+  var d = new Date(String(a.scheduled_at).replace(' ', 'T')).toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' });
+  return d.charAt(0).toUpperCase() + d.slice(1) + ' à ' + String(a.scheduled_at).slice(11, 16);
+}
+
+/** Etiquette de statut d'un RDV (tiroir) : Annulé / Terminé / Absent / Confirmé. */
+function apptBadgeHtml(a) {
+  return a.status === 'cancelled' ? '<span class="ad-badge cancelled">Annulé</span>'
+    : (a.display_status === 'completed' ? '<span class="ad-badge done">Terminé</span>'
+      : (a.display_status === 'no_show' ? '<span class="ad-badge cancelled">Absent</span>' : '<span class="ad-badge">Confirmé</span>'));
+}
+
+/**
+ * Detail du prix d'un RDV (a.pricing, calcule par le serveur) : prestation au tarif du coiffeur + chaque supplement,
+ * total et duree. Indique quand le coiffeur a un tarif personnalise (et le tarif du catalogue a cote).
+ */
+function apptPricingHtml(a) {
+  var p = a && a.pricing;
+  if (!p) return '';
+  var line = function (label, cents, mins, sub) {
+    return '<div style="display:flex;justify-content:space-between;gap:10px;font-size:13px;color:var(--grey);margin-top:3px">' +
+      '<span>' + label + (sub ? '<span style="display:block;font-size:12px;opacity:.8">' + sub + '</span>' : '') + '</span>' +
+      '<span style="white-space:nowrap">' + (mins ? formatMinutes(mins) + ' · ' : '') + eur(cents) + '</span></div>';
+  };
+  var svcName = a.pricing.extras.length && !p.service_price_cents && !p.service_duration_min ? '' : (a.service_name || 'Prestation');
+  var html = '';
+  if (svcName) {
+    html += line(esc(svcName), p.service_price_cents, p.service_duration_min,
+      p.custom ? '(tarif de ' + esc(a.barber_name || 'ce coiffeur') + ' — catalogue : ' + eur(p.service_catalog_price_cents) + ' · ' + formatMinutes(p.service_catalog_duration_min) + ')' : '');
+  }
+  p.extras.forEach(function (x) { html += line('+ ' + esc(x.name), x.price_cents, x.duration_min, x.custom ? '(tarif de ' + esc(a.barber_name || 'ce coiffeur') + ')' : ''); });
+  var charged = p.charged_cents !== null && p.charged_cents !== undefined && p.charged_cents !== p.total_cents
+    ? '<div style="font-size:12.5px;color:var(--grey);margin-top:4px">Montant actuellement en caisse : ' + eur(p.charged_cents) + '</div>' : '';
+  return '<div class="detail-row" style="flex-direction:column;align-items:stretch;gap:0">' +
+    '<div style="display:flex;justify-content:space-between;gap:10px"><span class="detail-label">Prix</span>' +
+    '<span class="detail-value">' + formatMinutes(p.total_duration_min) + ' · ' + eur(p.total_cents) + '</span></div>' +
+    html + charged + '</div>';
+}
+
+/** Les lignes d'infos d'un RDV, IDENTIQUES dans les tiroirs de l'admin, de la caisse et du poste. */
+function apptInfoRowsHtml(a) {
+  var p = a.pricing, extras = p && p.extras && p.extras.length && (p.service_price_cents || p.service_duration_min)
+    ? ' + ' + p.extras.map(function (x) { return x.name; }).join(' + ') : '';
+  return '<div class="detail-row"><span class="detail-label">Quand</span><span class="detail-value" style="text-transform:capitalize">' + esc(apptWhenLabel(a)) + '</span></div>' +
+    '<div class="detail-row"><span class="detail-label">Coiffeur</span><span class="detail-value">' + esc(a.barber_name || 'Non assigné') + '</span></div>' +
+    '<div class="detail-row"><span class="detail-label">Prestation</span><span class="detail-value">' + esc((a.service_name || '') + extras) + '</span></div>' +
+    apptPricingHtml(a) +
+    (a.email ? '<div class="detail-row"><span class="detail-label">Email</span><span class="detail-value">' + esc(a.email) + '</span></div>' : '') +
+    (a.phone ? '<div class="detail-row"><span class="detail-label">Téléphone</span><span class="detail-value">' + esc(a.phone) + '</span></div>' : '') +
+    (!a.email && !a.phone ? '<div class="hint" style="margin:0">Aucune coordonnée renseignée</div>' : '') +
+    (a.client_note ? '<div class="detail-row" style="flex-direction:column;align-items:flex-start;gap:2px"><span class="detail-label">📝 Note du client (RDV)</span><span class="detail-value" style="font-weight:400">' + esc(a.client_note) + '</span></div>' : '');
+}
+
 /**
  * Dernier jour du conge en cours a dateStr, en suivant les conges qui s'enchainent : un conge peut etre enregistre
  * en plusieurs morceaux (ex. 27-31 oct puis 1-15 nov, ou separes par un jour non travaille). Renvoie '' si pas en conge.

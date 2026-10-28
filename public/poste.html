@@ -491,7 +491,7 @@
   </button>
 </div>
 
-<script src="/app.js?v=48"></script>
+<script src="/app.js?v=49"></script>
 <script src="/autorefresh.js?v=3"></script>
 <script src="/staff-group.js?v=6"></script>
 <script>requireSalonInUrl("Pour utiliser votre poste, ouvrez le lien de votre salon.");</script>
@@ -1765,19 +1765,8 @@ function adWhenLabel(a) {
 function adRenderInfo() {
   var a = adAppt;
   document.getElementById('ad-name').textContent = a.client_name;
-  var statusHtml = a.status === 'cancelled'
-    ? '<span class="ad-badge cancelled">Annulé</span>'
-    : (a.display_status === 'completed' ? '<span class="ad-badge done">Terminé</span>'
-      : (a.display_status === 'no_show' ? '<span class="ad-badge cancelled">Absent</span>' : '<span class="ad-badge">Confirmé</span>'));
-  document.getElementById('ad-badge').innerHTML = statusHtml;
-  document.getElementById('ad-info').innerHTML =
-    '<div class="detail-row"><span class="detail-label">Quand</span><span class="detail-value" style="text-transform:capitalize">' + esc(adWhenLabel(a)) + '</span></div>' +
-    '<div class="detail-row"><span class="detail-label">Coiffeur</span><span class="detail-value">' + esc(a.barber_name || 'Non assigné') + '</span></div>' +
-    '<div class="detail-row"><span class="detail-label">Prestation</span><span class="detail-value">' + esc(a.service_name || '') + '</span></div>' +
-    (a.email ? '<div class="detail-row"><span class="detail-label">Email</span><span class="detail-value">' + esc(a.email) + '</span></div>' : '') +
-    (a.phone ? '<div class="detail-row"><span class="detail-label">Téléphone</span><span class="detail-value">' + esc(a.phone) + '</span></div>' : '') +
-    (!a.email && !a.phone ? '<div class="hint" style="margin:0">Aucune coordonnée renseignée</div>' : '') +
-    (a.client_note ? '<div class="detail-row" style="flex-direction:column;align-items:flex-start;gap:2px"><span class="detail-label">📝 Note du client (RDV)</span><span class="detail-value" style="font-weight:400">' + esc(a.client_note) + '</span></div>' : '');
+  document.getElementById('ad-badge').innerHTML = apptBadgeHtml(a);
+  document.getElementById('ad-info').innerHTML = apptInfoRowsHtml(a);   // memes lignes partout (app.js)
 }
 
 
