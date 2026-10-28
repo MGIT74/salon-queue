@@ -507,9 +507,9 @@
   .pd-mday.pd-hit { box-shadow: inset 0 0 0 3px #ffd60a; opacity: 1; }
   .pd-mday.pd-dim { opacity: .35; }
   .pd-mnum { font-size: 14px; font-weight: 700; min-width: 26px; height: 26px; border-radius: 13px; display: inline-flex; align-items: center; justify-content: center; padding: 0 4px; box-sizing: border-box; }
-  .pd-mchips { display: flex; flex-wrap: wrap; gap: 5px 10px; margin-top: 2px; }
-  .pd-mchip { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 700; }
-  .pd-mchip i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  /* Pastilles en bas de la case (le numéro du jour reste seul en haut) */
+  .pd-mchips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: auto; }
+  .pd-mchip { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; height: 24px; padding: 0 7px; box-sizing: border-box; border-radius: 12px; font-size: 12.5px; font-weight: 800; font-variant-numeric: tabular-nums; }
   .pd-mclosed { font-size: 11.5px; font-weight: 600; color: var(--grey); }
 
   /* Tablette (portrait) et petits ordinateurs : pas de colonne de cote, le prochain client passe au-dessus */
@@ -532,9 +532,8 @@
     .pd-g-ticks span.minor, .pd-legend { display: none; }
     .pd-mday { min-height: 58px; padding: 5px; gap: 2px; border-radius: 9px; }
     .pd-mnum { font-size: 12.5px; min-width: 22px; height: 22px; }
-    .pd-mchips { gap: 2px 5px; }
-    .pd-mchip { font-size: 10.5px; gap: 2px; }
-    .pd-mchip i { width: 7px; height: 7px; }
+    .pd-mchips { gap: 3px; }
+    .pd-mchip { min-width: 17px; height: 17px; padding: 0 4px; border-radius: 9px; font-size: 10px; }
     .pd-mgrid, .pd-mhead { gap: 4px; }
     .pd-wk-head b { font-size: 14px; }
     .pd-side > .pd-view-card { display: none; }
@@ -1836,7 +1835,9 @@ function pdMonthHtml() {
     var byB = {};
     its.forEach(function (a) { var k = a.barber_id || 'none'; byB[k] = (byB[k] || 0) + 1; });
     var chips = Object.keys(byB).slice(0, 5).map(function (k) {
-      return '<span class="pd-mchip"><i style="background:' + (k === 'none' ? 'var(--grey)' : barberColor(k)) + '"></i>' + byB[k] + '</span>';
+      // Pastille pleine de la couleur du coiffeur, le nombre de RDV dedans : rien à voir avec le numéro du jour.
+      var col = k === 'none' ? '#8e8e93' : barberColor(k);
+      return '<span class="pd-mchip" style="background:' + col + ';color:' + pdFg(col) + '">' + byB[k] + '</span>';
     }).join('');
     var closed = rdvIsSalonClosed(ds);
     var q = its.map(function (a) { return normText([a.client_name, a.email].join(' ')) + ' ' + String(a.phone || '').replace(/\D/g, ''); }).join(' | ');
