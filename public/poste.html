@@ -1623,7 +1623,9 @@ function posteDayHtml(dateStr) {
   if (closed) html += '<div class="salon-closure-banner" style="text-align:center;margin-bottom:12px">Salon fermé — aucun rendez-vous ne peut être ajouté ce jour.</div>';
 
   // 2) La journée en un coup d'œil : une barre par coiffeur
-  var rows = team.map(function (b) {
+  // « Moi seulement » : le coup d'œil ne montre que ma ligne aussi (gain de place). Sur téléphone, toute l'équipe reste (choix de la colonne).
+  var glanceTeam = pdOnlyMe && !pdIsPhone() && team.some(function (b) { return b.id === myId; }) ? team.filter(function (b) { return b.id === myId; }) : team;
+  var rows = glanceTeam.map(function (b) {
     var color = barberColor(b.id), isMe = b.id === myId;
     var its = items.filter(function (it) { return it.barberId === b.id; });
     var rowB = (barbers || []).find(function (x) { return x.id === b.id; });

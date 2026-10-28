@@ -53,5 +53,6 @@ check('heures de l\'agenda selon le « pas des creneaux » (Rendez-vous > Parame
 ctx.rdvSlotStepMin = 15;
 check('pas de 15 min : 09:15 / 09:30 / 09:45 quand la place le permet', /09:15/.test(ctx.pdTimeScale(540, 600, 2).hours) && /09:45/.test(ctx.pdTimeScale(540, 600, 2).hours));
 check('coup d\'œil du jour : photo seule a gauche (nom en info-bulle), icone RDV / Sans RDV de l\'app a droite', /'<span class="pd-g-name" title="' \+ esc\(isMe \? b\.name \+ ' \(moi\)' : b\.name\) \+ '">' \+ pdAvatarHtml\(b\) \+ '<\/span>'/.test(poste) && /rdvModeIconSvg\(walkMode, 16\)/.test(poste) && /var walkMode = !!\(rowB && \(walkDay \|\| !rowB\.kiosk_hidden\)\);/.test(poste) && /class="pd-glance pd-g-day"/.test(poste));
+check('« Moi seulement » : le coup d\'œil du jour ne montre que ma ligne (pas sur telephone)', /var glanceTeam = pdOnlyMe && !pdIsPhone\(\)[\s\S]{0,120}team\.filter\(function \(b\) \{ return b\.id === myId; \}\) : team;\n  var rows = glanceTeam\.map/.test(poste));
 console.log('\n' + pass + ' OK, ' + fail + ' ECHEC');
 process.exit(fail ? 1 : 0);
