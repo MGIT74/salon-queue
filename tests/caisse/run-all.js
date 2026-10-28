@@ -174,7 +174,8 @@ const suite = [
   ['151-planning-sans-bande-grise.js', false, ['exit']],
   ['152-tiroir-rdv-identique-et-prix.js', false, ['exit']],
   ['153-lien-activation-compte.js', false, ['exit']],
-  ['154-rdv-non-demarre-en-caisse.js', false, ['exit']]
+  ['154-rdv-non-demarre-en-caisse.js', false, ['exit']],
+  ['156-caisse-cartes-a-encaisser.js', false, ['exit']]
 ];
 
 let bad = 0;
