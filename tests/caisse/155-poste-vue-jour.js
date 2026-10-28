@@ -46,5 +46,6 @@ check('D : pauses, trait maintenant, etiquettes Prochain / En cours / Absent / T
 const addSrc = fnSrc('pdAddCheck');
 check('D : clic vide = memes regles (ferme, passe, absent, sans RDV, pas de RDV en ligne)', /rdvIsSalonClosed/.test(addSrc) && /isPastDay/.test(addSrc) && /barberOffReason/.test(addSrc) && /isWalkinOn/.test(addSrc) && /accepts_appointments/.test(addSrc) && /var why = pdAddCheck\(b, dateStr\);\n  if \(why\) \{ toast\(why, true\); return; \}/.test(poste));
 check('D : bulle « Ajouter un RDV » / « Plusieurs personnes (groupe) », heure touchee mise en avant', /Ajouter un RDV<svg/.test(poste) && /Plusieurs personnes \(groupe\)<svg/.test(poste) && /paGoStep\('client', 'group'\)/.test(fnSrc('pdDAdd')) && /var prefTime = typeof pdDPrefTime !== 'undefined' \? pdDPrefTime : null;/.test(poste) && /classList\.add\('pref'\)/.test(poste));
+check('D : chaque carte prend la couleur de son coiffeur (fond teinte + barre a gauche)', /'style="--c:' \+ barberColor\(b\.id\) \+ ';top:'/.test(poste) && /\.pdD-card \{[^}]*color-mix\(in srgb, var\(--c\) 30%, var\(--card\)\)[^}]*border-left: 4px solid var\(--c\)/.test(poste));
 console.log('\n' + pass + ' OK, ' + fail + ' ECHEC');
 process.exit(fail ? 1 : 0);
