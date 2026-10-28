@@ -188,4 +188,5 @@ node tests/caisse/151-planning-sans-bande-grise.js  # Planning : plus de bande g
 node tests/caisse/152-tiroir-rdv-identique-et-prix.js  # Tiroir RDV identique partout + detail du prix (tarif coiffeur, supplements)
 node tests/caisse/153-lien-activation-compte.js  # Lien d'activation : message clair, 2e clic, lien expire
 node tests/caisse/154-rdv-non-demarre-en-caisse.js  # RDV jamais demarre : en caisse a la fin du creneau, a verifier (Absent possible)
+node tests/caisse/155-poste-vue-jour.js  # Mon poste > Agenda > Jour : recherche client, coup d'oeil equipe, colonnes
 ```

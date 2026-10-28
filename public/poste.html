@@ -370,6 +370,129 @@
   .ad-badge.cancelled { background: rgba(196,0,27,.12); color: var(--red); }
   .ad-badge.done { background: rgba(30,126,52,.14); color: var(--green); }
   .ad-link-edit { display: flex; align-items: center; gap: 6px; background: none; border: none; color: var(--accent); font-family: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; padding: 0; margin: 0 0 14px; }
+
+  /* ---------- Vue « Jour » (proposition C) : recherche client, coup d'œil équipe, agenda en colonnes ---------- */
+  #cal-day-view button { font-family: inherit; }
+  .pd-search-wrap { position: relative; margin-bottom: 14px; z-index: 30; }
+  .pd-search { display: flex; align-items: center; gap: 10px; background: var(--fill); border-radius: 14px; padding: 0 14px; min-height: 48px; }
+  .pd-search:focus-within { box-shadow: inset 0 0 0 2px var(--blue); }
+  .pd-search svg { color: var(--grey); flex-shrink: 0; }
+  .pd-search input { flex: 1; min-width: 0; border: none; outline: none; background: transparent; color: var(--ink); font-family: inherit; font-size: 16px; padding: 12px 0; }
+  .pd-results { position: absolute; left: 0; right: 0; top: calc(100% + 6px); max-width: 640px; background: var(--card); border: 1px solid var(--sep); border-radius: 14px; padding: 6px; box-shadow: 0 16px 40px rgba(0,0,0,.35); max-height: 60vh; overflow-y: auto; }
+  .pd-res-group { font-size: 11px; font-weight: 700; color: var(--grey); letter-spacing: .06em; text-transform: uppercase; padding: 8px 10px 4px; }
+  .pd-res { width: 100%; display: flex; align-items: center; gap: 10px; border: none; background: transparent; color: var(--ink); border-radius: 10px; padding: 9px 10px; text-align: left; cursor: pointer; }
+  .pd-res:hover, .pd-res:focus-visible { background: var(--fill); outline: none; }
+  .pd-res-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .pd-res-main { display: flex; flex-direction: column; min-width: 0; }
+  .pd-res-name { font-size: 15px; font-weight: 700; }
+  .pd-res-meta { font-size: 12.5px; color: var(--grey); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pd-res-go { margin-left: auto; font-size: 12.5px; font-weight: 700; color: var(--blue); white-space: nowrap; }
+  .pd-res-foot { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; border-top: 1px solid var(--sep); margin-top: 6px; padding: 10px 10px 6px; font-size: 13px; color: var(--grey); }
+  .pd-res-foot button { border: none; background: none; color: var(--blue); font-weight: 700; font-size: 13px; cursor: pointer; padding: 0; }
+  .pd-res-empty { padding: 14px 10px; font-size: 14px; color: var(--grey); }
+
+  .pd-glance { background: var(--fill); border-radius: 16px; padding: 14px 16px 10px; margin-bottom: 14px; }
+  .pd-glance-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+  .pd-glance-head strong { font-size: 15px; }
+  .pd-legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--grey); }
+  .pd-legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .pd-legend i { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
+  .pd-g-row { display: grid; grid-template-columns: 130px minmax(0, 1fr) 130px; gap: 12px; align-items: center; width: 100%; border: none; background: transparent; color: var(--ink); padding: 3px 4px; border-radius: 9px; cursor: pointer; text-align: left; }
+  .pd-g-row:hover { background: var(--fill-2); }
+  .pd-g-row.me .pd-g-name { font-weight: 800; }
+  .pd-g-name { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; min-width: 0; }
+  .pd-g-name span:last-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pd-av { width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #fff; background-size: cover; background-position: center; }
+  .pd-g-bar { position: relative; height: 30px; background: var(--card); border-radius: 7px; overflow: hidden; }
+  .pd-g-seg { position: absolute; top: 4px; bottom: 4px; border-radius: 4px; box-sizing: border-box; }
+  .pd-g-seg.st-done, .pd-g-seg.st-past { opacity: .35; }
+  .pd-g-seg.st-absent { background: transparent !important; border: 1px dashed var(--grey); }
+  .pd-g-seg.is-next { box-shadow: 0 0 0 2px var(--ink); }
+  .pd-g-off { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--grey); }
+  .pd-g-now { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--red); }
+  .pd-g-sum { display: flex; flex-direction: column; min-width: 0; }
+  .pd-g-sum b { font-size: 13px; }
+  .pd-g-sum small { font-size: 11.5px; color: var(--grey); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pd-g-ticks { position: relative; height: 16px; margin: 4px 0 0; }
+  .pd-g-ticks span { position: absolute; transform: translateX(-50%); font-size: 10.5px; color: var(--grey); font-variant-numeric: tabular-nums; }
+
+  .pd-body { display: grid; grid-template-columns: 270px minmax(0, 1fr); gap: 16px; align-items: start; }
+  .pd-side { display: flex; flex-direction: column; gap: 12px; position: sticky; top: 12px; }
+  .pd-card { background: var(--fill); border-radius: 16px; padding: 14px 16px; }
+  .pd-card h4 { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--grey); }
+  .pd-next { box-shadow: inset 0 0 0 2px var(--blue); cursor: pointer; border: none; text-align: left; color: var(--ink); width: 100%; }
+  .pd-next .pd-next-when { font-size: 12.5px; font-weight: 700; color: var(--blue); }
+  .pd-next .pd-next-name { font-size: 20px; font-weight: 800; margin-top: 2px; }
+  .pd-next .pd-next-meta { font-size: 13px; color: var(--grey); margin-top: 2px; }
+  .pd-free-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 0; border-top: 1px solid var(--sep); }
+  .pd-free-row b { font-size: 14px; font-variant-numeric: tabular-nums; }
+  .pd-free-row small { display: block; font-size: 12px; color: var(--grey); }
+  .pd-free-row button { border: none; background: var(--blue-soft); color: var(--blue); font-size: 13px; font-weight: 700; padding: 8px 11px; border-radius: 9px; cursor: pointer; }
+  .pd-seg2 { display: flex; background: var(--fill-2); border-radius: 10px; padding: 3px; }
+  .pd-seg2 button { flex: 1; border: none; background: transparent; color: var(--grey); font-size: 13px; font-weight: 600; padding: 8px; border-radius: 8px; cursor: pointer; }
+  .pd-seg2 button.on { background: var(--card); color: var(--ink); }
+  .pd-add { width: 100%; }
+
+  .pd-cal { background: var(--fill); border-radius: 18px; padding: 10px 12px 12px; min-width: 0; }
+  .pd-cal-tools { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+  .pd-cal-tools .pd-zoom { display: flex; gap: 6px; }
+  .pd-cal-tools .pd-zoom button { width: 36px; height: 36px; border-radius: 50%; border: none; background: var(--card); color: var(--ink); font-size: 18px; cursor: pointer; }
+  .pd-cal-head { display: flex; gap: 8px; padding: 0 0 8px 52px; border-bottom: 1px solid var(--sep); }
+  .pd-col-head { display: flex; align-items: center; gap: 7px; min-width: 0; font-size: 13.5px; font-weight: 700; }
+  .pd-col-head span:last-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pd-cal-scroll { max-height: calc(100vh - 170px); overflow-y: auto; overflow-x: hidden; margin-top: 6px; }
+  .pd-grid { position: relative; }
+  .pd-line { position: absolute; left: 46px; right: 0; border-top: 1px solid var(--sep); }
+  .pd-line.half { border-top-style: dashed; opacity: .55; }
+  .pd-hour { position: absolute; left: 0; width: 40px; text-align: right; font-size: 11.5px; color: var(--grey); transform: translateY(-50%); font-variant-numeric: tabular-nums; }
+  .pd-cols { position: absolute; left: 52px; right: 0; top: 0; bottom: 0; display: flex; gap: 8px; }
+  .pd-col { position: relative; min-width: 0; cursor: pointer; border-radius: 8px; }
+  .pd-col.past, .pd-col.closed { cursor: default; }
+  .pd-col-off { position: absolute; left: 0; right: 0; top: 10px; text-align: center; font-size: 12px; color: var(--grey); padding: 0 6px; }
+  .pd-block { position: absolute; left: 0; right: 0; box-sizing: border-box; border: none; border-radius: 9px; padding: 0 10px; display: flex; align-items: center; gap: 7px; overflow: hidden; text-align: left; cursor: pointer; background: var(--c); color: var(--fg, #fff); transition: opacity .15s ease, box-shadow .15s ease; }
+  .pd-block .t { font-size: 11.5px; font-weight: 600; opacity: .88; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+  .pd-block .n { font-size: 13.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .pd-block .s { font-size: 12px; opacity: .82; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .pd-block .l { margin-left: auto; font-size: 10.5px; font-weight: 700; white-space: nowrap; flex-shrink: 0; }
+  .pd-block.st-done, .pd-block.st-past { background: var(--card); color: var(--grey); }
+  .pd-block.st-absent { background: transparent; color: var(--grey); border: 1px dashed var(--grey); }
+  .pd-block.st-absent .n { text-decoration: line-through; }
+  .pd-block.st-inprogress .l, .pd-block.is-next .l { background: #fff; color: #111; padding: 2px 7px; border-radius: 99px; }
+  .pd-block.is-next { box-shadow: 0 0 0 2px var(--fill), 0 0 0 4px var(--blue); z-index: 2; }
+  .pd-block.pd-hit { box-shadow: 0 0 0 2px var(--fill), 0 0 0 4px #ffd60a; z-index: 3; }
+  .pd-block.pd-dim { opacity: .4; }
+  .pd-col:not(.me) .pd-block { padding: 0 7px; gap: 5px; }
+  .pd-col:not(.me) .pd-block .n { font-size: 12px; }
+  .pd-free { position: absolute; left: 0; right: 0; box-sizing: border-box; border: 1px dashed var(--sep); background: transparent; color: var(--grey); border-radius: 9px; padding: 0 10px; display: flex; align-items: center; gap: 8px; font-size: 12px; cursor: pointer; overflow: hidden; }
+  .pd-free b { margin-left: auto; color: var(--blue); font-size: 12px; }
+  .pd-free:hover { border-color: var(--blue); }
+  .pd-break { position: absolute; left: 0; right: 0; box-sizing: border-box; border-radius: 8px; background: repeating-linear-gradient(135deg, transparent 0 6px, rgba(127,127,127,.16) 6px 12px); color: var(--grey); font-size: 11.5px; display: flex; align-items: center; padding: 0 10px; pointer-events: none; }
+  .pd-now { position: absolute; left: 0; right: 0; border-top: 2px solid var(--red); z-index: 4; pointer-events: none; }
+  .pd-now span { position: absolute; left: 0; top: -10px; background: var(--red); color: #fff; font-size: 10.5px; font-weight: 700; padding: 2px 6px; border-radius: 5px; }
+  .pd-empty-day { padding: 28px 10px; text-align: center; color: var(--grey); font-size: 14px; }
+
+  /* Tablette (portrait) et petits ordinateurs : pas de colonne de cote, le prochain client passe au-dessus */
+  @media (max-width: 999px) {
+    .pd-body { grid-template-columns: minmax(0, 1fr); }
+    .pd-side { position: static; flex-direction: row; flex-wrap: wrap; align-items: stretch; }
+    .pd-side > .pd-next { flex: 1 1 260px; }
+    .pd-side > .pd-free-card { display: none; }
+    .pd-side > .pd-view-card { flex: 1 1 200px; }
+    .pd-side > .pd-add { flex: 1 1 200px; width: auto; }
+  }
+  /* Telephone : frise compacte, une seule colonne (la sienne, ou celle du coiffeur touche dans la frise) */
+  @media (max-width: 699px) {
+    .pd-g-row { grid-template-columns: 64px minmax(0, 1fr); gap: 8px; }
+    .pd-g-sum { display: none; }
+    .pd-g-name .pd-av { width: 20px; height: 20px; font-size: 10px; }
+    .pd-g-name { font-size: 12px; gap: 5px; }
+    .pd-g-bar { height: 24px; }
+    .pd-g-row.focus { background: var(--fill-2); }
+    .pd-g-ticks span.minor, .pd-legend { display: none; }
+    .pd-side > .pd-view-card { display: none; }
+    .pd-cal { padding: 8px; }
+    .pd-cal-scroll { max-height: calc(100vh - 140px); }
+  }
 </style>
 </head>
 <body>
@@ -1267,8 +1390,403 @@ function renderCalWeek() {
 function renderCalDay() {
   document.getElementById('cal-month-label').textContent =
     calAnchor.toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
-  document.getElementById('cal-day-view').innerHTML = posteAddBtnHtml(ymd(calAnchor)) + renderAgendaTimeline(ymd(calAnchor));
+  // Vue « Jour » (proposition C) : recherche client + coup d'œil de l'équipe + agenda en colonnes.
+  // Les vues Mois et Semaine (et leur planning du jour choisi) gardent renderAgendaTimeline.
+  var dateStr = ymd(calAnchor);
+  var view = document.getElementById('cal-day-view');
+  var hadFocus = document.activeElement && document.activeElement.id === 'pd-search';
+  var prevScroll = view.querySelector('.pd-cal-scroll');
+  var keepTop = prevScroll && pdScrolledFor === dateStr ? prevScroll.scrollTop : null;
+  view.innerHTML = posteDayHtml(dateStr);
+  var sc = view.querySelector('.pd-cal-scroll');
+  if (sc) {
+    if (keepTop !== null) sc.scrollTop = keepTop;
+    else {
+      // 1re ouverture de ce jour : aujourd'hui -> une heure avant maintenant ; autre jour -> le 1er RDV.
+      var g = sc.querySelector('.pd-grid');
+      var target = Number(g && g.getAttribute('data-focus-top')) || 0;
+      sc.scrollTop = Math.max(0, target - 60 * pdPx);
+      pdScrolledFor = dateStr;
+    }
+  }
+  if (hadFocus) { var inp = document.getElementById('pd-search'); if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); } }
+  if (pdQuery) pdRunSearch(true);
 }
+
+/* ---------- Vue « Jour » : recherche client, coup d'œil de l'équipe, agenda en colonnes ---------- */
+var pdOnlyMe = false, pdFocusId = null, pdPx = 1.3, pdQuery = '', pdScrolledFor = null, pdSearchTimer = null, pdExtraLoaded = false;
+try {
+  pdOnlyMe = localStorage.getItem('poste_day_only_me') === '1';
+  var _pdz = Number(localStorage.getItem('poste_day_px'));
+  if (_pdz >= 0.8 && _pdz <= 2.6) pdPx = _pdz;
+} catch (e) { /* stockage indisponible : valeurs par defaut */ }
+
+function pdIsPhone() { return !!(window.matchMedia && window.matchMedia('(max-width: 699px)').matches); }
+function pdHM(m) { return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); }
+function pdDur(m) { return m >= 60 ? Math.floor(m / 60) + ' h ' + String(m % 60).padStart(2, '0') : m + ' min'; }
+function pdMin(t) { return Number(String(t).slice(0, 2)) * 60 + Number(String(t).slice(3, 5)); }
+/** Texte lisible sur la couleur d'un coiffeur (couleur claire = texte foncé). */
+function pdFg(color) {
+  var m = /^#([0-9a-f]{6})$/i.exec(String(color || ''));
+  if (!m) return '#ffffff';
+  var n = parseInt(m[1], 16), r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.62 ? '#1a1a1a' : '#ffffff';
+}
+function pdAvatarHtml(b) {
+  var photo = rdvBarberPhotos[b.id];
+  var style = photo ? 'background-image:url(&quot;' + esc(photo) + '&quot;)' : 'background:' + barberColor(b.id) + ';color:' + pdFg(barberColor(b.id));
+  return '<span class="pd-av" style="' + style + '" aria-hidden="true">' + (photo ? '' : esc(String(b.name || '?').charAt(0).toUpperCase())) + '</span>';
+}
+/** RDV d'un jour, TOUS les coiffeurs (le filtre par bulle ne s'applique qu'aux colonnes). */
+function pdApptsOfDay(dateStr) {
+  var seen = {}, out = [];
+  Object.keys(calMonthCache).forEach(function (k) {
+    (calMonthCache[k] || []).forEach(function (a) {
+      if (seen[a.id] || a.status === 'cancelled' || String(a.scheduled_at).slice(0, 10) !== dateStr) return;
+      seen[a.id] = true; out.push(a);
+    });
+  });
+  return out.sort(function (x, y) { return x.scheduled_at < y.scheduled_at ? -1 : 1; });
+}
+/** État affiché d'un RDV : absent, terminé, en cours, passé (jamais marqué), à venir. */
+function pdState(a, endMin, isToday, isPast, nowMin) {
+  if (a.display_status === 'no_show') return 'absent';
+  if (a.display_status === 'completed') return 'done';
+  if (a.queue_status === 'in_progress') return 'inprogress';
+  if (isPast || (isToday && endMin <= nowMin)) return 'past';
+  return 'todo';
+}
+/** Horaires et pauses d'un coiffeur ce jour-là (null si horaires non renseignés). */
+function pdBarberDay(b, dateStr) {
+  if (!b || !b.schedules || !b.schedules.length) return null;
+  var wd = new Date(dateStr + 'T12:00:00').getDay();
+  var s = b.schedules.filter(function (x) { return x.active && Number(x.weekday) === wd; })[0];
+  if (!s) return null;
+  return {
+    start: pdMin(s.start_time), end: pdMin(s.end_time),
+    breaks: (b.breaks || []).filter(function (x) { return x.active !== 0 && Number(x.weekday) === wd; })
+      .map(function (x) { return [pdMin(x.start_time), pdMin(x.end_time)]; })
+  };
+}
+/** Clic sur le vide d'une colonne : même règle que la ligne du planning (absent, sans RDV, pas de RDV en ligne...). */
+function pdColClickAttr(b, dateStr) {
+  if (rdvIsSalonClosed(dateStr) || isPastDay(dateStr)) return '';
+  var rowB = (barbers || []).find(function (x) { return x.id === b.id; });
+  var walkDay = isWalkinOn(rowB, dateStr);
+  var offWhy = rowB && !walkDay ? barberOffReason(rowB, dateStr) : '';
+  var nm = esc(String(b.name).replace(/'/g, ''));
+  if (offWhy) return ' onclick="toast(\'' + nm + ' ' + esc(offWhy).replace(/'/g, '') + ' : pas de rendez-vous possible.\', true)"';
+  if (walkDay) return ' onclick="toast(\'' + nm + ' est en « sans RDV » ce jour-là : pas de rendez-vous\', true)"';
+  if (b.accepts_appointments || (me && b.id === me.id)) return ' onclick="openPosteAddAppointment(\'' + dateStr + '\',\'' + b.id + '\')" title="Ajouter un RDV pour ' + esc(b.name) + '"';
+  return ' onclick="toast(\'' + nm + ' ne prend pas de RDV en ligne\', true)"';
+}
+
+function posteDayHtml(dateStr) {
+  var closed = rdvIsSalonClosed(dateStr), past = isPastDay(dateStr);
+  var nowStr = nowSalonDatetimeString(), isToday = nowStr.slice(0, 10) === dateStr;
+  var nowMin = Number(nowStr.slice(11, 13)) * 60 + Number(nowStr.slice(14, 16));
+  var appts = pdApptsOfDay(dateStr);
+  appts.forEach(function (a) { calApptById[a.id] = a; });
+  var team = posteTimelineBarbers(appts);
+  var items = appts.map(function (a) {
+    var s = pdMin(a.scheduled_at.slice(11, 16)), d = Math.max(a.duration_min || 30, 10);
+    return { a: a, id: a.id, barberId: a.barber_id, start: s, dur: d, end: s + d, st: pdState(a, s + d, isToday, past, nowMin) };
+  });
+  var myId = me && me.id;
+  // Mon prochain client : en cours, sinon le premier à venir.
+  var mine = items.filter(function (it) { return it.barberId === myId; });
+  var nextIt = mine.filter(function (it) { return it.st === 'inprogress'; })[0] || mine.filter(function (it) { return it.st === 'todo'; })[0] || null;
+
+  // Plage horaire : heures du salon ce jour-là, élargie si un RDV ou des horaires en dépassent.
+  var salonDay = salonScheduleByWeekday && salonScheduleByWeekday[new Date(dateStr + 'T00:00:00').getDay()];
+  var meDay = pdBarberDay((barbers || []).find(function (x) { return x.id === myId; }), dateStr);
+  var lo = [salonDay ? salonDay.startMin : 9 * 60], hi = [salonDay ? salonDay.endMin : 19 * 60];
+  if (meDay) { lo.push(meDay.start); hi.push(meDay.end); }
+  items.forEach(function (it) { lo.push(it.start); hi.push(it.end); });
+  var R0 = Math.floor(Math.min.apply(null, lo) / 60) * 60, R1 = Math.ceil(Math.max.apply(null, hi) / 60) * 60;
+  if (R1 - R0 < 4 * 60) R1 = R0 + 4 * 60;
+  var SPAN = R1 - R0, PX = pdPx;
+  var pct = function (m) { return ((m - R0) / SPAN * 100).toFixed(3); };
+
+  // Mes créneaux libres : entre mes RDV, dans mes horaires (sinon ceux du salon), sans les pauses, à partir de maintenant.
+  var free = [];
+  if (myId && !closed && !past) {
+    var dayStart = meDay ? meDay.start : (salonDay ? salonDay.startMin : R0), dayEnd = meDay ? meDay.end : (salonDay ? salonDay.endMin : R1);
+    var busy = mine.filter(function (it) { return it.st !== 'absent'; }).map(function (it) { return [it.start, it.end]; })
+      .concat(meDay ? meDay.breaks : []).sort(function (x, y) { return x[0] - y[0]; });
+    var cur = Math.max(dayStart, isToday ? nowMin : dayStart);
+    busy.forEach(function (bz) { if (bz[0] - cur >= 15 && bz[0] <= dayEnd) free.push([cur, Math.min(bz[0], dayEnd)]); cur = Math.max(cur, bz[1]); });
+    if (dayEnd - cur >= 15) free.push([cur, dayEnd]);
+    var myRow = (barbers || []).find(function (x) { return x.id === myId; });
+    if (myRow && (barberOffReason(myRow, dateStr) || isWalkinOn(myRow, dateStr))) free = [];
+  }
+
+  // 1) Recherche client
+  var html = '<div class="pd-search-wrap">' +
+    '<label class="pd-search"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>' +
+    '<span class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Rechercher un client</span>' +
+    '<input id="pd-search" type="search" autocomplete="off" placeholder="' + (pdIsPhone() ? 'Rechercher un client…' : 'Rechercher un client (nom, téléphone, email)…') + '" value="' + esc(pdQuery) + '" oninput="pdSearchInput(this.value)" onkeydown="if(event.key===\'Escape\'){this.value=\'\';pdSearchInput(\'\');}" onfocus="if(this.value)pdRunSearch()"></label>' +
+    '<div id="pd-results" class="pd-results" style="display:none"></div></div>';
+
+  if (closed) html += '<div class="salon-closure-banner" style="text-align:center;margin-bottom:12px">Salon fermé — aucun rendez-vous ne peut être ajouté ce jour.</div>';
+
+  // 2) La journée en un coup d'œil : une barre par coiffeur
+  var rows = team.map(function (b) {
+    var color = barberColor(b.id), isMe = b.id === myId;
+    var its = items.filter(function (it) { return it.barberId === b.id; });
+    var rowB = (barbers || []).find(function (x) { return x.id === b.id; });
+    var walkDay = isWalkinOn(rowB, dateStr), offWhy = rowB && !walkDay ? barberOffReason(rowB, dateStr) : '';
+    var segs = its.map(function (it) {
+      return '<span class="pd-g-seg st-' + it.st + (nextIt && it.id === nextIt.id ? ' is-next' : '') + '" title="' + esc(pdHM(it.start) + ' ' + it.a.client_name) + '" style="left:' + pct(it.start) + '%;width:calc(' + (it.dur / SPAN * 100).toFixed(3) + '% - 2px);background:' + color + '"></span>';
+    }).join('');
+    var left = its.filter(function (it) { return it.st === 'todo' || it.st === 'inprogress'; });
+    var sum1 = offWhy ? 'Absent' : walkDay ? 'Sans RDV' : its.length ? (left.length + ' à venir') : 'Aucun RDV';
+    var sum2 = '';
+    if (!offWhy && !walkDay && isToday && its.length) {
+      if (its.some(function (it) { return it.st === 'inprogress' || (it.start <= nowMin && it.end > nowMin && it.st === 'todo'); })) sum2 = 'Occupé';
+      else { var nx = its.filter(function (it) { return it.start >= nowMin && it.st === 'todo'; })[0]; sum2 = nx ? 'Libre jusqu’à ' + pdHM(nx.start) : 'Journée finie'; }
+    } else if (!offWhy && !walkDay && its.length) sum2 = 'de ' + pdHM(its[0].start) + ' à ' + pdHM(Math.max.apply(null, its.map(function (it) { return it.end; })));
+    var offTxt = offWhy ? esc(b.name) + ' ' + esc(offWhy) : (walkDay ? 'En « sans RDV » ce jour-là' : (!its.length ? 'Aucun RDV' : ''));
+    var focus = pdFocusId ? pdFocusId === b.id : isMe;
+    return '<button type="button" class="pd-g-row' + (isMe ? ' me' : '') + (focus ? ' focus' : '') + '" onclick="pdFocus(\'' + b.id + '\')" aria-label="Voir la journée de ' + esc(b.name) + '">' +
+      '<span class="pd-g-name">' + pdAvatarHtml(b) + '<span>' + (isMe ? 'Moi' : esc(b.name)) + '</span></span>' +
+      '<span class="pd-g-bar">' + segs + (offTxt ? '<span class="pd-g-off">' + offTxt + '</span>' : '') +
+        (isToday && nowMin >= R0 && nowMin <= R1 ? '<span class="pd-g-now" style="left:' + pct(nowMin) + '%"></span>' : '') + '</span>' +
+      '<span class="pd-g-sum"><b>' + esc(sum1) + '</b><small>' + esc(sum2) + '</small></span></button>';
+  }).join('');
+  var ticks = '';
+  // Telephone : une heure sur trois seulement (classe minor masquee), sinon les heures se chevauchent.
+  for (var t = R0; t <= R1; t += 60) ticks += '<span' + ((t - R0) % 180 ? ' class="minor"' : '') + ' style="left:' + pct(t) + '%">' + pdHM(t) + '</span>';
+  html += '<section class="pd-glance" aria-label="La journée en un coup d’œil">' +
+    '<div class="pd-glance-head"><strong>La journée en un coup d’œil</strong>' +
+    '<span class="pd-legend"><span><i style="background:var(--ink);opacity:.75"></i>À venir</span><span><i style="background:var(--ink);opacity:.25"></i>Terminé</span>' +
+    '<span><i style="border:1px dashed var(--grey)"></i>Absent</span>' + (isToday ? '<span><i style="width:2px;background:var(--red)"></i>Maintenant</span>' : '') + '</span></div>' +
+    rows +
+    '<div class="pd-g-row" style="cursor:default;padding-top:0;padding-bottom:0" aria-hidden="true"><span></span><span class="pd-g-ticks">' + ticks + '</span><span class="pd-g-sum"></span></div>' +
+    '</section>';
+
+  // 3) Colonne de côté : prochain client, mes créneaux libres, affichage, ajouter
+  var side = '';
+  if (nextIt) {
+    var inProg = nextIt.st === 'inprogress';
+    var when = inProg ? 'En cours' : (isToday ? (nextIt.start - nowMin > 0 ? 'Dans ' + pdDur(nextIt.start - nowMin) : 'Maintenant') : 'Premier RDV du jour');
+    side += '<button type="button" class="pd-card pd-next" onclick="pdGoTo(\'' + nextIt.id + '\')">' +
+      '<div class="pd-next-when">Mon prochain client · ' + esc(when) + '</div>' +
+      '<div class="pd-next-name">' + esc(nextIt.a.client_name) + '</div>' +
+      '<div class="pd-next-meta">' + pdHM(nextIt.start) + ' – ' + pdHM(nextIt.end) + ' · ' + esc(nextIt.a.service_name || '') + '</div></button>';
+  }
+  if (free.length) {
+    side += '<div class="pd-card pd-free-card"><h4>Mes créneaux libres · ' + pdDur(free.reduce(function (s, f) { return s + f[1] - f[0]; }, 0)) + '</h4>' +
+      free.map(function (f) {
+        return '<div class="pd-free-row"><span><b>' + pdHM(f[0]) + ' – ' + pdHM(f[1]) + '</b><small>' + pdDur(f[1] - f[0]) + '</small></span>' +
+          '<button type="button" onclick="openPosteAddAppointment(\'' + dateStr + '\',\'' + myId + '\')" aria-label="Ajouter un RDV sur ce créneau">+ RDV</button></div>';
+      }).join('') + '</div>';
+  }
+  if (!pdIsPhone()) {
+    side += '<div class="pd-card pd-view-card"><h4>Colonnes de l’agenda</h4><div class="pd-seg2">' +
+      '<button type="button" class="' + (pdOnlyMe ? 'on' : '') + '" onclick="pdSetOnlyMe(true)">Moi seulement</button>' +
+      '<button type="button" class="' + (pdOnlyMe ? '' : 'on') + '" onclick="pdSetOnlyMe(false)">Équipe</button></div></div>';
+  }
+  if (!closed && !past) side += '<button type="button" class="btn btn-primary pd-add" onclick="openPosteAddAppointment(\'' + dateStr + '\')">+ Ajouter un RDV</button>';
+
+  // 4) Agenda en colonnes (heures de haut en bas)
+  var cols;
+  if (pdIsPhone()) {
+    var fid = pdFocusId && team.some(function (b) { return b.id === pdFocusId; }) ? pdFocusId : myId;
+    cols = team.filter(function (b) { return b.id === fid; });
+    if (!cols.length) cols = team.slice(0, 1);
+  } else if (calBarberFilter) cols = team.filter(function (b) { return b.id === calBarberFilter; });
+  else if (pdOnlyMe) cols = team.filter(function (b) { return b.id === myId; });
+  else cols = team;
+  if (!cols.length) cols = team;
+  var single = cols.length === 1;
+
+  var lines = '';
+  for (var m = R0; m <= R1; m += 30) {
+    var y = Math.round((m - R0) * PX);
+    lines += '<div class="pd-line' + (m % 60 ? ' half' : '') + '" style="top:' + y + 'px"></div>' +
+      (m % 60 ? '' : '<div class="pd-hour" style="top:' + y + 'px">' + pdHM(m) + '</div>');
+  }
+  var colsHtml = cols.map(function (b) {
+    var isMe = b.id === myId, color = barberColor(b.id), fg = pdFg(color);
+    var rowB = (barbers || []).find(function (x) { return x.id === b.id; });
+    var walkDay = isWalkinOn(rowB, dateStr), offWhy = rowB && !walkDay ? barberOffReason(rowB, dateStr) : '';
+    var bd = pdBarberDay(rowB, dateStr);
+    var inner = '';
+    if (bd && !offWhy) bd.breaks.forEach(function (bk) {
+      inner += '<div class="pd-break" style="top:' + Math.round((bk[0] - R0) * PX) + 'px;height:' + Math.max(14, Math.round((bk[1] - bk[0]) * PX) - 3) + 'px">Pause</div>';
+    });
+    if (isMe) free.forEach(function (f) {
+      var h = Math.round((f[1] - f[0]) * PX) - 3;
+      inner += '<button type="button" class="pd-free" style="top:' + Math.round((f[0] - R0) * PX) + 'px;height:' + h + 'px" onclick="event.stopPropagation();openPosteAddAppointment(\'' + dateStr + '\',\'' + myId + '\')">Libre · ' + pdDur(f[1] - f[0]) + (h >= 18 ? '<b>+ Ajouter</b>' : '') + '</button>';
+    });
+    items.filter(function (it) { return it.barberId === b.id; }).forEach(function (it) {
+      var h = Math.max(16, Math.round(it.dur * PX) - 3), a = it.a;
+      var isNext = nextIt && it.id === nextIt.id;
+      var label = it.st === 'absent' ? 'Absent' : it.st === 'done' ? 'Terminé' : it.st === 'inprogress' ? 'En cours' : isNext ? 'Prochain' : '';
+      var showSvc = (isMe || single) && a.service_name;
+      inner += '<button type="button" class="pd-block st-' + it.st + (isNext ? ' is-next' : '') + '" data-id="' + esc(a.id) + '" ' +
+        'data-q="' + esc(normText([a.client_name, a.email, a.phone].join(' ')) + ' ' + String(a.phone || '').replace(/\D/g, '')) + '" ' +
+        'style="top:' + Math.round((it.start - R0) * PX) + 'px;height:' + h + 'px;--c:' + color + ';--fg:' + fg + '" ' +
+        'title="' + esc(pdHM(it.start) + ' — ' + a.client_name + ' — ' + (a.service_name || '') + ' — ' + b.name) + '" ' +
+        'onclick="event.stopPropagation();openPosteClientDrawer(\'' + a.id + '\')">' +
+        '<span class="t">' + pdHM(it.start) + '</span><span class="n">' + esc(a.client_name) + '</span>' +
+        (showSvc ? '<span class="s">' + esc(a.service_name) + ' · ' + it.dur + ' min</span>' : '') +
+        (label && (isMe || single) ? '<span class="l">' + label + '</span>' : '') + '</button>';
+    });
+    if (offWhy || walkDay) inner += '<div class="pd-col-off">' + (offWhy ? esc(offWhy.charAt(0).toUpperCase() + offWhy.slice(1)) : 'En « sans RDV » ce jour-là') + '</div>';
+    else if (!items.some(function (it) { return it.barberId === b.id; }) && !isMe) inner += '<div class="pd-col-off">Aucun RDV</div>';
+    return '<div class="pd-col' + (isMe ? ' me' : '') + (past ? ' past' : '') + (closed ? ' closed' : '') + '" data-barber="' + esc(b.id) + '" style="flex:' + (isMe && !single ? 2.2 : 1) + '"' + pdColClickAttr(b, dateStr) + '>' + inner + '</div>';
+  }).join('');
+  var heads = cols.map(function (b) {
+    return '<div class="pd-col-head" style="flex:' + (b.id === myId && !single ? 2.2 : 1) + '">' + pdAvatarHtml(b) + '<span>' + (b.id === myId ? esc(b.name) + ' · moi' : esc(b.name)) + '</span></div>';
+  }).join('');
+  var nowHtml = isToday && nowMin >= R0 && nowMin <= R1
+    ? '<div class="pd-now" style="top:' + Math.round((nowMin - R0) * PX) + 'px"><span>' + nowStr.slice(11, 16) + '</span></div>' : '';
+  var firstMine = mine[0] || items[0];
+  var focusTop = isToday ? Math.round((nowMin - R0) * PX) : (firstMine ? Math.round((firstMine.start - R0) * PX) : 0);
+  var cal = '<div class="pd-cal">' +
+    '<div class="pd-cal-tools"><span style="font-size:13px;color:var(--grey)">' + (items.length ? items.length + ' RDV ce jour' : 'Aucun RDV ce jour') + '</span>' +
+    '<span class="pd-zoom"><button type="button" onclick="pdZoom(-1)" aria-label="Réduire l’agenda">−</button><button type="button" onclick="pdZoom(1)" aria-label="Agrandir l’agenda">+</button></span></div>' +
+    '<div class="pd-cal-head">' + heads + '</div>' +
+    '<div class="pd-cal-scroll"><div class="pd-grid" data-date="' + dateStr + '" data-r0="' + R0 + '" data-r1="' + R1 + '" data-px="' + PX + '" data-focus-top="' + focusTop + '" style="height:' + Math.round(SPAN * PX + 12) + 'px">' +
+    lines + '<div class="pd-cols">' + colsHtml + '</div>' + nowHtml + '</div></div></div>';
+
+  return html + '<div class="pd-body"><aside class="pd-side">' + side + '</aside>' + cal + '</div>';
+}
+
+function pdSetOnlyMe(v) {
+  pdOnlyMe = !!v;
+  try { localStorage.setItem('poste_day_only_me', pdOnlyMe ? '1' : '0'); } catch (e) {}
+  renderCalDay();
+}
+function pdZoom(delta) {
+  pdPx = Math.max(0.8, Math.min(2.6, +(pdPx + delta * 0.3).toFixed(2)));
+  try { localStorage.setItem('poste_day_px', String(pdPx)); } catch (e) {}
+  pdScrolledFor = null;
+  renderCalDay();
+}
+/** Clic sur un coiffeur dans le coup d'œil : sur téléphone, sa colonne s'affiche ; sinon sa colonne est montrée. */
+function pdFocus(id) {
+  pdFocusId = id;
+  if (pdOnlyMe && me && id !== me.id) { pdOnlyMe = false; try { localStorage.setItem('poste_day_only_me', '0'); } catch (e) {} }
+  renderCalDay();
+  var col = document.querySelector('#cal-day-view .pd-col[data-barber="' + id + '"]');
+  if (col && col.scrollIntoView) col.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+/** Ouvre un RDV trouvé (recherche, prochain client) : bon jour, défile jusqu'à lui, ouvre sa fiche. */
+function pdGoTo(id) {
+  var a = calApptById[id];
+  if (!a) {
+    Object.keys(calMonthCache).some(function (k) { a = (calMonthCache[k] || []).filter(function (x) { return x.id === id; })[0]; return !!a; });
+  }
+  if (!a) return;
+  calApptById[id] = a;
+  var d = String(a.scheduled_at).slice(0, 10);
+  var box = document.getElementById('pd-results'); if (box) box.style.display = 'none';
+  if (d !== ymd(calAnchor)) { calAnchor = new Date(d + 'T00:00:00'); pdScrolledFor = null; renderCalDay(); }
+  var el = document.querySelector('#cal-day-view .pd-block[data-id="' + id + '"]');
+  if (el && el.scrollIntoView) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  openPosteClientDrawer(id);
+}
+
+function pdSearchInput(v) {
+  pdQuery = String(v || '');
+  clearTimeout(pdSearchTimer);
+  pdSearchTimer = setTimeout(function () { pdRunSearch(); }, 120);
+}
+/** Recherche dans les RDV chargés (mois affiché + les 2 suivants) : nom, email ou téléphone. */
+function pdRunSearch(keepClosed) {
+  var q = normText(pdQuery.trim()), qDigits = pdQuery.replace(/\D/g, '');
+  var dateStr = ymd(calAnchor);
+  document.querySelectorAll('#cal-day-view .pd-block').forEach(function (el) {
+    var hit = q && ((el.getAttribute('data-q') || '').indexOf(q) > -1 || (qDigits.length >= 3 && (el.getAttribute('data-q') || '').indexOf(qDigits) > -1));
+    el.classList.toggle('pd-hit', !!hit);
+    el.classList.toggle('pd-dim', !!q && !hit);
+  });
+  var box = document.getElementById('pd-results');
+  if (!box) return;
+  if (!q) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  if (!pdExtraLoaded) {
+    pdExtraLoaded = true;
+    var base = new Date(calAnchor.getFullYear(), calAnchor.getMonth(), 1);
+    var keys = [1, 2].map(function (n) { return monthKey(new Date(base.getFullYear(), base.getMonth() + n, 1)); }).filter(function (k) { return !calMonthCache[k]; });
+    Promise.all(keys.map(function (k) {
+      return barberApi('/api/appointments?month=' + k + '&all=1&caisse_view=1').then(function (r) { calMonthCache[k] = r.items; }).catch(function () {});
+    })).then(function () { if (pdQuery.trim()) pdRunSearch(true); });
+  }
+  if (keepClosed && box.style.display === 'none' && document.activeElement && document.activeElement.id !== 'pd-search') return;
+  var seen = {}, found = [];
+  Object.keys(calMonthCache).forEach(function (k) {
+    (calMonthCache[k] || []).forEach(function (a) {
+      if (seen[a.id] || a.status === 'cancelled') return;
+      var hay = normText([a.client_name, a.email].join(' '));
+      var ok = hay.indexOf(q) > -1 || (qDigits.length >= 3 && String(a.phone || '').replace(/\D/g, '').indexOf(qDigits) > -1);
+      if (ok) { seen[a.id] = true; found.push(a); }
+    });
+  });
+  var today = salonToday();
+  var sameDay = found.filter(function (a) { return a.scheduled_at.slice(0, 10) === dateStr; }).sort(function (x, y) { return x.scheduled_at < y.scheduled_at ? -1 : 1; });
+  var others = found.filter(function (a) { return a.scheduled_at.slice(0, 10) !== dateStr; });
+  var upcoming = others.filter(function (a) { return a.scheduled_at.slice(0, 10) >= today; }).sort(function (x, y) { return x.scheduled_at < y.scheduled_at ? -1 : 1; });
+  var older = others.filter(function (a) { return a.scheduled_at.slice(0, 10) < today; }).sort(function (x, y) { return x.scheduled_at > y.scheduled_at ? -1 : 1; });
+  var row = function (a, goLabel) {
+    var d = a.scheduled_at.slice(0, 10);
+    var dayTxt = d === dateStr ? '' : new Date(d + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'long' }) + ' · ';
+    return '<button type="button" class="pd-res" onclick="pdGoTo(\'' + a.id + '\')">' +
+      '<span class="pd-res-dot" style="background:' + (a.barber_id ? barberColor(a.barber_id) : 'var(--grey)') + '"></span>' +
+      '<span class="pd-res-main"><span class="pd-res-name">' + esc(a.client_name) + '</span>' +
+      '<span class="pd-res-meta">' + esc(dayTxt + a.scheduled_at.slice(11, 16) + ' · ' + (a.service_name || '') + ' · ' + (a.barber_name || 'Non assigné') + (a.display_status === 'no_show' ? ' · Absent' : '')) + '</span></span>' +
+      '<span class="pd-res-go">' + goLabel + '</span></button>';
+  };
+  var html = '';
+  if (sameDay.length) html += '<div class="pd-res-group">Ce jour</div>' + sameDay.slice(0, 8).map(function (a) { return row(a, 'Aller au RDV'); }).join('');
+  var rest = upcoming.concat(older).slice(0, 8);
+  if (rest.length) html += '<div class="pd-res-group">Autres jours</div>' + rest.map(function (a) { return row(a, 'Ouvrir ce jour'); }).join('');
+  if (!html) html = '<div class="pd-res-empty">Aucun RDV trouvé pour « ' + esc(pdQuery.trim()) + ' » (mois affiché et les 2 suivants).</div>';
+  var canAdd = !isPastDay(dateStr) && !rdvIsSalonClosed(dateStr);
+  html += '<div class="pd-res-foot"><span>' + (found.length ? 'Les RDV trouvés s’allument dans l’agenda' : '') + '</span>' +
+    (canAdd ? '<button type="button" onclick="pdNewForQuery()">+ Nouveau RDV pour « ' + esc(pdQuery.trim()) + ' »</button>' : '') + '</div>';
+  box.innerHTML = html;
+  box.style.display = 'block';
+}
+/** « + Nouveau RDV pour … » : ouvre l'ajout de RDV avec le nom déjà rempli (si ce n'est pas un numéro). */
+function pdNewForQuery() {
+  var q = pdQuery.trim();
+  var box = document.getElementById('pd-results'); if (box) box.style.display = 'none';
+  openPosteAddAppointment(ymd(calAnchor));
+  var nameEl = document.getElementById('pa-name'), phoneEl = document.getElementById('pa-phone'), emailEl = document.getElementById('pa-email');
+  if (/@/.test(q)) { if (emailEl) emailEl.value = q; }
+  else if (q.replace(/\D/g, '').length >= 6 && !/[a-z]/i.test(q)) { if (phoneEl) phoneEl.value = q; }
+  else if (nameEl) nameEl.value = q;
+}
+(function () {
+  // Vue Jour : passage telephone <-> tablette/ordinateur (une seule colonne ou toutes) -> on redessine.
+  var was = null, t = null;
+  window.addEventListener('resize', function () {
+    clearTimeout(t); t = setTimeout(function () {
+      var now = pdIsPhone() + '|' + posteSplit(); if (now === was) return; was = now;
+      if (typeof calViewMode !== 'undefined' && calViewMode === 'day' && document.querySelector('#cal-day-view .pd-grid')) renderCalDay();
+    }, 150);
+  });
+})();
+document.addEventListener('click', function (e) {
+  var box = document.getElementById('pd-results');
+  if (box && box.style.display !== 'none' && !(e.target.closest && e.target.closest('.pd-search-wrap'))) box.style.display = 'none';
+});
+/** Trait « maintenant » de la vue Jour : déplacé toutes les 30 s sans tout redessiner. */
+setInterval(function () {
+  var g = document.querySelector('#cal-day-view .pd-grid');
+  if (!g || document.getElementById('cal-day-view').style.display === 'none') return;
+  var nowStr = nowSalonDatetimeString();
+  if (g.getAttribute('data-date') !== nowStr.slice(0, 10)) return;
+  var r0 = Number(g.getAttribute('data-r0')), r1 = Number(g.getAttribute('data-r1')), px = Number(g.getAttribute('data-px'));
+  var nowMin = Number(nowStr.slice(11, 13)) * 60 + Number(nowStr.slice(14, 16));
+  var line = g.querySelector('.pd-now');
+  if (line && nowMin >= r0 && nowMin <= r1) { line.style.top = Math.round((nowMin - r0) * px) + 'px'; line.querySelector('span').textContent = nowStr.slice(11, 16); }
+  document.querySelectorAll('#cal-day-view .pd-g-now').forEach(function (n) { n.style.left = ((nowMin - r0) / (r1 - r0) * 100).toFixed(3) + '%'; });
+}, 30000);
 
 function selectCalDay(dateStr) {
   calSelectedDate = (!dateStr || dateStr === calSelectedDate) ? null : dateStr;
