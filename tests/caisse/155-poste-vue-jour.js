@@ -32,8 +32,8 @@ check('RDV trouves allumes dans l\'agenda, les autres pâlis', /classList\.toggl
 check('« + Nouveau RDV pour … » pre-remplit le nom (ou tel / email)', /function pdNewForQuery/.test(poste) && /nameEl\.value = q/.test(poste));
 check('coup d\'œil : une barre par coiffeur, trait « maintenant », resume', /La journée en un coup d’œil/.test(poste) && /pd-g-seg st-/.test(poste) && /Libre jusqu’à /.test(poste));
 check('agenda en colonnes : clic RDV = fiche (tiroir), clic vide = meme regle que la frise', /openPosteClientDrawer\(\\'' \+ a\.id/.test(poste) && /pdColClickAttr\(b, dateStr\)/.test(poste) && /barberOffReason\(rowB, dateStr\)/.test(fnSrc('pdColClickAttr')));
-check('jour passe / salon ferme : pas d\'ajout', /if \(rdvIsSalonClosed\(dateStr\) \|\| isPastDay\(dateStr\)\) return '';/.test(fnSrc('pdColClickAttr')) && /if \(!closed && !past\) side \+=/.test(poste));
-check('mes creneaux libres (sans pauses), prochain client, Moi seulement / Equipe, zoom', /Mes créneaux libres/.test(poste) && /Mon prochain client/.test(poste) && /function pdSetOnlyMe/.test(poste) && /function pdZoom/.test(poste) && /concat\(meDay \? meDay\.breaks : \[\]\)/.test(poste));
+check('jour passe / salon ferme : pas d\'ajout', /if \(rdvIsSalonClosed\(dateStr\) \|\| isPastDay\(dateStr\)\) return '';/.test(fnSrc('pdColClickAttr')) && /\(!closed && !past \? '<button type="button" class="btn btn-primary pd-add-top"/.test(poste));
+check('plus de colonne de cote : l\'agenda prend toute la largeur ; Moi seulement / Equipe, zoom et « + Ajouter un RDV » dans sa barre ; creneaux libres + prochain dans l\'agenda', !/<h4>Mes créneaux libres/.test(poste) && !/<aside class="pd-side">/.test(poste) && /return html \+ cal;/.test(poste) && /pd-cal-tools-r[\s\S]{0,400}pdSetOnlyMe\(true\)/.test(fnSrc('posteDayHtml')) && /function pdZoom/.test(poste) && /concat\(meDay \? meDay\.breaks : \[\]\)/.test(poste) && /class="pd-free/.test(poste) && /isNext \? 'Prochain'/.test(poste));
 check('telephone : une seule colonne (la sienne ou celle touchee)', /if \(pdIsPhone\(\)\) \{\n    var fid = pdFocusId/.test(poste));
 check('preferences gardees sans casser si le stockage est bloque (try/catch)', /try \{ localStorage\.setItem\('poste_day_only_me'/.test(poste) && /try \{\n  pdOnlyMe = localStorage\.getItem/.test(poste));
 check('Mois / Semaine : planning du jour choisi inchange (renderAgendaTimeline)', /posteAddBtnHtml\(dateStr\) \+\n    renderAgendaTimeline\(dateStr\)/.test(poste) && /function renderAgendaTimeline\(dateStr\)/.test(poste));
@@ -45,6 +45,5 @@ check('voies utilisees dans le Jour (par coiffeur) et la Semaine (par jour)', /p
 check('RDV passes / termines : gardent la couleur du coiffeur (plus pales), plus de gris', /\.pd-block\.st-done, \.pd-block\.st-past \{ opacity: \.5; \}/.test(poste) && !/\.pd-block\.st-done, \.pd-block\.st-past \{ background: var\(--card\)/.test(poste));
 check('semaine sur telephone : initiale du client dans le bloc', /String\(a\.client_name \|\| '\?'\)\.charAt\(0\)\.toUpperCase\(\)/.test(poste));
 check('mois : pastilles toujours dans le meme ordre (moi d\'abord, puis l\'equipe)', /Object\.keys\(byB\)\.sort\(function \(x, y\) \{ return order\(x\) - order\(y\); \}\)/.test(poste));
-check('prochain client : libelle + quand (pastille) sans couper le texte', /<span>Mon prochain client<\/span><em>/.test(poste));
 console.log('\n' + pass + ' OK, ' + fail + ' ECHEC');
 process.exit(fail ? 1 : 0);

@@ -434,6 +434,11 @@
   .pd-seg2 button { flex: 1; border: none; background: transparent; color: var(--grey); font-size: 13px; font-weight: 600; padding: 8px; border-radius: 8px; cursor: pointer; }
   .pd-seg2 button.on { background: var(--card); color: var(--ink); }
   .pd-add { width: 100%; }
+  .pd-cal-tools-r { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+  .pd-add-top { padding: 9px 16px; white-space: nowrap; }
+  .pd-cal-tools > span:first-child { white-space: nowrap; }
+  .pd-cal-tools .pd-seg2 button { white-space: nowrap; }
+  @media (max-width: 699px) { .pd-add-top { padding: 8px 12px; font-size: 14px; } .pd-cal-tools-r { gap: 6px; } }
 
   .pd-cal { background: var(--fill); border-radius: 18px; padding: 10px 12px 12px; min-width: 0; }
   .pd-cal-tools { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
@@ -1626,29 +1631,8 @@ function posteDayHtml(dateStr) {
     '<div class="pd-g-row" style="cursor:default;padding-top:0;padding-bottom:0" aria-hidden="true"><span></span><span class="pd-g-ticks">' + ticks + '</span><span class="pd-g-sum"></span></div>' +
     '</section>';
 
-  // 3) Colonne de côté : prochain client, mes créneaux libres, affichage, ajouter
-  var side = '';
-  if (nextIt) {
-    var inProg = nextIt.st === 'inprogress';
-    var when = inProg ? 'En cours' : (isToday ? (nextIt.start - nowMin > 0 ? 'Dans ' + pdDur(nextIt.start - nowMin) : 'Maintenant') : 'Premier RDV du jour');
-    side += '<button type="button" class="pd-card pd-next" onclick="pdGoTo(\'' + nextIt.id + '\')">' +
-      '<div class="pd-next-when"><span>Mon prochain client</span><em>' + esc(when) + '</em></div>' +
-      '<div class="pd-next-name">' + esc(nextIt.a.client_name) + '</div>' +
-      '<div class="pd-next-meta">' + pdHM(nextIt.start) + ' – ' + pdHM(nextIt.end) + ' · ' + esc(nextIt.a.service_name || '') + '</div></button>';
-  }
-  if (free.length) {
-    side += '<div class="pd-card pd-free-card"><h4>Mes créneaux libres · ' + pdDur(free.reduce(function (s, f) { return s + f[1] - f[0]; }, 0)) + '</h4>' +
-      free.map(function (f) {
-        return '<div class="pd-free-row"><span><b>' + pdHM(f[0]) + ' – ' + pdHM(f[1]) + '</b><small>' + pdDur(f[1] - f[0]) + '</small></span>' +
-          '<button type="button" onclick="openPosteAddAppointment(\'' + dateStr + '\',\'' + myId + '\')" aria-label="Ajouter un RDV sur ce créneau">+ RDV</button></div>';
-      }).join('') + '</div>';
-  }
-  if (!pdIsPhone()) {
-    side += '<div class="pd-card pd-view-card"><h4>Colonnes de l’agenda</h4><div class="pd-seg2">' +
-      '<button type="button" class="' + (pdOnlyMe ? 'on' : '') + '" onclick="pdSetOnlyMe(true)">Moi seulement</button>' +
-      '<button type="button" class="' + (pdOnlyMe ? '' : 'on') + '" onclick="pdSetOnlyMe(false)">Équipe</button></div></div>';
-  }
-  if (!closed && !past) side += '<button type="button" class="btn btn-primary pd-add" onclick="openPosteAddAppointment(\'' + dateStr + '\')">+ Ajouter un RDV</button>';
+  // (Plus de colonne de côté : l'agenda prend toute la largeur. Le prochain client reste marqué « Prochain »
+  // dans l'agenda, les créneaux libres y sont dessinés avec « + Ajouter » ; Moi / Équipe et « + Ajouter » sont dans la barre de l'agenda.)
 
   // 4) Agenda en colonnes (heures de haut en bas)
   var cols;
@@ -1709,12 +1693,16 @@ function posteDayHtml(dateStr) {
   var focusTop = isToday ? Math.round((nowMin - R0) * PX) : (firstMine ? Math.round((firstMine.start - R0) * PX) : 0);
   var cal = '<div class="pd-cal">' +
     '<div class="pd-cal-tools"><span style="font-size:13px;color:var(--grey)">' + (items.length ? items.length + ' RDV ce jour' : 'Aucun RDV ce jour') + '</span>' +
-    '<span class="pd-zoom"><button type="button" onclick="pdZoom(-1)" aria-label="Réduire l’agenda">−</button><button type="button" onclick="pdZoom(1)" aria-label="Agrandir l’agenda">+</button></span></div>' +
+    '<span class="pd-cal-tools-r">' +
+      (pdIsPhone() ? '' : '<span class="pd-seg2" style="min-width:220px"><button type="button" class="' + (pdOnlyMe ? 'on' : '') + '" onclick="pdSetOnlyMe(true)">Moi seulement</button><button type="button" class="' + (pdOnlyMe ? '' : 'on') + '" onclick="pdSetOnlyMe(false)">Équipe</button></span>') +
+      '<span class="pd-zoom"><button type="button" onclick="pdZoom(-1)" aria-label="Réduire l’agenda">−</button><button type="button" onclick="pdZoom(1)" aria-label="Agrandir l’agenda">+</button></span>' +
+      (!closed && !past ? '<button type="button" class="btn btn-primary pd-add-top" onclick="openPosteAddAppointment(\'' + dateStr + '\')">' + (pdIsPhone() ? '+ RDV' : '+ Ajouter un RDV') + '</button>' : '') +
+    '</span></div>' +
     '<div class="pd-cal-head">' + heads + '</div>' +
     '<div class="pd-cal-scroll"><div class="pd-grid" data-date="' + dateStr + '" data-r0="' + R0 + '" data-r1="' + R1 + '" data-px="' + PX + '" data-focus-top="' + focusTop + '" style="height:' + Math.round(SPAN * PX + 12) + 'px">' +
     lines + '<div class="pd-cols">' + colsHtml + '</div>' + nowHtml + '</div></div></div>';
 
-  return html + '<div class="pd-body"><aside class="pd-side">' + side + '</aside>' + cal + '</div>';
+  return html + cal;
 }
 
 function pdSetOnlyMe(v) {
