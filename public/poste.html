@@ -298,7 +298,6 @@
   .aa-slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px,1fr)); gap: 7px; margin-bottom: 6px; }
   .aa-slot { border: none; background: var(--fill); color: var(--ink); border-radius: 10px; padding: 10px 4px; cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 600; }
   .aa-slot.sel { background: var(--blue); color: #fff; }
-  .aa-slot.pref:not(.sel) { box-shadow: inset 0 0 0 2px var(--blue); }
   .aa-group-link { display: inline-flex; align-items: center; gap: 7px; align-self: flex-end; background: var(--fill); border: none; border-radius: 999px; padding: 7px 13px; font-family: inherit; font-size: 13.5px; font-weight: 600; color: var(--ink); cursor: pointer; margin-bottom: 10px; }
   .aa-group-link:hover { background: var(--fill-2); }
   .aa-back { background: none; border: none; padding: 0; font-family: inherit; font-size: 13.5px; color: var(--accent); font-weight: 500; cursor: pointer; margin-bottom: 14px; }
@@ -436,8 +435,8 @@
 
   .pd-cal { background: var(--fill); border-radius: 18px; padding: 10px 12px 12px; min-width: 0; }
   .pd-cal-tools { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
-  .pd-cal-tools .pd-zoom, .pdD-tools .pd-zoom { display: flex; gap: 6px; }
-  .pd-cal-tools .pd-zoom button, .pdD-tools .pd-zoom button { width: 36px; height: 36px; border-radius: 50%; border: none; background: var(--card); color: var(--ink); font-size: 18px; cursor: pointer; }
+  .pd-cal-tools .pd-zoom { display: flex; gap: 6px; }
+  .pd-cal-tools .pd-zoom button { width: 36px; height: 36px; border-radius: 50%; border: none; background: var(--card); color: var(--ink); font-size: 18px; cursor: pointer; }
   .pd-cal-head { display: flex; gap: 8px; padding: 0 0 8px 52px; border-bottom: 1px solid var(--sep); }
   .pd-col-head { display: flex; align-items: center; gap: 7px; min-width: 0; font-size: 13.5px; font-weight: 700; }
   .pd-col-head span:last-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -513,67 +512,6 @@
   .pd-mchip { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; height: 24px; padding: 0 7px; box-sizing: border-box; border-radius: 12px; font-size: 12.5px; font-weight: 800; font-variant-numeric: tabular-nums; }
   .pd-mclosed { font-size: 11.5px; font-weight: 600; color: var(--grey); }
 
-  /* ---------- Vue Jour, style D (cartes) ---------- */
-  .pdD-tools { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
-  .pdD-count { font-size: 13.5px; color: var(--grey); }
-  .pdD-count b { color: var(--ink); font-weight: 700; }
-  .pdD-tools-r { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-  .pdD-tools-r .pd-seg2 { min-width: 150px; }
-  .pdD-add { padding: 9px 16px; }
-  .pdD { background: var(--fill); border-radius: 18px; overflow: hidden; }
-  .pdD-x { overflow-x: auto; }
-  .pdD-heads { display: flex; border-bottom: 1px solid var(--sep); }
-  .pdD-gut { width: 56px; flex-shrink: 0; border-right: 1px solid var(--sep); }
-  .pdD-head { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-right: 1px solid var(--sep); position: relative; }
-  .pdD-head.me { background: var(--card); }
-  .pdD-av { width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 800; background-size: cover; background-position: center; }
-  .pdD-hname { display: flex; flex-direction: column; min-width: 0; }
-  .pdD-hname b { font-size: 14.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .pdD-hname small { font-size: 12px; color: var(--grey); }
-  .pdD-hbar { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; }
-  .pdD-scroll { padding-top: 0; margin-top: 0; }
-  .pdD-hour { width: 46px; font-weight: 600; font-size: 12px; }
-  .pdD-cols { position: absolute; left: 56px; right: 0; top: 0; bottom: 0; display: flex; }
-  .pdD-col { flex: 1; min-width: 0; position: relative; border-right: 1px solid var(--sep); cursor: pointer; }
-  .pdD-col.noadd { cursor: default; }
-  .pdD-card { left: 5px !important; right: 5px !important; background: var(--card); color: var(--ink); border-radius: 10px; padding: 8px 10px; flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 2px; box-shadow: 0 1px 0 rgba(0,0,0,.06); }
-  .pdD-card.tiny { padding: 3px 9px; justify-content: center; }
-  .pdD-card.mid { padding: 6px 10px; }
-  .pdD-card.st-done, .pdD-card.st-past { opacity: .55; background: var(--card); color: var(--ink); }
-  .pdD-card.st-absent { background: transparent; border: 1px dashed var(--grey); color: var(--grey); }
-  .pdD-card.st-absent .pdD-n { text-decoration: line-through; }
-  .pdD-card.is-next { box-shadow: inset 0 0 0 2px var(--blue); }
-  .pdD-dot { position: absolute; right: 8px; top: 8px; width: 7px; height: 7px; border-radius: 50%; }
-  .pdD-card.tiny .pdD-dot { top: 50%; margin-top: -3.5px; }
-  .pdD-n { font-size: 13.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 12px; min-width: 0; }
-  .pdD-s { font-size: 12px; color: var(--grey); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .pdD-row { display: flex; align-items: baseline; gap: 8px; min-width: 0; padding-right: 12px; }
-  .pdD-row .pdD-n { padding-right: 0; }
-  .pdD-r { margin-left: auto; font-size: 11.5px; color: var(--grey); white-space: nowrap; flex-shrink: 0; }
-  .pdD-chips { position: absolute; right: 8px; bottom: 6px; display: flex; gap: 5px; }
-  .pdD-chip { font-size: 10.5px; font-weight: 700; padding: 2px 6px; border-radius: 6px; }
-  .pdD-chip.next { background: var(--blue); color: #fff; }
-  .pdD-chip.cur { background: var(--blue-soft); color: var(--blue); }
-  .pdD-chip.abs { background: rgba(255,69,58,.14); color: var(--red); }
-  .pdD-chip.done { background: var(--fill-2); color: var(--grey); }
-  .pdD-break { position: absolute; left: 5px; right: 5px; border-radius: 10px; padding: 8px 10px; box-sizing: border-box; display: flex; flex-direction: column; gap: 1px; background: repeating-linear-gradient(135deg, var(--card) 0 7px, var(--fill-2) 7px 14px); pointer-events: none; overflow: hidden; }
-  .pdD-break b { font-size: 13px; }
-  .pdD-break small { font-size: 11.5px; color: var(--grey); }
-  .pdD-now { position: absolute; left: 56px; right: 0; border-top: 2px solid var(--blue); z-index: 5; pointer-events: none; }
-  .pdD-now span { position: absolute; left: -54px; top: -11px; background: var(--blue); color: #fff; font-size: 11.5px; font-weight: 700; padding: 2px 6px; border-radius: 6px; }
-  .pdD-sel { position: absolute; left: 5px; right: 5px; border: 1.5px dashed var(--blue); background: rgba(10,132,255,.14); border-radius: 10px; z-index: 3; pointer-events: none; }
-  .pdD-sel span { position: absolute; left: 6px; top: -24px; background: var(--blue); color: #fff; font-size: 11.5px; font-weight: 700; padding: 2px 8px; border-radius: 6px; white-space: nowrap; }
-  .pdD-pop { position: absolute; z-index: 9; background: var(--blue); border-radius: 14px; box-shadow: 0 18px 40px rgba(0,0,0,.45); overflow: hidden; }
-  .pdD-pop.sheet { position: fixed; left: 12px; right: 12px; bottom: calc(88px + env(safe-area-inset-bottom, 0px)); z-index: 60; }
-  .pdD-pop button { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; border: none; background: transparent; color: #fff; font-size: 15px; font-weight: 600; padding: 14px 16px; cursor: pointer; text-align: left; }
-  .pdD-pop button + button { border-top: 1px solid rgba(255,255,255,.22); }
-  .pdD-pop button:hover { background: rgba(255,255,255,.1); }
-  @media (max-width: 699px) {
-    .pdD-tools-r .pdD-style { min-width: 130px; }
-    .pdD-head { min-width: 150px; flex: 0 0 150px; }
-    .pdD-col { min-width: 150px; flex: 0 0 150px; }
-    .pdD-hname b { font-size: 13px; }
-  }
   /* Tablette (portrait) et petits ordinateurs : pas de colonne de cote, le prochain client passe au-dessus */
   @media (max-width: 999px) {
     .pd-body { grid-template-columns: minmax(0, 1fr); }
@@ -1574,7 +1512,6 @@ function pdSearchHtml() {
     '<div id="pd-results" class="pd-results" style="display:none"></div></div>';
 }
 function posteDayHtml(dateStr) {
-  if (pdStyle === 'D') return posteDayHtmlD(dateStr);   // style « cartes » (proposition D), le style C reste au choix
   var closed = rdvIsSalonClosed(dateStr), past = isPastDay(dateStr);
   var nowStr = nowSalonDatetimeString(), isToday = nowStr.slice(0, 10) === dateStr;
   var nowMin = Number(nowStr.slice(11, 13)) * 60 + Number(nowStr.slice(14, 16));
@@ -1736,7 +1673,6 @@ function posteDayHtml(dateStr) {
   var focusTop = isToday ? Math.round((nowMin - R0) * PX) : (firstMine ? Math.round((firstMine.start - R0) * PX) : 0);
   var cal = '<div class="pd-cal">' +
     '<div class="pd-cal-tools"><span style="font-size:13px;color:var(--grey)">' + (items.length ? items.length + ' RDV ce jour' : 'Aucun RDV ce jour') + '</span>' +
-    '<span class="pd-seg2" style="min-width:150px;margin-left:auto;margin-right:8px" title="Style d’affichage"><button type="button" onclick="pdSetStyle(\'D\')">Cartes</button><button type="button" class="on" onclick="pdSetStyle(\'C\')">Frise</button></span>' +
     '<span class="pd-zoom"><button type="button" onclick="pdZoom(-1)" aria-label="Réduire l’agenda">−</button><button type="button" onclick="pdZoom(1)" aria-label="Agrandir l’agenda">+</button></span></div>' +
     '<div class="pd-cal-head">' + heads + '</div>' +
     '<div class="pd-cal-scroll"><div class="pd-grid" data-date="' + dateStr + '" data-r0="' + R0 + '" data-r1="' + R1 + '" data-px="' + PX + '" data-focus-top="' + focusTop + '" style="height:' + Math.round(SPAN * PX + 12) + 'px">' +
@@ -1745,168 +1681,6 @@ function posteDayHtml(dateStr) {
   return html + '<div class="pd-body"><aside class="pd-side">' + side + '</aside>' + cal + '</div>';
 }
 
-/* ---------- Vue Jour, style D : une colonne par coiffeur, RDV en cartes neutres ---------- */
-var pdStyle = 'D';
-try { var _pds = localStorage.getItem('poste_day_style'); if (_pds === 'C' || _pds === 'D') pdStyle = _pds; } catch (e) {}
-function pdSetStyle(v) {
-  pdStyle = v === 'C' ? 'C' : 'D';
-  try { localStorage.setItem('poste_day_style', pdStyle); } catch (e) {}
-  pdScrolledFor = null;
-  renderCalDay();
-}
-/** Peut-on ajouter un RDV pour ce coiffeur ce jour-là ? Même règles que la frise (fermé, passé, absent, sans RDV...). */
-function pdAddCheck(b, dateStr) {
-  if (rdvIsSalonClosed(dateStr)) return 'Salon fermé ce jour : impossible de créer un rendez-vous.';
-  if (isPastDay(dateStr)) return 'Date passée : impossible de prendre un rendez-vous ce jour-là.';
-  var rowB = (barbers || []).find(function (x) { return x.id === b.id; });
-  var walkDay = isWalkinOn(rowB, dateStr), offWhy = rowB && !walkDay ? barberOffReason(rowB, dateStr) : '';
-  if (offWhy) return b.name + ' ' + offWhy + ' : pas de rendez-vous possible.';
-  if (walkDay) return b.name + ' est en « sans RDV » ce jour-là : pas de rendez-vous';
-  if (!(b.accepts_appointments || (me && b.id === me.id))) return b.name + ' ne prend pas de RDV en ligne';
-  return '';
-}
-
-function posteDayHtmlD(dateStr) {
-  var closed = rdvIsSalonClosed(dateStr), past = isPastDay(dateStr);
-  var nowStr = nowSalonDatetimeString(), isToday = nowStr.slice(0, 10) === dateStr;
-  var nowMin = Number(nowStr.slice(11, 13)) * 60 + Number(nowStr.slice(14, 16));
-  var appts = pdApptsOfDay(dateStr);
-  appts.forEach(function (a) { calApptById[a.id] = a; });
-  var team = posteTimelineBarbers(appts);
-  var myId = me && me.id;
-  var items = appts.map(function (a) {
-    var st0 = pdMin(a.scheduled_at.slice(11, 16)), d = Math.max(a.duration_min || 30, 10);
-    return { a: a, id: a.id, barberId: a.barber_id, start: st0, dur: d, end: st0 + d, st: pdState(a, st0 + d, isToday, past, nowMin) };
-  });
-  var mine = items.filter(function (it) { return it.barberId === myId; });
-  var nextIt = mine.filter(function (it) { return it.st === 'inprogress'; })[0] || mine.filter(function (it) { return it.st === 'todo'; })[0] || null;
-  var rg = pdRangeFor([dateStr], items);
-  (team || []).forEach(function (b) { var bd = pdBarberDay((barbers || []).find(function (x) { return x.id === b.id; }), dateStr); if (bd) { rg[0] = Math.min(rg[0], Math.floor(bd.start / 60) * 60); rg[1] = Math.max(rg[1], Math.ceil(bd.end / 60) * 60); } });
-  var R0 = rg[0], R1 = rg[1], SPAN = R1 - R0, PX = Math.max(1.4, pdPx * 1.6);
-  var cols = calBarberFilter ? team.filter(function (b) { return b.id === calBarberFilter; }) : (pdOnlyMe ? team.filter(function (b) { return b.id === myId; }) : team);
-  if (!cols.length) cols = team;
-
-  var html = pdSearchHtml();
-  if (closed) html += '<div class="salon-closure-banner" style="text-align:center;margin-bottom:12px">Salon fermé — aucun rendez-vous ne peut être ajouté ce jour.</div>';
-  html += '<div class="pdD-tools"><span class="pdD-count">' + (items.length ? items.length + ' RDV ce jour' : 'Aucun RDV ce jour') +
-    (nextIt ? ' · <b>Prochain : ' + pdHM(nextIt.start) + ' ' + esc(nextIt.a.client_name) + '</b>' : '') + '</span>' +
-    '<span class="pdD-tools-r">' +
-      '<span class="pd-seg2 pdD-style" title="Style d’affichage"><button type="button" class="on" onclick="pdSetStyle(\'D\')">Cartes</button><button type="button" onclick="pdSetStyle(\'C\')">Frise</button></span>' +
-      (pdIsPhone() ? '' : '<span class="pd-seg2"><button type="button" class="' + (pdOnlyMe ? 'on' : '') + '" onclick="pdSetOnlyMe(true)">Moi</button><button type="button" class="' + (pdOnlyMe ? '' : 'on') + '" onclick="pdSetOnlyMe(false)">Équipe</button></span>') +
-      '<span class="pd-zoom"><button type="button" onclick="pdZoom(-1)" aria-label="Réduire l’agenda">−</button><button type="button" onclick="pdZoom(1)" aria-label="Agrandir l’agenda">+</button></span>' +
-      (!closed && !past ? '<button type="button" class="btn btn-primary pdD-add" onclick="openPosteAddAppointment(\'' + dateStr + '\')">+ Ajouter</button>' : '') +
-    '</span></div>';
-
-  var heads = cols.map(function (b) {
-    var its = items.filter(function (it) { return it.barberId === b.id; });
-    var rowB = (barbers || []).find(function (x) { return x.id === b.id; });
-    var walkDay = isWalkinOn(rowB, dateStr), offWhy = rowB && !walkDay ? barberOffReason(rowB, dateStr) : '';
-    var left = its.filter(function (it) { return it.st === 'todo' || it.st === 'inprogress'; }).length;
-    var sub = offWhy ? 'Absent ce jour' : walkDay ? 'Sans RDV ce jour' : (its.length ? left + ' à venir' : 'Aucun RDV');
-    var photo = rdvBarberPhotos[b.id], color = barberColor(b.id);
-    var av = '<span class="pdD-av" style="' + (photo ? 'background-image:url(&quot;' + esc(photo) + '&quot;)' : 'background:' + color + ';color:' + pdFg(color)) + '" aria-hidden="true">' + (photo ? '' : esc(String(b.name).charAt(0).toUpperCase())) + '</span>';
-    return '<div class="pdD-head' + (b.id === myId ? ' me' : '') + '">' + av + '<span class="pdD-hname"><b>' + esc(b.name) + (b.id === myId ? ' · moi' : '') + '</b><small>' + esc(sub) + '</small></span><i class="pdD-hbar" style="background:' + color + '"></i></div>';
-  }).join('');
-
-  var lines = '';
-  for (var m = R0; m <= R1; m += 30) {
-    var yy = Math.round((m - R0) * PX) + 10;
-    lines += '<div class="pd-line' + (m % 60 ? ' half' : '') + '" style="top:' + yy + 'px;left:56px"></div>' + (m % 60 ? '' : '<div class="pd-hour pdD-hour" style="top:' + yy + 'px">' + (m / 60) + 'h</div>');
-  }
-  var colsHtml = cols.map(function (b) {
-    var rowB = (barbers || []).find(function (x) { return x.id === b.id; });
-    var walkDay = isWalkinOn(rowB, dateStr), offWhy = rowB && !walkDay ? barberOffReason(rowB, dateStr) : '';
-    var bd = pdBarberDay(rowB, dateStr), inner = '';
-    if (bd && !offWhy) bd.breaks.forEach(function (bk) {
-      inner += '<div class="pdD-break" style="top:' + (Math.round((bk[0] - R0) * PX) + 10) + 'px;height:' + Math.max(20, Math.round((bk[1] - bk[0]) * PX) - 4) + 'px"><b>Pause</b><small>' + pdHM(bk[0]) + ' – ' + pdHM(bk[1]) + '</small></div>';
-    });
-    items.filter(function (it) { return it.barberId === b.id; }).forEach(function (it) {
-      var a = it.a, h = Math.max(22, Math.round(it.dur * PX) - 4);
-      var isNext = nextIt && it.id === nextIt.id;
-      var size = h >= 74 ? 'tall' : h >= 44 ? 'mid' : 'tiny';
-      var dot = it.st === 'absent' ? 'var(--red)' : (it.st === 'done' ? '#8e8e93' : (it.st === 'past' ? 'var(--orange)' : '#30d158'));
-      var chip = it.st === 'absent' ? '<span class="pdD-chip abs">Absent</span>' : it.st === 'inprogress' ? '<span class="pdD-chip cur">En cours</span>'
-        : isNext ? '<span class="pdD-chip next">Prochain</span>' : it.st === 'done' ? '<span class="pdD-chip done">Terminé</span>' : '';
-      var range = pdHM(it.start) + ' – ' + pdHM(it.end);
-      inner += '<button type="button" class="pd-block pdD-card ' + size + ' st-' + it.st + (isNext ? ' is-next' : '') + '" data-id="' + esc(a.id) + '" ' +
-        'data-q="' + esc(normText([a.client_name, a.email, a.phone].join(' ')) + ' ' + String(a.phone || '').replace(/\D/g, '')) + '" ' +
-        'style="top:' + (Math.round((it.start - R0) * PX) + 10) + 'px;height:' + h + 'px" ' +
-        'title="' + esc(range + ' — ' + a.client_name + ' — ' + (a.service_name || '') + ' — ' + b.name) + '" ' +
-        'onclick="event.stopPropagation();openPosteClientDrawer(\'' + a.id + '\')">' +
-        '<i class="pdD-dot" style="background:' + dot + '"></i>' +
-        (size === 'tall'
-          ? '<span class="pdD-n">' + esc(a.client_name) + '</span><span class="pdD-s">' + esc(a.service_name || '') + '</span><span class="pdD-s">' + range + '</span>'
-          : size === 'mid' ? '<span class="pdD-n">' + esc(a.client_name) + '</span><span class="pdD-s">' + range + '</span>'
-          : '<span class="pdD-row"><span class="pdD-n">' + esc(a.client_name) + '</span><span class="pdD-r">' + range + '</span></span>') +
-        (chip && size !== 'tiny' ? '<span class="pdD-chips">' + chip + '</span>' : '') + '</button>';
-    });
-    if (offWhy || walkDay) inner += '<div class="pd-col-off">' + (offWhy ? esc(offWhy.charAt(0).toUpperCase() + offWhy.slice(1)) : 'En « sans RDV » ce jour-là') + '</div>';
-    var canAdd = !pdAddCheck(b, dateStr);
-    return '<div class="pdD-col' + (b.id === myId ? ' me' : '') + (canAdd ? '' : ' noadd') + '" data-barber="' + esc(b.id) + '" onclick="pdDColClick(event, \'' + b.id + '\', \'' + dateStr + '\')">' + inner + '</div>';
-  }).join('');
-  var nowHtml = isToday && nowMin >= R0 && nowMin <= R1
-    ? '<div class="pdD-now" style="top:' + (Math.round((nowMin - R0) * PX) + 10) + 'px"><span>' + nowStr.slice(11, 16) + '</span></div>' : '';
-  var firstMine = mine[0] || items[0];
-  var focusTop = isToday ? Math.round((nowMin - R0) * PX) : (firstMine ? Math.round((firstMine.start - R0) * PX) : 0);
-  var minW = 56 + cols.length * (pdIsPhone() ? 150 : 170);
-  html += '<div class="pdD">' +
-    '<div class="pdD-x"><div class="pdD-inner" style="min-width:' + minW + 'px">' +
-      '<div class="pdD-heads"><div class="pdD-gut" aria-hidden="true"></div>' + heads + '</div>' +
-      '<div class="pd-cal-scroll pdD-scroll"><div class="pd-grid pdD-grid" data-date="' + dateStr + '" data-r0="' + R0 + '" data-r1="' + R1 + '" data-px="' + PX + '" data-d="1" data-focus-top="' + focusTop + '" style="height:' + (Math.round(SPAN * PX) + 24) + 'px">' +
-        lines + '<div class="pdD-cols">' + colsHtml + '</div>' + nowHtml + '<div class="pdD-pop" id="pdD-pop" style="display:none"></div>' +
-      '</div></div>' +
-    '</div></div></div>';
-  return html;
-}
-
-/** Toucher le vide d'une colonne (style D) : le créneau s'entoure en pointillés + bulle « Ajouter un RDV / Plusieurs personnes ». */
-function pdDColClick(ev, barberId, dateStr) {
-  var col = ev.currentTarget, grid = col.closest('.pdD-grid');
-  var b = posteTimelineBarbers(pdApptsOfDay(dateStr)).find(function (x) { return x.id === barberId; }) || { id: barberId, name: '' };
-  var why = pdAddCheck(b, dateStr);
-  if (why) { toast(why, true); return; }
-  var r0 = Number(grid.getAttribute('data-r0')), px = Number(grid.getAttribute('data-px'));
-  var step = Math.max(15, rdvSlotStepMin > 0 ? rdvSlotStepMin : 15), len = 30;
-  var y = ev.clientY - col.getBoundingClientRect().top - 10;
-  var t = r0 + Math.floor(y / px / step) * step;
-  var pop = document.getElementById('pdD-pop');
-  grid.querySelectorAll('.pdD-sel').forEach(function (n) { n.remove(); });
-  var sel = document.createElement('div');
-  sel.className = 'pdD-sel';
-  sel.style.top = (Math.round((t - r0) * px) + 10) + 'px';
-  sel.style.height = Math.max(18, Math.round(len * px) - 2) + 'px';
-  sel.innerHTML = '<span>' + pdHM(t) + '</span>';
-  col.appendChild(sel);
-  var gr = grid.getBoundingClientRect(), cr = col.getBoundingClientRect();
-  pop.innerHTML = '<button type="button" onclick="pdDAdd(\'' + dateStr + '\',\'' + barberId + '\',false)">Ajouter un RDV<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>' +
-    '<button type="button" onclick="pdDAdd(\'' + dateStr + '\',\'' + barberId + '\',true)">Plusieurs personnes (groupe)<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3 19c0-3 2.7-5 6-5s6 2 6 5"/><circle cx="17" cy="9" r="2.4"/></svg></button>';
-  pop.style.display = 'block';
-  pop.classList.toggle('sheet', pdIsPhone());
-  if (pdIsPhone()) { pop.style.width = pop.style.left = pop.style.top = ''; return; }   // téléphone : bulle fixée au-dessus de la barre du bas
-  var w = Math.min(280, gr.width - 16);
-  pop.style.width = w + 'px';
-  pop.style.left = Math.max(8, Math.min(gr.width - w - 8, cr.left - gr.left + cr.width / 2 - w / 2)) + 'px';
-  pop.style.top = (Math.round((t - r0 + len) * px) + 18) + 'px';
-  try { pop.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e) {}
-}
-var pdDPrefTime = null;
-function pdDAdd(dateStr, barberId, group) {
-  var sel = document.querySelector('.pdD-sel span');
-  pdDClosePop();
-  pdDPrefTime = sel ? sel.textContent.trim() : null;
-  openPosteAddAppointment(dateStr, barberId);
-  pdDPrefTime = null;
-  if (group && typeof window.paGoStep === 'function') window.paGoStep('client', 'group');
-}
-function pdDClosePop() {
-  var pop = document.getElementById('pdD-pop'); if (pop) pop.style.display = 'none';
-  document.querySelectorAll('.pdD-sel').forEach(function (n) { n.remove(); });
-}
-document.addEventListener('click', function (e) {
-  if (!document.getElementById('pdD-pop')) return;
-  if (e.target.closest && (e.target.closest('#pdD-pop') || e.target.closest('.pdD-col'))) return;
-  pdDClosePop();
-});
 function pdSetOnlyMe(v) {
   pdOnlyMe = !!v;
   try { localStorage.setItem('poste_day_only_me', pdOnlyMe ? '1' : '0'); } catch (e) {}
@@ -2446,7 +2220,6 @@ function openPosteAddAppointment(dateStr, barberId) {
   var offWhy = target && target.schedules ? barberOffReason(target, dateStr) : '';
   if (offWhy) { toast(target.name + ' ' + offWhy + ' : pas de rendez-vous possible.', true); return; }
   var state = { serviceId: null, extraIds: [], productIds: [], time: null };
-  var prefTime = typeof pdDPrefTime !== 'undefined' ? pdDPrefTime : null;   // heure touchée dans l'agenda (style Cartes), sinon null
   // Offre du coiffeur du RDV : ses prestations et son tarif personnalisé (barberItems, app.js).
   var svcOffer = typeof barberItems === 'function' ? barberItems(target, 'services', services) : services;
   var extOffer = typeof barberItems === 'function' ? barberItems(target, 'extras', extras) : extras;
@@ -2641,18 +2414,13 @@ function openPosteAddAppointment(dateStr, barberId) {
         slotsByHalf.morning = r.slots.filter(function (s) { return s.time < '12:00'; });
         slotsByHalf.afternoon = r.slots.filter(function (s) { return s.time >= '12:00'; });
 
-        var pref = prefTime;   // heure touchée dans l'agenda (style Cartes) : on montre la bonne demi-journée et on met ce créneau en avant
         if (!slotsByHalf.morning.length) {
           toggleEl.style.display = 'none';
           currentHalf = 'afternoon';
           paRenderHalf();
         } else {
           toggleEl.style.display = 'flex';
-          paShowHalf(pref && pref >= '12:00' && slotsByHalf.afternoon.length ? 'afternoon' : 'morning');
-        }
-        if (pref) {
-          var near = [].slice.call(slotsEl.querySelectorAll('.aa-slot[data-time]')).filter(function (c) { return c.dataset.time >= pref; })[0];
-          if (near) { near.classList.add('pref'); try { near.scrollIntoView({ block: 'nearest' }); } catch (e) {} }
+          paShowHalf('morning');
         }
       })
       .catch(function (e) { slotsEl.innerHTML = ''; toast(e.message, true); });
