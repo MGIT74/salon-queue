@@ -37,5 +37,6 @@ check('mes creneaux libres (sans pauses), prochain client, Moi seulement / Equip
 check('telephone : une seule colonne (la sienne ou celle touchee)', /if \(pdIsPhone\(\)\) \{\n    var fid = pdFocusId/.test(poste));
 check('preferences gardees sans casser si le stockage est bloque (try/catch)', /try \{ localStorage\.setItem\('poste_day_only_me'/.test(poste) && /try \{\n  pdOnlyMe = localStorage\.getItem/.test(poste));
 check('Mois / Semaine : planning du jour choisi inchange (renderAgendaTimeline)', /posteAddBtnHtml\(dateStr\) \+\n    renderAgendaTimeline\(dateStr\)/.test(poste) && /function renderAgendaTimeline\(dateStr\)/.test(poste));
+check('mois : chaque jour = seulement les pastilles de couleur des coiffeurs avec leur nombre de RDV (plus de texte)', /'<span class="pd-mchips">' \+ chips \+ '<\/span>'/.test(poste) && !/pd-mcount/.test(poste));
 console.log('\n' + pass + ' OK, ' + fail + ' ECHEC');
 process.exit(fail ? 1 : 0);

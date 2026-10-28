@@ -507,11 +507,9 @@
   .pd-mday.pd-hit { box-shadow: inset 0 0 0 3px #ffd60a; opacity: 1; }
   .pd-mday.pd-dim { opacity: .35; }
   .pd-mnum { font-size: 14px; font-weight: 700; min-width: 26px; height: 26px; border-radius: 13px; display: inline-flex; align-items: center; justify-content: center; padding: 0 4px; box-sizing: border-box; }
-  .pd-mcount { font-size: 12px; color: var(--grey); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-  .pd-mcount b { color: var(--ink); }
-  .pd-mchips { display: flex; flex-wrap: wrap; gap: 4px 7px; }
-  .pd-mchip { display: inline-flex; align-items: center; gap: 3px; font-size: 11.5px; font-weight: 700; }
-  .pd-mchip i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .pd-mchips { display: flex; flex-wrap: wrap; gap: 5px 10px; margin-top: 2px; }
+  .pd-mchip { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 700; }
+  .pd-mchip i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
   .pd-mclosed { font-size: 11.5px; font-weight: 600; color: var(--grey); }
 
   /* Tablette (portrait) et petits ordinateurs : pas de colonne de cote, le prochain client passe au-dessus */
@@ -534,9 +532,9 @@
     .pd-g-ticks span.minor, .pd-legend { display: none; }
     .pd-mday { min-height: 58px; padding: 5px; gap: 2px; border-radius: 9px; }
     .pd-mnum { font-size: 12.5px; min-width: 22px; height: 22px; }
-    .pd-mcount { font-size: 11px; }
-    .pd-mme { display: none; }
-    .pd-mchips { display: none; }
+    .pd-mchips { gap: 2px 5px; }
+    .pd-mchip { font-size: 10.5px; gap: 2px; }
+    .pd-mchip i { width: 7px; height: 7px; }
     .pd-mgrid, .pd-mhead { gap: 4px; }
     .pd-wk-head b { font-size: 14px; }
     .pd-side > .pd-view-card { display: none; }
@@ -1845,7 +1843,7 @@ function pdMonthHtml() {
     cells += '<button type="button" class="pd-mday' + (ds === todayStr ? ' today' : '') + (ds < todayStr ? ' past' : '') + (closed ? ' closed' : '') + '" data-q="' + esc(q) + '" onclick="pdShowDay(\'' + ds + '\')" aria-label="' + esc(new Date(ds + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })) + (its.length ? ', ' + its.length + ' RDV' : '') + '">' +
       '<span class="pd-mnum">' + d + '</span>' +
       (closed ? '<span class="pd-mclosed">Fermé</span>'
-        : (its.length ? '<span class="pd-mcount"><b>' + its.length + '</b> RDV' + (mine && !pdOnlyMe && !calBarberFilter ? '<span class="pd-mme"> · <b>' + mine + '</b> moi</span>' : '') + '</span><span class="pd-mchips">' + chips + '</span>' : '')) +
+        : (its.length ? '<span class="pd-mchips">' + chips + '</span>' : '')) +   // juste la couleur de chaque coiffeur et son nombre de RDV
       '</button>';
   }
   while ((offset + nDays) % 7 && cells.split('pd-mday').length - 1 < 42) { cells += '<div class="pd-mday empty" aria-hidden="true"></div>'; offset++; }
