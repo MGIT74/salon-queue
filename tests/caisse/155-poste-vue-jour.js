@@ -38,5 +38,13 @@ check('telephone : une seule colonne (la sienne ou celle touchee)', /if \(pdIsPh
 check('preferences gardees sans casser si le stockage est bloque (try/catch)', /try \{ localStorage\.setItem\('poste_day_only_me'/.test(poste) && /try \{\n  pdOnlyMe = localStorage\.getItem/.test(poste));
 check('Mois / Semaine : planning du jour choisi inchange (renderAgendaTimeline)', /posteAddBtnHtml\(dateStr\) \+\n    renderAgendaTimeline\(dateStr\)/.test(poste) && /function renderAgendaTimeline\(dateStr\)/.test(poste));
 check('mois : chaque jour = seulement les pastilles de couleur des coiffeurs avec leur nombre de RDV (plus de texte)', /'<span class="pd-mchips">' \+ chips \+ '<\/span>'/.test(poste) && !/pd-mcount/.test(poste));
+console.log('\n[D] Vue Jour style « Cartes » (proposition D), le style « Frise » (C) reste au choix');
+check('style D par defaut, C au choix, garde sans casser (try/catch)', /var pdStyle = 'D';/.test(poste) && /if \(pdStyle === 'D'\) return posteDayHtmlD\(dateStr\);/.test(poste) && /try \{ localStorage\.setItem\('poste_day_style'/.test(poste) && /pdSetStyle\(\\'C\\'\)/.test(poste) && /pdSetStyle\(\\'D\\'\)/.test(poste));
+const dSrc = fnSrc('posteDayHtmlD');
+check('D : recherche, une colonne par coiffeur, cartes cliquables (fiche) avec data-q pour la recherche', /pdSearchHtml\(\)/.test(dSrc) && /pdD-col/.test(dSrc) && /class="pd-block pdD-card/.test(dSrc) && /data-q="/.test(dSrc) && /openPosteClientDrawer/.test(dSrc));
+check('D : pauses, trait maintenant, etiquettes Prochain / En cours / Absent / Termine', /pdD-break/.test(dSrc) && /pdD-now/.test(dSrc) && /Prochain<\/span>/.test(dSrc) && /En cours<\/span>/.test(dSrc) && /Absent<\/span>/.test(dSrc) && /Terminé<\/span>/.test(dSrc));
+const addSrc = fnSrc('pdAddCheck');
+check('D : clic vide = memes regles (ferme, passe, absent, sans RDV, pas de RDV en ligne)', /rdvIsSalonClosed/.test(addSrc) && /isPastDay/.test(addSrc) && /barberOffReason/.test(addSrc) && /isWalkinOn/.test(addSrc) && /accepts_appointments/.test(addSrc) && /var why = pdAddCheck\(b, dateStr\);\n  if \(why\) \{ toast\(why, true\); return; \}/.test(poste));
+check('D : bulle « Ajouter un RDV » / « Plusieurs personnes (groupe) », heure touchee mise en avant', /Ajouter un RDV<svg/.test(poste) && /Plusieurs personnes \(groupe\)<svg/.test(poste) && /paGoStep\('client', 'group'\)/.test(fnSrc('pdDAdd')) && /var prefTime = typeof pdDPrefTime !== 'undefined' \? pdDPrefTime : null;/.test(poste) && /classList\.add\('pref'\)/.test(poste));
 console.log('\n' + pass + ' OK, ' + fail + ' ECHEC');
 process.exit(fail ? 1 : 0);
