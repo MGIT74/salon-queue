@@ -28,11 +28,17 @@ check('poste : lignes non cliquables et pas de bouton « + Ajouter » un jour pa
 check('caisse : lignes non cliquables et pas de bouton « + Ajouter » un jour passe', /var trackClick = \(bid === 'unassigned' \|\| isPastDay\(dateStr\)\) \? ''/.test(read('caisse.html')) && /if \(activeBarberId && !isPastDay\(dateStr\)\)/.test(read('caisse.html')));
 
 console.log('\n[C] Calendrier : jours passes grises et non cliquables');
-[['dashboard.html', 'selectCalendarDay'], ['poste.html', 'selectCalDay'], ['caisse.html', 'selectCalDay']].forEach(([f, fn]) => {
+[['dashboard.html', 'selectCalendarDay'], ['caisse.html', 'selectCalDay']].forEach(([f, fn]) => {
   const s = read(f);
   check(f + ' : classe « past » (grisee) sur les jours passes, en Mois et en Semaine', (s.match(/if \(isPastDay\(dateStr\)\) classes \+= ' past';/g) || []).length === 2 && /\.cal-day\.past \{ opacity: \.5; \}/.test(s));
   check(f + ' : un jour passe reste cliquable pour consulter ses RDV (seule la prise de RDV est bloquee)', !/isPastDay\(dateStr\) \? '' : ' onclick/.test(s) && (s.match(new RegExp("' onclick=\"" + fn + "\\(\\\\'' \\+ dateStr", 'g')) || []).length === 2);
 });
+// Mon poste : Mois et Semaine au style de la vue Jour (test 155) - jours passes grises mais toujours ouvrables.
+{
+  const s = read('poste.html');
+  check('poste.html : jours passes grises en Mois (carte) et en Semaine (en-tete et colonne)', /\(ds < todayStr \? ' past' : ''\)/.test(s) && /pd-wk-head' \+ \(d === todayStr \? ' today' : ''\) \+ \(d < todayStr \? ' past' : ''\)/.test(s) && /\.pd-mday\.past \{ opacity: \.55; \}/.test(s));
+  check('poste.html : un jour passe reste ouvrable (sa vue Jour), seule la prise de RDV est bloquee', /onclick="pdShowDay\(\\'' \+ ds \+ '\\'\)"/.test(s) && /onclick="pdShowDay\(\\'' \+ d \+ '\\'\)" title="Ouvrir ce jour"/.test(s) && /if \(rdvIsSalonClosed\(dateStr\) \|\| isPastDay\(dateStr\)\) return '';/.test(s));
+}
 
 console.log('\n[D] Synchronisation des agendas');
 const caisse = read('caisse.html');

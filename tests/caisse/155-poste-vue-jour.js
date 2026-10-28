@@ -20,7 +20,14 @@ check('durees : 37 min, 1 h 35', ctx.pdDur(37) === '37 min' && ctx.pdDur(95) ===
 
 console.log('\n[B] Vue Jour');
 check('la vue Jour utilise la nouvelle mise en page', /view\.innerHTML = posteDayHtml\(dateStr\);/.test(poste));
-check('recherche client (nom, telephone, email) + resultats « Ce jour » / « Autres jours »', /id="pd-search"/.test(poste) && /Ce jour<\/div>/.test(poste) && /Autres jours<\/div>/.test(poste) && /function pdRunSearch/.test(poste));
+check('recherche client (nom, telephone, email) + resultats « Ce jour » / « Autres jours »', /id="pd-search"/.test(poste) && /pLabel = 'Ce jour'/.test(poste) && /pLabel = 'Cette semaine'/.test(poste) && /pLabel = 'Ce mois'/.test(poste) && /Autres jours<\/div>/.test(poste) && /function pdRunSearch/.test(poste));
+
+console.log('\n[C] Semaine et Mois au meme style');
+check('semaine : recherche + coup d\'œil des 7 jours (une piste par coiffeur) + 7 colonnes', /document\.getElementById\('cal-days'\)\.innerHTML = pdWeekHtml\(start\);/.test(poste) && /La semaine en un coup d’œil/.test(poste) && /pd-wk-cols/.test(poste));
+check('semaine : clic RDV = fiche, clic vide = ajouter pour moi ce jour-la, clic en-tete = vue Jour', /pd-wk-block[\s\S]{0,800}openPosteClientDrawer/.test(poste) && /pdColClickAttr\(meB, d\)/.test(poste) && /pd-wk-head[\s\S]{0,300}pdShowDay/.test(poste));
+check('mois : recherche + chiffres du mois + cartes (RDV, les miens, couleurs) ; toucher = vue Jour', /document\.getElementById\('cal-days'\)\.innerHTML = pdMonthHtml\(\);/.test(poste) && /RDV ce mois/.test(poste) && /pd-mchip/.test(poste) && /onclick="pdShowDay\(/.test(poste));
+check('un seul champ de recherche dans la page (l\'autre vue est videe)', /document\.getElementById\('cal-days'\)\.innerHTML = '';   \/\/ un seul champ/.test(poste) && (poste.match(/document\.getElementById\('cal-day-view'\)\.innerHTML = '';/g) || []).length >= 2);
+check('Moi seulement / Equipe et zoom redessinent la vue affichee', /function pdRerender\(\)/.test(poste) && /pdSetOnlyMe[\s\S]{0,300}pdRerender\(\)/.test(poste) && /pdZoom[\s\S]{0,400}pdRerender\(\)/.test(poste));
 check('RDV trouves allumes dans l\'agenda, les autres pâlis', /classList\.toggle\('pd-hit'/.test(poste) && /classList\.toggle\('pd-dim'/.test(poste));
 check('« + Nouveau RDV pour … » pre-remplit le nom (ou tel / email)', /function pdNewForQuery/.test(poste) && /nameEl\.value = q/.test(poste));
 check('coup d\'œil : une barre par coiffeur, trait « maintenant », resume', /La journée en un coup d’œil/.test(poste) && /pd-g-seg st-/.test(poste) && /Libre jusqu’à /.test(poste));
