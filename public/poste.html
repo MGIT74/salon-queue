@@ -413,6 +413,14 @@
   .pd-g-sum { display: flex; flex-direction: column; min-width: 0; }
   .pd-g-sum b { font-size: 13px; }
   .pd-g-sum small { font-size: 11.5px; color: var(--grey); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pd-g-day .pd-g-row { grid-template-columns: 30px minmax(0, 1fr) 34px; }
+  .pd-g-day .pd-g-name { justify-content: center; }
+  .pd-g-day .pd-g-name .pd-av { width: 28px; height: 28px; }
+  .pd-g-day .pd-g-row.me .pd-g-name .pd-av { box-shadow: 0 0 0 2px var(--fill), 0 0 0 4px var(--blue); }
+  .pd-g-day .pd-g-sum { align-items: center; }
+  .pd-g-ic { width: 30px; height: 30px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: var(--blue-soft, rgba(0,113,227,.14)); color: var(--blue); }
+  .pd-g-ic.walk { background: rgba(240,138,36,.16); color: #f08a24; }
+  .pd-g-ic.off { opacity: .4; }
   .pd-g-ticks { position: relative; height: 16px; margin: 4px 0 0; }
   .pd-g-ticks span { position: absolute; transform: translateX(-50%); font-size: 10.5px; color: var(--grey); font-variant-numeric: tabular-nums; }
 
@@ -555,6 +563,10 @@
   @media (max-width: 699px) {
     .pd-g-row { grid-template-columns: 64px minmax(0, 1fr); gap: 8px; }
     .pd-g-sum { display: none; }
+    .pd-g-day .pd-g-row { grid-template-columns: 24px minmax(0, 1fr) 28px; }
+    .pd-g-day .pd-g-sum { display: flex; }
+    .pd-g-day .pd-g-name .pd-av { width: 22px; height: 22px; }
+    .pd-g-ic { width: 26px; height: 26px; }
     .pd-g-name .pd-av { width: 20px; height: 20px; font-size: 10px; }
     .pd-g-name { font-size: 12px; gap: 5px; }
     .pd-g-bar { height: 24px; }
@@ -1628,16 +1640,20 @@ function posteDayHtml(dateStr) {
     } else if (!offWhy && !walkDay && its.length) sum2 = 'de ' + pdHM(its[0].start) + ' à ' + pdHM(Math.max.apply(null, its.map(function (it) { return it.end; })));
     var offTxt = offWhy ? esc(b.name) + ' ' + esc(offWhy) : (walkDay ? 'En « sans RDV » ce jour-là' : (!its.length ? 'Aucun RDV' : ''));
     var focus = pdFocusId ? pdFocusId === b.id : isMe;
+    var walkMode = !!(rowB && (walkDay || !rowB.kiosk_hidden));
     return '<button type="button" class="pd-g-row' + (isMe ? ' me' : '') + (focus ? ' focus' : '') + '" onclick="pdFocus(\'' + b.id + '\')" aria-label="Voir la journée de ' + esc(b.name) + '">' +
-      '<span class="pd-g-name">' + pdAvatarHtml(b) + '<span>' + (isMe ? 'Moi' : esc(b.name)) + '</span></span>' +
+      '<span class="pd-g-name" title="' + esc(isMe ? b.name + ' (moi)' : b.name) + '">' + pdAvatarHtml(b) + '</span>' +   // juste la photo, le nom en info-bulle
       '<span class="pd-g-bar">' + segs + (offTxt ? '<span class="pd-g-off">' + offTxt + '</span>' : '') +
         (isToday && nowMin >= R0 && nowMin <= R1 ? '<span class="pd-g-now" style="left:' + pct(nowMin) + '%"></span>' : '') + '</span>' +
-      '<span class="pd-g-sum"><b>' + esc(sum1) + '</b><small>' + esc(sum2) + '</small></span></button>';
+      // À droite : l'icône RDV ou Sans RDV de l'app (le détail en info-bulle).
+      // Même règle que l'étiquette RDV / Sans RDV de l'app (barberModeTagHtml), pour ce jour-là.
+      '<span class="pd-g-sum"><span class="pd-g-ic ' + (walkMode ? 'walk' : 'rdv') + (offWhy ? ' off' : '') + '" title="' + esc(b.name + ' — ' + (walkMode ? 'Sans RDV' : 'RDV') + ' — ' + sum1 + (sum2 ? ' · ' + sum2 : '')) + '">' +
+        rdvModeIconSvg(walkMode, 16) + '</span></span></button>';
   }).join('');
   var ticks = '';
   // Telephone : une heure sur trois seulement (classe minor masquee), sinon les heures se chevauchent.
   for (var t = R0; t <= R1; t += 60) ticks += '<span' + ((t - R0) % 180 ? ' class="minor"' : '') + ' style="left:' + pct(t) + '%">' + pdHM(t) + '</span>';
-  html += '<section class="pd-glance" aria-label="La journée en un coup d’œil">' +
+  html += '<section class="pd-glance pd-g-day" aria-label="La journée en un coup d’œil">' +
     '<div class="pd-glance-head"><strong>La journée en un coup d’œil</strong>' +
     '<span class="pd-legend"><span><i style="background:var(--ink);opacity:.75"></i>À venir</span><span><i style="background:var(--ink);opacity:.25"></i>Terminé</span>' +
     '<span><i style="border:1px dashed var(--grey)"></i>Absent</span>' + (isToday ? '<span><i style="width:2px;background:var(--red)"></i>Maintenant</span>' : '') + '</span></div>' +

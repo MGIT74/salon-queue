@@ -52,5 +52,6 @@ const tsA = ctx.pdTimeScale(540, 600, 1.3), tsB = ctx.pdTimeScale(540, 600, 4.5)
 check('heures de l\'agenda selon le « pas des creneaux » (Rendez-vous > Parametres) : 5 min -> 09:30 a petit zoom, 09:05 a grand zoom', /09:30/.test(tsA.hours) && !/09:05/.test(tsA.hours) && !/09:20/.test(tsA.hours) && /09:05/.test(tsB.hours) && /09:55/.test(tsB.hours) && /10:00/.test(tsB.hours) && (poste.match(/= pdTimeScale\(R0, R1, PX\)/g) || []).length === 2 && /max="6" step="0\.1"/.test(poste));
 ctx.rdvSlotStepMin = 15;
 check('pas de 15 min : 09:15 / 09:30 / 09:45 quand la place le permet', /09:15/.test(ctx.pdTimeScale(540, 600, 2).hours) && /09:45/.test(ctx.pdTimeScale(540, 600, 2).hours));
+check('coup d\'œil du jour : photo seule a gauche (nom en info-bulle), icone RDV / Sans RDV de l\'app a droite', /'<span class="pd-g-name" title="' \+ esc\(isMe \? b\.name \+ ' \(moi\)' : b\.name\) \+ '">' \+ pdAvatarHtml\(b\) \+ '<\/span>'/.test(poste) && /rdvModeIconSvg\(walkMode, 16\)/.test(poste) && /var walkMode = !!\(rowB && \(walkDay \|\| !rowB\.kiosk_hidden\)\);/.test(poste) && /class="pd-glance pd-g-day"/.test(poste));
 console.log('\n' + pass + ' OK, ' + fail + ' ECHEC');
 process.exit(fail ? 1 : 0);
