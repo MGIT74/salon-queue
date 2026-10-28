@@ -1158,13 +1158,15 @@ function saveNextNote(id) {
 function cancelMine(id) {
   var q = queue.find(function (x) { return x.id === id; });
   var name = q ? q.client_name : 'ce client';
-  var paidWarn = q && q.paid_at ? ' Attention : il a déjà payé d\'avance, le remboursement n\'est pas automatique.' : '';
+  // Déjà payé d'avance (seul, ou avec le ticket de son groupe) : l'argent reste encaissé, à rendre à la main.
+  var paidAmt = q && q.paid_at && q.total_price_cents ? ' (' + eur(q.total_price_cents) + ')' : '';
+  var paidWarn = q && q.paid_at ? ' Attention : il a déjà payé d\'avance' + paidAmt + ' : rendez-lui cet argent (espèces ou terminal), le remboursement n\'est pas automatique.' : '';
   showConfirm('Marquer ' + name + ' comme absent ? Il sera retiré de la file.' + paidWarn, { title: 'Client absent', danger: true, confirmLabel: 'Marquer absent' })
     .then(function (ok) {
       if (!ok) return;
       barberApi('/api/queue/' + id + '/cancel', { method: 'POST', body: {} })
         .then(refresh)
-        .then(function () { toast('Client marqué absent'); })
+        .then(function () { toast(q && q.paid_at ? name + ' marqué absent — pensez à lui rendre ' + (paidAmt ? paidAmt.slice(2, -1) : 'son paiement') : 'Client marqué absent', !!(q && q.paid_at)); })
         .catch(function (e) { toast(e.message, true); });
     });
 }

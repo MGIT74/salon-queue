@@ -4339,7 +4339,9 @@ function finishCut(id) {
 
 function cancelCut(id) {
   var q = queue.find(function (x) { return x.id === id; });
-  var paidWarn = q && q.paid_at ? ' Attention : il a déjà payé d\'avance, le remboursement n\'est pas automatique.' : '';
+  // Déjà payé d'avance (seul, ou avec le ticket de son groupe) : l'argent reste encaissé, à rendre à la main.
+  var paidAmt = q && q.paid_at && q.total_price_cents ? ' (' + eur(q.total_price_cents) + ')' : '';
+  var paidWarn = q && q.paid_at ? ' Attention : il a déjà payé d\'avance' + paidAmt + ' : rendez-lui cet argent (espèces ou terminal), le remboursement n\'est pas automatique.' : '';
   showConfirm('Marquer ce client comme absent ?' + paidWarn, { title: 'Client absent', danger: true }).then(function (ok) {
     if (!ok) return;
     api('/api/queue/' + id + '/cancel', { method: 'POST', body: {} })
