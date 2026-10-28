@@ -97,15 +97,24 @@ router.post('/signup', signupRateLimiter('client-signup'), wrap(async (req, res)
 router.post('/verify-email', wrap(async (req, res) => {
   const { token } = req.body;
   if (!token) return res.status(400).json({ error: 'Lien invalide' });
+  // Le jeton est GARDE apres activation : un 2e clic sur le lien (tres frequent) dit « deja active »
+  // au lieu de « lien invalide », qui faisait croire au client que son compte ne marchait pas.
   const [[client]] = await pool.query(
-    'SELECT id, pending_email FROM clients WHERE verify_token = ? AND verify_token_expires > NOW() AND salon_id = ?', [token, req.salon.id]
+    'SELECT id, email, pending_email, email_verified, verify_token_expires > NOW() AS still_valid FROM clients WHERE verify_token = ? AND salon_id = ?',
+    [String(token), req.salon.id]
   );
-  if (!client) return res.status(400).json({ error: 'Ce lien est invalide ou a expiré.' });
+  if (!client) {
+    return res.status(400).json({ error: "Ce lien n'est plus valide. Connectez-vous avec votre email : si votre compte n'est pas encore activé, vous pourrez recevoir un nouveau lien." });
+  }
+  if (client.email_verified && !client.pending_email) return res.json({ ok: true, already: true, email: client.email });
+  if (!client.still_valid) {
+    return res.status(400).json({ error: 'Ce lien a expiré (valable 24 heures). Demandez un nouveau lien ci-dessous.', expired: true, email: client.pending_email || client.email });
+  }
   await pool.query(
-    'UPDATE clients SET email = COALESCE(pending_email, email), pending_email = NULL, email_verified = 1, verify_token = NULL, verify_token_expires = NULL WHERE id = ?',
+    'UPDATE clients SET email = COALESCE(pending_email, email), pending_email = NULL, email_verified = 1 WHERE id = ?',
     [client.id]
   );
-  res.json({ ok: true });
+  res.json({ ok: true, email: client.pending_email || client.email });
 }));
 
 router.post('/resend-verification', signupRateLimiter('client-resend'), wrap(async (req, res) => {

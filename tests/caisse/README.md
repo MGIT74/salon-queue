@@ -186,4 +186,5 @@ node tests/caisse/149-conge-en-plusieurs-morceaux.js  # Conge en plusieurs morce
 node tests/caisse/150-caisse-agenda-legende.js  # Caisse > Agenda : legende des couleurs des coiffeurs
 node tests/caisse/151-planning-sans-bande-grise.js  # Planning : plus de bande grise au survol d'une ligne
 node tests/caisse/152-tiroir-rdv-identique-et-prix.js  # Tiroir RDV identique partout + detail du prix (tarif coiffeur, supplements)
+node tests/caisse/153-lien-activation-compte.js  # Lien d'activation : message clair, 2e clic, lien expire
 ```

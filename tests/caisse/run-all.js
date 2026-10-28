@@ -172,7 +172,8 @@ const suite = [
   ['149-conge-en-plusieurs-morceaux.js', false, ['exit']],
   ['150-caisse-agenda-legende.js', false, ['exit']],
   ['151-planning-sans-bande-grise.js', false, ['exit']],
-  ['152-tiroir-rdv-identique-et-prix.js', false, ['exit']]
+  ['152-tiroir-rdv-identique-et-prix.js', false, ['exit']],
+  ['153-lien-activation-compte.js', false, ['exit']]
 ];
 
 let bad = 0;

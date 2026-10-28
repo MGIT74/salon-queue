@@ -477,6 +477,7 @@
         <div class="fld"><label for="li-pass">Mot de passe</label><input id="li-pass" type="password"></div>
         <button class="go" onclick="doLogin()">Se connecter</button>
         <div class="err" id="login-err"></div>
+        <div id="login-ok" style="display:none;margin-top:12px;padding:12px 14px;border-radius:12px;background:rgba(30,126,52,.12);color:var(--green, #1e7e34);font-size:14px;font-weight:600;text-align:center"></div>
         <div style="text-align:center;margin-top:16px;display:flex;justify-content:space-between">
           <button class="link-btn" onclick="show('p-signup')">Créer un compte</button>
           <button class="link-btn" id="resend-btn" style="display:none" onclick="doResendVerification()">Renvoyer le lien de confirmation</button>
@@ -986,6 +987,7 @@ function doLogin() {
   var email = document.getElementById('li-email').value.trim();
   var password = document.getElementById('li-pass').value;
   document.getElementById('login-err').textContent = '';
+  var okEl = document.getElementById('login-ok'); if (okEl) okEl.style.display = 'none';
   document.getElementById('resend-btn').style.display = 'none';
   api('/api/client-auth/login', { method: 'POST', body: { email: email, password: password } })
     .then(function (d) {
@@ -2228,16 +2230,27 @@ function guardMissingSalon() {
 
   if (verifyToken) {
     api('/api/client-auth/verify-email', { method: 'POST', body: { token: verifyToken } })
-      .then(function () {
+      .then(function (d) {
         window.history.replaceState({}, '', window.location.pathname + (SALON_SLUG ? '?salon=' + SALON_SLUG : ''));
         document.documentElement.classList.remove('auth-checking');
         show('p-login');
         document.getElementById('login-err').textContent = '';
+        // Message clair : avant, la page affichait juste « Connectez-vous » et le client croyait que le lien n'avait pas marché.
+        var ok = document.getElementById('login-ok');
+        ok.textContent = d.already ? '✓ Votre compte est déjà activé. Connectez-vous avec votre email et votre mot de passe.'
+          : '✓ Votre compte est activé ! Connectez-vous avec votre email et votre mot de passe.';
+        ok.style.display = '';
+        if (d.email) document.getElementById('li-email').value = d.email;
+        document.getElementById('li-pass').focus();
       })
       .catch(function (e) {
+        window.history.replaceState({}, '', window.location.pathname + (SALON_SLUG ? '?salon=' + SALON_SLUG : ''));
         document.documentElement.classList.remove('auth-checking');
-        document.getElementById('login-err').textContent = e.message;
         show('p-login');
+        document.getElementById('login-err').textContent = e.message;
+        // Lien expire : email pre-rempli + bouton « Renvoyer le lien de confirmation ».
+        if (e.data && e.data.email) document.getElementById('li-email').value = e.data.email;
+        if (e.data && e.data.expired) document.getElementById('resend-btn').style.display = '';
       });
     return;
   }
