@@ -477,7 +477,8 @@ router.get('/availability-days', wrap(async (req, res) => {
  * Detail du prix de chaque RDV, pour l'afficher dans les tiroirs (admin, caisse, poste) :
  *  - prestation : tarif PERSONNALISE du coiffeur s'il existe (custom: true), sinon celui du catalogue ;
  *  - supplements choisis, chacun a son tarif (coiffeur ou catalogue) ;
- *  - total estime = prestation + supplements ; charged_cents = montant reel de la ligne de file si le RDV y est deja.
+ *  - produits choisis d'avance (en ligne / borne), avec quantite - sans duree ;
+ *  - total = prestation + supplements + produits ; charged_cents = montant de la ligne de file (prestation + supplements).
  * Meme regle que barberOffer / queueMath : c'est ce qui est encaisse.
  */
 async function apptPricing(rows) {
@@ -502,6 +503,17 @@ async function apptPricing(rows) {
      LEFT JOIN barber_extra_prices bep ON bep.barber_id = a.barber_id AND bep.extra_id = ae.extra_id
      WHERE ae.appointment_id IN (?) ORDER BY e.name`, [ids]
   );
+  // Produits choisis d'avance (en ligne ou a la borne) : ceux de la ligne de file si le RDV y est deja
+  // (c'est ce que la caisse ajoutera au ticket), sinon ceux du RDV. Jamais de duree.
+  const [prodA] = await pool.query(
+    `SELECT ap.appointment_id, p.name, p.price_cents, ap.quantity FROM appointment_products ap
+     JOIN products p ON p.id = ap.product_id WHERE ap.appointment_id IN (?) ORDER BY p.name`, [ids]
+  );
+  const [prodQ] = await pool.query(
+    `SELECT a.id AS appointment_id, p.name, p.price_cents, qp.quantity FROM appointments a
+     JOIN queue_products qp ON qp.queue_id = a.promoted_queue_id
+     JOIN products p ON p.id = qp.product_id WHERE a.id IN (?) ORDER BY p.name`, [ids]
+  );
   const num = (v) => (v === null || v === undefined ? null : Number(v));
   svc.forEach((r) => {
     const extrasOnly = Boolean(r.system_kind);
@@ -513,6 +525,7 @@ async function apptPricing(rows) {
       service_catalog_duration_min: extrasOnly ? 0 : Number(r.cat_duration) || 0,
       custom,
       extras: [],
+      products: [],
       charged_cents: num(r.charged_cents),
     };
   });
@@ -526,8 +539,16 @@ async function apptPricing(rows) {
       custom: num(e.b_price) !== null || num(e.b_duration) !== null,
     });
   });
+  const fromQueue = new Set(prodQ.map((x) => x.appointment_id));
+  prodQ.concat(prodA.filter((x) => !fromQueue.has(x.appointment_id))).forEach((x) => {
+    const p = out[x.appointment_id];
+    if (p) p.products.push({ name: x.name, unit_price_cents: Number(x.price_cents) || 0, quantity: Number(x.quantity) || 1 });
+  });
   Object.values(out).forEach((p) => {
-    p.total_cents = p.service_price_cents + p.extras.reduce((t, x) => t + x.price_cents, 0);
+    // services_total_cents = prestation + supplements (= montant de la ligne de file, qui ne compte pas les produits)
+    p.services_total_cents = p.service_price_cents + p.extras.reduce((t, x) => t + x.price_cents, 0);
+    p.products_total_cents = p.products.reduce((t, x) => t + x.unit_price_cents * x.quantity, 0);
+    p.total_cents = p.services_total_cents + p.products_total_cents;
     p.total_duration_min = p.service_duration_min + p.extras.reduce((t, x) => t + x.duration_min, 0);
   });
   return out;

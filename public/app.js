@@ -779,8 +779,13 @@ function apptPricingHtml(a) {
       p.custom ? '(tarif de ' + esc(a.barber_name || 'ce coiffeur') + ' — catalogue : ' + eur(p.service_catalog_price_cents) + ' · ' + formatMinutes(p.service_catalog_duration_min) + ')' : '');
   }
   p.extras.forEach(function (x) { html += line('+ ' + esc(x.name), x.price_cents, x.duration_min, x.custom ? '(tarif de ' + esc(a.barber_name || 'ce coiffeur') + ')' : ''); });
-  var charged = p.charged_cents !== null && p.charged_cents !== undefined && p.charged_cents !== p.total_cents
-    ? '<div style="font-size:12.5px;color:var(--grey);margin-top:4px">Montant actuellement en caisse : ' + eur(p.charged_cents) + '</div>' : '';
+  // Produits choisis d'avance (en ligne / borne) : ajoutes au ticket a l'encaissement, sans duree.
+  (p.products || []).forEach(function (x) {
+    html += line('+ ' + esc(x.name) + (x.quantity > 1 ? ' × ' + x.quantity : ''), x.unit_price_cents * x.quantity, 0, 'produit');
+  });
+  var svcTotal = p.services_total_cents !== undefined ? p.services_total_cents : p.total_cents;
+  var charged = p.charged_cents !== null && p.charged_cents !== undefined && p.charged_cents !== svcTotal
+    ? '<div style="font-size:12.5px;color:var(--grey);margin-top:4px">Prestation actuellement en caisse : ' + eur(p.charged_cents) + '</div>' : '';
   return '<div class="detail-row" style="flex-direction:column;align-items:stretch;gap:0">' +
     '<div style="display:flex;justify-content:space-between;gap:10px"><span class="detail-label">Prix</span>' +
     '<span class="detail-value">' + formatMinutes(p.total_duration_min) + ' · ' + eur(p.total_cents) + '</span></div>' +

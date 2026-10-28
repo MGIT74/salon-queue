@@ -24,9 +24,18 @@ check('Quand / Coiffeur / Email / Telephone', /Quand Mercredi 28 octobre à 10:5
 const b = JSON.parse(JSON.stringify(a)); b.pricing = { service_price_cents: 2700, service_duration_min: 35, service_catalog_price_cents: 2200, service_catalog_duration_min: 30, custom: true, extras: [], total_cents: 2700, total_duration_min: 35, charged_cents: 2500 };
 h = txt(ctx.apptInfoRowsHtml(b));
 check('tarif personnalise du coiffeur signale, avec le tarif du catalogue', /tarif de Mounir — catalogue : 22,00 € · 30 min/.test(h), h);
-check('montant en caisse different : affiche', /Montant actuellement en caisse : 25,00 €/.test(h));
+check('montant en caisse different : affiche', /Prestation actuellement en caisse : 25,00 €/.test(h));
 check('sans detail (ancien serveur) : pas de ligne Prix, pas d\'erreur', !/Prix/.test(txt(ctx.apptInfoRowsHtml(Object.assign({}, a, { pricing: null })))));
 check('statut : Confirmé / Terminé / Annulé', /Confirmé/.test(ctx.apptBadgeHtml(a)) && /Terminé/.test(ctx.apptBadgeHtml({ display_status: 'completed' })) && /Annulé/.test(ctx.apptBadgeHtml({ status: 'cancelled' })));
+
+const c = JSON.parse(JSON.stringify(a));
+c.pricing.products = [{ name: 'Coca', unit_price_cents: 250, quantity: 2 }];
+c.pricing.services_total_cents = 2700; c.pricing.products_total_cents = 500; c.pricing.total_cents = 3200;
+h = txt(ctx.apptInfoRowsHtml(c));
+check('produit choisi d\'avance : nom × quantite et prix (sans duree)', /\+ Coca × 2 produit 5,00 €/.test(h), h);
+check('total avec le produit, duree inchangee : 40 min · 32,00 €', /Prix 35 min · 32,00 €/.test(h));
+check('produit : pas de « en caisse » a tort (la file ne compte que prestation + supplements)', !/actuellement en caisse/.test(h));
+check('serveur : produits du RDV (ou de la ligne de file), total avec produits', /FROM appointment_products ap/.test(api) && /JOIN queue_products qp ON qp\.queue_id = a\.promoted_queue_id/.test(api) && /p\.total_cents = p\.services_total_cents \+ p\.products_total_cents/.test(api));
 
 console.log('\n[B] Branchement : meme tiroir partout');
 check('caisse : tiroir RDV = apptInfoRowsHtml', /document\.getElementById\('ad-info'\)\.innerHTML = apptInfoRowsHtml\(a\);/.test(caisse) && /apptBadgeHtml\(a\)/.test(caisse));
