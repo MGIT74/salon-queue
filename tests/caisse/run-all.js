@@ -176,7 +176,8 @@ const suite = [
   ['153-lien-activation-compte.js', false, ['exit']],
   ['154-rdv-non-demarre-en-caisse.js', false, ['exit']],
   ['155-poste-vue-jour.js', false, ['exit']],
-  ['156-caisse-cartes-a-encaisser.js', false, ['exit']]
+  ['156-caisse-cartes-a-encaisser.js', false, ['exit']],
+  ['157-modifier-prestation-rdv.js', false, ['exit']],
 ];
 
 let bad = 0;

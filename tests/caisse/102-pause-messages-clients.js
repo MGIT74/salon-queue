@@ -48,6 +48,7 @@ const mailer = require('../../src/lib/mailer');
   await mailer.sendAppointmentReminder('off', 'b@client.test', info);
   await mailer.sendAppointmentCancelledByAdmin('off', 'c@client.test', info);
   await mailer.sendAppointmentRescheduled('off', 'd@client.test', info);
+  await mailer.sendAppointmentServicesChanged('off', 'd2@client.test', Object.assign({ durationMin: 45, price: '32,00 €' }, info));
   await mailer.sendSalonClosureNotice('off', 'e@client.test', info);
   await mailer.sendTurnSoon('off', 'f@client.test', 'Karim', 10);
   await mailer.sendCustomClientEmail('off', 'g@client.test', 'Karim', 'Promo', 'Bonjour');

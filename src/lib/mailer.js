@@ -351,6 +351,27 @@ async function sendAppointmentRescheduled(salonId, to, info) {
   });
 }
 
+/** « Modifier la prestation » d'un RDV : nouvelle prestation, horaire, durée et prix. */
+async function sendAppointmentServicesChanged(salonId, to, info) {
+  const { tx, from, salon } = await getTransport(salonId);
+  await tx.sendMail({
+    from,
+    to,
+    subject: 'Votre rendez-vous a été modifié — ' + salon,
+    text: `Bonjour ${info.clientName},\n\n` +
+      `La prestation de votre rendez-vous chez ${salon} a été modifiée.\n\n` +
+      `Prestation : ${info.serviceName} (${info.durationMin} min) — ${info.price}\n` +
+      `Horaire : ${info.when}${info.barberName ? ' avec ' + info.barberName : ''}\n\n` +
+      `Besoin d'annuler ? ${info.cancelUrl}\n\n${salon}`,
+    html: `<p>Bonjour ${h(info.clientName)},</p>` +
+      `<p>La prestation de votre rendez-vous chez ${h(salon)} a été modifiée.</p>` +
+      `<p>Prestation : <strong>${h(info.serviceName)}</strong> (${h(String(info.durationMin))} min) — ${h(info.price)}<br>` +
+      `Horaire : <strong>${h(info.when)}</strong>${h(info.barberName ? ' avec ' + info.barberName : '')}</p>` +
+      `<p><a href="${h(info.cancelUrl)}">Annuler ce rendez-vous</a></p>` +
+      `<p>${h(salon)}</p>`
+  });
+}
+
 async function sendClientVerificationEmail(salonId, to, verifyUrl, options = {}) {
   const { tx, from, salon } = await getTransport(salonId, { force: true });
   // Création de compte : texte modifiable (Réglages > Notifications email). Le lien est TOUJOURS présent :
@@ -473,6 +494,6 @@ async function sendCustomClientEmail(salonId, to, clientName, subject, message) 
 
 module.exports = {
   sendTurnSoon, sendTest, sendGiftConfirmation, sendGiftCodeRenewed, sendLoyaltyActivation, sendAppointmentConfirmation, sendGroupAppointmentConfirmation,
-  sendAppointmentReminder, sendAppointmentCancelledByAdmin, sendAppointmentRescheduled,
+  sendAppointmentReminder, sendAppointmentCancelledByAdmin, sendAppointmentRescheduled, sendAppointmentServicesChanged,
   sendClientVerificationEmail, sendClientPasswordReset, sendClientSecurityNotice, sendAdminEmailVerification, sendSalonClosureNotice, sendCustomClientEmail, invalidateTransport, emailsPaused, forceSend
 };

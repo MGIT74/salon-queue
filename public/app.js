@@ -1794,3 +1794,191 @@ function barberOffReason(b, dateStr) {
   if (isWalkinOn(b, dateStr)) return 'est en « sans RDV » ce jour-là';
   return 'ne travaille pas ce jour-là';
 }
+
+/* ---------- « Modifier la prestation » d'un RDV à venir (Mon poste, Caisse, admin) ----------
+   Mêmes cartes que la prise de RDV (prestation, suppléments, produits), le choix actuel déjà coché, avec le nouveau
+   prix et la nouvelle heure de fin. Le serveur garde l'heure de début et vérifie la place derrière :
+   - ça tient -> enregistré (le client reçoit un email) ;
+   - ça dépasse de 10 min au plus -> on demande « Enregistrer quand même ? » ;
+   - plus de 10 min -> « Déplacer ce RDV » (créneaux libres pour la nouvelle durée) ou changer la prestation.
+   cfg : { call(path, opts) -> Promise (api / barberApi), actingAs, services, extras, products, barbers, onSaved() } */
+function openApptServicesEditor(a, cfg) {
+  if (!a) return;
+  cfg = cfg || {};
+  var call = cfg.call || api;
+  var barberList = cfg.barbers || [];
+  var target = barberList.find(function (b) { return b.id === a.barber_id; }) || null;
+  var svcOffer = target ? barberItems(target, 'services', cfg.services || []) : (cfg.services || []);
+  var extOffer = target ? barberItems(target, 'extras', cfg.extras || []) : (cfg.extras || []);
+  var prodOffer = (cfg.products || []).filter(function (p) { return p.online_bookable !== 0; });
+  var pr = a.pricing || {};
+  var startTime = String(a.scheduled_at).slice(11, 16), dateStr = String(a.scheduled_at).slice(0, 10);
+  var oldDur = Number(pr.total_duration_min || a.duration_min || 0);
+  var state = {
+    serviceId: svcOffer.some(function (s) { return String(s.id) === String(a.service_id); }) ? String(a.service_id) : ((pr.extras || []).length && !pr.service_duration_min ? EXTRAS_ONLY : String(a.service_id)),
+    extraIds: (pr.extras || []).map(function (x) { return String(x.id); }).filter(Boolean),
+    products: (pr.products || []).filter(function (x) { return x.id; }).map(function (x) { return { id: String(x.id), quantity: x.quantity || 1 }; })
+  };
+  var productIds = state.products.map(function (p) { return p.id; });
+  var whenTxt = new Date(dateStr + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+  var hm = function (m) { return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); };
+  var toMin = function (t) { return Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5)); };
+
+  var overlay = _buildModal(
+    '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px">' +
+      '<div class="modal-title" style="margin-bottom:0">Modifier la prestation — ' + esc(a.client_name) + '</div>' +
+      '<button type="button" class="ase-x" style="background:var(--fill);border:none;width:30px;height:30px;border-radius:50%;color:var(--grey);font-size:14px;cursor:pointer;flex-shrink:0;margin-left:10px" aria-label="Fermer">✕</button>' +
+    '</div>' +
+    '<div id="ase-step-edit">' +
+      '<div class="hint" style="margin:0 0 6px">' + esc(whenTxt.charAt(0).toUpperCase() + whenTxt.slice(1)) + ' à ' + startTime + (target ? ' · ' + esc(target.name) : '') + ' — même heure de début</div>' +
+      '<div class="aa-step-title">Prestation</div>' +
+      '<div class="item-grid compact" id="ase-service-grid"></div>' +
+      '<div class="aa-step-title" style="margin-top:14px">Suppléments</div>' +
+      '<div class="item-grid compact" id="ase-extras-grid"></div>' +
+      (prodOffer.length ? '<div class="aa-step-title" style="margin-top:14px">Produits</div><div class="item-grid compact" id="ase-products-grid"></div>' : '') +
+      '<div class="modal-error" id="ase-error" style="display:none"></div>' +
+      '<div class="modal-actions"><span class="ase-end" id="ase-end" style="flex:1;align-self:center;font-size:13px;color:var(--grey)"></span>' +
+        '<button type="button" class="btn btn-soft ase-cancel">Annuler</button><button type="button" class="btn btn-primary" id="ase-save">Enregistrer</button></div>' +
+    '</div>' +
+    '<div id="ase-step-move" style="display:none">' +
+      '<button type="button" class="aa-back" id="ase-back">‹ Retour à la prestation</button>' +
+      '<div class="hint" id="ase-move-hint" style="margin:0 0 8px"></div>' +
+      '<div class="fld" style="margin-bottom:10px"><label>Coiffeur</label><select class="modal-input" id="ase-barber"></select></div>' +
+      '<div class="fld" style="margin-bottom:10px"><label>Date</label><input class="modal-input" type="date" id="ase-date" value="' + dateStr + '"></div>' +
+      '<div class="aa-slots" id="ase-slots"></div>' +
+      '<div class="modal-error" id="ase-move-error" style="display:none"></div>' +
+      '<div class="modal-actions"><button type="button" class="btn btn-soft ase-cancel">Annuler</button><button type="button" class="btn btn-primary" id="ase-move-save" disabled>Enregistrer</button></div>' +
+    '</div>'
+  );
+  var $ = function (sel) { return overlay.querySelector(sel); };
+  var close = function () { _closeModal(overlay); };
+  overlay.querySelectorAll('.ase-x, .ase-cancel').forEach(function (b) { b.onclick = close; });
+
+  function sel() {
+    var s = state.serviceId === EXTRAS_ONLY ? EXTRAS_ONLY_SERVICE : svcOffer.find(function (x) { return String(x.id) === String(state.serviceId); });
+    return {
+      service: s || null,
+      extras: extOffer.filter(function (x) { return state.extraIds.indexOf(String(x.id)) !== -1; }),
+      products: prodOffer.filter(function (x) { return productIds.indexOf(String(x.id)) !== -1; }),
+      barber: moveTime ? ($('#ase-barber').selectedOptions[0] || {}).textContent : (target ? target.name : ''),
+      when: moveTime ? new Date($('#ase-date').value + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }) : whenTxt,
+      time: moveTime || startTime
+    };
+  }
+  function newDuration() {
+    var s = sel();
+    return (s.service ? Number(s.service.duration_min) || 0 : 0) + s.extras.reduce(function (t, x) { return t + (Number(x.duration_min) || 0); }, 0);
+  }
+  function refreshEnd() {
+    var d = newDuration(), el = $('#ase-end');
+    el.innerHTML = 'Fin prévue <b style="color:var(--ink)">' + hm(toMin(startTime) + d) + '</b>' +
+      (d !== oldDur && oldDur ? ' (avant ' + hm(toMin(startTime) + oldDur) + ')' : '');
+  }
+  var moveTime = null;   // créneau choisi à l'étape « Déplacer »
+  var refreshRecap = vitrineFlow(overlay, sel);
+  function render() {
+    vitrineRender({ kind: 'services', gridId: 'ase-service-grid', items: svcOffer, chosen: [state.serviceId], onclick: 'aseService(this)' });
+    if (extOffer.length) $('#ase-service-grid').insertAdjacentHTML('afterbegin', extrasOnlyCardHtml(state.serviceId === EXTRAS_ONLY, 'aseService(this)'));
+    vitrineRender({ kind: 'extras', gridId: 'ase-extras-grid', items: extOffer, chosen: state.extraIds, onclick: 'aseToggle(this, \'extras\')' });
+    if (prodOffer.length) vitrineRender({ kind: 'products', gridId: 'ase-products-grid', items: prodOffer, chosen: productIds, onclick: 'aseToggle(this, \'products\')' });
+    refreshEnd(); refreshRecap();
+  }
+  window.aseService = function (el) {
+    state.serviceId = el.dataset.id;
+    vitrineSelectOne(el);
+    hideErr(); refreshEnd(); refreshRecap();
+  };
+  window.aseToggle = function (el, kind) {
+    var list = kind === 'extras' ? state.extraIds : productIds, id = String(el.dataset.id), i = list.indexOf(id);
+    if (i === -1) list.push(id); else list.splice(i, 1);
+    vitrineToggle(el);
+    hideErr(); refreshEnd(); refreshRecap();
+  };
+  function hideErr() { $('#ase-error').style.display = 'none'; }
+  function bodyFor(extra) {
+    var qty = {};
+    state.products.forEach(function (p) { qty[p.id] = p.quantity; });
+    return Object.assign({
+      service_id: state.serviceId, extras: state.extraIds.slice(),
+      products: productIds.map(function (id) { return { id: id, quantity: qty[id] || 1 }; }),
+      base_url: window.location.origin + '/rdv.html'
+    }, extra || {});
+  }
+  function done(r) {
+    close();
+    toast((r && r.moved ? 'RDV déplacé à ' + moveTime + ' avec la nouvelle prestation' : 'Prestation modifiée' + (r && r.over_min ? ' (dépasse de ' + r.over_min + ' min)' : '')) +
+      (r && r.emailed ? ' · email envoyé au client' : ''));
+    if (cfg.onSaved) cfg.onSaved(r);
+  }
+  function save(force) {
+    if (state.serviceId === EXTRAS_ONLY && !state.extraIds.length) { showErr('Choisissez au moins un supplément.'); return; }
+    var btn = $('#ase-save'); btn.disabled = true;
+    call('/api/appointments/' + a.id + '/services', { method: 'PUT', actingAs: cfg.actingAs || a.barber_id || undefined, body: bodyFor(force ? { force: true } : null) })
+      .then(done)
+      .catch(function (e) {
+        btn.disabled = false;
+        var d = e.data || {};
+        if (d.code === 'overlap_confirm') {
+          showConfirm(d.error + ' C’est toléré jusqu’à 10 min. Enregistrer quand même ?', { title: 'Ça déborde un peu', confirmLabel: 'Enregistrer quand même' })
+            .then(function (ok) { if (ok) save(true); });
+        } else if (d.code === 'no_room') {
+          showErr(esc(d.error), true);
+        } else showErr(esc(e.message));
+      });
+  }
+  function showErr(html, withMove) {
+    var el = $('#ase-error');
+    el.innerHTML = html + (withMove ? '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">' +
+      '<button type="button" class="btn btn-primary" onclick="aseGoMove()">Déplacer ce RDV</button>' +
+      '<button type="button" class="btn btn-soft" onclick="aseKeepEditing()">Changer la prestation</button></div>' : '');
+    el.style.display = 'block';
+    try { el.scrollIntoView({ block: 'nearest' }); } catch (e) {}
+  }
+  window.aseKeepEditing = hideErr;
+  $('#ase-save').onclick = function () { save(false); };
+
+  // Déplacer : créneaux libres pour la NOUVELLE durée (même parcours que « Déplacer »), prestation + horaire enregistrés ensemble.
+  window.aseGoMove = function () {
+    $('#ase-step-edit').style.display = 'none';
+    $('#ase-step-move').style.display = 'flex';
+    var s = sel();
+    $('#ase-move-hint').textContent = 'Nouvelle durée : ' + formatMinutes(newDuration()) + ' — ' + (s.service && !s.service.extras_only ? s.service.name : '') +
+      (s.extras.length ? (s.service && !s.service.extras_only ? ' + ' : '') + s.extras.map(function (x) { return x.name; }).join(' + ') : '');
+    var opts = barberList.filter(function (b) { return b.id === a.barber_id || Boolean(b.accepts_appointments && b.active !== 0 && hasBookableSchedule(b)); });
+    $('#ase-barber').innerHTML = opts.map(function (b) { return '<option value="' + b.id + '"' + (b.id === a.barber_id ? ' selected' : '') + '>' + esc(b.name) + '</option>'; }).join('');
+    loadSlots();
+  };
+  $('#ase-back').onclick = function () { moveTime = null; $('#ase-step-move').style.display = 'none'; $('#ase-step-edit').style.display = 'flex'; refreshRecap(); };
+  $('#ase-barber').onchange = loadSlots;
+  $('#ase-date').onchange = loadSlots;
+  function loadSlots() {
+    var el = $('#ase-slots'), bid = $('#ase-barber').value, d = $('#ase-date').value;
+    moveTime = null; $('#ase-move-save').disabled = true; $('#ase-move-error').style.display = 'none'; refreshRecap();
+    var b = barberList.find(function (x) { return String(x.id) === String(bid); });
+    if (b && barberOffOn(b, d)) { el.innerHTML = barberOffSlotsHtml(b, d, true); return; }
+    el.innerHTML = '<span class="hint" style="margin:0">Chargement…</span>';
+    var svc = state.serviceId === EXTRAS_ONLY ? '' : state.serviceId;
+    call('/api/appointments/availability?date=' + d + '&service_id=' + encodeURIComponent(svc) + '&barber_id=' + bid + '&extras=' + state.extraIds.join(',') + '&exclude_appointment_id=' + a.id, { actingAs: bid })
+      .then(function (r) {
+        el.innerHTML = r.slots.length
+          ? r.slots.map(function (s) { return '<button type="button" class="aa-slot" data-time="' + s.time + '" onclick="asePickSlot(this)">' + s.time + '</button>'; }).join('')
+          : '<span class="hint" style="margin:0">' + esc(r.reason || 'Aucun créneau libre pour cette durée ce jour-là') + '</span>';
+      })
+      .catch(function (e) { el.innerHTML = ''; toast(e.message, true); });
+  }
+  window.asePickSlot = function (btn) {
+    moveTime = btn.dataset.time;
+    overlay.querySelectorAll('#ase-slots .aa-slot').forEach(function (c) { c.classList.toggle('sel', c === btn); });
+    $('#ase-move-save').disabled = false;
+    refreshRecap();
+  };
+  $('#ase-move-save').onclick = function () {
+    if (!moveTime) return;
+    var btn = $('#ase-move-save'); btn.disabled = true;
+    call('/api/appointments/' + a.id + '/services', { method: 'PUT', actingAs: cfg.actingAs || a.barber_id || undefined,
+      body: bodyFor({ date: $('#ase-date').value, time: moveTime, barber_id: $('#ase-barber').value }) })
+      .then(done)
+      .catch(function (e) { btn.disabled = false; var er = $('#ase-move-error'); er.textContent = e.message; er.style.display = 'block'; });
+  };
+  render();
+}

@@ -14,8 +14,11 @@ const d = dom.window.document;
 let pass = 0, fail = 0;
 const check = (n, ok, x = '') => { (ok ? pass++ : fail++); console.log((ok ? '  OK   ' : '  ECHEC') + ' ' + n + (x ? '  [' + x + ']' : '')); };
 
-const buttons = d.querySelectorAll('#drawer-appt-actions button');
-check('exactement 2 boutons dans le conteneur', buttons.length === 2, buttons.length);
+// 1er bouton : « Modifier la prestation » (ajouté), puis Déplacer et Annuler le RDV, inchangés.
+const all = d.querySelectorAll('#drawer-appt-actions button');
+check('« Modifier la prestation » en premier', all[0] && all[0].textContent.trim() === 'Modifier la prestation' && all[0].getAttribute('onclick') === 'editAppointmentServices()');
+const buttons = Array.prototype.slice.call(all, 1);
+check('exactement 3 boutons dans le conteneur (Modifier la prestation, Deplacer, Annuler)', all.length === 3, all.length);
 check('le 1er bouton dit "Deplacer"', buttons[0].textContent.trim() === 'Déplacer', buttons[0].textContent);
 check('le 1er bouton appelle openRescheduleAppointment() SANS argument', buttons[0].getAttribute('onclick') === 'openRescheduleAppointment()');
 check('le 2e bouton dit toujours "Annuler le RDV" (inchange)', buttons[1].textContent.trim() === 'Annuler le RDV', buttons[1].textContent);

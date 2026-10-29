@@ -12,8 +12,8 @@ const { pool, utcIso, getSettings } = require('../db');
 const requireAdmin = require('../middleware/auth');
 const requireAdminOrBarber = require('../middleware/barberAuth');
 const { logActivity } = require('../lib/activityLog');
-const { clientKey } = require('../lib/queueMath');
-const { sendAppointmentConfirmation, sendGroupAppointmentConfirmation, sendAppointmentCancelledByAdmin, sendAppointmentRescheduled, sendGiftCodeRenewed } = require('../lib/mailer');
+const { clientKey, recompute } = require('../lib/queueMath');
+const { sendAppointmentConfirmation, sendGroupAppointmentConfirmation, sendAppointmentCancelledByAdmin, sendAppointmentRescheduled, sendAppointmentServicesChanged, sendGiftCodeRenewed } = require('../lib/mailer');
 const { wrap } = require('../lib/wrap');
 const groupBooking = require('../lib/groupBooking');
 const { loadCatalog, offerFor, resolveOffer } = require('../lib/barberOffer');
@@ -495,7 +495,7 @@ async function apptPricing(rows) {
      WHERE a.id IN (?)`, [ids]
   );
   const [ext] = await pool.query(
-    `SELECT ae.appointment_id, e.name, e.price_cents AS cat_price, e.duration_min AS cat_duration,
+    `SELECT ae.appointment_id, ae.extra_id, e.name, e.price_cents AS cat_price, e.duration_min AS cat_duration,
             bep.price_cents AS b_price, bep.duration_min AS b_duration
      FROM appointment_extras ae
      JOIN appointments a ON a.id = ae.appointment_id
@@ -506,11 +506,11 @@ async function apptPricing(rows) {
   // Produits choisis d'avance (en ligne ou a la borne) : ceux de la ligne de file si le RDV y est deja
   // (c'est ce que la caisse ajoutera au ticket), sinon ceux du RDV. Jamais de duree.
   const [prodA] = await pool.query(
-    `SELECT ap.appointment_id, p.name, p.price_cents, ap.quantity FROM appointment_products ap
+    `SELECT ap.appointment_id, ap.product_id, p.name, p.price_cents, ap.quantity FROM appointment_products ap
      JOIN products p ON p.id = ap.product_id WHERE ap.appointment_id IN (?) ORDER BY p.name`, [ids]
   );
   const [prodQ] = await pool.query(
-    `SELECT a.id AS appointment_id, p.name, p.price_cents, qp.quantity FROM appointments a
+    `SELECT a.id AS appointment_id, qp.product_id, p.name, p.price_cents, qp.quantity FROM appointments a
      JOIN queue_products qp ON qp.queue_id = a.promoted_queue_id
      JOIN products p ON p.id = qp.product_id WHERE a.id IN (?) ORDER BY p.name`, [ids]
   );
@@ -533,6 +533,7 @@ async function apptPricing(rows) {
     const p = out[e.appointment_id];
     if (!p) return;
     p.extras.push({
+      id: e.extra_id,
       name: e.name,
       price_cents: num(e.b_price) !== null ? num(e.b_price) : Number(e.cat_price) || 0,
       duration_min: num(e.b_duration) !== null ? num(e.b_duration) : Number(e.cat_duration) || 0,
@@ -542,7 +543,7 @@ async function apptPricing(rows) {
   const fromQueue = new Set(prodQ.map((x) => x.appointment_id));
   prodQ.concat(prodA.filter((x) => !fromQueue.has(x.appointment_id))).forEach((x) => {
     const p = out[x.appointment_id];
-    if (p) p.products.push({ name: x.name, unit_price_cents: Number(x.price_cents) || 0, quantity: Number(x.quantity) || 1 });
+    if (p) p.products.push({ id: x.product_id, name: x.name, unit_price_cents: Number(x.price_cents) || 0, quantity: Number(x.quantity) || 1 });
   });
   Object.values(out).forEach((p) => {
     // services_total_cents = prestation + supplements (= montant de la ligne de file, qui ne compte pas les produits)
@@ -1320,6 +1321,45 @@ router.post('/:id/admin-cancel', requireAdminOrBarber, wrap(async (req, res) => 
 }));
 
 /**
+ * Change l'horaire (et éventuellement le coiffeur) d'un RDV déjà vérifié libre, et garde la file du jour cohérente :
+ * même jour -> sa ligne de file suit ; autre jour -> retirée de la file (re-promue le bon jour) ; déplacé à
+ * aujourd'hui -> mis dans la file tout de suite. Partagé par « Déplacer » et « Modifier la prestation ».
+ */
+async function applyMove(appt, date, time, finalBarberId, rdvSettings, extraIds, productSelections) {
+  const newScheduledAt = date + ' ' + time + ':00';
+  const today = nowInParis(rdvSettings.timezone).dateStr;
+  let stillPromotedId = appt.promoted_queue_id;
+
+  if (appt.promoted_queue_id) {
+    const [[q]] = await pool.query('SELECT status FROM queue WHERE id = ?', [appt.promoted_queue_id]);
+    if (q && q.status === 'waiting') {
+      if (date === today) {
+        // Même jour : on met juste à jour l'horaire/coiffeur de la ligne de file existante.
+        const checkinUtc = toMysqlDatetime(parisLocalToUtcDate(date, time + ':00', rdvSettings.timezone));
+        await pool.query('UPDATE queue SET checkin_at = ?, barber_id = ? WHERE id = ?', [checkinUtc, finalBarberId, appt.promoted_queue_id]);
+      } else {
+        // Déplacé à un autre jour : retiré de la file d'aujourd'hui,
+        // sera re-promu automatiquement le bon jour (promoteTodayAppointments).
+        await pool.query("UPDATE queue SET status = 'cancelled' WHERE id = ?", [appt.promoted_queue_id]);
+        stillPromotedId = null;
+      }
+    }
+    // Si déjà 'done'/'in_progress' (coupe déjà en cours ou finie) : on
+    // ne touche pas à la file, cas limite très rare pour un déplacement.
+  }
+
+  await pool.query(
+    'UPDATE appointments SET scheduled_at = ?, barber_id = ?, promoted_queue_id = ? WHERE id = ?',
+    [newScheduledAt, finalBarberId, stillPromotedId, appt.id]
+  );
+
+  if (date === today && !stillPromotedId) {
+    const [[fresh]] = await pool.query('SELECT * FROM appointments WHERE id = ?', [appt.id]);
+    await promoteAppointment(fresh, extraIds, productSelections);
+  }
+}
+
+/**
  * Modification/déplacement d'un RDV par l'admin (nouvelle date/heure,
  * et éventuellement nouveau coiffeur) - le client reçoit un email de
  * confirmation avec le nouvel horaire.
@@ -1388,36 +1428,7 @@ router.put('/:id/reschedule', requireAdminOrBarber, wrap(withBookingLock(async (
   if (!slots.includes(time)) return res.status(409).json({ error: (await walkinRefusal(finalBarberId, date)) || "Ce créneau n'est plus disponible" });
 
   const newScheduledAt = date + ' ' + time + ':00';
-  const today = nowInParis(rdvSettings.timezone).dateStr;
-  let stillPromotedId = appt.promoted_queue_id;
-
-  if (appt.promoted_queue_id) {
-    const [[q]] = await pool.query('SELECT status FROM queue WHERE id = ?', [appt.promoted_queue_id]);
-    if (q && q.status === 'waiting') {
-      if (date === today) {
-        // Même jour : on met juste à jour l'horaire/coiffeur de la ligne de file existante.
-        const checkinUtc = toMysqlDatetime(parisLocalToUtcDate(date, time + ':00', rdvSettings.timezone));
-        await pool.query('UPDATE queue SET checkin_at = ?, barber_id = ? WHERE id = ?', [checkinUtc, finalBarberId, appt.promoted_queue_id]);
-      } else {
-        // Déplacé à un autre jour : retiré de la file d'aujourd'hui,
-        // sera re-promu automatiquement le bon jour (promoteTodayAppointments).
-        await pool.query("UPDATE queue SET status = 'cancelled' WHERE id = ?", [appt.promoted_queue_id]);
-        stillPromotedId = null;
-      }
-    }
-    // Si déjà 'done'/'in_progress' (coupe déjà en cours ou finie) : on
-    // ne touche pas à la file, cas limite très rare pour un déplacement.
-  }
-
-  await pool.query(
-    'UPDATE appointments SET scheduled_at = ?, barber_id = ?, promoted_queue_id = ? WHERE id = ?',
-    [newScheduledAt, finalBarberId, stillPromotedId, appt.id]
-  );
-
-  if (date === today && !stillPromotedId) {
-    const [[fresh]] = await pool.query('SELECT * FROM appointments WHERE id = ?', [appt.id]);
-    await promoteAppointment(fresh, extraIds, productSelections);
-  }
+  await applyMove(appt, date, time, finalBarberId, rdvSettings, extraIds, productSelections);
 
   if (appt.email) {
     try {
@@ -1439,6 +1450,178 @@ router.put('/:id/reschedule', requireAdminOrBarber, wrap(withBookingLock(async (
   }
 
   res.json({ ok: true });
+})));
+
+/**
+ * « Modifier la prestation » d'un RDV à venir (Mon poste, Caisse, admin) : prestation, suppléments, produits.
+ * La nouvelle durée est celle du coiffeur (tarif personnalisé). On garde l'heure de début et on regarde ce qui suit
+ * ce RDV chez ce coiffeur (RDV suivant + marge tampon, pause, fin de journée) :
+ *  - ça tient (ou la durée ne s'allonge pas) -> enregistré ;
+ *  - ça dépasse de 10 min au plus -> refusé avec code « overlap_confirm » tant que l'équipe n'a pas confirmé (force) ;
+ *  - ça dépasse de plus de 10 min -> refusé (« no_room ») : il faut déplacer le RDV ou choisir autre chose.
+ * Avec date + time (+ barber_id) : prestation ET nouvel horaire enregistrés ensemble, créneau vérifié libre (strict).
+ * Interdit si le RDV est encaissé (sauf payé d'avance, la différence se règle en caisse), commencé ou terminé.
+ * Le client reçoit un email avec la nouvelle prestation, l'horaire et le prix.
+ */
+const SERVICE_EDIT_OVERLAP_MAX_MIN = 10;
+
+/** Ce qui vient juste après `startMin` chez ce coiffeur ce jour-là : { limit, label } (fin de journée par défaut). */
+async function nextBusyAfter(barberId, dateStr, startMin, rdvSettings, excludeId) {
+  const weekday = new Date(dateStr + 'T00:00:00Z').getUTCDay();
+  const [[schedule]] = await pool.query(
+    'SELECT start_time, end_time FROM barber_schedules WHERE barber_id = ? AND weekday = ? AND active = 1', [barberId, weekday]
+  );
+  const bufferMin = Number(rdvSettings.rdv_buffer_min) || 0;
+  let best = schedule ? { limit: timeToMinutes(schedule.end_time), label: 'la fin de journée (' + String(schedule.end_time).slice(0, 5) + ')' } : null;
+  // Strictement après le début : un RDV déjà posé à la même heure chevauchait déjà avant la modification.
+  const consider = (start, label) => { if (start > startMin && (!best || start < best.limit)) best = { limit: start, label }; };
+  const [others] = await pool.query(
+    `SELECT a.scheduled_at, a.client_name, q.status AS queue_status FROM appointments a
+     LEFT JOIN queue q ON q.id = a.promoted_queue_id
+     WHERE a.barber_id = ? AND a.status = 'confirmed' AND DATE(a.scheduled_at) = ? AND a.id != ?`,
+    [barberId, dateStr, excludeId]
+  );
+  others.filter((a) => a.queue_status !== 'done' && a.queue_status !== 'cancelled').forEach((a) => {
+    const hhmm = String(a.scheduled_at).split(' ')[1].slice(0, 5);
+    consider(timeToMinutes(hhmm), 'le RDV de ' + a.client_name + ' (' + hhmm + ')');
+  });
+  const [breaks] = await pool.query(
+    'SELECT start_time, end_time FROM barber_breaks WHERE barber_id = ? AND weekday = ? AND active = 1', [barberId, weekday]
+  );
+  breaks.forEach((b) => consider(timeToMinutes(b.start_time), 'la pause (' + String(b.start_time).slice(0, 5) + ')'));
+  // La marge tampon reste due APRES ce RDV-ci avant le suivant (comme pour une prise de RDV), pas avant une pause / la fin.
+  if (best && /^le RDV/.test(best.label) && bufferMin) best = { limit: best.limit - bufferMin, label: best.label + ', avec la marge de ' + bufferMin + ' min' };
+  return best;
+}
+
+function moneyLabel(cents, currency) {
+  return (Number(cents || 0) / 100).toFixed(2).replace('.', ',') + (currency === 'CHF' ? ' CHF' : ' €');
+}
+
+router.put('/:id/services', requireAdminOrBarber, wrap(withBookingLock(async (req, res) => {
+  const { service_id, date, time } = req.body;
+  const extrasIn = Array.isArray(req.body.extras) ? req.body.extras.map(String) : [];
+  const force = req.body.force === true;
+  const moving = Boolean(date || time);
+  if (moving && (!validBookingDate(date) || !validBookingTime(time))) return res.status(400).json({ error: 'Date ou heure invalide' });
+
+  const [[appt]] = await pool.query('SELECT * FROM appointments WHERE id = ? AND salon_id = ?', [req.params.id, req.salon.id]);
+  if (!appt) return res.status(404).json({ error: 'Rendez-vous introuvable' });
+  if (appt.status !== 'confirmed') return res.status(409).json({ error: 'Seuls les rendez-vous à venir peuvent être modifiés.' });
+  if (req.actingBarberId && appt.barber_id && appt.barber_id !== req.actingBarberId) {
+    return res.status(403).json({ error: "Ce n'est pas le RDV de ce coiffeur." });
+  }
+
+  let queueRow = null;
+  if (appt.promoted_queue_id) {
+    [[queueRow]] = await pool.query('SELECT id, status, prepaid_at, balance_paid_at FROM queue WHERE id = ?', [appt.promoted_queue_id]);
+    if (queueRow && queueRow.status === 'in_progress') return res.status(409).json({ error: 'Prestation déjà commencée : ajoutez un supplément depuis la caisse.' });
+    if (queueRow && (queueRow.status === 'done' || queueRow.status === 'cancelled')) return res.status(409).json({ error: 'Ce rendez-vous est déjà terminé ou marqué absent.' });
+    const paid = await saleForPassage(pool, req.salon.id, appt.promoted_queue_id);
+    const prepaidOpen = queueRow && queueRow.prepaid_at && !queueRow.balance_paid_at;
+    if (paid && !prepaidOpen) return res.status(409).json({ error: 'Rendez-vous encaissé : modification interdite.' });
+  }
+
+  const rdvSettings = await getSettings(req.salon.id);
+  const cat = await loadCatalog(req.salon.id, service_id, extrasIn);
+  if (!cat.ok) return res.status(cat.status).json({ error: cat.error });
+  const finalBarberId = (moving && req.body.barber_id) || appt.barber_id;
+  if (!finalBarberId) return res.status(400).json({ error: 'Le coiffeur est requis' });
+  const [[ownedBarber]] = await pool.query('SELECT id, name FROM barbers WHERE id = ? AND salon_id = ? AND active = 1', [finalBarberId, req.salon.id]);
+  if (!ownedBarber) return res.status(404).json({ error: 'Coiffeur introuvable' });
+  const offer = await offerFor(finalBarberId, cat);
+  if (!offer.ok) return res.status(offer.status).json({ error: offer.error });
+  const durationMin = offer.durationMin;
+
+  // Produits (facultatif : absent = inchangés) - comme à la prise de RDV, seulement ceux proposés en RDV.
+  let productSelections = null;
+  if (Array.isArray(req.body.products)) {
+    const ids = req.body.products.map((p) => p && p.id).filter(Boolean);
+    const [prodRows] = ids.length ? await pool.query('SELECT id FROM products WHERE id IN (?) AND salon_id = ? AND online_bookable = 1', [ids, req.salon.id]) : [[]];
+    const valid = new Set(prodRows.map((r) => r.id));
+    productSelections = req.body.products.filter((p) => p && valid.has(p.id))
+      .map((p) => ({ id: p.id, quantity: Math.min(99, Math.max(1, Number(p.quantity) || 1)) }));
+  } else {
+    const [rows] = await pool.query('SELECT product_id, quantity FROM appointment_products WHERE appointment_id = ?', [appt.id]);
+    productSelections = rows.map((r) => ({ id: r.product_id, quantity: r.quantity }));
+  }
+
+  const oldDate = String(appt.scheduled_at).slice(0, 10), oldTime = String(appt.scheduled_at).slice(11, 16);
+  let overMin = 0;
+  if (moving) {
+    if (await isSalonClosedOnDate(req.salon.id, date)) return res.status(409).json({ error: 'Salon fermé ce jour : déplacement impossible.' });
+    if (`${date} ${time}:00` < nowParisDatetimeString(rdvSettings.timezone)) return res.status(400).json({ error: 'Ce créneau est déjà passé.' });
+    const slots = await computeSlotsForBarber(finalBarberId, date, durationMin, rdvSettings, { skipLead: true, excludeAppointmentId: appt.id });
+    if (!slots.includes(time)) return res.status(409).json({ error: (await walkinRefusal(finalBarberId, date)) || "Ce créneau n'est plus disponible pour la nouvelle durée" });
+  } else {
+    // Durée actuelle chez ce coiffeur : si la nouvelle n'est pas plus longue, rien à vérifier.
+    const [oldExtras] = await pool.query('SELECT extra_id FROM appointment_extras WHERE appointment_id = ?', [appt.id]);
+    const oldCat = await loadCatalog(req.salon.id, appt.service_id, oldExtras.map((x) => x.extra_id));
+    const oldOffer = oldCat.ok ? await offerFor(finalBarberId, oldCat) : null;
+    const oldDuration = oldOffer && oldOffer.ok ? oldOffer.durationMin : 0;
+    if (durationMin > oldDuration) {
+      const startMin = timeToMinutes(oldTime);
+      const next = await nextBusyAfter(finalBarberId, oldDate, startMin, rdvSettings, appt.id);
+      overMin = next ? startMin + durationMin - next.limit : 0;
+      if (overMin > SERVICE_EDIT_OVERLAP_MAX_MIN) {
+        return res.status(409).json({
+          code: 'no_room', over_min: overMin, duration_min: durationMin, conflict: next.label,
+          error: 'Pas assez de place : la nouvelle prestation dépasse de ' + overMin + ' min sur ' + next.label + '. Déplacez le RDV ou choisissez une autre prestation.'
+        });
+      }
+      if (overMin > 0 && !force) {
+        return res.status(409).json({
+          code: 'overlap_confirm', over_min: overMin, duration_min: durationMin, conflict: next.label,
+          error: 'La nouvelle prestation dépasse de ' + overMin + ' min sur ' + next.label + '.'
+        });
+      }
+    }
+  }
+
+  const extraIds = cat.extras.map((e) => e.id);
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    await conn.query('UPDATE appointments SET service_id = ? WHERE id = ?', [cat.service.id, appt.id]);
+    await conn.query('DELETE FROM appointment_extras WHERE appointment_id = ?', [appt.id]);
+    if (extraIds.length) await conn.query('INSERT INTO appointment_extras (appointment_id, extra_id) VALUES ?', [extraIds.map((e) => [appt.id, e])]);
+    await conn.query('DELETE FROM appointment_products WHERE appointment_id = ?', [appt.id]);
+    if (productSelections.length) await conn.query('INSERT INTO appointment_products (appointment_id, product_id, quantity) VALUES ?', [productSelections.map((p) => [appt.id, p.id, p.quantity])]);
+    // RDV du jour déjà dans la file : sa ligne suit (c'est elle que la caisse encaisse).
+    if (queueRow && queueRow.status === 'waiting') {
+      await conn.query('UPDATE queue SET service_id = ? WHERE id = ?', [cat.service.id, queueRow.id]);
+      await conn.query('DELETE FROM queue_extras WHERE queue_id = ?', [queueRow.id]);
+      if (extraIds.length) await conn.query('INSERT INTO queue_extras (queue_id, extra_id) VALUES ?', [extraIds.map((e) => [queueRow.id, e])]);
+      await conn.query('DELETE FROM queue_products WHERE queue_id = ?', [queueRow.id]);
+      if (productSelections.length) await conn.query('INSERT INTO queue_products (queue_id, product_id, quantity) VALUES ?', [productSelections.map((p) => [queueRow.id, p.id, p.quantity])]);
+    }
+    await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+  if (moving) await applyMove(appt, date, time, finalBarberId, rdvSettings, extraIds, productSelections);
+  await recompute(req.salon.id).catch(() => {});
+
+  const newAt = moving ? (date + ' ' + time + ':00') : String(appt.scheduled_at);
+  const serviceName = serviceLabel(cat.service.name, cat.extras.map((e) => e.name), cat.service.extras_only);
+  if (appt.email) {
+    try {
+      const when = new Date(newAt.replace(' ', 'T')).toLocaleString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit' });
+      const baseUrl = safeBaseUrl(req, req.body.base_url);
+      const cancelUrl = baseUrl + (baseUrl.includes('?') ? '&' : '?') + 'cancel=' + appt.cancel_token;
+      await sendAppointmentServicesChanged(req.salon.id, appt.email, {
+        clientName: appt.client_name, when, serviceName, barberName: ownedBarber.name,
+        durationMin, price: moneyLabel(offer.priceCents, rdvSettings.currency), cancelUrl
+      });
+    } catch (err) {
+      console.error('[services-edit] envoi email échoué:', err.message);
+    }
+  }
+  const startM = timeToMinutes(newAt.slice(11, 16));
+  res.json({ ok: true, duration_min: durationMin, price_cents: offer.priceCents, end_time: minutesToTime(startM + durationMin), over_min: overMin > 0 ? overMin : 0, moved: moving, emailed: Boolean(appt.email) });
 })));
 
 /**

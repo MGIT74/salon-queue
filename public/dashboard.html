@@ -2848,7 +2848,8 @@
       Modifier
     </button>
 
-    <div id="drawer-appt-actions" style="display:none;gap:8px;margin:-10px 0 16px">
+    <div id="drawer-appt-actions" style="display:none;gap:8px;margin:-10px 0 16px;flex-wrap:wrap">
+      <button class="btn btn-soft" style="flex:1 1 100%" onclick="editAppointmentServices()">Modifier la prestation</button>
       <button class="btn btn-soft" style="flex:1" onclick="openRescheduleAppointment()">Déplacer</button>
       <button class="btn btn-soft" style="flex:1;color:var(--red)" onclick="cancelAppointmentByAdmin()">Annuler le RDV</button>
     </div>
@@ -2883,7 +2884,7 @@
   </div>
 </div>
 
-<script src="/app.js?v=50"></script>
+<script src="/app.js?v=51"></script>
 <script src="/autorefresh.js?v=3"></script>
 <script src="/staff-group.js?v=6"></script>
 <script src="/daterange.js?v=4"></script>
@@ -3874,6 +3875,19 @@ function isBookableForAdmin(b, dateStr) {
  * éventuellement différent) - prestation et suppléments inchangés. Le
  * client reçoit un email avec le nouvel horaire.
  */
+/** « Modifier la prestation » du RDV du tiroir (prestation, suppléments, produits) : éditeur partagé (app.js). */
+function editAppointmentServices() {
+  var a = drawerAppointmentData;
+  if (!a) return;
+  openApptServicesEditor(a, { call: api, services: services, extras: extras, products: products, barbers: barbers,
+    onSaved: function () {
+      closeClientDrawer();
+      Object.keys(calMonthCache).forEach(function (k) { delete calMonthCache[k]; });
+      loadCalendarPeriod();
+      renderRdvList();
+    } });
+}
+
 function openRescheduleAppointment(id, data) {
   id = id || drawerAppointmentId;
   data = data || drawerAppointmentData;
