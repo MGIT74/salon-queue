@@ -479,6 +479,16 @@
   /* Un trait entre chaque colonne de coiffeur (agenda et en-têtes) */
   .pd-cols .pd-col + .pd-col::before { content: ''; position: absolute; left: -5px; top: -10px; bottom: 0; border-left: 1px solid var(--sep); pointer-events: none; }
   .pd-xs-head .pd-col-head { position: relative; }
+  /* Glisser un nom pour changer l'ordre des colonnes (même effet que l'ordre des clients au Timer) */
+  .pd-head-drag { cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; border-radius: 10px; }
+  .pd-head-drag:hover { background: var(--fill-2); }
+  .pd-grip { margin-left: auto; color: var(--grey); opacity: .55; display: inline-flex; flex-shrink: 0; padding-right: 4px; }
+  .pd-head-drag:hover .pd-grip { opacity: 1; }
+  .pd-sorting .pd-col-head, .pd-sorting .pd-cols .pd-col { transition: transform .18s ease; }
+  .pd-sorting .pd-col-head.dragging, .pd-sorting .pd-cols .pd-col.dragging { transition: none; z-index: 8; }
+  .pd-col-head.dragging { cursor: grabbing; background: var(--card); box-shadow: 0 8px 24px rgba(0,0,0,.35); }
+  .pd-cols .pd-col.dragging { background: var(--fill); box-shadow: 0 8px 24px rgba(0,0,0,.25); }
+  .pd-sorting .settling { transition: transform .18s ease !important; }
   .pd-xs-head .pd-col-head + .pd-col-head::before { content: ''; position: absolute; left: -5px; top: -4px; bottom: -8px; border-left: 1px solid var(--sep); }
   .pd-grid { position: relative; }
   .pd-line { position: absolute; left: 46px; right: 0; border-top: 1px solid var(--sep); }
@@ -1598,7 +1608,7 @@ function posteDayHtml(dateStr) {
   var nowMin = Number(nowStr.slice(11, 13)) * 60 + Number(nowStr.slice(14, 16));
   var appts = pdApptsOfDay(dateStr);
   appts.forEach(function (a) { calApptById[a.id] = a; });
-  var team = posteTimelineBarbers(appts);
+  var team = pdApplyOrder(posteTimelineBarbers(appts));   // ordre choisi en glissant les noms (sinon l'ordre habituel)
   var items = appts.map(function (a) {
     var s = pdMin(a.scheduled_at.slice(11, 16)), d = Math.max(a.duration_min || 30, 10);
     return { a: a, id: a.id, barberId: a.barber_id, start: s, dur: d, end: s + d, st: pdState(a, s + d, isToday, past, nowMin) };
@@ -1734,7 +1744,10 @@ function posteDayHtml(dateStr) {
     return '<div class="pd-col' + (isMe ? ' me' : '') + (past ? ' past' : '') + (closed ? ' closed' : '') + '" data-barber="' + esc(b.id) + '" style="' + colStyle(b) + '"' + pdColClickAttr(b, dateStr) + '>' + inner + '</div>';
   }).join('');
   var heads = cols.map(function (b) {
-    return '<div class="pd-col-head" style="' + colStyle(b) + '">' + pdAvatarHtml(b) + '<span>' + (b.id === myId ? esc(b.name) + ' · moi' : esc(b.name)) + '</span></div>';
+    return '<div class="pd-col-head' + (single ? '' : ' pd-head-drag') + '" data-barber="' + esc(b.id) + '" style="' + colStyle(b) + '"' +
+      (single ? '' : ' onpointerdown="pdHeadDragStart(event, \'' + b.id + '\')" title="Glisser pour changer l’ordre des coiffeurs"') + '>' +
+      pdAvatarHtml(b) + '<span>' + (b.id === myId ? esc(b.name) + ' · moi' : esc(b.name)) + '</span>' +
+      (single ? '' : '<i class="pd-grip" aria-hidden="true">' + PD_GRIP_SVG + '</i>') + '</div>';
   }).join('');
   var nowHtml = isToday && nowMin >= R0 && nowMin <= R1
     ? '<div class="pd-now" style="top:' + Math.round((nowMin - R0) * PX) + 'px"><span>' + nowStr.slice(11, 16) + '</span></div>' : '';
@@ -1754,6 +1767,94 @@ function posteDayHtml(dateStr) {
 
   return html + cal;
 }
+
+var PD_GRIP_SVG = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>';
+/** Ordre des colonnes choisi sur cet appareil (glisser les noms) ; les coiffeurs pas encore placés gardent l'ordre habituel, à la fin. */
+function pdOrderKey() { return 'poste_day_order_' + (typeof SALON_SLUG !== 'undefined' ? SALON_SLUG : '') + '_' + (me ? me.id : ''); }
+function pdApplyOrder(list) {
+  var saved = [];
+  try { saved = JSON.parse(localStorage.getItem(pdOrderKey()) || '[]') || []; } catch (e) { saved = []; }
+  if (!saved.length && pdOrderMem) saved = pdOrderMem;
+  if (!saved.length) return list;
+  var pos = function (b) { var i = saved.indexOf(b.id); return i === -1 ? 1000 + list.indexOf(b) : i; };
+  return list.slice().sort(function (x, y) { return pos(x) - pos(y); });
+}
+/* Glisser-déposer horizontal : on attrape le nom, la colonne suit le doigt, les autres glissent pour faire la place ;
+   au lâcher, le nouvel ordre est gardé sur cet appareil et l'agenda est redessiné. */
+var pdHeadDrag = null;
+function pdHeadDragStart(ev, id) {
+  if (ev.button !== undefined && ev.button !== 0) return;
+  var view = document.getElementById('cal-day-view');
+  var heads = Array.prototype.slice.call(view.querySelectorAll('.pd-xs-head .pd-col-head'));
+  var cols = Array.prototype.slice.call(view.querySelectorAll('.pd-cols .pd-col'));
+  var from = heads.findIndex(function (h) { return h.dataset.barber === id; });
+  if (from === -1 || heads.length < 2) return;
+  ev.preventDefault();
+  var sc = view.querySelector('.pd-xs');
+  var lefts = heads.map(function (h) { return h.getBoundingClientRect().left; });
+  var mids = heads.map(function (h) { var r = h.getBoundingClientRect(); return r.left + r.width / 2; });
+  pdHeadDrag = { id: id, heads: heads, cols: cols, from: from, to: from, startX: ev.clientX, startScroll: sc ? sc.scrollLeft : 0, sc: sc,
+                 lefts: lefts, mids: mids, moved: false, lastX: ev.clientX };
+  try { ev.currentTarget.setPointerCapture(ev.pointerId); } catch (e) {}
+  window.addEventListener('pointermove', pdHeadDragMove);
+  window.addEventListener('pointerup', pdHeadDragEnd);
+  window.addEventListener('pointercancel', pdHeadDragEnd);
+}
+function pdHeadDragMove(ev) {
+  var d = pdHeadDrag; if (!d) return;
+  d.lastX = ev.clientX;
+  if (!d.moved) {
+    if (Math.abs(ev.clientX - d.startX) < 6) return;   // un simple toucher ne déclenche rien
+    d.moved = true;
+    document.getElementById('cal-day-view').classList.add('pd-sorting');
+    d.heads[d.from].classList.add('dragging'); if (d.cols[d.from]) d.cols[d.from].classList.add('dragging');
+  }
+  // Près du bord : l'agenda défile tout seul pour atteindre les colonnes cachées.
+  if (d.sc) {
+    var r = d.sc.getBoundingClientRect();
+    if (ev.clientX > r.right - 40) d.sc.scrollLeft += 14; else if (ev.clientX < r.left + 70) d.sc.scrollLeft -= 14;
+  }
+  var dx = ev.clientX - d.startX + ((d.sc ? d.sc.scrollLeft : 0) - d.startScroll);
+  var t = 'translateX(' + dx + 'px)';
+  d.heads[d.from].style.transform = t; if (d.cols[d.from]) d.cols[d.from].style.transform = t;
+  var center = d.mids[d.from] + dx, to = 0, best = Infinity;
+  d.mids.forEach(function (m, i) { var dist = Math.abs(center - m); if (dist < best) { best = dist; to = i; } });
+  d.to = to;
+  d.heads.forEach(function (h, k) {
+    if (k === d.from) return;
+    var shift = 0;
+    if (d.from < to && k > d.from && k <= to) shift = d.lefts[k - 1] - d.lefts[k];
+    else if (to < d.from && k >= to && k < d.from) shift = d.lefts[k + 1] - d.lefts[k];
+    var tr = shift ? 'translateX(' + shift + 'px)' : '';
+    h.style.transform = tr; if (d.cols[k]) d.cols[k].style.transform = tr;
+  });
+}
+function pdHeadDragEnd() {
+  var d = pdHeadDrag; if (!d) return;
+  window.removeEventListener('pointermove', pdHeadDragMove);
+  window.removeEventListener('pointerup', pdHeadDragEnd);
+  window.removeEventListener('pointercancel', pdHeadDragEnd);
+  if (!d.moved) { pdHeadDrag = null; return; }
+  // La colonne se pose à sa nouvelle place, puis on redessine dans le nouvel ordre.
+  var fin = d.to === d.from ? '' : 'translateX(' + (d.lefts[d.to] - d.lefts[d.from]) + 'px)';
+  [d.heads[d.from], d.cols[d.from]].forEach(function (el) { if (el) { el.classList.add('settling'); el.style.transform = fin; } });
+  setTimeout(function () {
+    pdHeadDrag = null;
+    document.getElementById('cal-day-view').classList.remove('pd-sorting');
+    if (d.to === d.from) { d.heads.concat(d.cols).forEach(function (el) { el.style.transform = ''; el.classList.remove('dragging', 'settling'); }); return; }
+    var ids = d.heads.map(function (h) { return h.dataset.barber; });
+    ids.splice(d.to, 0, ids.splice(d.from, 1)[0]);
+    // Les coiffeurs absents de l'agenda ce jour-là gardent leur place relative : on fusionne avec l'ordre déjà gardé.
+    var saved = [];
+    try { saved = JSON.parse(localStorage.getItem(pdOrderKey()) || '[]') || []; } catch (e) {}
+    var merged = ids.concat(saved.filter(function (x) { return ids.indexOf(x) === -1; }));
+    try { localStorage.setItem(pdOrderKey(), JSON.stringify(merged)); } catch (e) {}
+    pdOrderMem = merged;
+    renderCalDay();
+    toast('Ordre des coiffeurs mis à jour');
+  }, 190);
+}
+var pdOrderMem = null;   // si le stockage du navigateur est bloqué : l'ordre tient au moins jusqu'au rechargement
 
 function pdSetOnlyMe(v) {
   pdOnlyMe = !!v;
