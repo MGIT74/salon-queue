@@ -535,8 +535,6 @@
   .pd-block.is-next { box-shadow: 0 0 0 2px var(--fill), 0 0 0 4px var(--blue); z-index: 2; }
   .pd-block.pd-hit { box-shadow: 0 0 0 2px var(--fill), 0 0 0 4px #ffd60a; z-index: 3; }
   .pd-block.pd-dim { opacity: .4; }
-  .pd-col:not(.me) .pd-block { padding: 0 7px; gap: 5px; }
-  .pd-col:not(.me) .pd-block .n { font-size: 12px; }
   .pd-free { position: absolute; left: 0; right: 0; box-sizing: border-box; border: 1px dashed var(--sep); background: transparent; color: var(--grey); border-radius: 9px; padding: 0 10px; display: flex; align-items: center; gap: 8px; font-size: 12px; cursor: pointer; overflow: hidden; }
   .pd-free b { margin-left: auto; color: var(--blue); font-size: 12px; }
   .pd-free:hover { border-color: var(--blue); }
@@ -1744,7 +1742,7 @@ function posteDayHtml(dateStr) {
       var h = Math.max(16, Math.round(it.dur * PX) - 3), a = it.a;
       var isNext = nextIt && it.id === nextIt.id;
       var label = it.st === 'absent' ? 'Absent' : it.st === 'done' ? 'Terminé' : it.st === 'inprogress' ? 'En cours' : isNext ? 'Prochain' : '';
-      var showSvc = (isMe || single) && a.service_name;
+      var showSvc = !!a.service_name;   // la prestation pour tous les coiffeurs (plus seulement la mienne)
       var narrow = it.lanes > 1;
       inner += '<button type="button" class="pd-block st-' + it.st + (isNext ? ' is-next' : '') + (narrow ? ' narrow' : '') + (h >= 46 ? ' tall' : '') + '" data-id="' + esc(a.id) + '" ' +
         'data-q="' + esc(normText([a.client_name, a.email, a.phone].join(' ')) + ' ' + String(a.phone || '').replace(/\D/g, '')) + '" ' +
@@ -1753,7 +1751,7 @@ function posteDayHtml(dateStr) {
         'onclick="event.stopPropagation();openPosteClientDrawer(\'' + a.id + '\')">' +
         '<span class="t">' + pdHM(it.start) + '</span><span class="n">' + esc(a.client_name) + '</span>' +
         (showSvc && !narrow ? '<span class="s">' + esc(a.service_name) + ' · ' + pdDur(it.dur) + '</span>' : '') +
-        (label && (isMe || single) && !narrow ? '<span class="l">' + label + '</span>' : '') + '</button>';
+        (label && !narrow ? '<span class="l">' + label + '</span>' : '') + '</button>';
     });
     if (offWhy || walkDay) inner += '<div class="pd-col-off">' + (offWhy ? esc(offWhy.charAt(0).toUpperCase() + offWhy.slice(1)) : 'En « sans RDV » ce jour-là') + '</div>';
     else if (!items.some(function (it) { return it.barberId === b.id; }) && !isMe) inner += '<div class="pd-col-off">Aucun RDV</div>';
