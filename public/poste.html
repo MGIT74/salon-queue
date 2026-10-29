@@ -394,6 +394,15 @@
 
   .pd-glance { background: var(--fill); border-radius: 16px; padding: 14px 16px 10px; margin-bottom: 14px; }
   .pd-glance-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+  .pd-fold { display: inline-flex; align-items: center; gap: 8px; border: none; background: none; color: var(--ink); font-family: inherit; padding: 0; cursor: pointer; }
+  .pd-fold strong { font-size: 15px; }
+  .pd-fold-ic { color: var(--grey); transition: transform .2s ease; }
+  .pd-fold-txt { font-size: 12.5px; font-weight: 600; color: var(--blue); }
+  .pd-fold:hover .pd-fold-ic { color: var(--ink); }
+  .pd-glance.folded { padding-bottom: 14px; }
+  .pd-glance.folded .pd-glance-head { margin-bottom: 0; }
+  .pd-glance.folded .pd-fold-ic { transform: rotate(-90deg); }
+  .pd-glance.folded > :not(.pd-glance-head), .pd-glance.folded .pd-legend { display: none; }
   .pd-glance-head strong { font-size: 15px; }
   .pd-legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--grey); }
   .pd-legend span { display: inline-flex; align-items: center; gap: 5px; }
@@ -1681,8 +1690,8 @@ function posteDayHtml(dateStr) {
   // Telephone : une heure sur trois seulement (classe minor masquee), sinon les heures se chevauchent.
   for (var t = R0; t <= R1; t += 60) ticks += '<span' + ((t - R0) % 180 ? ' class="minor"' : '') + ' style="left:' + pct(t) + '%">' + pdHM(t) + '</span>';
   ticks += pdGlanceStepTicks(R0, R1, pct);
-  html += '<section class="pd-glance pd-g-day" aria-label="La journée en un coup d’œil">' +
-    '<div class="pd-glance-head"><strong>La journée en un coup d’œil</strong>' +
+  html += '<section class="pd-glance pd-g-day' + (pdGlanceFolded ? ' folded' : '') + '" aria-label="La journée en un coup d’œil">' +
+    '<div class="pd-glance-head">' + pdFoldBtnHtml('La journée en un coup d’œil') +
     '<span class="pd-legend"><span><i style="background:var(--ink);opacity:.75"></i>À venir</span><span><i style="background:var(--ink);opacity:.25"></i>Terminé</span>' +
     '<span><i style="border:1px dashed var(--grey)"></i>Absent</span>' + (isToday ? '<span><i style="width:2px;background:var(--red)"></i>Maintenant</span>' : '') + '</span></div>' +
     rows +
@@ -1856,6 +1865,26 @@ function pdHeadDragEnd() {
 }
 var pdOrderMem = null;   // si le stockage du navigateur est bloqué : l'ordre tient au moins jusqu'au rechargement
 
+/* « Coup d'œil » repliable : un clic sur son titre le replie (plus de place pour l'agenda dessous), un autre le rouvre.
+   Choix gardé sur cet appareil (try/catch : le stockage peut être bloqué). */
+var pdGlanceFolded = false;
+try { pdGlanceFolded = localStorage.getItem('poste_glance_folded') === '1'; } catch (e) {}
+function pdFoldBtnHtml(title) {
+  return '<button type="button" class="pd-fold" onclick="pdToggleGlance()" aria-expanded="' + (pdGlanceFolded ? 'false' : 'true') + '" title="' + (pdGlanceFolded ? 'Afficher' : 'Replier') + '">' +
+    '<strong>' + title + '</strong>' +
+    '<svg class="pd-fold-ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>' +
+    '<span class="pd-fold-txt">' + (pdGlanceFolded ? 'Afficher' : 'Replier') + '</span></button>';
+}
+function pdToggleGlance() {
+  pdGlanceFolded = !pdGlanceFolded;
+  try { localStorage.setItem('poste_glance_folded', pdGlanceFolded ? '1' : '0'); } catch (e) {}
+  document.querySelectorAll('.pd-glance.pd-g-day, .pd-glance.pd-g-week').forEach(function (sec) {
+    sec.classList.toggle('folded', pdGlanceFolded);
+    var b = sec.querySelector('.pd-fold');
+    if (b) { b.setAttribute('aria-expanded', pdGlanceFolded ? 'false' : 'true'); b.title = pdGlanceFolded ? 'Afficher' : 'Replier'; b.querySelector('.pd-fold-txt').textContent = pdGlanceFolded ? 'Afficher' : 'Replier'; }
+  });
+}
+
 function pdSetOnlyMe(v) {
   pdOnlyMe = !!v;
   try { localStorage.setItem('poste_day_only_me', pdOnlyMe ? '1' : '0'); } catch (e) {}
@@ -1952,7 +1981,7 @@ function pdWeekHtml(start) {
   var ticks = '';
   for (var t = R0; t <= R1; t += 60) ticks += '<span' + ((t - R0) % 180 ? ' class="minor"' : '') + ' style="left:' + pct(t) + '%">' + pdHM(t) + '</span>';
   ticks += pdGlanceStepTicks(R0, R1, pct);
-  html += '<section class="pd-glance pd-g-week" aria-label="La semaine en un coup d’œil"><div class="pd-glance-head"><strong>La semaine en un coup d’œil</strong>' +
+  html += '<section class="pd-glance pd-g-week' + (pdGlanceFolded ? ' folded' : '') + '" aria-label="La semaine en un coup d’œil"><div class="pd-glance-head">' + pdFoldBtnHtml('La semaine en un coup d’œil') +
     '<span class="pd-legend">' + lanes.map(function (b) { return '<span><i style="background:' + barberColor(b.id) + '"></i>' + (b.id === myId ? 'Moi' : esc(b.name)) + '</span>'; }).join('') + '</span></div>' +
     rows + '<div class="pd-g-row" style="cursor:default;padding-top:0;padding-bottom:0" aria-hidden="true"><span></span><span class="pd-g-ticks">' + ticks + '</span><span class="pd-g-sum"></span></div></section>';
 
