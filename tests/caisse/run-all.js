@@ -178,6 +178,7 @@ const suite = [
   ['155-poste-vue-jour.js', false, ['exit']],
   ['156-caisse-cartes-a-encaisser.js', false, ['exit']],
   ['157-modifier-prestation-rdv.js', false, ['exit']],
+  ['158-ticket-sans-accents.js', false, ['exit']],
 ];
 
 let bad = 0;

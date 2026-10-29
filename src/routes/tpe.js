@@ -1,4 +1,5 @@
 const express = require('express');
+const { asciiTicket } = require('../lib/ticketText');
 const crypto = require('crypto');
 const { pool, utcIso } = require('../db');
 const requireAdminOrBarber = require('../middleware/barberAuth');
@@ -137,9 +138,12 @@ router.post('/print', requireAdminOrBarber, wrap(async (req, res) => {
   if (text.length > 50_000) return res.status(400).json({ error: 'Ticket trop long' });
 
   const id = crypto.randomUUID();
+  // Ticket thermique : sans accents (lisible sur toutes les marques d'imprimante, voir lib/ticketText).
+  // Le tiroir ('drawer') est une commande brute : jamais modifiée.
+  const finalText = mode === 'escpos' ? asciiTicket(text) : text;
   await pool.query(
     'INSERT INTO print_jobs (id, salon_id, text, mode) VALUES (?, ?, ?, ?)',
-    [id, req.salon.id, text, mode]
+    [id, req.salon.id, finalText, mode]
   );
   res.json({ ok: true, job_id: id });
 }));

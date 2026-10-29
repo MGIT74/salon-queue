@@ -191,4 +191,5 @@ node tests/caisse/154-rdv-non-demarre-en-caisse.js  # RDV jamais demarre : en ca
 node tests/caisse/155-poste-vue-jour.js  # Mon poste > Agenda > Jour : recherche client, coup d'oeil equipe, colonnes
 node tests/caisse/156-caisse-cartes-a-encaisser.js  # Caisse : cartes A encaisser sur 2 lignes, ticket toujours visible
 node tests/caisse/157-modifier-prestation-rdv.js  # RDV : modifier la prestation (place derriere, 10 min toleres, deplacer), email client
+node tests/caisse/158-ticket-sans-accents.js  # Tickets imprimes sans accents (toutes marques d imprimante), tiroir inchange
 ```
