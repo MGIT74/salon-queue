@@ -403,6 +403,12 @@
   .pd-glance.folded .pd-glance-head { margin-bottom: 0; }
   .pd-glance.folded .pd-fold-ic { transform: rotate(-90deg); }
   .pd-glance.folded > :not(.pd-glance-head), .pd-glance.folded .pd-legend { display: none; }
+  /* Recherche client dans l'en-tête du coup d'œil, entre le titre et la légende */
+  .pd-glance-head { align-items: center; }
+  .pd-glance-head .pd-search-wrap { flex: 1 1 260px; max-width: 520px; margin: 0; }
+  .pd-glance-head .pd-search { min-height: 40px; background: var(--card); border-radius: 12px; }
+  .pd-glance-head .pd-search input { font-size: 15px; padding: 9px 0; }
+  .pd-glance.folded .pd-glance-head .pd-search-wrap { display: block; }
   .pd-glance-head strong { font-size: 15px; }
   .pd-legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--grey); }
   .pd-legend span { display: inline-flex; align-items: center; gap: 5px; }
@@ -605,6 +611,7 @@
     .pd-g-bar { height: 24px; }
     .pd-g-row.focus { background: var(--fill-2); }
     .pd-g-ticks span.minor, .pd-legend, .pd-g-st.s { display: none; }
+    .pd-glance-head .pd-search-wrap { flex-basis: 100%; max-width: none; order: 3; }
     .pd-mday { min-height: 58px; padding: 5px; gap: 2px; border-radius: 9px; }
     .pd-mnum { font-size: 12.5px; min-width: 22px; height: 22px; }
     .pd-mchips { gap: 3px; }
@@ -1651,8 +1658,8 @@ function posteDayHtml(dateStr) {
     if (myRow && (barberOffReason(myRow, dateStr) || isWalkinOn(myRow, dateStr))) free = [];
   }
 
-  // 1) Recherche client
-  var html = pdSearchHtml();
+  // 1) La recherche client est dans l'en-tête du coup d'œil (gain de place).
+  var html = '';
 
   if (closed) html += '<div class="salon-closure-banner" style="text-align:center;margin-bottom:12px">Salon fermé — aucun rendez-vous ne peut être ajouté ce jour.</div>';
 
@@ -1691,7 +1698,7 @@ function posteDayHtml(dateStr) {
   for (var t = R0; t <= R1; t += 60) ticks += '<span' + ((t - R0) % 180 ? ' class="minor"' : '') + ' style="left:' + pct(t) + '%">' + pdHM(t) + '</span>';
   ticks += pdGlanceStepTicks(R0, R1, pct);
   html += '<section class="pd-glance pd-g-day' + (pdGlanceFolded ? ' folded' : '') + '" aria-label="La journée en un coup d’œil">' +
-    '<div class="pd-glance-head">' + pdFoldBtnHtml('La journée en un coup d’œil') +
+    '<div class="pd-glance-head">' + pdFoldBtnHtml('La journée en un coup d’œil') + pdSearchHtml() +
     '<span class="pd-legend"><span><i style="background:var(--ink);opacity:.75"></i>À venir</span><span><i style="background:var(--ink);opacity:.25"></i>Terminé</span>' +
     '<span><i style="border:1px dashed var(--grey)"></i>Absent</span>' + (isToday ? '<span><i style="width:2px;background:var(--red)"></i>Maintenant</span>' : '') + '</span></div>' +
     rows +
@@ -1953,7 +1960,7 @@ function pdWeekHtml(start) {
   var lanes = calBarberFilter ? team.filter(function (b) { return b.id === calBarberFilter; }) : (pdOnlyMe ? team.filter(function (b) { return b.id === myId; }) : team);
   if (!lanes.length) lanes = team;
 
-  var html = pdSearchHtml();
+  var html = '';   // la recherche client est dans l'en-tête du coup d'œil (gain de place)
   // Coup d'œil : une ligne par jour, une piste par coiffeur dans la barre.
   var rows = days.map(function (d, i) {
     var its = shown.filter(function (it) { return it.day === d; });
@@ -1981,7 +1988,7 @@ function pdWeekHtml(start) {
   var ticks = '';
   for (var t = R0; t <= R1; t += 60) ticks += '<span' + ((t - R0) % 180 ? ' class="minor"' : '') + ' style="left:' + pct(t) + '%">' + pdHM(t) + '</span>';
   ticks += pdGlanceStepTicks(R0, R1, pct);
-  html += '<section class="pd-glance pd-g-week' + (pdGlanceFolded ? ' folded' : '') + '" aria-label="La semaine en un coup d’œil"><div class="pd-glance-head">' + pdFoldBtnHtml('La semaine en un coup d’œil') +
+  html += '<section class="pd-glance pd-g-week' + (pdGlanceFolded ? ' folded' : '') + '" aria-label="La semaine en un coup d’œil"><div class="pd-glance-head">' + pdFoldBtnHtml('La semaine en un coup d’œil') + pdSearchHtml() +
     '<span class="pd-legend">' + lanes.map(function (b) { return '<span><i style="background:' + barberColor(b.id) + '"></i>' + (b.id === myId ? 'Moi' : esc(b.name)) + '</span>'; }).join('') + '</span></div>' +
     rows + '<div class="pd-g-row" style="cursor:default;padding-top:0;padding-bottom:0" aria-hidden="true"><span></span><span class="pd-g-ticks">' + ticks + '</span><span class="pd-g-sum"></span></div></section>';
 
