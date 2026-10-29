@@ -1597,6 +1597,24 @@ function pdBarberDay(b, dateStr) {
   };
 }
 /** Clic sur le vide d'une colonne : même règle que la ligne du planning (absent, sans RDV, pas de RDV en ligne...). */
+/**
+ * Toucher un endroit libre de l'agenda (colonne d'un coiffeur, bloc « Libre ») : prise de RDV avec l'HEURE TOUCHÉE déjà
+ * choisie (arrondie au pas des créneaux) si elle est libre pour la prestation choisie ; les autres heures restent proposées.
+ */
+function pdColAdd(ev, dateStr, barberId) {
+  var col = ev.currentTarget.closest ? (ev.currentTarget.closest('.pd-col') || ev.currentTarget) : ev.currentTarget;
+  var grid = col.closest ? col.closest('.pd-grid') : null;
+  pdPrefTime = null;
+  if (grid) {
+    var r0 = Number(grid.getAttribute('data-r0')), px = Number(grid.getAttribute('data-px'));
+    var step = rdvSlotStepMin > 0 ? rdvSlotStepMin : 15;
+    var m = r0 + Math.max(0, ev.clientY - col.getBoundingClientRect().top) / px;
+    m = Math.floor(m / step) * step;
+    pdPrefTime = pdHM(m);
+  }
+  openPosteAddAppointment(dateStr, barberId);
+  pdPrefTime = null;
+}
 function pdColClickAttr(b, dateStr) {
   if (rdvIsSalonClosed(dateStr) || isPastDay(dateStr)) return '';
   var rowB = (barbers || []).find(function (x) { return x.id === b.id; });
@@ -1605,7 +1623,7 @@ function pdColClickAttr(b, dateStr) {
   var nm = esc(String(b.name).replace(/'/g, ''));
   if (offWhy) return ' onclick="toast(\'' + nm + ' ' + esc(offWhy).replace(/'/g, '') + ' : pas de rendez-vous possible.\', true)"';
   if (walkDay) return ' onclick="toast(\'' + nm + ' est en « sans RDV » ce jour-là : pas de rendez-vous\', true)"';
-  if (b.accepts_appointments || (me && b.id === me.id)) return ' onclick="openPosteAddAppointment(\'' + dateStr + '\',\'' + b.id + '\')" title="Ajouter un RDV pour ' + esc(b.name) + '"';
+  if (b.accepts_appointments || (me && b.id === me.id)) return ' onclick="pdColAdd(event, \'' + dateStr + '\',\'' + b.id + '\')" title="Ajouter un RDV pour ' + esc(b.name) + '"';
   return ' onclick="toast(\'' + nm + ' ne prend pas de RDV en ligne\', true)"';
 }
 
@@ -1736,7 +1754,7 @@ function posteDayHtml(dateStr) {
     });
     if (isMe) free.forEach(function (f) {
       var h = Math.round((f[1] - f[0]) * PX) - 3;
-      inner += '<button type="button" class="pd-free' + (h >= 44 ? ' tall' : '') + '" style="top:' + Math.round((f[0] - R0) * PX) + 'px;height:' + h + 'px" onclick="event.stopPropagation();openPosteAddAppointment(\'' + dateStr + '\',\'' + myId + '\')">Libre · ' + pdDur(f[1] - f[0]) + (h >= 18 ? '<b>+ Ajouter</b>' : '') + '</button>';
+      inner += '<button type="button" class="pd-free' + (h >= 44 ? ' tall' : '') + '" style="top:' + Math.round((f[0] - R0) * PX) + 'px;height:' + h + 'px" onclick="event.stopPropagation();pdColAdd(event, \'' + dateStr + '\',\'' + myId + '\')">Libre · ' + pdDur(f[1] - f[0]) + (h >= 18 ? '<b>+ Ajouter</b>' : '') + '</button>';
     });
     pdLayout(items.filter(function (it) { return it.barberId === b.id; })).forEach(function (it) {
       var h = Math.max(16, Math.round(it.dur * PX) - 3), a = it.a;
@@ -2574,6 +2592,7 @@ function openPosteAddAppointment(dateStr, barberId) {
         '<button id="pa-half-afternoon" onclick="paShowHalf(\'afternoon\')">Après-midi</button>' +
       '</div>' +
       '<div class="aa-slots" id="pa-slots"><span class="hint" style="margin:0">Chargement…</span></div>' +
+      '<div class="step-bar"><button type="button" class="btn btn-primary" id="pa-dt-next" style="width:100%;display:none" onclick="paGoStep(\'products\')"></button></div>' +
     '</div>' +
 
     // Derniere etape : le client (clients connus proposes des 3 lettres), puis Enregistrer. Au telephone, on cherche
@@ -2672,7 +2691,7 @@ function openPosteAddAppointment(dateStr, barberId) {
     var list = slotsByHalf[currentHalf];
     slotsEl.innerHTML = list.length
       ? list.map(function (s) {
-          return '<button class="aa-slot" data-time="' + s.time + '" onclick="paSelectSlot(this)">' + s.time + '</button>';
+          return '<button class="aa-slot' + (s.time === state.time ? ' sel' : '') + '" data-time="' + s.time + '" onclick="paSelectSlot(this)">' + s.time + '</button>';
         }).join('')
       : '<span class="hint" style="margin:0">Aucun créneau ' + (currentHalf === 'morning' ? 'le matin' : "l'après-midi") + '</span>';
   }
@@ -2728,10 +2747,26 @@ function openPosteAddAppointment(dateStr, barberId) {
           toggleEl.style.display = 'flex';
           paShowHalf(prefTime && prefTime >= '12:00' && slotsByHalf.afternoon.length ? 'afternoon' : 'morning');
         }
-        if (prefTime) {   // le créneau le plus proche de l'heure touchée est entouré (on le choisit d'un clic, comme d'habitude)
-          var near = [].slice.call(slotsEl.querySelectorAll('.aa-slot[data-time]')).filter(function (c) { return c.dataset.time >= prefTime; })[0];
-          if (near) { near.classList.add('pref'); try { near.scrollIntoView({ block: 'nearest' }); } catch (e) {} }
+        // Heure touchée dans l'agenda (ou déjà choisie) : libre pour cette prestation -> déjà sélectionnée, bouton
+        // « Continuer à HH:MM » (les autres heures restent proposées) ; pas libre -> le créneau suivant est seulement entouré.
+        var want = state.time || prefTime;
+        var exact = want ? r.slots.some(function (x) { return x.time === want; }) : false;
+        var nx = overlay.querySelector('#pa-dt-next');
+        if (exact) {
+          state.time = want;
+          var half = want >= '12:00' ? 'afternoon' : 'morning';
+          if (half !== currentHalf && slotsByHalf.morning.length) paShowHalf(half);   // la bonne demi-journée
+          var el = slotsEl.querySelector('.aa-slot[data-time="' + want + '"]');
+          if (el) { el.classList.add('sel'); try { el.scrollIntoView({ block: 'nearest' }); } catch (e) {} }
+          nx.textContent = 'Continuer à ' + want; nx.style.display = '';
+        } else {
+          state.time = null; nx.style.display = 'none';
+          if (prefTime) {
+            var near = [].slice.call(slotsEl.querySelectorAll('.aa-slot[data-time]')).filter(function (c) { return c.dataset.time >= prefTime; })[0];
+            if (near) { near.classList.add('pref'); try { near.scrollIntoView({ block: 'nearest' }); } catch (e) {} }
+          }
         }
+        if (typeof flowRefresh === 'function') flowRefresh();
       })
       .catch(function (e) { slotsEl.innerHTML = ''; toast(e.message, true); });
   }
