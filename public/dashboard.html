@@ -4022,6 +4022,7 @@ function openRescheduleAppointment(id, data) {
   };
 }
 
+var drawerClientSource = null;
 function toggleEditClientInfo() {
   var editing = document.getElementById('drawer-info-edit-section').style.display !== 'none';
   if (editing) {
@@ -4076,6 +4077,7 @@ function openClientDrawer(id, source, directData) {
     : (source === 'appointment' ? directData : clientHistory.find(function (x) { return x.id === id; }));
   if (!c) return;
 
+  drawerClientSource = source;
   drawerClientId = id;
   // Les rendez-vous futurs peuvent être corrigés sans entrée dans la file.
   drawerQueueId = source === 'appointment' ? (c.promoted_queue_id || null) : id;
