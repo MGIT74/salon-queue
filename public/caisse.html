@@ -4372,7 +4372,7 @@ function ticketLinesHtml(justAddedIndex) {
 function renderTicket(justAddedIndex) {
   document.getElementById('ticket-lines').innerHTML = ticketLinesHtml(justAddedIndex);
   var addBtn = document.getElementById('ticket-group-add');
-  if (addBtn) addBtn.style.display = ticket.length && ticketQueueId && !ticketMode ? 'flex' : 'none';
+  if (addBtn) addBtn.style.display = ticket.length && ticketQueueId && ticketMode !== 'balance' ? 'flex' : 'none';
 
   var modeEl = document.getElementById('ticket-mode');
   if (modeEl) {
