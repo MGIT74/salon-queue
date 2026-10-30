@@ -921,7 +921,7 @@ function gotoHome() {
 if (window.AutoRefresh) AutoRefresh.start(function () {
   var ag = document.getElementById('p-agenda');
   if (!ag || ag.style.display === 'none' || !calBooted) return;
-  calMonthCache = {}; return loadAgendaPeriod();
+  invalidateAgendaCache(); return loadAgendaPeriod();
 }, { idleMs: 15000, busy: function () { return !!document.querySelector('.modal-overlay, .appt-drawer-backdrop.on'); } });
 
 function gotoAgenda() {
@@ -930,7 +930,7 @@ function gotoAgenda() {
   document.getElementById('nav-home').classList.remove('on');
   document.getElementById('nav-agenda').classList.add('on');
   // Toujours relu en ouvrant l'Agenda : RDV pris ailleurs, fermetures ajoutées par l'admin...
-  calBooted = true; calMonthCache = {}; loadAgendaPeriod();
+  calBooted = true; invalidateAgendaCache(); loadAgendaPeriod();
 }
 
 /* ---------- Application ---------- */
@@ -1388,13 +1388,25 @@ function rdvLoadSalonClosures() {
   return barberApi('/api/salon-calendar/public-closures').then(function(r){rdvSalonClosures=r.items||[];}).catch(function(){rdvSalonClosures=[];});
 }
 
+// Une réponse réseau ancienne ne doit jamais écraser un rafraîchissement plus récent.
+var calLoadSequence = 0;
+var calCacheGeneration = 0;
+function invalidateAgendaCache() {
+  calCacheGeneration++;
+  calMonthCache = {};
+}
 function loadAgendaPeriod() {
+  var sequence = ++calLoadSequence;
+  var generation = calCacheGeneration;
   var keys = neededMonthKeys();
   var toFetch = keys.filter(function (k) { return !calMonthCache[k]; });
-  Promise.all(toFetch.map(function (k) {
+  return Promise.all(toFetch.map(function (k) {
     // caisse_view=1 : les RDV de TOUS les coiffeurs (comme la caisse), pas seulement les siens.
-    return barberApi('/api/appointments?month=' + k + '&all=1&caisse_view=1').then(function (r) { calMonthCache[k] = r.items; });
+    return barberApi('/api/appointments?month=' + k + '&all=1&caisse_view=1').then(function (r) {
+      if (sequence === calLoadSequence && generation === calCacheGeneration) calMonthCache[k] = r.items;
+    });
   }).concat([loadRdvSlotStep(), loadSalonScheduleForTimeline(), rdvLoadSalonClosures()])).then(function () {
+    if (sequence !== calLoadSequence || generation !== calCacheGeneration) return;
     refreshBarberLooks();
     if (calViewMode === 'month') renderCalMonth();
     else if (calViewMode === 'week') renderCalWeek();
@@ -2528,7 +2540,7 @@ function paOpenGroup() {
   _closeModal(ctx.overlay);
   StaffGroupBooking.open({
     api: barberApi, client: client,
-    onDone: function () { Object.keys(calMonthCache).forEach(function (k) { delete calMonthCache[k]; }); loadAgendaPeriod(); }
+    onDone: function () { invalidateAgendaCache(); loadAgendaPeriod(); }
   });
 }
 
@@ -2808,7 +2820,7 @@ function openPosteAddAppointment(dateStr, barberId) {
     }).then(function () {
       _closeModal(overlay);
       toast(forOther && target ? 'RDV ajouté pour ' + target.name : 'RDV ajouté');
-      Object.keys(calMonthCache).forEach(function (k) { delete calMonthCache[k]; });
+      invalidateAgendaCache();
       loadAgendaPeriod();
     }).catch(function (e) { errEl.textContent = e.message; errEl.style.display = 'block'; });
   };
@@ -2921,8 +2933,8 @@ function openApptDrawer(a) {
   adQueueId = a.promoted_queue_id || null;
   document.getElementById('ad-edit-section').style.display = 'none';
   document.getElementById('ad-info').style.display = 'block';
-  // Le crayon n'existe que pour un RDV déjà dans la file (jour J) : avant, il n'y a pas encore de fiche à modifier.
-  document.getElementById('ad-edit-btn').style.display = (adQueueId && a.status !== 'cancelled') ? 'flex' : 'none';
+  // Les coordonnées restent modifiables même avant l'entrée du RDV dans la file.
+  document.getElementById('ad-edit-btn').style.display = a.status !== 'cancelled' ? 'flex' : 'none';
   document.getElementById('ad-actions').style.display = adIsUpcoming(a) ? 'flex' : 'none';
   adRenderInfo();
   var noteBox = document.getElementById('ad-note-box');
@@ -2931,7 +2943,7 @@ function openApptDrawer(a) {
       '<textarea id="ad-note" rows="3" placeholder="Ex: préfère dégradé américain, allergie...">' + esc(a.note || '') + '</textarea>' +
       '<button class="btn btn-soft" style="margin-top:8px" onclick="adSaveNote()">Enregistrer la note</button>';
   } else {
-    noteBox.innerHTML = '<p class="hint" style="margin:0">Pas encore modifiable — ce RDV entrera dans la file le jour même.</p>';
+    noteBox.innerHTML = '<p class="hint" style="margin:0">La note interne sera disponible lorsque le RDV entrera dans la file.</p>';
   }
   adLoadDetails(a, adQueueId);
   document.getElementById('appt-drawer-backdrop').classList.add('on');
@@ -2948,7 +2960,7 @@ function closeApptDrawer() {
 
 /** Rafraîchit l'agenda et la file après une modification. */
 function adRefreshViews() {
-  Object.keys(calMonthCache).forEach(function (k) { delete calMonthCache[k]; });
+  invalidateAgendaCache();
   if (calBooted) loadAgendaPeriod();
   refresh();
 }
@@ -2965,12 +2977,13 @@ function adToggleEdit() {
 }
 
 function adSaveInfo() {
-  if (!adAppt || !adQueueId) return;
+  if (!adAppt) return;
   var name = document.getElementById('ad-edit-name').value.trim();
   if (!name) { toast('Le nom est requis', true); return; }
   var email = document.getElementById('ad-edit-email').value.trim();
   var phone = document.getElementById('ad-edit-phone').value.trim();
-  barberApi('/api/queue/' + adQueueId, { method: 'PUT', body: { client_name: name, email: email, phone: phone }, actingAs: adAppt.barber_id || undefined })
+  var url = adQueueId ? '/api/queue/' + adQueueId : '/api/appointments/' + adAppt.id + '/contact';
+  barberApi(url, { method: 'PUT', body: { client_name: name, email: email, phone: phone }, actingAs: adAppt.barber_id || undefined })
     .then(function () {
       adAppt.client_name = name; adAppt.email = email; adAppt.phone = phone;
       adRenderInfo(); adToggleEdit();
