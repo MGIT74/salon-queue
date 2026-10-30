@@ -4101,7 +4101,7 @@ function openGroupPayPicker() {
         return '<button type="button" class="advance-pick" data-id="' + esc(x.id) + '">' +
           '<span><span style="font-weight:600">' + esc(x.client_name) + '</span>' + (sameGroup ? '<span class="pending-group">Son groupe</span>' : '') +
           '<span class="meta" style="display:block">' + esc(svcLabel(x.service.name, x.extras)) + (x.barber_id ? ' · ' + esc(nameOf(x.barber_id)) : '') +
-            (x.early ? ' · ' + (x.status === 'in_progress' ? 'en cours' : 'en attente') + ' — payé d\\'avance' : '') + '</span></span>' +
+            (x.early ? ' · ' + (x.status === 'in_progress' ? 'en cours' : 'en attente') + ' — payé d\'avance' : '') + '</span></span>' +
           '<span style="font-weight:700">' + eur(x.total_price_cents) + '</span></button>';
       }).join('') : '<div class="empty">Aucun client disponible pour ce filtre.</div>';
       Array.prototype.forEach.call(candidates.querySelectorAll('.advance-pick'), function (b) {
