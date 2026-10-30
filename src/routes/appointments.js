@@ -1286,9 +1286,6 @@ router.post('/:id/admin-cancel', requireAdminOrBarber, wrap(async (req, res) => 
   // coiffeur actif (lui-même par défaut, ou celui désigné par bulle
   // depuis la caisse partagée) - jamais celui d'un autre sans être passé
   // par cette sélection explicite.
-  if (req.actingBarberId && appt.barber_id && appt.barber_id !== req.actingBarberId) {
-    return res.status(403).json({ error: "Ce n'est pas le RDV de ce coiffeur." });
-  }
 
   if (appt.promoted_queue_id) {
     const paid = await saleForPassage(pool, req.salon.id, appt.promoted_queue_id);
@@ -1360,6 +1357,43 @@ async function applyMove(appt, date, time, finalBarberId, rdvSettings, extraIds,
 }
 
 /**
+ * Corriger les coordonnées d'un RDV futur, avant son entrée dans la file.
+ * Accessible à tous les coiffeurs authentifiés du salon, sans accès
+ * supplémentaire aux opérations de caisse.
+ */
+router.put('/:id/contact', requireAdminOrBarber, wrap(async (req, res) => {
+  const fields = ['client_name', 'email', 'phone'];
+  if (!req.body || !fields.some((key) => Object.prototype.hasOwnProperty.call(req.body, key)) ||
+      Object.keys(req.body).some((key) => !fields.includes(key))) {
+    return res.status(400).json({ error: 'Coordonnées invalides' });
+  }
+  const [[appt]] = await pool.query(
+    'SELECT id, status, promoted_queue_id FROM appointments WHERE id = ? AND salon_id = ?',
+    [req.params.id, req.salon.id]
+  );
+  if (!appt) return res.status(404).json({ error: 'Rendez-vous introuvable' });
+  if (appt.status !== 'confirmed') return res.status(409).json({ error: 'Ce rendez-vous ne peut plus être modifié' });
+  if (appt.promoted_queue_id) return res.status(409).json({ error: 'Ce rendez-vous est déjà dans la file : utilisez la fiche client' });
+  const name = req.body.client_name;
+  if (name !== undefined && !String(name || '').trim()) return res.status(400).json({ error: 'Le nom est requis' });
+  const err = contactError({ name, email: req.body.email, phone: req.body.phone }, { nameRequired: false });
+  if (err) return res.status(400).json({ error: err });
+  const sets = [], params = [];
+  for (const field of fields) {
+    if (req.body[field] === undefined) continue;
+    sets.push(field + ' = ?');
+    params.push(String(req.body[field] || '').trim() || (field === 'client_name' ? '' : null));
+  }
+  params.push(appt.id, req.salon.id);
+  const [result] = await pool.query(
+    'UPDATE appointments SET ' + sets.join(', ') + " WHERE id = ? AND salon_id = ? AND status = 'confirmed' AND promoted_queue_id IS NULL",
+    params
+  );
+  if (!result.affectedRows) return res.status(409).json({ error: 'Rendez-vous modifié entre-temps : actualisez l’agenda' });
+  res.json({ ok: true });
+}));
+
+/**
  * Modification/déplacement d'un RDV par l'admin (nouvelle date/heure,
  * et éventuellement nouveau coiffeur) - le client reçoit un email de
  * confirmation avec le nouvel horaire.
@@ -1384,9 +1418,6 @@ router.put('/:id/reschedule', requireAdminOrBarber, wrap(withBookingLock(async (
   // coiffeur actif (lui-même, ou celui désigné par bulle depuis la caisse
   // partagée) - même règle que l'annulation. Il peut en revanche le confier
   // à un autre coiffeur (barber_id), si ce dernier a le créneau libre.
-  if (req.actingBarberId && appt.barber_id && appt.barber_id !== req.actingBarberId) {
-    return res.status(403).json({ error: "Ce n'est pas le RDV de ce coiffeur." });
-  }
 
   if (appt.promoted_queue_id) {
     const paid = await saleForPassage(pool, req.salon.id, appt.promoted_queue_id);
@@ -1508,9 +1539,6 @@ router.put('/:id/services', requireAdminOrBarber, wrap(withBookingLock(async (re
   const [[appt]] = await pool.query('SELECT * FROM appointments WHERE id = ? AND salon_id = ?', [req.params.id, req.salon.id]);
   if (!appt) return res.status(404).json({ error: 'Rendez-vous introuvable' });
   if (appt.status !== 'confirmed') return res.status(409).json({ error: 'Seuls les rendez-vous à venir peuvent être modifiés.' });
-  if (req.actingBarberId && appt.barber_id && appt.barber_id !== req.actingBarberId) {
-    return res.status(403).json({ error: "Ce n'est pas le RDV de ce coiffeur." });
-  }
 
   let queueRow = null;
   if (appt.promoted_queue_id) {
