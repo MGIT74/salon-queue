@@ -1154,13 +1154,15 @@ async function createGroupBooking(req, res, staff) {
  */
 // Verrouiller les annulations publiques sur le salon propriétaire du RDV,
 // même si le lien d'annulation est ouvert depuis un autre contexte de salon.
-const resolveCancellationSalon = async (req, res, next) => {
-  const token = req.body && req.body.token;
-  if (!token) return res.status(400).json({ error: 'Token requis' });
-  const [[row]] = await pool.query('SELECT salon_id FROM appointments WHERE cancel_token = ? LIMIT 1', [token]);
-  if (!row) return res.status(404).json({ error: 'Rendez-vous introuvable' });
-  req.bookingLockSalonId = row.salon_id;
-  next();
+const resolveCancellationSalon = (req, res, next) => {
+  (async () => {
+    const token = req.body && req.body.token;
+    if (!token) return res.status(400).json({ error: 'Token requis' });
+    const [[row]] = await pool.query('SELECT salon_id FROM appointments WHERE cancel_token = ? LIMIT 1', [token]);
+    if (!row) return res.status(404).json({ error: 'Rendez-vous introuvable' });
+    req.bookingLockSalonId = row.salon_id;
+    next();
+  })().catch(next);
 };
 
 router.post('/cancel-group', resolveCancellationSalon, wrap(withBookingLock(async (req, res) => {
