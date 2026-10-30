@@ -4037,10 +4037,11 @@ function toggleEditClientInfo() {
 }
 
 function saveClientInfo() {
-  if (!drawerQueueId) return;
+  if (!drawerQueueId && !(drawerClientId && drawerClientSource === 'appointment')) return;
   var name = document.getElementById('drawer-edit-name').value.trim();
   if (!name) { toast('Le nom est requis', true); return; }
-  api('/api/queue/' + drawerQueueId, {
+  var url = drawerQueueId ? '/api/queue/' + drawerQueueId : '/api/appointments/' + drawerClientId + '/contact';
+  api(url, {
     method: 'PUT',
     body: {
       client_name: name,
@@ -4050,6 +4051,16 @@ function saveClientInfo() {
   }).then(function () {
     toast('Client mis à jour');
     toggleEditClientInfo();
+    if (drawerAppointmentData) {
+      drawerAppointmentData.client_name = name;
+      drawerAppointmentData.email = document.getElementById('drawer-edit-email').value.trim();
+      drawerAppointmentData.phone = document.getElementById('drawer-edit-phone').value.trim();
+      document.getElementById('drawer-client-name').textContent = name;
+      document.getElementById('drawer-info-section').innerHTML = apptInfoRowsHtml(drawerAppointmentData);
+      Object.keys(calMonthCache).forEach(function (k) { delete calMonthCache[k]; });
+      loadCalendarPeriod();
+      renderRdvList();
+    }
     return Promise.all([loadClients(), refreshQueue()]);
   }).catch(function (e) { toast(e.message, true); });
 }
@@ -4066,14 +4077,12 @@ function openClientDrawer(id, source, directData) {
   if (!c) return;
 
   drawerClientId = id;
-  // Pour un RDV pas encore promu en file, il n'y a pas encore de vraie
-  // ligne 'queue' à éditer - le crayon est alors désactivé (rien à
-  // mettre à jour tant que le jour du RDV n'est pas arrivé).
+  // Les rendez-vous futurs peuvent être corrigés sans entrée dans la file.
   drawerQueueId = source === 'appointment' ? (c.promoted_queue_id || null) : id;
   drawerClientSnapshot = { client_name: c.client_name, email: c.email || '', phone: c.phone || '' };
   document.getElementById('drawer-info-edit-section').style.display = 'none';
   document.getElementById('drawer-info-section').style.display = 'block';
-  document.getElementById('drawer-edit-btn').style.display = drawerQueueId ? 'flex' : 'none';
+  document.getElementById('drawer-edit-btn').style.display = (drawerQueueId || (source === 'appointment' && c.status === 'confirmed')) ? 'flex' : 'none';
   document.getElementById('drawer-client-name').textContent = c.client_name;
   document.getElementById('drawer-note').value = c.note || '';
 
