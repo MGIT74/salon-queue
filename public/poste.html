@@ -1395,6 +1395,22 @@ function invalidateAgendaCache() {
   calCacheGeneration++;
   calMonthCache = {};
 }
+// Rafraîchissement inter-postes : les autres terminaux peuvent modifier les RDV.
+// Une génération et un numéro de requête empêchent une réponse ancienne d'écraser la plus récente.
+var agendaSyncRequest = 0;
+var agendaSyncGeneration = 0;
+function syncInvalidateAgenda() {
+  agendaSyncGeneration++;
+  invalidateAgendaCache();
+}
+setInterval(function () {
+  if (!calBooted || document.hidden) return;
+  syncInvalidateAgenda();
+  loadAgendaPeriod();
+}, 15000);
+document.addEventListener('visibilitychange', function () {
+  if (!document.hidden && calBooted) { syncInvalidateAgenda(); loadAgendaPeriod(); }
+});
 function loadAgendaPeriod() {
   var sequence = ++calLoadSequence;
   var generation = calCacheGeneration;
