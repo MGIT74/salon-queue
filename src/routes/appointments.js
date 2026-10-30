@@ -1924,19 +1924,31 @@ async function promoteTodayAppointments(salonId) {
  * n'agit que sur les RDV encore à venir. Aucun email envoyé - une
  * suppression, ce n'est pas une annulation communiquée au client.
  */
-router.delete('/:id', requireAdmin, wrap(async (req, res) => {
+router.delete('/:id', requireAdmin, wrap(withBookingLock(async (req, res) => {
   const [[appt]] = await pool.query(
-    'SELECT id, gift_card_id FROM appointments WHERE id = ? AND salon_id = ?',
+    'SELECT id, gift_card_id, promoted_queue_id, status FROM appointments WHERE id = ? AND salon_id = ?',
     [req.params.id, req.salon.id]
   );
   if (!appt) return res.status(404).json({ error: 'Rendez-vous introuvable' });
 
-  await pool.query('DELETE FROM appointments WHERE id = ?', [req.params.id]);
+  // Une suppression définitive ne doit pas laisser un passage actif
+  // orphelin dans la file, ni effacer un rendez-vous déjà pris en charge.
+  if (appt.promoted_queue_id) {
+    const [[q]] = await pool.query('SELECT status FROM queue WHERE id = ? AND salon_id = ?', [appt.promoted_queue_id, req.salon.id]);
+    if (q && (q.status === 'waiting' || q.status === 'in_progress')) {
+      return res.status(409).json({ error: 'Ce rendez-vous est encore dans la file. Annulez-le avant de le supprimer.' });
+    }
+    if (await saleForPassage(pool, req.salon.id, appt.promoted_queue_id)) {
+      return res.status(409).json({ error: 'Rendez-vous encaissé : suppression impossible, utilisez la procédure de remboursement.' });
+    }
+  }
+
+  await pool.query('DELETE FROM appointments WHERE id = ? AND salon_id = ?', [req.params.id, req.salon.id]);
   // Sans ça, un cadeau resterait verrouillé indéfiniment (plus aucun
   // rendez-vous pour le libérer un jour) puisque la ligne qui le
   // bloquait vient de disparaître.
   if (appt.gift_card_id) await releaseGiftAfterCancellation(req.salon.id, appt.gift_card_id, appt.id);
   res.json({ ok: true });
-}));
+})));
 
 module.exports = { router, promoteTodayAppointments, nowParisDatetimeString, nowInParis, computeSlotsForBarber, parisLocalToUtcDate };
