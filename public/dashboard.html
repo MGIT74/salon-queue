@@ -6897,6 +6897,9 @@ function loadCalendarPeriod() {
     else if (calViewMode === 'week') renderWeekView();
     else renderDayView();
     renderCalendarLegend(keys);
+    // La liste des rendez-vous utilise le même cache : la rafraîchir après
+    // la réception des nouvelles réservations, y compris celles créées manuellement.
+    renderRdvList();
   }).catch(function (e) { toast(e.message, true); });
 }
 
