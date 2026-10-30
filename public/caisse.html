@@ -4091,7 +4091,7 @@ function openGroupPayPicker() {
         var color = b.color || stableColorForId(b.id);
         var initial = (b.name || '?').trim().charAt(0).toUpperCase();
         var avatarStyle = b.photo_url
-          ? 'background-image:url(\\'' + b.photo_url + '\\')'
+          ? 'background-image:url(&quot;' + esc(b.photo_url) + '&quot;)'
           : 'background:' + color;
         return '<button type="button" class="barber-bubble gp-barber-filter" data-barber="' + esc(b.id) + '" title="' + esc(b.name) + '" aria-label="Filtrer les clients de ' + esc(b.name) + '">' +
           '<span class="avatar" style="' + avatarStyle + '">' + (b.photo_url ? '' : esc(initial)) + '</span></button>';
