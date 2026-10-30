@@ -1403,7 +1403,7 @@ function loadAgendaPeriod() {
   return Promise.all(toFetch.map(function (k) {
     // caisse_view=1 : les RDV de TOUS les coiffeurs (comme la caisse), pas seulement les siens.
     return barberApi('/api/appointments?month=' + k + '&all=1&caisse_view=1').then(function (r) {
-      if (generation === calCacheGeneration) calMonthCache[k] = r.items;
+      if (sequence === calLoadSequence && generation === calCacheGeneration) calMonthCache[k] = r.items;
     });
   }).concat([loadRdvSlotStep(), loadSalonScheduleForTimeline(), rdvLoadSalonClosures()])).then(function () {
     if (sequence !== calLoadSequence || generation !== calCacheGeneration) return;
