@@ -145,6 +145,32 @@
   .site-redirect { margin-top: 16px; color: var(--grey); font-size: 13.5px; }
   .site-redirect .link-btn { background: none; border: 0; padding: 4px; margin-top: 2px; color: var(--blue); font: inherit; font-weight: 600; cursor: pointer; }
   .site-redirect .link-btn:hover { text-decoration: underline; }
+  /* RDV sans compte : verification de l'email par code a 6 chiffres */
+  .vf { display: flex; flex-direction: column; align-items: center; text-align: center; }
+  .vf-ic { width: 68px; height: 68px; border-radius: 22px; background: var(--blue-soft); color: var(--blue); display: flex; align-items: center; justify-content: center; margin-top: 8px; }
+  .vf-ic.warn { background: rgba(179,90,0,.12); color: var(--orange); border-radius: 50%; }
+  .vf h2 { font-size: 24px; font-weight: 800; letter-spacing: -.02em; margin: 16px 0 6px; }
+  .vf-sub { font-size: 15px; color: var(--grey); line-height: 1.5; margin: 0; }
+  .vf-sub b { color: var(--ink); }
+  .vf-sub .link-btn { background: none; border: 0; padding: 0 2px; color: var(--blue); font: inherit; font-weight: 600; cursor: pointer; }
+  .vf-boxes { display: flex; gap: 10px; margin-top: 24px; align-items: center; justify-content: center; }
+  .vf-boxes input { width: 54px; height: 66px; box-sizing: border-box; border: 1.5px solid var(--sep); border-radius: 14px; background: var(--card); color: var(--ink);
+    text-align: center; font-family: inherit; font-size: 28px; font-weight: 700; padding: 0; outline: none; transition: border-color .15s, box-shadow .15s; }
+  .vf-boxes input:focus { border: 2px solid var(--blue); box-shadow: 0 0 0 4px rgba(var(--accent-rgb), .14); }
+  .vf-boxes .dash { width: 12px; height: 3px; border-radius: 2px; background: var(--sep); flex-shrink: 0; }
+  .vf-boxes.bad input { border-color: var(--red); color: var(--red); }
+  .vf-boxes.off { opacity: .45; }
+  .vf-timer { display: flex; align-items: center; gap: 9px; margin-top: 16px; font-size: 13.5px; color: var(--grey); flex-wrap: wrap; justify-content: center; }
+  .vf-pill { display: inline-flex; align-items: center; gap: 6px; background: var(--blue-soft); color: var(--blue); border-radius: 99px; padding: 5px 12px; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .vf-msg { margin-top: 16px; border-radius: 12px; padding: 11px 16px; font-size: 14.5px; font-weight: 600; display: none; }
+  .vf-msg.err { display: block; background: rgba(196,0,27,.08); color: var(--red); }
+  .vf-msg.warn { display: block; background: rgba(179,90,0,.1); color: var(--orange); }
+  .vf-resend { margin-top: 18px; font-size: 14.5px; color: var(--grey); }
+  .vf-resend .link-btn { background: none; border: 0; padding: 0 2px; color: var(--blue); font: inherit; font-weight: 600; cursor: pointer; }
+  .vf-new { margin-top: 16px; width: auto; padding: 14px 24px; }
+  #vf-over .go { width: 100%; max-width: 420px; }
+  .vf-tip { margin-top: 18px; background: var(--fill); border-radius: 14px; padding: 13px 16px; font-size: 13.5px; color: var(--ink); line-height: 1.5; text-align: left; }
+  @media (max-width: 420px) { .vf-boxes { gap: 6px; } .vf-boxes input { width: 44px; height: 58px; font-size: 24px; } }
   .confirm-box .check {
     width: 56px; height: 56px; border-radius: 50%; background: var(--green); margin: 0 auto 18px;
     display: flex; align-items: center; justify-content: center;
@@ -256,7 +282,7 @@
   <section class="panel" id="p-group-contact">
     <button class="back" onclick="show(grp ? 'p-cart' : 'p-group')">‹ Retour</button>
     <div class="eyebrow" id="group-contact-summary"></div>
-    <div class="login-hint">Vous avez un compte ? <a href="#" onclick="goLogin(event)">Se connecter</a><span>Pas de compte ? Réservez quand même : vous recevrez un email de confirmation avec un lien pour annuler.</span></div>
+    <div class="login-hint">Vous avez un compte ? <a href="#" onclick="goLogin(event)">Se connecter</a><span>Pas de compte ? Réservez quand même : on vérifie juste votre email avec un code.</span></div>
     <div class="fld"><label for="grp-name">Votre prénom</label><input id="grp-name" type="text" autocomplete="given-name"></div>
     <div class="fld"><label for="grp-email">Email — pour la confirmation</label><input id="grp-email" type="email" autocomplete="email"></div>
     <div class="fld"><label for="grp-phone">Téléphone</label>
@@ -273,7 +299,7 @@
         <input id="grp-phone" type="tel" autocomplete="tel-national" style="flex:1;min-width:0" placeholder="6 12 34 56 78">
       </div>
     </div>
-    <button class="go" id="group-confirm-btn" onclick="submitGroup()">Confirmer les rendez-vous</button>
+    <button class="go" id="group-confirm-btn" onclick="submitGroup()">Recevoir mon code</button>
   </section>
 
   <section class="panel" id="p-group-confirmed">
@@ -366,7 +392,7 @@
   <section class="panel" id="p-contact">
     <button class="back" onclick="show('p-datetime')">‹ Retour</button>
     <div class="eyebrow" id="contact-summary"></div>
-    <div class="login-hint">Vous avez un compte ? <a href="#" onclick="goLogin(event)">Se connecter</a><span>Pas de compte ? Réservez quand même : vous recevrez un email de confirmation avec un lien pour annuler.</span></div>
+    <div class="login-hint">Vous avez un compte ? <a href="#" onclick="goLogin(event)">Se connecter</a><span>Pas de compte ? Réservez quand même : on vérifie juste votre email avec un code.</span></div>
     <div class="flow-recap" data-recap></div>
     <div class="fld"><label for="rdv-name">Prénom</label><input id="rdv-name" type="text" autocomplete="given-name"></div>
     <div class="fld"><label for="rdv-email">Email — pour la confirmation</label><input id="rdv-email" type="email" autocomplete="email"></div>
@@ -384,7 +410,29 @@
         <input id="rdv-phone" type="tel" autocomplete="tel-national" style="flex:1;min-width:0" placeholder="6 12 34 56 78">
       </div>
     </div>
-    <button class="go" id="confirm-btn" onclick="submitAppointment()">Confirmer le rendez-vous</button>
+    <button class="go" id="confirm-btn" onclick="submitAppointment()">Recevoir mon code</button>
+  </section>
+
+  <!-- RDV sans compte : l'email est verifie par un code a 6 chiffres avant d'enregistrer le RDV. -->
+  <section class="panel" id="p-verify">
+    <button class="back" type="button" onclick="vfBack()">‹ Retour</button>
+    <div class="vf" id="vf-main">
+      <div class="vf-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="m3.5 7 8.5 6 8.5-6"/></svg></div>
+      <h2>Vérifiez votre email</h2>
+      <p class="vf-sub">Nous avons envoyé un code à 6 chiffres à<br><b id="vf-email"></b> · <button type="button" class="link-btn" onclick="vfBack()">Modifier</button></p>
+      <div class="vf-boxes" id="vf-boxes" role="group" aria-label="Code à 6 chiffres"></div>
+      <div class="vf-timer" id="vf-timer"><span class="vf-pill"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 1.5"/><path d="M10 2h4"/></svg><span id="vf-left">1:00</span></span><span>Code valable 60 secondes · votre créneau est gardé pendant ce temps</span></div>
+      <div class="vf-msg" id="vf-msg" role="alert"></div>
+      <button type="button" class="go vf-new" id="vf-new" style="display:none" onclick="vfResend()">Recevoir un nouveau code</button>
+      <div class="vf-resend" id="vf-resend"></div>
+    </div>
+    <div class="vf" id="vf-over" style="display:none">
+      <div class="vf-ic warn" aria-hidden="true"><svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4"/><path d="M10 2h4"/></svg></div>
+      <h2>Le temps est écoulé</h2>
+      <p class="vf-sub" id="vf-over-text">Votre email n'a pas pu être vérifié. Le créneau a été libéré pour les autres clients.</p>
+      <div class="vf-tip"><b>Vous ne recevez pas le code ?</b><br>Vérifiez l'adresse email et vos spams, ou appelez le salon pour réserver.</div>
+      <button type="button" class="go" style="margin-top:22px" onclick="vfRestart()">Recommencer la réservation</button>
+    </div>
   </section>
 
   <section class="panel" id="p-confirmed">
@@ -1003,11 +1051,10 @@ function submitAppointment() {
   if (cp) { toast(cp, true); return; }
 
   var btn = document.getElementById('confirm-btn');
-  btn.disabled = true; btn.textContent = 'Enregistrement…';
+  btn.disabled = true; btn.textContent = 'Envoi du code…';
 
-  api('/api/appointments', {
-    method: 'POST',
-    body: {
+  // Sans compte : l'email est d'abord verifie par un code a 6 chiffres (le RDV est enregistre avec le bon code).
+  vfStart('single', {
       client_name: name, email: email, phone: phone || null,
       service_id: selService, extras: selExtras,
       products: selProducts.map(function (id) { return { id: id, quantity: 1 }; }),
@@ -1015,8 +1062,7 @@ function submitAppointment() {
       barber_id: selBarber === '' ? null : selSlot.barberId, date: selDate, time: selSlot.time,
       gift_id: activeGift ? activeGift.id : null,
       base_url: window.location.origin + window.location.pathname + (SALON_SLUG ? '?salon=' + SALON_SLUG : '')
-    }
-  }).then(function (r) {
+  }, 'p-contact', function (r) {
     var s = services.find(function (x) { return x.id === selService; });
     var exNames = selExtras.map(function (id) { var e = extras.find(function (x) { return x.id === id; }); return e ? e.name : ''; });
     var when = new Date(selDate + 'T' + selSlot.time).toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' }) + ' à ' + selSlot.time;
@@ -1025,7 +1071,7 @@ function submitAppointment() {
   }).catch(function (e) {
     toast(e.message, true);
   }).finally(function () {
-    btn.disabled = false; btn.textContent = 'Confirmer le rendez-vous';
+    btn.disabled = false; btn.textContent = 'Recevoir mon code';
   });
 }
 
@@ -1073,6 +1119,7 @@ function enterStaffMode() {
   document.querySelector('label[for="grp-name"]').textContent = 'Nom du client';
   document.querySelector('label[for="grp-email"]').textContent = 'Email (optionnel — confirmation envoyée s\'il est renseigné)';
   document.querySelector('label[for="grp-phone"]').textContent = 'Téléphone (optionnel)';
+  document.getElementById('group-confirm-btn').textContent = 'Confirmer les rendez-vous';
   // Client déjà saisi dans « Ajouter un RDV » (dashboard / caisse) : son nom remplace « Le client », coordonnées pré-remplies.
   var c = STAFF_BRIDGE.client;
   if (c && c.name) {
@@ -1126,12 +1173,11 @@ function submitGroup() {
   var cpg = contactProblem({ name: name, email: email, phone: phone }, { emailRequired: !STAFF_BRIDGE, phoneRequired: !STAFF_BRIDGE });
   if (cpg) { toast(cpg, true); return; }
   var btn = document.getElementById('group-confirm-btn');
-  btn.disabled = true; btn.textContent = 'Enregistrement…';
-  (STAFF_BRIDGE ? STAFF_BRIDGE.api : api)(STAFF_BRIDGE ? '/api/appointments/admin-group' : '/api/appointments/group', {
-    method: 'POST',
-    body: { client_name: name, email: email, phone: phone, people: grp ? GroupBooking.cartPayload(grp.cart) : groupPayload,
-            base_url: window.location.origin + window.location.pathname + (SALON_SLUG ? '?salon=' + SALON_SLUG : '') }
-  }).then(function (r) {
+  btn.disabled = true; btn.textContent = STAFF_BRIDGE ? 'Enregistrement…' : 'Envoi du code…';
+  var gBody = { client_name: name, email: email, phone: phone, people: grp ? GroupBooking.cartPayload(grp.cart) : groupPayload,
+            base_url: window.location.origin + window.location.pathname + (SALON_SLUG ? '?salon=' + SALON_SLUG : '') };
+  // Salon (STAFF_BRIDGE) : enregistre tout de suite ; client sans compte : code a 6 chiffres envoye a son email d'abord.
+  var gDone = function (r) {
     document.getElementById('group-confirm-list').innerHTML = r.appointments.map(function (a) {
       var when = new Date(a.scheduled_at.replace(' ', 'T')).toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' }) + ' à ' + String(a.scheduled_at).slice(11, 16);
       return '<div class="gb-done"><b>' + esc(a.name) + '</b><span>' + esc(when) + ' — ' + esc(a.service_name || '') + (a.barber_name ? ' · ' + esc(a.barber_name) : '') + '</span></div>';
@@ -1144,15 +1190,167 @@ function submitGroup() {
       if (again) { again.textContent = 'Fermer'; again.onclick = function () { STAFF_BRIDGE.close(); }; }
     }
     show('p-group-confirmed'); redirectToSalonSite('p-group-confirmed');
-  }).catch(function (e) {
+  };
+  (STAFF_BRIDGE
+    ? STAFF_BRIDGE.api('/api/appointments/admin-group', { method: 'POST', body: gBody }).then(gDone)
+    : vfStart('group', gBody, 'p-group-contact', gDone)
+  ).catch(function (e) {
     toast(e.message, true);
     // Un creneau vient d'etre pris : on renvoie directement sur la personne concernee pour qu'elle en choisisse un autre.
     if (e.data && typeof e.data.person_index === 'number' && e.data.person_index >= 0) {
       if (grp && grp.cart[e.data.person_index]) cartRedoTime(e.data.person_index);
       else if (groupCtl) { groupCtl.focusPerson(e.data.person_index, e.message); show('p-group'); }
     }
-  }).finally(function () { btn.disabled = false; btn.textContent = 'Confirmer les rendez-vous'; });
+  }).finally(function () { btn.disabled = false; btn.textContent = STAFF_BRIDGE ? 'Confirmer les rendez-vous' : 'Recevoir mon code'; });
 }
+
+/* ---------- RDV sans compte : verification de l'email par code a 6 chiffres ----------
+   vfStart envoie la reservation au serveur, qui la verifie a blanc, garde le creneau 60 s et envoie le code.
+   Le bon code enregistre le RDV (onDone recoit la meme reponse qu'avant). 3 codes au plus, 3 essais par code. */
+var vf = null;   // { id, kind, back, onDone, expiresAt, sendsLeft, timer, busy }
+function vfStart(kind, body, back, onDone) {
+  return api('/api/appointments/verify/start', { method: 'POST', body: { kind: kind, booking: body } }).then(function (r) {
+    if (vf && vf.timer) clearInterval(vf.timer);
+    vf = { id: r.verification_id, kind: kind, back: back, onDone: onDone, sendsLeft: r.sends_left, busy: false };
+    document.getElementById('vf-email').textContent = r.email;
+    document.getElementById('vf-main').style.display = '';
+    document.getElementById('vf-over').style.display = 'none';
+    show('p-verify');
+    vfArm(r.expires_in);
+  });
+}
+function vfBoxesHtml() {
+  var h = '';
+  for (var i = 0; i < 6; i++) {
+    if (i === 3) h += '<span class="dash" aria-hidden="true"></span>';
+    h += '<input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1" aria-label="Chiffre ' + (i + 1) + '"' + (i === 0 ? ' autocomplete="one-time-code"' : ' autocomplete="off"') +
+      ' oninput="vfInput(this, ' + i + ')" onkeydown="vfKey(event, ' + i + ')" onpaste="vfPaste(event)">';
+  }
+  return h;
+}
+function vfInputs() { return Array.prototype.slice.call(document.querySelectorAll('#vf-boxes input')); }
+function vfArm(sec) {
+  var boxes = document.getElementById('vf-boxes');
+  boxes.innerHTML = vfBoxesHtml(); boxes.className = 'vf-boxes';
+  vfMsg('', '');
+  document.getElementById('vf-new').style.display = 'none';
+  document.getElementById('vf-timer').style.display = '';
+  vfResendLine();
+  vf.expiresAt = Date.now() + (sec || 60) * 1000;
+  if (vf.timer) clearInterval(vf.timer);
+  vf.timer = setInterval(vfTick, 250); vfTick();
+  setTimeout(function () { var f = vfInputs()[0]; if (f) f.focus(); }, 60);
+}
+function vfTick() {
+  if (!vf) return;
+  var left = Math.max(0, Math.ceil((vf.expiresAt - Date.now()) / 1000));
+  document.getElementById('vf-left').textContent = Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0');
+  if (!left) { clearInterval(vf.timer); vf.timer = null; vfExpired(); }
+}
+function vfResendLine() {
+  var el = document.getElementById('vf-resend');
+  el.innerHTML = vf.sendsLeft > 0
+    ? 'Pas reçu ? <button type="button" class="link-btn" onclick="vfResend()">Renvoyer un code</button> · ' + vf.sendsLeft + (vf.sendsLeft > 1 ? ' renvois possibles' : ' renvoi possible') + '<br><span style="font-size:13px">Pensez à regarder dans les spams.</span>'
+    : '<span style="font-size:13px">Pensez à regarder dans les spams.</span>';
+}
+function vfMsg(text, kind) {
+  var m = document.getElementById('vf-msg');
+  m.textContent = text || ''; m.className = 'vf-msg' + (kind ? ' ' + kind : '');
+}
+function vfLockBoxes() {
+  document.getElementById('vf-boxes').classList.add('off');
+  vfInputs().forEach(function (i) { i.disabled = true; });
+  document.getElementById('vf-timer').style.display = 'none';
+}
+// Code expire (60 s) ou trop d'essais : nouveau code si il en reste, sinon le creneau est libere.
+function vfOutOfTime(text) {
+  if (vf.timer) { clearInterval(vf.timer); vf.timer = null; }
+  vfLockBoxes();
+  if (vf.sendsLeft > 0) {
+    vfMsg(text, 'warn');
+    var b = document.getElementById('vf-new'); b.style.display = ''; b.disabled = false;
+    document.getElementById('vf-resend').innerHTML = 'Encore ' + vf.sendsLeft + (vf.sendsLeft > 1 ? ' renvois possibles' : ' renvoi possible') + '. Ensuite, le créneau est libéré pour les autres clients.';
+  } else vfOver();
+}
+function vfExpired() { vfOutOfTime('Les 60 secondes sont écoulées : ce code ne marche plus.'); }
+function vfOver(text) {
+  if (vf && vf.timer) { clearInterval(vf.timer); vf.timer = null; }
+  document.getElementById('vf-main').style.display = 'none';
+  document.getElementById('vf-over').style.display = '';
+  document.getElementById('vf-over-text').textContent = text || "Votre email n'a pas pu être vérifié après 3 codes. Le créneau a été libéré pour les autres clients.";
+}
+function vfInput(el, i) {
+  var d = el.value.replace(/\D/g, '');
+  if (d.length > 1) { vfFill(d, i); return; }
+  el.value = d;
+  document.getElementById('vf-boxes').classList.remove('bad');
+  if (d && i < 5) vfInputs()[i + 1].focus();
+  vfMaybeSubmit();
+}
+function vfKey(ev, i) {
+  if (ev.key === 'Backspace' && !ev.target.value && i > 0) { var p = vfInputs()[i - 1]; p.value = ''; p.focus(); ev.preventDefault(); }
+  else if (ev.key === 'ArrowLeft' && i > 0) vfInputs()[i - 1].focus();
+  else if (ev.key === 'ArrowRight' && i < 5) vfInputs()[i + 1].focus();
+}
+function vfPaste(ev) {
+  var t = (ev.clipboardData || window.clipboardData).getData('text') || '';
+  var d = t.replace(/\D/g, '');
+  if (!d) return;
+  ev.preventDefault(); vfFill(d, 0);
+}
+function vfFill(digits, from) {
+  var ins = vfInputs();
+  for (var k = 0; k < digits.length && from + k < 6; k++) ins[from + k].value = digits[k];
+  ins[Math.min(5, from + digits.length)].focus();
+  vfMaybeSubmit();
+}
+function vfMaybeSubmit() {
+  var code = vfInputs().map(function (i) { return i.value; }).join('');
+  if (code.length === 6 && !vf.busy) vfConfirm(code);
+}
+function vfConfirm(code) {
+  vf.busy = true; vfMsg('Vérification…', '');
+  api('/api/appointments/verify/confirm', { method: 'POST', body: { verification_id: vf.id, code: code } }).then(function (r) {
+    if (vf.timer) clearInterval(vf.timer);
+    var done = vf.onDone; vf = null;
+    done(r);
+  }).catch(function (e) {
+    var d = e.data || {};
+    if (vf) vf.busy = false;
+    if (!vf) return;
+    if (typeof d.sends_left === 'number') vf.sendsLeft = d.sends_left;
+    if (d.code === 'wrong') {
+      document.getElementById('vf-boxes').classList.add('bad');
+      vfMsg(e.message, 'err');
+      vfInputs().forEach(function (i) { i.value = ''; }); vfInputs()[0].focus();
+    } else if (d.code === 'locked') { document.getElementById('vf-boxes').classList.add('bad'); vfOutOfTime(e.message); }
+    else if (d.code === 'expired') vfExpired();
+    else if (d.code === 'closed') vfOver(e.message);
+    else vfMsg(e.message, 'err');
+  });
+}
+function vfResend() {
+  if (!vf || vf.busy) return;
+  vf.busy = true;
+  var b = document.getElementById('vf-new'); b.disabled = true;
+  api('/api/appointments/verify/resend', { method: 'POST', body: { verification_id: vf.id } }).then(function (r) {
+    vf.busy = false; vf.sendsLeft = r.sends_left;
+    vfArm(r.expires_in);
+    toast('Nouveau code envoyé');
+  }).catch(function (e) {
+    var d = e.data || {};
+    vf.busy = false; b.disabled = false;
+    if (d.code === 'no_more' || d.code === 'closed' || d.code === 'slot_taken') vfOver(e.message);
+    else toast(e.message, true);
+  });
+}
+function vfBack() {
+  if (vf && vf.timer) { clearInterval(vf.timer); vf.timer = null; }
+  var back = vf ? vf.back : 'p-contact';
+  vf = null;
+  show(back);
+}
+function vfRestart() { vf = null; startNewBooking(); }
 
 /* ---------- Reservation a plusieurs : une personne a la fois, puis un panier ----------
    Apres « Qui vient ? », chaque personne refait exactement la reservation normale (coiffeur > prestation > supplements >

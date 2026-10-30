@@ -20,7 +20,7 @@ check('normalizePeople : horaire invalide -> erreur avec l\'index de la personne
 const state = { appts: [], extras: [], inserted: 0, deleted: [], mails: [], queue: [] };
 const ymd = (d) => d.toISOString().slice(0, 10);
 const tomorrow = ymd(new Date(Date.now() + 86400000 * 2));
-const settings = { timezone: 'Europe/Paris', rdv_slot_step_min: 15, rdv_min_lead_min: 0, rdv_buffer_min: 0, rdv_max_advance_days: 0 };
+const settings = { timezone: 'Europe/Paris', rdv_slot_step_min: 15, rdv_min_lead_min: 0, rdv_buffer_min: 0, rdv_max_advance_days: 0, rdv_guest_email_code: '0' };  // code email : cf. test 159
 const SERVICES = { s30: { id: 's30', name: 'Coupe', duration_min: 30, price_cents: 2000 }, s45: { id: 's45', name: 'Coupe + barbe', duration_min: 45, price_cents: 2800 } };
 const BARBERS = { b1: 'Karim', b2: 'Sofiane' };
 function fakeQuery(sql, params) {

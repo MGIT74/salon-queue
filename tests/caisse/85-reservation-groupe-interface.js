@@ -100,7 +100,7 @@ let JSDOM; try { ({ JSDOM } = require('jsdom')); } catch (e) { console.log('jsdo
   }
   const rdv = fs.readFileSync(path.join(root, 'public/rdv.html'), 'utf8'), cmp = fs.readFileSync(path.join(root, 'public/compte.html'), 'utf8');
   for (const [f, h] of [['rdv', rdv], ['compte', cmp]]) {
-    assert(/group-booking\.js/.test(h) && /GroupBooking\.create/.test(h) && /appointments\/group/.test(h), f); }
+    assert(/group-booking\.js/.test(h) && /GroupBooking\.create/.test(h) && /appointments\/group|vfStart\('group'/.test(h), f); }  // rdv.html : via le code email (test 159)
   assert(/cancel-group/.test(rdv) && /get\('all'\)/.test(rdv)); assert(/relatives/.test(cmp) && /person_name/.test(cmp));
   ok('rdv.html / compte.html branchés (groupe, annulation groupée, proches, prénom sur les RDV)');
   assert(/<section class="panel flow on gb-pick" id="p-start">/.test(rdv) && /<section class="panel flow gb-pick" id="p-group">/.test(rdv) && /onSolo: STAFF_BRIDGE \? null/.test(rdv) && !/GroupBooking\.tileHtml/.test(rdv) && !/GroupBooking\.tileHtml/.test(cmp));

@@ -372,6 +372,31 @@ async function sendAppointmentServicesChanged(salonId, to, info) {
   });
 }
 
+/** RDV en ligne sans compte : le code à 6 chiffres qui vérifie l'email (part même si les emails clients sont en pause). */
+async function sendBookingCode(salonId, to, info) {
+  const { tx, from, salon } = await getTransport(salonId, { force: true });
+  const spaced = info.code.slice(0, 3) + ' ' + info.code.slice(3);
+  const lines = info.lines || [];
+  await tx.sendMail({
+    from,
+    to,
+    subject: spaced + ' — votre code pour confirmer le rendez-vous',
+    text: `Bonjour ${info.clientName || ''},\n\n` +
+      `Votre code pour confirmer votre rendez-vous chez ${salon} :\n\n${spaced}\n\n` +
+      `Valable ${info.ttlSec || 60} secondes. Passé ce délai, demandez un nouveau code sur la page.\n\n` +
+      (lines.length ? lines.join('\n') + '\n\n' : '') +
+      `Vous n'avez rien demandé ? Ignorez cet email : aucun rendez-vous ne sera pris sans ce code.\n\n${salon}`,
+    html: `<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;text-align:center;color:#1d1d1f">` +
+      `<p style="color:#6e6e73;font-weight:700;letter-spacing:.04em">${h(String(salon).toUpperCase())}</p>` +
+      `<h2 style="margin:18px 0 6px">Votre code de vérification</h2>` +
+      `<p>Bonjour ${h(info.clientName || '')}, saisissez ce code sur la page de réservation pour confirmer votre rendez-vous.</p>` +
+      `<p style="display:inline-block;background:#f2f2f6;border-radius:14px;padding:14px 26px;font-size:36px;font-weight:800;letter-spacing:8px;margin:16px 0 6px">${h(spaced)}</p>` +
+      `<p style="color:#6e6e73;font-size:13px">Valable ${h(String(info.ttlSec || 60))} secondes. Passé ce délai, demandez un nouveau code sur la page.</p>` +
+      (lines.length ? `<p style="color:#3a3a3c;font-size:14px;margin-top:22px">${lines.map(h).join('<br>')}</p>` : '') +
+      `<p style="color:#8e8e93;font-size:12px;margin-top:22px">Vous n'avez rien demandé ? Ignorez cet email : aucun rendez-vous ne sera pris sans ce code.</p></div>`
+  });
+}
+
 async function sendClientVerificationEmail(salonId, to, verifyUrl, options = {}) {
   const { tx, from, salon } = await getTransport(salonId, { force: true });
   // Création de compte : texte modifiable (Réglages > Notifications email). Le lien est TOUJOURS présent :
@@ -494,6 +519,6 @@ async function sendCustomClientEmail(salonId, to, clientName, subject, message) 
 
 module.exports = {
   sendTurnSoon, sendTest, sendGiftConfirmation, sendGiftCodeRenewed, sendLoyaltyActivation, sendAppointmentConfirmation, sendGroupAppointmentConfirmation,
-  sendAppointmentReminder, sendAppointmentCancelledByAdmin, sendAppointmentRescheduled, sendAppointmentServicesChanged,
+  sendAppointmentReminder, sendAppointmentCancelledByAdmin, sendAppointmentRescheduled, sendAppointmentServicesChanged, sendBookingCode,
   sendClientVerificationEmail, sendClientPasswordReset, sendClientSecurityNotice, sendAdminEmailVerification, sendSalonClosureNotice, sendCustomClientEmail, invalidateTransport, emailsPaused, forceSend
 };

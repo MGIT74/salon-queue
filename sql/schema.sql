@@ -1457,3 +1457,23 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 SET @idx := (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'sale_items' AND index_name = 'idx_sale_items_queue');
 SET @sql := IF(@idx = 0, 'CREATE INDEX idx_sale_items_queue ON sale_items(queue_id)', 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- RDV en ligne SANS compte : l'email est vérifié par un code à 6 chiffres avant d'enregistrer le RDV.
+-- payload = la réservation (coiffeur « premier disponible » déjà choisi) ; holds = créneaux gardés pendant la
+-- vérification (JSON [{barber_id, date, start, end}] en minutes), libres dès que expires_at est passé.
+-- 3 codes au plus (sends), 3 essais par code (attempts), 60 s par code.
+CREATE TABLE IF NOT EXISTS booking_verifications (
+  id CHAR(36) PRIMARY KEY,
+  salon_id CHAR(36) NOT NULL,
+  email VARCHAR(255) NOT NULL,
+  kind VARCHAR(10) NOT NULL,
+  payload MEDIUMTEXT NOT NULL,
+  holds TEXT NULL,
+  code_hash CHAR(64) NULL,
+  expires_at DATETIME NOT NULL,
+  sends INT NOT NULL DEFAULT 1,
+  attempts INT NOT NULL DEFAULT 0,
+  status VARCHAR(12) NOT NULL DEFAULT 'pending',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_bv_salon (salon_id, status, expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

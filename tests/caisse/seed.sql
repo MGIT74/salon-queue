@@ -4,3 +4,5 @@ INSERT INTO salons (id,owner_id,name,slug,is_default) VALUES ('s1','o1','Salon T
 INSERT INTO barbers (id,salon_id,name,pin_code) VALUES ('b1','s1','Alice','1111'),('b2','s1','Bob','2222');
 INSERT INTO services (id,salon_id,name,duration_min,price_cents) VALUES ('sv1','s1','Coupe',30,2000);
 INSERT INTO products (id,salon_id,name,price_cents,category,stock_enabled,stock_quantity) VALUES ('p1','s1','Gel',500,'coiffage',1,3);
+-- RDV sans compte : la verification de l'email par code est desactivee pour les anciens tests (cf. test 159 qui l'active).
+INSERT INTO settings (salon_id,`key`,value) VALUES ('s1','rdv_guest_email_code','0');

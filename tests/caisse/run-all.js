@@ -179,6 +179,7 @@ const suite = [
   ['156-caisse-cartes-a-encaisser.js', false, ['exit']],
   ['157-modifier-prestation-rdv.js', false, ['exit']],
   ['158-ticket-sans-accents.js', false, ['exit']],
+  ['159-rdv-code-email.js', false, ['exit']],
 ];
 
 let bad = 0;

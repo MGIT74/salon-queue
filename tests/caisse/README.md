@@ -192,4 +192,5 @@ node tests/caisse/155-poste-vue-jour.js  # Mon poste > Agenda > Jour : recherche
 node tests/caisse/156-caisse-cartes-a-encaisser.js  # Caisse : cartes A encaisser sur 2 lignes, ticket toujours visible
 node tests/caisse/157-modifier-prestation-rdv.js  # RDV : modifier la prestation (place derriere, 10 min toleres, deplacer), email client
 node tests/caisse/158-ticket-sans-accents.js  # Tickets imprimes sans accents (toutes marques d imprimante), tiroir inchange
+node tests/caisse/159-rdv-code-email.js  # RDV sans compte : email verifie par code a 6 chiffres (60 s, 3 codes, 3 essais), creneau garde puis libere
 ```

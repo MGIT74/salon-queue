@@ -1581,6 +1581,9 @@ function apiForBooking(path, opts) {
   opts = opts || {};
   var headers = { 'Content-Type': 'application/json' };
   if (bookSalonSlug) headers['X-Salon-Slug'] = bookSalonSlug;
+  // Compte connecté (email déjà vérifié) : pas de code à 6 chiffres à la réservation.
+  var tok = null; try { tok = localStorage.getItem('client_token'); } catch (e) {}
+  if (tok) headers['X-Client-Token'] = tok;
   return fetch(path, {
     method: opts.method || 'GET', headers: headers,
     body: opts.body ? JSON.stringify(opts.body) : undefined

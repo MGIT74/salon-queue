@@ -7,13 +7,15 @@ const { signupRateLimiter } = require('../middleware/rateLimiter');
 // envoyer des centaines d'emails de confirmation (au nom du salon) à n'importe quelle adresse.
 // 30 réservations par heure et par adresse IP, largement au-dessus d'un usage normal (une famille).
 const bookingRateLimiter = signupRateLimiter('rdv-booking', { max: 30, windowMs: 60 * 60 * 1000, blockMs: 30 * 60 * 1000 });
+// Saisie / renvoi du code à 6 chiffres (RDV sans compte) : compteur à part, 3 essais par code limitent déjà les devinettes.
+const codeRateLimiter = signupRateLimiter('rdv-code', { max: 60, windowMs: 60 * 60 * 1000, blockMs: 30 * 60 * 1000 });
 const crypto = require('crypto');
 const { pool, utcIso, getSettings } = require('../db');
 const requireAdmin = require('../middleware/auth');
 const requireAdminOrBarber = require('../middleware/barberAuth');
 const { logActivity } = require('../lib/activityLog');
 const { clientKey, recompute } = require('../lib/queueMath');
-const { sendAppointmentConfirmation, sendGroupAppointmentConfirmation, sendAppointmentCancelledByAdmin, sendAppointmentRescheduled, sendAppointmentServicesChanged, sendGiftCodeRenewed } = require('../lib/mailer');
+const { sendAppointmentConfirmation, sendGroupAppointmentConfirmation, sendAppointmentCancelledByAdmin, sendAppointmentRescheduled, sendAppointmentServicesChanged, sendBookingCode, sendGiftCodeRenewed } = require('../lib/mailer');
 const { wrap } = require('../lib/wrap');
 const groupBooking = require('../lib/groupBooking');
 const { loadCatalog, offerFor, resolveOffer } = require('../lib/barberOffer');
@@ -313,6 +315,8 @@ async function computeSlotsForBarber(barberId, dateStr, durationMin, rdvSettings
   breaks.forEach((b) => busyRanges.push([timeToMinutes(b.start_time), timeToMinutes(b.end_time)]));
   // Creneaux deja choisis (pas encore enregistres) par les autres personnes d'une reservation de groupe.
   (opts.extraBusy || []).forEach((r) => busyRanges.push(r));
+  // Créneaux gardés pendant qu'un client vérifie son email par code (60 s par code), sauf le sien.
+  (await verificationHolds(barberId, dateStr, opts.excludeVerificationId)).forEach((r) => busyRanges.push([r[0], r[1] + bufferMin]));
 
   const startMin = timeToMinutes(schedule.start_time);
   const endMin = timeToMinutes(schedule.end_time);
@@ -678,7 +682,10 @@ router.get('/lookup', requireAdminOrBarber, wrap(async (req, res) => {
  * Création d'un rendez-vous — public, comme le check-in kiosk. Si
  * pour AUJOURD'HUI, promeut immédiatement en entrée de file.
  */
-router.post('/', bookingRateLimiter, wrap(withBookingLock(async (req, res) => {
+router.post('/', bookingRateLimiter, wrap(withBookingLock((req, res) => bookSingle(req, res))));
+
+async function bookSingle(req, res) {
+  if (!req.dryRun && !(await guestEmailVerified(req))) return verifyRequired(res);
   const { client_name, email, phone, service_id, barber_id, extras, date, time, gift_id } = req.body;
   const clientNote = req.body.client_note ? String(req.body.client_note).slice(0, 500) : null;
   if (!client_name) return res.status(400).json({ error: 'Le nom est requis' });
@@ -749,8 +756,21 @@ router.post('/', bookingRateLimiter, wrap(withBookingLock(async (req, res) => {
     const offer = await offerFor(finalBarberId, cat);
     if (!offer.ok) return res.status(offer.status).json({ error: offer.error });
     durationMin = offer.durationMin;
-    const slots = await computeSlotsForBarber(finalBarberId, date, durationMin, rdvSettings);
+    const slots = await computeSlotsForBarber(finalBarberId, date, durationMin, rdvSettings, { excludeVerificationId: req.verificationId });
     if (!slots.includes(time)) return res.status(409).json({ error: (await walkinRefusal(finalBarberId, date)) || "Ce créneau n'est plus disponible" });
+  }
+
+  // Vérification de l'email par code (client sans compte) : on s'arrête ici, rien n'est enregistré.
+  // On renvoie le créneau à garder pendant la vérification et le résumé pour l'email du code.
+  if (req.dryRun) {
+    const [[bRow]] = await pool.query('SELECT name FROM barbers WHERE id = ?', [finalBarberId]);
+    const startMin = timeToMinutes(time);
+    return res.json({
+      ok: true, dry: true,
+      resolved: { barber_id: finalBarberId },
+      holds: [{ barber_id: finalBarberId, date, start: startMin, end: startMin + durationMin }],
+      summary: [{ name: client_name, when: date + ' ' + time, service: serviceLabel(service.name, extraNames, service.extras_only), barber: bRow ? bRow.name : null }]
+    });
   }
 
   const id = crypto.randomUUID();
@@ -843,6 +863,148 @@ router.post('/', bookingRateLimiter, wrap(withBookingLock(async (req, res) => {
 
   // Le coiffeur retenu (utile surtout en « Premier disponible ») : affiche au client apres confirmation.
   res.json({ ok: true, id, barber_id: finalBarberId, barber_name: barber ? barber.name : null });
+}
+
+/* ---------- RDV en ligne sans compte : vérification de l'email par code à 6 chiffres ----------
+   Le client sans compte reçoit un code par email ; le RDV n'est enregistré qu'avec le bon code. Le créneau est
+   gardé pendant les 60 s de validité du code ; 3 codes au plus (le 1er + 2 renvois) et 3 essais par code ;
+   ensuite le créneau est rendu aux autres clients. Les clients connectés à leur compte (email déjà vérifié)
+   et les RDV pris par le salon ne sont pas concernés. Réglage rdv_guest_email_code = '0' : désactivé. */
+const CODE_TTL_SEC = 60, CODE_MAX_SENDS = 3, CODE_MAX_ATTEMPTS = 3;
+const codeHash = (id, code) => crypto.createHash('sha256').update(id + ':' + String(code)).digest('hex');
+
+/** Le client qui réserve a-t-il le droit de ne pas passer par le code ? */
+async function guestEmailVerified(req) {
+  if (req.emailVerifiedByCode) return true;
+  const s = await getSettings(req.salon.id);
+  if (String(s.rdv_guest_email_code) === '0') return true;
+  const token = req.headers && req.headers['x-client-token'];
+  if (token) {
+    const [[c]] = await pool.query(
+      `SELECT c.email_verified FROM client_sessions cs JOIN clients c ON c.id = cs.client_id
+       WHERE cs.token = ? AND cs.expires_at > NOW()
+         AND c.salon_id IN (SELECT id FROM salons WHERE owner_id = (SELECT owner_id FROM salons WHERE id = ?))`, [token, req.salon.id]);
+    if (c && c.email_verified) return true;
+  }
+  return false;
+}
+function verifyRequired(res) {
+  return res.status(403).json({ code: 'verify_required', error: 'Pour confirmer, vérifiez votre email avec le code reçu (rechargez la page si besoin).' });
+}
+
+/** Créneaux gardés par les vérifications en cours (code encore valable) pour ce coiffeur ce jour-là. */
+async function verificationHolds(barberId, dateStr, excludeId) {
+  const [rows] = await pool.query(
+    `SELECT holds FROM booking_verifications
+     WHERE salon_id = (SELECT salon_id FROM barbers WHERE id = ?) AND status = 'pending' AND expires_at > NOW() AND id != ?`,
+    [barberId, excludeId || '']
+  ).catch(() => [[]]);
+  const out = [];
+  rows.forEach((r) => {
+    let hs = [];
+    try { hs = JSON.parse(r.holds || '[]'); } catch (e) { hs = []; }
+    hs.forEach((h) => { if (h && h.barber_id === barberId && h.date === dateStr) out.push([Number(h.start), Number(h.end)]); });
+  });
+  return out;
+}
+
+/** Fait tourner la réservation « à blanc » (rien n'est enregistré) : erreurs, coiffeur retenu, créneaux, résumé. */
+async function dryRunBooking(req, kind, body, verificationId) {
+  const fakeReq = Object.assign(Object.create(Object.getPrototypeOf(req)), req, { body, dryRun: true, verificationId });
+  const out = { status: 200, data: null };
+  const fakeRes = { status(c) { out.status = c; return this; }, json(d) { out.data = d; return this; } };
+  if (kind === 'group') await createGroupBooking(fakeReq, fakeRes, false); else await bookSingle(fakeReq, fakeRes);
+  return out;
+}
+/** La réservation à enregistrer plus tard, avec le coiffeur retenu (« premier disponible » figé). */
+function resolvedPayload(kind, body, data) {
+  const p = JSON.parse(JSON.stringify(body));
+  if (kind === 'group') {
+    const ids = (data.resolved && data.resolved.barber_ids) || [];
+    (p.people || []).forEach((person, i) => { if (ids[i]) person.barber_id = ids[i]; });
+  } else if (data.resolved && data.resolved.barber_id) p.barber_id = data.resolved.barber_id;
+  return p;
+}
+async function sendCodeEmail(req, v, code, summary) {
+  const fmt = (w) => new Date(String(w).replace(' ', 'T')).toLocaleString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit' });
+  const lines = (summary || []).map((x) => fmt(x.when) + ' · ' + x.service + (x.barber ? ' · avec ' + x.barber : '') + ((summary || []).length > 1 ? ' (' + x.name + ')' : ''));
+  const payload = JSON.parse(v.payload);
+  await sendBookingCode(req.salon.id, v.email, { clientName: payload.client_name, code, lines, ttlSec: CODE_TTL_SEC });
+}
+function newCode() { return String(crypto.randomInt(0, 1000000)).padStart(6, '0'); }
+
+// 1) Le client demande son code : la réservation est vérifiée à blanc, le créneau gardé 60 s, le code envoyé.
+router.post('/verify/start', bookingRateLimiter, wrap(withBookingLock(async (req, res) => {
+  const kind = req.body.kind === 'group' ? 'group' : 'single';
+  const body = req.body.booking && typeof req.body.booking === 'object' ? req.body.booking : null;
+  if (!body) return res.status(400).json({ error: 'Réservation manquante' });
+  if (!body.email || !isValidEmail(body.email)) return res.status(400).json({ error: 'Entrez un email valide pour recevoir le code' });
+  const dry = await dryRunBooking(req, kind, body, null);
+  if (dry.status >= 400 || !dry.data || !dry.data.dry) return res.status(dry.status >= 400 ? dry.status : 400).json(dry.data || { error: 'Réservation impossible' });
+  const id = crypto.randomUUID(), code = newCode();
+  const payload = resolvedPayload(kind, body, dry.data);
+  await pool.query(
+    `INSERT INTO booking_verifications (id, salon_id, email, kind, payload, holds, code_hash, expires_at, sends, attempts, status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, NOW() + INTERVAL ? SECOND, 1, 0, 'pending')`,
+    [id, req.salon.id, String(body.email).trim(), kind, JSON.stringify(payload), JSON.stringify(dry.data.holds || []), codeHash(id, code), CODE_TTL_SEC]
+  );
+  const [[v]] = await pool.query('SELECT * FROM booking_verifications WHERE id = ?', [id]);
+  try { await sendCodeEmail(req, v, code, dry.data.summary); } catch (err) {
+    await pool.query("UPDATE booking_verifications SET status = 'failed' WHERE id = ?", [id]);
+    console.error('[rdv-code] envoi du code échoué:', err.message);
+    return res.status(502).json({ error: "L'email avec le code n'a pas pu être envoyé. Vérifiez l'adresse ou réessayez." });
+  }
+  res.json({ ok: true, verification_id: id, email: v.email, expires_in: CODE_TTL_SEC, sends_left: CODE_MAX_SENDS - 1, attempts_left: CODE_MAX_ATTEMPTS });
+})));
+
+// 2) Pas reçu / expiré / trop d'essais : nouveau code (3 codes en tout), le créneau est revérifié et regardé 60 s.
+router.post('/verify/resend', codeRateLimiter, wrap(withBookingLock(async (req, res) => {
+  const [[v]] = await pool.query('SELECT * FROM booking_verifications WHERE id = ? AND salon_id = ?', [String(req.body.verification_id || ''), req.salon.id]);
+  if (!v || v.status !== 'pending') return res.status(410).json({ code: 'closed', error: 'Cette vérification est terminée : recommencez la réservation.' });
+  if (v.sends >= CODE_MAX_SENDS) {
+    await pool.query("UPDATE booking_verifications SET status = 'failed' WHERE id = ?", [v.id]);
+    return res.status(410).json({ code: 'no_more', error: 'Le créneau a été libéré pour les autres clients.' });
+  }
+  const dry = await dryRunBooking(req, v.kind, JSON.parse(v.payload), v.id);
+  if (dry.status >= 400 || !dry.data || !dry.data.dry) {
+    await pool.query("UPDATE booking_verifications SET status = 'failed' WHERE id = ?", [v.id]);
+    return res.status(409).json({ code: 'slot_taken', error: (dry.data && dry.data.error) || "Ce créneau n'est plus disponible : choisissez-en un autre." });
+  }
+  const code = newCode();
+  await pool.query(
+    'UPDATE booking_verifications SET code_hash = ?, expires_at = NOW() + INTERVAL ? SECOND, sends = sends + 1, attempts = 0, holds = ? WHERE id = ?',
+    [codeHash(v.id, code), CODE_TTL_SEC, JSON.stringify(dry.data.holds || []), v.id]
+  );
+  try { await sendCodeEmail(req, v, code, dry.data.summary); } catch (err) {
+    console.error('[rdv-code] renvoi du code échoué:', err.message);
+    return res.status(502).json({ error: "L'email avec le code n'a pas pu être envoyé. Réessayez." });
+  }
+  res.json({ ok: true, expires_in: CODE_TTL_SEC, sends_left: CODE_MAX_SENDS - v.sends - 1, attempts_left: CODE_MAX_ATTEMPTS });
+})));
+
+// 3) Le bon code : le RDV est enregistré (même chemin qu'une réservation normale), sinon l'erreur et ce qu'il reste.
+router.post('/verify/confirm', codeRateLimiter, wrap(withBookingLock(async (req, res) => {
+  const [[v]] = await pool.query(
+    'SELECT *, expires_at <= NOW() AS is_expired FROM booking_verifications WHERE id = ? AND salon_id = ?',
+    [String(req.body.verification_id || ''), req.salon.id]
+  );
+  if (!v || v.status !== 'pending') return res.status(410).json({ code: 'closed', error: 'Cette vérification est terminée : recommencez la réservation.' });
+  const sendsLeft = Math.max(0, CODE_MAX_SENDS - v.sends);
+  if (Number(v.is_expired)) return res.status(410).json({ code: 'expired', sends_left: sendsLeft, error: 'Les 60 secondes sont écoulées : ce code ne marche plus.' });
+  if (!v.code_hash) return res.status(400).json({ code: 'locked', attempts_left: 0, sends_left: sendsLeft, error: 'Trop d\'essais : demandez un nouveau code.' });
+  const code = String(req.body.code || '').replace(/\D/g, '');
+  if (code.length !== 6 || codeHash(v.id, code) !== v.code_hash) {
+    const attempts = v.attempts + 1, left = Math.max(0, CODE_MAX_ATTEMPTS - attempts);
+    await pool.query('UPDATE booking_verifications SET attempts = ?, code_hash = IF(? >= ?, NULL, code_hash) WHERE id = ?', [attempts, attempts, CODE_MAX_ATTEMPTS, v.id]);
+    return res.status(400).json(left
+      ? { code: 'wrong', attempts_left: left, sends_left: sendsLeft, error: 'Code incorrect. Il vous reste ' + left + (left > 1 ? ' essais.' : ' essai.') }
+      : { code: 'locked', attempts_left: 0, sends_left: sendsLeft, error: 'Trop d\'essais : demandez un nouveau code.' });
+  }
+  const [used] = await pool.query("UPDATE booking_verifications SET status = 'used' WHERE id = ? AND status = 'pending'", [v.id]);
+  if (!used.affectedRows) return res.status(410).json({ code: 'closed', error: 'Cette vérification est terminée.' });
+  const realReq = Object.assign(Object.create(Object.getPrototypeOf(req)), req, { body: JSON.parse(v.payload), emailVerifiedByCode: true, verificationId: v.id });
+  if (v.kind === 'group') return createGroupBooking(realReq, res, false);
+  return bookSingle(realReq, res);
 })));
 
 /**
@@ -863,6 +1025,7 @@ router.post('/group', bookingRateLimiter, wrap(withBookingLock((req, res) => cre
 router.post('/admin-group', requireAdminOrBarber, wrap(withBookingLock((req, res) => createGroupBooking(req, res, true))));
 
 async function createGroupBooking(req, res, staff) {
+  if (!staff && !req.dryRun && !(await guestEmailVerified(req))) return verifyRequired(res);
   const { client_name, email, phone } = req.body;
   if (!email && !staff) return res.status(400).json({ error: "L'email est requis pour la confirmation" });
   if (!client_name) return res.status(400).json({ error: 'Le nom est requis' });
@@ -911,11 +1074,11 @@ async function createGroupBooking(req, res, staff) {
       const offer = await offerFor(barberId, cat);
       if (!offer.ok) return fail(offer.status, i, offer.error + ' (' + p.name + ').');
       durationMin = offer.durationMin;
-      const slots = await computeSlotsForBarber(barberId, p.date, durationMin, rdvSettings, staff ? { skipLead: true } : {});
+      const slots = await computeSlotsForBarber(barberId, p.date, durationMin, rdvSettings, staff ? { skipLead: true } : { excludeVerificationId: req.verificationId });
       if (!slots.includes(p.time)) return fail(409, i, (await walkinRefusal(barberId, p.date)) || ("Le créneau de " + p.name + " n'est plus disponible (" + p.time + ")."));
     } else {
       // « Premier disponible » pour cette personne (les RDV deja crees du groupe comptent : ils sont en base).
-      const pick = chooseAnyBarber(await anyBarberCandidates(req.salon.id, cat, p.date, rdvSettings, () => (staff ? { skipLead: true } : {})), p.time);
+      const pick = chooseAnyBarber(await anyBarberCandidates(req.salon.id, cat, p.date, rdvSettings, () => (staff ? { skipLead: true } : { excludeVerificationId: req.verificationId })), p.time);
       if (!pick) return fail(409, i, "Le créneau de " + p.name + " n'est plus disponible (" + p.time + ").");
       barberId = pick.id; durationMin = pick.offer.durationMin;
     }
@@ -931,6 +1094,21 @@ async function createGroupBooking(req, res, staff) {
     created.push({ id, cancelToken, person: p, barberId, scheduledAt, serviceName: serviceLabel(service.name, extraNames, service.extras_only), extraIds, productSelections, durationMin });
     if (extraIds.length) await pool.query('INSERT INTO appointment_extras (appointment_id, extra_id) VALUES ?', [extraIds.map((eid) => [id, eid])]);
     if (productSelections.length) await pool.query('INSERT INTO appointment_products (appointment_id, product_id, quantity) VALUES ?', [productSelections.map((x) => [id, x.id, x.quantity])]);
+  }
+
+  // Vérification de l'email par code : tout est possible -> on retire ces RDV d'essai et on renvoie les créneaux
+  // à garder (un par personne, coiffeur retenu compris) et le résumé pour l'email du code.
+  if (req.dryRun) {
+    await pool.query('DELETE FROM appointments WHERE id IN (?)', [created.map((c) => c.id)]);
+    const ids = Array.from(new Set(created.map((c) => c.barberId)));
+    const [bRows] = await pool.query('SELECT id, name FROM barbers WHERE id IN (?)', [ids]);
+    const nm = Object.fromEntries(bRows.map((b) => [b.id, b.name]));
+    return res.json({
+      ok: true, dry: true,
+      resolved: { barber_ids: created.map((c) => c.barberId) },
+      holds: created.map((c) => { const st = timeToMinutes(c.person.time); return { barber_id: c.barberId, date: c.person.date, start: st, end: st + c.durationMin }; }),
+      summary: created.map((c) => ({ name: c.person.name, when: c.person.date + ' ' + c.person.time, service: c.serviceName, barber: nm[c.barberId] || null }))
+    });
   }
 
   // Tout est enregistre : mail unique, puis mise en file immediate des passages d'AUJOURD'HUI.
