@@ -1453,7 +1453,7 @@ router.post('/cancel', wrap(async (req, res) => {
  * via token, aucun email envoyé puisqu'il vient d'annuler lui-même).
  * Ici un email d'excuses est envoyé au client s'il a une adresse.
  */
-router.post('/:id/admin-cancel', requireAdminOrBarber, wrap(async (req, res) => {
+router.post('/:id/admin-cancel', requireAdminOrBarber, wrap(withBookingLock(async (req, res) => {
   const [[appt]] = await pool.query(
     `SELECT a.id, a.status, a.scheduled_at, a.barber_id, a.promoted_queue_id, a.client_name, a.email, a.gift_card_id, a.salon_id, s.name AS service_name
      FROM appointments a JOIN services s ON s.id = a.service_id
@@ -1493,7 +1493,7 @@ router.post('/:id/admin-cancel', requireAdminOrBarber, wrap(async (req, res) => 
     }
   }
   res.json({ ok: true });
-}));
+})));
 
 /**
  * Change l'horaire (et éventuellement le coiffeur) d'un RDV déjà vérifié libre, et garde la file du jour cohérente :
