@@ -1460,13 +1460,7 @@ router.post('/:id/admin-cancel', requireAdminOrBarber, wrap(async (req, res) => 
   if (!appt) return res.status(404).json({ error: 'Rendez-vous introuvable' });
   if (appt.status !== 'confirmed') return res.status(409).json({ error: 'Ce rendez-vous ne peut plus être annulé' });
 
-  // Un coiffeur (session PIN, pas admin) ne peut annuler que le RDV du
-  // coiffeur actif (lui-même par défaut, ou celui désigné par bulle
-  // depuis la caisse partagée) - jamais celui d'un autre sans être passé
-  // par cette sélection explicite.
-  if (req.actingBarberId && appt.barber_id && appt.barber_id !== req.actingBarberId) {
-    return res.status(403).json({ error: "Ce n'est pas le RDV de ce coiffeur." });
-  }
+  // Tout coiffeur authentifié peut gérer les RDV des collègues du même salon.
 
   if (appt.promoted_queue_id) {
     const paid = await saleForPassage(pool, req.salon.id, appt.promoted_queue_id);
@@ -1558,13 +1552,7 @@ router.put('/:id/reschedule', requireAdminOrBarber, wrap(withBookingLock(async (
   if (!appt) return res.status(404).json({ error: 'Rendez-vous introuvable' });
   if (appt.status !== 'confirmed') return res.status(409).json({ error: 'Seuls les rendez-vous confirmés peuvent être déplacés.' });
 
-  // Un coiffeur (session PIN, pas admin) ne peut déplacer que le RDV du
-  // coiffeur actif (lui-même, ou celui désigné par bulle depuis la caisse
-  // partagée) - même règle que l'annulation. Il peut en revanche le confier
-  // à un autre coiffeur (barber_id), si ce dernier a le créneau libre.
-  if (req.actingBarberId && appt.barber_id && appt.barber_id !== req.actingBarberId) {
-    return res.status(403).json({ error: "Ce n'est pas le RDV de ce coiffeur." });
-  }
+  // Un coiffeur authentifié peut déplacer un RDV d'un collègue du même salon.
 
   if (appt.promoted_queue_id) {
     const paid = await saleForPassage(pool, req.salon.id, appt.promoted_queue_id);
@@ -1686,9 +1674,6 @@ router.put('/:id/services', requireAdminOrBarber, wrap(withBookingLock(async (re
   const [[appt]] = await pool.query('SELECT * FROM appointments WHERE id = ? AND salon_id = ?', [req.params.id, req.salon.id]);
   if (!appt) return res.status(404).json({ error: 'Rendez-vous introuvable' });
   if (appt.status !== 'confirmed') return res.status(409).json({ error: 'Seuls les rendez-vous à venir peuvent être modifiés.' });
-  if (req.actingBarberId && appt.barber_id && appt.barber_id !== req.actingBarberId) {
-    return res.status(403).json({ error: "Ce n'est pas le RDV de ce coiffeur." });
-  }
 
   let queueRow = null;
   if (appt.promoted_queue_id) {
