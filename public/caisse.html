@@ -79,6 +79,10 @@
     transition: transform .15s ease, box-shadow .15s ease;
   }
 
+  /* Filtres de coiffeurs : exactement les bulles de la caisse, sans les noms sous les cercles. */
+  #gp-barber-filters .barber-bubble { flex: 0 0 auto; }
+  #gp-barber-filters .barber-bubble.on .avatar { --accent: var(--blue); }
+
   /* --- Footer Timer / Agenda / Caisse (repris de "Mon poste") --- */
   .caisse-footer {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
@@ -4082,13 +4086,15 @@ function openGroupPayPicker() {
     var selectedBarber = null;
     var html = '<div class="modal-title">Payer aussi pour…</div>' +
       '<p class="hint" style="margin:0 0 12px">' + esc(payer ? payer.client_name : 'Ce client') + ' règle aussi la prestation de la personne choisie : un seul ticket, un seul paiement.</p>' +
-      '<div id="gp-barber-filters" style="display:flex;gap:12px;overflow-x:auto;padding:6px 4px 14px">' +
+      '<div id="gp-barber-filters" class="barber-bubbles" style="display:flex;gap:12px;flex-wrap:nowrap;overflow-x:auto;padding:8px 6px 14px;margin:0 0 4px">' +
       barbers.map(function (b) {
-        var initial = String(b.name || '?').trim().charAt(0).toUpperCase();
-        var photo = b.photo_url || b.avatar_url || b.photo || '';
-        return '<button type="button" class="barber-bubble gp-barber-filter" data-barber="' + esc(b.id) + '" title="' + esc(b.name) + '" style="flex:0 0 auto;min-width:52px">' +
-          '<span class="avatar" style="' + (photo ? 'background-image:url(&quot;' + esc(photo) + '&quot;);' : '') + '">' + (photo ? '' : esc(initial)) + '</span>' +
-          '<span style="font-size:11px;max-width:76px;overflow:hidden;text-overflow:ellipsis">' + esc(b.name) + '</span></button>';
+        var color = b.color || stableColorForId(b.id);
+        var initial = (b.name || '?').trim().charAt(0).toUpperCase();
+        var avatarStyle = b.photo_url
+          ? 'background-image:url(\\'' + b.photo_url + '\\')'
+          : 'background:' + color;
+        return '<button type="button" class="barber-bubble gp-barber-filter" data-barber="' + esc(b.id) + '" title="' + esc(b.name) + '" aria-label="Filtrer les clients de ' + esc(b.name) + '">' +
+          '<span class="avatar" style="' + avatarStyle + '">' + (b.photo_url ? '' : esc(initial)) + '</span></button>';
       }).join('') + '</div>' +
       '<div id="gp-candidates" style="max-height:45vh;overflow-y:auto"></div>' +
       '<div class="modal-actions"><button class="btn btn-soft" id="gp-close">Fermer</button></div>';
