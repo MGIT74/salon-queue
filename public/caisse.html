@@ -2117,12 +2117,30 @@ function rdvLoadSalonClosures() {
   return barberApi('/api/salon-calendar/public-closures').then(function (r) { rdvSalonClosures = r.items || []; }).catch(function () { rdvSalonClosures = []; });
 }
 
+// Rafraîchissement inter-postes : les autres terminaux peuvent modifier les RDV.
+// Une génération et un numéro de requête empêchent une réponse ancienne d'écraser la plus récente.
+var agendaSyncRequest = 0;
+var agendaSyncGeneration = 0;
+function syncInvalidateAgenda() {
+  agendaSyncGeneration++;
+  calMonthCache = {};
+}
+setInterval(function () {
+  if (!calBooted || document.hidden) return;
+  syncInvalidateAgenda();
+  loadAgendaPeriod();
+}, 15000);
+document.addEventListener('visibilitychange', function () {
+  if (!document.hidden && calBooted) { syncInvalidateAgenda(); loadAgendaPeriod(); }
+});
 function loadAgendaPeriod() {
+  var syncRequest = ++agendaSyncRequest;
+  var syncGeneration = agendaSyncGeneration;
   var keys = neededMonthKeys();
   var toFetch = keys.filter(function (k) { return !calMonthCache[k]; });
   Promise.all(
     toFetch.map(function (k) {
-      return barberApi('/api/appointments?month=' + k + '&all=1&caisse_view=1').then(function (r) { calMonthCache[k] = r.items; });
+      return barberApi('/api/appointments?month=' + k + '&all=1&caisse_view=1').then(function (r) { if (syncRequest === agendaSyncRequest && syncGeneration === agendaSyncGeneration) calMonthCache[k] = r.items; });
     }).concat([
       // Necessaire pour placer sur la frise du jour les clients SANS
       // rendez-vous deja demarres (voir renderAgendaTimeline) - queue
@@ -2135,6 +2153,7 @@ function loadAgendaPeriod() {
       rdvLoadSalonClosures()
     ])
   ).then(function () {
+    if (syncRequest !== agendaSyncRequest || syncGeneration !== agendaSyncGeneration) return;
     if (calViewMode === 'month') renderCalMonth();
     else if (calViewMode === 'week') renderCalWeek();
     else renderCalDay();
