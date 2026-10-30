@@ -1181,6 +1181,7 @@ function renderNext() {
               ? '<button class="btn btn-primary" onclick="quickFinishMine(\'' + q.id + '\')">Je prends</button>'
               : '<button class="btn btn-primary" onclick="startMine(\'' + q.id + '\')">Commencer</button>'
           )) +
+          '<button class="btn btn-ghost" onclick="cancelNotifiedMine(\'' + q.id + '\')">Annuler</button>' +
           '<button class="btn btn-outline-red" onclick="cancelMine(\'' + q.id + '\')">Absent</button>' +
         '</div>' +
       '</div>' +
@@ -1240,6 +1241,20 @@ function saveNextNote(id) {
   barberApi('/api/queue/' + id + '/note', { method: 'PUT', body: { note: note } })
     .then(function () { toast('Note enregistrée'); })
     .catch(function (e) { toast(e.message, true); });
+}
+
+function cancelNotifiedMine(id) {
+  var q = queue.find(function (x) { return x.id === id; });
+  var name = q ? q.client_name : 'ce client';
+  showConfirm('Le client ' + name + ' a prévenu le salon de son annulation ? Le rendez-vous sera marqué « Annulé » et retiré de la file.', {
+    title: 'Annulation signalée', danger: false, confirmLabel: 'Confirmer l’annulation'
+  }).then(function (ok) {
+    if (!ok) return;
+    barberApi('/api/queue/' + id + '/cancel', { method: 'POST', body: { reason: 'client_notified' } })
+      .then(refresh)
+      .then(function () { toast('Rendez-vous annulé — client ayant prévenu'); })
+      .catch(function (e) { toast(e.message, true); });
+  });
 }
 
 function cancelMine(id) {
