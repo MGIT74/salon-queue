@@ -789,10 +789,28 @@ router.post('/:id/cancel', requireAdminOrBarber, wrap(async (req, res) => {
       return res.status(403).json({ error: "Ce n'est pas votre client." });
     }
   }
+  // Le client ayant prévenu est une annulation, pas une absence.
+  // Conserver le comportement historique de « Absent » pour les autres appels.
+  const notified = req.body && req.body.reason === 'client_notified';
+  if (notified) {
+    const [[linked]] = await pool.query(
+      'SELECT id FROM appointments WHERE promoted_queue_id = ? AND salon_id = ? AND status = ? LIMIT 1',
+      [req.params.id, req.salon.id, 'confirmed']
+    );
+    if (!linked) return res.status(409).json({ error: 'Annulation téléphonique réservée aux rendez-vous.' });
+    const sale = await saleForPassage(pool, req.salon.id, req.params.id);
+    if (sale) return res.status(409).json({ error: 'Rendez-vous encaissé : régularisez ou remboursez avant annulation.' });
+  }
   await pool.query(
     "UPDATE queue SET status = 'cancelled' WHERE id = ? AND salon_id = ? AND status IN ('waiting','in_progress')",
     [req.params.id, req.salon.id]
   );
+  if (notified) {
+    await pool.query(
+      "UPDATE appointments SET status = 'cancelled' WHERE promoted_queue_id = ? AND salon_id = ? AND status = 'confirmed'",
+      [req.params.id, req.salon.id]
+    );
+  }
   await recompute(req.salon.id);
   res.json({ ok: true });
 }));
