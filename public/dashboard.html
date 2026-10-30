@@ -6818,7 +6818,7 @@ function adjustTimelineZoom(delta) {
 if (window.AutoRefresh) AutoRefresh.start(function () {
   var tab = document.getElementById('t-rdv');
   if (!tab || !tab.classList.contains('on')) return;
-  calMonthCache = {}; return loadCalendarPeriod();
+  syncInvalidateAgenda(); return loadCalendarPeriod();
 }, { idleMs: 15000, busy: function () { return !!document.querySelector('.modal-overlay, .client-drawer-backdrop.on'); } });
 
 function startCalendarNowRefresh() {
@@ -6867,12 +6867,32 @@ function rdvLoadSalonClosures() {
   return api('/api/salon-calendar/public-closures').then(function(r){rdvSalonClosures=r.items||[];}).catch(function(){rdvSalonClosures=[];});
 }
 
+// Rafraîchissement inter-postes : les autres terminaux peuvent modifier les RDV.
+// Une génération et un numéro de requête empêchent une réponse ancienne d'écraser la plus récente.
+var agendaSyncRequest = 0;
+var agendaSyncGeneration = 0;
+function syncInvalidateAgenda() {
+  agendaSyncGeneration++;
+  calMonthCache = {};
+}
+// L'admin utilise déjà AutoRefresh avec détection des tiroirs et modales ouverts.
+document.addEventListener('visibilitychange', function () {
+  var tab = document.getElementById('t-rdv');
+  if (!document.hidden && tab && tab.classList.contains('on') &&
+      !document.querySelector('.modal-overlay, .client-drawer-backdrop.on')) {
+    syncInvalidateAgenda();
+    loadCalendarPeriod();
+  }
+});
 function loadCalendarPeriod() {
+  var syncRequest = ++agendaSyncRequest;
+  var syncGeneration = agendaSyncGeneration;
   var keys = neededMonthKeys();
   var toFetch = keys.filter(function (k) { return !calMonthCache[k]; });
   Promise.all(toFetch.map(function (k) {
-    return api('/api/appointments?month=' + k + '&all=1').then(function (r) { calMonthCache[k] = r.items; });
+    return api('/api/appointments?month=' + k + '&all=1').then(function (r) { if (syncRequest === agendaSyncRequest && syncGeneration === agendaSyncGeneration) calMonthCache[k] = r.items; });
   }).concat([rdvLoadSalonClosures()])).then(function () {
+    if (syncRequest !== agendaSyncRequest || syncGeneration !== agendaSyncGeneration) return;
     if (calViewMode === 'month') renderMonthView();
     else if (calViewMode === 'week') renderWeekView();
     else renderDayView();
