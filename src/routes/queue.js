@@ -869,15 +869,14 @@ router.put('/:id', requireAdminOrBarber, wrap(async (req, res) => {
     sets.push('barber_id = ?'); params.push(barber_id || null);
   }
 
-  // Coordonnées du client (nom/email/téléphone) : réservé à l'admin
-  // (pas au coiffeur, qui n'a de toute façon accès qu'à ses propres
-  // clients via req.barberId), édition ponctuelle depuis la fiche
-  // client (ex: coquille dans l'email, numéro corrigé).
-  if (!req.barberId) {
-    if (client_name !== undefined && String(client_name).trim()) { sets.push('client_name = ?'); params.push(String(client_name).trim()); }
-    if (email !== undefined) { sets.push('email = ?'); params.push(email ? String(email).trim() : null); }
-    if (phone !== undefined) { sets.push('phone = ?'); params.push(phone ? String(phone).trim() : null); }
+  // Le coiffeur peut corriger les coordonnées de son propre client.
+  // Le contrôle d'appartenance au coiffeur a déjà été effectué ci-dessus.
+  if (client_name !== undefined) {
+    if (!String(client_name).trim()) return res.status(400).json({ error: 'Le nom est requis' });
+    sets.push('client_name = ?'); params.push(String(client_name).trim());
   }
+  if (email !== undefined) { sets.push('email = ?'); params.push(email ? String(email).trim() : null); }
+  if (phone !== undefined) { sets.push('phone = ?'); params.push(phone ? String(phone).trim() : null); }
 
   const conn = await pool.getConnection();
   try {
@@ -902,6 +901,16 @@ router.put('/:id', requireAdminOrBarber, wrap(async (req, res) => {
     'SELECT id FROM appointments WHERE promoted_queue_id = ?', [req.params.id]
   );
   if (linkedAppt) {
+    // Conserver le rendez-vous et la file synchronisés après correction du client.
+    const apptContactSets = [];
+    const apptContactParams = [];
+    if (client_name !== undefined) { apptContactSets.push('client_name = ?'); apptContactParams.push(String(client_name).trim()); }
+    if (email !== undefined) { apptContactSets.push('email = ?'); apptContactParams.push(email ? String(email).trim() : null); }
+    if (phone !== undefined) { apptContactSets.push('phone = ?'); apptContactParams.push(phone ? String(phone).trim() : null); }
+    if (apptContactSets.length) {
+      apptContactParams.push(linkedAppt.id, req.salon.id);
+      await conn.query('UPDATE appointments SET ' + apptContactSets.join(', ') + ' WHERE id = ? AND salon_id = ?', apptContactParams);
+    }
     if (service_id) {
       await conn.query('UPDATE appointments SET service_id = ? WHERE id = ?', [service_id, linkedAppt.id]);
     }
