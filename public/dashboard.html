@@ -6818,7 +6818,7 @@ function adjustTimelineZoom(delta) {
 if (window.AutoRefresh) AutoRefresh.start(function () {
   var tab = document.getElementById('t-rdv');
   if (!tab || !tab.classList.contains('on')) return;
-  calMonthCache = {}; return loadCalendarPeriod();
+  syncInvalidateAgenda(); return loadCalendarPeriod();
 }, { idleMs: 15000, busy: function () { return !!document.querySelector('.modal-overlay, .client-drawer-backdrop.on'); } });
 
 function startCalendarNowRefresh() {
@@ -6875,13 +6875,14 @@ function syncInvalidateAgenda() {
   agendaSyncGeneration++;
   calMonthCache = {};
 }
-setInterval(function () {
-  if (!calBooted || document.hidden) return;
-  syncInvalidateAgenda();
-  loadCalendarPeriod();
-}, 15000);
+// L'admin utilise déjà AutoRefresh avec détection des tiroirs et modales ouverts.
 document.addEventListener('visibilitychange', function () {
-  if (!document.hidden && calBooted) { syncInvalidateAgenda(); loadCalendarPeriod(); }
+  var tab = document.getElementById('t-rdv');
+  if (!document.hidden && tab && tab.classList.contains('on') &&
+      !document.querySelector('.modal-overlay, .client-drawer-backdrop.on')) {
+    syncInvalidateAgenda();
+    loadCalendarPeriod();
+  }
 });
 function loadCalendarPeriod() {
   var syncRequest = ++agendaSyncRequest;
