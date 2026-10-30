@@ -117,6 +117,17 @@
   #gp-candidates .advance-pick { display: flex; align-items: center; gap: 12px; }
   #gp-candidates .advance-pick > span:last-child { margin-left: auto; white-space: nowrap; }
 
+  /* Modification avant encaissement : cartes du catalogue, sans menu natif. */
+  .finished-edit-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; max-height:38vh; overflow-y:auto; margin:12px 0; }
+  .finished-edit-card { position:relative; display:flex; flex-direction:column; align-items:flex-start; gap:7px; text-align:left; padding:14px; border:1px solid var(--sep); border-radius:14px; background:var(--card); color:var(--text); cursor:pointer; font:inherit; min-height:76px; }
+  .finished-edit-card.selected { border-color:var(--blue); box-shadow:inset 0 0 0 1px var(--blue); }
+  .finished-edit-card-name { font-weight:600; padding-right:12px; }
+  .finished-edit-card-price { font-weight:700; color:var(--grey); }
+  .finished-edit-check { position:absolute; top:9px; right:10px; color:var(--blue); font-weight:700; }
+  .finished-edit-total { display:flex; align-items:center; justify-content:space-between; border-top:1px solid var(--sep); padding:14px 2px; }
+  .finished-edit-total strong { font-size:21px; }
+  @media(max-width:440px) { .finished-edit-grid { grid-template-columns:1fr; } }
+
   /* --- Footer Timer / Agenda / Caisse (repris de "Mon poste") --- */
   .caisse-footer {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
@@ -3762,26 +3773,81 @@ function markUnstartedAbsent(queueId) {
     }).catch(function (e) { toast(e.message, true); });
 }
 
-/** Corriger une prestation terminée mais non encaissée, sans changer le statut du passage. */
+/** Corriger prestation et suppléments d'un passage terminé, uniquement avant paiement. */
 function editFinishedService(queueId) {
   var q = pendingPayments.find(function (x) { return x.id === queueId; });
   if (!q || q.prepaid) return;
-  barberApi('/api/catalog/services').then(function (r) {
-    var services = r.items || [];
+  Promise.all([barberApi('/api/catalog/services'), barberApi('/api/catalog/extras')]).then(function (responses) {
+    var services = (responses[0].items || []).filter(function (x) { return x.active !== 0 && x.active !== false; });
+    var extras = (responses[1].items || []).filter(function (x) { return x.active !== 0 && x.active !== false; });
+    var selectedService = q.service && q.service.id;
+    var selectedExtras = new Set((q.extras || []).map(function (e) { return e.id; }));
+    var tab = 'services';
+    var saving = false;
     var html = '<div class="modal-title">Modifier la prestation de ' + esc(q.client_name) + '</div>' +
-      '<p class="hint">Correction avant encaissement uniquement.</p>' +
-      '<select id="finished-service-choice" class="input" style="width:100%;margin:12px 0">' +
-      services.map(function (svc) { return '<option value="' + esc(svc.id) + '"' + (q.service && svc.id === q.service.id ? ' selected' : '') + '>' + esc(svc.name) + ' · ' + eur(svc.price_cents) + '</option>'; }).join('') + '</select>' +
-      '<div class="modal-actions"><button class="btn btn-soft" id="finished-service-cancel">Annuler</button><button class="btn btn-primary" id="finished-service-save">Enregistrer</button></div>';
+      '<p class="hint" style="margin:0 0 14px">Correction avant encaissement uniquement.</p>' +
+      '<div class="cat-tabs finished-edit-tabs" style="display:flex">' +
+      '<button type="button" data-tab="services" class="on">Prestations</button>' +
+      '<button type="button" data-tab="extras">Suppléments</button></div>' +
+      '<div class="finished-edit-grid" id="finished-edit-grid"></div>' +
+      '<div class="finished-edit-total"><span>Total actualisé</span><strong id="finished-edit-total"></strong></div>' +
+      '<div class="modal-actions"><button class="btn btn-soft" id="finished-service-cancel">Annuler</button>' +
+      '<button class="btn btn-primary" id="finished-service-save">Enregistrer</button></div>';
     var overlay = _buildModal(html);
-    overlay.querySelector('#finished-service-cancel').onclick = function () { _closeModal(overlay); };
-    overlay.querySelector('#finished-service-save').onclick = function () {
-      var serviceId = overlay.querySelector('#finished-service-choice').value;
-      if (!serviceId) return;
-      barberApi('/api/queue/' + encodeURIComponent(queueId), { method: 'PUT', body: { service_id: serviceId } })
-        .then(function () { _closeModal(overlay); toast('Prestation corrigée'); loadPendingPayments(); })
-        .catch(function (e) { toast(e.message, true); });
+    var grid = overlay.querySelector('#finished-edit-grid');
+    function totalCents() {
+      var svc = services.find(function (x) { return x.id === selectedService; });
+      var base = svc ? Number(svc.price_cents || 0) : 0;
+      var extrasTotal = extras.filter(function (x) { return selectedExtras.has(x.id); })
+        .reduce(function (sum, x) { return sum + Number(x.price_cents || 0); }, 0);
+      var productsTotal = (q.products || []).reduce(function (sum, x) {
+        return sum + Number(x.price_cents || 0) * Number(x.quantity || 1);
+      }, 0);
+      return base + extrasTotal + productsTotal;
+    }
+    function render() {
+      Array.prototype.forEach.call(overlay.querySelectorAll('.finished-edit-tabs button'), function (b) {
+        b.classList.toggle('on', b.dataset.tab === tab);
+      });
+      var items = tab === 'services' ? services : extras;
+      grid.innerHTML = items.length ? items.map(function (item) {
+        var on = tab === 'services' ? selectedService === item.id : selectedExtras.has(item.id);
+        return '<button type="button" class="finished-edit-card' + (on ? ' selected' : '') + '" data-id="' + esc(item.id) + '" aria-pressed="' + on + '">' +
+          '<span class="finished-edit-card-name">' + esc(item.name) + '</span>' +
+          '<span class="finished-edit-card-price">' + eur(item.price_cents) + '</span>' +
+          (on ? '<span class="finished-edit-check">✓</span>' : '') + '</button>';
+      }).join('') : '<div class="empty">Aucun article disponible.</div>';
+      overlay.querySelector('#finished-edit-total').textContent = eur(totalCents());
+    }
+    Array.prototype.forEach.call(overlay.querySelectorAll('.finished-edit-tabs button'), function (b) {
+      b.onclick = function () { tab = b.dataset.tab; render(); };
+    });
+    grid.onclick = function (e) {
+      var card = e.target.closest('.finished-edit-card');
+      if (!card) return;
+      var id = card.dataset.id;
+      if (tab === 'services') selectedService = id;
+      else if (selectedExtras.has(id)) selectedExtras.delete(id);
+      else selectedExtras.add(id);
+      render();
     };
+    overlay.querySelector('#finished-service-cancel').onclick = function () { if (!saving) _closeModal(overlay); };
+    overlay.querySelector('#finished-service-save').onclick = function () {
+      if (saving || !selectedService) { if (!selectedService) toast('Sélectionnez une prestation.', true); return; }
+      saving = true;
+      var saveButton = overlay.querySelector('#finished-service-save');
+      saveButton.disabled = true;
+      barberApi('/api/queue/' + encodeURIComponent(queueId), {
+        method: 'PUT', body: { service_id: selectedService, extras: Array.from(selectedExtras) }
+      }).then(function () {
+        _closeModal(overlay);
+        toast('Prestation et suppléments corrigés');
+        loadPendingPayments();
+      }).catch(function (e) {
+        saving = false; saveButton.disabled = false; toast(e.message, true);
+      });
+    };
+    render();
   }).catch(function (e) { toast(e.message, true); });
 }
 
