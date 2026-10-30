@@ -80,7 +80,15 @@
   }
 
   /* Filtres de coiffeurs : exactement les bulles de la caisse, sans les noms sous les cercles. */
-  #gp-barber-filters .barber-bubble { flex: 0 0 auto; }
+  #gp-barber-filters .barber-bubble {
+    flex: 0 0 auto; border: 0; border-radius: 50%; background: transparent;
+    outline: none; box-shadow: none; -webkit-tap-highlight-color: transparent;
+  }
+  #gp-barber-filters .barber-bubble:focus,
+  #gp-barber-filters .barber-bubble:focus-visible,
+  #gp-barber-filters .barber-bubble:active {
+    outline: none; box-shadow: none; background: transparent;
+  }
   #gp-barber-filters .barber-bubble.on .avatar { --accent: var(--blue); }
 
   /* Coiffeur responsable affiché seulement dans la liste Tous. */
