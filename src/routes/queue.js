@@ -805,11 +805,17 @@ router.put('/:id', requireAdminOrBarber, wrap(async (req, res) => {
   );
   if (!existing) return res.status(404).json({ error: 'Client introuvable' });
 
-  if (req.actingBarberId && existing.barber_id !== req.actingBarberId) {
+  const { service_id, extras, barber_id, client_name, email, phone } = req.body;
+  // Tous les coiffeurs authentifiés du salon peuvent corriger les coordonnées
+  // d'un RDV de collègue, sans obtenir le droit de modifier sa prestation,
+  // ses suppléments ou son affectation dans la file.
+  const contactOnly = !service_id && extras === undefined && barber_id === undefined &&
+    (client_name !== undefined || email !== undefined || phone !== undefined) &&
+    Object.keys(req.body || {}).every((key) => ['client_name', 'email', 'phone'].includes(key));
+  if (req.actingBarberId && existing.barber_id !== req.actingBarberId && !contactOnly) {
     return res.status(403).json({ error: "Ce n'est pas votre client." });
   }
 
-  const { service_id, extras, barber_id, client_name, email, phone } = req.body;
   // Fiche modifiee : chaque coordonnee saisie doit etre valide (un champ vide reste permis).
   const contactErr = contactError({ name: client_name, email, phone }, { nameRequired: false });
   if (contactErr) return res.status(400).json({ error: contactErr });
