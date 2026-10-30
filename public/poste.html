@@ -921,7 +921,7 @@ function gotoHome() {
 if (window.AutoRefresh) AutoRefresh.start(function () {
   var ag = document.getElementById('p-agenda');
   if (!ag || ag.style.display === 'none' || !calBooted) return;
-  invalidateAgendaCache(); return loadAgendaPeriod();
+  syncInvalidateAgenda(); return loadAgendaPeriod();
 }, { idleMs: 15000, busy: function () { return !!document.querySelector('.modal-overlay, .appt-drawer-backdrop.on'); } });
 
 function gotoAgenda() {
@@ -1395,6 +1395,23 @@ function invalidateAgendaCache() {
   calCacheGeneration++;
   calMonthCache = {};
 }
+// Rafraîchissement inter-postes : les autres terminaux peuvent modifier les RDV.
+// Une génération et un numéro de requête empêchent une réponse ancienne d'écraser la plus récente.
+var agendaSyncRequest = 0;
+var agendaSyncGeneration = 0;
+function syncInvalidateAgenda() {
+  agendaSyncGeneration++;
+  invalidateAgendaCache();
+}
+// AutoRefresh existant respecte l'inactivité et les fenêtres de modification.
+document.addEventListener('visibilitychange', function () {
+  var ag = document.getElementById('p-agenda');
+  if (!document.hidden && calBooted && ag && ag.style.display !== 'none' &&
+      !document.querySelector('.modal-overlay, .appt-drawer-backdrop.on')) {
+    syncInvalidateAgenda();
+    loadAgendaPeriod();
+  }
+});
 function loadAgendaPeriod() {
   var sequence = ++calLoadSequence;
   var generation = calCacheGeneration;
