@@ -321,6 +321,9 @@ async function computeSlotsForBarber(barberId, dateStr, durationMin, rdvSettings
   const startMin = timeToMinutes(schedule.start_time);
   const endMin = timeToMinutes(schedule.end_time);
   const paris = nowInParis(rdvSettings.timezone);
+  // Une date passée ne doit jamais exposer de créneau, même si l'horaire
+  // hebdomadaire du coiffeur est actif ce jour-là.
+  if (dateStr < paris.dateStr) return [];
   const isToday = dateStr === paris.dateStr;
   let nowMin = isToday ? paris.minutes : -1;
 
