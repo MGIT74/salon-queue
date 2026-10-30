@@ -3724,6 +3724,29 @@ function markUnstartedAbsent(queueId) {
     }).catch(function (e) { toast(e.message, true); });
 }
 
+/** Corriger une prestation terminée mais non encaissée, sans changer le statut du passage. */
+function editFinishedService(queueId) {
+  var q = pendingPayments.find(function (x) { return x.id === queueId; });
+  if (!q || q.prepaid) return;
+  barberApi('/api/catalog/services').then(function (r) {
+    var services = r.items || [];
+    var html = '<div class="modal-title">Modifier la prestation de ' + esc(q.client_name) + '</div>' +
+      '<p class="hint">Correction avant encaissement uniquement.</p>' +
+      '<select id="finished-service-choice" class="input" style="width:100%;margin:12px 0">' +
+      services.map(function (svc) { return '<option value="' + esc(svc.id) + '"' + (q.service && svc.id === q.service.id ? ' selected' : '') + '>' + esc(svc.name) + ' · ' + eur(svc.price_cents) + '</option>'; }).join('') + '</select>' +
+      '<div class="modal-actions"><button class="btn btn-soft" id="finished-service-cancel">Annuler</button><button class="btn btn-primary" id="finished-service-save">Enregistrer</button></div>';
+    var overlay = _buildModal(html);
+    overlay.querySelector('#finished-service-cancel').onclick = function () { _closeModal(overlay); };
+    overlay.querySelector('#finished-service-save').onclick = function () {
+      var serviceId = overlay.querySelector('#finished-service-choice').value;
+      if (!serviceId) return;
+      barberApi('/api/queue/' + encodeURIComponent(queueId), { method: 'PUT', body: JSON.stringify({ service_id: serviceId }) })
+        .then(function () { _closeModal(overlay); toast('Prestation corrigée'); loadPendingPayments(); })
+        .catch(function (e) { toast(e.message, true); });
+    };
+  }).catch(function (e) { toast(e.message, true); });
+}
+
 function renderPendingList() {
   var label = document.getElementById('pending-label');
   var list = document.getElementById('pending-list');
@@ -3810,6 +3833,7 @@ function renderPendingList() {
           ? '<button class="btn btn-primary" onclick="event.stopPropagation();usePendingGroupForTicket(\'' + q.id + '\')">Encaisser le groupe (' + (mates.length + earlyN + 1) + ')</button>'
           : '') +
         unstartedAbsentBtn(q) +
+        (!q.prepaid ? '<button class="btn btn-soft" onclick="event.stopPropagation();editFinishedService(\'' + q.id + '\')">Modifier la prestation</button>' : '') +
         (isActive && !q.loyalty_member
           ? '<button class="btn btn-ghost" onclick="event.stopPropagation();proposeLoyaltyActivation(\'' + q.id + '\')">Activer carte de fidélité</button>'
           : '') +
