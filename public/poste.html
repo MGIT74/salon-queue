@@ -2933,8 +2933,8 @@ function openApptDrawer(a) {
   adQueueId = a.promoted_queue_id || null;
   document.getElementById('ad-edit-section').style.display = 'none';
   document.getElementById('ad-info').style.display = 'block';
-  // Le crayon n'existe que pour un RDV déjà dans la file (jour J) : avant, il n'y a pas encore de fiche à modifier.
-  document.getElementById('ad-edit-btn').style.display = (adQueueId && a.status !== 'cancelled') ? 'flex' : 'none';
+  // Les coordonnées restent modifiables même avant l'entrée du RDV dans la file.
+  document.getElementById('ad-edit-btn').style.display = a.status !== 'cancelled' ? 'flex' : 'none';
   document.getElementById('ad-actions').style.display = adIsUpcoming(a) ? 'flex' : 'none';
   adRenderInfo();
   var noteBox = document.getElementById('ad-note-box');
@@ -2943,7 +2943,7 @@ function openApptDrawer(a) {
       '<textarea id="ad-note" rows="3" placeholder="Ex: préfère dégradé américain, allergie...">' + esc(a.note || '') + '</textarea>' +
       '<button class="btn btn-soft" style="margin-top:8px" onclick="adSaveNote()">Enregistrer la note</button>';
   } else {
-    noteBox.innerHTML = '<p class="hint" style="margin:0">Pas encore modifiable — ce RDV entrera dans la file le jour même.</p>';
+    noteBox.innerHTML = '<p class="hint" style="margin:0">La note interne sera disponible lorsque le RDV entrera dans la file.</p>';
   }
   adLoadDetails(a, adQueueId);
   document.getElementById('appt-drawer-backdrop').classList.add('on');
@@ -2977,12 +2977,13 @@ function adToggleEdit() {
 }
 
 function adSaveInfo() {
-  if (!adAppt || !adQueueId) return;
+  if (!adAppt) return;
   var name = document.getElementById('ad-edit-name').value.trim();
   if (!name) { toast('Le nom est requis', true); return; }
   var email = document.getElementById('ad-edit-email').value.trim();
   var phone = document.getElementById('ad-edit-phone').value.trim();
-  barberApi('/api/queue/' + adQueueId, { method: 'PUT', body: { client_name: name, email: email, phone: phone }, actingAs: adAppt.barber_id || undefined })
+  var url = adQueueId ? '/api/queue/' + adQueueId : '/api/appointments/' + adAppt.id + '/contact';
+  barberApi(url, { method: 'PUT', body: { client_name: name, email: email, phone: phone }, actingAs: adAppt.barber_id || undefined })
     .then(function () {
       adAppt.client_name = name; adAppt.email = email; adAppt.phone = phone;
       adRenderInfo(); adToggleEdit();
