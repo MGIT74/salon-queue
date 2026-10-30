@@ -1152,7 +1152,18 @@ async function createGroupBooking(req, res, staff) {
  * de l'email de groupe). Le delai limite d'annulation s'applique a chaque rendez-vous : ceux qui sont
  * deja trop proches sont gardes, et le client est prevenu.
  */
-router.post('/cancel-group', wrap(async (req, res) => {
+// Verrouiller les annulations publiques sur le salon propriétaire du RDV,
+// même si le lien d'annulation est ouvert depuis un autre contexte de salon.
+const resolveCancellationSalon = wrap(async (req, res, next) => {
+  const token = req.body && req.body.token;
+  if (!token) return res.status(400).json({ error: 'Token requis' });
+  const [[row]] = await pool.query('SELECT salon_id FROM appointments WHERE cancel_token = ? LIMIT 1', [token]);
+  if (!row) return res.status(404).json({ error: 'Rendez-vous introuvable' });
+  req.bookingLockSalonId = row.salon_id;
+  next();
+});
+
+router.post('/cancel-group', resolveCancellationSalon, wrap(withBookingLock(async (req, res) => {
   const { token } = req.body;
   if (!token) return res.status(400).json({ error: 'Token requis' });
   const [[appt]] = await pool.query('SELECT id, salon_id, group_id FROM appointments WHERE cancel_token = ?', [token]);
@@ -1185,7 +1196,7 @@ router.post('/cancel-group', wrap(async (req, res) => {
   }
   if (!cancelled) return res.status(403).json({ error: "Trop tard pour annuler ces rendez-vous en ligne, contactez directement le salon." });
   res.json({ ok: true, cancelled, kept });
-}));
+})));
 
 /**
  * Création manuelle d'un RDV par l'admin (ex: client au téléphone) -
@@ -1405,7 +1416,7 @@ router.post('/import', requireAdmin, wrap(async (req, res) => {
  * Annulation publique via le lien envoyé par email — retrouvé
  * uniquement par le token (le lien ne contient que ça, pas l'id).
  */
-router.post('/cancel', wrap(async (req, res) => {
+router.post('/cancel', resolveCancellationSalon, wrap(withBookingLock(async (req, res) => {
   const { token } = req.body;
   if (!token) return res.status(400).json({ error: 'Token requis' });
 
@@ -1445,7 +1456,7 @@ router.post('/cancel', wrap(async (req, res) => {
   if (appt.gift_card_id) await releaseGiftAfterCancellation(appt.salon_id, appt.gift_card_id, appt.id);
 
   res.json({ ok: true });
-}));
+})));
 
 /**
  * Annulation à l'initiative de l'ADMIN (bouton dans le tiroir client de
