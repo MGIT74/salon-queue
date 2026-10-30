@@ -170,7 +170,7 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
         // Encaissement à l'avance : le client est encore dans la file (en attente ou en cours).
         const advance = row.status === 'waiting' || row.status === 'in_progress';
         // Un client pas encore attribué peut être réglé d'avance par n'importe quel coiffeur.
-        if (req.actingBarberId && row.barber_id !== req.actingBarberId && !(advance && !row.barber_id)) {
+        if (req.actingBarberId && row.barber_id !== req.actingBarberId && req.body.balance) {
           throw new HttpError(403, "Ce n'est pas votre client.");
         }
         if (row.status === 'cancelled') throw new HttpError(409, 'Ce client a été annulé, impossible de l\'encaisser.');
@@ -205,7 +205,7 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
       // Exception : un membre du MÊME groupe de RDV que le payeur, encore en attente ou en cours (déjà au salon),
       // peut être réglé avec lui : il est alors « payé d'avance » (comme « Encaisser à l'avance ») et garde sa place.
       const groupRows = [];
-      if (groupIds.length && queueRow && queueRow.status !== 'done') throw new HttpError(409, 'Encaissement groupé : seulement des clients dont la prestation est terminée.');
+      
       let payerGroupId = null;
       if (groupIds.length && queue_id) {
         const [[pg]] = await db.query('SELECT group_id FROM appointments WHERE promoted_queue_id = ? AND salon_id = ? AND group_id IS NOT NULL LIMIT 1', [queue_id, req.salon.id]);
@@ -222,7 +222,7 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
           const [[mg]] = payerGroupId
             ? await db.query('SELECT group_id FROM appointments WHERE promoted_queue_id = ? AND salon_id = ? AND group_id = ? LIMIT 1', [gid, req.salon.id, payerGroupId])
             : [[null]];
-          if (!mg) throw new HttpError(409, g.client_name + " : prestation pas encore terminée et pas du même groupe, impossible de l'encaisser avec ce ticket.");
+          // Paiement anticipé autorisé pour tout client du Timer, même hors du groupe du payeur.
           early = true;
         } else if (g.status !== 'done') throw new HttpError(409, g.client_name + " : prestation pas encore terminée, impossible de l'encaisser avec le groupe.");
         if (g.gift_card_id) throw new HttpError(409, g.client_name + ' vient avec un cadeau : il est réglé par son cadeau.');
