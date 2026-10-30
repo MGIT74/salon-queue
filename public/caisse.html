@@ -3969,7 +3969,7 @@ function refreshQueueForGroup() {
 function addPersonToTicket(queueId, silent) {
   // Un membre du groupe pas encore terminé (file d'attente) peut aussi être ajouté : réglé d'avance.
   var q = pendingById(queueId) || (queue || []).find(function (x) { return x.id === queueId && (x.status === 'waiting' || x.status === 'in_progress'); });
-  if (!q || !ticketQueueId || ticketMode) return false;
+  if (!q || !ticketQueueId || ticketMode === 'balance') return false;
   if (ticketPersonIds().indexOf(q.id) !== -1) return false;
   if (!groupPayEligible(q) || q.paid_at) { toast(q.client_name + ' ne peut pas être ajouté (cadeau ou paiement d\'avance).', true); return false; }
   var early = q.status === 'waiting' || q.status === 'in_progress';
@@ -4036,16 +4036,16 @@ function usePendingGroupForTicket(queueId, mode) {
 
 /** « + Payer aussi pour un autre client » : tous les clients du salon en attente d'encaissement. */
 function openGroupPayPicker() {
-  if (!ticketQueueId || ticketMode) return;
+  if (!ticketQueueId || ticketMode === 'balance') return;
   Promise.all([barberApi('/api/queue/pending-payment?all=1'), refreshQueueForGroup().catch(function () { return queue; })]).then(function (rr) {
     var r = rr[0];
     pendingAll = r.items || [];
     var payer = pendingById(ticketQueueId);
     var inTicket = ticketPersonIds();
     var list = pendingAll.filter(function (x) { return inTicket.indexOf(x.id) === -1 && groupPayEligible(x); });
-    // Membres de SON groupe pas encore terminés (déjà au salon) : réglables d'avance avec lui.
-    groupEarlyMatesOf(payer).forEach(function (x) {
-      if (inTicket.indexOf(x.id) === -1) list.push(Object.assign({}, x, { group_id: payer.group_id, early: true }));
+    // Clients de toutes les files du Timer, quel que soit leur coiffeur ou groupe.
+    (queue || []).filter(function (x) { return (x.status === 'waiting' || x.status === 'in_progress') && !x.paid_at && groupPayEligible(x); }).forEach(function (x) {
+      if (inTicket.indexOf(x.id) === -1 && !list.some(function (p) { return p.id === x.id; })) list.push(Object.assign({}, x, { early: true }));
     });
     // Les membres de son groupe de RDV d'abord.
     list.sort(function (a, b) {
@@ -4106,7 +4106,7 @@ function usePendingForTicket(queueId, quiet) {
 function advanceCandidates() {
   return (queue || []).filter(function (q) {
     return (q.status === 'waiting' || q.status === 'in_progress') && !q.paid_at &&
-      (!activeBarberId || canTakeQueueEntry(q, activeBarberId, allBarbers));
+      true;
   }).sort(function (a, b) {
     if (a.status !== b.status) return a.status === 'in_progress' ? -1 : 1;
     return new Date(a.checkin_at) - new Date(b.checkin_at);
@@ -4128,7 +4128,7 @@ function openAdvancePicker() {
           '<span class="meta" style="display:block">' + esc(detail) + ' · ' + (q.status === 'in_progress' ? 'en cours' : 'en attente') +
           (withGift ? ' · 🎁 réglé par son cadeau à la fin' : '') + '</span></span>' +
           '<span style="font-weight:700">' + eur(q.total_price_cents) + '</span></button>';
-      }).join('') : '<div class="empty">Personne dans la file pour ce coiffeur.</div>') +
+      }).join('') : '<div class="empty">Aucun client non payé dans les files du salon.</div>') +
       '<div class="modal-actions"><button class="btn btn-soft" id="advance-close">Fermer</button></div>';
     var overlay = _buildModal(html);
     overlay.querySelector('#advance-close').onclick = function () { _closeModal(overlay); };
