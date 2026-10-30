@@ -921,7 +921,7 @@ function gotoHome() {
 if (window.AutoRefresh) AutoRefresh.start(function () {
   var ag = document.getElementById('p-agenda');
   if (!ag || ag.style.display === 'none' || !calBooted) return;
-  invalidateAgendaCache(); return loadAgendaPeriod();
+  syncInvalidateAgenda(); return loadAgendaPeriod();
 }, { idleMs: 15000, busy: function () { return !!document.querySelector('.modal-overlay, .appt-drawer-backdrop.on'); } });
 
 function gotoAgenda() {
@@ -1403,13 +1403,14 @@ function syncInvalidateAgenda() {
   agendaSyncGeneration++;
   invalidateAgendaCache();
 }
-setInterval(function () {
-  if (!calBooted || document.hidden) return;
-  syncInvalidateAgenda();
-  loadAgendaPeriod();
-}, 15000);
+// AutoRefresh existant respecte l'inactivité et les fenêtres de modification.
 document.addEventListener('visibilitychange', function () {
-  if (!document.hidden && calBooted) { syncInvalidateAgenda(); loadAgendaPeriod(); }
+  var ag = document.getElementById('p-agenda');
+  if (!document.hidden && calBooted && ag && ag.style.display !== 'none' &&
+      !document.querySelector('.modal-overlay, .appt-drawer-backdrop.on')) {
+    syncInvalidateAgenda();
+    loadAgendaPeriod();
+  }
 });
 function loadAgendaPeriod() {
   var sequence = ++calLoadSequence;
