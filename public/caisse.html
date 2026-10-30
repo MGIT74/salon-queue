@@ -2125,13 +2125,14 @@ function syncInvalidateAgenda() {
   agendaSyncGeneration++;
   calMonthCache = {};
 }
-setInterval(function () {
-  if (!calBooted || document.hidden) return;
-  syncInvalidateAgenda();
-  loadAgendaPeriod();
-}, 15000);
+// AutoRefresh existant respecte les tickets, paiements et fenêtres ouvertes.
 document.addEventListener('visibilitychange', function () {
-  if (!document.hidden && calBooted) { syncInvalidateAgenda(); loadAgendaPeriod(); }
+  var panel = document.getElementById('panel-agenda');
+  if (!document.hidden && calBooted && panel && panel.classList.contains('on') &&
+      !caisseIsBusy()) {
+    syncInvalidateAgenda();
+    loadAgendaPeriod();
+  }
 });
 function loadAgendaPeriod() {
   var syncRequest = ++agendaSyncRequest;
@@ -3288,7 +3289,7 @@ AutoRefresh.start(function () {
   var on = document.querySelector('.caisse-tab-panel.on');
   var id = on ? on.id : '';
   if (id === 'panel-caisse') return loadCatalog();
-  if (id === 'panel-agenda') { calMonthCache = {}; return loadAgendaPeriod(); }
+  if (id === 'panel-agenda') { syncInvalidateAgenda(); return loadAgendaPeriod(); }
 }, { idleMs: 15000, busy: caisseIsBusy });
 
 function loadInactivitySetting() {
