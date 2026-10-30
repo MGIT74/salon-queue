@@ -3740,7 +3740,7 @@ function editFinishedService(queueId) {
     overlay.querySelector('#finished-service-save').onclick = function () {
       var serviceId = overlay.querySelector('#finished-service-choice').value;
       if (!serviceId) return;
-      barberApi('/api/queue/' + encodeURIComponent(queueId), { method: 'PUT', body: JSON.stringify({ service_id: serviceId }) })
+      barberApi('/api/queue/' + encodeURIComponent(queueId), { method: 'PUT', body: { service_id: serviceId } })
         .then(function () { _closeModal(overlay); toast('Prestation corrigée'); loadPendingPayments(); })
         .catch(function (e) { toast(e.message, true); });
     };
