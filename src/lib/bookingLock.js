@@ -32,7 +32,9 @@ async function acquire(name, timeoutMs) {
 /** Enveloppe un gestionnaire Express (req, res) => Promise : il s'exécute seul pour ce salon. */
 function withBookingLock(handler, timeoutMs) {
   return async function (req, res) {
-    const name = 'rdv:' + (req.salon && req.salon.id);
+    // Les annulations publiques utilisent le salon réel associé au token,
+    // pas un éventuel salon sélectionné par le navigateur.
+    const name = 'rdv:' + (req.bookingLockSalonId || (req.salon && req.salon.id));
     const conn = await acquire(name, timeoutMs || 10000);
     if (!conn) return res.status(503).json({ error: 'Beaucoup de réservations en même temps, réessayez dans un instant.' });
     try {
