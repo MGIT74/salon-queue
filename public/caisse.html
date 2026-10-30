@@ -39,6 +39,11 @@
   html, body { min-height: 100%; }
   .wrap { max-width: 1100px; margin: 0 auto; padding: 20px 18px 40px; }
 
+  /* Sélecteurs d'encaissement : largeur adaptée aux écrans web et tablettes. */
+  @media (min-width: 600px) {
+    .gp-wide-picker { width: min(820px, calc(100vw - 48px)) !important; max-width: min(820px, calc(100vw - 48px)) !important; box-sizing: border-box; }
+  }
+
   /* --- Écran de connexion (identique à Mon poste) --- */
   .login { text-align: center; padding-top: 12vh; }
   .login .mark { font-size: 15px; font-weight: 600; color: var(--grey); margin-bottom: 6px; }
@@ -4232,12 +4237,18 @@ function openGroupPayPicker() {
         return '<button type="button" class="barber-bubble gp-barber-filter" data-barber="' + esc(b.id) + '" title="' + esc(b.name) + '" aria-label="Filtrer les clients de ' + esc(b.name) + '">' +
           '<span class="avatar" style="' + avatarStyle + '">' + (b.photo_url ? '' : esc(initial)) + '</span></button>';
       }).join('') + '</div>' +
+      '<input type="search" class="input gp-client-search" placeholder="Rechercher un client…" aria-label="Rechercher un client" autocomplete="off" style="display:block;width:100%;box-sizing:border-box;margin:0 0 12px;padding:12px 14px;border:1px solid var(--border);border-radius:12px;background:var(--fill);color:var(--text);font-size:15px" />' +
       '<div id="gp-candidates" style="max-height:45vh;overflow-y:auto"></div>' +
       '<div class="modal-actions"><button class="btn btn-soft" id="gp-close">Fermer</button></div>';
     var overlay = _buildModal(html);
+    var dialog = overlay.querySelector('.modal, .modal-content, .modal-dialog, .modal-box') || overlay.firstElementChild;
+    if (dialog) dialog.classList.add('gp-wide-picker');
     var candidates = overlay.querySelector('#gp-candidates');
+    var searchInput = overlay.querySelector('.gp-client-search');
     function renderCandidates() {
       var visible = selectedBarber ? list.filter(function (x) { return x.barber_id === selectedBarber; }) : list;
+      var query = searchInput.value.trim().toLocaleLowerCase('fr');
+      if (query) visible = visible.filter(function (item) { return String(item.client_name || '').toLocaleLowerCase('fr').includes(query); });
       candidates.innerHTML = visible.length ? visible.map(function (x) {
         var sameGroup = payer && payer.group_id && x.group_id === payer.group_id;
         var assignedBarber = allBarbers.find(function (b) { return b.id === x.barber_id; });
@@ -4266,6 +4277,7 @@ function openGroupPayPicker() {
         b.setAttribute('aria-pressed', b.getAttribute('data-barber') === selectedBarber ? 'true' : 'false');
       });
     }
+    searchInput.addEventListener('input', renderCandidates);
     overlay.querySelector('#gp-close').onclick = function () { _closeModal(overlay); };
     Array.prototype.forEach.call(overlay.querySelectorAll('.gp-barber-filter'), function (b) {
       b.onclick = function () {
@@ -4339,12 +4351,18 @@ function openAdvancePicker() {
         return '<button type="button" class="barber-bubble gp-barber-filter" data-barber="' + esc(b.id) + '" title="' + esc(b.name) + '" aria-label="Filtrer les clients de ' + esc(b.name) + '">' +
           '<span class="avatar" style="' + avatarStyle + '">' + (b.photo_url ? '' : esc(initial)) + '</span></button>';
       }).join('') + '</div>' +
+      '<input type="search" class="input gp-client-search" placeholder="Rechercher un client…" aria-label="Rechercher un client" autocomplete="off" style="display:block;width:100%;box-sizing:border-box;margin:0 0 12px;padding:12px 14px;border:1px solid var(--border);border-radius:12px;background:var(--fill);color:var(--text);font-size:15px" />' +
       '<div id="gp-candidates" style="max-height:45vh;overflow-y:auto"></div>' +
       '<div class="modal-actions"><button class="btn btn-soft" id="advance-close">Fermer</button></div>';
     var overlay = _buildModal(html);
+    var dialog = overlay.querySelector('.modal, .modal-content, .modal-dialog, .modal-box') || overlay.firstElementChild;
+    if (dialog) dialog.classList.add('gp-wide-picker');
     var candidates = overlay.querySelector('#gp-candidates');
+    var searchInput = overlay.querySelector('.gp-client-search');
     function renderCandidates() {
       var visible = selectedBarber ? list.filter(function (q) { return q.barber_id === selectedBarber; }) : list;
+      var query = searchInput.value.trim().toLocaleLowerCase('fr');
+      if (query) visible = visible.filter(function (item) { return String(item.client_name || '').toLocaleLowerCase('fr').includes(query); });
       candidates.innerHTML = visible.length ? visible.map(function (q) {
         var detail = svcLabel(q.service.name, q.extras);
         var withGift = Boolean(q.gift_card && q.gift_card.explicit);
@@ -4375,6 +4393,7 @@ function openAdvancePicker() {
         b.setAttribute('aria-pressed', on ? 'true' : 'false');
       });
     }
+    searchInput.addEventListener('input', renderCandidates);
     overlay.querySelector('#advance-close').onclick = function () { _closeModal(overlay); };
     Array.prototype.forEach.call(overlay.querySelectorAll('.gp-barber-filter'), function (b) {
       b.onclick = function () {
