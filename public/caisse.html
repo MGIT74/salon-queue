@@ -83,6 +83,16 @@
   #gp-barber-filters .barber-bubble { flex: 0 0 auto; }
   #gp-barber-filters .barber-bubble.on .avatar { --accent: var(--blue); }
 
+  /* Coiffeur responsable affiché seulement dans la liste Tous. */
+  .gp-client-barber-avatar {
+    width: 34px; height: 34px; min-width: 34px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    background-size: cover; background-position: center;
+    color: #fff; font-size: 13px; font-weight: 700; flex-shrink: 0;
+  }
+  #gp-candidates .advance-pick { display: flex; align-items: center; gap: 12px; }
+  #gp-candidates .advance-pick > span:last-child { margin-left: auto; white-space: nowrap; }
+
   /* --- Footer Timer / Agenda / Caisse (repris de "Mon poste") --- */
   .caisse-footer {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
@@ -4104,7 +4114,19 @@ function openGroupPayPicker() {
       var visible = selectedBarber ? list.filter(function (x) { return x.barber_id === selectedBarber; }) : list;
       candidates.innerHTML = visible.length ? visible.map(function (x) {
         var sameGroup = payer && payer.group_id && x.group_id === payer.group_id;
+        var assignedBarber = allBarbers.find(function (b) { return b.id === x.barber_id; });
+        var barberAvatar = '';
+        if (!selectedBarber && assignedBarber) {
+          var color = assignedBarber.color || stableColorForId(assignedBarber.id);
+          var initial = (assignedBarber.name || '?').trim().charAt(0).toUpperCase();
+          var avatarStyle = assignedBarber.photo_url
+            ? 'background-image:url(&quot;' + esc(assignedBarber.photo_url) + '&quot;)'
+            : 'background:' + color;
+          barberAvatar = '<span class="gp-client-barber-avatar" title="Coiffeur : ' + esc(assignedBarber.name) + '" style="' + avatarStyle + '">' +
+            (assignedBarber.photo_url ? '' : esc(initial)) + '</span>';
+        }
         return '<button type="button" class="advance-pick" data-id="' + esc(x.id) + '">' +
+          barberAvatar +
           '<span><span style="font-weight:600">' + esc(x.client_name) + '</span>' + (sameGroup ? '<span class="pending-group">Son groupe</span>' : '') +
           '<span class="meta" style="display:block">' + esc(svcLabel(x.service.name, x.extras)) + (x.barber_id ? ' · ' + esc(nameOf(x.barber_id)) : '') +
             (x.early ? ' · ' + (x.status === 'in_progress' ? 'en cours' : 'en attente') + ' — payé d\'avance' : '') + '</span></span>' +
