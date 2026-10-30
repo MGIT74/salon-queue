@@ -79,6 +79,55 @@
     transition: transform .15s ease, box-shadow .15s ease;
   }
 
+  /* Filtres de coiffeurs : exactement les bulles de la caisse, sans les noms sous les cercles. */
+  #gp-barber-filters .barber-bubble {
+    flex: 0 0 auto; border: 0; border-radius: 50%; background: transparent;
+    outline: none; box-shadow: none; -webkit-tap-highlight-color: transparent;
+  }
+  #gp-barber-filters .barber-bubble:focus,
+  #gp-barber-filters .barber-bubble:focus-visible,
+  #gp-barber-filters .barber-bubble:active {
+    outline: none; box-shadow: none; background: transparent;
+  }
+  /* Anneau strictement circulaire : evite le halo rectangulaire du focus/tap. */
+  #gp-barber-filters .barber-bubble {
+    appearance: none; -webkit-appearance: none; -webkit-tap-highlight-color: transparent;
+    background: transparent !important; outline: 0 !important;
+    box-shadow: none !important; border: 0 !important;
+    border-radius: 50%; overflow: visible;
+  }
+  #gp-barber-filters .barber-bubble.on .avatar {
+    border-radius: 50%;
+    border: 3px solid var(--card);
+    box-shadow: 0 0 0 2px var(--blue);
+    filter: none;
+    transform: scale(1.08);
+  }
+  #gp-barber-filters .barber-bubble:not(.on) .avatar {
+    box-shadow: none; transform: none;
+  }
+
+  /* Coiffeur responsable affiché seulement dans la liste Tous. */
+  .gp-client-barber-avatar {
+    width: 34px; height: 34px; min-width: 34px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    background-size: cover; background-position: center;
+    color: #fff; font-size: 13px; font-weight: 700; flex-shrink: 0;
+  }
+  #gp-candidates .advance-pick { display: flex; align-items: center; gap: 12px; }
+  #gp-candidates .advance-pick > span:last-child { margin-left: auto; white-space: nowrap; }
+
+  /* Modification avant encaissement : cartes du catalogue, sans menu natif. */
+  .finished-edit-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; max-height:38vh; overflow-y:auto; margin:12px 0; }
+  .finished-edit-card { position:relative; display:flex; flex-direction:column; align-items:flex-start; gap:7px; text-align:left; padding:14px; border:1px solid var(--sep); border-radius:14px; background:var(--card); color:var(--text); cursor:pointer; font:inherit; min-height:76px; }
+  .finished-edit-card.selected { border-color:var(--blue); box-shadow:inset 0 0 0 1px var(--blue); }
+  .finished-edit-card-name { font-weight:600; padding-right:12px; }
+  .finished-edit-card-price { font-weight:700; color:var(--grey); }
+  .finished-edit-check { position:absolute; top:9px; right:10px; color:var(--blue); font-weight:700; }
+  .finished-edit-total { display:flex; align-items:center; justify-content:space-between; border-top:1px solid var(--sep); padding:14px 2px; }
+  .finished-edit-total strong { font-size:21px; }
+  @media(max-width:440px) { .finished-edit-grid { grid-template-columns:1fr; } }
+
   /* --- Footer Timer / Agenda / Caisse (repris de "Mon poste") --- */
   .caisse-footer {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
@@ -3724,6 +3773,84 @@ function markUnstartedAbsent(queueId) {
     }).catch(function (e) { toast(e.message, true); });
 }
 
+/** Corriger prestation et suppléments d'un passage terminé, uniquement avant paiement. */
+function editFinishedService(queueId) {
+  var q = pendingPayments.find(function (x) { return x.id === queueId; });
+  if (!q || q.prepaid) return;
+  Promise.all([barberApi('/api/catalog/services'), barberApi('/api/catalog/extras')]).then(function (responses) {
+    var services = (responses[0].items || []).filter(function (x) { return x.active !== 0 && x.active !== false; });
+    var extras = (responses[1].items || []).filter(function (x) { return x.active !== 0 && x.active !== false; });
+    var selectedService = q.service && q.service.id;
+    var selectedExtras = new Set((q.extras || []).map(function (e) { return e.id; }));
+    var tab = 'services';
+    var saving = false;
+    var html = '<div class="modal-title">Modifier la prestation de ' + esc(q.client_name) + '</div>' +
+      '<p class="hint" style="margin:0 0 14px">Correction avant encaissement uniquement.</p>' +
+      '<div class="cat-tabs finished-edit-tabs" style="display:flex">' +
+      '<button type="button" data-tab="services" class="on">Prestations</button>' +
+      '<button type="button" data-tab="extras">Suppléments</button></div>' +
+      '<div class="finished-edit-grid" id="finished-edit-grid"></div>' +
+      '<div class="finished-edit-total"><span>Total actualisé</span><strong id="finished-edit-total"></strong></div>' +
+      '<div class="modal-actions"><button class="btn btn-soft" id="finished-service-cancel">Annuler</button>' +
+      '<button class="btn btn-primary" id="finished-service-save">Enregistrer</button></div>';
+    var overlay = _buildModal(html);
+    var grid = overlay.querySelector('#finished-edit-grid');
+    function totalCents() {
+      var svc = services.find(function (x) { return x.id === selectedService; });
+      var base = svc ? Number(svc.price_cents || 0) : 0;
+      var extrasTotal = extras.filter(function (x) { return selectedExtras.has(x.id); })
+        .reduce(function (sum, x) { return sum + Number(x.price_cents || 0); }, 0);
+      var productsTotal = (q.products || []).reduce(function (sum, x) {
+        return sum + Number(x.price_cents || 0) * Number(x.quantity || 1);
+      }, 0);
+      return base + extrasTotal + productsTotal;
+    }
+    function render() {
+      Array.prototype.forEach.call(overlay.querySelectorAll('.finished-edit-tabs button'), function (b) {
+        b.classList.toggle('on', b.dataset.tab === tab);
+      });
+      var items = tab === 'services' ? services : extras;
+      grid.innerHTML = items.length ? items.map(function (item) {
+        var on = tab === 'services' ? selectedService === item.id : selectedExtras.has(item.id);
+        return '<button type="button" class="finished-edit-card' + (on ? ' selected' : '') + '" data-id="' + esc(item.id) + '" aria-pressed="' + on + '">' +
+          '<span class="finished-edit-card-name">' + esc(item.name) + '</span>' +
+          '<span class="finished-edit-card-price">' + eur(item.price_cents) + '</span>' +
+          (on ? '<span class="finished-edit-check">✓</span>' : '') + '</button>';
+      }).join('') : '<div class="empty">Aucun article disponible.</div>';
+      overlay.querySelector('#finished-edit-total').textContent = eur(totalCents());
+    }
+    Array.prototype.forEach.call(overlay.querySelectorAll('.finished-edit-tabs button'), function (b) {
+      b.onclick = function () { tab = b.dataset.tab; render(); };
+    });
+    grid.onclick = function (e) {
+      var card = e.target.closest('.finished-edit-card');
+      if (!card) return;
+      var id = card.dataset.id;
+      if (tab === 'services') selectedService = id;
+      else if (selectedExtras.has(id)) selectedExtras.delete(id);
+      else selectedExtras.add(id);
+      render();
+    };
+    overlay.querySelector('#finished-service-cancel').onclick = function () { if (!saving) _closeModal(overlay); };
+    overlay.querySelector('#finished-service-save').onclick = function () {
+      if (saving || !selectedService) { if (!selectedService) toast('Sélectionnez une prestation.', true); return; }
+      saving = true;
+      var saveButton = overlay.querySelector('#finished-service-save');
+      saveButton.disabled = true;
+      barberApi('/api/queue/' + encodeURIComponent(queueId), {
+        method: 'PUT', body: { service_id: selectedService, extras: Array.from(selectedExtras) }
+      }).then(function () {
+        _closeModal(overlay);
+        toast('Prestation et suppléments corrigés');
+        loadPendingPayments();
+      }).catch(function (e) {
+        saving = false; saveButton.disabled = false; toast(e.message, true);
+      });
+    };
+    render();
+  }).catch(function (e) { toast(e.message, true); });
+}
+
 function renderPendingList() {
   var label = document.getElementById('pending-label');
   var list = document.getElementById('pending-list');
@@ -3810,6 +3937,7 @@ function renderPendingList() {
           ? '<button class="btn btn-primary" onclick="event.stopPropagation();usePendingGroupForTicket(\'' + q.id + '\')">Encaisser le groupe (' + (mates.length + earlyN + 1) + ')</button>'
           : '') +
         unstartedAbsentBtn(q) +
+        (!q.prepaid ? '<button class="btn btn-soft" onclick="event.stopPropagation();editFinishedService(\'' + q.id + '\')">Modifier la prestation</button>' : '') +
         (isActive && !q.loyalty_member
           ? '<button class="btn btn-ghost" onclick="event.stopPropagation();proposeLoyaltyActivation(\'' + q.id + '\')">Activer carte de fidélité</button>'
           : '') +
@@ -3969,7 +4097,7 @@ function refreshQueueForGroup() {
 function addPersonToTicket(queueId, silent) {
   // Un membre du groupe pas encore terminé (file d'attente) peut aussi être ajouté : réglé d'avance.
   var q = pendingById(queueId) || (queue || []).find(function (x) { return x.id === queueId && (x.status === 'waiting' || x.status === 'in_progress'); });
-  if (!q || !ticketQueueId || ticketMode) return false;
+  if (!q || !ticketQueueId || ticketMode === 'balance') return false;
   if (ticketPersonIds().indexOf(q.id) !== -1) return false;
   if (!groupPayEligible(q) || q.paid_at) { toast(q.client_name + ' ne peut pas être ajouté (cadeau ou paiement d\'avance).', true); return false; }
   var early = q.status === 'waiting' || q.status === 'in_progress';
@@ -4036,16 +4164,16 @@ function usePendingGroupForTicket(queueId, mode) {
 
 /** « + Payer aussi pour un autre client » : tous les clients du salon en attente d'encaissement. */
 function openGroupPayPicker() {
-  if (!ticketQueueId || ticketMode) return;
+  if (!ticketQueueId || ticketMode === 'balance') return;
   Promise.all([barberApi('/api/queue/pending-payment?all=1'), refreshQueueForGroup().catch(function () { return queue; })]).then(function (rr) {
     var r = rr[0];
     pendingAll = r.items || [];
     var payer = pendingById(ticketQueueId);
     var inTicket = ticketPersonIds();
     var list = pendingAll.filter(function (x) { return inTicket.indexOf(x.id) === -1 && groupPayEligible(x); });
-    // Membres de SON groupe pas encore terminés (déjà au salon) : réglables d'avance avec lui.
-    groupEarlyMatesOf(payer).forEach(function (x) {
-      if (inTicket.indexOf(x.id) === -1) list.push(Object.assign({}, x, { group_id: payer.group_id, early: true }));
+    // Clients de toutes les files du Timer, quel que soit leur coiffeur ou groupe.
+    (queue || []).filter(function (x) { return (x.status === 'waiting' || x.status === 'in_progress') && !x.paid_at && groupPayEligible(x); }).forEach(function (x) {
+      if (inTicket.indexOf(x.id) === -1 && !list.some(function (p) { return p.id === x.id; })) list.push(Object.assign({}, x, { early: true }));
     });
     // Les membres de son groupe de RDV d'abord.
     list.sort(function (a, b) {
@@ -4053,22 +4181,64 @@ function openGroupPayPicker() {
       return ga - gb;
     });
     var nameOf = function (id) { var b = allBarbers.find(function (x) { return x.id === id; }); return b ? b.name : ''; };
+    var barberIds = new Set(list.map(function (x) { return x.barber_id; }).filter(Boolean));
+    var barbers = allBarbers.filter(function (b) { return barberIds.has(b.id); });
+    var selectedBarber = null;
     var html = '<div class="modal-title">Payer aussi pour…</div>' +
       '<p class="hint" style="margin:0 0 12px">' + esc(payer ? payer.client_name : 'Ce client') + ' règle aussi la prestation de la personne choisie : un seul ticket, un seul paiement.</p>' +
-      (list.length ? list.map(function (x) {
+      '<div id="gp-barber-filters" class="barber-bubbles" style="display:flex;gap:12px;flex-wrap:nowrap;overflow-x:auto;padding:8px 6px 14px;margin:0 0 4px">' +
+      barbers.map(function (b) {
+        var color = b.color || stableColorForId(b.id);
+        var initial = (b.name || '?').trim().charAt(0).toUpperCase();
+        var avatarStyle = b.photo_url
+          ? 'background-image:url(&quot;' + esc(b.photo_url) + '&quot;)'
+          : 'background:' + color;
+        return '<button type="button" class="barber-bubble gp-barber-filter" data-barber="' + esc(b.id) + '" title="' + esc(b.name) + '" aria-label="Filtrer les clients de ' + esc(b.name) + '">' +
+          '<span class="avatar" style="' + avatarStyle + '">' + (b.photo_url ? '' : esc(initial)) + '</span></button>';
+      }).join('') + '</div>' +
+      '<div id="gp-candidates" style="max-height:45vh;overflow-y:auto"></div>' +
+      '<div class="modal-actions"><button class="btn btn-soft" id="gp-close">Fermer</button></div>';
+    var overlay = _buildModal(html);
+    var candidates = overlay.querySelector('#gp-candidates');
+    function renderCandidates() {
+      var visible = selectedBarber ? list.filter(function (x) { return x.barber_id === selectedBarber; }) : list;
+      candidates.innerHTML = visible.length ? visible.map(function (x) {
         var sameGroup = payer && payer.group_id && x.group_id === payer.group_id;
+        var assignedBarber = allBarbers.find(function (b) { return b.id === x.barber_id; });
+        var barberAvatar = '';
+        if (!selectedBarber && assignedBarber) {
+          var color = assignedBarber.color || stableColorForId(assignedBarber.id);
+          var initial = (assignedBarber.name || '?').trim().charAt(0).toUpperCase();
+          var avatarStyle = assignedBarber.photo_url
+            ? 'background-image:url(&quot;' + esc(assignedBarber.photo_url) + '&quot;)'
+            : 'background:' + color;
+          barberAvatar = '<span class="gp-client-barber-avatar" title="Coiffeur : ' + esc(assignedBarber.name) + '" style="' + avatarStyle + '">' +
+            (assignedBarber.photo_url ? '' : esc(initial)) + '</span>';
+        }
         return '<button type="button" class="advance-pick" data-id="' + esc(x.id) + '">' +
+          barberAvatar +
           '<span><span style="font-weight:600">' + esc(x.client_name) + '</span>' + (sameGroup ? '<span class="pending-group">Son groupe</span>' : '') +
           '<span class="meta" style="display:block">' + esc(svcLabel(x.service.name, x.extras)) + (x.barber_id ? ' · ' + esc(nameOf(x.barber_id)) : '') +
             (x.early ? ' · ' + (x.status === 'in_progress' ? 'en cours' : 'en attente') + ' — payé d\'avance' : '') + '</span></span>' +
           '<span style="font-weight:700">' + eur(x.total_price_cents) + '</span></button>';
-      }).join('') : '<div class="empty">Aucun autre client en attente d\'encaissement.</div>') +
-      '<div class="modal-actions"><button class="btn btn-soft" id="gp-close">Fermer</button></div>';
-    var overlay = _buildModal(html);
+      }).join('') : '<div class="empty">Aucun client disponible pour ce filtre.</div>';
+      Array.prototype.forEach.call(candidates.querySelectorAll('.advance-pick'), function (b) {
+        b.onclick = function () { _closeModal(overlay); addPersonToTicket(b.getAttribute('data-id')); };
+      });
+      Array.prototype.forEach.call(overlay.querySelectorAll('.gp-barber-filter'), function (b) {
+        b.classList.toggle('on', b.getAttribute('data-barber') === selectedBarber);
+        b.setAttribute('aria-pressed', b.getAttribute('data-barber') === selectedBarber ? 'true' : 'false');
+      });
+    }
     overlay.querySelector('#gp-close').onclick = function () { _closeModal(overlay); };
-    Array.prototype.forEach.call(overlay.querySelectorAll('.advance-pick'), function (b) {
-      b.onclick = function () { _closeModal(overlay); addPersonToTicket(b.getAttribute('data-id')); };
+    Array.prototype.forEach.call(overlay.querySelectorAll('.gp-barber-filter'), function (b) {
+      b.onclick = function () {
+        var id = b.getAttribute('data-barber');
+        selectedBarber = selectedBarber === id ? null : id;
+        renderCandidates();
+      };
     });
+    renderCandidates();
   }).catch(function (e) { toast(e.message, true); });
 }
 
@@ -4106,7 +4276,7 @@ function usePendingForTicket(queueId, quiet) {
 function advanceCandidates() {
   return (queue || []).filter(function (q) {
     return (q.status === 'waiting' || q.status === 'in_progress') && !q.paid_at &&
-      (!activeBarberId || canTakeQueueEntry(q, activeBarberId, allBarbers));
+      true;
   }).sort(function (a, b) {
     if (a.status !== b.status) return a.status === 'in_progress' ? -1 : 1;
     return new Date(a.checkin_at) - new Date(b.checkin_at);
@@ -4118,23 +4288,66 @@ function openAdvancePicker() {
   barberApi('/api/queue').then(function (r) {
     queue = r.queue || [];
     var list = advanceCandidates();
+    var barberIds = new Set(list.map(function (q) { return q.barber_id; }).filter(Boolean));
+    var barbers = allBarbers.filter(function (b) { return barberIds.has(b.id); });
+    var selectedBarber = null;
     var html = '<div class="modal-title">Encaisser à l\'avance</div>' +
       '<p class="hint" style="margin:0 0 12px">Le client paie maintenant et garde sa place dans la file.</p>' +
-      (list.length ? list.map(function (q) {
+      '<div id="gp-barber-filters" class="barber-bubbles" style="display:flex;gap:12px;flex-wrap:nowrap;overflow-x:auto;padding:8px 6px 14px;margin:0 0 4px">' +
+      barbers.map(function (b) {
+        var color = b.color || stableColorForId(b.id);
+        var initial = (b.name || '?').trim().charAt(0).toUpperCase();
+        var avatarStyle = b.photo_url
+          ? 'background-image:url(&quot;' + esc(b.photo_url) + '&quot;)'
+          : 'background:' + color;
+        return '<button type="button" class="barber-bubble gp-barber-filter" data-barber="' + esc(b.id) + '" title="' + esc(b.name) + '" aria-label="Filtrer les clients de ' + esc(b.name) + '">' +
+          '<span class="avatar" style="' + avatarStyle + '">' + (b.photo_url ? '' : esc(initial)) + '</span></button>';
+      }).join('') + '</div>' +
+      '<div id="gp-candidates" style="max-height:45vh;overflow-y:auto"></div>' +
+      '<div class="modal-actions"><button class="btn btn-soft" id="advance-close">Fermer</button></div>';
+    var overlay = _buildModal(html);
+    var candidates = overlay.querySelector('#gp-candidates');
+    function renderCandidates() {
+      var visible = selectedBarber ? list.filter(function (q) { return q.barber_id === selectedBarber; }) : list;
+      candidates.innerHTML = visible.length ? visible.map(function (q) {
         var detail = svcLabel(q.service.name, q.extras);
         var withGift = Boolean(q.gift_card && q.gift_card.explicit);
+        var assignedBarber = allBarbers.find(function (b) { return b.id === q.barber_id; });
+        var barberAvatar = '';
+        if (!selectedBarber && assignedBarber) {
+          var color = assignedBarber.color || stableColorForId(assignedBarber.id);
+          var initial = (assignedBarber.name || '?').trim().charAt(0).toUpperCase();
+          var avatarStyle = assignedBarber.photo_url
+            ? 'background-image:url(&quot;' + esc(assignedBarber.photo_url) + '&quot;)'
+            : 'background:' + color;
+          barberAvatar = '<span class="gp-client-barber-avatar" title="Coiffeur : ' + esc(assignedBarber.name) + '" style="' + avatarStyle + '">' +
+            (assignedBarber.photo_url ? '' : esc(initial)) + '</span>';
+        }
         return '<button type="button" class="advance-pick" data-id="' + esc(q.id) + '"' + (withGift ? ' disabled' : '') + '>' +
+          barberAvatar +
           '<span><span style="font-weight:600">' + esc(q.client_name) + '</span>' +
           '<span class="meta" style="display:block">' + esc(detail) + ' · ' + (q.status === 'in_progress' ? 'en cours' : 'en attente') +
           (withGift ? ' · 🎁 réglé par son cadeau à la fin' : '') + '</span></span>' +
           '<span style="font-weight:700">' + eur(q.total_price_cents) + '</span></button>';
-      }).join('') : '<div class="empty">Personne dans la file pour ce coiffeur.</div>') +
-      '<div class="modal-actions"><button class="btn btn-soft" id="advance-close">Fermer</button></div>';
-    var overlay = _buildModal(html);
+      }).join('') : '<div class="empty">Aucun client disponible pour ce filtre.</div>';
+      Array.prototype.forEach.call(candidates.querySelectorAll('.advance-pick'), function (b) {
+        b.onclick = function () { _closeModal(overlay); useAdvanceForTicket(b.getAttribute('data-id')); };
+      });
+      Array.prototype.forEach.call(overlay.querySelectorAll('.gp-barber-filter'), function (b) {
+        var on = b.getAttribute('data-barber') === selectedBarber;
+        b.classList.toggle('on', on);
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+      });
+    }
     overlay.querySelector('#advance-close').onclick = function () { _closeModal(overlay); };
-    Array.prototype.forEach.call(overlay.querySelectorAll('.advance-pick'), function (b) {
-      b.onclick = function () { _closeModal(overlay); useAdvanceForTicket(b.getAttribute('data-id')); };
+    Array.prototype.forEach.call(overlay.querySelectorAll('.gp-barber-filter'), function (b) {
+      b.onclick = function () {
+        var id = b.getAttribute('data-barber');
+        selectedBarber = selectedBarber === id ? null : id;
+        renderCandidates();
+      };
     });
+    renderCandidates();
   }).catch(function (e) { toast(e.message, true); });
 }
 
@@ -4348,7 +4561,7 @@ function ticketLinesHtml(justAddedIndex) {
 function renderTicket(justAddedIndex) {
   document.getElementById('ticket-lines').innerHTML = ticketLinesHtml(justAddedIndex);
   var addBtn = document.getElementById('ticket-group-add');
-  if (addBtn) addBtn.style.display = ticket.length && ticketQueueId && !ticketMode ? 'flex' : 'none';
+  if (addBtn) addBtn.style.display = ticket.length && ticketQueueId && ticketMode !== 'balance' ? 'flex' : 'none';
 
   var modeEl = document.getElementById('ticket-mode');
   if (modeEl) {
