@@ -1689,6 +1689,14 @@ function pdApptsOfDay(dateStr) {
   return out.sort(function (x, y) { return x.scheduled_at < y.scheduled_at ? -1 : 1; });
 }
 /** État affiché d'un RDV : absent, terminé, en cours, passé (jamais marqué), à venir. */
+function pdRealEnd(it) {
+  var a = it.a || {};
+  if (it.st !== 'done' || !a.queue_start_at || !a.queue_end_at) return it.end;
+  var d = new Date(a.queue_end_at);
+  if (isNaN(d)) return it.end;
+  // Heure du salon (les écrans du salon sont à l'heure locale) ; jamais avant le début ni après la fin prévue.
+  return Math.max(it.start, Math.min(it.end, d.getHours() * 60 + d.getMinutes()));
+}
 function pdState(a, endMin, isToday, isPast, nowMin) {
   if (a.display_status === 'no_show') return 'absent';
   if (a.display_status === 'completed') return 'done';
@@ -1793,7 +1801,9 @@ function posteDayHtml(dateStr) {
     if (bid !== myId && !(row && row.accepts_appointments)) return out;
     var bd = pdBarberDay(row, dateStr);
     var dayStart = Math.max(R0, bd ? bd.start : (salonDay ? salonDay.startMin : R0)), dayEnd = Math.min(R1, bd ? bd.end : (salonDay ? salonDay.endMin : R1));
-    var busy = items.filter(function (it) { return it.barberId === bid && it.st !== 'absent'; }).map(function (it) { return [it.start, it.end]; })
+    // Coupe terminée plus tôt avec le Timer : sa plage s'arrête à la vraie fin (le temps gagné redevient libre,
+    // comme côté serveur). Sans Timer (« Je prends ») : la plage prévue reste occupée.
+    var busy = items.filter(function (it) { return it.barberId === bid && it.st !== 'absent'; }).map(function (it) { return [it.start, pdRealEnd(it)]; })
       .concat(bd ? bd.breaks : []).sort(function (x, y) { return x[0] - y[0]; });
     var cur = Math.max(dayStart, isToday ? nowMin : dayStart);
     // Le plus petit trou utile : la prestation OU le supplément seul le plus court de ce coiffeur (ex. 5 min).

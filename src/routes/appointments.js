@@ -297,7 +297,7 @@ async function computeSlotsForBarber(barberId, dateStr, durationMin, rdvSettings
   const [existing] = await pool.query(
     `SELECT a.scheduled_at, COALESCE(MAX(bsp.duration_min), MAX(s.duration_min)) AS svc_duration,
             COALESCE(SUM(COALESCE(bep.duration_min, e.duration_min)), 0) AS extras_duration,
-            q.status AS queue_status
+            q.status AS queue_status, MAX(q.start_at) AS queue_start_at
      FROM appointments a
      JOIN services s ON s.id = a.service_id
      LEFT JOIN barber_service_prices bsp ON bsp.barber_id = a.barber_id AND bsp.service_id = a.service_id
@@ -316,8 +316,10 @@ async function computeSlotsForBarber(barberId, dateStr, durationMin, rdvSettings
   // suite, pas seulement à l'heure théorique de fin. La marge tampon
   // (rdv_buffer_min) prolonge chaque plage occupée après la fin
   // théorique, pour laisser un temps de battement avant le RDV suivant.
+  // Terminé SANS Timer (« Je prends » d'un coiffeur sans chrono : marqué terminé dès le début de la coupe) : la
+  // plage reste bloquée jusqu'à sa fin prévue - sinon on pouvait réserver par-dessus une coupe encore en cours.
   const busyRanges = existing
-    .filter((a) => a.queue_status !== 'done' && a.queue_status !== 'cancelled')
+    .filter((a) => a.queue_status !== 'cancelled' && !(a.queue_status === 'done' && a.queue_start_at))
     .map((a) => {
       const start = timeToMinutes(a.scheduled_at.split(' ')[1].slice(0, 5));
       return [start, start + a.svc_duration + Number(a.extras_duration) + bufferMin];
@@ -611,6 +613,9 @@ async function buildApptItems(salonId, rows) {
         // pendant ce délai (bouton Annuler resté actif à tort).
         scheduled_at: r.scheduled_at,
         created_at: utcIso(r.created_at),
+        // Coupe faite avec le Timer : vraie heure de début / fin (UTC). Sans Timer (« Je prends ») : début vide.
+        queue_start_at: r.queue_start_at ? utcIso(r.queue_start_at) : null,
+        queue_end_at: r.queue_end_at ? utcIso(r.queue_end_at) : null,
         display_status: displayStatus,
         note: noteByKey[clientKey(r)] || '',
         duration_min: (r.service_duration_min || 0) + Number(r.extras_duration_min || 0),
@@ -657,7 +662,7 @@ router.get('/', requireAdminOrBarber, wrap(async (req, res) => {
 
   const [rows] = await pool.query(
     `SELECT a.*, ${serviceNameSql()} AS service_name, COALESCE(bsp.duration_min, s.duration_min) AS service_duration_min, b.name AS barber_name,
-            q.status AS queue_status,
+            q.status AS queue_status, q.start_at AS queue_start_at, q.end_at AS queue_end_at,
             COALESCE((
               SELECT SUM(COALESCE(bep.duration_min, e.duration_min)) FROM appointment_extras ae
               JOIN extras e ON e.id = ae.extra_id
@@ -687,7 +692,7 @@ router.get('/lookup', requireAdminOrBarber, wrap(async (req, res) => {
   if (!id && !queueId) return res.status(400).json({ error: 'id ou queue_id requis' });
   const [rows] = await pool.query(
     `SELECT a.*, ${serviceNameSql()} AS service_name, COALESCE(bsp.duration_min, s.duration_min) AS service_duration_min, b.name AS barber_name,
-            q.status AS queue_status,
+            q.status AS queue_status, q.start_at AS queue_start_at, q.end_at AS queue_end_at,
             COALESCE((
               SELECT SUM(COALESCE(bep.duration_min, e.duration_min)) FROM appointment_extras ae
               JOIN extras e ON e.id = ae.extra_id
@@ -1721,12 +1726,12 @@ async function nextBusyAfter(barberId, dateStr, startMin, rdvSettings, excludeId
   // Strictement après le début : un RDV déjà posé à la même heure chevauchait déjà avant la modification.
   const consider = (start, label) => { if (start > startMin && (!best || start < best.limit)) best = { limit: start, label }; };
   const [others] = await pool.query(
-    `SELECT a.scheduled_at, a.client_name, q.status AS queue_status FROM appointments a
+    `SELECT a.scheduled_at, a.client_name, q.status AS queue_status, q.start_at AS queue_start_at FROM appointments a
      LEFT JOIN queue q ON q.id = a.promoted_queue_id
      WHERE a.barber_id = ? AND a.status = 'confirmed' AND DATE(a.scheduled_at) = ? AND a.id != ?`,
     [barberId, dateStr, excludeId]
   );
-  others.filter((a) => a.queue_status !== 'done' && a.queue_status !== 'cancelled').forEach((a) => {
+  others.filter((a) => a.queue_status !== 'cancelled' && !(a.queue_status === 'done' && a.queue_start_at)).forEach((a) => {
     const hhmm = String(a.scheduled_at).split(' ')[1].slice(0, 5);
     consider(timeToMinutes(hhmm), 'le RDV de ' + a.client_name + ' (' + hhmm + ')');
   });
