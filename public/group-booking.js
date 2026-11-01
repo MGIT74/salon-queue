@@ -294,7 +294,7 @@
 
     /* ---------- Creneaux d'UNE personne (choix « separement », ou un creneau pris entre-temps) ---------- */
     function slotsUrl(p, barber, held) {
-      return '/api/appointments/availability?date=' + p.date + '&service_id=' + p.serviceId + '&extras=' + p.extraIds.join(',') +
+      return '/api/appointments/availability?all=1&date=' + p.date + '&service_id=' + p.serviceId + '&extras=' + p.extraIds.join(',') +
         (barber ? '&barber_id=' + barber : '') + (held ? '&held=' + encodeURIComponent(held) : '');
     }
     function loadSlots(p) {
@@ -338,7 +338,7 @@
     function fetchTimes(p, b, date) {
       var key = [date, p.serviceId, p.extraIds.join(','), b.id].join('|');
       if (slotCache[key]) return Promise.resolve(slotCache[key]);
-      return cfg.api('/api/appointments/availability?date=' + date + '&service_id=' + p.serviceId + '&extras=' + p.extraIds.join(',') + '&barber_id=' + b.id)
+      return cfg.api('/api/appointments/availability?all=1&date=' + date + '&service_id=' + p.serviceId + '&extras=' + p.extraIds.join(',') + '&barber_id=' + b.id)
         .then(function (r) { slotCache[key] = (r.slots || []).map(function (s) { return s.time; }); return slotCache[key]; })
         .catch(function () { return []; });
     }

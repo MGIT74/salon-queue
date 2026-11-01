@@ -55,7 +55,7 @@
 .cal-day.salon-closed::after{content:'Fermé';display:block;font-size:10px;font-weight:700;color:var(--red,#e65c5c);margin-top:2px}
 .salon-closure-banner{padding:10px 13px;border-radius:9px;margin:0 0 12px;background:rgba(160,100,100,.13);color:var(--red,#e65c5c);font-weight:650;font-size:13px}
 </style>
-<link rel="stylesheet" href="/app.css?v=49">
+<link rel="stylesheet" href="/app.css?v=50">
 <style>
   .wrap { max-width: none; margin: 0; padding: clamp(16px,1.8vw,28px); }
 
@@ -7124,6 +7124,7 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
         '<button id="aa-half-afternoon" onclick="aaShowHalf(\'afternoon\')">Après-midi</button>' +
       '</div>' +
       '<div class="aa-slots" id="aa-slots"><span class="hint" style="margin:0">Chargement…</span></div>' +
+      '<button type="button" class="aa-all-hours" id="aa-all-hours" style="display:none" onclick="aaToggleAllHours()"></button>' +
     '</div>' +
 
     // Derniere etape : le client (clients connus proposes des 3 lettres), puis Enregistrer. Au telephone, on cherche
@@ -7295,6 +7296,16 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
     aaLoadSlots();
   };
 
+  // Heures « à la suite » selon la durée du RDV (serveur) ; l'équipe peut voir toutes les heures libres.
+  var aaAllHours = false;
+  window.aaToggleAllHours = function () { aaAllHours = !aaAllHours; state.time = null; aaLoadSlots(); };
+  function aaShowAllHoursLink(r) {
+    var b = overlay.querySelector('#aa-all-hours');
+    if (!b) return;
+    var more = r && r.packed && Number(r.all_count) > (r.slots || []).length;
+    b.style.display = (more || aaAllHours) && r && (r.slots || []).length ? '' : 'none';
+    b.textContent = aaAllHours ? 'Voir seulement les heures à la suite' : 'Voir toutes les heures (' + (r && r.all_count) + ')';
+  }
   function aaLoadSlots() {
     var slotsEl = overlay.querySelector('#aa-slots');
     var toggleEl = overlay.querySelector('#aa-half-toggle');
@@ -7303,8 +7314,9 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
     var offB = state.barberId && rdvBarbers.find(function (x) { return String(x.id) === String(state.barberId); });
     if (offB && barberOffOn(offB, dateStr)) { slotsEl.innerHTML = barberOffSlotsHtml(offB, dateStr, false); return; }
     slotsEl.innerHTML = '<span class="hint" style="margin:0">Chargement…</span>';
-    api('/api/appointments/availability?date=' + dateStr + '&service_id=' + state.serviceId + '&barber_id=' + state.barberId + '&extras=' + state.extraIds.join(','))
+    api('/api/appointments/availability?date=' + dateStr + '&service_id=' + state.serviceId + '&barber_id=' + state.barberId + '&extras=' + state.extraIds.join(',') + (aaAllHours ? '&all=1' : ''))
       .then(function (r) {
+        aaShowAllHoursLink(r);
         if (!r.slots.length) { slotsEl.innerHTML = '<span class="hint" style="margin:0">Aucun créneau disponible ce jour-là</span>'; return; }
 
         // Matin (avant 12h) / après-midi (12h et après) - si le matin

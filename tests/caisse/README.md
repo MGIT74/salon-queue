@@ -196,4 +196,5 @@ node tests/caisse/159-rdv-code-email.js  # RDV sans compte : email verifie par c
 node tests/caisse/160-je-l-ai-pris.js  # « Je l'ai pris » : client sans RDV pris par un autre coiffeur, l'autre est prevenu
 node tests/caisse/161-modifier-prestation-a-suivre.js  # « Modifier la prestation » dans les listes A suivre (poste et caisse)
 node tests/caisse/162-coiffeur-tous-jours-desactives.js  # Coiffeur sans aucun jour actif : pas proposable en RDV manuel (admin, poste, caisse)
+node tests/caisse/163-creneaux-a-la-suite.js  # Heures proposees a la suite selon la duree du RDV (+ « Voir toutes les heures » pour l'equipe)
 ```

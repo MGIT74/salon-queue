@@ -1,4 +1,5 @@
 // Offre propre a chaque coiffeur, partout ou l'on reserve :
+// (all=1 : toutes les heures libres - ce test verifie quelles heures sont libres, pas l'affichage « a la suite » du test 163.)
 // - son tarif personnalise (prix ET duree) remplace celui du catalogue : creneaux, RDV deja pris, affichage ;
 // - une prestation qu'il ne fait pas, archivee ou supprimee n'est plus reservable (en ligne, groupe, staff, deplacement) ;
 // - barberItems (app.js) applique la meme regle cote ecrans.
@@ -36,15 +37,15 @@ async function call(method, url, headers, body) {
        INSERT INTO barber_service_exclusions (barber_id, service_id) VALUES ('b2','t108x');`);
 
   console.log('\n[A] Tarif personnalise de Bob : Coupe 25 EUR / 40 min (catalogue : 20 EUR / 30 min)');
-  let r = await call('GET', `/api/appointments/availability?date=${DAY}&service_id=sv1&barber_id=b2`, PUB);
+  let r = await call('GET', `/api/appointments/availability?all=1&date=${DAY}&service_id=sv1&barber_id=b2`, PUB);
   check('availability Bob : duree 40 min et prix 25 EUR annonces', r.body && r.body.duration_min === 40 && r.body.price_cents === 2500, r.body);
   check('dernier creneau de Bob = 18:20 (40 min avant 19:00)', r.body.slots.slice(-1)[0].time === '18:20', r.body.slots.slice(-2));
-  r = await call('GET', `/api/appointments/availability?date=${DAY}&service_id=sv1&barber_id=b1`, PUB);
+  r = await call('GET', `/api/appointments/availability?all=1&date=${DAY}&service_id=sv1&barber_id=b1`, PUB);
   check('Alice (sans tarif perso) : 30 min / 20 EUR, dernier creneau 18:30', r.body.duration_min === 30 && r.body.price_cents === 2000 && r.body.slots.slice(-1)[0].time === '18:30', r.body.slots.slice(-1));
 
   r = await call('POST', '/api/appointments/admin-create', ADMIN, { client_name: 'Tarif Bob', service_id: 'sv1', extras: [], date: DAY, time: '10:00', barber_id: 'b2' });
   check('RDV Coupe chez Bob a 10:00 cree', r.status === 200, r.body);
-  r = await call('GET', `/api/appointments/availability?date=${DAY}&service_id=sv1&barber_id=b2`, PUB);
+  r = await call('GET', `/api/appointments/availability?all=1&date=${DAY}&service_id=sv1&barber_id=b2`, PUB);
   const bobTimes = r.body.slots.map((s) => s.time);
   check('son RDV bloque bien 40 min : 10:30 pris, 10:45 libre', !bobTimes.includes('10:30') && bobTimes.includes('10:45'), bobTimes.filter((t) => t >= '09:00' && t <= '11:00'));
   check('...et 09:30 aussi refuse (09:30 + 40 min deborde sur 10:00)', !bobTimes.includes('09:30') && bobTimes.includes('09:15'));
@@ -57,9 +58,9 @@ async function call(method, url, headers, body) {
   check('/api/barbers : tarif perso et prestation exclue publies', bob.service_overrides && bob.service_overrides.sv1 && bob.service_overrides.sv1.price_cents === 2500 && bob.service_overrides.sv1.duration_min === 40 && bob.disabled_service_ids.includes('t108x'), bob.service_overrides);
 
   console.log('\n[B] Prestation que Bob ne fait pas (Couleur)');
-  r = await call('GET', `/api/appointments/availability?date=${DAY}&service_id=t108x&barber_id=b2`, PUB);
+  r = await call('GET', `/api/appointments/availability?all=1&date=${DAY}&service_id=t108x&barber_id=b2`, PUB);
   check('availability Bob : aucun creneau, avec la raison', r.status === 200 && r.body.slots.length === 0 && /ne r.alise pas/.test(r.body.reason || ''), r.body);
-  r = await call('GET', `/api/appointments/availability?date=${DAY}&service_id=t108x`, PUB);
+  r = await call('GET', `/api/appointments/availability?all=1&date=${DAY}&service_id=t108x`, PUB);
   check('« premier disponible » : seulement des creneaux d\'Alice', r.body.slots.length > 0 && r.body.slots.every((s) => s.barber_id === 'b1'), r.body.slots.slice(0, 2));
   r = await call('POST', '/api/appointments', PUB, { client_name: 'Refus', email: 'refus@test.fr', phone: '0600000000', service_id: 't108x', barber_id: 'b2', extras: [], date: DAY, time: '15:00' });
   check('reservation en ligne chez Bob refusee (409)', r.status === 409 && /ne r.alise pas/.test(r.body.error), r.body);
@@ -77,7 +78,7 @@ async function call(method, url, headers, body) {
   for (const [id, label] of [['t108i', 'archivee'], ['t108d', 'supprimee']]) {
     r = await call('POST', '/api/appointments/admin-create', ADMIN, { client_name: 'X', service_id: id, extras: [], date: DAY, time: '17:00', barber_id: 'b1' });
     check('prestation ' + label + ' : creation refusee (404)', r.status === 404, r.body);
-    r = await call('GET', `/api/appointments/availability?date=${DAY}&service_id=${id}&barber_id=b1`, PUB);
+    r = await call('GET', `/api/appointments/availability?all=1&date=${DAY}&service_id=${id}&barber_id=b1`, PUB);
     check('prestation ' + label + ' : pas de creneau propose', r.status === 404, r.body);
   }
 

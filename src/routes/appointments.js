@@ -207,6 +207,24 @@ async function walkinRefusal(barberId, dateStr) {
 
 // ---------- « Premier disponible » : le systeme choisit le coiffeur ----------
 // Candidats = coiffeurs qui prennent des RDV et font la prestation, avec leurs creneaux du jour.
+/**
+ * Heures proposées « à la suite » : dans chaque espace libre, on part de la première heure possible puis on enchaîne
+ * des RDV de cette durée bout à bout (durée du RDV + marge tampon). Dynamique : un espace libre commence là où finit
+ * le RDV d'avant (même un shampoing de 5 min), au pas des créneaux. Seulement pour l'AFFICHAGE : un RDV reste
+ * acceptable à n'importe quelle heure libre (staff : « Voir toutes les heures »).
+ * slots : heures « HH:MM » triées où le RDV tient ; blockMin : durée du RDV + marge tampon.
+ */
+function packSlots(slots, blockMin) {
+  const toMin = (t) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+  const out = [];
+  let next = -1;
+  for (const t of slots) {
+    const m = toMin(t);
+    if (m >= next) { out.push(t); next = m + Math.max(1, blockMin); }
+  }
+  return out;
+}
+
 async function anyBarberCandidates(salonId, cat, date, rdvSettings, optsFor) {
   const [barbers] = await pool.query(
     'SELECT id FROM barbers WHERE salon_id = ? AND active = 1 AND accepts_appointments = 1 ORDER BY sort_order, name', [salonId]
@@ -413,23 +431,31 @@ router.get('/availability', wrap(async (req, res) => {
   const bufferMinForHeld = Number(rdvSettings.rdv_buffer_min) || 0;
   const optsFor = (bid) => Object.assign({}, slotOpts, held.length ? { extraBusy: groupBooking.heldRanges(held, bid, date, bufferMinForHeld) } : {});
 
+  // Heures « à la suite » selon la durée du RDV (packSlots), sauf : ?all=1 (l'équipe veut toutes les heures),
+  // déplacement d'un RDV existant, réservation à plusieurs (les personnes s'enchaînent à l'heure exacte).
+  const packed = req.query.all !== '1' && !req.query.exclude_appointment_id && !held.length;
+  const bufferMin = Number(rdvSettings.rdv_buffer_min) || 0;
+
   if (barber_id) {
     const offer = await offerFor(barber_id, cat);
     if (!offer.ok) return res.json({ ok: true, slots: [], reason: offer.error });
-    const slots = await computeSlotsForBarber(barber_id, date, offer.durationMin, rdvSettings, optsFor(barber_id));
-    return res.json({ ok: true, slots: slots.map((s) => ({ time: s, barber_id })), duration_min: offer.durationMin, price_cents: offer.priceCents });
+    const all = await computeSlotsForBarber(barber_id, date, offer.durationMin, rdvSettings, optsFor(barber_id));
+    const slots = packed ? packSlots(all, offer.durationMin + bufferMin) : all;
+    return res.json({ ok: true, slots: slots.map((s) => ({ time: s, barber_id })), duration_min: offer.durationMin, price_cents: offer.priceCents, packed, all_count: all.length });
   }
 
   // « Premier disponible » : toutes les heures ou au moins un coiffeur est libre ; pour chacune, le coiffeur que le
   // systeme choisirait (le plus de creneaux libres ce jour-la), avec SON prix et SA duree.
   const cands = await anyBarberCandidates(req.salon.id, cat, date, rdvSettings, optsFor);
-  const times = Array.from(new Set([].concat(...cands.map((c) => c.slots)))).sort();
+  const allTimes = Array.from(new Set([].concat(...cands.map((c) => c.slots)))).sort();
+  // « Premier disponible » : les heures à la suite de chaque coiffeur, réunies.
+  const times = packed ? Array.from(new Set([].concat(...cands.map((c) => packSlots(c.slots, c.offer.durationMin + bufferMin))))).sort() : allTimes;
   const merged = times.map((time) => {
     const c = chooseAnyBarber(cands, time);
     return { time, barber_id: c.id, price_cents: c.offer.priceCents, duration_min: c.offer.durationMin };
   });
   const prices = cands.map((c) => c.offer.priceCents);
-  res.json({ ok: true, slots: merged, any: true, price_min_cents: prices.length ? Math.min(...prices) : null, price_max_cents: prices.length ? Math.max(...prices) : null });
+  res.json({ ok: true, slots: merged, any: true, packed, all_count: allTimes.length, price_min_cents: prices.length ? Math.min(...prices) : null, price_max_cents: prices.length ? Math.max(...prices) : null });
 }));
 
 // Jours qui ont AU MOINS un creneau (meme calcul que /availability), pour griser dans le calendrier de reservation

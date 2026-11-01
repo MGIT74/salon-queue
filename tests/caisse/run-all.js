@@ -183,6 +183,7 @@ const suite = [
   ['160-je-l-ai-pris.js', false, ['exit']],
   ['161-modifier-prestation-a-suivre.js', false, ['exit']],
   ['162-coiffeur-tous-jours-desactives.js', false, ['exit']],
+  ['163-creneaux-a-la-suite.js', false, ['exit']],
 ];
 
 let bad = 0;

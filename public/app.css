@@ -864,3 +864,4 @@ body .tfx > button { transition: color .25s ease, transform .1s ease; }
 .qe-search { width: 100%; box-sizing: border-box; margin-top: 12px; padding: 11px 14px; border: none; border-radius: 12px; background: var(--fill); color: var(--ink); font: inherit; font-size: 15px; outline: none; }
 .qe-search:focus { box-shadow: 0 0 0 2px var(--blue); }
 .finished-edit-grid .empty { grid-column: 1 / -1; }
+.aa-all-hours { display: block; margin: 4px 0 10px; padding: 6px 0; border: 0; background: none; color: var(--blue); font: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; }

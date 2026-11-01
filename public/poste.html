@@ -98,7 +98,7 @@
 .cal-day.salon-closed::after{content:'Fermé';display:block;font-size:10px;font-weight:700;color:var(--red,#e65c5c);margin-top:2px}
 .salon-closure-banner{padding:10px 13px;border-radius:9px;margin:0 0 12px;background:rgba(160,100,100,.13);color:var(--red,#e65c5c);font-weight:650;font-size:13px}
 </style>
-<link rel="stylesheet" href="/app.css?v=49">
+<link rel="stylesheet" href="/app.css?v=50">
 <style>
   html, body { min-height: 100%; }
   .wrap { max-width: 480px; margin: 0 auto; padding: 20px 18px 40px; }
@@ -2727,6 +2727,7 @@ function openPosteAddAppointment(dateStr, barberId) {
         '<button id="pa-half-afternoon" onclick="paShowHalf(\'afternoon\')">Après-midi</button>' +
       '</div>' +
       '<div class="aa-slots" id="pa-slots"><span class="hint" style="margin:0">Chargement…</span></div>' +
+      '<button type="button" class="aa-all-hours" id="pa-all-hours" style="display:none" onclick="paToggleAllHours()"></button>' +
       '<div class="step-bar"><button type="button" class="btn btn-primary" id="pa-dt-next" style="width:100%;display:none" onclick="paGoStep(\'products\')"></button></div>' +
     '</div>' +
 
@@ -2860,6 +2861,16 @@ function openPosteAddAppointment(dateStr, barberId) {
     paLoadSlots();
   };
 
+  // Heures « à la suite » selon la durée du RDV (serveur) ; l'équipe peut voir toutes les heures libres.
+  var paAllHours = !!prefTime;
+  window.paToggleAllHours = function () { paAllHours = !paAllHours; state.time = null; paLoadSlots(); };
+  function paShowAllHoursLink(r) {
+    var b = overlay.querySelector('#pa-all-hours');
+    if (!b) return;
+    var more = r && r.packed && Number(r.all_count) > (r.slots || []).length;
+    b.style.display = (more || paAllHours) && r && (r.slots || []).length ? '' : 'none';
+    b.textContent = paAllHours ? 'Voir seulement les heures à la suite' : 'Voir toutes les heures (' + (r && r.all_count) + ')';
+  }
   function paLoadSlots() {
     var slotsEl = overlay.querySelector('#pa-slots');
     var toggleEl = overlay.querySelector('#pa-half-toggle');
@@ -2867,8 +2878,9 @@ function openPosteAddAppointment(dateStr, barberId) {
     paRenderDtBarbers();
     if (target && barberOffOn(target, dateStr)) { slotsEl.innerHTML = barberOffSlotsHtml(target, dateStr, false); return; }
     slotsEl.innerHTML = '<span class="hint" style="margin:0">Chargement…</span>';
-    barberApi('/api/appointments/availability?date=' + dateStr + '&service_id=' + state.serviceId + '&barber_id=' + targetId + '&extras=' + state.extraIds.join(','), { actingAs: targetId })
+    barberApi('/api/appointments/availability?date=' + dateStr + '&service_id=' + state.serviceId + '&barber_id=' + targetId + '&extras=' + state.extraIds.join(',') + (paAllHours ? '&all=1' : ''), { actingAs: targetId })
       .then(function (r) {
+        paShowAllHoursLink(r);
         if (!r.slots.length) { slotsEl.innerHTML = '<span class="hint" style="margin:0">Aucun créneau disponible ce jour-là</span>'; return; }
 
         slotsByHalf.morning = r.slots.filter(function (s) { return s.time < '12:00'; });

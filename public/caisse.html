@@ -34,7 +34,7 @@
 <style>
   html.auth-checking #login-screen { display: none; }
 </style>
-<link rel="stylesheet" href="/app.css?v=49">
+<link rel="stylesheet" href="/app.css?v=50">
 <style>
   html, body { min-height: 100%; }
   .wrap { max-width: 1100px; margin: 0 auto; padding: 20px 18px 40px; }
@@ -3095,6 +3095,7 @@ function openCaisseAddAppointment(dateStr, barberId) {
         '<button id="pa-half-afternoon" onclick="paShowHalf(\'afternoon\')">Après-midi</button>' +
       '</div>' +
       '<div class="aa-slots" id="pa-slots"><span class="hint" style="margin:0">Chargement…</span></div>' +
+      '<button type="button" class="aa-all-hours" id="pa-all-hours" style="display:none" onclick="paToggleAllHours()"></button>' +
     '</div>' +
 
     // Derniere etape : le client (clients connus proposes des 3 lettres), puis Enregistrer. Au telephone, on cherche
@@ -3227,6 +3228,16 @@ function openCaisseAddAppointment(dateStr, barberId) {
     paLoadSlots();
   };
 
+  // Heures « à la suite » selon la durée du RDV (serveur) ; l'équipe peut voir toutes les heures libres.
+  var paAllHours = false;
+  window.paToggleAllHours = function () { paAllHours = !paAllHours; state.time = null; paLoadSlots(); };
+  function paShowAllHoursLink(r) {
+    var b = overlay.querySelector('#pa-all-hours');
+    if (!b) return;
+    var more = r && r.packed && Number(r.all_count) > (r.slots || []).length;
+    b.style.display = (more || paAllHours) && r && (r.slots || []).length ? '' : 'none';
+    b.textContent = paAllHours ? 'Voir seulement les heures à la suite' : 'Voir toutes les heures (' + (r && r.all_count) + ')';
+  }
   function paLoadSlots() {
     var slotsEl = overlay.querySelector('#pa-slots');
     var toggleEl = overlay.querySelector('#pa-half-toggle');
@@ -3234,8 +3245,9 @@ function openCaisseAddAppointment(dateStr, barberId) {
     paRenderDtBarbers();
     if (barber && barberOffOn(barber, dateStr)) { slotsEl.innerHTML = barberOffSlotsHtml(barber, dateStr, false); return; }
     slotsEl.innerHTML = '<span class="hint" style="margin:0">Chargement…</span>';
-    barberApi('/api/appointments/availability?date=' + dateStr + '&service_id=' + state.serviceId + '&barber_id=' + barberId + '&extras=' + state.extraIds.join(','), { actingAs: barberId })
+    barberApi('/api/appointments/availability?date=' + dateStr + '&service_id=' + state.serviceId + '&barber_id=' + barberId + '&extras=' + state.extraIds.join(',') + (paAllHours ? '&all=1' : ''), { actingAs: barberId })
       .then(function (r) {
+        paShowAllHoursLink(r);
         if (!r.slots.length) { slotsEl.innerHTML = '<span class="hint" style="margin:0">Aucun créneau disponible ce jour-là</span>'; return; }
 
         slotsByHalf.morning = r.slots.filter(function (s) { return s.time < '12:00'; });
