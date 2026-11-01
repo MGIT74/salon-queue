@@ -113,7 +113,7 @@ const row = async (id) => (await pool.query('SELECT status, barber_id, taken_fro
   }
   check('poste : message « X a pris Y » + OK', h.includes("'/api/queue/taken-notices'") && h.includes(" a pris ") && h.includes('takenSeenOk('));
   check('poste : étiquette « pris à Alice » sur la coupe en cours', h.includes("'pris à ' + esc("));
-  check('app.js / app.css rechargés (v=53 / v=46), queue-sim chargé', h.includes('app.js?v=55') && c.includes('app.js?v=55') && h.includes('app.css?v=47') && h.includes('queue-sim.js') && c.includes('queue-sim.js'));
+  check('app.js / app.css rechargés (v=53 / v=46), queue-sim chargé', h.includes('app.js?v=56') && c.includes('app.js?v=56') && h.includes('app.css?v=48') && h.includes('queue-sim.js') && c.includes('queue-sim.js'));
   check('« Qui a pris » : attente estimée de chaque coiffeur (comme le kiosk) + fenêtre élargie', app.includes('QueueSim.simulate(') && app.includes('tk-wait') && app.includes("classList.add('tk-wide')"));
   await pool.end();
   console.log(`\n${pass} OK, ${fail} ECHEC`);

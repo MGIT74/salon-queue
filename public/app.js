@@ -2103,6 +2103,7 @@ function editQueueServiceDialog(q, opts) {
       '<div class="modal-actions"><button class="btn btn-soft" id="finished-service-cancel">Annuler</button>' +
       '<button class="btn btn-primary" id="finished-service-save">Enregistrer</button></div>';
     var overlay = _buildModal(html);
+    overlay.querySelector('.modal-box').classList.add('qe-wide');   // plus large sur ordinateur et tablette
     var grid = overlay.querySelector('#finished-edit-grid');
     function totalCents() {
       var svc = services.find(function (x) { return x.id === selectedService; });

@@ -855,3 +855,9 @@ body .tfx > button { transition: color .25s ease, transform .1s ease; }
 .finished-edit-total { display:flex; align-items:center; justify-content:space-between; border-top:1px solid var(--sep); padding:14px 2px; }
 .finished-edit-total strong { font-size:21px; }
 @media(max-width:440px) { .finished-edit-grid { grid-template-columns:1fr; } }
+/* Ordinateur et tablette : fenêtre « Modifier la prestation » plus large, 3 cartes par ligne, plus de hauteur. */
+.finished-edit-card-name { overflow-wrap: break-word; min-width: 0; max-width: 100%; }
+@media (min-width: 700px) {
+  .modal-box.qe-wide { max-width: 760px; }
+  .modal-box.qe-wide .finished-edit-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); max-height: 52vh; }
+}
