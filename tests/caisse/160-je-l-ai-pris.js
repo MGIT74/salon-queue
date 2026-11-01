@@ -97,13 +97,23 @@ const row = async (id) => (await pool.query('SELECT status, barber_id, taken_fro
   const c = fs.readFileSync(path.join(__dirname, '../../public/caisse.html'), 'utf8');
   const app = fs.readFileSync(path.join(__dirname, '../../public/app.js'), 'utf8');
   check('poste : vrai bouton « Pris par un collègue » sur toute la liste', /'<div class="next-btns">' \+\n[^\n]*\n\s*\(takenColleagues\(q\)\.length \? '<button class="btn btn-soft" onclick="takenByColleague\(/.test(h));
-  check('caisse : même bouton, « moi » = la bulle choisie', /\(takenColleaguesOf\(q, activeBarberId, allBarbers\)\.length \? '<button class="btn btn-soft" onclick="takenByColleague\(/.test(c) && /takenColleagueDialog\(id, \{ meId: activeBarberId, barbers: allBarbers/.test(c));
+  check('caisse : même bouton, « moi » = la bulle choisie', /\(takenColleaguesOf\(q, activeBarberId, allBarbers, queue\)\.length \? '<button class="btn btn-soft" onclick="takenByColleague\(/.test(c) && /takenColleagueDialog\(id, \{ meId: activeBarberId, barbers: allBarbers/.test(c));
   check('fenêtres communes (app.js) : « Qui a pris » puis commencer / déjà fait', app.includes('function takenColleagueDialog(') && app.includes('Qui a pris ') && app.includes('Je commence maintenant') && app.includes("'/api/queue/' + id + '/taken'"));
   check('poste : plus de bloc « Chez les autres coiffeurs » (le bouton suffit)', !h.includes('Chez les autres coiffeurs') && !h.includes('takenOthersHtml'));
   check('poste : une coupe en cours ne cache plus la liste, elle bloque seulement « Commencer »', h.includes('var locked = somethingActive || i > 0') && !h.includes('Terminez la coupe en cours pour passer à la suivante'));
+  {
+    // Qui est proposé dans « Qui a pris ? » : comme le kiosk (sans RDV, au travail maintenant), + ceux qui coupent.
+    const src = ['isOnLeaveOn', 'takenColleaguesOf'].map((n) => app.match(new RegExp('function ' + n + '\\([\\s\\S]*?\\n}\\n'))[0]).join('\n');
+    const f = new Function(src + '; return takenColleaguesOf;')();
+    const B = (id, o) => Object.assign({ id, active: 1, kiosk_hidden: 0, walkin_today: false, on_break_now: false, outside_hours_now: false, on_leave_today: false }, o);
+    const list = [B('me'), B('owner'), B('ok'), B('rdv', { kiosk_hidden: 1 }), B('rdvWalk', { kiosk_hidden: 1, walkin_today: true }), B('conge', { on_leave_today: true }),
+      B('horsHoraires', { outside_hours_now: true }), B('pause', { on_break_now: true }), B('coupe', { kiosk_hidden: 1 }), B('off', { active: 0 })];
+    const got = f({ barber_id: 'owner' }, 'me', list, [{ status: 'in_progress', barber_id: 'coupe' }]).map((b) => b.id).join(',');
+    check('« Qui a pris ? » : sans les coiffeurs en mode RDV, en congé, hors horaires, en pause (comme le kiosk)', got === 'ok,rdvWalk,coupe', got);
+  }
   check('poste : message « X a pris Y » + OK', h.includes("'/api/queue/taken-notices'") && h.includes(" a pris ") && h.includes('takenSeenOk('));
   check('poste : étiquette « pris à Alice » sur la coupe en cours', h.includes("'pris à ' + esc("));
-  check('app.js / app.css rechargés (v=53 / v=46), queue-sim chargé', h.includes('app.js?v=53') && c.includes('app.js?v=53') && h.includes('app.css?v=46') && h.includes('queue-sim.js') && c.includes('queue-sim.js'));
+  check('app.js / app.css rechargés (v=53 / v=46), queue-sim chargé', h.includes('app.js?v=54') && c.includes('app.js?v=54') && h.includes('app.css?v=46') && h.includes('queue-sim.js') && c.includes('queue-sim.js'));
   check('« Qui a pris » : attente estimée de chaque coiffeur (comme le kiosk) + fenêtre élargie', app.includes('QueueSim.simulate(') && app.includes('tk-wait') && app.includes("classList.add('tk-wide')"));
   await pool.end();
   console.log(`\n${pass} OK, ${fail} ECHEC`);

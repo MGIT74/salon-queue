@@ -1079,7 +1079,7 @@
   </div>
 </div>
 
-<script src="/app.js?v=53"></script>
+<script src="/app.js?v=54"></script>
 <script src="/queue-sim.js?v=1"></script>
 <script src="/staff-group.js?v=6"></script>
 <script src="/autorefresh.js?v=3"></script>
@@ -1907,7 +1907,7 @@ function renderNext() {
         '</div>' +
         '<div class="next-btns">' +
           // Ce client a été pris en vrai par un collègue : on le signale (il passe chez lui, il est prévenu).
-          (takenColleaguesOf(q, activeBarberId, allBarbers).length ? '<button class="btn btn-soft" onclick="takenByColleague(\'' + q.id + '\')">Pris par un collègue</button>' : '') +
+          (takenColleaguesOf(q, activeBarberId, allBarbers, queue).length ? '<button class="btn btn-soft" onclick="takenByColleague(\'' + q.id + '\')">Pris par un collègue</button>' : '') +
           (locked ? '' : (
             (activeBarber && activeBarber.timer_enabled === 0)
               ? '<button class="btn btn-primary" onclick="quickFinishMine(\'' + q.id + '\')">Je prends</button>'

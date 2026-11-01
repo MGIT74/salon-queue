@@ -1989,9 +1989,16 @@ function openApptServicesEditor(a, cfg) {
    ctx = { meId, barbers, queue, refresh } (meId : coiffeur connecté au poste, ou bulle choisie en caisse). */
 var TK_CLOCK = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 1.5"/><path d="M10 2h4"/></svg>';
 var TK_CHECK = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
-// Collègues qui ont pu le prendre : tous les coiffeurs actifs sauf moi et celui qu'il attendait.
-function takenColleaguesOf(q, meId, list) {
-  return (list || []).filter(function (b) { return b.id !== meId && b.id !== q.barber_id && b.active !== 0 && b.active !== false; });
+// Collègues qui ont pu le prendre : sauf moi et celui qu'il attendait, et seulement ceux qui travaillent sans RDV
+// en ce moment, comme sur le kiosk (pas en mode RDV, pas en congé, pas hors de ses horaires ni en pause).
+// Un coiffeur qui a une coupe en cours reste proposé (il est là, en train de travailler).
+function takenColleaguesOf(q, meId, list, queueList) {
+  return (list || []).filter(function (b) {
+    if (b.id === meId || b.id === q.barber_id || b.active === 0 || b.active === false || b.deleted_at) return false;
+    var cutting = (queueList || []).some(function (x) { return x.status === 'in_progress' && x.barber_id === b.id; });
+    if (cutting) return true;
+    return (!b.kiosk_hidden || b.walkin_today) && !b.on_break_now && !b.outside_hours_now && !isOnLeaveOn(b);
+  });
 }
 function takenAvatar(id, list, size) {
   var b = id && (list || []).find(function (x) { return x.id === id; });
@@ -2042,7 +2049,7 @@ function takenDialog(id, takerId, ctx) {
 function takenColleagueDialog(id, ctx) {
   var q = (ctx.queue || []).find(function (x) { return x.id === id; });
   if (!q) return;
-  var list = takenColleaguesOf(q, ctx.meId, ctx.barbers);
+  var list = takenColleaguesOf(q, ctx.meId, ctx.barbers, ctx.queue);
   // Attente estimée de chaque coiffeur, même calcul que le kiosk (queue-sim.js), sans compter ce client-là.
   var sim = null;
   try {
