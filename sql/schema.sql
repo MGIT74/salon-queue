@@ -1477,3 +1477,9 @@ CREATE TABLE IF NOT EXISTS booking_verifications (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_bv_salon (salon_id, status, expires_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- « Je l'ai pris » : client sans RDV pris par un autre coiffeur que celui choisi au kiosk (qui l'avait, qui l'a pris,
+-- qui l'a signale, quand). Sert a prevenir l'autre coiffeur et au journal.
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'queue' AND column_name = 'taken_from_barber_id');
+SET @sql := IF(@c = 0, 'ALTER TABLE queue ADD COLUMN taken_from_barber_id CHAR(36) NULL, ADD COLUMN taken_by_barber_id CHAR(36) NULL, ADD COLUMN taken_at DATETIME NULL', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;

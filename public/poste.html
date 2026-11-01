@@ -168,6 +168,26 @@
     50% { box-shadow: 0 0 0 4px var(--orange, #f97316); }
   }
   .next-info { cursor: pointer; flex: 1; min-width: 140px; }
+  /* « Je l'ai pris » : clients sans RDV qui attendent les autres coiffeurs */
+  .tk-others { border: 1.5px dashed var(--sep); border-radius: 18px; padding: 10px 10px 0; margin-bottom: 14px; }
+  .tk-others .next-card { box-shadow: none; padding: 12px 14px; }
+  .tk-label-hint { font-weight: 500; letter-spacing: 0; text-transform: none; }
+  .tk-from { font-size: 12px; font-weight: 600; color: var(--ink); background: var(--fill); border-radius: 99px; padding: 3px 9px 3px 3px; display: inline-flex; align-items: center; gap: 6px; margin: -2px 0 8px; }
+  .tk-link { background: none; border: 0; padding: 4px 0 0; font: inherit; font-size: 13.5px; font-weight: 600; color: var(--blue); cursor: pointer; flex-basis: 100%; text-align: left; }
+  .tk-swap { display: flex; align-items: center; justify-content: center; gap: 10px; color: var(--grey); font-size: 20px; margin-bottom: 4px; }
+  .tk-choice { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; border: 1.5px solid var(--sep); border-radius: 16px; padding: 12px 14px; margin-top: 10px; background: var(--card); color: var(--ink); font: inherit; cursor: pointer; }
+  .tk-choice.main { border: 2px solid var(--blue); }
+  .tk-choice[disabled] { opacity: .45; cursor: default; }
+  .tk-choice .t { font-weight: 700; font-size: 15px; }
+  .tk-choice .d { font-size: 12.5px; color: var(--grey); margin-top: 1px; }
+  .tk-choice .ic { width: 38px; height: 38px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex: none; background: var(--fill); color: var(--ink); }
+  .tk-choice.main .ic { background: var(--blue); color: #fff; }
+  .tk-inform { margin-top: 14px; font-size: 12.5px; color: var(--grey); text-align: center; }
+  .tk-notices { position: fixed; left: 50%; transform: translateX(-50%); bottom: 84px; z-index: 900; width: min(440px, calc(100% - 32px)); display: flex; flex-direction: column; gap: 8px; }
+  .tk-notice { background: #1d1d1f; color: #fff; border-radius: 16px; padding: 12px 14px; display: flex; align-items: center; gap: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+  .tk-notice .t { font-weight: 700; font-size: 14.5px; }
+  .tk-notice .d { font-size: 12.5px; color: #c7c7cc; }
+  .tk-notice button { margin-left: auto; background: rgba(255,255,255,.16); color: #fff; border: 0; border-radius: 99px; padding: 8px 16px; font: inherit; font-weight: 600; font-size: 13px; cursor: pointer; }
   .next-info .name { font-size: 16px; font-weight: 600; letter-spacing: -.02em; }
   .next-info .meta { font-size: 13px; color: var(--grey); margin-top: 2px; }
   .next-btns { display: flex; gap: 8px; flex-shrink: 0; }
@@ -962,6 +982,7 @@ function refresh() {
     if (reloadCatalog) catalogLoadedAt = Date.now();   // seulement si la lecture a REUSSI : sinon on reessaie au prochain tour
     renderActive();
     renderNext();
+    takenNoticesRefresh();
     var meB = (barbers || []).filter(function (b) { return me && b.id === me.id; })[0];
     if (meB) document.getElementById('my-name').innerHTML = esc(me.name) + barberModeTagHtml(meB);
   }).catch(function (e) { toast(e.message, true); });
@@ -1050,6 +1071,8 @@ function renderActive(force) {
   zone.innerHTML =
     '<div class="active-card">' +
       '<div class="name">' + queueSourceIconHtml(cur) + esc(cur.client_name) + '</div>' +
+      (cur.taken_from_barber_id && cur.taken_from_barber_id !== me.id
+        ? '<div class="tk-from">' + barberAvatarHtml(takenBarber(cur.taken_from_barber_id), barbers, 18) + 'pris à ' + esc(takenBarber(cur.taken_from_barber_id).name) + '</div>' : '') +
       (cur.is_appointment
         ? '<div class="hint" style="color:var(--blue);margin:-4px 0 6px">Rendez-vous</div>'
         : '') +
@@ -1127,8 +1150,11 @@ var nextDetailOpen = {}; // { [queueId]: true }
 
 function renderNext() {
   var zone = document.getElementById('next-zone');
+  // Ne pas reconstruire pendant une saisie (note), voir plus bas.
+  var editingNow = zone.contains(document.activeElement) && document.activeElement !== document.body;
+  if (editingNow && zone.children.length) return;
   if (myActive()) {
-    zone.innerHTML = '<div class="empty">Terminez la coupe en cours pour passer à la suivante</div>';
+    zone.innerHTML = '<div class="empty">Terminez la coupe en cours pour passer à la suivante</div>' + takenOthersHtml();
     return;
   }
 
@@ -1143,7 +1169,7 @@ function renderNext() {
   }).sort(function (a, b) { return new Date(a.checkin_at) - new Date(b.checkin_at); });
 
   if (mine.length === 0) {
-    zone.innerHTML = '<div class="empty">Personne en attente pour vous pour le moment</div>';
+    zone.innerHTML = '<div class="empty">Personne en attente pour vous pour le moment</div>' + takenOthersHtml();
     return;
   }
 
@@ -1184,6 +1210,9 @@ function renderNext() {
           '<button class="btn btn-ghost" onclick="cancelNotifiedMine(\'' + q.id + '\')">Annuler</button>' +
           '<button class="btn btn-outline-red" onclick="cancelMine(\'' + q.id + '\')">Absent</button>' +
         '</div>' +
+        // Mon client sans RDV pris en vrai par un collegue (qui a oublie de le dire) : je le signale moi-meme.
+        (!q.is_appointment && q.barber_id === me.id && takenColleagues(q).length
+          ? '<button type="button" class="tk-link" onclick="takenByColleague(\'' + q.id + '\')">Pris par un collègue ?</button>' : '') +
       '</div>' +
       '<div class="next-detail" id="next-detail-' + q.id + '" style="display:' + (open ? 'block' : 'none') + '">' +
         '<div class="detail-row"><span class="detail-label">Client</span><span class="detail-value">' + esc(q.client_name) + '</span></div>' +
@@ -1195,7 +1224,117 @@ function renderNext() {
         '<button class="btn btn-soft" onclick="saveNextNote(\'' + q.id + '\')">Enregistrer la note</button>' +
       '</div>' +
     '</div>';
-  }).join('');
+  }).join('') + takenOthersHtml();
+}
+
+/* ---------- « Je l'ai pris » : un coiffeur a pris en vrai le client sans RDV d'un autre ----------
+   Tout coiffeur peut le signaler (celui qui l'a pris, ou celui qui l'avait). Le client passe chez le preneur
+   (coupe demarree, ou deja faite = a encaisser) ; l'autre coiffeur est seulement prevenu (takenNotices). */
+function takenOthers() {
+  return queue.filter(function (q) {
+    return q.status === 'waiting' && !q.is_appointment && q.barber_id && q.barber_id !== me.id;
+  }).sort(function (a, b) { return new Date(a.checkin_at) - new Date(b.checkin_at); });
+}
+function takenBarber(id) { return (barbers || []).find(function (b) { return b.id === id; }) || { id: id, name: '?' }; }
+function takenColleagues(q) { return (barbers || []).filter(function (b) { return b.id !== q.barber_id && b.active !== 0 && b.active !== false; }); }
+function takenSince(q) {
+  var m = Math.max(0, Math.round((Date.now() - new Date(q.checkin_at).getTime()) / 60000));
+  return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h ' + String(m % 60).padStart(2, '0');
+}
+function takenOthersHtml() {
+  var list = takenOthers();
+  if (!list.length) return '';
+  return '<div class="section-label" style="margin-top:18px">Chez les autres coiffeurs · ' + list.length +
+      ' <span class="tk-label-hint">— vous en avez pris un ? touchez « Je l\'ai pris »</span></div>' +
+    '<div class="tk-others">' + list.map(function (q) {
+      var b = takenBarber(q.barber_id);
+      return '<div class="next-item"><div class="next-card">' + barberAvatarHtml(b, barbers, 36) +
+        '<div class="next-info" style="cursor:default"><div class="name">' + esc(q.client_name) + '</div>' +
+        '<div class="meta">' + esc(svcLabel(q.service.name, q.extras)) + ' · attend <b style="color:var(--ink)">' + esc(b.name) + '</b> · depuis ' + takenSince(q) + '</div></div>' +
+        '<div class="next-btns"><button class="btn btn-soft" onclick="takenOpen(\'' + q.id + '\', \'' + me.id + '\')">Je l\'ai pris</button></div>' +
+      '</div></div>';
+    }).join('') + '</div>';
+}
+var TK_CLOCK = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 1.5"/><path d="M10 2h4"/></svg>';
+var TK_CHECK = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
+// takerId a pris le client q : « Je commence maintenant » ou « Je l'ai déjà fait ».
+function takenOpen(id, takerId) {
+  var q = queue.find(function (x) { return x.id === id; });
+  if (!q) return;
+  var from = takenBarber(q.barber_id), taker = takenBarber(takerId), self = takerId === me.id;
+  var busy = queue.some(function (x) { return x.status === 'in_progress' && x.barber_id === takerId; });
+  var overlay = _buildModal(
+    '<div class="tk-swap">' + barberAvatarHtml(from, barbers, 38) + '<span>→</span>' + barberAvatarHtml(taker, barbers, 38) + '</div>' +
+    '<div class="modal-title" style="text-align:center">' + (self ? 'Vous avez pris ' : taker.name + ' a pris ') + esc(q.client_name) + ' ?</div>' +
+    '<div class="modal-message" style="text-align:center">Il attendait <b>' + esc(from.name) + '</b>. Il passe chez ' + (self ? 'vous' : esc(taker.name)) + '.</div>' +
+    '<button type="button" class="tk-choice main" id="tk-start"' + (busy ? ' disabled' : '') + '><span class="ic">' + TK_CLOCK + '</span><span><div class="t">' + (self ? 'Je commence maintenant' : 'Il commence maintenant') + '</div>' +
+      '<div class="d">' + (busy ? (self ? 'Vous avez' : esc(taker.name) + ' a') + ' déjà une coupe en cours' : 'Le timer démarre chez ' + (self ? 'vous' : esc(taker.name))) + '</div></span></button>' +
+    '<button type="button" class="tk-choice" id="tk-done"><span class="ic">' + TK_CHECK + '</span><span><div class="t">' + (self ? 'Je l\'ai déjà fait' : 'C\'est déjà fait') + '</div>' +
+      '<div class="d">Il passe « à encaisser » au nom de ' + (self ? 'vous' : esc(taker.name)) + '</div></span></button>' +
+    '<div class="modal-actions" style="margin-top:12px"><button class="btn btn-ghost" id="tk-cancel">Annuler</button></div>' +
+    '<div class="tk-inform">🔔 ' + esc(self ? from.name : taker.name) + ' sera prévenu' + ' sur son poste</div>'
+  );
+  var close = function () { _closeModal(overlay); };
+  overlay.querySelector('#tk-cancel').onclick = close;
+  overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+  var send = function (mode) {
+    overlay.querySelectorAll('.tk-choice').forEach(function (b) { b.disabled = true; });
+    barberApi('/api/queue/' + id + '/taken', { method: 'POST', body: { barber_id: takerId, mode: mode } })
+      .then(function () {
+        close();
+        toast(q.client_name + (self ? ' est chez vous' : ' est passé chez ' + taker.name));
+        refresh();
+      })
+      .catch(function (e) { close(); toast(e.message, true); refresh(); });
+  };
+  overlay.querySelector('#tk-start').onclick = function () { send('start'); };
+  overlay.querySelector('#tk-done').onclick = function () { send('done'); };
+}
+// « Pris par un collègue ? » : sur mon client, je choisis le collègue qui l'a pris.
+function takenByColleague(id) {
+  var q = queue.find(function (x) { return x.id === id; });
+  if (!q) return;
+  var list = takenColleagues(q);
+  var overlay = _buildModal(
+    '<div class="modal-title" style="text-align:center">Qui a pris ' + esc(q.client_name) + ' ?</div>' +
+    '<div class="modal-message" style="text-align:center">Il quitte votre file et passe chez ce coiffeur.</div>' +
+    list.map(function (b) {
+      var busy = queue.some(function (x) { return x.status === 'in_progress' && x.barber_id === b.id; });
+      return '<button type="button" class="tk-choice" data-b="' + esc(b.id) + '">' + barberAvatarHtml(b, barbers, 38) +
+        '<span><div class="t">' + esc(b.name) + '</div><div class="d">' + (busy ? 'coupe en cours' : 'libre') + '</div></span></button>';
+    }).join('') +
+    '<div class="modal-actions" style="margin-top:12px"><button class="btn btn-ghost" id="tk-cancel">Annuler</button></div>'
+  );
+  var close = function () { _closeModal(overlay); };
+  overlay.querySelector('#tk-cancel').onclick = close;
+  overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+  overlay.querySelectorAll('[data-b]').forEach(function (btn) {
+    btn.onclick = function () { close(); setTimeout(function () { takenOpen(id, btn.getAttribute('data-b')); }, 200); };
+  });
+}
+// Messages « Bob a pris Karim » : affichés jusqu'à « OK » (mémorisé sur cet appareil).
+var takenSeen = {};
+try { takenSeen = JSON.parse(localStorage.getItem('poste_taken_seen') || '{}') || {}; } catch (e) { takenSeen = {}; }
+function takenNoticesRefresh() {
+  if (!me) return;
+  barberApi('/api/queue/taken-notices').then(function (r) {
+    var box = document.getElementById('tk-notices');
+    if (!box) { box = document.createElement('div'); box.id = 'tk-notices'; box.className = 'tk-notices'; document.body.appendChild(box); }
+    var items = (r.items || []).filter(function (n) { return !takenSeen[n.id + ':' + me.id]; });
+    box.innerHTML = items.map(function (n) {
+      return '<div class="tk-notice">' + barberAvatarHtml(takenBarber(n.lost ? n.to_id : (n.reporter_id || n.from_id)), barbers, 34) +
+        '<div><div class="t">' + (n.lost ? esc(n.to_name) + ' a pris ' + esc(n.client_name) : esc(n.client_name) + ' est passé chez vous') + '</div>' +
+        '<div class="d">' + (n.lost ? 'Il n\'est plus dans votre file' : (n.reporter_name ? esc(n.reporter_name) + ' l\'a signalé' : 'Signalé') + ' · il attendait ' + esc(n.from_name)) + '</div></div>' +
+        '<button type="button" onclick="takenSeenOk(\'' + n.id + '\')">OK</button></div>';
+    }).join('');
+  }).catch(function () {});
+}
+function takenSeenOk(id) {
+  takenSeen[id + ':' + me.id] = Date.now();
+  // On ne garde que les 2 derniers jours.
+  Object.keys(takenSeen).forEach(function (k) { if (Date.now() - takenSeen[k] > 2 * 864e5) delete takenSeen[k]; });
+  try { localStorage.setItem('poste_taken_seen', JSON.stringify(takenSeen)); } catch (e) {}
+  takenNoticesRefresh();
 }
 
 /**

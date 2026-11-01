@@ -751,6 +751,76 @@ router.post('/:id/quick-finish', requireAdminOrBarber, wrap(async (req, res) => 
   res.json({ ok: true });
 }));
 
+/**
+ * « Je l'ai pris » : un client SANS RDV inscrit pour un coiffeur (kiosk) a ete pris en vrai par un autre.
+ * N'importe quel coiffeur peut le signaler : celui qui l'a pris (barber_id = lui), ou celui qui l'avait
+ * (« Pris par un collegue ? », barber_id = le collegue). Le client passe chez le preneur : coupe demarree
+ * (mode 'start') ou deja faite, a encaisser (mode 'done'). L'autre coiffeur est seulement prevenu (taken-notices).
+ */
+router.post('/:id/taken', requireAdminOrBarber, wrap(async (req, res) => {
+  const [[row]] = await pool.query(
+    'SELECT id, client_name, barber_id, status, is_appointment FROM queue WHERE id = ? AND salon_id = ?',
+    [req.params.id, req.salon.id]
+  );
+  if (!row) return res.status(404).json({ error: 'Client introuvable' });
+  if (row.status !== 'waiting') return res.status(409).json({ error: 'Ce client n\'attend plus : rafraîchissez la liste.' });
+  if (row.is_appointment || !row.barber_id) return res.status(400).json({ error: 'Seuls les clients sans RDV qui attendent un coiffeur précis sont concernés.' });
+  const takerId = String(req.body.barber_id || req.actingBarberId || '');
+  if (!takerId || takerId === row.barber_id) return res.status(400).json({ error: 'Choisissez le coiffeur qui a pris ce client.' });
+  // Coiffeur par PIN : il signale soit qu'IL l'a pris, soit que SON client a ete pris par un collegue.
+  if (req.actingBarberId && req.actingBarberId !== takerId && req.actingBarberId !== row.barber_id) {
+    return res.status(403).json({ error: "Ce n'est ni votre client, ni vous qui l'avez pris." });
+  }
+  const [[taker]] = await pool.query('SELECT id, name FROM barbers WHERE id = ? AND salon_id = ? AND active = 1', [takerId, req.salon.id]);
+  if (!taker) return res.status(404).json({ error: 'Coiffeur introuvable' });
+  const mode = req.body.mode === 'done' ? 'done' : 'start';
+  if (mode === 'start') {
+    const [[busy]] = await pool.query(
+      "SELECT client_name FROM queue WHERE barber_id = ? AND salon_id = ? AND status = 'in_progress' LIMIT 1", [takerId, req.salon.id]);
+    if (busy) return res.status(409).json({ code: 'busy', error: taker.name + ' a déjà une coupe en cours (' + busy.client_name + ') : choisissez « Déjà fait ».' });
+  }
+  const reporter = req.actingBarberId || null;
+  const [upd] = await pool.query(
+    mode === 'start'
+      ? "UPDATE queue SET status = 'in_progress', start_at = NOW(), barber_id = ?, taken_from_barber_id = ?, taken_by_barber_id = ?, taken_at = NOW() WHERE id = ? AND salon_id = ? AND status = 'waiting'"
+      : "UPDATE queue SET status = 'done', end_at = NOW(), barber_id = ?, taken_from_barber_id = ?, taken_by_barber_id = ?, taken_at = NOW() WHERE id = ? AND salon_id = ? AND status = 'waiting'",
+    [takerId, row.barber_id, reporter, row.id, req.salon.id]
+  );
+  if (!upd.affectedRows) return res.status(409).json({ error: 'Ce client n\'attend plus : rafraîchissez la liste.' });
+  await pool.query('UPDATE appointments SET barber_id = ? WHERE promoted_queue_id = ? AND salon_id = ?', [takerId, row.id, req.salon.id]);
+  const [[from]] = await pool.query('SELECT name FROM barbers WHERE id = ?', [row.barber_id]);
+  const [[rep]] = reporter ? await pool.query('SELECT name FROM barbers WHERE id = ?', [reporter]) : [[null]];
+  logActivity(req.salon.id, 'client_taken',
+    taker.name + ' a pris "' + row.client_name + '" (attendait ' + (from ? from.name : '?') + ')' + (mode === 'done' ? ', déjà fait' : ''),
+    rep ? rep.name : 'Admin');
+  await recompute(req.salon.id);
+  res.json({ ok: true, mode, taker: taker.name });
+}));
+
+/** Messages « Bob a pris Karim » du jour pour le coiffeur connecte (sauf ceux qu'il a signales lui-meme). */
+router.get('/taken-notices', requireAdminOrBarber, wrap(async (req, res) => {
+  const meId = req.actingBarberId;
+  if (!meId) return res.json({ items: [] });
+  const [rows] = await pool.query(
+    `SELECT q.id, q.client_name, q.taken_at, q.taken_from_barber_id, q.barber_id, q.taken_by_barber_id,
+            bf.name AS from_name, bt.name AS to_name, br.name AS reporter_name
+     FROM queue q
+     LEFT JOIN barbers bf ON bf.id = q.taken_from_barber_id
+     LEFT JOIN barbers bt ON bt.id = q.barber_id
+     LEFT JOIN barbers br ON br.id = q.taken_by_barber_id
+     WHERE q.salon_id = ? AND q.taken_at >= NOW() - INTERVAL 12 HOUR
+       AND (q.taken_from_barber_id = ? OR q.barber_id = ?) AND (q.taken_by_barber_id IS NULL OR q.taken_by_barber_id != ?)
+     ORDER BY q.taken_at`,
+    [req.salon.id, meId, meId, meId]
+  );
+  res.json({ items: rows.map((r) => ({
+    id: r.id, client_name: r.client_name, at: utcIso(r.taken_at),
+    from_id: r.taken_from_barber_id, to_id: r.barber_id, reporter_id: r.taken_by_barber_id,
+    lost: r.taken_from_barber_id === meId,   // vrai : on m'a pris mon client ; faux : on m'a attribue un client
+    from_name: r.from_name, to_name: r.to_name, reporter_name: r.reporter_name
+  })) });
+}));
+
 router.post('/:id/finish', requireAdminOrBarber, wrap(async (req, res) => {
   const [[currentState]] = await pool.query('SELECT status FROM queue WHERE id = ? AND salon_id = ?', [req.params.id, req.salon.id]);
   if (!currentState) return res.status(404).json({ error: 'Client introuvable' });
