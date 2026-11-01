@@ -836,10 +836,12 @@ function leaveEndFrom(b, dateStr) {
 function barberBookableOn(b, dateStr) {
   if (!b || !dateStr) return true;
   if (isOnLeaveOn(b, dateStr) || isWalkinOn(b, dateStr)) return false;
-  var schedules = (b.schedules || []).filter(function (s) { return s.active; });
-  if (!schedules.length) return true;   // horaires inconnus : on ne grise pas
+  var all = b.schedules || [];
+  // Horaires jamais réglés (aucune ligne) : on ne grise pas. Mais des horaires réglés avec TOUS les jours
+  // désactivés = coiffeur indisponible : aucun jour réservable (avant, ce cas était pris pour « inconnu »).
+  if (!all.length) return true;
   var wd = new Date(dateStr + 'T12:00:00Z').getUTCDay();
-  return schedules.some(function (s) { return Number(s.weekday) === wd; });
+  return all.some(function (s) { return s.active && Number(s.weekday) === wd; });
 }
 // Jour a griser pour ce choix : un coiffeur precis, ou « Premier disponible » (grise seulement si AUCUN n'est la).
 function bookingDayBlocked(selectedBarberId, barberList, dateStr) {
