@@ -25,7 +25,7 @@ check('recherche client (nom, telephone, email) + resultats « Ce jour » / « A
 console.log('\n[C] Semaine et Mois au meme style');
 check('semaine : recherche + coup d\'œil des 7 jours (une piste par coiffeur) + 7 colonnes', /document\.getElementById\('cal-days'\)\.innerHTML = pdWeekHtml\(start\);/.test(poste) && /La semaine en un coup d’œil/.test(poste) && /pd-wk-cols/.test(poste));
 check('semaine : clic RDV = fiche, clic vide = ajouter pour moi ce jour-la, clic en-tete = vue Jour', /pd-wk-block[\s\S]{0,800}openPosteClientDrawer/.test(poste) && /pdColClickAttr\(meB, d\)/.test(poste) && /pd-wk-head[\s\S]{0,300}pdShowDay/.test(poste));
-check('mois : recherche + chiffres du mois + cartes (RDV, les miens, couleurs) ; toucher = vue Jour', /document\.getElementById\('cal-days'\)\.innerHTML = pdMonthHtml\(\);/.test(poste) && /RDV ce mois/.test(poste) && /pd-mchip/.test(poste) && /onclick="pdShowDay\(/.test(poste));
+check('mois : recherche + chiffres du mois + cartes (RDV, les miens, couleurs) ; toucher = vue Jour', /document\.getElementById\('cal-days'\)\.innerHTML = pdMonthHtml\(\);/.test(poste) && /RDV ce mois/.test(poste) && /pd-mbar/.test(poste) && /onclick="pdShowDay\(/.test(poste));
 check('un seul champ de recherche dans la page (l\'autre vue est videe)', /document\.getElementById\('cal-days'\)\.innerHTML = '';   \/\/ un seul champ/.test(poste) && (poste.match(/document\.getElementById\('cal-day-view'\)\.innerHTML = '';/g) || []).length >= 2);
 check('Moi seulement / Equipe et zoom redessinent la vue affichee', /function pdRerender\(\)/.test(poste) && /pdSetOnlyMe[\s\S]{0,300}pdRerender\(\)/.test(poste) && /pdZoom[\s\S]{0,400}pdRerender\(\)/.test(poste));
 check('RDV trouves allumes dans l\'agenda, les autres pâlis', /classList\.toggle\('pd-hit'/.test(poste) && /classList\.toggle\('pd-dim'/.test(poste));
@@ -37,7 +37,7 @@ check('plus de colonne de cote : l\'agenda prend toute la largeur ; Moi seulemen
 check('telephone : une seule colonne (la sienne ou celle touchee)', /if \(pdIsPhone\(\)\) \{\n    var fid = pdFocusId/.test(poste));
 check('preferences gardees sans casser si le stockage est bloque (try/catch)', /try \{ localStorage\.setItem\('poste_day_only_me'/.test(poste) && /try \{\n  pdOnlyMe = localStorage\.getItem/.test(poste));
 check('Mois / Semaine : planning du jour choisi inchange (renderAgendaTimeline)', /posteAddBtnHtml\(dateStr\) \+\n    renderAgendaTimeline\(dateStr\)/.test(poste) && /function renderAgendaTimeline\(dateStr\)/.test(poste));
-check('mois : chaque jour = seulement les pastilles de couleur des coiffeurs avec leur nombre de RDV (plus de texte)', /'<span class="pd-mchips">' \+ chips \+ '<\/span>'/.test(poste) && !/pd-mcount/.test(poste));
+check('mois : chaque jour = total des RDV + barre aux couleurs des coiffeurs (plus de texte)', /'<span class="pd-mbar">' \+ bar \+ '<\/span>'/.test(poste) && !/pd-mcount/.test(poste));
 console.log('\n[D] Finitions (Mois / Semaine / Jour)');
 const L = ctx.pdLayout([{ start: 600, end: 630 }, { start: 615, end: 645 }, { start: 630, end: 660 }, { start: 700, end: 730 }]);
 check('RDV qui se chevauchent : cote a cote (voies), les autres en pleine largeur', L[0].lanes === 2 && L[1].lanes === 2 && L[2].lanes === 2 && L[0].lane === 0 && L[1].lane === 1 && L[2].lane === 0 && L[3].lanes === 1 && ctx.pdLaneCss(L[3]) === '' && /width:calc\(50\.000% - 2px\)/.test(ctx.pdLaneCss(L[1])));
