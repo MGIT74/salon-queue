@@ -35,6 +35,23 @@ const svcOf = async (id) => (await pool.query('SELECT service_id FROM queue WHER
     check('client d\'Alice : Bob seul ne peut pas', r.status === 403 && await svcOf('t161-alice') === 'sv1', JSON.stringify(r.data));
     r = await call('PUT', '/api/queue/t161-alice', { service_id: 't161-barbe', extras: [] }, H('b1', '1111'));
     check('client d\'Alice : Alice peut', r.status === 200 && await svcOf('t161-alice') === 't161-barbe', JSON.stringify(r.data));
+    // Tout suit la nouvelle durée : la file (durée, attente des suivants), l'agenda lié, le kiosk / l'écran TV.
+    await pool.query("DELETE FROM queue WHERE id IN ('t161-bob','t161-alice')");
+    await pool.query("UPDATE queue SET status = 'cancelled' WHERE salon_id = 's1' AND status IN ('waiting','in_progress') AND id NOT LIKE 't161%'");
+    await pool.query("INSERT INTO queue (id, salon_id, client_name, service_id, barber_id, status, checkin_at) VALUES ('t161-a','s1','T161 A','sv1','b2','waiting', UTC_TIMESTAMP() - INTERVAL 2 MINUTE), ('t161-b','s1','T161 B','sv1','b2','waiting', UTC_TIMESTAMP() - INTERVAL 1 MINUTE)");
+    await pool.query("INSERT INTO appointments (id, salon_id, barber_id, client_name, service_id, scheduled_at, status, promoted_queue_id, source) VALUES ('t161-appt','s1','b2','T161 A','sv1', NOW(), 'confirmed', 't161-a', 'walkin')");
+    const q0 = (await call('GET', '/api/queue', null, H('b2', '2222'))).data.queue || [];
+    const waitB0 = (q0.find((x) => x.id === 't161-b') || {}).estimated_wait_min;
+    r = await call('PUT', '/api/queue/t161-a', { service_id: 't161-barbe', extras: [] }, H('b2', '2222'));
+    const q1 = (await call('GET', '/api/queue', null, { 'X-Salon-Slug': 'test' })).data.queue || [];
+    const a1 = q1.find((x) => x.id === 't161-a') || {}, b1 = q1.find((x) => x.id === 't161-b') || {};
+    check('nouvelle durée prise en compte (30 -> 45 min) et prix', a1.total_duration_min === 45 && a1.total_price_cents === 3000, JSON.stringify({ d: a1.total_duration_min, p: a1.total_price_cents }));
+    check('attente du client suivant recalculée (+15 min) : kiosk / écran TV', b1.estimated_wait_min === waitB0 + 15, waitB0 + ' -> ' + b1.estimated_wait_min);
+    const [[stored]] = await pool.query("SELECT total_duration_min, estimated_wait_min FROM queue WHERE id = 't161-b'");
+    check('attente enregistrée en base aussi (emails « bientôt votre tour », dashboard)', stored.estimated_wait_min === b1.estimated_wait_min, JSON.stringify(stored));
+    const [[ap]] = await pool.query("SELECT service_id FROM appointments WHERE id = 't161-appt'");
+    check('agenda : le RDV lié a la nouvelle prestation (donc la nouvelle durée)', ap.service_id === 't161-barbe', JSON.stringify(ap));
+    await pool.query("DELETE FROM appointments WHERE id = 't161-appt'");
     await pool.query("UPDATE queue SET status = 'in_progress', start_at = NOW() WHERE id = 't161-libre'");
     await pool.query("UPDATE queue SET barber_id = 'b1' WHERE id = 't161-libre'");
     r = await call('PUT', '/api/queue/t161-libre', { service_id: 'sv1', extras: [] }, H('b2', '2222'));
