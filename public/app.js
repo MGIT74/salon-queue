@@ -1982,3 +1982,81 @@ function openApptServicesEditor(a, cfg) {
   };
   render();
 }
+
+/* ---------- « Je l'ai pris » / « Pris par un collègue » (poste et caisse) ----------
+   Un client de la file a été pris en vrai par un autre coiffeur : on le dit à l'app, il passe chez ce coiffeur
+   (coupe démarrée, ou déjà faite = à encaisser) et l'autre coiffeur est seulement prévenu.
+   ctx = { meId, barbers, queue, refresh } (meId : coiffeur connecté au poste, ou bulle choisie en caisse). */
+var TK_CLOCK = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 1.5"/><path d="M10 2h4"/></svg>';
+var TK_CHECK = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
+// Collègues qui ont pu le prendre : tous les coiffeurs actifs sauf moi et celui qu'il attendait.
+function takenColleaguesOf(q, meId, list) {
+  return (list || []).filter(function (b) { return b.id !== meId && b.id !== q.barber_id && b.active !== 0 && b.active !== false; });
+}
+function takenAvatar(id, list, size) {
+  var b = id && (list || []).find(function (x) { return x.id === id; });
+  if (b) return barberAvatarHtml(b, list, size);
+  return '<span class="b-avatar tk-any" style="width:' + size + 'px;height:' + size + 'px;border-radius:50%;flex:none;display:inline-flex;align-items:center;justify-content:center;font-weight:700">?</span>';
+}
+// Fenêtre 2 : takerId a pris le client -> « commence maintenant » ou « déjà fait ».
+function takenDialog(id, takerId, ctx) {
+  var q = (ctx.queue || []).find(function (x) { return x.id === id; });
+  if (!q) return;
+  var byId = function (bid) { return (ctx.barbers || []).find(function (b) { return b.id === bid; }); };
+  var from = q.barber_id && byId(q.barber_id), taker = byId(takerId) || { name: '?' }, self = takerId === ctx.meId;
+  var fromName = from ? from.name : 'le premier disponible';
+  var busy = (ctx.queue || []).some(function (x) { return x.status === 'in_progress' && x.barber_id === takerId; });
+  var who = self ? 'vous' : esc(taker.name);
+  // Prévenu : celui qui l'avait (si ce n'est pas moi), et le preneur (si ce n'est pas moi).
+  var told = [];
+  if (from && q.barber_id !== ctx.meId) told.push(from.name);
+  if (!self) told.push(taker.name);
+  var overlay = _buildModal(
+    '<div class="tk-swap">' + takenAvatar(q.barber_id, ctx.barbers, 38) + '<span>→</span>' + takenAvatar(takerId, ctx.barbers, 38) + '</div>' +
+    '<div class="modal-title" style="text-align:center">' + (self ? 'Vous avez pris ' : esc(taker.name) + ' a pris ') + esc(q.client_name) + ' ?</div>' +
+    '<div class="modal-message" style="text-align:center">Il attendait <b>' + esc(fromName) + '</b>. Il passe chez ' + who + '.</div>' +
+    '<button type="button" class="tk-choice main" id="tk-start"' + (busy ? ' disabled' : '') + '><span class="ic">' + TK_CLOCK + '</span><span><div class="t">' + (self ? 'Je commence maintenant' : 'Il commence maintenant') + '</div>' +
+      '<div class="d">' + (busy ? (self ? 'Vous avez' : esc(taker.name) + ' a') + ' déjà une coupe en cours' : 'Le timer démarre chez ' + who) + '</div></span></button>' +
+    '<button type="button" class="tk-choice" id="tk-done"><span class="ic">' + TK_CHECK + '</span><span><div class="t">' + (self ? 'Je l\'ai déjà fait' : 'C\'est déjà fait') + '</div>' +
+      '<div class="d">Il passe « à encaisser » au nom de ' + who + '</div></span></button>' +
+    '<div class="modal-actions" style="margin-top:12px"><button class="btn btn-ghost" id="tk-cancel">Annuler</button></div>' +
+    (told.length ? '<div class="tk-inform">🔔 ' + told.map(esc).join(' et ') + (told.length > 1 ? ' seront prévenus' : ' sera prévenu') + ' sur son poste</div>' : '')
+  );
+  var close = function () { _closeModal(overlay); };
+  overlay.querySelector('#tk-cancel').onclick = close;
+  overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+  var send = function (mode) {
+    overlay.querySelectorAll('.tk-choice').forEach(function (b) { b.disabled = true; });
+    barberApi('/api/queue/' + id + '/taken', { method: 'POST', body: { barber_id: takerId, mode: mode } })
+      .then(function () {
+        close();
+        toast(q.client_name + (self ? ' est chez vous' : ' est passé chez ' + taker.name));
+        ctx.refresh();
+      })
+      .catch(function (e) { close(); toast(e.message, true); ctx.refresh(); });
+  };
+  overlay.querySelector('#tk-start').onclick = function () { send('start'); };
+  overlay.querySelector('#tk-done').onclick = function () { send('done'); };
+}
+// Fenêtre 1 : « Pris par un collègue » -> qui l'a pris ?
+function takenColleagueDialog(id, ctx) {
+  var q = (ctx.queue || []).find(function (x) { return x.id === id; });
+  if (!q) return;
+  var list = takenColleaguesOf(q, ctx.meId, ctx.barbers);
+  var overlay = _buildModal(
+    '<div class="modal-title" style="text-align:center">Qui a pris ' + esc(q.client_name) + ' ?</div>' +
+    '<div class="modal-message" style="text-align:center">Il quitte cette file et passe chez ce coiffeur.</div>' +
+    list.map(function (b) {
+      var busy = (ctx.queue || []).some(function (x) { return x.status === 'in_progress' && x.barber_id === b.id; });
+      return '<button type="button" class="tk-choice" data-b="' + esc(b.id) + '">' + barberAvatarHtml(b, ctx.barbers, 38) +
+        '<span><div class="t">' + esc(b.name) + '</div><div class="d">' + (busy ? 'coupe en cours' : 'libre') + '</div></span></button>';
+    }).join('') +
+    '<div class="modal-actions" style="margin-top:12px"><button class="btn btn-ghost" id="tk-cancel">Annuler</button></div>'
+  );
+  var close = function () { _closeModal(overlay); };
+  overlay.querySelector('#tk-cancel').onclick = close;
+  overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+  overlay.querySelectorAll('[data-b]').forEach(function (btn) {
+    btn.onclick = function () { close(); setTimeout(function () { takenDialog(id, btn.getAttribute('data-b'), ctx); }, 200); };
+  });
+}

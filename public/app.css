@@ -825,3 +825,15 @@ body .tfx > button { transition: color .25s ease, transform .1s ease; }
 /* RDV a plusieurs : personnes deja validees au-dessus du recapitulatif, avec leur heure */
 .recap-cart-list { padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px dashed var(--sep); }
 .recap-cart .recap-k { color: var(--ink); text-transform: none; letter-spacing: 0; font-size: 12.5px; }
+
+/* « Je l'ai pris » / « Pris par un collègue » (poste et caisse) : fenêtre de choix */
+.tk-swap { display: flex; align-items: center; justify-content: center; gap: 10px; color: var(--grey); font-size: 20px; margin-bottom: 4px; }
+.tk-choice { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; border: 1.5px solid var(--sep); border-radius: 16px; padding: 12px 14px; margin-top: 10px; background: var(--card); color: var(--ink); font: inherit; cursor: pointer; }
+.tk-choice.main { border: 2px solid var(--blue); }
+.tk-choice[disabled] { opacity: .45; cursor: default; }
+.tk-choice .t { font-weight: 700; font-size: 15px; }
+.tk-choice .d { font-size: 12.5px; color: var(--grey); margin-top: 1px; }
+.tk-choice .ic { width: 38px; height: 38px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex: none; background: var(--fill); color: var(--ink); }
+.tk-choice.main .ic { background: var(--blue); color: #fff; }
+.tk-inform { margin-top: 14px; font-size: 12.5px; color: var(--grey); text-align: center; }
+.tk-any { background: var(--fill) !important; color: var(--grey) !important; }

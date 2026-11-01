@@ -752,7 +752,8 @@ router.post('/:id/quick-finish', requireAdminOrBarber, wrap(async (req, res) => 
 }));
 
 /**
- * « Je l'ai pris » : un client SANS RDV inscrit pour un coiffeur (kiosk) a ete pris en vrai par un autre.
+ * « Je l'ai pris » / « Pris par un collegue » : un client de la file (avec ou sans RDV, avec un coiffeur ou
+ * « premier disponible ») a ete pris en vrai par un autre coiffeur.
  * N'importe quel coiffeur peut le signaler : celui qui l'a pris (barber_id = lui), ou celui qui l'avait
  * (« Pris par un collegue ? », barber_id = le collegue). Le client passe chez le preneur : coupe demarree
  * (mode 'start') ou deja faite, a encaisser (mode 'done'). L'autre coiffeur est seulement prevenu (taken-notices).
@@ -764,11 +765,11 @@ router.post('/:id/taken', requireAdminOrBarber, wrap(async (req, res) => {
   );
   if (!row) return res.status(404).json({ error: 'Client introuvable' });
   if (row.status !== 'waiting') return res.status(409).json({ error: 'Ce client n\'attend plus : rafraîchissez la liste.' });
-  if (row.is_appointment || !row.barber_id) return res.status(400).json({ error: 'Seuls les clients sans RDV qui attendent un coiffeur précis sont concernés.' });
   const takerId = String(req.body.barber_id || req.actingBarberId || '');
   if (!takerId || takerId === row.barber_id) return res.status(400).json({ error: 'Choisissez le coiffeur qui a pris ce client.' });
   // Coiffeur par PIN : il signale soit qu'IL l'a pris, soit que SON client a ete pris par un collegue.
-  if (req.actingBarberId && req.actingBarberId !== takerId && req.actingBarberId !== row.barber_id) {
+  // Client « premier disponible » (sans coiffeur) : n'importe quel coiffeur peut dire qui l'a pris.
+  if (req.actingBarberId && row.barber_id && req.actingBarberId !== takerId && req.actingBarberId !== row.barber_id) {
     return res.status(403).json({ error: "Ce n'est ni votre client, ni vous qui l'avez pris." });
   }
   const [[taker]] = await pool.query('SELECT id, name FROM barbers WHERE id = ? AND salon_id = ? AND active = 1', [takerId, req.salon.id]);
@@ -788,10 +789,10 @@ router.post('/:id/taken', requireAdminOrBarber, wrap(async (req, res) => {
   );
   if (!upd.affectedRows) return res.status(409).json({ error: 'Ce client n\'attend plus : rafraîchissez la liste.' });
   await pool.query('UPDATE appointments SET barber_id = ? WHERE promoted_queue_id = ? AND salon_id = ?', [takerId, row.id, req.salon.id]);
-  const [[from]] = await pool.query('SELECT name FROM barbers WHERE id = ?', [row.barber_id]);
+  const [[from]] = row.barber_id ? await pool.query('SELECT name FROM barbers WHERE id = ?', [row.barber_id]) : [[null]];
   const [[rep]] = reporter ? await pool.query('SELECT name FROM barbers WHERE id = ?', [reporter]) : [[null]];
   logActivity(req.salon.id, 'client_taken',
-    taker.name + ' a pris "' + row.client_name + '" (attendait ' + (from ? from.name : '?') + ')' + (mode === 'done' ? ', déjà fait' : ''),
+    taker.name + ' a pris "' + row.client_name + '" (attendait ' + (from ? from.name : 'le premier disponible') + ')' + (mode === 'done' ? ', déjà fait' : ''),
     rep ? rep.name : 'Admin');
   await recompute(req.salon.id);
   res.json({ ok: true, mode, taker: taker.name });

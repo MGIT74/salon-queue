@@ -73,10 +73,15 @@ const row = async (id) => (await pool.query('SELECT status, barber_id, taken_fro
     await ins('t160-x', 'T160 X', 'b1', 3);
     r = await call('POST', '/api/queue/t160-x/taken', { barber_id: 't160z', mode: 'done' }, BOB);
     check('Bob ne peut pas donner le client d\'Alice à Zoe (ni à lui, ni le sien)', r.status === 403, JSON.stringify(r.data));
-    r = await call('POST', '/api/queue/t160-rdv/taken', { barber_id: 'b2', mode: 'done' }, BOB);
-    check('client avec RDV : refusé', r.status === 400, JSON.stringify(r.data));
-    r = await call('POST', '/api/queue/t160-libre/taken', { barber_id: 'b2', mode: 'done' }, BOB);
-    check('client « premier disponible » : refusé (déjà « Commencer » pour tous)', r.status === 400, JSON.stringify(r.data));
+    r = await call('POST', '/api/queue/t160-rdv/taken', { barber_id: 'b2', mode: 'done' }, ALICE);
+    const rd = await row('t160-rdv');
+    check('client avec RDV : Alice signale que Bob l\'a pris -> chez Bob', r.status === 200 && rd.barber_id === 'b2' && rd.taken_from_barber_id === 'b1', JSON.stringify(r.data));
+    r = await call('POST', '/api/queue/t160-libre/taken', { barber_id: 't160z', mode: 'done' }, BOB);
+    const lb = await row('t160-libre');
+    check('client « premier disponible » : Bob signale que Zoe l\'a pris -> chez Zoe', r.status === 200 && lb.barber_id === 't160z' && lb.taken_from_barber_id === null, JSON.stringify(r.data));
+    r = await call('GET', '/api/queue/taken-notices', null, ZOE);
+    const nl = (r.data.items || []).find((n) => n.id === 't160-libre');
+    check('Zoe prévenue (il attendait le premier disponible)', nl && nl.lost === false && nl.from_name === null, JSON.stringify(nl));
     r = await call('POST', '/api/queue/t160-karim/taken', { barber_id: 'b1', mode: 'done' }, ALICE);
     check('client qui n\'attend plus : refusé', r.status === 409, JSON.stringify(r.data));
     r = await call('POST', '/api/queue/t160-x/taken', { barber_id: 'b1', mode: 'done' }, ALICE);
@@ -87,13 +92,17 @@ const row = async (id) => (await pool.query('SELECT status, barber_id, taken_fro
     await clean();
   }
 
-  // --- Poste ---
+  // --- Poste et caisse ---
   const h = fs.readFileSync(path.join(__dirname, '../../public/poste.html'), 'utf8');
-  check('poste : bloc « Chez les autres coiffeurs » avec « Je l\'ai pris »', h.includes('Chez les autres coiffeurs · ') && h.includes("Je l\\'ai pris</button>") && /function takenOthers\(\)/.test(h));
-  check('poste : « Je commence maintenant » / « Je l\'ai déjà fait »', h.includes('Je commence maintenant') && h.includes("Je l\\'ai déjà fait") && h.includes("'/api/queue/' + id + '/taken'"));
-  check('poste : « Pris par un collègue ? » sur ses clients sans RDV', h.includes('Pris par un collègue ?') && h.includes('Qui a pris '));
+  const c = fs.readFileSync(path.join(__dirname, '../../public/caisse.html'), 'utf8');
+  const app = fs.readFileSync(path.join(__dirname, '../../public/app.js'), 'utf8');
+  check('poste : vrai bouton « Pris par un collègue » sur toute la liste', /'<div class="next-btns">' \+\n[^\n]*\n\s*\(takenColleagues\(q\)\.length \? '<button class="btn btn-soft" onclick="takenByColleague\(/.test(h));
+  check('caisse : même bouton, « moi » = la bulle choisie', /\(takenColleaguesOf\(q, activeBarberId, allBarbers\)\.length \? '<button class="btn btn-soft" onclick="takenByColleague\(/.test(c) && /takenColleagueDialog\(id, \{ meId: activeBarberId, barbers: allBarbers/.test(c));
+  check('fenêtres communes (app.js) : « Qui a pris » puis commencer / déjà fait', app.includes('function takenColleagueDialog(') && app.includes('Qui a pris ') && app.includes('Je commence maintenant') && app.includes("'/api/queue/' + id + '/taken'"));
+  check('poste : bloc « Chez les autres coiffeurs » avec « Je l\'ai pris » (inchangé)', h.includes('Chez les autres coiffeurs · ') && h.includes("Je l\\'ai pris</button>"));
   check('poste : message « X a pris Y » + OK', h.includes("'/api/queue/taken-notices'") && h.includes(" a pris ") && h.includes('takenSeenOk('));
   check('poste : étiquette « pris à Alice » sur la coupe en cours', h.includes("'pris à ' + esc("));
+  check('app.js / app.css rechargés (v=52 / v=45)', h.includes('app.js?v=52') && c.includes('app.js?v=52') && h.includes('app.css?v=45'));
   await pool.end();
   console.log(`\n${pass} OK, ${fail} ECHEC`);
   process.exit(fail ? 1 : 0);
