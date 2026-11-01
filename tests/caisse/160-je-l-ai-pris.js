@@ -99,7 +99,8 @@ const row = async (id) => (await pool.query('SELECT status, barber_id, taken_fro
   check('poste : vrai bouton « Pris par un collègue » sur toute la liste', /'<div class="next-btns">' \+\n[^\n]*\n\s*\(takenColleagues\(q\)\.length \? '<button class="btn btn-soft" onclick="takenByColleague\(/.test(h));
   check('caisse : même bouton, « moi » = la bulle choisie', /\(takenColleaguesOf\(q, activeBarberId, allBarbers\)\.length \? '<button class="btn btn-soft" onclick="takenByColleague\(/.test(c) && /takenColleagueDialog\(id, \{ meId: activeBarberId, barbers: allBarbers/.test(c));
   check('fenêtres communes (app.js) : « Qui a pris » puis commencer / déjà fait', app.includes('function takenColleagueDialog(') && app.includes('Qui a pris ') && app.includes('Je commence maintenant') && app.includes("'/api/queue/' + id + '/taken'"));
-  check('poste : bloc « Chez les autres coiffeurs » avec « Je l\'ai pris » (inchangé)', h.includes('Chez les autres coiffeurs · ') && h.includes("Je l\\'ai pris</button>"));
+  check('poste : plus de bloc « Chez les autres coiffeurs » (le bouton suffit)', !h.includes('Chez les autres coiffeurs') && !h.includes('takenOthersHtml'));
+  check('poste : une coupe en cours ne cache plus la liste, elle bloque seulement « Commencer »', h.includes('var locked = somethingActive || i > 0') && !h.includes('Terminez la coupe en cours pour passer à la suivante'));
   check('poste : message « X a pris Y » + OK', h.includes("'/api/queue/taken-notices'") && h.includes(" a pris ") && h.includes('takenSeenOk('));
   check('poste : étiquette « pris à Alice » sur la coupe en cours', h.includes("'pris à ' + esc("));
   check('app.js / app.css rechargés (v=52 / v=45)', h.includes('app.js?v=52') && c.includes('app.js?v=52') && h.includes('app.css?v=45'));

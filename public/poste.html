@@ -168,10 +168,7 @@
     50% { box-shadow: 0 0 0 4px var(--orange, #f97316); }
   }
   .next-info { cursor: pointer; flex: 1; min-width: 140px; }
-  /* « Je l'ai pris » : clients sans RDV qui attendent les autres coiffeurs */
-  .tk-others { border: 1.5px dashed var(--sep); border-radius: 18px; padding: 10px 10px 0; margin-bottom: 14px; }
-  .tk-others .next-card { box-shadow: none; padding: 12px 14px; }
-  .tk-label-hint { font-weight: 500; letter-spacing: 0; text-transform: none; }
+  /* « Pris par un collègue » : étiquette et messages */
   .tk-from { font-size: 12px; font-weight: 600; color: var(--ink); background: var(--fill); border-radius: 99px; padding: 3px 9px 3px 3px; display: inline-flex; align-items: center; gap: 6px; margin: -2px 0 8px; }
   .tk-notices { position: fixed; left: 50%; transform: translateX(-50%); bottom: 84px; z-index: 900; width: min(440px, calc(100% - 32px)); display: flex; flex-direction: column; gap: 8px; }
   .tk-notice { background: #1d1d1f; color: #fff; border-radius: 16px; padding: 12px 14px; display: flex; align-items: center; gap: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
@@ -1145,10 +1142,8 @@ function renderNext() {
   // Ne pas reconstruire pendant une saisie (note), voir plus bas.
   var editingNow = zone.contains(document.activeElement) && document.activeElement !== document.body;
   if (editingNow && zone.children.length) return;
-  if (myActive()) {
-    zone.innerHTML = '<div class="empty">Terminez la coupe en cours pour passer à la suivante</div>' + takenOthersHtml();
-    return;
-  }
+  // Comme dans la caisse : une coupe en cours ne cache plus la liste des suivants, elle bloque seulement « Commencer ».
+  var somethingActive = myActive();
 
   // Ne pas reconstruire pendant que l'utilisateur interagit (note en
   // cours de frappe) — sinon le rafraîchissement automatique (toutes
@@ -1161,7 +1156,7 @@ function renderNext() {
   }).sort(function (a, b) { return new Date(a.checkin_at) - new Date(b.checkin_at); });
 
   if (mine.length === 0) {
-    zone.innerHTML = '<div class="empty">Personne en attente pour vous pour le moment</div>' + takenOthersHtml();
+    zone.innerHTML = '<div class="empty">Personne en attente pour vous pour le moment</div>';
     return;
   }
 
@@ -1171,7 +1166,7 @@ function renderNext() {
     var startAt = q.is_appointment ? timerStartAllowedAt(q, timerCfg, me && me.id) : 0;
     var tooEarly = isAppointmentNotYet && Date.now() < startAt;
     var noTimerBarber = me.timerEnabled === false;
-    var locked = i > 0 || (tooEarly && !noTimerBarber);
+    var locked = somethingActive || i > 0 || (tooEarly && !noTimerBarber);
     var detail = svcLabel(q.service.name, q.extras);
     var open = Boolean(nextDetailOpen[q.id]);
     var minutesUntil = isAppointmentNotYet ? Math.round((new Date(q.checkin_at) - new Date()) / 60000) : null;
@@ -1215,37 +1210,14 @@ function renderNext() {
         '<button class="btn btn-soft" onclick="saveNextNote(\'' + q.id + '\')">Enregistrer la note</button>' +
       '</div>' +
     '</div>';
-  }).join('') + takenOthersHtml();
+  }).join('');
 }
 
-/* ---------- « Je l'ai pris » : un coiffeur a pris en vrai le client sans RDV d'un autre ----------
-   Tout coiffeur peut le signaler (celui qui l'a pris, ou celui qui l'avait). Le client passe chez le preneur
+/* ---------- « Pris par un collègue » : un client de la liste a été pris en vrai par un autre coiffeur ----------
+   Le client passe chez le preneur
    (coupe demarree, ou deja faite = a encaisser) ; l'autre coiffeur est seulement prevenu (takenNotices). */
-function takenOthers() {
-  return queue.filter(function (q) {
-    return q.status === 'waiting' && !q.is_appointment && q.barber_id && q.barber_id !== me.id;
-  }).sort(function (a, b) { return new Date(a.checkin_at) - new Date(b.checkin_at); });
-}
 function takenBarber(id) { return (barbers || []).find(function (b) { return b.id === id; }) || { id: id, name: '?' }; }
 function takenColleagues(q) { return takenColleaguesOf(q, me.id, barbers); }
-function takenSince(q) {
-  var m = Math.max(0, Math.round((Date.now() - new Date(q.checkin_at).getTime()) / 60000));
-  return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h ' + String(m % 60).padStart(2, '0');
-}
-function takenOthersHtml() {
-  var list = takenOthers();
-  if (!list.length) return '';
-  return '<div class="section-label" style="margin-top:18px">Chez les autres coiffeurs · ' + list.length +
-      ' <span class="tk-label-hint">— vous en avez pris un ? touchez « Je l\'ai pris »</span></div>' +
-    '<div class="tk-others">' + list.map(function (q) {
-      var b = takenBarber(q.barber_id);
-      return '<div class="next-item"><div class="next-card">' + barberAvatarHtml(b, barbers, 36) +
-        '<div class="next-info" style="cursor:default"><div class="name">' + esc(q.client_name) + '</div>' +
-        '<div class="meta">' + esc(svcLabel(q.service.name, q.extras)) + ' · attend <b style="color:var(--ink)">' + esc(b.name) + '</b> · depuis ' + takenSince(q) + '</div></div>' +
-        '<div class="next-btns"><button class="btn btn-soft" onclick="takenOpen(\'' + q.id + '\', \'' + me.id + '\')">Je l\'ai pris</button></div>' +
-      '</div></div>';
-    }).join('') + '</div>';
-}
 // Fenêtres « Je l'ai pris » / « Pris par un collègue » : communes au poste et à la caisse (app.js).
 function takenCtx() { return { meId: me.id, barbers: barbers, queue: queue, refresh: refresh }; }
 function takenOpen(id, takerId) { takenDialog(id, takerId, takenCtx()); }
