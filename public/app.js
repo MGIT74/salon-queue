@@ -2043,16 +2043,29 @@ function takenColleagueDialog(id, ctx) {
   var q = (ctx.queue || []).find(function (x) { return x.id === id; });
   if (!q) return;
   var list = takenColleaguesOf(q, ctx.meId, ctx.barbers);
+  // Attente estimée de chaque coiffeur, même calcul que le kiosk (queue-sim.js), sans compter ce client-là.
+  var sim = null;
+  try {
+    if (window.QueueSim) sim = QueueSim.simulate({
+      now: Date.now(),
+      barbers: (ctx.barbers || []).filter(function (b) { return b.active !== 0 && b.active !== false; }).map(function (b) { return { id: b.id, walkin: !b.kiosk_hidden || !!b.walkin_today }; }),
+      entries: (ctx.queue || []).filter(function (x) { return x.id !== q.id; })
+    });
+  } catch (e) { sim = null; }
   var overlay = _buildModal(
     '<div class="modal-title" style="text-align:center">Qui a pris ' + esc(q.client_name) + ' ?</div>' +
     '<div class="modal-message" style="text-align:center">Il quitte cette file et passe chez ce coiffeur.</div>' +
     list.map(function (b) {
       var busy = (ctx.queue || []).some(function (x) { return x.status === 'in_progress' && x.barber_id === b.id; });
+      var w = sim ? sim.nextFor(b.id, Number(q.total_duration_min) || 0) : null;
+      var waitHtml = w === null ? '' : '<span class="tk-wait' + (w === 0 ? ' free' : '') + '">' + (w === 0 ? 'Disponible' : '~ ' + esc(formatMinutes(w))) +
+        '<small>' + (w === 0 ? 'tout de suite' : 'd\'attente') + '</small></span>';
       return '<button type="button" class="tk-choice" data-b="' + esc(b.id) + '">' + barberAvatarHtml(b, ctx.barbers, 38) +
-        '<span><div class="t">' + esc(b.name) + '</div><div class="d">' + (busy ? 'coupe en cours' : 'libre') + '</div></span></button>';
+        '<span style="flex:1;min-width:0"><div class="t">' + esc(b.name) + '</div><div class="d">' + (busy ? 'coupe en cours' : 'libre') + '</div></span>' + waitHtml + '</button>';
     }).join('') +
     '<div class="modal-actions" style="margin-top:12px"><button class="btn btn-ghost" id="tk-cancel">Annuler</button></div>'
   );
+  overlay.querySelector('.modal-box').classList.add('tk-wide');
   var close = function () { _closeModal(overlay); };
   overlay.querySelector('#tk-cancel').onclick = close;
   overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });

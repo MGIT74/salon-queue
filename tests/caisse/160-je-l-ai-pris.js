@@ -103,7 +103,8 @@ const row = async (id) => (await pool.query('SELECT status, barber_id, taken_fro
   check('poste : une coupe en cours ne cache plus la liste, elle bloque seulement « Commencer »', h.includes('var locked = somethingActive || i > 0') && !h.includes('Terminez la coupe en cours pour passer à la suivante'));
   check('poste : message « X a pris Y » + OK', h.includes("'/api/queue/taken-notices'") && h.includes(" a pris ") && h.includes('takenSeenOk('));
   check('poste : étiquette « pris à Alice » sur la coupe en cours', h.includes("'pris à ' + esc("));
-  check('app.js / app.css rechargés (v=52 / v=45)', h.includes('app.js?v=52') && c.includes('app.js?v=52') && h.includes('app.css?v=45'));
+  check('app.js / app.css rechargés (v=53 / v=46), queue-sim chargé', h.includes('app.js?v=53') && c.includes('app.js?v=53') && h.includes('app.css?v=46') && h.includes('queue-sim.js') && c.includes('queue-sim.js'));
+  check('« Qui a pris » : attente estimée de chaque coiffeur (comme le kiosk) + fenêtre élargie', app.includes('QueueSim.simulate(') && app.includes('tk-wait') && app.includes("classList.add('tk-wide')"));
   await pool.end();
   console.log(`\n${pass} OK, ${fail} ECHEC`);
   process.exit(fail ? 1 : 0);
