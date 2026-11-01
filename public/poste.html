@@ -546,6 +546,8 @@
   .pd-free b { margin-left: auto; color: var(--blue); font-size: 12px; }
   .pd-free:hover { border-color: var(--blue); }
   .pd-free.tall { align-items: flex-start; padding-top: 8px; }
+  .pd-free.tiny { font-size: 10.5px; padding: 0 8px; border-radius: 6px; }
+  .pd-free.tiny b { font-size: 10.5px; }
   .pd-break { position: absolute; left: 0; right: 0; box-sizing: border-box; border-radius: 8px; background: repeating-linear-gradient(135deg, transparent 0 6px, rgba(127,127,127,.16) 6px 12px); color: var(--grey); font-size: 11.5px; display: flex; align-items: center; padding: 0 10px; pointer-events: none; }
   .pd-now { position: absolute; left: 0; right: 0; border-top: 2px solid var(--red); z-index: 4; pointer-events: none; }
   .pd-now span { position: absolute; left: 0; top: -10px; background: var(--red); color: #fff; font-size: 10.5px; font-weight: 700; padding: 2px 6px; border-radius: 5px; }
@@ -1741,6 +1743,14 @@ function pdSearchHtml() {
     '<input id="pd-search" type="search" autocomplete="off" placeholder="' + (pdIsPhone() ? 'Rechercher un client…' : 'Rechercher un client (nom, téléphone, email)…') + '" value="' + esc(pdQuery) + '" oninput="pdSearchInput(this.value)" onkeydown="if(event.key===\'Escape\'){this.value=\'\';pdSearchInput(\'\');}" onfocus="if(this.value)pdRunSearch()"></label>' +
     '<div id="pd-results" class="pd-results" style="display:none"></div></div>';
 }
+// Durée la plus courte qu'on peut réserver chez ce coiffeur : ses prestations et ses suppléments (« supplément
+// seul »), avec ses durées à lui. Sert à montrer même les tout petits créneaux libres (5 min, 10 min...).
+function pdShortestItem(row) {
+  var list = (typeof barberItems === 'function' ? barberItems(row, 'services', services || []).concat(barberItems(row, 'extras', extras || [])) : (services || []).concat(extras || []))
+    .filter(function (x) { return x.active !== 0 && x.active !== false && Number(x.duration_min) > 0 && x.name !== EXTRAS_ONLY_NAME; })
+    .map(function (x) { return Number(x.duration_min); });
+  return list.length ? Math.min.apply(null, list) : 15;
+}
 function posteDayHtml(dateStr) {
   var closed = rdvIsSalonClosed(dateStr), past = isPastDay(dateStr);
   var nowStr = nowSalonDatetimeString(), isToday = nowStr.slice(0, 10) === dateStr;
@@ -1783,8 +1793,10 @@ function posteDayHtml(dateStr) {
     var busy = items.filter(function (it) { return it.barberId === bid && it.st !== 'absent'; }).map(function (it) { return [it.start, it.end]; })
       .concat(bd ? bd.breaks : []).sort(function (x, y) { return x[0] - y[0]; });
     var cur = Math.max(dayStart, isToday ? nowMin : dayStart);
-    busy.forEach(function (bz) { if (bz[0] - cur >= 15 && bz[0] <= dayEnd) out.push([cur, Math.min(bz[0], dayEnd)]); cur = Math.max(cur, bz[1]); });
-    if (dayEnd - cur >= 15) out.push([cur, dayEnd]);
+    // Le plus petit trou utile : la prestation OU le supplément seul le plus court de ce coiffeur (ex. 5 min).
+    var minD = pdShortestItem(row);
+    busy.forEach(function (bz) { if (bz[0] - cur >= minD && bz[0] <= dayEnd) out.push([cur, Math.min(bz[0], dayEnd)]); cur = Math.max(cur, bz[1]); });
+    if (dayEnd - cur >= minD) out.push([cur, dayEnd]);
     return out;
   }
   var free = freeSpansOf(myId);
@@ -1868,8 +1880,8 @@ function posteDayHtml(dateStr) {
       inner += '<div class="pd-break" style="top:' + Math.round((bk[0] - R0) * PX) + 'px;height:' + Math.max(14, Math.round((bk[1] - bk[0]) * PX) - 3) + 'px">Pause</div>';
     });
     (isMe ? free : freeSpansOf(b.id)).forEach(function (f) {
-      var h = Math.round((f[1] - f[0]) * PX) - 3;
-      inner += '<button type="button" class="pd-free' + (h >= 44 ? ' tall' : '') + '" style="top:' + Math.round((f[0] - R0) * PX) + 'px;height:' + h + 'px" onclick="event.stopPropagation();pdColAdd(event, \'' + dateStr + '\',\'' + b.id + '\')" title="Ajouter un RDV pour ' + esc(b.name) + '">Libre · ' + pdDur(f[1] - f[0]) + (h >= 18 ? '<b>+ Ajouter</b>' : '') + '</button>';
+      var h = Math.max(12, Math.round((f[1] - f[0]) * PX) - 3);
+      inner += '<button type="button" class="pd-free' + (h >= 44 ? ' tall' : '') + (h < 20 ? ' tiny' : '') + '" style="top:' + Math.round((f[0] - R0) * PX) + 'px;height:' + h + 'px" onclick="event.stopPropagation();pdColAdd(event, \'' + dateStr + '\',\'' + b.id + '\')" title="Ajouter un RDV pour ' + esc(b.name) + '">Libre · ' + pdDur(f[1] - f[0]) + '<b>+ Ajouter</b></button>';
     });
     pdLayout(items.filter(function (it) { return it.barberId === b.id; })).forEach(function (it) {
       var h = Math.max(16, Math.round(it.dur * PX) - 3), a = it.a;
