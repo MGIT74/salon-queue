@@ -421,7 +421,10 @@
   .pd-legend span { display: inline-flex; align-items: center; gap: 5px; }
   .pd-legend i { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
   .pd-g-row { display: grid; grid-template-columns: 130px minmax(0, 1fr) 130px; gap: 12px; align-items: center; width: 100%; border: none; background: transparent; color: var(--ink); padding: 3px 4px; border-radius: 9px; cursor: pointer; text-align: left; }
-  .pd-g-row:hover { background: var(--fill-2); }
+  .pd-g-row { cursor: default; }
+  .pd-g-row.pick { cursor: pointer; }
+  .pd-g-row.pick:hover { background: var(--fill-2); }
+  .pd-g-row .pd-g-add { cursor: pointer; }
   .pd-g-row.me .pd-g-name { font-weight: 800; }
   .pd-g-name { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; min-width: 0; }
   .pd-g-name span:last-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1827,14 +1830,18 @@ function posteDayHtml(dateStr) {
     var offTxt = offWhy ? esc(b.name) + ' ' + esc(offWhy) : (walkDay ? 'En « sans RDV » ce jour-là' : (!its.length ? 'Aucun RDV' : ''));
     var focus = pdFocusId ? pdFocusId === b.id : isMe;
     var walkMode = !!(rowB && (walkDay || !rowB.kiosk_hidden));
-    return '<button type="button" class="pd-g-row' + (isMe ? ' me' : '') + (focus ? ' focus' : '') + '" onclick="pdFocus(\'' + b.id + '\')" aria-label="Voir la journée de ' + esc(b.name) + '">' +
+    // Ordinateur / tablette : la photo et l'icône ne sont pas cliquables (seule la barre l'est : ajouter, ouvrir un RDV).
+    // Téléphone : toucher la ligne choisit la colonne affichée en dessous (une seule colonne à la fois).
+    var rowTag = pdIsPhone() ? 'button type="button"' : 'div';
+    return '<' + rowTag + ' class="pd-g-row' + (isMe ? ' me' : '') + (focus ? ' focus' : '') + (pdIsPhone() ? ' pick' : '') + '"' +
+      (pdIsPhone() ? ' onclick="pdFocus(\'' + b.id + '\')" aria-label="Voir la journée de ' + esc(b.name) + '"' : '') + '>' +
       '<span class="pd-g-name" title="' + esc(isMe ? b.name + ' (moi)' : b.name) + '">' + pdAvatarHtml(b) + '</span>' +   // juste la photo, le nom en info-bulle
       '<span class="pd-g-bar pd-g-add" title="Toucher un espace libre pour ajouter un RDV à ' + esc(b.name) + '" onclick="pdGlanceAdd(event, \'' + b.id + '\', \'' + dateStr + '\', ' + R0 + ', ' + SPAN + ')">' + segs + (offTxt ? '<span class="pd-g-off">' + offTxt + '</span>' : '') +
         (isToday && nowMin >= R0 && nowMin <= R1 ? '<span class="pd-g-now" style="left:' + pct(nowMin) + '%"></span>' : '') + '</span>' +
       // À droite : l'icône RDV ou Sans RDV de l'app (le détail en info-bulle).
       // Même règle que l'étiquette RDV / Sans RDV de l'app (barberModeTagHtml), pour ce jour-là.
       '<span class="pd-g-sum"><span class="pd-g-ic ' + (walkMode ? 'walk' : 'rdv') + (offWhy ? ' off' : '') + '" title="' + esc(b.name + ' — ' + (walkMode ? 'Sans RDV' : 'RDV') + ' — ' + sum1 + (sum2 ? ' · ' + sum2 : '')) + '">' +
-        rdvModeIconSvg(walkMode, 16) + '</span></span></button>';
+        rdvModeIconSvg(walkMode, 16) + '</span></span></' + (pdIsPhone() ? 'button' : 'div') + '>';
   }).join('');
   var ticks = '';
   // Telephone : une heure sur trois seulement (classe minor masquee), sinon les heures se chevauchent.
@@ -2120,7 +2127,7 @@ function pdWeekHtml(start) {
       return pdGlanceSegHtml(it, 'st-' + it.st, 'top:' + (3 + li * laneH) + 'px;bottom:auto;height:' + (laneH - 2) + 'px;left:' + pct(it.start) + '%;width:calc(' + (it.dur / SPAN * 100).toFixed(3) + '% - 1px);', barberColor(it.barberId), laneH >= 22 ? 2 : (laneH >= 13 ? 1 : 0));
     }).join('');
     var dd = new Date(d + 'T00:00:00');
-    return '<button type="button" class="pd-g-row' + (d === todayStr ? ' me' : '') + '" onclick="pdShowDay(\'' + d + '\')" aria-label="Ouvrir le ' + esc(dd.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })) + '">' +
+    return '<button type="button" class="pd-g-row pick' + (d === todayStr ? ' me' : '') + '" onclick="pdShowDay(\'' + d + '\')" aria-label="Ouvrir le ' + esc(dd.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })) + '">' +
       '<span class="pd-g-name"><span class="pd-wd' + (d === todayStr ? ' today' : '') + '">' + PD_WD[i] + ' ' + dd.getDate() + '</span></span>' +
       '<span class="pd-g-bar" style="height:' + barH + 'px">' + segs + (closed ? '<span class="pd-g-off">Salon fermé</span>' : (!its.length ? '<span class="pd-g-off">Aucun RDV</span>' : '')) +
         (d === todayStr && nowMin >= R0 && nowMin <= R1 ? '<span class="pd-g-now" style="left:' + pct(nowMin) + '%"></span>' : '') + '</span>' +
