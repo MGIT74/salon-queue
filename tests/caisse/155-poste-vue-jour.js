@@ -37,7 +37,7 @@ check('plus de colonne de cote : l\'agenda prend toute la largeur ; Moi seulemen
 check('telephone : une seule colonne (la sienne ou celle touchee)', /if \(pdIsPhone\(\)\) \{\n    var fid = pdFocusId/.test(poste));
 check('preferences gardees sans casser si le stockage est bloque (try/catch)', /try \{ localStorage\.setItem\('poste_day_only_me'/.test(poste) && /try \{\n  pdOnlyMe = localStorage\.getItem/.test(poste));
 check('Mois / Semaine : planning du jour choisi inchange (renderAgendaTimeline)', /posteAddBtnHtml\(dateStr\) \+\n    renderAgendaTimeline\(dateStr\)/.test(poste) && /function renderAgendaTimeline\(dateStr\)/.test(poste));
-check('mois : chaque jour = total des RDV + barre aux couleurs des coiffeurs (plus de texte)', /'<span class="pd-mbar">' \+ bar \+ '<\/span>'/.test(poste) && !/pd-mcount/.test(poste));
+check('mois : chaque jour = total des RDV + barre aux couleurs des coiffeurs (plus de texte)', poste.includes('<span class="pd-mbar">\' + bar + \'</span>') && !/pd-mcount/.test(poste));
 console.log('\n[D] Finitions (Mois / Semaine / Jour)');
 const L = ctx.pdLayout([{ start: 600, end: 630 }, { start: 615, end: 645 }, { start: 630, end: 660 }, { start: 700, end: 730 }]);
 check('RDV qui se chevauchent : cote a cote (voies), les autres en pleine largeur', L[0].lanes === 2 && L[1].lanes === 2 && L[2].lanes === 2 && L[0].lane === 0 && L[1].lane === 1 && L[2].lane === 0 && L[3].lanes === 1 && ctx.pdLaneCss(L[3]) === '' && /width:calc\(50\.000% - 2px\)/.test(ctx.pdLaneCss(L[1])));
