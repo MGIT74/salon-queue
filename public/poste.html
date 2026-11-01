@@ -1192,7 +1192,7 @@ function renderNext() {
       : '';
     return '<div class="next-item" data-id="' + q.id + '">' +
       '<div class="next-card' + (locked ? ' locked' : '') + (prepAlert ? ' prep-alert' : '') + '">' +
-        '<div class="next-info" onclick="toggleNextDetail(\'' + q.id + '\')">' +
+        '<div class="next-info" onclick="openNextClient(\'' + q.id + '\')">' +
           '<div class="name">' + queueSourceIconHtml(q) + esc(q.client_name) + '</div>' +
           '<div class="meta">' + esc(detail) + '</div>' +
           appointmentBadge +
@@ -1297,6 +1297,14 @@ function giftDetailHtml(gift) {
     '<span class="detail-label" style="color:' + (gift.explicit ? 'var(--green)' : 'var(--grey)') + '">' + title + '</span>' +
     '<span class="detail-value" style="font-weight:400">' + itemsList + '</span>' +
     '</div>';
+}
+
+// Toucher un client de la liste « À suivre » : le tiroir de droite avec toutes ses infos (comme dans l'agenda).
+// Client sans fiche d'agenda (ancien passage) : le petit détail sous la carte, comme avant.
+function openNextClient(queueId) {
+  barberApi('/api/appointments/lookup?queue_id=' + encodeURIComponent(queueId))
+    .then(function (r) { if (r && r.item) openApptDrawer(r.item); else toggleNextDetail(queueId); })
+    .catch(function () { toggleNextDetail(queueId); });
 }
 
 function toggleNextDetail(id) {
