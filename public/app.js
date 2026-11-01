@@ -2080,3 +2080,82 @@ function takenColleagueDialog(id, ctx) {
     btn.onclick = function () { close(); setTimeout(function () { takenDialog(id, btn.getAttribute('data-b'), ctx); }, 200); };
   });
 }
+
+/* ---------- « Modifier la prestation » d'un passage de la file (pas encore encaissé) ----------
+   Fenêtre commune : caisse (À encaisser) et listes « À suivre » du Timer (poste et caisse).
+   opts = { hint, actingAs (coiffeur du client), onSaved }. Enregistre via PUT /api/queue/:id. */
+function editQueueServiceDialog(q, opts) {
+  opts = opts || {};
+  Promise.all([barberApi('/api/catalog/services'), barberApi('/api/catalog/extras')]).then(function (responses) {
+    var services = (responses[0].items || []).filter(function (x) { return x.active !== 0 && x.active !== false; });
+    var extras = (responses[1].items || []).filter(function (x) { return x.active !== 0 && x.active !== false; });
+    var selectedService = q.service && q.service.id;
+    var selectedExtras = new Set((q.extras || []).map(function (e) { return e.id; }));
+    var tab = 'services';
+    var saving = false;
+    var html = '<div class="modal-title">Modifier la prestation de ' + esc(q.client_name) + '</div>' +
+      (opts.hint ? '<p class="hint" style="margin:0 0 14px">' + esc(opts.hint) + '</p>' : '') +
+      '<div class="qe-tabs finished-edit-tabs">' +
+      '<button type="button" data-tab="services" class="on">Prestations</button>' +
+      '<button type="button" data-tab="extras">Suppléments</button></div>' +
+      '<div class="finished-edit-grid" id="finished-edit-grid"></div>' +
+      '<div class="finished-edit-total"><span>Total actualisé</span><strong id="finished-edit-total"></strong></div>' +
+      '<div class="modal-actions"><button class="btn btn-soft" id="finished-service-cancel">Annuler</button>' +
+      '<button class="btn btn-primary" id="finished-service-save">Enregistrer</button></div>';
+    var overlay = _buildModal(html);
+    var grid = overlay.querySelector('#finished-edit-grid');
+    function totalCents() {
+      var svc = services.find(function (x) { return x.id === selectedService; });
+      var base = svc ? Number(svc.price_cents || 0) : 0;
+      var extrasTotal = extras.filter(function (x) { return selectedExtras.has(x.id); })
+        .reduce(function (sum, x) { return sum + Number(x.price_cents || 0); }, 0);
+      var productsTotal = (q.products || []).reduce(function (sum, x) {
+        return sum + Number(x.price_cents || 0) * Number(x.quantity || 1);
+      }, 0);
+      return base + extrasTotal + productsTotal;
+    }
+    function render() {
+      Array.prototype.forEach.call(overlay.querySelectorAll('.finished-edit-tabs button'), function (b) {
+        b.classList.toggle('on', b.dataset.tab === tab);
+      });
+      var items = tab === 'services' ? services : extras;
+      grid.innerHTML = items.length ? items.map(function (item) {
+        var on = tab === 'services' ? selectedService === item.id : selectedExtras.has(item.id);
+        return '<button type="button" class="finished-edit-card' + (on ? ' selected' : '') + '" data-id="' + esc(item.id) + '" aria-pressed="' + on + '">' +
+          '<span class="finished-edit-card-name">' + esc(item.name) + '</span>' +
+          '<span class="finished-edit-card-price">' + eur(item.price_cents) + '</span>' +
+          (on ? '<span class="finished-edit-check">✓</span>' : '') + '</button>';
+      }).join('') : '<div class="empty">Aucun article disponible.</div>';
+      overlay.querySelector('#finished-edit-total').textContent = eur(totalCents());
+    }
+    Array.prototype.forEach.call(overlay.querySelectorAll('.finished-edit-tabs button'), function (b) {
+      b.onclick = function () { tab = b.dataset.tab; render(); };
+    });
+    grid.onclick = function (e) {
+      var card = e.target.closest('.finished-edit-card');
+      if (!card) return;
+      var id = card.dataset.id;
+      if (tab === 'services') selectedService = id;
+      else if (selectedExtras.has(id)) selectedExtras.delete(id);
+      else selectedExtras.add(id);
+      render();
+    };
+    overlay.querySelector('#finished-service-cancel').onclick = function () { if (!saving) _closeModal(overlay); };
+    overlay.querySelector('#finished-service-save').onclick = function () {
+      if (saving || !selectedService) { if (!selectedService) toast('Sélectionnez une prestation.', true); return; }
+      saving = true;
+      var saveButton = overlay.querySelector('#finished-service-save');
+      saveButton.disabled = true;
+      var req = { method: 'PUT', body: { service_id: selectedService, extras: Array.from(selectedExtras) } };
+      if (opts.actingAs) req.actingAs = opts.actingAs;
+      barberApi('/api/queue/' + encodeURIComponent(q.id), req).then(function () {
+        _closeModal(overlay);
+        toast('Prestation et suppléments corrigés');
+        if (opts.onSaved) opts.onSaved();
+      }).catch(function (e) {
+        saving = false; saveButton.disabled = false; toast(e.message, true);
+      });
+    };
+    render();
+  }).catch(function (e) { toast(e.message, true); });
+}

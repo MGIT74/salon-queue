@@ -901,7 +901,9 @@ router.put('/:id', requireAdminOrBarber, wrap(async (req, res) => {
   const contactOnly = !service_id && extras === undefined && barber_id === undefined &&
     (client_name !== undefined || email !== undefined || phone !== undefined) &&
     Object.keys(req.body || {}).every((key) => ['client_name', 'email', 'phone'].includes(key));
-  if (req.actingBarberId && existing.barber_id !== req.actingBarberId && !contactOnly) {
+  // Client « premier disponible » pas encore commencé : n'importe quel coiffeur peut corriger sa prestation.
+  const freeWaiting = !existing.barber_id && existing.status === 'waiting';
+  if (req.actingBarberId && existing.barber_id !== req.actingBarberId && !contactOnly && !freeWaiting) {
     return res.status(403).json({ error: "Ce n'est pas votre client." });
   }
   // Fiche modifiee : chaque coordonnee saisie doit etre valide (un champ vide reste permis).

@@ -194,4 +194,5 @@ node tests/caisse/157-modifier-prestation-rdv.js  # RDV : modifier la prestation
 node tests/caisse/158-ticket-sans-accents.js  # Tickets imprimes sans accents (toutes marques d imprimante), tiroir inchange
 node tests/caisse/159-rdv-code-email.js  # RDV sans compte : email verifie par code a 6 chiffres (60 s, 3 codes, 3 essais), creneau garde puis libere
 node tests/caisse/160-je-l-ai-pris.js  # « Je l'ai pris » : client sans RDV pris par un autre coiffeur, l'autre est prevenu
+node tests/caisse/161-modifier-prestation-a-suivre.js  # « Modifier la prestation » dans les listes A suivre (poste et caisse)
 ```

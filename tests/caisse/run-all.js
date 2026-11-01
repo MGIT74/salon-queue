@@ -181,6 +181,7 @@ const suite = [
   ['158-ticket-sans-accents.js', false, ['exit']],
   ['159-rdv-code-email.js', false, ['exit']],
   ['160-je-l-ai-pris.js', false, ['exit']],
+  ['161-modifier-prestation-a-suivre.js', false, ['exit']],
 ];
 
 let bad = 0;

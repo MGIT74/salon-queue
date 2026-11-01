@@ -98,7 +98,7 @@
 .cal-day.salon-closed::after{content:'Fermé';display:block;font-size:10px;font-weight:700;color:var(--red,#e65c5c);margin-top:2px}
 .salon-closure-banner{padding:10px 13px;border-radius:9px;margin:0 0 12px;background:rgba(160,100,100,.13);color:var(--red,#e65c5c);font-weight:650;font-size:13px}
 </style>
-<link rel="stylesheet" href="/app.css?v=46">
+<link rel="stylesheet" href="/app.css?v=47">
 <style>
   html, body { min-height: 100%; }
   .wrap { max-width: 480px; margin: 0 auto; padding: 20px 18px 40px; }
@@ -760,7 +760,7 @@
   </button>
 </div>
 
-<script src="/app.js?v=54"></script>
+<script src="/app.js?v=55"></script>
 <script src="/queue-sim.js?v=1"></script>
 <script src="/autorefresh.js?v=3"></script>
 <script src="/staff-group.js?v=6"></script>
@@ -1192,6 +1192,8 @@ function renderNext() {
         '<div class="next-btns">' +
           // Ce client a été pris en vrai par un collègue : je le signale (il passe chez lui, il est prévenu).
           (takenColleagues(q).length ? '<button class="btn btn-soft" onclick="takenByColleague(\'' + q.id + '\')">Pris par un collègue</button>' : '') +
+          // Erreur de prestation à l'inscription : on la corrige avant de commencer.
+          '<button class="btn btn-soft" onclick="editWaitingService(\'' + q.id + '\')">Modifier la prestation</button>' +
           (locked ? '' : (
             me.timerEnabled === false
               ? '<button class="btn btn-primary" onclick="quickFinishMine(\'' + q.id + '\')">Je prends</button>'
@@ -1223,6 +1225,12 @@ function takenColleagues(q) { return takenColleaguesOf(q, me.id, barbers, queue)
 function takenCtx() { return { meId: me.id, barbers: barbers, queue: queue, refresh: refresh }; }
 function takenOpen(id, takerId) { takenDialog(id, takerId, takenCtx()); }
 function takenByColleague(id) { takenColleagueDialog(id, takenCtx()); }
+// « Modifier la prestation » d'un client pas encore commencé (fenêtre commune avec la caisse, app.js).
+function editWaitingService(id) {
+  var q = queue.find(function (x) { return x.id === id; });
+  if (!q) return;
+  editQueueServiceDialog(q, { hint: 'Client pas encore commencé : corrigez la prestation choisie.', actingAs: q.barber_id || undefined, onSaved: refresh });
+}
 // Messages « Bob a pris Karim » : affichés jusqu'à « OK » (mémorisé sur cet appareil).
 var takenSeen = {};
 try { takenSeen = JSON.parse(localStorage.getItem('poste_taken_seen') || '{}') || {}; } catch (e) { takenSeen = {}; }
