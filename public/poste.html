@@ -1762,24 +1762,32 @@ function posteDayHtml(dateStr) {
   var meDay = pdBarberDay((barbers || []).find(function (x) { return x.id === myId; }), dateStr);
   var lo = [salonDay ? salonDay.startMin : 9 * 60], hi = [salonDay ? salonDay.endMin : 19 * 60];
   if (meDay) { lo.push(meDay.start); hi.push(meDay.end); }
+  // Horaires des collègues aussi : leurs créneaux libres doivent tenir dans la grille.
+  team.forEach(function (t) { var d = pdBarberDay((barbers || []).find(function (x) { return x.id === t.id; }), dateStr); if (d) { lo.push(d.start); hi.push(d.end); } });
   items.forEach(function (it) { lo.push(it.start); hi.push(it.end); });
   var R0 = Math.floor(Math.min.apply(null, lo) / 60) * 60, R1 = Math.ceil(Math.max.apply(null, hi) / 60) * 60;
   if (R1 - R0 < 4 * 60) R1 = R0 + 4 * 60;
   var SPAN = R1 - R0, PX = pdPx;
   var pct = function (m) { return ((m - R0) / SPAN * 100).toFixed(3); };
 
-  // Mes créneaux libres : entre mes RDV, dans mes horaires (sinon ceux du salon), sans les pauses, à partir de maintenant.
-  var free = [];
-  if (myId && !closed && !past) {
-    var dayStart = meDay ? meDay.start : (salonDay ? salonDay.startMin : R0), dayEnd = meDay ? meDay.end : (salonDay ? salonDay.endMin : R1);
-    var busy = mine.filter(function (it) { return it.st !== 'absent'; }).map(function (it) { return [it.start, it.end]; })
-      .concat(meDay ? meDay.breaks : []).sort(function (x, y) { return x[0] - y[0]; });
+  // Créneaux libres d'un coiffeur : entre ses RDV, dans ses horaires (sinon ceux du salon), sans les pauses, à partir
+  // de maintenant. Pour moi et pour chaque collègue qui prend des RDV ce jour-là (rectangle « Libre · + Ajouter »).
+  function freeSpansOf(bid) {
+    var out = [];
+    if (!bid || closed || past) return out;
+    var row = (barbers || []).find(function (x) { return x.id === bid; });
+    if (row && (barberOffReason(row, dateStr) || isWalkinOn(row, dateStr))) return out;
+    if (bid !== myId && !(row && row.accepts_appointments)) return out;
+    var bd = pdBarberDay(row, dateStr);
+    var dayStart = Math.max(R0, bd ? bd.start : (salonDay ? salonDay.startMin : R0)), dayEnd = Math.min(R1, bd ? bd.end : (salonDay ? salonDay.endMin : R1));
+    var busy = items.filter(function (it) { return it.barberId === bid && it.st !== 'absent'; }).map(function (it) { return [it.start, it.end]; })
+      .concat(bd ? bd.breaks : []).sort(function (x, y) { return x[0] - y[0]; });
     var cur = Math.max(dayStart, isToday ? nowMin : dayStart);
-    busy.forEach(function (bz) { if (bz[0] - cur >= 15 && bz[0] <= dayEnd) free.push([cur, Math.min(bz[0], dayEnd)]); cur = Math.max(cur, bz[1]); });
-    if (dayEnd - cur >= 15) free.push([cur, dayEnd]);
-    var myRow = (barbers || []).find(function (x) { return x.id === myId; });
-    if (myRow && (barberOffReason(myRow, dateStr) || isWalkinOn(myRow, dateStr))) free = [];
+    busy.forEach(function (bz) { if (bz[0] - cur >= 15 && bz[0] <= dayEnd) out.push([cur, Math.min(bz[0], dayEnd)]); cur = Math.max(cur, bz[1]); });
+    if (dayEnd - cur >= 15) out.push([cur, dayEnd]);
+    return out;
   }
+  var free = freeSpansOf(myId);
 
   // 1) La recherche client est dans l'en-tête du coup d'œil (gain de place).
   var html = '';
@@ -1859,9 +1867,9 @@ function posteDayHtml(dateStr) {
     if (bd && !offWhy) bd.breaks.forEach(function (bk) {
       inner += '<div class="pd-break" style="top:' + Math.round((bk[0] - R0) * PX) + 'px;height:' + Math.max(14, Math.round((bk[1] - bk[0]) * PX) - 3) + 'px">Pause</div>';
     });
-    if (isMe) free.forEach(function (f) {
+    (isMe ? free : freeSpansOf(b.id)).forEach(function (f) {
       var h = Math.round((f[1] - f[0]) * PX) - 3;
-      inner += '<button type="button" class="pd-free' + (h >= 44 ? ' tall' : '') + '" style="top:' + Math.round((f[0] - R0) * PX) + 'px;height:' + h + 'px" onclick="event.stopPropagation();pdColAdd(event, \'' + dateStr + '\',\'' + myId + '\')">Libre · ' + pdDur(f[1] - f[0]) + (h >= 18 ? '<b>+ Ajouter</b>' : '') + '</button>';
+      inner += '<button type="button" class="pd-free' + (h >= 44 ? ' tall' : '') + '" style="top:' + Math.round((f[0] - R0) * PX) + 'px;height:' + h + 'px" onclick="event.stopPropagation();pdColAdd(event, \'' + dateStr + '\',\'' + b.id + '\')" title="Ajouter un RDV pour ' + esc(b.name) + '">Libre · ' + pdDur(f[1] - f[0]) + (h >= 18 ? '<b>+ Ajouter</b>' : '') + '</button>';
     });
     pdLayout(items.filter(function (it) { return it.barberId === b.id; })).forEach(function (it) {
       var h = Math.max(16, Math.round(it.dur * PX) - 3), a = it.a;
