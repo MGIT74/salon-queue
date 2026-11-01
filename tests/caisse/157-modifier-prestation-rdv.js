@@ -64,7 +64,8 @@ const DAY = d.toISOString().slice(0, 10);
 
   console.log('\n[C] Règles');
   r = await call('PUT', '/api/appointments/t157z/services', { service_id: 'sv1', extras: [] });
-  check('un coiffeur ne modifie pas le RDV d\'un collègue', r.status === 403);
+  // Depuis « permettre aux coiffeurs de gérer les RDV des collègues du salon » : un collègue peut le modifier.
+  check('un coiffeur du salon peut modifier le RDV d\'un collègue', r.status === 200, JSON.stringify(r.data));
   await pool.query("UPDATE appointments SET status = 'cancelled' WHERE id = 't157z'");
   r = await call('PUT', '/api/appointments/t157z/services', { service_id: 'sv1', extras: [] }, H('b2', '2222'));
   check('RDV annulé : pas modifiable', r.status === 409);

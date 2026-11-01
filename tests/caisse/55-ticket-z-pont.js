@@ -26,6 +26,7 @@ for (const [n, c] of [['caisse', caisse], ['admin', dash]]) {
   check(n + ' : envoi au pont via /api/tpe/print puis repli window.print()', /function printZNow\(\)[\s\S]*?\/api\/tpe\/print[\s\S]*?window\.print\(\)/.test(c) && /buildZText\(currentZClosing/.test(c));
 }
 check('admin : n\'envoie au pont que s\'il est configure (sinon dialogue navigateur)', /if \(!d\.tpe_bridge_url\) \{ done\(\); window\.print\(\); return; \}/.test(dash));
-check('caisse : sans pont, dialogue navigateur', /if \(!tpeBridgeUrl \|\| !currentZClosing\) \{ window\.print\(\); return; \}/.test(caisse));
+// Depuis « ticket Z sans dialogue navigateur » : la caisse relit le pont et prévient s'il manque, sans ouvrir le dialogue.
+check('caisse : pont relu avant impression, message s\'il manque', /function printZNow\(\)[\s\S]*?\/api\/settings\/public[\s\S]*?Pont d\\'impression non configuré/.test(caisse));
 check('app.js versionne (cache) sur les pages', /app\.js\?v=\d+/.test(caisse) && /app\.js\?v=\d+/.test(dash));
 console.log('\n' + pass + ' OK, ' + fail + ' ECHEC'); process.exit(fail ? 1 : 0);
