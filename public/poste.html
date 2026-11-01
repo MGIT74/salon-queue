@@ -592,20 +592,18 @@
   .pd-mday:hover { box-shadow: inset 0 0 0 2px var(--fill-2); }
   .pd-mday.empty { background: none !important; box-shadow: none !important; cursor: default; }
   .pd-mday.today { box-shadow: inset 0 0 0 2px var(--blue); }
-  .pd-mday.today .pd-mnum { color: var(--blue); }
   .pd-mday.past { opacity: .55; }
   .pd-mday.closed { background: repeating-linear-gradient(135deg, var(--card) 0 8px, var(--fill-2) 8px 16px); }
   .pd-mday.pd-hit { box-shadow: inset 0 0 0 3px #ffd60a; opacity: 1; }
   .pd-mday.pd-dim { opacity: .35; }
-  /* Proposition A : le numéro du jour en gros en haut (le total « 19 RDV » en gris à droite) ; en bas, une petite
-     étiquette grise par coiffeur : un point de sa couleur + son nombre (plus de ronds pleins qui ressemblent à des jours). */
-  .pd-mtop { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; width: 100%; }
-  .pd-mnum { font-size: 20px; font-weight: 800; letter-spacing: -.02em; line-height: 1.1; }
-  .pd-mtot { font-size: 11px; font-weight: 600; color: var(--grey); white-space: nowrap; }
-  .pd-mchips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: auto; }
-  .pd-mchip { display: inline-flex; align-items: center; gap: 4px; background: var(--fill-2); color: var(--ink); border-radius: 6px; padding: 2px 6px 2px 5px; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.3; }
-  .pd-mchip i { width: 8px; height: 8px; border-radius: 50%; flex: none; }
-  .pd-mchip b { font-weight: 600; }
+  /* Proposition B : le numéro du jour en petit en haut, le total des RDV en gros, et une barre partagée avec la
+     couleur de chaque coiffeur (sa part des RDV du jour). Le détail s'ouvre en touchant le jour. */
+  .pd-mnum { font-size: 13px; font-weight: 700; color: var(--grey); line-height: 1.4; }
+  .pd-mday.today .pd-mnum { background: var(--blue); color: #fff; border-radius: 99px; padding: 0 8px; }
+  .pd-mtot { margin-top: auto; font-size: 22px; font-weight: 800; letter-spacing: -.02em; line-height: 1.05; font-variant-numeric: tabular-nums; }
+  .pd-mtot small { font-size: 11px; font-weight: 600; color: var(--grey); letter-spacing: 0; margin-left: 2px; }
+  .pd-mbar { display: flex; gap: 2px; width: 100%; height: 6px; border-radius: 3px; overflow: hidden; }
+  .pd-mbar span { min-width: 3px; }
   .pd-mclosed { font-size: 11.5px; font-weight: 600; color: var(--grey); }
 
   /* Tablette (portrait) et petits ordinateurs : pas de colonne de cote, le prochain client passe au-dessus */
@@ -635,13 +633,11 @@
     .pd-glance-head .pd-search-wrap { flex-basis: 100%; max-width: none; order: 3; }
     .pd-mstats .pd-search-wrap { flex-basis: 100%; order: 9; }
     .pd-mday { min-height: 58px; padding: 5px; gap: 2px; border-radius: 9px; }
-    .pd-mnum { font-size: 14px; }
-    .pd-mtot { display: none; }
-    .pd-mchips { gap: 2px; }
-    /* Téléphone : juste les points de couleur des coiffeurs (les nombres prenaient trop de place). */
-    .pd-mchip { background: none; padding: 0; gap: 0; }
-    .pd-mchip b { display: none; }
-    .pd-mchip i { width: 8px; height: 8px; }
+    .pd-mnum { font-size: 11.5px; }
+    .pd-mday.today .pd-mnum { padding: 0 6px; }
+    .pd-mtot { font-size: 15px; }
+    .pd-mtot small { display: none; }
+    .pd-mbar { height: 4px; gap: 1px; }
     .pd-mgrid, .pd-mhead { gap: 4px; }
     .pd-wk-head b { font-size: 14px; }
     .pd-wk-block { justify-content: center; padding: 0 !important; }
@@ -2233,18 +2229,19 @@ function pdMonthHtml() {
     its.forEach(function (a) { var k = a.barber_id || 'none'; byB[k] = (byB[k] || 0) + 1; });
     // Toujours le même ordre d'un jour à l'autre (moi d'abord, puis l'équipe) pour repérer chaque coiffeur au premier coup d'œil.
     var order = function (k) { if (k === myId) return -1; var i = (barbers || []).findIndex(function (x) { return x.id === k; }); return i === -1 ? 999 : i; };
-    var chips = Object.keys(byB).sort(function (x, y) { return order(x) - order(y); }).slice(0, 5).map(function (k) {
+    var bar = Object.keys(byB).sort(function (x, y) { return order(x) - order(y); }).map(function (k) {
       // Pastille pleine de la couleur du coiffeur, le nombre de RDV dedans : rien à voir avec le numéro du jour.
       var col = k === 'none' ? '#8e8e93' : barberColor(k);
       var nm = k === 'none' ? 'Sans coiffeur' : ((barbers || []).find(function (x) { return x.id === k; }) || {}).name || '';
-      return '<span class="pd-mchip" title="' + esc(nm + ' : ' + byB[k] + ' RDV') + '"><i style="background:' + col + '"></i><b>' + byB[k] + '</b></span>';
+      // Part de ce coiffeur dans la barre du jour (sa couleur, largeur = son nombre de RDV).
+      return '<span style="flex:' + byB[k] + ';background:' + col + '" title="' + esc(nm + ' : ' + byB[k] + ' RDV') + '"></span>';
     }).join('');
     var closed = rdvIsSalonClosed(ds);
     var q = its.map(function (a) { return normText([a.client_name, a.email].join(' ')) + ' ' + String(a.phone || '').replace(/\D/g, ''); }).join(' | ');
     cells += '<button type="button" class="pd-mday' + (ds === todayStr ? ' today' : '') + (ds < todayStr ? ' past' : '') + (closed ? ' closed' : '') + '" data-q="' + esc(q) + '" onclick="pdShowDay(\'' + ds + '\')" aria-label="' + esc(new Date(ds + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })) + (its.length ? ', ' + its.length + ' RDV' : '') + '">' +
-      '<span class="pd-mtop"><span class="pd-mnum">' + d + '</span>' + (its.length && !closed ? '<span class="pd-mtot">' + its.length + ' RDV</span>' : '') + '</span>' +
+      '<span class="pd-mnum">' + d + '</span>' +
       (closed ? '<span class="pd-mclosed">Fermé</span>'
-        : (its.length ? '<span class="pd-mchips">' + chips + '</span>' : '')) +   // juste la couleur de chaque coiffeur et son nombre de RDV
+        : (its.length ? '<span class="pd-mtot">' + its.length + '<small>RDV</small></span><span class="pd-mbar">' + bar + '</span>' : '')) +   // juste la couleur de chaque coiffeur et son nombre de RDV
       '</button>';
   }
   while ((offset + nDays) % 7 && cells.split('pd-mday').length - 1 < 42) { cells += '<div class="pd-mday empty" aria-hidden="true"></div>'; offset++; }
