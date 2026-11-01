@@ -63,6 +63,7 @@ const svcOf = async (id) => (await pool.query('SELECT service_id FROM queue WHER
   const h = fs.readFileSync(path.join(__dirname, '../../public/poste.html'), 'utf8');
   const c = fs.readFileSync(path.join(__dirname, '../../public/caisse.html'), 'utf8');
   check('fenêtre commune editQueueServiceDialog (prestations / suppléments / total / PUT)', /function editQueueServiceDialog\(q, opts\)/.test(app) && app.includes("'/api/queue/' + encodeURIComponent(q.id)") && app.includes('Total actualisé'));
+  check('fenêtre : champ de recherche (prestations et suppléments, sans accents ni majuscules)', app.includes('id="qe-search"') && app.includes("fold(x.name).indexOf(needle)") && app.includes('Rechercher un supplément'));
   check('poste : bouton « Modifier la prestation » dans la liste À suivre', /onclick="editWaitingService\(\\'' \+ q\.id \+ '\\'\)">Modifier la prestation<\/button>/.test(h) && /function editWaitingService\(id\)/.test(h));
   check('caisse : bouton dans À suivre + « À encaisser » inchangé (même fenêtre)', /onclick="editWaitingService\(\\'' \+ q\.id \+ '\\'\)">Modifier la prestation<\/button>/.test(c) && /function editFinishedService\(queueId\)[\s\S]{0,300}editQueueServiceDialog\(q, \{ hint: 'Correction avant encaissement uniquement\.'/.test(c));
   await pool.end();

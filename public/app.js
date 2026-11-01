@@ -2098,6 +2098,7 @@ function editQueueServiceDialog(q, opts) {
       '<div class="qe-tabs finished-edit-tabs">' +
       '<button type="button" data-tab="services" class="on">Prestations</button>' +
       '<button type="button" data-tab="extras">Suppléments</button></div>' +
+      '<input type="search" class="qe-search" id="qe-search" placeholder="Rechercher une prestation" autocomplete="off">' +
       '<div class="finished-edit-grid" id="finished-edit-grid"></div>' +
       '<div class="finished-edit-total"><span>Total actualisé</span><strong id="finished-edit-total"></strong></div>' +
       '<div class="modal-actions"><button class="btn btn-soft" id="finished-service-cancel">Annuler</button>' +
@@ -2105,6 +2106,10 @@ function editQueueServiceDialog(q, opts) {
     var overlay = _buildModal(html);
     overlay.querySelector('.modal-box').classList.add('qe-wide');   // plus large sur ordinateur et tablette
     var grid = overlay.querySelector('#finished-edit-grid');
+    var search = overlay.querySelector('#qe-search');
+    // Recherche sans tenir compte des accents ni des majuscules (« coupe enfant », « barbe »...).
+    var fold = function (t) { return String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); };
+    search.oninput = function () { render(); };
     function totalCents() {
       var svc = services.find(function (x) { return x.id === selectedService; });
       var base = svc ? Number(svc.price_cents || 0) : 0;
@@ -2119,18 +2124,21 @@ function editQueueServiceDialog(q, opts) {
       Array.prototype.forEach.call(overlay.querySelectorAll('.finished-edit-tabs button'), function (b) {
         b.classList.toggle('on', b.dataset.tab === tab);
       });
-      var items = tab === 'services' ? services : extras;
+      var all = tab === 'services' ? services : extras;
+      var needle = fold(search.value).trim();
+      var items = needle ? all.filter(function (x) { return fold(x.name).indexOf(needle) !== -1; }) : all;
+      search.placeholder = tab === 'services' ? 'Rechercher une prestation' : 'Rechercher un supplément';
       grid.innerHTML = items.length ? items.map(function (item) {
         var on = tab === 'services' ? selectedService === item.id : selectedExtras.has(item.id);
         return '<button type="button" class="finished-edit-card' + (on ? ' selected' : '') + '" data-id="' + esc(item.id) + '" aria-pressed="' + on + '">' +
           '<span class="finished-edit-card-name">' + esc(item.name) + '</span>' +
           '<span class="finished-edit-card-price">' + eur(item.price_cents) + '</span>' +
           (on ? '<span class="finished-edit-check">✓</span>' : '') + '</button>';
-      }).join('') : '<div class="empty">Aucun article disponible.</div>';
+      }).join('') : '<div class="empty">' + (needle ? 'Aucun résultat pour « ' + esc(search.value.trim()) + ' ».' : 'Aucun article disponible.') + '</div>';
       overlay.querySelector('#finished-edit-total').textContent = eur(totalCents());
     }
     Array.prototype.forEach.call(overlay.querySelectorAll('.finished-edit-tabs button'), function (b) {
-      b.onclick = function () { tab = b.dataset.tab; render(); };
+      b.onclick = function () { tab = b.dataset.tab; search.value = ''; render(); };
     });
     grid.onclick = function (e) {
       var card = e.target.closest('.finished-edit-card');
