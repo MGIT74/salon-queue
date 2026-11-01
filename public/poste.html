@@ -598,10 +598,12 @@
   .pd-mday.pd-dim { opacity: .35; }
   /* Proposition B : le numéro du jour en petit en haut, le total des RDV en gros, et une barre partagée avec la
      couleur de chaque coiffeur (sa part des RDV du jour). Le détail s'ouvre en touchant le jour. */
-  .pd-mnum { font-size: 13px; font-weight: 700; color: var(--grey); line-height: 1.4; }
-  .pd-mday.today .pd-mnum { background: var(--blue); color: #fff; border-radius: 99px; padding: 0 8px; }
-  .pd-mtot { margin-top: auto; font-size: 22px; font-weight: 800; letter-spacing: -.02em; line-height: 1.05; font-variant-numeric: tabular-nums; }
-  .pd-mtot small { font-size: 11px; font-weight: 600; color: var(--grey); letter-spacing: 0; margin-left: 2px; }
+  /* Le numéro du jour reste LE gros chiffre de la case ; le nombre de RDV est petit, gris, collé à la barre
+     (« 15 RDV ») : on ne confond plus les deux. */
+  .pd-mnum { font-size: 19px; font-weight: 800; color: var(--ink); letter-spacing: -.02em; line-height: 1.15; }
+  .pd-mday.today .pd-mnum { color: var(--blue); }
+  .pd-mtot { margin-top: auto; font-size: 11.5px; font-weight: 600; color: var(--grey); line-height: 1.2; font-variant-numeric: tabular-nums; }
+  .pd-mtot small { font-size: inherit; font-weight: inherit; color: inherit; margin-left: 3px; }
   .pd-mbar { display: flex; gap: 2px; width: 100%; height: 6px; border-radius: 3px; overflow: hidden; }
   .pd-mbar span { min-width: 3px; }
   .pd-mclosed { font-size: 11.5px; font-weight: 600; color: var(--grey); }
@@ -633,10 +635,9 @@
     .pd-glance-head .pd-search-wrap { flex-basis: 100%; max-width: none; order: 3; }
     .pd-mstats .pd-search-wrap { flex-basis: 100%; order: 9; }
     .pd-mday { min-height: 58px; padding: 5px; gap: 2px; border-radius: 9px; }
-    .pd-mnum { font-size: 11.5px; }
-    .pd-mday.today .pd-mnum { padding: 0 6px; }
-    .pd-mtot { font-size: 15px; }
-    .pd-mtot small { display: none; }
+    .pd-mnum { font-size: 13px; }
+    .pd-mtot { display: none; }   /* téléphone : le jour + la barre de couleurs suffisent */
+    .pd-mbar { margin-top: auto; }
     .pd-mbar { height: 4px; gap: 1px; }
     .pd-mgrid, .pd-mhead { gap: 4px; }
     .pd-wk-head b { font-size: 14px; }
