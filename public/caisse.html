@@ -3387,20 +3387,34 @@ var currentZClosing = null, currentZSalonName = '';
  * reçus) ; sans pont, ou si l'envoi échoue, repli sur le dialogue d'impression du navigateur.
  */
 function printZNow() {
-  if (!tpeBridgeUrl || !currentZClosing) { window.print(); return; }
+  if (!currentZClosing) { toast('Aucun ticket Z à imprimer', true); return; }
   var btn = document.getElementById('z-print-btn');
   if (btn) btn.disabled = true;
-  var text = buildZText(currentZClosing, { salonName: currentZSalonName, labels: { especes: 'Especes', cb: 'Carte bancaire', autre: 'Autre' } });
-  barberApi('/api/tpe/print', { method: 'POST', body: { text: text, mode: tpePrintMode } })
-    .then(function (d) {
-      if (btn) btn.disabled = false;
-      if (d.ok) { toast('Ticket Z envoyé à l\'imprimante'); closeZTicket(); } else { window.print(); }
-    })
-    .catch(function () {
-      if (btn) btn.disabled = false;
-      toast('File d\'impression indisponible — le dialogue va s\'ouvrir', true);
-      window.print();
+  var done = function () { if (btn) btn.disabled = false; };
+  // Comme dans Admin : relire la configuration actuelle du pont avant chaque impression.
+  barberApi('/api/settings/public').then(function (cfg) {
+    if (!cfg.tpe_bridge_url) {
+      done();
+      toast('Pont d\'impression non configuré. Vérifiez la connexion dans les réglages.', true);
+      return;
+    }
+    var text = buildZText(currentZClosing, { salonName: currentZSalonName });
+    return barberApi('/api/tpe/print', {
+      method: 'POST',
+      body: { text: text, mode: cfg.tpe_print_mode === 'text' ? 'text' : 'escpos' }
+    }).then(function (result) {
+      done();
+      if (result.ok) {
+        toast('Ticket Z envoyé à l\'imprimante');
+        closeZTicket();
+      } else {
+        toast('Impression du ticket Z échouée. Vérifiez le pont et réessayez.', true);
+      }
     });
+  }).catch(function () {
+    done();
+    toast('Pont d\'impression indisponible. Vérifiez la connexion et réessayez.', true);
+  });
 }
 
 function printZTicket(id) {
@@ -5254,32 +5268,39 @@ var currentReceiptCtx = null;
  * bloquer l'encaissement.
  */
 function printReceiptSilent() {
-  if (!tpeBridgeUrl || !currentReceiptCtx) { window.print(); return; }
+  if (!currentReceiptCtx) { toast('Aucun ticket à imprimer', true); return; }
   var btn = document.getElementById('receipt-print-btn');
-  if (btn) { btn.disabled = true; }
-  var ticketText = buildReceiptText(currentReceiptCtx.lines, currentReceiptCtx.total, currentReceiptCtx.method, {
-    cashCents: currentReceiptCtx.cashCents,
-    whenDate: currentReceiptCtx.whenDate, ticketNumber: currentReceiptCtx.ticketNumber,
-    barberName: currentReceiptCtx.barberName, salonName: currentReceiptCtx.salonName
-  });
-  barberApi('/api/tpe/print', {
-    method: 'POST',
-    body: { text: ticketText, mode: tpePrintMode }
-  })
-    .then(function (d) {
-      if (btn) { btn.disabled = false; }
-      if (d.ok) {
+  if (btn) btn.disabled = true;
+  var done = function () { if (btn) btn.disabled = false; };
+  // Recharger la configuration, comme pour le Z : ne pas dépendre de la valeur au chargement de la page.
+  barberApi('/api/settings/public').then(function (cfg) {
+    if (!cfg.tpe_bridge_url) {
+      done();
+      toast('Pont d\'impression non configuré. Vérifiez la connexion.', true);
+      return;
+    }
+    var ctx = currentReceiptCtx;
+    var ticketText = buildReceiptText(ctx.lines, ctx.total, ctx.method, {
+      cashCents: ctx.cashCents,
+      whenDate: ctx.whenDate, ticketNumber: ctx.ticketNumber,
+      barberName: ctx.barberName, salonName: ctx.salonName
+    });
+    return barberApi('/api/tpe/print', {
+      method: 'POST',
+      body: { text: ticketText, mode: cfg.tpe_print_mode === 'text' ? 'text' : 'escpos' }
+    }).then(function (result) {
+      done();
+      if (result.ok) {
         toast('Ticket envoyé à l\'imprimante');
         closeReceipt();
       } else {
-        window.print();
+        toast('Impression échouée. Vérifiez le pont et réessayez.', true);
       }
-    })
-    .catch(function () {
-      if (btn) { btn.disabled = false; }
-      toast('File d\'impression indisponible — le dialogue va s\'ouvrir', true);
-      window.print();
     });
+  }).catch(function () {
+    done();
+    toast('Pont d\'impression indisponible. Vérifiez la connexion et réessayez.', true);
+  });
 }
 
 /**
