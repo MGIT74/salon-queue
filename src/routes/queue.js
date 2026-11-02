@@ -545,40 +545,72 @@ async function insertCheckin(salonId, d, offsetSec = 0) {
 // Meme compteur pour une personne seule et pour un groupe : un groupe compte comme UNE inscription.
 const checkinLimiter = signupRateLimiter('queue-checkin', { max: 12, windowMs: 15 * 60 * 1000, blockMs: 15 * 60 * 1000 });
 
-// --- Kiosk : heure de fermeture du salon (stricte) -------------------------
-// Horaires du salon (Réglages > Calendrier) et fermetures exceptionnelles : un client sans RDV n'est inscrit au kiosk
-// que si sa coupe (attente estimée + durée) finit au plus tard à la fermeture du salon. Horaires du salon jamais
-// réglés : pas de limite (comme avant). Le poste et la caisse peuvent toujours ajouter un client à la main.
+// --- Kiosk : heure de fin (stricte) -----------------------------------------
+// Un client sans RDV n'est inscrit au kiosk que si sa coupe (attente estimée + durée) finit au plus tard à la fin de
+// journée de SON coiffeur :
+//  - horaires généraux du salon ACTIFS ce jour-là (Réglages > Calendrier) : fin = la plus tôt entre la fermeture du
+//    salon et la fin des horaires du coiffeur (un coiffeur qui part plus tôt devient complet plus tôt) ;
+//  - jour DÉSACTIVÉ dans les horaires généraux (ex. dimanche) : chaque coiffeur suit ses propres horaires ;
+//  - « Premier disponible » : la fin la plus tardive des coiffeurs (n'importe lequel peut le prendre).
+// Fermeture exceptionnelle du salon : fermé. Aucun horaire nulle part : pas de limite. Poste et caisse : libres.
 const toMinHM = (t) => Number(String(t).slice(0, 2)) * 60 + Number(String(t).slice(3, 5));
+const hmOf = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
 async function salonDayLimits(salonId) {
   const settings = await getSettings(salonId);
   const now = nowParisDatetimeString(settings.timezone);
   const date = now.slice(0, 10), nowMin = toMinHM(now.slice(11, 16));
+  const weekday = new Date(date + 'T00:00:00Z').getUTCDay();
   const [[closure]] = await pool.query('SELECT id FROM salon_closures WHERE salon_id = ? AND start_date <= ? AND end_date >= ? LIMIT 1', [salonId, date, date]);
   if (closure) return { limited: true, closed: true, reason: 'closure', now_min: nowMin };
   const [rows] = await pool.query('SELECT weekday, start_time, end_time, active FROM salon_schedules WHERE salon_id = ?', [salonId]);
-  if (!rows.length) return { limited: false, closed: false, now_min: nowMin };
-  const weekday = new Date(date + 'T00:00:00Z').getUTCDay();
-  const day = rows.find((r) => r.active && Number(r.weekday) === weekday);
-  if (!day) return { limited: true, closed: true, reason: 'day', now_min: nowMin };
-  const openMin = toMinHM(day.start_time), closeMin = toMinHM(day.end_time);
-  return { limited: true, closed: nowMin >= closeMin, reason: nowMin >= closeMin ? 'over' : null, now_min: nowMin,
-           open_min: openMin, close_min: closeMin, open_time: String(day.start_time).slice(0, 5), close_time: String(day.end_time).slice(0, 5) };
+  const gen = rows.find((r) => r.active && Number(r.weekday) === weekday) || null;
+  const genOpen = gen ? toMinHM(gen.start_time) : null, genClose = gen ? toMinHM(gen.end_time) : null;
+  const [barbers] = await pool.query('SELECT id FROM barbers WHERE salon_id = ? AND active = 1', [salonId]);
+  const [bs] = await pool.query(
+    'SELECT bs.barber_id, bs.weekday, bs.start_time, bs.end_time, bs.active FROM barber_schedules bs JOIN barbers b ON b.id = bs.barber_id WHERE b.salon_id = ?', [salonId]);
+  const barberClose = {}, barberOpen = {};
+  barbers.forEach((b) => {
+    const own = bs.filter((x) => x.barber_id === b.id);
+    const today = own.find((x) => x.active && Number(x.weekday) === weekday);
+    // Horaires jamais réglés : pas de fin propre. Réglés mais pas ce jour-là : il ne travaille pas (fin = 0).
+    const ownEnd = own.length ? (today ? toMinHM(today.end_time) : 0) : null;
+    const ownStart = today ? toMinHM(today.start_time) : null;
+    if (gen) {
+      barberClose[b.id] = ownEnd === null ? genClose : Math.min(genClose, ownEnd);
+      barberOpen[b.id] = Math.max(genOpen, ownStart === null ? 0 : ownStart);
+    } else {
+      barberClose[b.id] = ownEnd;   // null = pas de limite
+      barberOpen[b.id] = ownStart === null ? 0 : ownStart;
+    }
+  });
+  const ends = Object.values(barberClose);
+  const anyClose = ends.some((e) => e === null) ? null : (ends.length ? Math.max(...ends) : null);
+  const limited = !!gen || ends.some((e) => e !== null);
+  const over = gen ? nowMin >= genClose : false;
+  return { limited, closed: over, reason: over ? 'over' : null, now_min: nowMin, general_active: !!gen,
+           open_min: genOpen, close_min: genClose, close_time: gen ? String(gen.end_time).slice(0, 5) : null,
+           barber_close: barberClose, barber_open: barberOpen, any_close: anyClose };
 }
 function closedMessage(l) {
   if (l.reason === 'closure') return 'Le salon est fermé aujourd\'hui.';
-  if (l.reason === 'day') return 'Le salon est fermé aujourd\'hui.';
   return 'Le salon est fermé (fermeture à ' + l.close_time + ').';
 }
-// Après inscription : chaque nouveau client doit finir avant la fermeture, sinon on annule l'inscription.
+// Fin de journée pour ce client : celle de son coiffeur, ou la plus tardive en « Premier disponible ».
+function endFor(l, barberId) {
+  if (barberId) return { end: l.barber_close[barberId] === undefined ? null : l.barber_close[barberId], open: l.barber_open[barberId] || 0 };
+  return { end: l.any_close, open: l.open_min || 0 };
+}
+// Après inscription : chaque nouveau client doit finir avant cette fin, sinon on annule l'inscription.
 async function overCloseTime(salonId, ids, l) {
-  if (!l.limited || l.close_min === undefined) return null;
+  if (!l.limited) return null;
   const rows = await loadQueue(salonId);
   for (const id of ids) {
     const r = rows.find((x) => x.id === id);
     if (!r) continue;
-    const start = Math.max(l.now_min + (Number(r.estimated_wait_min) || 0), l.open_min);
-    if (start + (Number(r.total_duration_min) || 0) > l.close_min) return r;
+    const lim = endFor(l, r.barber_id);
+    if (lim.end === null) continue;
+    const start = Math.max(l.now_min + (Number(r.estimated_wait_min) || 0), lim.open);
+    if (start + (Number(r.total_duration_min) || 0) > lim.end) return Object.assign({}, r, { limit_time: hmOf(lim.end) });
   }
   return null;
 }
@@ -594,7 +626,7 @@ async function removeCheckin(id) {
   await pool.query('DELETE FROM queue WHERE id = ?', [id]);
 }
 function tooLateMessage(r, l, group) {
-  return (group ? r.client_name + ' : ' : '') + 'plus assez de temps avant la fermeture du salon à ' + l.close_time +
+  return (group ? r.client_name + ' : ' : '') + 'plus assez de temps avant la fin de journée (' + r.limit_time + ')' +
     ' pour cette prestation' + (r.barber_id ? ' avec ce coiffeur' : '') + '. Choisissez une prestation plus courte' + (r.barber_id ? ' ou un autre coiffeur' : '') + ', ou revenez demain.';
 }
 
@@ -614,7 +646,7 @@ router.post('/checkin', checkinLimiter, wrap(async (req, res) => {
   const late = await overCloseTime(req.salon.id, [id], limits);
   if (late) {
     await removeCheckin(id); await recompute(req.salon.id);
-    return res.status(409).json({ code: 'too_late', close_time: limits.close_time, error: tooLateMessage(late, limits, false) });
+    return res.status(409).json({ code: 'too_late', close_time: late.limit_time, error: tooLateMessage(late, limits, false) });
   }
 
   const rows = await loadQueue(req.salon.id);
@@ -651,7 +683,7 @@ router.post('/checkin-group', checkinLimiter, wrap(async (req, res) => {
   if (late) {
     for (const id of ids) await removeCheckin(id);
     await recompute(req.salon.id);
-    return res.status(409).json({ code: 'too_late', close_time: limits.close_time, person_index: ids.indexOf(late.id), error: tooLateMessage(late, limits, true) });
+    return res.status(409).json({ code: 'too_late', close_time: late.limit_time, person_index: ids.indexOf(late.id), error: tooLateMessage(late, limits, true) });
   }
 
   const rows = await loadQueue(req.salon.id);

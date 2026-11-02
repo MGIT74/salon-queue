@@ -641,13 +641,18 @@ function finalLabel() { return grp ? 'Valider pour ' + grp.people[grp.current].n
 // Heure de fermeture du salon (stricte) : un coiffeur dont la file finit après la fermeture est « Complet aujourd'hui ».
 var dayLimits = null, dayLimitsAt = 0;
 function limitsNowMin() { return dayLimits ? dayLimits.now_min + Math.floor((Date.now() - dayLimitsAt) / 60000) : 0; }
-function fullToday(wait) {
-  if (!dayLimits || !dayLimits.limited || dayLimits.close_min === undefined) return false;
-  var start = Math.max(limitsNowMin() + (wait || 0), dayLimits.open_min);
-  return start + newClientMin() > dayLimits.close_min;
+// Fin de journée du coiffeur (horaires du salon si actifs ce jour-là, bornés par les siens ; sinon les siens).
+// « Premier disponible » (barberId vide) : la fin la plus tardive.
+function fullToday(wait, barberId) {
+  if (!dayLimits || !dayLimits.limited) return false;
+  var end = barberId ? (dayLimits.barber_close || {})[barberId] : dayLimits.any_close;
+  if (end === null || end === undefined) return false;
+  var open = barberId ? ((dayLimits.barber_open || {})[barberId] || 0) : (dayLimits.open_min || 0);
+  var start = Math.max(limitsNowMin() + (wait || 0), open);
+  return start + newClientMin() > end;
 }
 function salonClosedNow() {
-  return !!(dayLimits && (dayLimits.closed || (dayLimits.close_min !== undefined && limitsNowMin() >= dayLimits.close_min)));
+  return !!(dayLimits && (dayLimits.closed || (dayLimits.general_active && dayLimits.close_min !== null && limitsNowMin() >= dayLimits.close_min)));
 }
 function refresh() {
   return Promise.all([api('/api/queue'), api('/api/barbers'), api('/api/queue/day-limits').catch(function () { return null; })]).then(function (r) {
@@ -763,13 +768,13 @@ function renderBarberGrid() {
   // Le client garde sa place dans la file generale ; le premier coiffeur qui se libere le prend.
   // Salon fermé (jour fermé, fermeture exceptionnelle, heure passée) : plus d'inscription au kiosk.
   if (salonClosedNow()) {
-    document.getElementById('barber-grid').innerHTML = '<div class="kiosk-closed">' + (dayLimits.reason === 'closure' || dayLimits.reason === 'day' ? 'Le salon est fermé aujourd\'hui.' : 'Le salon est fermé.' + (dayLimits.close_time ? ' Fermeture à ' + esc(dayLimits.close_time) + '.' : '')) + '<small>À bientôt !</small></div>';
+    document.getElementById('barber-grid').innerHTML = '<div class="kiosk-closed">' + (dayLimits.reason === 'closure' ? 'Le salon est fermé aujourd\'hui.' : 'Le salon est fermé.' + (dayLimits.close_time ? ' Fermeture à ' + esc(dayLimits.close_time) + '.' : '')) + '<small>À bientôt !</small></div>';
     return;
   }
   var anyTile = '';
   if (barbers.length >= 2) {
     var aw = waitForBarber(null);
-    var anyFull = fullToday(aw);
+    var anyFull = fullToday(aw, '');
     if (anyFull) anyTile = '<button class="barber-card any-tile full" disabled>' +
       '<div class="barber-fallback"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="m15.5 11 2 2 4-4.5"/></svg></div>' +
       '<div class="barber-overlay"><div class="barber-name">Premier disponible</div><div class="barber-wait full">Complet aujourd\'hui</div></div></button>';
@@ -785,7 +790,7 @@ function renderBarberGrid() {
     var free = w === 0;
     var waitLabel = free ? 'Disponible' : (over ? '~' : '') + formatMinutes(w);
     // File qui finit après la fermeture du salon : « Complet aujourd'hui », pas cliquable.
-    var full = fullToday(w);
+    var full = fullToday(w, b.id);
     if (full) waitLabel = 'Complet aujourd\'hui';
     return '<button class="barber-card' + (b.photo_url ? ' has-photo' : '') + (full ? ' full' : '') + '"' +
       (full ? ' disabled' : ' onclick="pickBarberAndGo(\'' + b.id + '\')"') + '>' +
