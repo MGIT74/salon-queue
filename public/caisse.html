@@ -2731,13 +2731,10 @@ function openApptDrawer(a) {
   document.getElementById('ad-actions').style.display = adIsUpcoming(a) ? 'flex' : 'none';
   adRenderInfo();
   var noteBox = document.getElementById('ad-note-box');
-  if (adQueueId) {
-    noteBox.innerHTML =
-      '<textarea id="ad-note" rows="3" placeholder="Ex: préfère dégradé américain, allergie...">' + esc(a.note || '') + '</textarea>' +
-      '<button class="btn btn-soft" style="margin-top:8px" onclick="adSaveNote()">Enregistrer la note</button>';
-  } else {
-    noteBox.innerHTML = '<p class="hint" style="margin:0">La note interne sera disponible lorsque le RDV entrera dans la file.</p>';
-  }
+  // Note interne : toujours modifiable, même pour un RDV à venir (pas encore dans la file).
+  noteBox.innerHTML =
+    '<textarea id="ad-note" rows="3" placeholder="Ex: préfère dégradé américain, allergie...">' + esc(a.note || '') + '</textarea>' +
+    '<button class="btn btn-soft" style="margin-top:8px" onclick="adSaveNote()">Enregistrer la note</button>';
   adLoadDetails(a, adQueueId);
   document.getElementById('appt-drawer-backdrop').classList.add('on');
   _lockBodyScroll();
@@ -2803,9 +2800,10 @@ function adSaveInfo() {
 }
 
 function adSaveNote() {
-  if (!adAppt || !adQueueId) return;
+  if (!adAppt) return;
   var note = document.getElementById('ad-note').value;
-  barberApi('/api/queue/' + adQueueId + '/note', { method: 'PUT', body: { note: note }, actingAs: adAppt.barber_id || undefined })
+  // Dans la file : la note de la file ; RDV à venir : la même note, rattachée au client depuis le RDV.
+  barberApi(adQueueId ? '/api/queue/' + adQueueId + '/note' : '/api/appointments/' + adAppt.id + '/note', { method: 'PUT', body: { note: note }, actingAs: adAppt.barber_id || undefined })
     .then(function () { adAppt.note = note; toast('Note enregistrée'); })
     .catch(function (e) { toast(e.message, true); });
 }

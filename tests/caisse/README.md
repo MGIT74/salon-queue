@@ -199,4 +199,5 @@ node tests/caisse/162-coiffeur-tous-jours-desactives.js  # Coiffeur sans aucun j
 node tests/caisse/163-creneaux-a-la-suite.js  # Heures proposees a la suite selon la duree du RDV (+ « Voir toutes les heures » pour l'equipe)
 node tests/caisse/164-fini-plus-tot-timer.js  # Fini plus tot : temps libere avec le Timer, plage gardee sans Timer
 node tests/caisse/165-kiosk-fermeture-salon.js  # Kiosk : fin de journee stricte (salon si actif, sinon horaires du coiffeur)
+node tests/caisse/166-note-rdv-a-venir.js  # Note interne modifiable depuis le tiroir d'un RDV a venir (poste, caisse, admin)
 ```

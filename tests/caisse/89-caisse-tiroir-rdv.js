@@ -55,7 +55,8 @@ let JSDOM = null; try { JSDOM = require('jsdom').JSDOM; } catch (_) { /* absent 
     w.openAgendaClientDrawer('a1');
     check('clic sur un RDV a venir : le tiroir s\'ouvre avec le nom, le statut et les details', drawer() && $('ad-name').textContent === 'Tom' && /Confirmé/.test($('ad-badge').textContent) && /Coupe/.test($('ad-info').textContent) && /Thomas/.test($('ad-info').textContent));
     check('Deplacer + Annuler le RDV visibles', $('ad-actions').style.display === 'flex');
-    check('RDV pas encore dans la file : pas de crayon, note non modifiable', $('ad-edit-btn').style.display === 'none' && /entrera dans la file/.test($('ad-note-box').textContent));
+    // Coordonnées modifiables avant l'entrée en file (changement voulu), et note interne modifiable aussi (test 166).
+    check('RDV pas encore dans la file : crayon et note modifiables', $('ad-edit-btn').style.display === 'flex' && !!$('ad-note-box').querySelector('textarea'));
     await tick();
     check('Tiroir : fidelite + cadeau affiches (comme l\'admin)', $('ad-marketing-section').style.display === 'block' && /7 points/.test($('ad-marketing-content').textContent) && /Remise disponible/.test($('ad-marketing-content').textContent) && /3 points avant la remise \(10\)/.test($('ad-marketing-content').textContent) && /Cadeau disponible/.test($('ad-marketing-content').textContent));
     check('Tiroir : historique (RDV futur -> par contact), 5 passages dont 4 affiches', /5 passages au total/.test($('ad-visit-count').textContent) && $('ad-visits').querySelectorAll('.ad-visit-row').length === 4 && calls.some((c) => c[0] === 'api' && /client-history-by-contact\?/.test(c[2])));

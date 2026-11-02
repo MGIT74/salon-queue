@@ -1583,6 +1583,24 @@ async function applyMove(appt, date, time, finalBarberId, rdvSettings, extraIds,
  * Accessible à tous les coiffeurs authentifiés du salon, sans accès
  * supplémentaire aux opérations de caisse.
  */
+// Note interne du client depuis le tiroir d'un RDV (même avant son entrée dans la file, ex. RDV à venir) : même note
+// que celle de la file (client_notes, rattachée au client par email / téléphone / nom), visible partout.
+router.put('/:id/note', requireAdminOrBarber, wrap(async (req, res) => {
+  const [[a]] = await pool.query('SELECT client_name, email, phone FROM appointments WHERE id = ? AND salon_id = ?', [req.params.id, req.salon.id]);
+  if (!a) return res.status(404).json({ error: 'Rendez-vous introuvable' });
+  const key = clientKey(a);
+  if (!key) return res.status(400).json({ error: 'Impossible de rattacher une note à ce client' });
+  const note = String(req.body.note || '').trim().slice(0, 2000);
+  if (note) {
+    await pool.query(
+      `INSERT INTO client_notes (id, salon_id, client_key, note) VALUES (UUID(), ?, ?, ?)
+       ON DUPLICATE KEY UPDATE note = VALUES(note), updated_at = NOW()`, [req.salon.id, key, note]);
+  } else {
+    await pool.query('DELETE FROM client_notes WHERE salon_id = ? AND client_key = ?', [req.salon.id, key]);
+  }
+  res.json({ ok: true });
+}));
+
 router.put('/:id/contact', requireAdminOrBarber, wrap(async (req, res) => {
   const fields = ['client_name', 'email', 'phone'];
   if (!req.body || !fields.some((key) => Object.prototype.hasOwnProperty.call(req.body, key)) ||

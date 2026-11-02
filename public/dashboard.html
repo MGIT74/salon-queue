@@ -4197,9 +4197,12 @@ function renderDrawerVisits(items) {
 }
 
 function saveDrawerNote() {
-  if (!drawerQueueId) { toast('Impossible de rattacher une note - ce RDV n\'est pas encore dans la file (jour futur).', true); return; }
   var note = document.getElementById('drawer-note').value;
-  api('/api/queue/' + drawerQueueId + '/note', { method: 'PUT', body: { note: note } })
+  // RDV à venir (pas encore dans la file) : la même note, rattachée au client depuis le RDV.
+  var url = drawerQueueId ? '/api/queue/' + drawerQueueId + '/note'
+    : (drawerClientSource === 'appointment' && drawerClientId ? '/api/appointments/' + encodeURIComponent(drawerClientId) + '/note' : null);
+  if (!url) { toast('Impossible de rattacher une note à ce client.', true); return; }
+  api(url, { method: 'PUT', body: { note: note } })
     .then(function () {
       var q = queue.find(function (x) { return x.id === drawerQueueId; });
       if (q) q.note = note;
