@@ -545,12 +545,77 @@ async function insertCheckin(salonId, d, offsetSec = 0) {
 // Meme compteur pour une personne seule et pour un groupe : un groupe compte comme UNE inscription.
 const checkinLimiter = signupRateLimiter('queue-checkin', { max: 12, windowMs: 15 * 60 * 1000, blockMs: 15 * 60 * 1000 });
 
+// --- Kiosk : heure de fermeture du salon (stricte) -------------------------
+// Horaires du salon (Réglages > Calendrier) et fermetures exceptionnelles : un client sans RDV n'est inscrit au kiosk
+// que si sa coupe (attente estimée + durée) finit au plus tard à la fermeture du salon. Horaires du salon jamais
+// réglés : pas de limite (comme avant). Le poste et la caisse peuvent toujours ajouter un client à la main.
+const toMinHM = (t) => Number(String(t).slice(0, 2)) * 60 + Number(String(t).slice(3, 5));
+async function salonDayLimits(salonId) {
+  const settings = await getSettings(salonId);
+  const now = nowParisDatetimeString(settings.timezone);
+  const date = now.slice(0, 10), nowMin = toMinHM(now.slice(11, 16));
+  const [[closure]] = await pool.query('SELECT id FROM salon_closures WHERE salon_id = ? AND start_date <= ? AND end_date >= ? LIMIT 1', [salonId, date, date]);
+  if (closure) return { limited: true, closed: true, reason: 'closure', now_min: nowMin };
+  const [rows] = await pool.query('SELECT weekday, start_time, end_time, active FROM salon_schedules WHERE salon_id = ?', [salonId]);
+  if (!rows.length) return { limited: false, closed: false, now_min: nowMin };
+  const weekday = new Date(date + 'T00:00:00Z').getUTCDay();
+  const day = rows.find((r) => r.active && Number(r.weekday) === weekday);
+  if (!day) return { limited: true, closed: true, reason: 'day', now_min: nowMin };
+  const openMin = toMinHM(day.start_time), closeMin = toMinHM(day.end_time);
+  return { limited: true, closed: nowMin >= closeMin, reason: nowMin >= closeMin ? 'over' : null, now_min: nowMin,
+           open_min: openMin, close_min: closeMin, open_time: String(day.start_time).slice(0, 5), close_time: String(day.end_time).slice(0, 5) };
+}
+function closedMessage(l) {
+  if (l.reason === 'closure') return 'Le salon est fermé aujourd\'hui.';
+  if (l.reason === 'day') return 'Le salon est fermé aujourd\'hui.';
+  return 'Le salon est fermé (fermeture à ' + l.close_time + ').';
+}
+// Après inscription : chaque nouveau client doit finir avant la fermeture, sinon on annule l'inscription.
+async function overCloseTime(salonId, ids, l) {
+  if (!l.limited || l.close_min === undefined) return null;
+  const rows = await loadQueue(salonId);
+  for (const id of ids) {
+    const r = rows.find((x) => x.id === id);
+    if (!r) continue;
+    const start = Math.max(l.now_min + (Number(r.estimated_wait_min) || 0), l.open_min);
+    if (start + (Number(r.total_duration_min) || 0) > l.close_min) return r;
+  }
+  return null;
+}
+async function removeCheckin(id) {
+  const [ap] = await pool.query('SELECT id FROM appointments WHERE promoted_queue_id = ?', [id]);
+  for (const a of ap) {
+    await pool.query('DELETE FROM appointment_extras WHERE appointment_id = ?', [a.id]);
+    await pool.query('DELETE FROM appointment_products WHERE appointment_id = ?', [a.id]);
+    await pool.query('DELETE FROM appointments WHERE id = ?', [a.id]);
+  }
+  await pool.query('DELETE FROM queue_extras WHERE queue_id = ?', [id]);
+  await pool.query('DELETE FROM queue_products WHERE queue_id = ?', [id]);
+  await pool.query('DELETE FROM queue WHERE id = ?', [id]);
+}
+function tooLateMessage(r, l, group) {
+  return (group ? r.client_name + ' : ' : '') + 'plus assez de temps avant la fermeture du salon à ' + l.close_time +
+    ' pour cette prestation' + (r.barber_id ? ' avec ce coiffeur' : '') + '. Choisissez une prestation plus courte' + (r.barber_id ? ' ou un autre coiffeur' : '') + ', ou revenez demain.';
+}
+
+// Pour le kiosk : le salon est-il ouvert, à quelle heure ferme-t-il (pour griser les coiffeurs complets).
+router.get('/day-limits', wrap(async (req, res) => {
+  res.json(Object.assign({ ok: true }, await salonDayLimits(req.salon.id)));
+}));
+
 router.post('/checkin', checkinLimiter, wrap(async (req, res) => {
   const v = await validateCheckin(req.salon.id, req.body);
   if (v.error) return res.status(v.status).json({ error: v.error });
+  const limits = await salonDayLimits(req.salon.id);
+  if (limits.closed) return res.status(409).json({ code: 'salon_closed', error: closedMessage(limits) });
   const id = await insertCheckin(req.salon.id, v.data);
 
   await recompute(req.salon.id);
+  const late = await overCloseTime(req.salon.id, [id], limits);
+  if (late) {
+    await removeCheckin(id); await recompute(req.salon.id);
+    return res.status(409).json({ code: 'too_late', close_time: limits.close_time, error: tooLateMessage(late, limits, false) });
+  }
 
   const rows = await loadQueue(req.salon.id);
   const me = rows.find((r) => r.id === id);
@@ -576,10 +641,18 @@ router.post('/checkin-group', checkinLimiter, wrap(async (req, res) => {
     if (v.error) return res.status(v.status).json({ error: name + ' : ' + v.error, person_index: i });
     checked.push(v.data);
   }
+  const limits = await salonDayLimits(req.salon.id);
+  if (limits.closed) return res.status(409).json({ code: 'salon_closed', error: closedMessage(limits) });
   const ids = [];
   for (let i = 0; i < checked.length; i++) ids.push(await insertCheckin(req.salon.id, checked[i], i));
 
   await recompute(req.salon.id);
+  const late = await overCloseTime(req.salon.id, ids, limits);
+  if (late) {
+    for (const id of ids) await removeCheckin(id);
+    await recompute(req.salon.id);
+    return res.status(409).json({ code: 'too_late', close_time: limits.close_time, person_index: ids.indexOf(late.id), error: tooLateMessage(late, limits, true) });
+  }
 
   const rows = await loadQueue(req.salon.id);
   res.json({ ok: true, entries: ids.map((id) => rows.find((r) => r.id === id)).filter(Boolean) });

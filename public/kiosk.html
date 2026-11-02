@@ -98,6 +98,12 @@
     transition: transform .12s ease;
   }
   .barber-card:active { transform: scale(.97); }
+  /* Complet aujourd'hui (la file finit après la fermeture du salon) */
+  .barber-card.full { opacity: .45; filter: grayscale(1); cursor: not-allowed; }
+  .barber-card.full:active { transform: none; }
+  .barber-card .barber-wait.full, .barber-card.has-photo:not(.gift-tile) .barber-wait.full { color: var(--red, #c4001b); }
+  .kiosk-closed { grid-column: 1 / -1; text-align: center; padding: 48px 20px; font-size: clamp(20px, 2.4vw, 28px); font-weight: 800; color: var(--ink); }
+  .kiosk-closed small { display: block; margin-top: 8px; font-size: 15px; font-weight: 600; color: var(--grey); }
   .barber-fallback {
     position: absolute; inset: 0;
     display: flex; align-items: center; justify-content: center;
@@ -632,8 +638,20 @@ function updateStep1Label() {
 // Derniere etape : « Confirmer » pour une personne seule ; a plusieurs, on valide la personne en cours (puis le groupe).
 function finalLabel() { return grp ? 'Valider pour ' + grp.people[grp.current].name : 'Confirmer'; }
 
+// Heure de fermeture du salon (stricte) : un coiffeur dont la file finit après la fermeture est « Complet aujourd'hui ».
+var dayLimits = null, dayLimitsAt = 0;
+function limitsNowMin() { return dayLimits ? dayLimits.now_min + Math.floor((Date.now() - dayLimitsAt) / 60000) : 0; }
+function fullToday(wait) {
+  if (!dayLimits || !dayLimits.limited || dayLimits.close_min === undefined) return false;
+  var start = Math.max(limitsNowMin() + (wait || 0), dayLimits.open_min);
+  return start + newClientMin() > dayLimits.close_min;
+}
+function salonClosedNow() {
+  return !!(dayLimits && (dayLimits.closed || (dayLimits.close_min !== undefined && limitsNowMin() >= dayLimits.close_min)));
+}
 function refresh() {
-  return Promise.all([api('/api/queue'), api('/api/barbers')]).then(function (r) {
+  return Promise.all([api('/api/queue'), api('/api/barbers'), api('/api/queue/day-limits').catch(function () { return null; })]).then(function (r) {
+    if (r[2]) { dayLimits = r[2]; dayLimitsAt = Date.now(); }
     queue = r[0].queue;
     // Jour « sans RDV » choisi dans son calendrier : le coiffeur est propose a la borne ce jour-la, meme s'il est masque d'habitude.
     barbers = r[1].items.filter(function (b) { return (!b.kiosk_hidden || b.walkin_today) && !b.on_break_now && !b.outside_hours_now && !isOnLeaveOn(b); });
@@ -743,10 +761,19 @@ function renderBarberGrid() {
 
   // « Premier disponible » : seulement s'il y a au moins 2 coiffeurs sans RDV presents (un seul : rien a choisir).
   // Le client garde sa place dans la file generale ; le premier coiffeur qui se libere le prend.
+  // Salon fermé (jour fermé, fermeture exceptionnelle, heure passée) : plus d'inscription au kiosk.
+  if (salonClosedNow()) {
+    document.getElementById('barber-grid').innerHTML = '<div class="kiosk-closed">' + (dayLimits.reason === 'closure' || dayLimits.reason === 'day' ? 'Le salon est fermé aujourd\'hui.' : 'Le salon est fermé.' + (dayLimits.close_time ? ' Fermeture à ' + esc(dayLimits.close_time) + '.' : '')) + '<small>À bientôt !</small></div>';
+    return;
+  }
   var anyTile = '';
   if (barbers.length >= 2) {
     var aw = waitForBarber(null);
-    anyTile = '<button class="barber-card any-tile" onclick="pickBarberAndGo(\'\')">' +
+    var anyFull = fullToday(aw);
+    if (anyFull) anyTile = '<button class="barber-card any-tile full" disabled>' +
+      '<div class="barber-fallback"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="m15.5 11 2 2 4-4.5"/></svg></div>' +
+      '<div class="barber-overlay"><div class="barber-name">Premier disponible</div><div class="barber-wait full">Complet aujourd\'hui</div></div></button>';
+    else anyTile = '<button class="barber-card any-tile" onclick="pickBarberAndGo(\'\')">' +
       '<div class="barber-fallback"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="m15.5 11 2 2 4-4.5"/></svg></div>' +
       '<div class="barber-overlay"><div class="barber-name">Premier disponible</div>' +
       '<div class="barber-wait' + (aw === 0 ? ' free' : '') + '">' + (aw === 0 ? 'Disponible' : formatMinutes(aw)) + '</div></div></button>';
@@ -757,13 +784,16 @@ function renderBarberGrid() {
     var over = isOverrun(b.id);
     var free = w === 0;
     var waitLabel = free ? 'Disponible' : (over ? '~' : '') + formatMinutes(w);
-    return '<button class="barber-card' + (b.photo_url ? ' has-photo' : '') + '"' +
-      ' onclick="pickBarberAndGo(\'' + b.id + '\')">' +
+    // File qui finit après la fermeture du salon : « Complet aujourd'hui », pas cliquable.
+    var full = fullToday(w);
+    if (full) waitLabel = 'Complet aujourd\'hui';
+    return '<button class="barber-card' + (b.photo_url ? ' has-photo' : '') + (full ? ' full' : '') + '"' +
+      (full ? ' disabled' : ' onclick="pickBarberAndGo(\'' + b.id + '\')"') + '>' +
       (b.photo_url ? '<div class="barber-photo" style="background-image:url(&quot;' + esc(b.photo_url) + '&quot;)"></div>'
                    : '<div class="barber-fallback">' + esc(b.name.charAt(0).toUpperCase()) + '</div>') +
       '<div class="barber-overlay">' +
         '<div class="barber-name">' + esc(b.name) + '</div>' +
-        '<div class="barber-wait' + (free ? ' free' : '') + '">' + waitLabel + '</div>' +
+        '<div class="barber-wait' + (full ? ' full' : (free ? ' free' : '')) + '">' + waitLabel + '</div>' +
       '</div></button>';
   }).join('');
 }

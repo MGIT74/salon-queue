@@ -185,6 +185,7 @@ const suite = [
   ['162-coiffeur-tous-jours-desactives.js', false, ['exit']],
   ['163-creneaux-a-la-suite.js', false, ['exit']],
   ['164-fini-plus-tot-timer.js', false, ['exit']],
+  ['165-kiosk-fermeture-salon.js', false, ['exit']],
 ];
 
 let bad = 0;
