@@ -55,7 +55,7 @@
 .cal-day.salon-closed::after{content:'Fermé';display:block;font-size:10px;font-weight:700;color:var(--red,#e65c5c);margin-top:2px}
 .salon-closure-banner{padding:10px 13px;border-radius:9px;margin:0 0 12px;background:rgba(160,100,100,.13);color:var(--red,#e65c5c);font-weight:650;font-size:13px}
 </style>
-<link rel="stylesheet" href="/app.css?v=55">
+<link rel="stylesheet" href="/app.css?v=56">
 <style>
   .wrap { max-width: none; margin: 0; padding: clamp(16px,1.8vw,28px); }
 
@@ -2896,7 +2896,7 @@
   </div>
 </div>
 
-<script src="/app.js?v=61"></script>
+<script src="/app.js?v=62"></script>
 <script src="/autorefresh.js?v=3"></script>
 <script src="/staff-group.js?v=6"></script>
 <script src="/daterange.js?v=4"></script>
@@ -7163,6 +7163,7 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
       '</div>' +
       '<div class="aa-slots" id="aa-slots"><span class="hint" style="margin:0">Chargement…</span></div>' +
       '<button type="button" class="aa-all-hours" id="aa-all-hours" style="display:none" onclick="aaToggleAllHours()"></button>' +
+      staffForceHtml('aa') +
     '</div>' +
 
     // Derniere etape : le client (clients connus proposes des 3 lettres), puis Enregistrer. Au telephone, on cherche
@@ -7186,6 +7187,11 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
 
   var STEPS = ['service', 'extras', 'barber', 'datetime', 'products', 'client'];
   attachClientAutocomplete(overlay, 'aa-name', 'aa-email', 'aa-phone', api);
+  // « Forcer » dans un créneau trop court (un coiffeur précis ; pas en « Premier disponible »).
+  var aaForce = staffForceInit({ overlay: overlay, prefix: 'aa', api: api,
+    params: function () { return { barber_id: state.barberId, date: dateStr, service_id: state.serviceId, extras: state.extraIds }; },
+    defaultTime: function () { return ''; },
+    onForce: function (t) { state.time = t; state.force = true; state.slotBarber = null; overlay.querySelectorAll('#aa-slots .aa-slot').forEach(function (c) { c.classList.remove('sel'); }); aaGoStep('products'); } });
 
   // Clic sur la ligne d'un coiffeur précis dans le planning : on sait déjà qui, après le client on passe
   // directement à la prestation - exactement le principe déjà en place sur la Caisse.
@@ -7210,7 +7216,7 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
       var s = aaOffer('services').find(function (x) { return x.id === state.serviceId; });
       var exN = aaOffer('extras').filter(function (x) { return state.extraIds.indexOf(String(x.id)) !== -1; }).map(function (x) { return x.name; });
       var bName = state.barberId === '' ? anyBarberLabel(rdvBarbers, state.slotBarber) : ((rdvBarbers.find(function (x) { return String(x.id) === String(state.barberId); }) || {}).name || '');
-      overlay.querySelector('#aa-contact-summary').textContent = when + ' à ' + state.time + ' — ' + (s ? s.name : svcLabel('', exN)) + (bName ? ' · ' + bName : '');
+      overlay.querySelector('#aa-contact-summary').textContent = (state.force ? '⚠ RDV forcé — ' : '') + when + ' à ' + state.time + ' — ' + (s ? s.name : svcLabel('', exN)) + (bName ? ' · ' + bName : '');
     }
   };
 
@@ -7349,8 +7355,10 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
     var toggleEl = overlay.querySelector('#aa-half-toggle');
     aaRenderDtBarbers();
     toggleEl.style.display = 'none';
+    state.force = false; aaForce.reset();
+    if (!state.barberId) aaForce.hide();   // « Premier disponible » : on force seulement pour un coiffeur précis
     var offB = state.barberId && rdvBarbers.find(function (x) { return String(x.id) === String(state.barberId); });
-    if (offB && barberOffOn(offB, dateStr)) { slotsEl.innerHTML = barberOffSlotsHtml(offB, dateStr, false); return; }
+    if (offB && barberOffOn(offB, dateStr)) { aaForce.hide(); slotsEl.innerHTML = barberOffSlotsHtml(offB, dateStr, false); return; }
     slotsEl.innerHTML = '<span class="hint" style="margin:0">Chargement…</span>';
     api('/api/appointments/availability?date=' + dateStr + '&service_id=' + state.serviceId + '&barber_id=' + state.barberId + '&extras=' + state.extraIds.join(',') + (aaAllHours ? '&all=1' : ''))
       .then(function (r) {
@@ -7377,7 +7385,7 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
   }
 
   window.aaSelectSlot = function (el) {
-    state.time = el.dataset.time;
+    state.time = el.dataset.time; state.force = false;
     state.slotBarber = el.dataset.barber || null;   // « Premier disponible » : coiffeur retenu pour cette heure
     overlay.querySelectorAll('#aa-slots .aa-slot').forEach(function (c) { c.classList.remove('sel'); });
     el.classList.add('sel');
@@ -7402,11 +7410,12 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
         service_id: state.serviceId, barber_id: state.barberId || null, extras: state.extraIds,
         products: state.productIds.map(function (id) { return { id: id, quantity: 1 }; }),
         date: dateStr, time: state.time,
+        force: !!state.force, force_ack: !!state.force,   // RDV forcé : case « Je prends la responsabilité » cochée
         base_url: window.location.origin + '/rdv.html'
       }
     }).then(function (r) {
       _closeModal(overlay);
-      toast('RDV ajouté' + (state.barberId === '' && r && r.barber_name ? ' avec ' + r.barber_name : ''));
+      toast((state.force ? '⚠ RDV forcé ajouté' : 'RDV ajouté') + (state.barberId === '' && r && r.barber_name ? ' avec ' + r.barber_name : ''));
       return refreshQueue();
     }).then(function () {
       Object.keys(calMonthCache).forEach(function (k) { delete calMonthCache[k]; });

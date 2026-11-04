@@ -1489,3 +1489,8 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'appointments' AND column_name = 'client_time');
 SET @sql := IF(@c = 0, 'ALTER TABLE appointments ADD COLUMN client_time DATETIME NULL', 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- RDV « forcé » par l'équipe dans un créneau trop court (chevauche le RDV suivant) : qui l'a forcé et quand.
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'appointments' AND column_name = 'forced_by');
+SET @sql := IF(@c = 0, 'ALTER TABLE appointments ADD COLUMN forced_by VARCHAR(120) NULL, ADD COLUMN forced_at DATETIME NULL', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;

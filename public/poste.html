@@ -98,7 +98,7 @@
 .cal-day.salon-closed::after{content:'Fermé';display:block;font-size:10px;font-weight:700;color:var(--red,#e65c5c);margin-top:2px}
 .salon-closure-banner{padding:10px 13px;border-radius:9px;margin:0 0 12px;background:rgba(160,100,100,.13);color:var(--red,#e65c5c);font-weight:650;font-size:13px}
 </style>
-<link rel="stylesheet" href="/app.css?v=55">
+<link rel="stylesheet" href="/app.css?v=56">
 <style>
   html, body { min-height: 100%; }
   .wrap { max-width: 480px; margin: 0 auto; padding: 20px 18px 40px; }
@@ -559,6 +559,10 @@
   @media (hover: none) { .pd-block.can-nudge .pd-nudges { display: flex; opacity: .9; } .pd-nudge { padding: 5px 10px; } }
   .pd-block.nudged { box-shadow: 0 0 0 2px var(--fill), 0 0 0 4px #30d158; z-index: 3; }
   .pd-block .pd-moved { font-style: normal; display: inline-block; margin-left: 5px; padding: 0 5px; border-radius: 99px; background: #fff; color: #111; font-size: 10px; font-weight: 800; line-height: 1.45; vertical-align: 1px; }
+  .pd-block.forced { box-shadow: inset 0 0 0 2.5px #ff9f0a; }
+  .pd-forced-tag { position: absolute; right: 6px; bottom: 4px; z-index: 3; background: #ff9f0a; color: #111; border-radius: 99px; padding: 1px 7px; font-size: 10.5px; font-weight: 800; line-height: 1.4; }
+  .pd-forced-ov { position: absolute; left: 0; right: 0; z-index: 0; pointer-events: none; background: repeating-linear-gradient(135deg, rgba(255,159,10,.75) 0 5px, transparent 5px 11px); }
+  .pd-block.forced > .t, .pd-block.forced > .n, .pd-block.forced > .cat-chips, .pd-block.forced > .cat-dots { position: relative; z-index: 2; text-shadow: 0 1px 2px rgba(0,0,0,.45); }
   .pd-moved-badge { flex: none; margin-left: auto; border: none; border-radius: 99px; padding: 3px 9px; background: #ffd60a; color: #111; font: inherit; font-size: 12px; font-weight: 800; cursor: pointer; line-height: 1.3; }
   .pd-moved-badge:hover { filter: brightness(1.08); }
   .pd-moved-badge + .pd-grip { margin-left: 4px; }
@@ -802,7 +806,7 @@
   </button>
 </div>
 
-<script src="/app.js?v=61"></script>
+<script src="/app.js?v=62"></script>
 <script src="/queue-sim.js?v=1"></script>
 <script src="/autorefresh.js?v=3"></script>
 <script src="/staff-group.js?v=6"></script>
@@ -1979,7 +1983,7 @@ function posteDayHtml(dateStr) {
       var cats = catItemsOf(a), roomy = h >= 46 && !narrow;
       var room = nudgeRoom(it), canNudge = room[0] || room[1];
       inner += '<button type="button" class="pd-block st-' + it.st + (isNext ? ' is-next' : '') + (narrow ? ' narrow' : '') + (h >= 46 ? ' tall' : '') +
-        (canNudge ? ' can-nudge' : '') + (pdNudgeFlash === a.id ? ' nudged' : '') + '" data-id="' + esc(a.id) + '" ' +
+        (canNudge ? ' can-nudge' : '') + (pdNudgeFlash === a.id ? ' nudged' : '') + (a.forced_by ? ' forced' : '') + '" data-id="' + esc(a.id) + '" ' +
         (canNudge ? 'data-up="' + (room[0] ? 1 : 0) + '" data-down="' + (room[1] ? 1 : 0) + '" data-start="' + it.start + '" ' : '') +
         'data-q="' + esc(normText([a.client_name, a.email, a.phone].join(' ')) + ' ' + String(a.phone || '').replace(/\D/g, '')) + '" ' +
         'style="top:' + Math.round((it.start - R0) * PX) + 'px;height:' + h + 'px;' + pdLaneCss(it) + '--c:' + color + ';--fg:' + fg + '" ' +
@@ -1988,6 +1992,8 @@ function posteDayHtml(dateStr) {
         '<span class="t">' + pdHM(it.start) + ' – ' + pdHM(it.end) + (a.client_time ? pdMovedIconHtml(a) : '') + '</span><span class="n">' + esc(a.client_name) + '</span>' +
         (roomy ? catChipsHtml(cats).replace('cat-chips', h < 80 ? 'cat-chips one' : 'cat-chips') : !narrow ? catDotsHtml(cats) : '') +
         (label && !narrow ? '<span class="l">' + label + '</span>' : '') +
+        // RDV forcé : étiquette « ⚠ Forcé » + la partie qui chevauche le RDV suivant hachurée en orange.
+        (a.forced_by ? '<span class="pd-forced-tag" title="RDV forcé par ' + esc(a.forced_by) + ' : il chevauche un autre RDV">⚠' + (narrow ? '' : ' Forcé') + '</span>' + pdForcedHatchHtml(it, items) : '') +
         // Décaler de 5 min : flèches au survol (toucher sur tablette), ou glisser le bloc.
         (canNudge ? '<span class="pd-nudges">' +
           (room[0] ? '<span class="pd-nudge up" data-dir="-1" title="Avancer de 5 min (' + pdHM(it.start - PD_NUDGE_MIN) + ')">▲ 5 min</span>' : '') +
@@ -2086,6 +2092,15 @@ function adRestoreClientTime() {
   closeApptDrawer();
   calApptById[a.id] = a;
   pdNudge(a.id, diff, true);
+}
+// Partie d'un RDV forcé qui chevauche un autre RDV du même coiffeur (hachures orange, en bas du bloc).
+function pdForcedHatchHtml(it, items) {
+  var ov = items.filter(function (o) { return o !== it && o.barberId === it.barberId && o.st !== 'absent' && o.start < it.end && pdRealEnd(o) > it.start; });
+  if (!ov.length) return '';
+  var from = Math.max(it.start, Math.min.apply(null, ov.map(function (o) { return o.start; })));
+  var to = Math.min(it.end, Math.max.apply(null, ov.map(function (o) { return pdRealEnd(o); })));
+  if (to <= from) return '';
+  return '<span class="pd-forced-ov" style="top:' + ((from - it.start) / it.dur * 100).toFixed(2) + '%;height:' + ((to - from) / it.dur * 100).toFixed(2) + '%"></span>';
 }
 function pdNudge(id, minutes, undo) {
   if (pdNudgeBusy) return Promise.resolve();
@@ -2951,6 +2966,7 @@ function openPosteAddAppointment(dateStr, barberId) {
       '</div>' +
       '<div class="aa-slots" id="pa-slots"><span class="hint" style="margin:0">Chargement…</span></div>' +
       '<button type="button" class="aa-all-hours" id="pa-all-hours" style="display:none" onclick="paToggleAllHours()"></button>' +
+      staffForceHtml('pa') +
       '<div class="step-bar"><button type="button" class="btn btn-primary" id="pa-dt-next" style="width:100%;display:none" onclick="paGoStep(\'products\')"></button></div>' +
     '</div>' +
 
@@ -2975,6 +2991,11 @@ function openPosteAddAppointment(dateStr, barberId) {
 
   var STEPS = ['service', 'extras', 'datetime', 'products', 'client'];
   attachClientAutocomplete(overlay, 'pa-name', 'pa-email', 'pa-phone', barberApi);
+  // « Forcer » dans un créneau trop court (le coiffeur prend la responsabilité du débordement).
+  var paForce = staffForceInit({ overlay: overlay, prefix: 'pa', api: barberApi,
+    params: function () { return { barber_id: targetId, date: dateStr, service_id: state.serviceId, extras: state.extraIds }; },
+    defaultTime: function () { return prefTime || ''; },
+    onForce: function (t) { state.time = t; state.force = true; overlay.querySelectorAll('#pa-slots .aa-slot').forEach(function (c) { c.classList.remove('sel'); }); paGoStep('products'); } });
 
   window.paGoStep = function (step, mode) {
     STEPS.forEach(function (s) { overlay.querySelector('#pa-step-' + s).style.display = s === step ? 'flex' : 'none'; });
@@ -2990,7 +3011,7 @@ function openPosteAddAppointment(dateStr, barberId) {
       if (group) return;
       var s = svcOffer.find(function (x) { return x.id === state.serviceId; });
       var exN = extOffer.filter(function (x) { return state.extraIds.indexOf(String(x.id)) !== -1; }).map(function (x) { return x.name; });
-      overlay.querySelector('#pa-contact-summary').textContent = when + ' à ' + state.time + ' — ' + (s ? s.name : svcLabel('', exN));
+      overlay.querySelector('#pa-contact-summary').textContent = (state.force ? '⚠ RDV forcé — ' : '') + when + ' à ' + state.time + ' — ' + (s ? s.name : svcLabel('', exN));
     }
   };
 
@@ -3099,7 +3120,8 @@ function openPosteAddAppointment(dateStr, barberId) {
     var toggleEl = overlay.querySelector('#pa-half-toggle');
     toggleEl.style.display = 'none';
     paRenderDtBarbers();
-    if (target && barberOffOn(target, dateStr)) { slotsEl.innerHTML = barberOffSlotsHtml(target, dateStr, false); return; }
+    state.force = false; paForce.reset();
+    if (target && barberOffOn(target, dateStr)) { paForce.hide(); slotsEl.innerHTML = barberOffSlotsHtml(target, dateStr, false); return; }
     slotsEl.innerHTML = '<span class="hint" style="margin:0">Chargement…</span>';
     barberApi('/api/appointments/availability?date=' + dateStr + '&service_id=' + state.serviceId + '&barber_id=' + targetId + '&extras=' + state.extraIds.join(',') + (paAllHours ? '&all=1' : ''), { actingAs: targetId })
       .then(function (r) {
@@ -3142,7 +3164,7 @@ function openPosteAddAppointment(dateStr, barberId) {
   }
 
   window.paSelectSlot = function (el) {
-    state.time = el.dataset.time;
+    state.time = el.dataset.time; state.force = false;
     overlay.querySelectorAll('#pa-slots .aa-slot').forEach(function (c) { c.classList.remove('sel'); });
     el.classList.add('sel');
     paGoStep('products');
@@ -3167,11 +3189,12 @@ function openPosteAddAppointment(dateStr, barberId) {
         service_id: state.serviceId, extras: state.extraIds,
         products: state.productIds.map(function (id) { return { id: id, quantity: 1 }; }),
         date: dateStr, time: state.time,
+        force: !!state.force, force_ack: !!state.force,   // RDV forcé : case « Je prends la responsabilité » cochée
         base_url: window.location.origin + '/rdv.html'
       }
     }).then(function () {
       _closeModal(overlay);
-      toast(forOther && target ? 'RDV ajouté pour ' + target.name : 'RDV ajouté');
+      toast((state.force ? '⚠ RDV forcé ajouté' : 'RDV ajouté') + (forOther && target ? ' pour ' + target.name : ''));
       invalidateAgendaCache();
       loadAgendaPeriod();
     }).catch(function (e) { errEl.textContent = e.message; errEl.style.display = 'block'; });

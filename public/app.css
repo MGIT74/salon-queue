@@ -908,3 +908,22 @@ body .tfx > button { transition: color .25s ease, transform .1s ease; }
 .cp-prev { width: 34px; height: 34px; border-radius: 50%; flex: none; box-shadow: inset 0 0 0 1px rgba(0,0,0,.15); }
 .cp-hex { flex: 1; min-width: 0; padding: 8px 10px; border: none; border-radius: 8px; background: var(--fill); color: var(--ink); font: inherit; font-size: 14px; text-transform: lowercase; outline: none; }
 .cp-foot .cp-ok { padding: 8px 18px; }
+
+/* « Forcer » un RDV (équipe) : lien, grand avertissement orange, case obligatoire, bouton orange */
+.force-wrap { margin-top: 10px; }
+.force-link { border: 1.5px dashed #ff9f0a; background: none; color: #d97c00; border-radius: 12px; padding: 9px 12px; width: 100%; text-align: left; font: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer; }
+[data-theme="dark"] .force-link { color: #ff9f0a; }
+.force-panel { margin-top: 10px; display: flex; flex-direction: column; gap: 10px; }
+.force-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13.5px; font-weight: 600; }
+.force-time { padding: 8px 10px; border: none; border-radius: 10px; background: var(--fill); color: var(--ink); font: inherit; font-size: 15px; }
+.force-hint { font-weight: 400; color: var(--grey); font-size: 12.5px; }
+.force-warn { background: rgba(255,159,10,.14); border: 2px solid #ff9f0a; border-radius: 14px; padding: 12px 14px; font-size: 13.5px; line-height: 1.5; }
+.force-wt { display: block; color: #d97c00; font-size: 15px; margin-bottom: 3px; }
+[data-theme="dark"] .force-wt { color: #ff9f0a; }
+.force-err { background: rgba(255,69,58,.12); color: var(--red); border-radius: 12px; padding: 10px 12px; font-size: 13.5px; }
+.force-ack { display: flex; align-items: center; gap: 9px; font-size: 14px; font-weight: 700; cursor: pointer; }
+.force-ack input { width: 20px; height: 20px; accent-color: #ff9f0a; }
+.btn.force-go { background: #ff9f0a; color: #111; font-weight: 800; }
+.btn.force-go:disabled { opacity: .4; cursor: not-allowed; }
+.forced-info { background: rgba(255,159,10,.14); border-left: 4px solid #ff9f0a; border-radius: 8px; padding: 9px 11px; margin: 0 0 8px; font-size: 13px; line-height: 1.45; }
+.forced-info b { color: #d97c00; } [data-theme="dark"] .forced-info b { color: #ff9f0a; }

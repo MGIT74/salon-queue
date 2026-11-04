@@ -189,6 +189,7 @@ const suite = [
   ['166-note-rdv-a-venir.js', false, ['exit']],
   ['167-couleurs-menus-et-heures.js', false, ['exit']],
   ['168-decaler-5-min.js', false, ['exit']],
+  ['169-rdv-force.js', false, ['exit']],
 ];
 
 let bad = 0;

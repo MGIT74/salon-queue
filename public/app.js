@@ -835,6 +835,7 @@ function apptInfoRowsHtml(a) {
   var p = a.pricing, extras = p && p.extras && p.extras.length && (p.service_price_cents || p.service_duration_min)
     ? ' + ' + p.extras.map(function (x) { return x.name; }).join(' + ') : '';
   return '<div class="detail-row"><span class="detail-label">Quand</span><span class="detail-value" style="text-transform:capitalize">' + esc(apptWhenLabel(a)) + '</span></div>' +
+    (typeof forcedInfoHtml === 'function' ? forcedInfoHtml(a) : '') +
     // Décalé de 5 min depuis l'agenda du poste (client non prévenu) : son heure à lui reste visible.
     (a.client_time ? '<div class="detail-row"><span class="detail-label">⇅ Heure du client</span><span class="detail-value">' + esc(a.client_time.slice(11, 16)) +
       ' <span style="color:var(--grey);font-weight:400">· décalé à ' + esc(String(a.scheduled_at || '').slice(11, 16)) + ', client non prévenu</span></span></div>' : '') +
@@ -2210,4 +2211,71 @@ function editQueueServiceDialog(q, opts) {
     };
     render();
   }).catch(function (e) { toast(e.message, true); });
+}
+
+/* ===== « Forcer » un RDV dans un créneau trop court (équipe : admin, Mon poste, caisse ; jamais côté client) =====
+   Sous les heures proposées : lien « Forcer un RDV à une autre heure… » -> on choisit l'heure, le serveur dit de combien
+   ça déborde et sur qui (GET /api/appointments/force-check), grand avertissement orange, case « Je prends la
+   responsabilité » obligatoire, puis bouton orange. o = { overlay, prefix, api, params() -> { barber_id, date,
+   service_id, extras }, defaultTime() -> 'HH:MM' | '', onForce(time) }. */
+function staffForceHtml(p) {
+  return '<div class="force-wrap" id="' + p + '-force" style="display:none">' +
+    '<button type="button" class="force-link">⚠ Forcer un RDV à une autre heure…</button>' +
+    '<div class="force-panel" style="display:none">' +
+      '<div class="force-row"><label for="' + p + '-force-time">Heure</label><input type="time" step="300" id="' + p + '-force-time" class="force-time">' +
+      '<span class="force-hint">Réservé à l\'équipe : le RDV peut chevaucher le suivant.</span></div>' +
+      '<div class="force-res"></div>' +
+      '<label class="force-ack" style="display:none"><input type="checkbox"> Je prends la responsabilité de ce débordement</label>' +
+      '<button type="button" class="btn force-go" disabled style="display:none"></button>' +
+    '</div></div>';
+}
+function staffForceInit(o) {
+  var w = o.overlay.querySelector('#' + o.prefix + '-force');
+  if (!w) return { reset: function () {}, hide: function () {} };
+  var link = w.querySelector('.force-link'), panel = w.querySelector('.force-panel'), tin = w.querySelector('.force-time'),
+    res = w.querySelector('.force-res'), ack = w.querySelector('.force-ack'), box = ack.querySelector('input'), go = w.querySelector('.force-go');
+  var seq = 0, cur = null;
+  function clearResult() { res.innerHTML = ''; ack.style.display = 'none'; box.checked = false; go.style.display = 'none'; go.disabled = true; cur = null; }
+  function check() {
+    clearResult();
+    var t = tin.value;
+    if (!/^\d\d:\d\d$/.test(t)) return;
+    var p = o.params();
+    if (!p.barber_id) { res.innerHTML = '<div class="force-err">Choisissez d\'abord un coiffeur.</div>'; return; }
+    res.innerHTML = '<span class="hint" style="margin:0">Vérification…</span>';
+    var my = ++seq;
+    o.api('/api/appointments/force-check?barber_id=' + encodeURIComponent(p.barber_id) + '&date=' + p.date + '&time=' + t +
+      '&service_id=' + encodeURIComponent(p.service_id || '') + '&extras=' + (p.extras || []).join(','), { actingAs: p.barber_id })
+      .then(function (r) {
+        if (my !== seq) return;
+        if (!r.ok) { res.innerHTML = '<div class="force-err">' + esc(r.error) + '</div>'; return; }
+        var ov = r.overlaps || [];
+        res.innerHTML = '<div class="force-warn"><b class="force-wt">⚠ Attention : RDV forcé</b>' + t + ' – ' + esc(r.end) +
+          (ov.length ? ' <b>déborde</b> sur ' + ov.map(function (x) { return 'le RDV de <b>' + esc(x.client_name) + ' (' + esc(x.time) + ')</b> de <b>' + x.minutes + ' min</b>'; }).join(', ') +
+            '.<br>Le coiffeur devra rattraper le retard. Les clients ne sont pas prévenus du chevauchement.'
+            : ' : pas de chevauchement (heure en dehors des créneaux proposés).') + '</div>';
+        ack.style.display = ''; go.style.display = ''; go.textContent = 'Forcer le RDV à ' + t; cur = t;
+      })
+      .catch(function (e) { if (my === seq) res.innerHTML = '<div class="force-err">' + esc(e.message) + '</div>'; });
+  }
+  link.onclick = function () {
+    var open = panel.style.display === 'none';
+    panel.style.display = open ? '' : 'none';
+    if (open && !tin.value) { tin.value = (o.defaultTime && o.defaultTime()) || ''; }
+    if (open) check();
+  };
+  tin.onchange = check;
+  box.onchange = function () { go.disabled = !box.checked; };
+  go.onclick = function () { if (cur && box.checked) o.onForce(cur); };
+  return {
+    reset: function () { w.style.display = ''; panel.style.display = 'none'; tin.value = ''; clearResult(); },
+    hide: function () { w.style.display = 'none'; }
+  };
+}
+// Ligne du tiroir d'un RDV forcé (admin, poste, caisse).
+function forcedInfoHtml(a) {
+  if (!a || !a.forced_by) return '';
+  var d = a.forced_at ? new Date(a.forced_at) : null;
+  var when = d && !isNaN(d) ? ' le ' + d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }) + ' à ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
+  return '<div class="forced-info"><b>⚠ RDV forcé par ' + esc(a.forced_by) + '</b>' + when + '<br>Il chevauche un autre RDV : le coiffeur gère le retard.</div>';
 }

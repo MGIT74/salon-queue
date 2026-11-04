@@ -318,7 +318,9 @@ async function computeSlotsForBarber(barberId, dateStr, durationMin, rdvSettings
   // théorique, pour laisser un temps de battement avant le RDV suivant.
   // Terminé SANS Timer (« Je prends » d'un coiffeur sans chrono : marqué terminé dès le début de la coupe) : la
   // plage reste bloquée jusqu'à sa fin prévue - sinon on pouvait réserver par-dessus une coupe encore en cours.
+  // « Forcer » un RDV : les autres RDV ne bloquent pas (le chevauchement est voulu) ; pauses, horaires, congés, oui.
   const busyRanges = existing
+    .filter(() => !opts.ignoreAppointments)
     .filter((a) => a.queue_status !== 'cancelled' && !(a.queue_status === 'done' && a.queue_start_at))
     .map((a) => {
       const start = timeToMinutes(a.scheduled_at.split(' ')[1].slice(0, 5));
@@ -623,6 +625,9 @@ async function buildApptItems(salonId, rows) {
         scheduled_at: r.scheduled_at,
         // Décalé de 5 min depuis l'agenda du poste : heure réservée par le client (null = pas décalé).
         client_time: r.client_time ? String(r.client_time).slice(0, 19) : null,
+        // RDV forcé dans un créneau trop court : par qui, quand (UTC).
+        forced_by: r.forced_by || null,
+        forced_at: r.forced_at ? utcIso(r.forced_at) : null,
         created_at: utcIso(r.created_at),
         // Coupe faite avec le Timer : vraie heure de début / fin (UTC). Sans Timer (« Je prends ») : début vide.
         queue_start_at: r.queue_start_at ? utcIso(r.queue_start_at) : null,
@@ -1257,6 +1262,48 @@ async function isSalonClosedOnDate(salonId, dateStr) {
   return !!closed;
 }
 
+/**
+ * « Forcer » un RDV (équipe : admin, Mon poste, caisse) dans un créneau trop court : il peut chevaucher d'autres
+ * RDV du coiffeur, mais jamais une pause, un congé, une fermeture, les horaires du coiffeur ni une heure passée.
+ * Renvoie { ok, end, overlaps: [{ client_name, time, minutes }] } ou { ok: false, error }.
+ */
+async function forceCheck(barberId, date, time, durationMin, rdvSettings) {
+  const ok = await computeSlotsForBarber(barberId, date, durationMin, rdvSettings,
+    { skipLead: true, atTime: time, ignoreBusyNow: true, ignoreAppointments: true });
+  if (!ok.length) {
+    return { ok: false, error: (await walkinRefusal(barberId, date)) || 'Impossible de forcer à ' + time + ' : en dehors des horaires du coiffeur, pendant une pause, un congé, ou heure déjà passée.' };
+  }
+  const start = timeToMinutes(time), end = start + durationMin;
+  const [rows] = await pool.query(
+    `SELECT a.client_name, a.scheduled_at, COALESCE(MAX(bsp.duration_min), MAX(s.duration_min)) AS svc,
+            COALESCE(SUM(COALESCE(bep.duration_min, e.duration_min)), 0) AS ext, q.status AS queue_status, MAX(q.start_at) AS queue_start_at
+     FROM appointments a JOIN services s ON s.id = a.service_id
+     LEFT JOIN barber_service_prices bsp ON bsp.barber_id = a.barber_id AND bsp.service_id = a.service_id
+     LEFT JOIN appointment_extras ae ON ae.appointment_id = a.id LEFT JOIN extras e ON e.id = ae.extra_id
+     LEFT JOIN barber_extra_prices bep ON bep.barber_id = a.barber_id AND bep.extra_id = ae.extra_id
+     LEFT JOIN queue q ON q.id = a.promoted_queue_id
+     WHERE a.barber_id = ? AND a.status = 'confirmed' AND DATE(a.scheduled_at) = ? GROUP BY a.id`, [barberId, date]);
+  const overlaps = rows.filter((r) => r.queue_status !== 'cancelled' && !(r.queue_status === 'done' && r.queue_start_at)).map((r) => {
+    const hm = String(r.scheduled_at).split(' ')[1].slice(0, 5), s0 = timeToMinutes(hm), e0 = s0 + Number(r.svc) + Number(r.ext);
+    return { client_name: r.client_name, time: hm, minutes: Math.min(end, e0) - Math.max(start, s0) };
+  }).filter((o) => o.minutes > 0).sort((x, y) => (x.time < y.time ? -1 : 1));
+  return { ok: true, end: minutesToTime(end), overlaps };
+}
+
+// Aperçu avant de forcer (fenêtre orange) : de combien le RDV déborde, et sur qui.
+router.get('/force-check', requireAdminOrBarber, wrap(async (req, res) => {
+  const { date, time, service_id } = req.query;
+  const barberId = req.query.barber_id;
+  if (!barberId || !validBookingDate(date) || !validBookingTime(time)) return res.status(400).json({ error: 'Coiffeur, date et heure requis' });
+  const [[owned]] = await pool.query('SELECT id FROM barbers WHERE id = ? AND salon_id = ? AND active = 1', [barberId, req.salon.id]);
+  if (!owned) return res.status(404).json({ error: 'Coiffeur introuvable' });
+  const cat = await loadCatalog(req.salon.id, service_id, req.query.extras ? String(req.query.extras).split(',').filter(Boolean) : []);
+  if (!cat.ok) return res.status(cat.status).json({ error: cat.error });
+  const offer = await offerFor(barberId, cat);
+  if (!offer.ok) return res.status(offer.status).json({ error: offer.error });
+  res.json(await forceCheck(barberId, date, time, offer.durationMin, await getSettings(req.salon.id)));
+}));
+
 router.post('/admin-create', requireAdminOrBarber, wrap(withBookingLock(async (req, res) => {
   const { client_name, email, phone, service_id, extras, date, time } = req.body;
   // Un coiffeur connecté (PIN) ne peut créer un RDV que pour le coiffeur
@@ -1305,7 +1352,7 @@ router.post('/admin-create', requireAdminOrBarber, wrap(withBookingLock(async (r
   // coiffeur connecté req.barberId est déjà garanti sûr par
   // barberAuth.js (le PIN est vérifié avec salon_id) - reste utile
   // pour le choix libre de l'admin.
-  let durationMin;
+  let durationMin, forced = false;
   if (!barber_id) {
     const pick = chooseAnyBarber(await anyBarberCandidates(req.salon.id, cat, date, rdvSettings, () => ({ skipLead: true })), time);
     if (!pick) return res.status(409).json({ error: "Aucun coiffeur n'est libre à ce créneau" });
@@ -1325,17 +1372,31 @@ router.post('/admin-create', requireAdminOrBarber, wrap(withBookingLock(async (r
     // idé par le staff. Le pas des créneaux et la marge tampon restent
     // appliqués (évite un vrai conflit d'agenda).
     const slots = await computeSlotsForBarber(barber_id, date, durationMin, rdvSettings, { skipLead: true });
-    if (!slots.includes(time)) return res.status(409).json({ error: (await walkinRefusal(barber_id, date)) || "Ce créneau n'est plus disponible" });
+    if (!slots.includes(time)) {
+      // « Forcer » (équipe seulement, case « Je prends la responsabilité » cochée) : chevauchement accepté.
+      if (req.body.force === true && req.body.force_ack === true) {
+        const fc = await forceCheck(barber_id, date, time, durationMin, rdvSettings);
+        if (!fc.ok) return res.status(409).json({ error: fc.error });
+        forced = true;
+      } else {
+        return res.status(409).json({ error: (await walkinRefusal(barber_id, date)) || "Ce créneau n'est plus disponible" });
+      }
+    }
   }
 
   const id = crypto.randomUUID();
   const cancelToken = crypto.randomBytes(24).toString('hex');
   const scheduledAt = date + ' ' + time + ':00';
+  let forcedBy = null;
+  if (forced) {
+    if (req.barberId) { const [[fb]] = await pool.query('SELECT name FROM barbers WHERE id = ?', [req.barberId]); forcedBy = fb ? fb.name : 'un coiffeur'; }
+    else forcedBy = "l'admin";
+  }
 
   await pool.query(
-    `INSERT INTO appointments (id, salon_id, barber_id, client_name, email, phone, service_id, scheduled_at, status, cancel_token, client_note)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?)`,
-    [id, req.salon.id, barber_id, client_name, email || null, phone || null, service.id, scheduledAt, cancelToken, clientNote]
+    `INSERT INTO appointments (id, salon_id, barber_id, client_name, email, phone, service_id, scheduled_at, status, cancel_token, client_note, forced_by, forced_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?, ?, IF(?, UTC_TIMESTAMP(), NULL))`,
+    [id, req.salon.id, barber_id, client_name, email || null, phone || null, service.id, scheduledAt, cancelToken, clientNote, forcedBy, forced ? 1 : 0]
   );
   if (extraIds.length) {
     await pool.query('INSERT INTO appointment_extras (appointment_id, extra_id) VALUES ?', [extraIds.map((eid) => [id, eid])]);
@@ -1372,7 +1433,7 @@ router.post('/admin-create', requireAdminOrBarber, wrap(withBookingLock(async (r
   }
 
   const [[assigned]] = await pool.query('SELECT name FROM barbers WHERE id = ?', [barber_id]);
-  res.json({ ok: true, id, barber_id, barber_name: assigned ? assigned.name : null });
+  res.json({ ok: true, id, barber_id, barber_name: assigned ? assigned.name : null, forced });
 })));
 
 /**

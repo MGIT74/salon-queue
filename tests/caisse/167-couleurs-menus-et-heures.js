@@ -64,7 +64,7 @@ check('points de couleur (petit bloc)', (lib.catDotsHtml(items).match(/<i class=
   check('caisse, frise : heure de fin', c.includes("esc(it.timeLabel) + ' – ' + tbHM(it.startMin + it.durMin) + '</span>"));
   check('heures : plus de Matin / Après-midi (rdv, compte, admin, poste, caisse, groupe)',
     [rdv, compte, p, c, d].every((h) => !/s\.time < '12:00'/.test(h) && !h.includes("'le matin'")) && gb.includes('var morning = (q.slots || []).slice(), aft = [];'));
-  check('versions rechargées (app.js v=61, app.css v=55, group-booking v=29)', [d, p, c, rdv, compte, k].every((h) => h.includes('app.js?v=61') && h.includes('app.css?v=55')) && rdv.includes('group-booking.js?v=29'));
+  check('versions rechargées (app.js v=62, app.css v=56, group-booking v=29)', [d, p, c, rdv, compte, k].every((h) => h.includes('app.js?v=62') && h.includes('app.css?v=56')) && rdv.includes('group-booking.js?v=29'));
   await pool.end();
   console.log(`\n${pass} OK, ${fail} ECHEC`);
   process.exit(fail ? 1 : 0);

@@ -34,7 +34,7 @@
 <style>
   html.auth-checking #login-screen { display: none; }
 </style>
-<link rel="stylesheet" href="/app.css?v=55">
+<link rel="stylesheet" href="/app.css?v=56">
 <style>
   html, body { min-height: 100%; }
   .wrap { max-width: 1100px; margin: 0 auto; padding: 20px 18px 40px; }
@@ -1070,7 +1070,7 @@
   </div>
 </div>
 
-<script src="/app.js?v=61"></script>
+<script src="/app.js?v=62"></script>
 <script src="/queue-sim.js?v=1"></script>
 <script src="/staff-group.js?v=6"></script>
 <script src="/autorefresh.js?v=3"></script>
@@ -3095,6 +3095,7 @@ function openCaisseAddAppointment(dateStr, barberId) {
       '</div>' +
       '<div class="aa-slots" id="pa-slots"><span class="hint" style="margin:0">Chargement…</span></div>' +
       '<button type="button" class="aa-all-hours" id="pa-all-hours" style="display:none" onclick="paToggleAllHours()"></button>' +
+      staffForceHtml('pa') +
     '</div>' +
 
     // Derniere etape : le client (clients connus proposes des 3 lettres), puis Enregistrer. Au telephone, on cherche
@@ -3118,6 +3119,11 @@ function openCaisseAddAppointment(dateStr, barberId) {
 
   var STEPS = ['service', 'extras', 'datetime', 'products', 'client'];
   attachClientAutocomplete(overlay, 'pa-name', 'pa-email', 'pa-phone', barberApi);
+  // « Forcer » dans un créneau trop court (le coiffeur prend la responsabilité du débordement).
+  var paForce = staffForceInit({ overlay: overlay, prefix: 'pa', api: barberApi,
+    params: function () { return { barber_id: barberId, date: dateStr, service_id: state.serviceId, extras: state.extraIds }; },
+    defaultTime: function () { return ''; },
+    onForce: function (t) { state.time = t; state.force = true; overlay.querySelectorAll('#pa-slots .aa-slot').forEach(function (c) { c.classList.remove('sel'); }); paGoStep('products'); } });
 
   window.paGoStep = function (step, mode) {
     STEPS.forEach(function (s) { overlay.querySelector('#pa-step-' + s).style.display = s === step ? 'flex' : 'none'; });
@@ -3133,7 +3139,7 @@ function openCaisseAddAppointment(dateStr, barberId) {
       if (group) return;
       var s = svcOffer.find(function (x) { return x.id === state.serviceId; });
       var exN = extOffer.filter(function (x) { return state.extraIds.indexOf(String(x.id)) !== -1; }).map(function (x) { return x.name; });
-      overlay.querySelector('#pa-contact-summary').textContent = when + ' à ' + state.time + ' — ' + (s ? s.name : svcLabel('', exN));
+      overlay.querySelector('#pa-contact-summary').textContent = (state.force ? '⚠ RDV forcé — ' : '') + when + ' à ' + state.time + ' — ' + (s ? s.name : svcLabel('', exN));
     }
   };
 
@@ -3242,7 +3248,8 @@ function openCaisseAddAppointment(dateStr, barberId) {
     var toggleEl = overlay.querySelector('#pa-half-toggle');
     toggleEl.style.display = 'none';
     paRenderDtBarbers();
-    if (barber && barberOffOn(barber, dateStr)) { slotsEl.innerHTML = barberOffSlotsHtml(barber, dateStr, false); return; }
+    state.force = false; paForce.reset();
+    if (barber && barberOffOn(barber, dateStr)) { paForce.hide(); slotsEl.innerHTML = barberOffSlotsHtml(barber, dateStr, false); return; }
     slotsEl.innerHTML = '<span class="hint" style="margin:0">Chargement…</span>';
     barberApi('/api/appointments/availability?date=' + dateStr + '&service_id=' + state.serviceId + '&barber_id=' + barberId + '&extras=' + state.extraIds.join(',') + (paAllHours ? '&all=1' : ''), { actingAs: barberId })
       .then(function (r) {
@@ -3265,7 +3272,7 @@ function openCaisseAddAppointment(dateStr, barberId) {
   }
 
   window.paSelectSlot = function (el) {
-    state.time = el.dataset.time;
+    state.time = el.dataset.time; state.force = false;
     overlay.querySelectorAll('#pa-slots .aa-slot').forEach(function (c) { c.classList.remove('sel'); });
     el.classList.add('sel');
     paGoStep('products');
@@ -3289,11 +3296,12 @@ function openCaisseAddAppointment(dateStr, barberId) {
         service_id: state.serviceId, extras: state.extraIds,
         products: state.productIds.map(function (id) { return { id: id, quantity: 1 }; }),
         date: dateStr, time: state.time, barber_id: barberId,
+        force: !!state.force, force_ack: !!state.force,   // RDV forcé : case « Je prends la responsabilité » cochée
         base_url: window.location.origin + '/rdv.html'
       }
     }).then(function () {
       _closeModal(overlay);
-      toast('RDV ajouté');
+      toast(state.force ? '⚠ RDV forcé ajouté' : 'RDV ajouté');
       Object.keys(calMonthCache).forEach(function (k) { delete calMonthCache[k]; });
       loadAgendaPeriod();
     }).catch(function (e) { errEl.textContent = e.message; errEl.style.display = 'block'; });
