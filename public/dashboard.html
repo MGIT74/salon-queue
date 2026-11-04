@@ -55,7 +55,7 @@
 .cal-day.salon-closed::after{content:'Fermé';display:block;font-size:10px;font-weight:700;color:var(--red,#e65c5c);margin-top:2px}
 .salon-closure-banner{padding:10px 13px;border-radius:9px;margin:0 0 12px;background:rgba(160,100,100,.13);color:var(--red,#e65c5c);font-weight:650;font-size:13px}
 </style>
-<link rel="stylesheet" href="/app.css?v=56">
+<link rel="stylesheet" href="/app.css?v=57">
 <style>
   .wrap { max-width: none; margin: 0; padding: clamp(16px,1.8vw,28px); }
 
@@ -2896,7 +2896,7 @@
   </div>
 </div>
 
-<script src="/app.js?v=62"></script>
+<script src="/app.js?v=63"></script>
 <script src="/autorefresh.js?v=3"></script>
 <script src="/staff-group.js?v=6"></script>
 <script src="/daterange.js?v=4"></script>
@@ -9316,7 +9316,7 @@ function openCatColorsDialog(focus) {
   var saved = { service: CAT_COLORS.service, extra: CAT_COLORS.extra, product: CAT_COLORS.product };
   var overlay = _buildModal('<div class="modal-title">Couleurs dans l\'agenda</div>' +
     '<p class="hint" style="margin:0 0 14px">Couleur des étiquettes Prestation, Supplément et Produit sur les RDV de l\'agenda du poste. Nulle part ailleurs.</p>' +
-    '<div class="cat-color-rows">' + row('service', 'Prestation', '✂') + row('extra', 'Supplément', '+') + row('product', 'Produit', '🛍') + '</div>' +
+    '<div class="cat-color-rows">' + row('service', 'Prestation', CAT_ICON.service) + row('extra', 'Supplément', CAT_ICON.extra) + row('product', 'Produit', CAT_ICON.product) + '</div>' +
     '<button class="btn btn-ghost" id="cat-color-reset" style="padding:8px 0;font-size:13px;margin-top:8px">Rétablir les couleurs d\'origine</button>' +
     '<div class="modal-actions"><button class="btn btn-soft" id="cat-color-cancel">Annuler</button><button class="btn btn-primary" id="cat-color-save">Enregistrer</button></div>');
   var box = overlay.querySelector('.modal-box');

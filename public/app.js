@@ -300,7 +300,12 @@ function applyCatColors(c) {
   st.textContent = ':root, [data-theme="dark"] { --cat-service: ' + CAT_COLORS.service + '; --cat-extra: ' + CAT_COLORS.extra + '; --cat-product: ' + CAT_COLORS.product + '; }';
 }
 // Étiquette d'un élément d'un RDV (agenda du poste) : 'service' | 'extra' | 'product'.
-var CAT_ICON = { service: '✂', extra: '+', product: '🛍' };
+// Petites icônes blanches dans un rond de la couleur du menu (SVG : même rendu partout, pas d'emoji).
+var CAT_ICON = {
+  service: '<svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M8.6 7.6 20 18M8.6 16.4 20 6"/></svg>',
+  extra: '<svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  product: '<svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"><path d="M5 8h14l-1 12H6z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg>'
+};
 var CAT_LABEL = { service: 'Prestation', extra: 'Supplément', product: 'Produit' };
 function catChipHtml(kind, name) {
   return '<span class="cat-chip k-' + kind + '" title="' + esc(CAT_LABEL[kind] + ' : ' + name) + '"><i>' + CAT_ICON[kind] + '</i>' + esc(name) + '</span>';
@@ -2277,5 +2282,5 @@ function forcedInfoHtml(a) {
   if (!a || !a.forced_by) return '';
   var d = a.forced_at ? new Date(a.forced_at) : null;
   var when = d && !isNaN(d) ? ' le ' + d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }) + ' à ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
-  return '<div class="forced-info"><b>⚠ RDV forcé par ' + esc(a.forced_by) + '</b>' + when + '<br>Il chevauche un autre RDV : le coiffeur gère le retard.</div>';
+  return '<div class="forced-info"><span class="fi-ic" aria-hidden="true">!</span><div><b>RDV forcé par ' + esc(a.forced_by) + '</b>' + when + '<br>Il chevauche un autre RDV : le coiffeur gère le retard.</div></div>';
 }
