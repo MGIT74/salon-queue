@@ -55,7 +55,7 @@
 .cal-day.salon-closed::after{content:'Fermé';display:block;font-size:10px;font-weight:700;color:var(--red,#e65c5c);margin-top:2px}
 .salon-closure-banner{padding:10px 13px;border-radius:9px;margin:0 0 12px;background:rgba(160,100,100,.13);color:var(--red,#e65c5c);font-weight:650;font-size:13px}
 </style>
-<link rel="stylesheet" href="/app.css?v=50">
+<link rel="stylesheet" href="/app.css?v=51">
 <style>
   .wrap { max-width: none; margin: 0; padding: clamp(16px,1.8vw,28px); }
 
@@ -2353,6 +2353,18 @@
         <button class="btn btn-soft" style="padding:8px 14px;font-size:13px" onclick="saveAccentColor()">Enregistrer</button>
         <button class="btn btn-ghost" style="padding:8px 14px;font-size:13px" onclick="resetAccentColor()">Réinitialiser</button>
       </div>
+
+      <h4 style="font-size:14.5px;font-weight:600;margin:22px 0 4px">Couleurs des 3 menus</h4>
+      <p class="hint">Prestations, suppléments et produits : couleur des cartes, des onglets et des étiquettes de l'agenda (prise de RDV, admin, poste, caisse).</p>
+      <div class="cat-color-rows" id="cat-color-rows">
+        <label class="cat-color-row"><input type="color" id="cat-color-service" value="#0a84ff"><span class="cat-chip k-service" id="cat-color-prev-service"><i>✂</i>Prestation</span><span class="hint" id="cat-color-hex-service" style="margin:0">#0a84ff</span></label>
+        <label class="cat-color-row"><input type="color" id="cat-color-extra" value="#bf5af2"><span class="cat-chip k-extra" id="cat-color-prev-extra"><i>+</i>Supplément</span><span class="hint" id="cat-color-hex-extra" style="margin:0">#bf5af2</span></label>
+        <label class="cat-color-row"><input type="color" id="cat-color-product" value="#30d158"><span class="cat-chip k-product" id="cat-color-prev-product"><i>🛍</i>Produit</span><span class="hint" id="cat-color-hex-product" style="margin:0">#30d158</span></label>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:10px">
+        <button class="btn btn-soft" style="padding:8px 14px;font-size:13px" onclick="saveCatColors()">Enregistrer</button>
+        <button class="btn btn-ghost" style="padding:8px 14px;font-size:13px" onclick="resetCatColors()">Rétablir les couleurs d'origine</button>
+      </div>
     </div>
 
     <div class="card-box">
@@ -2884,7 +2896,7 @@
   </div>
 </div>
 
-<script src="/app.js?v=58"></script>
+<script src="/app.js?v=59"></script>
 <script src="/autorefresh.js?v=3"></script>
 <script src="/staff-group.js?v=6"></script>
 <script src="/daterange.js?v=4"></script>
@@ -3020,6 +3032,7 @@ function loadCurrentSalonName() {
       }
       var logoRemoveBtn = document.getElementById('logo-remove-btn');
       if (logoRemoveBtn) logoRemoveBtn.style.display = currentSalonLogo ? 'inline-block' : 'none';
+      applyCatColors(d.cat_colors); fillCatColorInputs();
       if (d.accent_color) {
         applyAccentColor(d.accent_color);
         var accentInput = document.getElementById('acc-accent-color');
@@ -3929,7 +3942,7 @@ function openRescheduleAppointment(id, data) {
       ? list.map(function (s) {
           return '<button class="aa-slot" data-time="' + s.time + '" onclick="rsSelectSlot(this)">' + s.time + '</button>';
         }).join('')
-      : '<span class="hint" style="margin:0">Aucun créneau ' + (rsCurrentHalf === 'morning' ? 'le matin' : "l'après-midi") + '</span>';
+      : '<span class="hint" style="margin:0">Aucun créneau disponible</span>';
   }
 
   window.rsShowHalf = function (half) {
@@ -3965,15 +3978,15 @@ function openRescheduleAppointment(id, data) {
         // après) que "Ajouter un RDV" - évite un popup interminable
         // quand un coiffeur a beaucoup de créneaux libres dans la
         // journée.
-        rsSlotsByHalf.morning = r.slots.filter(function (s) { return s.time < '12:00'; });
-        rsSlotsByHalf.afternoon = r.slots.filter(function (s) { return s.time >= '12:00'; });
+        rsSlotsByHalf.morning = r.slots.slice();   // plus de Matin / Après-midi : toutes les heures d'un coup
+        rsSlotsByHalf.afternoon = [];
 
         if (!rsSlotsByHalf.morning.length) {
           toggleEl.style.display = 'none';
           rsCurrentHalf = 'afternoon';
           rsRenderHalf();
         } else {
-          toggleEl.style.display = 'flex';
+          toggleEl.style.display = 'none';
           rsShowHalf('morning');
         }
       })
@@ -7094,13 +7107,13 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
 
     '<div id="aa-step-service" style="display:none">' +
       '<button type="button" class="aa-group-link" onclick="aaGoStep(\'client\', \'group\')"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M17.5 14.2c2.3.3 3.5 2.2 3.5 5.8"/></svg>Plusieurs personnes ?</button>' +
-      '<div class="aa-step-title">Prestation</div>' +
+      '<div class="aa-step-title cat-head k-service">Prestation</div>' +
       '<div class="item-grid compact" id="aa-service-grid"></div>' +
     '</div>' +
 
     '<div id="aa-step-extras" style="display:none">' +
       '<button class="aa-back" onclick="aaGoStep(\'service\')">‹ Retour</button>' +
-      '<div class="aa-step-title" id="aa-extras-title">Suppléments (optionnels)</div>' +
+      '<div class="aa-step-title cat-head k-extra" id="aa-extras-title">Suppléments (optionnels)</div>' +
       vitrineSearchHtml('aa-extras', 'Rechercher un supplément', "aaFilter('extras')") +
       '<div class="item-grid compact" id="aa-extras-grid"></div>' +
       '<div class="items-empty" id="aa-extras-empty">Aucun résultat</div>' +
@@ -7110,7 +7123,7 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
 
     '<div id="aa-step-products" style="display:none">' +
       '<button class="aa-back" onclick="aaGoStep(\'datetime\')">‹ Retour</button>' +
-      '<div class="aa-step-title">Un produit à acheter sur place ? (optionnel)</div>' +
+      '<div class="aa-step-title cat-head k-product">Un produit à acheter sur place ? (optionnel)</div>' +
       vitrineSearchHtml('aa-products', 'Rechercher un produit', "aaFilter('products')") +
       '<div class="item-grid compact" id="aa-products-grid"></div>' +
       '<div class="items-empty" id="aa-products-empty">Aucun résultat</div>' +
@@ -7274,7 +7287,7 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
       ? list.map(function (s) {
           return '<button class="aa-slot" data-time="' + s.time + '" data-barber="' + (s.barber_id || '') + '" onclick="aaSelectSlot(this)">' + s.time + '</button>';
         }).join('')
-      : '<span class="hint" style="margin:0">Aucun créneau ' + (currentHalf === 'morning' ? 'le matin' : "l'après-midi") + '</span>';
+      : '<span class="hint" style="margin:0">Aucun créneau disponible</span>';
   }
 
   window.aaShowHalf = function (half) {
@@ -7326,15 +7339,15 @@ function openAdminAddAppointment(dateStr, preselectedBarberId) {
         // est entièrement passé (aucun créneau restant avant midi), on
         // n'affiche même pas l'onglet Matin, inutile de proposer un
         // choix vide.
-        slotsByHalf.morning = r.slots.filter(function (s) { return s.time < '12:00'; });
-        slotsByHalf.afternoon = r.slots.filter(function (s) { return s.time >= '12:00'; });
+        slotsByHalf.morning = r.slots.slice();   // plus de Matin / Après-midi : toutes les heures d'un coup
+        slotsByHalf.afternoon = [];
 
         if (!slotsByHalf.morning.length) {
           toggleEl.style.display = 'none';
           currentHalf = 'afternoon';
           aaRenderHalf();
         } else {
-          toggleEl.style.display = 'flex';
+          toggleEl.style.display = 'none';
           aaShowHalf('morning');
         }
       })
@@ -9185,6 +9198,33 @@ function resetAccentColor() {
       document.getElementById('acc-accent-color-hex').textContent = '#0062c4';
       toast('Bleu par défaut restauré — rechargez la page pour le voir partout');
     })
+    .catch(function (e) { toast(e.message, true); });
+}
+
+// Couleurs des 3 menus (prestation / supplément / produit) : aperçu en direct, puis enregistrement.
+var CAT_COLOR_DEFAULTS = { service: '#0a84ff', extra: '#bf5af2', product: '#30d158' };
+function fillCatColorInputs() {
+  ['service', 'extra', 'product'].forEach(function (k) {
+    var inp = document.getElementById('cat-color-' + k);
+    if (!inp) return;
+    inp.value = CAT_COLORS[k];
+    document.getElementById('cat-color-hex-' + k).textContent = CAT_COLORS[k];
+    inp.oninput = function () {
+      document.getElementById('cat-color-hex-' + k).textContent = inp.value;
+      var c = {}; c[k] = inp.value; applyCatColors(c);   // aperçu immédiat (pas encore enregistré)
+    };
+  });
+}
+function saveCatColors() {
+  var body = {};
+  ['service', 'extra', 'product'].forEach(function (k) { body['color_cat_' + k] = document.getElementById('cat-color-' + k).value; });
+  api('/api/settings', { method: 'PUT', body: body })
+    .then(function () { toast('Couleurs enregistrées'); })
+    .catch(function (e) { toast(e.message, true); });
+}
+function resetCatColors() {
+  api('/api/settings', { method: 'PUT', body: { color_cat_service: '', color_cat_extra: '', color_cat_product: '' } })
+    .then(function () { applyCatColors(CAT_COLOR_DEFAULTS); fillCatColorInputs(); toast("Couleurs d'origine rétablies"); })
     .catch(function (e) { toast(e.message, true); });
 }
 

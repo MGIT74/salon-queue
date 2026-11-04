@@ -34,7 +34,7 @@
 <style>
   html.auth-checking #login-screen { display: none; }
 </style>
-<link rel="stylesheet" href="/app.css?v=50">
+<link rel="stylesheet" href="/app.css?v=51">
 <style>
   html, body { min-height: 100%; }
   .wrap { max-width: 1100px; margin: 0 auto; padding: 20px 18px 40px; }
@@ -334,6 +334,7 @@
   /* Heure du rendez-vous, au-dessus du nom du client. */
   .timeline-block .tb-time { font-size: 10.5px; font-weight: 700; opacity: .92; letter-spacing: .2px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
   .timeline-block .tb-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+  .timeline-block .cat-dots i { width: 8px; height: 8px; border-width: 1.5px; }
   .timeline-now-line {
     position: absolute; top: 0; bottom: 0; width: 2px; background: var(--accent, var(--blue));
     z-index: 5; cursor: help;
@@ -848,9 +849,9 @@
       <div class="caisse-grid-col">
         <div id="caisse-no-timer-active" style="display:none"></div>
         <div class="cat-tabs" id="cat-tabs">
-          <button class="on" data-cat="services">Prestations</button>
-          <button data-cat="extras">Suppléments</button>
-          <button data-cat="products">Produits</button>
+          <button class="on k-service" data-cat="services"><i class="cat-ic">✂</i> Prestations</button>
+          <button class="k-extra" data-cat="extras"><i class="cat-ic">+</i> Suppléments</button>
+          <button class="k-product" data-cat="products"><i class="cat-ic">🛍</i> Produits</button>
           <button data-cat="pending" id="cat-tab-pending">À encaisser <span class="cat-badge" id="pending-tab-count" style="display:none"></span></button>
         </div>
         <div id="item-cats" style="display:none;gap:8px;flex-wrap:wrap;margin:0 0 10px"></div>
@@ -1070,7 +1071,7 @@
   </div>
 </div>
 
-<script src="/app.js?v=58"></script>
+<script src="/app.js?v=59"></script>
 <script src="/queue-sim.js?v=1"></script>
 <script src="/staff-group.js?v=6"></script>
 <script src="/autorefresh.js?v=3"></script>
@@ -1122,7 +1123,7 @@ function loadSalonName() {
       vatRates = d.vat_rates || { service: 20, extra: 20, product: 20 };
       tpeBridgeUrl = d.tpe_bridge_url || null;
       tpePrintMode = d.tpe_print_mode === 'text' ? 'text' : 'escpos';
-      applyAccentColor(d.accent_color);
+      applyAccentColor(d.accent_color); applyCatColors(d.cat_colors);
       document.title = name + ' — Caisse';
       var mark = document.getElementById('salon-mark');
       if (mark) mark.textContent = name.toUpperCase();
@@ -1890,7 +1891,7 @@ function renderNext() {
           '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></span>' : '') +
         '<div class="next-info" onclick="openNextClient(\'' + q.id + '\')">' +
           '<div class="name">' + queueSourceIconHtml(q) + esc(q.client_name) + '</div>' +
-          '<div class="meta">' + esc(detail) + '</div>' +
+          '<div class="meta">' + esc(detail) + '</div>' + productChipsHtml(q) +
           appointmentBadge +
           paidBadgeHtml(q) +
           (q.gift_card ? giftBadgeHtml(q.gift_card) : '') +
@@ -2451,13 +2452,14 @@ function renderAgendaTimeline(dateStr) {
   // et son clic differe selon l'origine.
   var items = appts.map(function (a) {
     return { kind: 'appt', id: a.id, barberId: a.barber_id, clientName: a.client_name, serviceName: a.service_name,
-      startMin: apptMinutes(a), durMin: Math.max(a.duration_min || 30, 15), timeLabel: a.scheduled_at.slice(11, 16) };
+      startMin: apptMinutes(a), durMin: Math.max(a.duration_min || 30, 15), timeLabel: a.scheduled_at.slice(11, 16), cats: catItemsOf(a) };
   }).concat(walkIns.map(function (q) {
     var sm = salonDateAndMinutesOf(q.start_at).minutes;
     var hh = String(Math.floor(sm / 60)).padStart(2, '0'), mm = String(sm % 60).padStart(2, '0');
     return { kind: 'walkin', id: q.id, barberId: q.barber_id, clientName: q.client_name, serviceName: q.service.name,
-      startMin: sm, durMin: Math.max(q.total_duration_min || 30, 15), timeLabel: hh + ':' + mm };
+      startMin: sm, durMin: Math.max(q.total_duration_min || 30, 15), timeLabel: hh + ':' + mm, cats: catItemsOf(q) };
   }));
+  var tbHM = function (m) { m = Math.round(m) % 1440; return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); };
 
   var starts = items.map(function (it) { return it.startMin; });
   var ends = items.map(function (it) { return it.startMin + it.durMin; });
@@ -2511,7 +2513,7 @@ function renderAgendaTimeline(dateStr) {
         : 'openAgendaWalkInDrawer(\'' + it.id + '\')';
       return '<div class="timeline-block" style="left:' + leftPct + '%;width:' + widthPct + '%;background:' + color + '" ' +
         'title="' + esc(it.timeLabel + ' — ' + it.clientName + ' — ' + (it.serviceName || '') + (it.kind === 'walkin' ? ' (sans RDV)' : '')) + '" ' +
-        'onclick="event.stopPropagation();' + onclick + '">' + '<span class="tb-time">' + esc(it.timeLabel) + '</span><span class="tb-name">' + esc(it.clientName) + '</span></div>';
+        'onclick="event.stopPropagation();' + onclick + '">' + '<span class="tb-time">' + esc(it.timeLabel) + ' – ' + tbHM(it.startMin + it.durMin) + ' ' + catDotsHtml(it.cats) + '</span><span class="tb-name">' + esc(it.clientName) + '</span></div>';
     }).join('');
     // Sans-rdv uniquement : la ligne reste visible (pour voir ses RDV
     // deja enregistres) mais pas cliquable pour en ajouter un nouveau -
@@ -2881,7 +2883,7 @@ function adReschedule() {
     var list = byHalf[curHalf];
     overlay.querySelector('#rs-slots').innerHTML = list.length
       ? list.map(function (s) { return '<button class="aa-slot" data-time="' + s.time + '" onclick="adRsSelectSlot(this)">' + s.time + '</button>'; }).join('')
-      : '<span class="hint" style="margin:0">Aucun créneau ' + (curHalf === 'morning' ? 'le matin' : "l'après-midi") + '</span>';
+      : '<span class="hint" style="margin:0">Aucun créneau disponible</span>';
   }
   window.adRsShowHalf = function (half) {
     curHalf = half;
@@ -2915,10 +2917,10 @@ function adReschedule() {
     barberApi('/api/appointments/availability?date=' + date + '&service_id=' + a.service_id + '&barber_id=' + barberId + '&exclude_appointment_id=' + a.id, { actingAs: barberId })
       .then(function (r) {
         if (!r.slots.length) { slotsEl.innerHTML = '<span class="hint" style="margin:0">Aucun créneau disponible ce jour-là</span>'; return; }
-        byHalf.morning = r.slots.filter(function (s) { return s.time < '12:00'; });
-        byHalf.afternoon = r.slots.filter(function (s) { return s.time >= '12:00'; });
+        byHalf.morning = r.slots.slice();   // plus de Matin / Après-midi : toutes les heures d'un coup
+        byHalf.afternoon = [];
         if (!byHalf.morning.length) { toggleEl.style.display = 'none'; curHalf = 'afternoon'; renderHalf(); }
-        else { toggleEl.style.display = 'flex'; adRsShowHalf('morning'); }
+        else { toggleEl.style.display = 'none'; adRsShowHalf('morning'); }
       })
       .catch(function (e) { slotsEl.innerHTML = ''; toast(e.message, true); });
   }
@@ -3060,13 +3062,13 @@ function openCaisseAddAppointment(dateStr, barberId) {
 
     '<div id="pa-step-service" style="display:none">' +
       '<button type="button" class="aa-group-link" onclick="paGoStep(\'client\', \'group\')"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M17.5 14.2c2.3.3 3.5 2.2 3.5 5.8"/></svg>Plusieurs personnes ?</button>' +
-      '<div class="aa-step-title">Prestation</div>' +
+      '<div class="aa-step-title cat-head k-service">Prestation</div>' +
       '<div class="item-grid compact" id="pa-service-grid"></div>' +
     '</div>' +
 
     '<div id="pa-step-extras" style="display:none">' +
       '<button class="aa-back" onclick="paGoStep(\'service\')">‹ Retour</button>' +
-      '<div class="aa-step-title" id="pa-extras-title">Suppléments (optionnels)</div>' +
+      '<div class="aa-step-title cat-head k-extra" id="pa-extras-title">Suppléments (optionnels)</div>' +
       vitrineSearchHtml('pa-extras', 'Rechercher un supplément', "paFilter('extras')") +
       '<div class="item-grid compact" id="pa-extras-grid"></div>' +
       '<div class="items-empty" id="pa-extras-empty">Aucun résultat</div>' +
@@ -3076,7 +3078,7 @@ function openCaisseAddAppointment(dateStr, barberId) {
 
     '<div id="pa-step-products" style="display:none">' +
       '<button class="aa-back" onclick="paGoStep(\'datetime\')">‹ Retour</button>' +
-      '<div class="aa-step-title">Un produit à acheter sur place ? (optionnel)</div>' +
+      '<div class="aa-step-title cat-head k-product">Un produit à acheter sur place ? (optionnel)</div>' +
       vitrineSearchHtml('pa-products', 'Rechercher un produit', "paFilter('products')") +
       '<div class="item-grid compact" id="pa-products-grid"></div>' +
       '<div class="items-empty" id="pa-products-empty">Aucun résultat</div>' +
@@ -3194,7 +3196,7 @@ function openCaisseAddAppointment(dateStr, barberId) {
       ? list.map(function (s) {
           return '<button class="aa-slot" data-time="' + s.time + '" onclick="paSelectSlot(this)">' + s.time + '</button>';
         }).join('')
-      : '<span class="hint" style="margin:0">Aucun créneau ' + (currentHalf === 'morning' ? 'le matin' : "l'après-midi") + '</span>';
+      : '<span class="hint" style="margin:0">Aucun créneau disponible</span>';
   }
 
   window.paShowHalf = function (half) {
@@ -3248,15 +3250,15 @@ function openCaisseAddAppointment(dateStr, barberId) {
         paShowAllHoursLink(r);
         if (!r.slots.length) { slotsEl.innerHTML = '<span class="hint" style="margin:0">Aucun créneau disponible ce jour-là</span>'; return; }
 
-        slotsByHalf.morning = r.slots.filter(function (s) { return s.time < '12:00'; });
-        slotsByHalf.afternoon = r.slots.filter(function (s) { return s.time >= '12:00'; });
+        slotsByHalf.morning = r.slots.slice();   // plus de Matin / Après-midi : toutes les heures d'un coup
+        slotsByHalf.afternoon = [];
 
         if (!slotsByHalf.morning.length) {
           toggleEl.style.display = 'none';
           currentHalf = 'afternoon';
           paRenderHalf();
         } else {
-          toggleEl.style.display = 'flex';
+          toggleEl.style.display = 'none';
           paShowHalf('morning');
         }
       })

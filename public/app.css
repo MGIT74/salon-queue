@@ -865,3 +865,37 @@ body .tfx > button { transition: color .25s ease, transform .1s ease; }
 .qe-search:focus { box-shadow: 0 0 0 2px var(--blue); }
 .finished-edit-grid .empty { grid-column: 1 / -1; }
 .aa-all-hours { display: block; margin: 4px 0 10px; padding: 6px 0; border: 0; background: none; color: var(--blue); font: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; }
+
+/* ===== Couleurs des 3 menus : prestation / supplément / produit =====
+   Réglables par le salon (Réglages > Compte), posées par applyCatColors() (app.js). */
+:root { --cat-service: #0a84ff; --cat-extra: #bf5af2; --cat-product: #30d158; }
+.k-service { --k: var(--cat-service); }
+.k-extra { --k: var(--cat-extra); }
+.k-product { --k: var(--cat-product); }
+/* Cartes : liseré en haut + mention de la catégorie */
+.item-card.k-service::before, .item-card.k-extra::before, .item-card.k-product::before,
+.finished-edit-card::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 4px; background: var(--k); z-index: 3; pointer-events: none; }
+.finished-edit-card { overflow: hidden; }
+.item-kind { font-size: 10.5px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--k, var(--grey)); line-height: 1.2; }
+:root:not([data-theme="dark"]) .item-kind { color: color-mix(in srgb, var(--k, #666) 78%, #000); }
+/* Titres d'étape et onglets : pastille + texte à la couleur du menu */
+.cat-head { display: flex; align-items: center; gap: 8px; }
+.cat-head::before { content: ''; flex: none; width: 10px; height: 10px; border-radius: 3px; background: var(--k); }
+.cat-tabs button.k-service, .cat-tabs button.k-extra, .cat-tabs button.k-product,
+.qe-tabs button.k-service, .qe-tabs button.k-extra { color: var(--k); }
+:root:not([data-theme="dark"]) :is(.cat-tabs, .qe-tabs) button:is(.k-service, .k-extra, .k-product) { color: color-mix(in srgb, var(--k) 80%, #000); }
+.cat-ic { font-style: normal; font-weight: 800; }
+/* Étiquettes d'un RDV (agenda, tiroir, À suivre) : fond blanc, bord coloré */
+.cat-chip { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; background: rgba(255,255,255,.94); color: #1d1d1f; border-radius: 6px; padding: 1px 6px 1px 3px;
+  font-size: 11px; font-weight: 700; line-height: 1.45; border-left: 4px solid var(--k); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cat-chip i { font-style: normal; color: var(--k); font-size: 10.5px; flex: none; }
+:root:not([data-theme="dark"]) .cat-chip { box-shadow: 0 0 0 1px rgba(0,0,0,.08); }
+.cat-chips { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 3px; min-width: 0; }
+.cat-dots { display: inline-flex; gap: 3px; vertical-align: middle; }
+.cat-dots i { width: 9px; height: 9px; border-radius: 50%; background: var(--k); border: 1.5px solid #fff; flex: none; }
+.cat-color-rows { display: flex; flex-direction: column; gap: 8px; }
+.cat-color-row { display: flex; align-items: center; gap: 12px; cursor: pointer; }
+.cat-color-row input[type="color"] { width: 40px; height: 40px; border: none; border-radius: 10px; padding: 0; cursor: pointer; background: none; flex: none; }
+.cat-color-row .cat-chip { font-size: 13px; padding: 3px 9px 3px 5px; min-width: 120px; }
+.detail-value .cat-chips { justify-content: flex-end; margin-top: 4px; }
+.next-info .cat-chips, .meta + .cat-chips { margin-top: 4px; }

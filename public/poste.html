@@ -98,7 +98,7 @@
 .cal-day.salon-closed::after{content:'Fermé';display:block;font-size:10px;font-weight:700;color:var(--red,#e65c5c);margin-top:2px}
 .salon-closure-banner{padding:10px 13px;border-radius:9px;margin:0 0 12px;background:rgba(160,100,100,.13);color:var(--red,#e65c5c);font-weight:650;font-size:13px}
 </style>
-<link rel="stylesheet" href="/app.css?v=50">
+<link rel="stylesheet" href="/app.css?v=51">
 <style>
   html, body { min-height: 100%; }
   .wrap { max-width: 480px; margin: 0 auto; padding: 20px 18px 40px; }
@@ -547,6 +547,11 @@
   .pd-block.is-next { box-shadow: 0 0 0 2px var(--fill), 0 0 0 4px var(--blue); z-index: 2; }
   .pd-block.pd-hit { box-shadow: 0 0 0 2px var(--fill), 0 0 0 4px #ffd60a; z-index: 3; }
   .pd-block.pd-dim { opacity: .4; }
+  .pd-block .cat-chips { max-width: 100%; overflow: hidden; max-height: calc(100% - 34px); }
+  .pd-block .cat-chips.one { flex-wrap: nowrap; max-height: none; }
+  .pd-block .cat-chips.one .cat-chip { flex-shrink: 0; }
+  .pd-block .cat-dots { flex-shrink: 0; }
+  .pd-block.tall .cat-dots { margin-top: 2px; }
   .pd-free { position: absolute; left: 0; right: 0; box-sizing: border-box; border: 1px dashed var(--sep); background: transparent; color: var(--grey); border-radius: 9px; padding: 0 10px; display: flex; align-items: center; gap: 8px; font-size: 12px; cursor: pointer; overflow: hidden; }
   .pd-free b { margin-left: auto; color: var(--blue); font-size: 12px; }
   .pd-free:hover { border-color: var(--blue); }
@@ -773,7 +778,7 @@
   </button>
 </div>
 
-<script src="/app.js?v=58"></script>
+<script src="/app.js?v=59"></script>
 <script src="/queue-sim.js?v=1"></script>
 <script src="/autorefresh.js?v=3"></script>
 <script src="/staff-group.js?v=6"></script>
@@ -812,7 +817,7 @@ function loadSalonName() {
       CURRENCY = d.currency || 'EUR'; if (d.timezone) SALON_TIMEZONE = d.timezone;
       rdvPrepAlertMin = Number(d.rdv_prep_alert_min) || 0;
       timerCfg = { timer_early_enabled: d.timer_early_enabled, timer_early_min: d.timer_early_min, timer_early_barbers: d.timer_early_barbers || {} };
-      applyAccentColor(d.accent_color);
+      applyAccentColor(d.accent_color); applyCatColors(d.cat_colors);
       document.title = name + ' — Mon poste';
       var mark = document.getElementById('salon-mark');
       if (mark) mark.textContent = name.toUpperCase();
@@ -1196,7 +1201,7 @@ function renderNext() {
       '<div class="next-card' + (locked ? ' locked' : '') + (prepAlert ? ' prep-alert' : '') + '">' +
         '<div class="next-info" onclick="openNextClient(\'' + q.id + '\')">' +
           '<div class="name">' + queueSourceIconHtml(q) + esc(q.client_name) + '</div>' +
-          '<div class="meta">' + esc(detail) + '</div>' +
+          '<div class="meta">' + esc(detail) + '</div>' + productChipsHtml(q) +
           appointmentBadge +
           (q.paid_at ? '<div class="meta" style="color:var(--green);font-weight:600">✓ Déjà payé</div>' : '') +
           (q.gift_card ? giftBadgeHtml(q.gift_card) : '') +
@@ -1927,15 +1932,16 @@ function posteDayHtml(dateStr) {
       var h = Math.max(16, Math.round(it.dur * PX) - 3), a = it.a;
       var isNext = nextIt && it.id === nextIt.id;
       var label = it.st === 'absent' ? 'Absent' : it.st === 'done' ? 'Terminé' : it.st === 'inprogress' ? 'En cours' : isNext ? 'Prochain' : '';
-      var showSvc = !!a.service_name;   // la prestation pour tous les coiffeurs (plus seulement la mienne)
       var narrow = it.lanes > 1;
+      // Ce qu'il faut préparer : une étiquette par élément (couleur du menu) ; bloc trop petit : des points.
+      var cats = catItemsOf(a), roomy = h >= 46 && !narrow;
       inner += '<button type="button" class="pd-block st-' + it.st + (isNext ? ' is-next' : '') + (narrow ? ' narrow' : '') + (h >= 46 ? ' tall' : '') + '" data-id="' + esc(a.id) + '" ' +
         'data-q="' + esc(normText([a.client_name, a.email, a.phone].join(' ')) + ' ' + String(a.phone || '').replace(/\D/g, '')) + '" ' +
         'style="top:' + Math.round((it.start - R0) * PX) + 'px;height:' + h + 'px;' + pdLaneCss(it) + '--c:' + color + ';--fg:' + fg + '" ' +
-        'title="' + esc(pdHM(it.start) + ' – ' + pdHM(it.end) + ' — ' + a.client_name + ' — ' + (a.service_name || '') + ' — ' + b.name) + '" ' +
+        'title="' + esc(pdHM(it.start) + ' – ' + pdHM(it.end) + ' — ' + a.client_name + ' — ' + (cats.length ? cats.map(function (c) { return c.name; }).join(' + ') : (a.service_name || '')) + ' — ' + b.name) + '" ' +
         'onclick="event.stopPropagation();openPosteClientDrawer(\'' + a.id + '\')">' +
-        '<span class="t">' + pdHM(it.start) + '</span><span class="n">' + esc(a.client_name) + '</span>' +
-        (showSvc && !narrow ? '<span class="s">' + esc(a.service_name) + ' · ' + pdDur(it.dur) + '</span>' : '') +
+        '<span class="t">' + pdHM(it.start) + ' – ' + pdHM(it.end) + '</span><span class="n">' + esc(a.client_name) + '</span>' +
+        (roomy ? catChipsHtml(cats).replace('cat-chips', h < 80 ? 'cat-chips one' : 'cat-chips') : !narrow ? catDotsHtml(cats) : '') +
         (label && !narrow ? '<span class="l">' + label + '</span>' : '') + '</button>';
     });
     if (offWhy || walkDay) inner += '<div class="pd-col-off">' + (offWhy ? esc(offWhy.charAt(0).toUpperCase() + offWhy.slice(1)) : 'En « sans RDV » ce jour-là') + '</div>';
@@ -2200,7 +2206,7 @@ function pdWeekHtml(start) {
         'onclick="event.stopPropagation();openPosteClientDrawer(\'' + a.id + '\')">' +
         // Telephone : colonnes etroites -> juste l'initiale du client ; ordinateur : heure + nom (le nom passe dessous si la place manque).
         (phone ? (narrow ? '' : '<span class="n">' + esc(String(a.client_name || '?').charAt(0).toUpperCase()) + '</span>')
-          : '<span class="t">' + pdHM(it.start) + '</span><span class="n">' + esc(a.client_name) + '</span>') + '</button>';
+          : '<span class="t">' + pdHM(it.start) + '</span><span class="n">' + esc(a.client_name) + '</span>' + (h >= 40 && !narrow ? catDotsHtml(catItemsOf(a)) : '')) + '</button>';
     });
     if (rdvIsSalonClosed(d)) inner += '<div class="pd-col-off">Fermé</div>';
     var nowL = d === todayStr && nowMin >= R0 && nowMin <= R1 ? '<div class="pd-now" style="top:' + Math.round((nowMin - R0) * PX) + 'px"></div>' : '';
@@ -2732,13 +2738,13 @@ function openPosteAddAppointment(dateStr, barberId) {
 
     '<div id="pa-step-service" style="display:none">' +
       '<button type="button" class="aa-group-link" onclick="paGoStep(\'client\', \'group\')"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M17.5 14.2c2.3.3 3.5 2.2 3.5 5.8"/></svg>Plusieurs personnes ?</button>' +
-      '<div class="aa-step-title">Prestation</div>' +
+      '<div class="aa-step-title cat-head k-service">Prestation</div>' +
       '<div class="item-grid compact" id="pa-service-grid"></div>' +
     '</div>' +
 
     '<div id="pa-step-extras" style="display:none">' +
       '<button class="aa-back" onclick="paGoStep(\'service\')">‹ Retour</button>' +
-      '<div class="aa-step-title" id="pa-extras-title">Suppléments (optionnels)</div>' +
+      '<div class="aa-step-title cat-head k-extra" id="pa-extras-title">Suppléments (optionnels)</div>' +
       vitrineSearchHtml('pa-extras', 'Rechercher un supplément', "paFilter('extras')") +
       '<div class="item-grid compact" id="pa-extras-grid"></div>' +
       '<div class="items-empty" id="pa-extras-empty">Aucun résultat</div>' +
@@ -2748,7 +2754,7 @@ function openPosteAddAppointment(dateStr, barberId) {
 
     '<div id="pa-step-products" style="display:none">' +
       '<button class="aa-back" onclick="paGoStep(\'datetime\')">‹ Retour</button>' +
-      '<div class="aa-step-title">Un produit à acheter sur place ? (optionnel)</div>' +
+      '<div class="aa-step-title cat-head k-product">Un produit à acheter sur place ? (optionnel)</div>' +
       vitrineSearchHtml('pa-products', 'Rechercher un produit', "paFilter('products')") +
       '<div class="item-grid compact" id="pa-products-grid"></div>' +
       '<div class="items-empty" id="pa-products-empty">Aucun résultat</div>' +
@@ -2867,7 +2873,7 @@ function openPosteAddAppointment(dateStr, barberId) {
       ? list.map(function (s) {
           return '<button class="aa-slot' + (s.time === state.time ? ' sel' : '') + '" data-time="' + s.time + '" onclick="paSelectSlot(this)">' + s.time + '</button>';
         }).join('')
-      : '<span class="hint" style="margin:0">Aucun créneau ' + (currentHalf === 'morning' ? 'le matin' : "l'après-midi") + '</span>';
+      : '<span class="hint" style="margin:0">Aucun créneau disponible</span>';
   }
 
   window.paShowHalf = function (half) {
@@ -2921,15 +2927,15 @@ function openPosteAddAppointment(dateStr, barberId) {
         paShowAllHoursLink(r);
         if (!r.slots.length) { slotsEl.innerHTML = '<span class="hint" style="margin:0">Aucun créneau disponible ce jour-là</span>'; return; }
 
-        slotsByHalf.morning = r.slots.filter(function (s) { return s.time < '12:00'; });
-        slotsByHalf.afternoon = r.slots.filter(function (s) { return s.time >= '12:00'; });
+        slotsByHalf.morning = r.slots.slice();   // plus de Matin / Après-midi : toutes les heures d'un coup
+        slotsByHalf.afternoon = [];
 
         if (!slotsByHalf.morning.length) {
           toggleEl.style.display = 'none';
           currentHalf = 'afternoon';
           paRenderHalf();
         } else {
-          toggleEl.style.display = 'flex';
+          toggleEl.style.display = 'none';
           paShowHalf(prefTime && prefTime >= '12:00' && slotsByHalf.afternoon.length ? 'afternoon' : 'morning');
         }
         // Heure touchée dans l'agenda (ou déjà choisie) : libre pour cette prestation -> déjà sélectionnée, bouton
@@ -2939,7 +2945,7 @@ function openPosteAddAppointment(dateStr, barberId) {
         var nx = overlay.querySelector('#pa-dt-next');
         if (exact) {
           state.time = want;
-          var half = want >= '12:00' ? 'afternoon' : 'morning';
+          var half = 'morning';
           if (half !== currentHalf && slotsByHalf.morning.length) paShowHalf(half);   // la bonne demi-journée
           var el = slotsEl.querySelector('.aa-slot[data-time="' + want + '"]');
           if (el) { el.classList.add('sel'); try { el.scrollIntoView({ block: 'nearest' }); } catch (e) {} }
@@ -3239,7 +3245,7 @@ function adReschedule() {
     var list = byHalf[curHalf];
     overlay.querySelector('#rs-slots').innerHTML = list.length
       ? list.map(function (s) { return '<button class="aa-slot" data-time="' + s.time + '" onclick="adRsSelectSlot(this)">' + s.time + '</button>'; }).join('')
-      : '<span class="hint" style="margin:0">Aucun créneau ' + (curHalf === 'morning' ? 'le matin' : "l'après-midi") + '</span>';
+      : '<span class="hint" style="margin:0">Aucun créneau disponible</span>';
   }
   window.adRsShowHalf = function (half) {
     curHalf = half;
@@ -3273,10 +3279,10 @@ function adReschedule() {
     barberApi('/api/appointments/availability?date=' + date + '&service_id=' + a.service_id + '&barber_id=' + barberId + '&exclude_appointment_id=' + a.id, { actingAs: barberId })
       .then(function (r) {
         if (!r.slots.length) { slotsEl.innerHTML = '<span class="hint" style="margin:0">Aucun créneau disponible ce jour-là</span>'; return; }
-        byHalf.morning = r.slots.filter(function (s) { return s.time < '12:00'; });
-        byHalf.afternoon = r.slots.filter(function (s) { return s.time >= '12:00'; });
+        byHalf.morning = r.slots.slice();   // plus de Matin / Après-midi : toutes les heures d'un coup
+        byHalf.afternoon = [];
         if (!byHalf.morning.length) { toggleEl.style.display = 'none'; curHalf = 'afternoon'; renderHalf(); }
-        else { toggleEl.style.display = 'flex'; adRsShowHalf('morning'); }
+        else { toggleEl.style.display = 'none'; adRsShowHalf('morning'); }
       })
       .catch(function (e) { slotsEl.innerHTML = ''; toast(e.message, true); });
   }

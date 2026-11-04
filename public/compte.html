@@ -29,7 +29,7 @@
   html.auth-checking #p-login { display: none !important; }
   html.auth-checking #auth-layout { display: none !important; }
 </style>
-<link rel="stylesheet" href="/app.css?v=50">
+<link rel="stylesheet" href="/app.css?v=51">
 <script>
   // Applique tout de suite la couleur du salon si on l'a déjà vue lors
   // d'une visite précédente (cache localStorage par salon), plutôt que
@@ -702,7 +702,7 @@
 
   <section class="panel" id="p-book-service">
     <button class="back" onclick="show('p-book-barber')">‹ Retour</button>
-    <div class="eyebrow">Prestation</div>
+    <div class="eyebrow cat-head k-service">Prestation</div>
     <div class="item-grid" id="bk-svc-grid"></div>
     <div class="flow-recap" data-recap></div>
     <button class="go" id="bk-service-next-btn" onclick="goToBookExtrasStep()" disabled>Suivant</button>
@@ -710,7 +710,7 @@
 
   <section class="panel" id="p-book-extras">
     <button class="back" onclick="show('p-book-service')">‹ Retour</button>
-    <div class="eyebrow">Suppléments (optionnels)</div>
+    <div class="eyebrow cat-head k-extra">Suppléments (optionnels)</div>
     <p class="step-sub">Personnalisez votre prestation : touchez pour ajouter.</p>
     <div class="items-search" id="bk-extras-search" style="display:none">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
@@ -727,7 +727,7 @@
 
   <section class="panel" id="p-book-products">
     <button class="back" onclick="show('p-book-extras')">‹ Retour</button>
-    <div class="eyebrow">Un produit à acheter sur place ? (optionnel)</div>
+    <div class="eyebrow cat-head k-product">Un produit à acheter sur place ? (optionnel)</div>
     <p class="step-sub">À régler sur place, au salon.</p>
     <div class="items-search" id="bk-products-search" style="display:none">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
@@ -832,9 +832,9 @@
 
 </div>
 
-<script src="/app.js?v=58"></script>
+<script src="/app.js?v=59"></script>
 <script src="/autorefresh.js?v=3"></script>
-<script src="/group-booking.js?v=28"></script>
+<script src="/group-booking.js?v=29"></script>
 <style>
 .gb-done{padding:10px 0;border-bottom:1px solid var(--sep)}.gb-done:last-child{border:none}.gb-done b{display:block}.gb-done span{color:var(--grey);font-size:14px}
 #relatives-list{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
@@ -1948,7 +1948,7 @@ function renderBookHalf() {
     ? list.map(function (s) {
         return '<button class="slot-btn" data-time="' + s.time + '" data-barber="' + s.barber_id + '" onclick="selectBookSlot(this)">' + s.time + '</button>';
       }).join('')
-    : '<div class="empty">Aucun créneau ' + (bkCurrentHalf === 'morning' ? 'le matin' : "l'après-midi") + '</div>';
+    : '<div class="empty">Aucun créneau disponible</div>';
 }
 
 function showBookHalf(half) {
@@ -1998,15 +1998,15 @@ function loadBookSlots() {
       return;
     }
 
-    bkSlotsByHalf.morning = r.slots.filter(function (s) { return s.time < '12:00'; });
-    bkSlotsByHalf.afternoon = r.slots.filter(function (s) { return s.time >= '12:00'; });
+    bkSlotsByHalf.morning = r.slots.slice();   // plus de Matin / Après-midi : toutes les heures d'un coup
+    bkSlotsByHalf.afternoon = [];
 
     if (!bkSlotsByHalf.morning.length) {
       toggleEl.style.display = 'none';
       bkCurrentHalf = 'afternoon';
       renderBookHalf();
     } else {
-      toggleEl.style.display = 'flex';
+      toggleEl.style.display = 'none';
       showBookHalf('morning');
     }
   }).catch(function (e) { if (reqId === slotsEl.__req) slotsEl.classList.remove('is-loading'); toast(e.message, true); });
@@ -2188,7 +2188,7 @@ function guardMissingSalon() {
           var sideSalon = document.getElementById('side-salon'); if (sideSalon) sideSalon.textContent = d.salon_name;
         }
         CURRENCY = d.currency || 'EUR'; if (d.timezone) SALON_TIMEZONE = d.timezone;
-        applyAccentColor(d.accent_color);
+        applyAccentColor(d.accent_color); applyCatColors(d.cat_colors);
         try { localStorage.setItem('theme_' + SALON_SLUG, JSON.stringify({ accent_color: d.accent_color || null })); } catch (e) {}
         if (d.login_image_url) {
           var visualPanel = document.getElementById('auth-visual-panel');

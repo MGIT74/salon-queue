@@ -18,7 +18,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>File d'attente</title>
-<link rel="stylesheet" href="/app.css?v=50">
+<link rel="stylesheet" href="/app.css?v=51">
 <script>
   // Adresse SANS ?salon=... : on masque la page le temps de savoir si la plateforme heberge plusieurs salons
   // (voir requireSalonInUrl dans app.js) - pour ne jamais montrer, meme une fraction de seconde, un ecran sans salon.
@@ -358,7 +358,7 @@
           <div class="fld"><label for="f-mail">Email — pour être prévenu avant votre tour</label>
             <input id="f-mail" type="email" placeholder="vous@exemple.com" autocomplete="email"></div>
         </div>
-        <div class="klabel">Prestation</div>
+        <div class="klabel cat-head k-service">Prestation</div>
       </div>
       <div class="kbody"><div class="item-grid" id="svc-grid"></div></div>
       <div class="kfoot">
@@ -472,8 +472,8 @@
   </main>
 </div>
 
-<script src="/app.js?v=58"></script>
-<script src="/group-booking.js?v=28"></script>
+<script src="/app.js?v=59"></script>
+<script src="/group-booking.js?v=29"></script>
 <script src="/queue-sim.js?v=1"></script>
 <script>requireSalonInUrl("Pour utiliser cette borne, ouvrez le lien de votre salon.");</script>
 <script>
@@ -511,7 +511,7 @@ function loadCatalog() {
     salonLogoUrl = r[2].logo_url || '';
     giftTileImage = r[2].gift_tile_image_url || '';
     CURRENCY = r[2].currency || 'EUR'; if (r[2].timezone) SALON_TIMEZONE = r[2].timezone;
-    applyAccentColor(r[2].accent_color);
+    applyAccentColor(r[2].accent_color); applyCatColors(r[2].cat_colors);
     document.getElementById('salon-name').textContent = salonName;
     document.getElementById('t-salon').textContent = salonName;
     document.querySelectorAll('.t-salon-name').forEach(function (el) { el.textContent = salonName; });

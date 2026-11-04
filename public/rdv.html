@@ -18,7 +18,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Prendre rendez-vous</title>
-<link rel="stylesheet" href="/app.css?v=50">
+<link rel="stylesheet" href="/app.css?v=51">
 <script>
   // Adresse SANS ?salon=... : on masque la page le temps de savoir si la plateforme heberge plusieurs salons
   // (voir guardMissingSalon) - pour ne jamais montrer, meme une fraction de seconde, un formulaire sans salon.
@@ -325,7 +325,7 @@
 
   <section class="panel" id="p-service">
     <button class="back" onclick="serviceBack()">‹ Retour</button>
-    <div class="eyebrow">Prestation</div>
+    <div class="eyebrow cat-head k-service">Prestation</div>
     <div class="item-grid" id="svc-grid"></div>
     <div class="flow-recap" data-recap></div>
     <button class="go" id="service-next-btn" onclick="goToExtrasStep()" disabled>Suivant</button>
@@ -333,7 +333,7 @@
 
   <section class="panel" id="p-extras">
     <button class="back" onclick="show('p-service')">‹ Retour</button>
-    <div class="eyebrow">Suppléments (optionnels)</div>
+    <div class="eyebrow cat-head k-extra">Suppléments (optionnels)</div>
     <p class="step-sub">Personnalisez votre prestation : touchez pour ajouter.</p>
     <div class="items-search" id="extras-search" style="display:none">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
@@ -350,7 +350,7 @@
 
   <section class="panel" id="p-products">
     <button class="back" onclick="show('p-extras')">‹ Retour</button>
-    <div class="eyebrow">Un produit à acheter sur place ? (optionnel)</div>
+    <div class="eyebrow cat-head k-product">Un produit à acheter sur place ? (optionnel)</div>
     <p class="step-sub">À régler sur place, au salon.</p>
     <div class="items-search" id="products-search" style="display:none">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
@@ -463,8 +463,8 @@
   </section>
 </div>
 
-<script src="/app.js?v=58"></script>
-<script src="/group-booking.js?v=28"></script>
+<script src="/app.js?v=59"></script>
+<script src="/group-booking.js?v=29"></script>
 <style>
 body.staff-mode .gift-summary-box,body.staff-mode .theme-btn,body.staff-mode .login-hint{display:none!important}
 #p-start .gb-choices{max-width:960px}
@@ -659,7 +659,7 @@ function loadCatalog() {
     giftCardImageUrl = r[4].gift_card_image_url || '';
     salonWebsite = /^https?:\/\//i.test(r[4].website_url || '') ? r[4].website_url : '';
     giftTileImageUrl = r[4].gift_tile_image_url || '';
-    applyAccentColor(r[4].accent_color);
+    applyAccentColor(r[4].accent_color); applyCatColors(r[4].cat_colors);
     document.title = 'Rendez-vous — ' + salonName;
     document.getElementById('salon-mark').textContent = salonName.toUpperCase();
     rdvBufferMin = Number(r[4].rdv_buffer_min) || 0;
@@ -944,7 +944,7 @@ function renderHalf() {
     ? list.map(function (s) {
         return '<button class="slot-btn" data-time="' + s.time + '" data-barber="' + s.barber_id + '" onclick="selectSlot(this)">' + s.time + '</button>';
       }).join('')
-    : '<div class="empty">Aucun créneau ' + (currentHalf === 'morning' ? 'le matin' : "l'après-midi") + '</div>';
+    : '<div class="empty">Aucun créneau disponible</div>';
 }
 
 function showHalf(half) {
@@ -998,15 +998,15 @@ function loadSlots() {
     // Matin (avant 12h) / après-midi (12h et après) - si le matin est
     // entièrement passé (aucun créneau restant avant midi), on
     // n'affiche même pas l'onglet Matin.
-    slotsByHalf.morning = r.slots.filter(function (s) { return s.time < '12:00'; });
-    slotsByHalf.afternoon = r.slots.filter(function (s) { return s.time >= '12:00'; });
+    slotsByHalf.morning = r.slots.slice();   // plus de Matin / Après-midi : toutes les heures d'un coup
+    slotsByHalf.afternoon = [];
 
     if (!slotsByHalf.morning.length) {
       toggleEl.style.display = 'none';
       currentHalf = 'afternoon';
       renderHalf();
     } else {
-      toggleEl.style.display = 'flex';
+      toggleEl.style.display = 'none';
       showHalf('morning');
     }
   }).catch(function (e) { if (reqId === slotsEl.__req) slotsEl.classList.remove('is-loading'); toast(e.message, true); });

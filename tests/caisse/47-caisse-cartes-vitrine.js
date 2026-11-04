@@ -18,7 +18,7 @@ const rupt = ctx.vitrineCardHtml('products', { id: 'p2', name: 'Eau', price_cent
 check('page RDV : une prestation n\'a pas de bouton + (choix unique, coche), comme avant', !/item-add/.test(svcRdv) && /item-check/.test(svcRdv));
 check('caisse : une prestation a le bouton + (on peut en ajouter plusieurs)', /item-add/.test(svcCaisse) && !/item-check/.test(svcCaisse));
 check('caisse : le stock restant est affiche sur les produits', /12 en stock/.test(prod));
-check('caisse : produit en rupture = carte grisee, desactivee, "Épuisé"', /item-card out/.test(rupt) && /disabled/.test(rupt) && /Épuisé/.test(rupt));
+check('caisse : produit en rupture = carte grisee, desactivee, "Épuisé"', /item-card[^"]* out/.test(rupt) && /disabled/.test(rupt) && /Épuisé/.test(rupt));
 
 console.log('\n[B] Branchement de la caisse');
 check('renderItemGrid utilise vitrineRender (plus de tuiles .item-btn maison)', /function renderItemGrid[\s\S]*vitrineRender\(\{/.test(caisse) && !/class="item-btn/.test(caisse));

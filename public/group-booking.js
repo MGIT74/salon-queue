@@ -501,7 +501,8 @@
         go: goBtn('Suivant', !String(cur.name || '').trim(), 'name-next') };
       // datetime : l'heure d'UNE personne (choix « separement », ou creneau pris entre-temps)
       var q = cur, whoQ = q.isSelf ? '' : esc(label(q)) + ' — ';
-      var morning = (q.slots || []).filter(function (s) { return s.time < '12:00'; }), aft = (q.slots || []).filter(function (s) { return s.time >= '12:00'; });
+      // Plus de Matin / Après-midi : toutes les heures d'un coup.
+      var morning = (q.slots || []).slice(), aft = [];
       var body2 = '<div class="fld"><label for="gb-date">Date</label><input id="gb-date" type="date" min="' + today() + '" value="' + esc(q.date) + '"></div>';
       if (q.suggestions && q.suggestions.length) body2 += '<div class="gb-chips">' + q.suggestions.map(function (sg) {
         return '<button type="button" class="gb-chip sugg" data-act="sugg" data-time="' + esc(sg.time) + '" data-barber="' + esc(sg.barberId) + '">' + (sg.kind === 'after' ? ic('next') + 'À la suite de ' : ic('same') + 'En même temps que ') + esc(sg.name) + ' · ' + esc(sg.time) + (barberName(sg.barberId) ? ' · ' + esc(barberName(sg.barberId)) : '') + '</button>'; }).join('') + '</div>';

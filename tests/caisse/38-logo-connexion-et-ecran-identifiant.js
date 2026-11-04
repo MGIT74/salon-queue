@@ -32,7 +32,7 @@ const CHAISE = '<svg id="chaise" viewBox="0 0 24 24"><path d="M5 10h14"/></svg>'
   async function load(slug, settings, failFetch) {
     const dom = new JSDOM('<html class="login-icon-pending"><body><div id="auth-glow-icon">' + CHAISE + '</div></body></html>', { runScripts: 'outside-only', url: 'http://localhost/' });
     const x = dom.window; const orig = x.document.getElementById('auth-glow-icon').innerHTML;
-    x.SALON_SLUG = slug; x.applyAccentColor = () => {}; x.applySidebarBrand = () => {}; x.brandCacheKey = () => 'k'; x.rerenderAllTimelines = () => {};
+    x.SALON_SLUG = slug; x.applyAccentColor = () => {}; x.applyCatColors = () => {}; x.fillCatColorInputs = () => {}; x.applySidebarBrand = () => {}; x.brandCacheKey = () => 'k'; x.rerenderAllTimelines = () => {};
     x.fetch = () => failFetch ? Promise.reject(new Error('reseau')) : Promise.resolve({ json: () => Promise.resolve(settings) });
     x.eval(fnSrc(dash, 'setLoginIconLogo') + '\nvar rdvSlotStepMin = 15;var currentSalonName="",currentSalonLogo="",currentGiftTileImage="",currentLoginImage="",currentLoyaltyCardImage="",currentGiftCardImage="";\n' + fnSrc(dash, 'loadCurrentSalonName'));
     x.loadCurrentSalonName(); await sleep(50);

@@ -187,6 +187,7 @@ const suite = [
   ['164-fini-plus-tot-timer.js', false, ['exit']],
   ['165-kiosk-fermeture-salon.js', false, ['exit']],
   ['166-note-rdv-a-venir.js', false, ['exit']],
+  ['167-couleurs-menus-et-heures.js', false, ['exit']],
 ];
 
 let bad = 0;

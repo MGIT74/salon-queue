@@ -26,6 +26,7 @@ const EDITABLE = [
   'email_tpl_closure_subject', 'email_tpl_closure_body',
   'email_tpl_signup_subject', 'email_tpl_signup_body',
   'accent_color', 'login_image_url',
+  'color_cat_service', 'color_cat_extra', 'color_cat_product',
   'caisse_inactivity_seconds', 'caisse_reopen_hour', 'currency', 'salon_website_url',
   'caisse_open_enabled', 'caisse_open_hour', 'caisse_close_enabled', 'caisse_close_hour',
   'rdv_slot_step_min', 'rdv_min_lead_min', 'rdv_max_advance_days',
@@ -180,6 +181,14 @@ router.put('/', requireAdmin, wrap(async (req, res) => {
       if (mode !== 'salon') clean[id] = mode === 'custom' ? { mode, min } : { mode };
     }
     patch.timer_early_barbers = JSON.stringify(clean);
+  }
+
+  // Couleurs des 3 menus (prestation, supplément, produit) : #rrggbb, ou vide = couleur par défaut.
+  for (const k of ['color_cat_service', 'color_cat_extra', 'color_cat_product']) {
+    if (patch[k] === undefined) continue;
+    const v = String(patch[k]).trim().toLowerCase();
+    if (v && !/^#[0-9a-f]{6}$/.test(v)) return res.status(400).json({ error: 'Couleur invalide (ex. #0a84ff)' });
+    patch[k] = v;
   }
 
   // Champ mot de passe laissé vide = on conserve l'ancien
@@ -471,6 +480,12 @@ router.get('/public', wrap(async (req, res) => {
     timer_early_min: s.timer_early_min === undefined || s.timer_early_min === '' ? 10 : Number(s.timer_early_min),
     timer_early_barbers: (() => { try { return JSON.parse(s.timer_early_barbers || '{}'); } catch (e) { return {}; } })(),
     accent_color: s.accent_color || null,
+    // Couleurs des 3 menus (cartes, onglets, étiquettes de l'agenda).
+    cat_colors: {
+      service: s.color_cat_service || '#0a84ff',
+      extra: s.color_cat_extra || '#bf5af2',
+      product: s.color_cat_product || '#30d158'
+    },
     login_image_url: s.login_image_url || null,
     timezone: s.timezone || 'Europe/Paris',
     legal: {

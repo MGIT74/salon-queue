@@ -289,6 +289,48 @@ function applyAccentColor(hex) {
   document.head.appendChild(style);
 }
 
+// Couleurs des 3 menus (prestation, supplément, produit), réglables dans Réglages > Compte :
+// cartes, onglets, titres d'étape et étiquettes de l'agenda. c = cat_colors de /api/settings/public.
+var CAT_COLORS = { service: '#0a84ff', extra: '#bf5af2', product: '#30d158' };
+function applyCatColors(c) {
+  if (!c) return;
+  ['service', 'extra', 'product'].forEach(function (k) { if (/^#[0-9a-fA-F]{6}$/.test(c[k] || '')) CAT_COLORS[k] = c[k]; });
+  var st = document.getElementById('cat-colors-style');
+  if (!st) { st = document.createElement('style'); st.id = 'cat-colors-style'; document.head.appendChild(st); }
+  st.textContent = ':root, [data-theme="dark"] { --cat-service: ' + CAT_COLORS.service + '; --cat-extra: ' + CAT_COLORS.extra + '; --cat-product: ' + CAT_COLORS.product + '; }';
+}
+// Étiquette d'un élément d'un RDV (agenda, tiroir, À suivre) : 'service' | 'extra' | 'product'.
+var CAT_ICON = { service: '✂', extra: '+', product: '🛍' };
+var CAT_LABEL = { service: 'Prestation', extra: 'Supplément', product: 'Produit' };
+function catChipHtml(kind, name) {
+  return '<span class="cat-chip k-' + kind + '" title="' + esc(CAT_LABEL[kind] + ' : ' + name) + '"><i>' + CAT_ICON[kind] + '</i>' + esc(name) + '</span>';
+}
+
+// Éléments d'un RDV (a.pricing du serveur) ou d'un client de la file (q.service / q.extras / q.products) :
+// [{ k: 'service'|'extra'|'product', name }]. Sans détail (ancien serveur) : juste la prestation.
+function catItemsOf(x) {
+  if (!x) return [];
+  var out = [], p = x.pricing;
+  var svcName = x.service_name !== undefined ? x.service_name : (x.service && x.service.name);
+  var extras = p ? p.extras : (x.extras || []);
+  var products = p ? (p.products || []) : (x.products || []);
+  var extrasOnly = svcName === 'Supplément seul' || (p && extras.length && !p.service_price_cents && !p.service_duration_min);
+  if (svcName && !extrasOnly) out.push({ k: 'service', name: svcName });
+  (extras || []).forEach(function (e) { var n = typeof e === 'string' ? e : e && e.name; if (n) out.push({ k: 'extra', name: n }); });
+  (products || []).forEach(function (e) { if (e && e.name) out.push({ k: 'product', name: e.name + (Number(e.quantity) > 1 ? ' × ' + e.quantity : '') }); });
+  return out;
+}
+function catChipsHtml(items) {
+  return items.length ? '<span class="cat-chips">' + items.map(function (it) { return catChipHtml(it.k, it.name); }).join('') + '</span>' : '';
+}
+function catDotsHtml(items) {
+  return items.length ? '<span class="cat-dots">' + items.map(function (it) { return '<i class="k-' + it.k + '" title="' + esc(CAT_LABEL[it.k] + ' : ' + it.name) + '"></i>'; }).join('') + '</span>' : '';
+}
+// Produits à préparer (tiroir, liste « À suivre ») : étiquettes 🛍 seulement.
+function productChipsHtml(x) {
+  return catChipsHtml(catItemsOf(x).filter(function (it) { return it.k === 'product'; }));
+}
+
 // Fuseau horaire du salon (Europe/Paris par défaut) - chaque page le met
 // à jour après avoir chargé les réglages (SALON_TIMEZONE = data.timezone),
 // comme CURRENCY ci-dessous. Utilisé pour tout affichage/calcul de date
@@ -798,7 +840,8 @@ function apptInfoRowsHtml(a) {
     ? ' + ' + p.extras.map(function (x) { return x.name; }).join(' + ') : '';
   return '<div class="detail-row"><span class="detail-label">Quand</span><span class="detail-value" style="text-transform:capitalize">' + esc(apptWhenLabel(a)) + '</span></div>' +
     '<div class="detail-row"><span class="detail-label">Coiffeur</span><span class="detail-value">' + esc(a.barber_name || 'Non assigné') + '</span></div>' +
-    '<div class="detail-row"><span class="detail-label">Prestation</span><span class="detail-value">' + esc((a.service_name || '') + extras) + '</span></div>' +
+    '<div class="detail-row"><span class="detail-label">Prestation</span><span class="detail-value">' + esc((a.service_name || '') + extras) +
+      (typeof productChipsHtml === 'function' ? productChipsHtml(a) : '') + '</span></div>' +
     apptPricingHtml(a) +
     (a.email ? '<div class="detail-row"><span class="detail-label">Email</span><span class="detail-value">' + esc(a.email) + '</span></div>' : '') +
     (a.phone ? '<div class="detail-row"><span class="detail-label">Téléphone</span><span class="detail-value">' + esc(a.phone) + '</span></div>' : '') +
@@ -1145,11 +1188,12 @@ function vitrineCardHtml(kind, it, selected, onclick, opts) {
   var price = (kind === 'extras' ? '+' : '') + (it.price_from ? 'dès ' : '') + eur(it.price_cents);
   var action = (isSvc && !opts.add) ? '' : out ? '<span class="item-out">Épuisé</span>' : '<span class="item-add">' + VITRINE_PLUS_SVG + VITRINE_CHECK_SVG + '</span>';
   var on = !out && selected;
-  return '<button type="button" class="item-card' + (it.image_url ? ' has-photo' : '') + (on ? ' sel' : '') + (out ? ' out' : '') + '"' +
+  var kk = isSvc ? 'service' : kind === 'extras' ? 'extra' : 'product';   // couleur du menu (applyCatColors)
+  return '<button type="button" class="item-card k-' + kk + (it.image_url ? ' has-photo' : '') + (on ? ' sel' : '') + (out ? ' out' : '') + '"' +
     ' data-id="' + it.id + '" data-name="' + esc(normText(it.name)) + '" title="' + esc(it.name) + '"' +
     ' aria-pressed="' + (on ? 'true' : 'false') + '"' + (out ? ' disabled' : ' onclick="' + String(onclick).replace(/\{id\}/g, it.id) + '"') + '>' +
     '<span class="item-media"' + photo + '>' + icon + (isSvc && !opts.add ? '<span class="item-check">' + VITRINE_CHECK_SM_SVG + '</span>' : '') + '</span>' +
-    '<span class="item-body"><span class="item-name">' + esc(it.name) + '</span>' +
+    '<span class="item-body"><span class="item-kind">' + { service: 'Prestation', extra: 'Supplément', product: 'Produit' }[kk] + '</span><span class="item-name">' + esc(it.name) + '</span>' +
     (meta ? '<span class="item-meta">' + esc(meta) + '</span>' : '') +
     '<span class="item-foot"><span class="item-price">' + price + '</span>' + action + '</span></span></button>';
 }
@@ -2098,8 +2142,8 @@ function editQueueServiceDialog(q, opts) {
     var html = '<div class="modal-title">Modifier la prestation de ' + esc(q.client_name) + '</div>' +
       (opts.hint ? '<p class="hint" style="margin:0 0 14px">' + esc(opts.hint) + '</p>' : '') +
       '<div class="qe-tabs finished-edit-tabs">' +
-      '<button type="button" data-tab="services" class="on">Prestations</button>' +
-      '<button type="button" data-tab="extras">Suppléments</button></div>' +
+      '<button type="button" data-tab="services" class="on k-service"><i class="cat-ic">✂</i> Prestations</button>' +
+      '<button type="button" data-tab="extras" class="k-extra"><i class="cat-ic">+</i> Suppléments</button></div>' +
       '<input type="search" class="qe-search" id="qe-search" placeholder="Rechercher une prestation" autocomplete="off">' +
       '<div class="finished-edit-grid" id="finished-edit-grid"></div>' +
       '<div class="finished-edit-total"><span>Total actualisé</span><strong id="finished-edit-total"></strong></div>' +
@@ -2132,8 +2176,8 @@ function editQueueServiceDialog(q, opts) {
       search.placeholder = tab === 'services' ? 'Rechercher une prestation' : 'Rechercher un supplément';
       grid.innerHTML = items.length ? items.map(function (item) {
         var on = tab === 'services' ? selectedService === item.id : selectedExtras.has(item.id);
-        return '<button type="button" class="finished-edit-card' + (on ? ' selected' : '') + '" data-id="' + esc(item.id) + '" aria-pressed="' + on + '">' +
-          '<span class="finished-edit-card-name">' + esc(item.name) + '</span>' +
+        return '<button type="button" class="finished-edit-card k-' + (tab === 'services' ? 'service' : 'extra') + (on ? ' selected' : '') + '" data-id="' + esc(item.id) + '" aria-pressed="' + on + '">' +
+          '<span class="item-kind">' + (tab === 'services' ? 'Prestation' : 'Supplément') + '</span><span class="finished-edit-card-name">' + esc(item.name) + '</span>' +
           '<span class="finished-edit-card-price">' + eur(item.price_cents) + '</span>' +
           (on ? '<span class="finished-edit-check">✓</span>' : '') + '</button>';
       }).join('') : '<div class="empty">' + (needle ? 'Aucun résultat pour « ' + esc(search.value.trim()) + ' ».' : 'Aucun article disponible.') + '</div>';

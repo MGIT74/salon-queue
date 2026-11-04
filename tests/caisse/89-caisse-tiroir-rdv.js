@@ -96,12 +96,12 @@ let JSDOM = null; try { JSDOM = require('jsdom').JSDOM; } catch (_) { /* absent 
     // Deplacer
     w.openApptDrawer(APPT); calls.length = 0; w.adReschedule(); await tick();
     const modal = () => doc.querySelector('.modal-box');
-    check('Deplacer : fenetre avec coiffeurs, date et creneaux (Matin / Apres-midi)', !!$('rs-barber') && $('rs-barber').options.length === 2 && $('rs-date').value === '2026-10-20' && /10:00/.test(modal().textContent), modal() && modal().textContent.slice(0, 120));
+    check('Deplacer : fenetre avec coiffeurs, date et creneaux (toutes les heures d\'un coup)', !!$('rs-barber') && $('rs-barber').options.length === 2 && $('rs-date').value === '2026-10-20' && /10:00/.test(modal().textContent), modal() && modal().textContent.slice(0, 120));
     const av = calls.find((c) => c[0] === 'api' && /availability/.test(c[2]));
     check('creneaux : availability de ce coiffeur en excluant le RDV lui-meme', av && /exclude_appointment_id=a1/.test(av[2]) && /barber_id=b1/.test(av[2]) && /service_id=s1/.test(av[2]), av);
     check('Enregistrer inactif tant qu\'aucun creneau n\'est choisi', $('rs-save-btn').disabled === true);
     $('rs-barber').value = 'b2';
-    w.adRsShowHalf('afternoon'); w.adRsSelectSlot(doc.querySelector('.aa-slot[data-time="15:30"]'));
+    w.adRsSelectSlot(doc.querySelector('.aa-slot[data-time="15:30"]'));
     check('choix d\'un creneau : Enregistrer actif', $('rs-save-btn').disabled === false);
     calls.length = 0; $('rs-date').value = '2026-10-21'; $('rs-save-btn').click(); await tick();
     const rp = calls.find((c) => c[0] === 'api' && /reschedule/.test(c[2]));
