@@ -227,6 +227,12 @@
               margin-bottom: 14px; transition: background .25s ease; }
   .cal-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; gap: 12px; flex-wrap: wrap; }
   .cal-month-label { font-size: 17px; font-weight: 600; letter-spacing: -.02em; text-transform: capitalize; }
+  .cal-today { padding: 9px 16px; font-size: 14px; font-weight: 600; white-space: nowrap; }
+  /* Téléphone : ‹ date › sur la 1re ligne, [Aujourd'hui] [Jour | Semaine | Mois] sur la 2e. */
+  @media (max-width: 699px) {
+    .cal-nav > .btn:first-child { order: 1; } .cal-nav .cal-month-label { order: 2; flex: 1; text-align: center; } .cal-nav > .btn:last-child { order: 3; }
+    .cal-nav .cal-today { order: 4; padding: 8px 12px; } .cal-nav .cal-view-switch { order: 5; flex: 1; min-width: 0; } .cal-nav .cal-view-switch button { flex: 1; padding-left: 6px; padding-right: 6px; }
+  }
   .cal-view-switch { display: flex; background: var(--fill); border-radius: 10px; padding: 3px; gap: 2px; }
   .cal-view-switch button {
     border: none; background: none; color: var(--grey); font-family: inherit; font-size: 13px; font-weight: 600;
@@ -326,7 +332,8 @@
     .cal-nav > .btn:first-child { order: 1; }
     /* Une seule ligne : ‹  date  [Mois | Semaine | Jour]  › (le choix de la vue a cote de la date, une ligne de gagnee) */
     .cal-nav .cal-month-label { order: 2; font-size: 19px; min-width: 0; flex: 1; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .cal-nav .cal-view-switch { order: 3; margin-left: auto; flex-shrink: 0; }
+    .cal-nav .cal-today { order: 3; margin-left: auto; flex-shrink: 0; }
+    .cal-nav .cal-view-switch { order: 3; margin-left: 4px; flex: none; }
     .cal-nav > .btn:last-child { order: 4; }
     .cal-view-switch button { padding: 9px 18px; font-size: 14px; }
     .cal-grid { gap: 6px; }
@@ -725,10 +732,12 @@
         <div class="cal-nav">
           <button class="btn btn-soft" onclick="calShiftPeriod(-1)">‹</button>
           <div class="cal-month-label" id="cal-month-label"></div>
+          <!-- Retour rapide au jour d'aujourd'hui (même vue). -->
+          <button type="button" class="btn btn-soft cal-today" id="cal-today-btn" onclick="calGoToday()">Aujourd'hui</button>
           <div class="cal-view-switch">
-            <button id="cal-view-month" class="on" onclick="setCalView('month')">Mois</button>
+            <button id="cal-view-day" class="on" onclick="setCalView('day')">Jour</button>
             <button id="cal-view-week" onclick="setCalView('week')">Semaine</button>
-            <button id="cal-view-day" onclick="setCalView('day')">Jour</button>
+            <button id="cal-view-month" onclick="setCalView('month')">Mois</button>
           </div>
           <button class="btn btn-soft" onclick="calShiftPeriod(1)">›</button>
         </div>
@@ -986,7 +995,9 @@ function gotoAgenda() {
   document.getElementById('nav-home').classList.remove('on');
   document.getElementById('nav-agenda').classList.add('on');
   // Toujours relu en ouvrant l'Agenda : RDV pris ailleurs, fermetures ajoutées par l'admin...
-  calBooted = true; invalidateAgendaCache(); loadAgendaPeriod();
+  calBooted = true; invalidateAgendaCache();
+  if (!calViewReady) { calViewReady = true; setCalView(calViewMode); }   // 1re ouverture : vue Jour (affichage prêt)
+  else loadAgendaPeriod();
 }
 
 /* ---------- Application ---------- */
@@ -1419,7 +1430,8 @@ function finishMine(id) {
 /* ---------- Agenda : TOUS les coiffeurs du salon, même planning (timeline) que le tableau de bord ----------
    Chaque coiffeur voit les RDV de ses collègues et peut ajouter un RDV au nom de l'un d'eux (clic sur sa ligne). */
 var calAnchor = new Date();
-var calViewMode = 'month';
+var calViewMode = 'day';   // la vue Jour d'abord (puis Semaine, Mois)
+var calViewReady = false;
 var calMonthCache = {};
 var calSelectedDate = null;
 var calBooted = false;
@@ -1492,6 +1504,13 @@ function setCalView(mode) {
   loadAgendaPeriod();
 }
 
+// « Aujourd'hui » : revient au jour d'aujourd'hui dans la vue choisie (Jour : à l'heure actuelle).
+function calGoToday() {
+  calAnchor = new Date();
+  calSelectedDate = null;
+  if (typeof pdScrolledFor !== 'undefined') pdScrolledFor = null;
+  loadAgendaPeriod();
+}
 function calShiftPeriod(delta) {
   if (calViewMode === 'month') calAnchor = new Date(calAnchor.getFullYear(), calAnchor.getMonth() + delta, 1);
   else if (calViewMode === 'week') calAnchor = addDays(calAnchor, delta * 7);
