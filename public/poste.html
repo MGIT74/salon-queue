@@ -1504,12 +1504,9 @@ function setCalView(mode) {
   loadAgendaPeriod();
 }
 
-// « Aujourd'hui » : revient au jour d'aujourd'hui dans la vue choisie (Jour : à l'heure actuelle).
+// « Aujourd'hui » : depuis n'importe quelle vue (Jour, Semaine, Mois), ouvre la vue Jour d'aujourd'hui, à l'heure actuelle.
 function calGoToday() {
-  calAnchor = new Date();
-  calSelectedDate = null;
-  if (typeof pdScrolledFor !== 'undefined') pdScrolledFor = null;
-  loadAgendaPeriod();
+  pdShowDay(ymd(new Date()), function () {});   // « then » : pas de retour en haut, l'agenda se place sur maintenant
 }
 function calShiftPeriod(delta) {
   if (calViewMode === 'month') calAnchor = new Date(calAnchor.getFullYear(), calAnchor.getMonth() + delta, 1);
