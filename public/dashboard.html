@@ -55,7 +55,7 @@
 .cal-day.salon-closed::after{content:'Fermé';display:block;font-size:10px;font-weight:700;color:var(--red,#e65c5c);margin-top:2px}
 .salon-closure-banner{padding:10px 13px;border-radius:9px;margin:0 0 12px;background:rgba(160,100,100,.13);color:var(--red,#e65c5c);font-weight:650;font-size:13px}
 </style>
-<link rel="stylesheet" href="/app.css?v=52">
+<link rel="stylesheet" href="/app.css?v=53">
 <style>
   .wrap { max-width: none; margin: 0; padding: clamp(16px,1.8vw,28px); }
 
@@ -9204,10 +9204,16 @@ function resetAccentColor() {
 // Couleurs des 3 menus (prestation / supplément / produit) : aperçu en direct, puis enregistrement.
 var CAT_COLOR_DEFAULTS = { service: '#0a84ff', extra: '#bf5af2', product: '#30d158' };
 // Fenêtre ouverte par l'icône réglages à côté de « + Ajouter » (Prestations / Suppléments / Produits).
+// Pastilles de couleur cliquables (pas le sélecteur du navigateur, qu'il fallait fermer en cliquant ailleurs).
+var CAT_COLOR_SWATCHES = ['#0a84ff', '#64d2ff', '#5e5ce6', '#bf5af2', '#ff375f', '#ff453a', '#ff9f0a', '#ffd60a', '#30d158', '#00c7be', '#a2845e', '#8e8e93'];
 function openCatColorsDialog(focus) {
   var row = function (k, label, icon) {
-    return '<label class="cat-color-row' + (k === focus ? ' focus' : '') + '"><input type="color" id="cat-color-' + k + '" value="' + CAT_COLORS[k] + '">' +
-      '<span class="cat-chip k-' + k + '"><i>' + icon + '</i>' + label + '</span><span class="hint" id="cat-color-hex-' + k + '" style="margin:0">' + CAT_COLORS[k] + '</span></label>';
+    return '<div class="cat-color-row' + (k === focus ? ' focus' : '') + '" data-k="' + k + '">' +
+      '<div class="cat-color-head"><span class="cat-chip k-' + k + '"><i>' + icon + '</i>' + label + '</span>' +
+      '<input type="text" class="cat-color-hex" id="cat-color-' + k + '" maxlength="7" spellcheck="false" autocomplete="off" aria-label="Code couleur ' + label + '"></div>' +
+      '<div class="cat-swatches">' + CAT_COLOR_SWATCHES.map(function (c) {
+        return '<button type="button" class="cat-swatch" data-c="' + c + '" style="background:' + c + '" aria-label="' + c + '"></button>';
+      }).join('') + '</div></div>';
   };
   var saved = { service: CAT_COLORS.service, extra: CAT_COLORS.extra, product: CAT_COLORS.product };
   var overlay = _buildModal('<div class="modal-title">Couleurs dans l\'agenda</div>' +
@@ -9215,7 +9221,14 @@ function openCatColorsDialog(focus) {
     '<div class="cat-color-rows">' + row('service', 'Prestation', '✂') + row('extra', 'Supplément', '+') + row('product', 'Produit', '🛍') + '</div>' +
     '<button class="btn btn-ghost" id="cat-color-reset" style="padding:8px 0;font-size:13px;margin-top:8px">Rétablir les couleurs d\'origine</button>' +
     '<div class="modal-actions"><button class="btn btn-soft" id="cat-color-cancel">Annuler</button><button class="btn btn-primary" id="cat-color-save">Enregistrer</button></div>');
+  overlay.querySelector('.modal-box').classList.add('cat-color-box');
   fillCatColorInputs();
+  overlay.querySelector('.cat-color-rows').onclick = function (e) {
+    var sw = e.target.closest('.cat-swatch');
+    if (!sw) return;
+    var k = sw.closest('.cat-color-row').getAttribute('data-k'), c = {};
+    c[k] = sw.getAttribute('data-c'); applyCatColors(c); fillCatColorInputs();   // aperçu immédiat (pas encore enregistré)
+  };
   overlay.querySelector('#cat-color-cancel').onclick = function () { applyCatColors(saved); _closeModal(overlay); };
   overlay.querySelector('#cat-color-reset').onclick = function () { applyCatColors(CAT_COLOR_DEFAULTS); fillCatColorInputs(); };
   overlay.querySelector('#cat-color-save').onclick = function () { saveCatColors(function () { _closeModal(overlay); }); };
@@ -9225,17 +9238,25 @@ function fillCatColorInputs() {
     var inp = document.getElementById('cat-color-' + k);
     if (!inp) return;
     inp.value = CAT_COLORS[k];
-    document.getElementById('cat-color-hex-' + k).textContent = CAT_COLORS[k];
+    inp.classList.remove('bad');
+    Array.prototype.forEach.call(inp.closest('.cat-color-row').querySelectorAll('.cat-swatch'), function (b) {
+      b.classList.toggle('on', b.getAttribute('data-c') === CAT_COLORS[k].toLowerCase());
+    });
+    // Code saisi à la main (#rrggbb) : appliqué dès qu'il est complet et valide.
     inp.oninput = function () {
-      document.getElementById('cat-color-hex-' + k).textContent = inp.value;
-      var c = {}; c[k] = inp.value; applyCatColors(c);   // aperçu immédiat (pas encore enregistré)
+      var v = inp.value.trim(); if (v && v.charAt(0) !== '#') v = '#' + v;
+      var ok = /^#[0-9a-fA-F]{6}$/.test(v);
+      inp.classList.toggle('bad', !ok);
+      if (!ok) return;
+      var c = {}; c[k] = v.toLowerCase(); applyCatColors(c);
+      Array.prototype.forEach.call(inp.closest('.cat-color-row').querySelectorAll('.cat-swatch'), function (b) { b.classList.toggle('on', b.getAttribute('data-c') === c[k]); });
     };
   });
 }
 function saveCatColors(done) {
   var body = {};
   ['service', 'extra', 'product'].forEach(function (k) {
-    var v = document.getElementById('cat-color-' + k).value.toLowerCase();
+    var v = CAT_COLORS[k].toLowerCase();   // couleur affichée (pastille ou code valide)
     body['color_cat_' + k] = v === CAT_COLOR_DEFAULTS[k] ? '' : v;   // couleur d'origine = pas de réglage
   });
   api('/api/settings', { method: 'PUT', body: body })

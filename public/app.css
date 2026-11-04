@@ -880,8 +880,17 @@ body .tfx > button { transition: color .25s ease, transform .1s ease; }
 .cat-chips { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 3px; min-width: 0; }
 .cat-dots { display: inline-flex; gap: 3px; vertical-align: middle; }
 .cat-dots i { width: 9px; height: 9px; border-radius: 50%; background: var(--k); border: 1.5px solid #fff; flex: none; }
-.cat-color-rows { display: flex; flex-direction: column; gap: 8px; }
-.cat-color-row { display: flex; align-items: center; gap: 12px; cursor: pointer; }
-.cat-color-row input[type="color"] { width: 40px; height: 40px; border: none; border-radius: 10px; padding: 0; cursor: pointer; background: none; flex: none; }
-.cat-color-row .cat-chip { font-size: 13px; padding: 3px 9px 3px 5px; min-width: 120px; }
-.cat-color-row.focus .cat-chip { box-shadow: 0 0 0 2px var(--k); }
+.cat-color-rows { display: flex; flex-direction: column; gap: 14px; }
+.cat-color-row { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-radius: 14px; background: var(--fill); }
+.cat-color-row.focus { box-shadow: inset 0 0 0 2px var(--k, var(--accent)); }
+.cat-color-row[data-k="service"] { --k: var(--cat-service); } .cat-color-row[data-k="extra"] { --k: var(--cat-extra); } .cat-color-row[data-k="product"] { --k: var(--cat-product); }
+.cat-color-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.cat-color-head .cat-chip { font-size: 13px; padding: 3px 9px 3px 5px; }
+.cat-color-hex { width: 92px; padding: 6px 9px; border: none; border-radius: 8px; background: var(--card); color: var(--ink); font: inherit; font-size: 13px; font-variant-numeric: tabular-nums; text-transform: lowercase; outline: none; }
+.cat-color-hex.bad { box-shadow: inset 0 0 0 1.5px var(--red); }
+.cat-swatches { display: grid; grid-template-columns: repeat(12, 1fr); gap: 6px; }
+.cat-swatch { aspect-ratio: 1; min-width: 0; border: none; border-radius: 50%; cursor: pointer; padding: 0; box-shadow: inset 0 0 0 1px rgba(0,0,0,.12); transition: transform .1s ease; }
+.cat-swatch:hover { transform: scale(1.12); }
+.cat-swatch.on { box-shadow: 0 0 0 2px var(--fill), 0 0 0 4px var(--ink); }
+@media (max-width: 520px) { .cat-swatches { grid-template-columns: repeat(6, 1fr); } }
+.modal-box.cat-color-box { max-width: 460px; }
