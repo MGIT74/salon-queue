@@ -77,7 +77,8 @@ const at = async (id) => String((await pool.query('SELECT scheduled_at FROM appo
   check('poste : petit signe ⇅ dans le bloc + bouton « Remettre à l\'heure du client »', /function pdMovedIconHtml\(a\)/.test(p) && p.includes('(a.client_time ? pdMovedIconHtml(a) : \'\')') && /function adRestoreClientTime\(\)/.test(p) && p.includes('id="ad-restore-time"'));
   check('poste : blocs déplaçables seulement s\'il y a la place (nudgeRoom), flèches ▲ / ▼', /function nudgeRoom\(it\)/.test(p) && p.includes("(canNudge ? ' can-nudge' : '')") && p.includes('class="pd-nudge up" data-dir="-1"') && p.includes('class="pd-nudge down" data-dir="1"'));
   check('poste : glisser à la souris, au doigt par les flèches (le bloc fait défiler)', p.includes("if (e.pointerType === 'touch' && !handle) return;") && p.includes("drag.bl.style.transform = 'translateY(' + off + 'px)'"));
-  check('poste : bandeau « Revenir en arrière » (décalages du jour gardés sur l\'appareil)', /function pdNudgeBarHtml\(dateStr\)/.test(p) && p.includes('pdNudgeBarHtml(dateStr) +') && /function pdNudgeUndo\(dateStr\)[\s\S]{0,400}pdNudge\(last\.id, -last\.minutes, true\)/.test(p));
+  check('poste : en-tête de chaque coiffeur, pastille « ⇅ N » (RDV décalés, données du serveur) -> fenêtre avec « Remettre à HH:MM »',
+    p.includes('pdMovedBadgeHtml(items, b, dateStr) +') && /function pdMovedOf\(barberId, dateStr\)[\s\S]{0,200}a\.client_time/.test(p) && /function pdMovedDialog\(barberId, dateStr\)/.test(p) && p.includes('↩ Remettre à ') && !p.includes('pdNudgeBarHtml('));
   check('poste : après un glisser, le tiroir ne s\'ouvre pas', p.includes('bl.dataset.noClick'));
   await pool.end();
   console.log(`\n${pass} OK, ${fail} ECHEC`);
