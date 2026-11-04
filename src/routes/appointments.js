@@ -347,7 +347,10 @@ async function computeSlotsForBarber(barberId, dateStr, durationMin, rdvSettings
   const isToday = dateStr === paris.dateStr;
   let nowMin = isToday ? paris.minutes : -1;
 
-  if (isToday) {
+  if (isToday && opts.ignoreBusyNow) {
+    // Décalage de 5 min depuis l'agenda : seulement « pas dans le passé » (le retard du chrono ne compte pas).
+    nowMin = paris.minutes - 1;
+  } else if (isToday) {
     // Coiffeur sans chrono/file d'attente en temps reel (timer_enabled=0,
     // ex. loueur de fauteuil independant) : on ne consulte PAS son
     // eventuel retard reel, la reservation reste un calcul classique
@@ -361,6 +364,12 @@ async function computeSlotsForBarber(barberId, dateStr, durationMin, rdvSettings
     }
   }
 
+  // Une seule heure précise à vérifier (décalage de 5 min), hors du pas des créneaux.
+  if (opts.atTime) {
+    const t = timeToMinutes(opts.atTime);
+    if (t < startMin || t + durationMin > endMin || (isToday && t <= nowMin)) return [];
+    return busyRanges.some(([bStart, bEnd]) => t < bEnd && t + durationMin > bStart) ? [] : [opts.atTime];
+  }
   const slots = [];
   for (let t = startMin; t + durationMin <= endMin; t += stepMin) {
     if (isToday && t <= nowMin) continue;
@@ -1718,6 +1727,45 @@ router.put('/:id/reschedule', requireAdminOrBarber, wrap(withBookingLock(async (
   }
 
   res.json({ ok: true });
+})));
+
+/**
+ * Décaler un RDV de 5 min (avant ou après) depuis l'agenda de « Mon poste », pour combler les petits trous.
+ * Même jour, même coiffeur, dans du temps libre. Le client N'EST PAS prévenu (5 min, c'est rien) ; au-delà,
+ * c'est « Déplacer » (avec email). Sert aussi à « Revenir en arrière » (décalage inverse).
+ */
+const NUDGE_MAX_MIN = 5;
+router.put('/:id/nudge', requireAdminOrBarber, wrap(withBookingLock(async (req, res) => {
+  const minutes = Number(req.body && req.body.minutes);
+  if (!Number.isInteger(minutes) || !minutes || Math.abs(minutes) > NUDGE_MAX_MIN) return res.status(400).json({ error: 'Décalage possible : 5 min avant ou après' });
+  const [[appt]] = await pool.query(
+    `SELECT a.*, s.duration_min, q.status AS queue_status FROM appointments a
+     JOIN services s ON s.id = a.service_id LEFT JOIN queue q ON q.id = a.promoted_queue_id
+     WHERE a.id = ? AND a.salon_id = ?`, [req.params.id, req.salon.id]);
+  if (!appt) return res.status(404).json({ error: 'Rendez-vous introuvable' });
+  if (appt.status !== 'confirmed') return res.status(409).json({ error: 'Ce rendez-vous ne peut plus être décalé.' });
+  if (appt.queue_status && appt.queue_status !== 'waiting' && appt.queue_status !== 'cancelled') return res.status(409).json({ error: 'Ce rendez-vous a déjà commencé : il ne bouge plus.' });
+  if (appt.promoted_queue_id && await saleForPassage(pool, req.salon.id, appt.promoted_queue_id)) return res.status(409).json({ error: 'Rendez-vous encaissé : il ne bouge plus.' });
+  if (!appt.barber_id) return res.status(409).json({ error: 'Ce rendez-vous n\'a pas de coiffeur.' });
+  const [date, hm] = String(appt.scheduled_at).split(' ');
+  const from = hm.slice(0, 5), t = timeToMinutes(from) + minutes;
+  if (t < 0 || t >= 24 * 60) return res.status(409).json({ error: 'Impossible de changer de jour.' });
+  const to = minutesToTime(t);
+  const rdvSettings = await getSettings(req.salon.id);
+  if (`${date} ${to}:00` <= nowParisDatetimeString(rdvSettings.timezone)) return res.status(409).json({ error: 'Cette heure est déjà passée.' });
+  const [extraLinks] = await pool.query(
+    'SELECT e.id, e.name, e.duration_min FROM appointment_extras ae JOIN extras e ON e.id = ae.extra_id WHERE ae.appointment_id = ?', [appt.id]);
+  const offer = await offerFor(appt.barber_id, {
+    service: { id: appt.service_id, duration_min: appt.duration_min, price_cents: 0 },
+    extras: extraLinks.map((e) => ({ id: e.id, name: e.name, duration_min: e.duration_min, price_cents: 0 }))
+  });
+  if (!offer.ok) return res.status(offer.status).json({ error: offer.error });
+  const ok = await computeSlotsForBarber(appt.barber_id, date, offer.durationMin, rdvSettings,
+    { skipLead: true, excludeAppointmentId: appt.id, atTime: to, ignoreBusyNow: true });
+  if (!ok.length) return res.status(409).json({ error: "Pas de place : l'heure " + to + ' est déjà prise (ou en dehors des horaires).' });
+  const [productLinks] = await pool.query('SELECT product_id, quantity FROM appointment_products WHERE appointment_id = ?', [appt.id]);
+  await applyMove(appt, date, to, appt.barber_id, rdvSettings, extraLinks.map((e) => e.id), productLinks.map((p) => ({ id: p.product_id, quantity: p.quantity })));
+  res.json({ ok: true, from, to, minutes });   // pas d'email : 5 min, le client n'est pas dérangé
 })));
 
 /**

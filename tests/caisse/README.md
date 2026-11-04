@@ -201,4 +201,5 @@ node tests/caisse/164-fini-plus-tot-timer.js  # Fini plus tot : temps libere ave
 node tests/caisse/165-kiosk-fermeture-salon.js  # Kiosk : fin de journee stricte (salon si actif, sinon horaires du coiffeur)
 node tests/caisse/166-note-rdv-a-venir.js  # Note interne modifiable depuis le tiroir d'un RDV a venir (poste, caisse, admin)
 node tests/caisse/167-couleurs-menus-et-heures.js  # Couleurs des 3 menus (personnalisables), etiquettes dans l'agenda, heures sans Matin / Apres-midi
+node tests/caisse/168-decaler-5-min.js  # Poste, agenda : decaler un RDV de 5 min (glisser / fleches), sans prevenir le client, Revenir en arriere
 ```

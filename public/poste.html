@@ -547,6 +547,23 @@
   .pd-block.is-next { box-shadow: 0 0 0 2px var(--fill), 0 0 0 4px var(--blue); z-index: 2; }
   .pd-block.pd-hit { box-shadow: 0 0 0 2px var(--fill), 0 0 0 4px #ffd60a; z-index: 3; }
   .pd-block.pd-dim { opacity: .4; }
+  /* Décaler de 5 min : flèches au survol, le bloc suit la souris (5 min max), bandeau « Revenir en arrière » */
+  .pd-block.can-nudge { cursor: grab; }
+  .pd-block.dragging { cursor: grabbing; z-index: 6; box-shadow: 0 8px 22px rgba(0,0,0,.35), 0 0 0 2px #fff; transition: none; }
+  .pd-block.dragging[data-to]:not([data-to=""])::after { content: '→ ' attr(data-to); position: absolute; right: 8px; bottom: 5px; background: #fff; color: #111; font-size: 11px; font-weight: 800; padding: 2px 7px; border-radius: 99px; }
+  .pd-nudges { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: none; gap: 5px; z-index: 4; }
+  .pd-nudge { display: block; background: #fff; color: #111; font-size: 10.5px; font-weight: 800; line-height: 1; padding: 3px 8px; border-radius: 99px; box-shadow: 0 1px 4px rgba(0,0,0,.35); cursor: pointer; white-space: nowrap; touch-action: none; }
+  .pd-nudge:hover { background: #ffd60a; }
+  .pd-block.can-nudge:hover .pd-nudges, .pd-block.dragging .pd-nudges { display: flex; }
+  .pd-block.narrow .pd-nudges { flex-direction: column; gap: 2px; }
+  @media (hover: none) { .pd-block.can-nudge .pd-nudges { display: flex; opacity: .9; } .pd-nudge { padding: 5px 10px; } }
+  .pd-block.nudged { box-shadow: 0 0 0 2px var(--fill), 0 0 0 4px #30d158; z-index: 3; }
+  .pd-nudge-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 10px; padding: 8px 8px 8px 14px; border-radius: 14px; background: var(--fill); font-size: 13.5px; }
+  .pd-nudge-txt { flex: 1; min-width: 0; }
+  .pd-nudge-more { color: var(--grey); }
+  .pd-nudge-undo { border: none; border-radius: 99px; padding: 8px 14px; background: var(--ink); color: var(--card); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+  .pd-nudge-close { border: none; background: none; color: var(--grey); width: 30px; height: 30px; border-radius: 50%; cursor: pointer; font-size: 13px; }
+  .pd-nudge-close:hover { background: var(--fill-2); color: var(--ink); }
   .pd-block .cat-chips { max-width: 100%; overflow: hidden; max-height: calc(100% - 34px); }
   .pd-block .cat-chips.one { flex-wrap: nowrap; max-height: none; }
   .pd-block .cat-chips.one .cat-chip { flex-shrink: 0; }
@@ -1841,6 +1858,21 @@ function posteDayHtml(dateStr) {
     return out;
   }
   var free = freeSpansOf(myId);
+  // Décaler de 5 min (glisser) : place libre juste avant / juste après un RDV à venir. [peut monter, peut descendre]
+  function nudgeRoom(it) {
+    if (closed || past || it.st !== 'todo') return [false, false];
+    var row = (barbers || []).find(function (x) { return x.id === it.barberId; });
+    var bd = pdBarberDay(row, dateStr);
+    if (!bd || (row && (barberOffReason(row, dateStr) || isWalkinOn(row, dateStr)))) return [false, false];
+    var prevEnd = Math.max(bd.start, isToday ? nowMin + 1 : bd.start), nextStart = bd.end;
+    items.filter(function (o) { return o !== it && o.barberId === it.barberId && o.st !== 'absent'; }).map(function (o) { return [o.start, pdRealEnd(o)]; })
+      .concat(bd.breaks).forEach(function (z) {
+        if (z[1] <= it.start) prevEnd = Math.max(prevEnd, z[1]);
+        else if (z[0] >= it.end) nextStart = Math.min(nextStart, z[0]);
+        else { prevEnd = Infinity; nextStart = -Infinity; }   // chevauchement déjà là : on ne touche pas
+      });
+    return [it.start - prevEnd >= PD_NUDGE_MIN, nextStart - it.end >= PD_NUDGE_MIN];
+  }
 
   // 1) La recherche client est dans l'en-tête du coup d'œil (gain de place).
   var html = '';
@@ -1935,14 +1967,21 @@ function posteDayHtml(dateStr) {
       var narrow = it.lanes > 1;
       // Ce qu'il faut préparer : une étiquette par élément (couleur du menu) ; bloc trop petit : des points.
       var cats = catItemsOf(a), roomy = h >= 46 && !narrow;
-      inner += '<button type="button" class="pd-block st-' + it.st + (isNext ? ' is-next' : '') + (narrow ? ' narrow' : '') + (h >= 46 ? ' tall' : '') + '" data-id="' + esc(a.id) + '" ' +
+      var room = nudgeRoom(it), canNudge = room[0] || room[1];
+      inner += '<button type="button" class="pd-block st-' + it.st + (isNext ? ' is-next' : '') + (narrow ? ' narrow' : '') + (h >= 46 ? ' tall' : '') +
+        (canNudge ? ' can-nudge' : '') + (pdNudgeFlash === a.id ? ' nudged' : '') + '" data-id="' + esc(a.id) + '" ' +
+        (canNudge ? 'data-up="' + (room[0] ? 1 : 0) + '" data-down="' + (room[1] ? 1 : 0) + '" data-start="' + it.start + '" ' : '') +
         'data-q="' + esc(normText([a.client_name, a.email, a.phone].join(' ')) + ' ' + String(a.phone || '').replace(/\D/g, '')) + '" ' +
         'style="top:' + Math.round((it.start - R0) * PX) + 'px;height:' + h + 'px;' + pdLaneCss(it) + '--c:' + color + ';--fg:' + fg + '" ' +
         'title="' + esc(pdHM(it.start) + ' – ' + pdHM(it.end) + ' — ' + a.client_name + ' — ' + (cats.length ? cats.map(function (c) { return c.name; }).join(' + ') : (a.service_name || '')) + ' — ' + b.name) + '" ' +
         'onclick="event.stopPropagation();openPosteClientDrawer(\'' + a.id + '\')">' +
         '<span class="t">' + pdHM(it.start) + ' – ' + pdHM(it.end) + '</span><span class="n">' + esc(a.client_name) + '</span>' +
         (roomy ? catChipsHtml(cats).replace('cat-chips', h < 80 ? 'cat-chips one' : 'cat-chips') : !narrow ? catDotsHtml(cats) : '') +
-        (label && !narrow ? '<span class="l">' + label + '</span>' : '') + '</button>';
+        (label && !narrow ? '<span class="l">' + label + '</span>' : '') +
+        // Décaler de 5 min : flèches au survol (toucher sur tablette), ou glisser le bloc.
+        (canNudge ? '<span class="pd-nudges">' +
+          (room[0] ? '<span class="pd-nudge up" data-dir="-1" title="Avancer de 5 min (' + pdHM(it.start - PD_NUDGE_MIN) + ')">▲ 5 min</span>' : '') +
+          (room[1] ? '<span class="pd-nudge down" data-dir="1" title="Reculer de 5 min (' + pdHM(it.start + PD_NUDGE_MIN) + ')">▼ 5 min</span>' : '') + '</span>' : '') + '</button>';
     });
     if (offWhy || walkDay) inner += '<div class="pd-col-off">' + (offWhy ? esc(offWhy.charAt(0).toUpperCase() + offWhy.slice(1)) : 'En « sans RDV » ce jour-là') + '</div>';
     else if (!items.some(function (it) { return it.barberId === b.id; }) && !isMe) inner += '<div class="pd-col-off">Aucun RDV</div>';
@@ -1965,6 +2004,7 @@ function posteDayHtml(dateStr) {
       pdZoomSliderHtml() +
       (!closed && !past ? '<button type="button" class="btn btn-primary pd-add-top" onclick="openPosteAddAppointment(\'' + dateStr + '\')">' + (pdIsPhone() ? '+ RDV' : '+ Ajouter un RDV') + '</button>' : '') +
     '</span></div>' +
+    pdNudgeBarHtml(dateStr) +
     '<div class="pd-cal-scroll pd-xs"><div class="pd-xs-in" style="min-width:' + minW + 'px">' +
     '<div class="pd-cal-head pd-xs-head">' + heads + '</div>' +
     '<div class="pd-grid" data-date="' + dateStr + '" data-r0="' + R0 + '" data-r1="' + R1 + '" data-px="' + PX + '" data-focus-top="' + focusTop + '" style="height:' + Math.round(SPAN * PX + 12) + 'px">' +
@@ -1972,6 +2012,104 @@ function posteDayHtml(dateStr) {
 
   return html + cal;
 }
+
+/* ===== Décaler un RDV de 5 min (combler les petits trous) =====
+   Glisser un bloc vers le haut / le bas (ou toucher ▲ / ▼) : il bouge de 5 min s'il y a la place juste à côté.
+   Le client n'est pas prévenu (5 min) ; plus loin, c'est « Déplacer » (avec email). Chaque décalage peut être
+   annulé : bandeau « Revenir en arrière » en haut de l'agenda (les décalages du jour, du plus récent au plus ancien). */
+var PD_NUDGE_MIN = 5;
+var pdNudgeFlash = null, pdNudgeBusy = false, pdNudgeMem = {};
+function pdNudgeKey(dateStr) { return 'poste_nudge_' + (typeof SALON_SLUG !== 'undefined' ? SALON_SLUG : '') + '_' + dateStr; }
+function pdNudgeList(dateStr) {
+  try { var v = JSON.parse(localStorage.getItem(pdNudgeKey(dateStr)) || 'null'); if (Array.isArray(v)) return v; } catch (e) {}
+  return pdNudgeMem[dateStr] || [];
+}
+function pdNudgeSave(dateStr, list) {
+  pdNudgeMem[dateStr] = list;
+  try { localStorage.setItem(pdNudgeKey(dateStr), JSON.stringify(list)); } catch (e) {}
+}
+function pdNudgeBarHtml(dateStr) {
+  var list = pdNudgeList(dateStr);
+  if (!list.length) return '';
+  var last = list[list.length - 1];
+  return '<div class="pd-nudge-bar" role="status"><span class="pd-nudge-txt">↩ <b>' + esc(last.name) + '</b> décalé de 5 min (' + esc(last.from) + ' → ' + esc(last.to) + ')' +
+    (list.length > 1 ? ' <span class="pd-nudge-more">· ' + list.length + ' décalages aujourd\'hui</span>' : '') + '</span>' +
+    '<button type="button" class="pd-nudge-undo" onclick="pdNudgeUndo(\'' + dateStr + '\')">Revenir en arrière</button>' +
+    '<button type="button" class="pd-nudge-close" aria-label="Masquer" title="Masquer" onclick="pdNudgeSave(\'' + dateStr + '\', []);renderCalDay()">✕</button></div>';
+}
+function pdNudge(id, minutes, undo) {
+  if (pdNudgeBusy) return Promise.resolve();
+  var a = calApptById[id];
+  if (!a) return Promise.resolve();
+  pdNudgeBusy = true;
+  var dateStr = a.scheduled_at.slice(0, 10);
+  return barberApi('/api/appointments/' + encodeURIComponent(id) + '/nudge', { method: 'PUT', actingAs: a.barber_id || undefined, body: { minutes: minutes } })
+    .then(function (r) {
+      var list = pdNudgeList(dateStr);
+      if (undo) { list.pop(); toast('Heure d\'avant remise : ' + a.client_name + ' à ' + r.to); }
+      else { list.push({ id: id, name: a.client_name, from: r.from, to: r.to, minutes: minutes }); toast(a.client_name + ' : ' + r.from + ' → ' + r.to + ' (client non prévenu)'); }
+      pdNudgeSave(dateStr, list.slice(-30));
+      pdNudgeFlash = id;
+      setTimeout(function () { pdNudgeFlash = null; var el = document.querySelector('.pd-block.nudged'); if (el) el.classList.remove('nudged'); }, 2500);
+      adRefreshViews();
+    })
+    .catch(function (e) { toast(e.message, true); renderCalDay(); })
+    .then(function () { pdNudgeBusy = false; });
+}
+function pdNudgeUndo(dateStr) {
+  var list = pdNudgeList(dateStr), last = list[list.length - 1];
+  if (!last) return;
+  if (!calApptById[last.id]) { list.pop(); pdNudgeSave(dateStr, list); renderCalDay(); toast('Ce RDV n\'est plus dans l\'agenda', true); return; }
+  pdNudge(last.id, -last.minutes, true);
+}
+// Glisser (souris / stylet sur le bloc ; doigt sur les flèches ▲ ▼) et toucher les flèches.
+(function () {
+  var drag = null;
+  function view() { return document.getElementById('cal-day-view'); }
+  document.addEventListener('pointerdown', function (e) {
+    var v = view(); if (!v || !v.contains(e.target)) return;
+    var bl = e.target.closest('.pd-block.can-nudge');
+    if (!bl || (e.button !== undefined && e.button !== 0)) return;
+    var handle = e.target.closest('.pd-nudge');
+    if (e.pointerType === 'touch' && !handle) return;   // au doigt, le bloc fait défiler l'agenda ; on glisse par les flèches
+    var px = Number((v.querySelector('.pd-grid') || {}).getAttribute ? v.querySelector('.pd-grid').getAttribute('data-px') : 1) || 1;
+    drag = { bl: bl, id: bl.getAttribute('data-id'), y: e.clientY, px: px, up: bl.getAttribute('data-up') === '1', down: bl.getAttribute('data-down') === '1',
+      start: Number(bl.getAttribute('data-start')), moved: false, handle: handle, pid: e.pointerId, dir: 0 };
+    if (handle) { e.preventDefault(); try { handle.setPointerCapture(e.pointerId); } catch (x) {} }
+  }, true);
+  document.addEventListener('pointermove', function (e) {
+    if (!drag || e.pointerId !== drag.pid) return;
+    var dy = e.clientY - drag.y, step = PD_NUDGE_MIN * drag.px;
+    if (!drag.moved && Math.abs(dy) < 6) return;
+    if (!drag.moved) { drag.moved = true; drag.bl.classList.add('dragging'); }
+    e.preventDefault();
+    var max = drag.down ? step : 0, min = drag.up ? -step : 0;
+    var off = Math.max(min, Math.min(max, dy));
+    drag.dir = off <= -step / 2 ? -1 : off >= step / 2 ? 1 : 0;
+    drag.bl.style.transform = 'translateY(' + off + 'px)';
+    drag.bl.setAttribute('data-to', drag.dir ? pdHM(drag.start + drag.dir * PD_NUDGE_MIN) : '');
+  }, { capture: true, passive: false });
+  function end(e) {
+    if (!drag || (e && e.pointerId !== drag.pid)) return;
+    var d = drag; drag = null;
+    if (!d.moved) {
+      // Simple toucher d'une flèche : décale tout de suite.
+      if (d.handle) { d.bl.dataset.noClick = '1'; pdNudge(d.id, Number(d.handle.getAttribute('data-dir')) * PD_NUDGE_MIN); }
+      return;
+    }
+    d.bl.dataset.noClick = '1';
+    d.bl.classList.remove('dragging'); d.bl.removeAttribute('data-to');
+    if (d.dir) { d.bl.style.transform = 'translateY(' + (d.dir * PD_NUDGE_MIN * d.px) + 'px)'; pdNudge(d.id, d.dir * PD_NUDGE_MIN); }
+    else d.bl.style.transform = '';
+  }
+  document.addEventListener('pointerup', end, true);
+  document.addEventListener('pointercancel', function (e) { if (drag && e.pointerId === drag.pid) { drag.bl.classList.remove('dragging'); drag.bl.style.transform = ''; drag = null; } }, true);
+  // Après un glisser ou un toucher de flèche : pas d'ouverture du tiroir.
+  document.addEventListener('click', function (e) {
+    var bl = e.target.closest && e.target.closest('.pd-block');
+    if (bl && bl.dataset.noClick) { delete bl.dataset.noClick; e.stopPropagation(); e.preventDefault(); }
+  }, true);
+})();
 
 var PD_GRIP_SVG = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>';
 /** Ordre des colonnes choisi sur cet appareil (glisser les noms) ; les coiffeurs pas encore placés gardent l'ordre habituel, à la fin. */
