@@ -1,8 +1,8 @@
-// Couleurs des 3 menus (prestation / supplément / produit), réglables par le salon, + heures sans Matin / Après-midi.
+// Couleurs des 3 menus (prestation / supplément / produit) SEULEMENT dans l'agenda du poste, + heures sans Matin / Après-midi.
 // - Réglages color_cat_* (#rrggbb ou vide = défaut), renvoyés par /api/settings/public (cat_colors).
-// - Cartes : liseré + mention de la catégorie ; onglets et titres d'étape colorés.
-// - Agenda du poste : heure de fin + une étiquette par élément (petit bloc : points) ; frise de la caisse : fin + points.
-// - Étiquette produit 🛍 dans le tiroir et dans « À suivre ». Vraie base + vrai serveur (port 3999).
+// - Réglage dans l'admin : icône à côté de « + Ajouter » (Prestations / Suppléments / Produits) -> fenêtre.
+// - Agenda du poste : heure de fin + une étiquette par élément (petit bloc : points). Nulle part ailleurs (cartes,
+//   onglets, réservation client, caisse, tiroir). Frise de la caisse : heure de fin. Vraie base + vrai serveur (port 3999).
 process.env.DB_HOST = process.env.DB_HOST || '127.0.0.1';
 process.env.DB_USER = process.env.DB_USER || 'sq';
 process.env.DB_PASSWORD = process.env.DB_PASSWORD || 'sqpass';
@@ -18,8 +18,8 @@ const read = (f) => fs.readFileSync(path.join(__dirname, '../../public/' + f), '
 const app = read('app.js');
 const fn = (n) => app.match(new RegExp('function ' + n + '\\([\\s\\S]*?\\n}\\n'))[0];
 const lib = new Function('function esc(s) { return String(s == null ? \'\' : s).replace(/&/g, \'&amp;\').replace(/</g, \'&lt;\').replace(/>/g, \'&gt;\').replace(/"/g, \'&quot;\'); }; var CAT_ICON = { service: "✂", extra: "+", product: "🛍" }; var CAT_LABEL = { service: "Prestation", extra: "Supplément", product: "Produit" };' +
-  ['catChipHtml', 'catItemsOf', 'catChipsHtml', 'catDotsHtml', 'productChipsHtml'].map(fn).join('\n') +
-  '; return { catItemsOf, catChipsHtml, catDotsHtml, productChipsHtml };')();
+  ['catChipHtml', 'catItemsOf', 'catChipsHtml', 'catDotsHtml'].map(fn).join('\n') +
+  '; return { catItemsOf, catChipsHtml, catDotsHtml };')();
 
 // Éléments d'un RDV (a.pricing) et d'un client de la file
 const appt = { service_name: 'Coupe', pricing: { service_price_cents: 2000, service_duration_min: 30, extras: [{ name: 'Barbe' }, { name: 'Shampoing' }], products: [{ name: 'Gel', quantity: 2 }] } };
@@ -31,7 +31,6 @@ check('sans détail (ancien serveur) : juste la prestation', JSON.stringify(lib.
 const chips = lib.catChipsHtml(items);
 check('étiquettes : une par élément, classe de couleur du menu', (chips.match(/class="cat-chip k-/g) || []).length === 4 && chips.includes('k-product') && chips.includes('🛍'));
 check('points de couleur (petit bloc)', (lib.catDotsHtml(items).match(/<i class="k-/g) || []).length === 4);
-check('produit seul (tiroir / À suivre)', (lib.productChipsHtml(appt).match(/cat-chip k-product/g) || []).length === 1 && lib.productChipsHtml({ service_name: 'Coupe' }) === '');
 
 (async () => {
   try {
@@ -49,17 +48,19 @@ check('produit seul (tiroir / À suivre)', (lib.productChipsHtml(appt).match(/ca
     await fetch(BASE + '/api/settings', { method: 'PUT', headers: ADMIN, body: JSON.stringify({ color_cat_service: '', color_cat_extra: '', color_cat_product: '' }) });
   }
   const css = read('app.css'), d = read('dashboard.html'), p = read('poste.html'), c = read('caisse.html'), rdv = read('rdv.html'), compte = read('compte.html'), k = read('kiosk.html'), gb = read('group-booking.js');
-  check('app.css : variables --cat-* et cartes / étiquettes', /--cat-service: #0a84ff; --cat-extra: #bf5af2; --cat-product: #30d158;/.test(css) && css.includes('.item-card.k-service::before') && css.includes('.cat-chip {') && css.includes('.cat-head::before'));
-  check('cartes : classe de couleur + mention de la catégorie', app.includes("class=\"item-card k-' + kk") && app.includes('<span class="item-kind">'));
-  check('toutes les pages appliquent les couleurs du salon', ['caisse', 'poste', 'compte'].every((n) => read(n + '.html').includes('applyCatColors(d.cat_colors)')) && rdv.includes('applyCatColors(r[4].cat_colors)') && k.includes('applyCatColors(r[2].cat_colors)') && d.includes('applyCatColors(d.cat_colors)'));
-  check('admin : 3 sélecteurs de couleur + Enregistrer / Rétablir', ['cat-color-service', 'cat-color-extra', 'cat-color-product'].every((id) => d.includes('id="' + id + '"')) && /function saveCatColors\(\)/.test(d) && /function resetCatColors\(\)/.test(d));
-  check('onglets caisse et titres d\'étape colorés', c.includes('class="on k-service" data-cat="services"') && c.includes('class="k-product" data-cat="products"') && [p, c, d].every((h) => h.includes('aa-step-title cat-head k-extra')) && rdv.includes('eyebrow cat-head k-product') && compte.includes('eyebrow cat-head k-service'));
+  check('app.css : variables --cat-* et étiquettes', /--cat-service: #0a84ff; --cat-extra: #bf5af2; --cat-product: #30d158;/.test(css) && css.includes('.cat-chip {') && css.includes('.cat-dots i'));
+  check('nulle part ailleurs : cartes, onglets, titres d\'étape, fenêtre « Modifier la prestation » sans couleur',
+    !app.includes('item-kind') && !/class="item-card k-/.test(app) && !css.includes('.item-card.k-service') && !css.includes('.cat-head') && !app.includes('finished-edit-card k-') &&
+    [d, p, c, rdv, compte, k].every((h) => !h.includes('cat-head')) && c.includes('<button class="on" data-cat="services">Prestations</button>'));
+  check('pas de couleur côté client (réservation, compte, borne) ni à la caisse', [rdv, compte, k, c].every((h) => !h.includes('applyCatColors(') && !h.includes('catDotsHtml(') && !h.includes('catChipsHtml(')) && !app.includes('productChipsHtml'));
+  check('poste : applique les couleurs du salon', p.includes('applyCatColors(d.cat_colors)'));
+  check('admin : icône réglages à côté de « + Ajouter » (3 menus) -> fenêtre, plus dans Compte',
+    ['service', 'extra', 'product'].every((x) => d.includes('onclick="openCatColorsDialog(\'' + x + '\')"')) && /function openCatColorsDialog\(focus\)/.test(d) && /function saveCatColors\(done\)/.test(d) && !d.includes('Couleurs des 3 menus</h4>'));
   check('poste, agenda Jour : heure de fin + étiquettes (petit bloc : points)', p.includes("'<span class=\"t\">' + pdHM(it.start) + ' – ' + pdHM(it.end) + '</span>") && p.includes('(roomy ? catChipsHtml(cats)') && p.includes(': !narrow ? catDotsHtml(cats)'));
-  check('caisse, frise : heure de fin + points', c.includes("' – ' + tbHM(it.startMin + it.durMin) + ' ' + catDotsHtml(it.cats)"));
-  check('produit 🛍 dans À suivre (poste et caisse) et le tiroir', p.includes("esc(detail) + '</div>' + productChipsHtml(q)") && c.includes("esc(detail) + '</div>' + productChipsHtml(q)") && app.includes('productChipsHtml(a)'));
+  check('caisse, frise : heure de fin', c.includes("esc(it.timeLabel) + ' – ' + tbHM(it.startMin + it.durMin) + '</span>"));
   check('heures : plus de Matin / Après-midi (rdv, compte, admin, poste, caisse, groupe)',
     [rdv, compte, p, c, d].every((h) => !/s\.time < '12:00'/.test(h) && !h.includes("'le matin'")) && gb.includes('var morning = (q.slots || []).slice(), aft = [];'));
-  check('versions rechargées (app.js v=59, app.css v=51, group-booking v=29)', [d, p, c, rdv, compte, k].every((h) => h.includes('app.js?v=59') && h.includes('app.css?v=51')) && rdv.includes('group-booking.js?v=29'));
+  check('versions rechargées (app.js v=60, app.css v=52, group-booking v=29)', [d, p, c, rdv, compte, k].every((h) => h.includes('app.js?v=60') && h.includes('app.css?v=52')) && rdv.includes('group-booking.js?v=29'));
   await pool.end();
   console.log(`\n${pass} OK, ${fail} ECHEC`);
   process.exit(fail ? 1 : 0);

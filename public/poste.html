@@ -98,7 +98,7 @@
 .cal-day.salon-closed::after{content:'Fermé';display:block;font-size:10px;font-weight:700;color:var(--red,#e65c5c);margin-top:2px}
 .salon-closure-banner{padding:10px 13px;border-radius:9px;margin:0 0 12px;background:rgba(160,100,100,.13);color:var(--red,#e65c5c);font-weight:650;font-size:13px}
 </style>
-<link rel="stylesheet" href="/app.css?v=51">
+<link rel="stylesheet" href="/app.css?v=52">
 <style>
   html, body { min-height: 100%; }
   .wrap { max-width: 480px; margin: 0 auto; padding: 20px 18px 40px; }
@@ -778,7 +778,7 @@
   </button>
 </div>
 
-<script src="/app.js?v=59"></script>
+<script src="/app.js?v=60"></script>
 <script src="/queue-sim.js?v=1"></script>
 <script src="/autorefresh.js?v=3"></script>
 <script src="/staff-group.js?v=6"></script>
@@ -1201,7 +1201,7 @@ function renderNext() {
       '<div class="next-card' + (locked ? ' locked' : '') + (prepAlert ? ' prep-alert' : '') + '">' +
         '<div class="next-info" onclick="openNextClient(\'' + q.id + '\')">' +
           '<div class="name">' + queueSourceIconHtml(q) + esc(q.client_name) + '</div>' +
-          '<div class="meta">' + esc(detail) + '</div>' + productChipsHtml(q) +
+          '<div class="meta">' + esc(detail) + '</div>' +
           appointmentBadge +
           (q.paid_at ? '<div class="meta" style="color:var(--green);font-weight:600">✓ Déjà payé</div>' : '') +
           (q.gift_card ? giftBadgeHtml(q.gift_card) : '') +
@@ -2738,13 +2738,13 @@ function openPosteAddAppointment(dateStr, barberId) {
 
     '<div id="pa-step-service" style="display:none">' +
       '<button type="button" class="aa-group-link" onclick="paGoStep(\'client\', \'group\')"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M17.5 14.2c2.3.3 3.5 2.2 3.5 5.8"/></svg>Plusieurs personnes ?</button>' +
-      '<div class="aa-step-title cat-head k-service">Prestation</div>' +
+      '<div class="aa-step-title">Prestation</div>' +
       '<div class="item-grid compact" id="pa-service-grid"></div>' +
     '</div>' +
 
     '<div id="pa-step-extras" style="display:none">' +
       '<button class="aa-back" onclick="paGoStep(\'service\')">‹ Retour</button>' +
-      '<div class="aa-step-title cat-head k-extra" id="pa-extras-title">Suppléments (optionnels)</div>' +
+      '<div class="aa-step-title" id="pa-extras-title">Suppléments (optionnels)</div>' +
       vitrineSearchHtml('pa-extras', 'Rechercher un supplément', "paFilter('extras')") +
       '<div class="item-grid compact" id="pa-extras-grid"></div>' +
       '<div class="items-empty" id="pa-extras-empty">Aucun résultat</div>' +
@@ -2754,7 +2754,7 @@ function openPosteAddAppointment(dateStr, barberId) {
 
     '<div id="pa-step-products" style="display:none">' +
       '<button class="aa-back" onclick="paGoStep(\'datetime\')">‹ Retour</button>' +
-      '<div class="aa-step-title cat-head k-product">Un produit à acheter sur place ? (optionnel)</div>' +
+      '<div class="aa-step-title">Un produit à acheter sur place ? (optionnel)</div>' +
       vitrineSearchHtml('pa-products', 'Rechercher un produit', "paFilter('products')") +
       '<div class="item-grid compact" id="pa-products-grid"></div>' +
       '<div class="items-empty" id="pa-products-empty">Aucun résultat</div>' +
