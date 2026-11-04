@@ -2232,6 +2232,7 @@ function staffForceHtml(p) {
       '<div class="force-res"></div>' +
       '<label class="force-ack" style="display:none"><input type="checkbox"> Je prends la responsabilité de ce débordement</label>' +
       '<button type="button" class="btn force-go" disabled style="display:none"></button>' +
+      '<button type="button" class="force-other" style="display:none">Changer l\'heure…</button>' +
     '</div></div>';
 }
 function staffForceInit(o) {
@@ -2263,17 +2264,30 @@ function staffForceInit(o) {
       })
       .catch(function (e) { if (my === seq) res.innerHTML = '<div class="force-err">' + esc(e.message) + '</div>'; });
   }
+  var row = w.querySelector('.force-row'), other = w.querySelector('.force-other');
+  // Heure touchée dans l'agenda : le lien la montre déjà (« Forcer le RDV à 16:40 ») ; un toucher -> l'avertissement.
+  function paintLink() {
+    var dt = (o.defaultTime && o.defaultTime()) || '';
+    link.innerHTML = dt ? '⚠ Forcer le RDV à <span class="force-tm">' + esc(dt) + '</span><span class="force-chev" aria-hidden="true">›</span>' : '⚠ Forcer un RDV à une autre heure…';
+    return dt;
+  }
   link.onclick = function () {
     var open = panel.style.display === 'none';
     panel.style.display = open ? '' : 'none';
-    if (open && !tin.value) { tin.value = (o.defaultTime && o.defaultTime()) || ''; }
-    if (open) check();
+    if (!open) return;
+    var dt = paintLink();
+    if (!tin.value) tin.value = dt;
+    row.style.display = dt ? 'none' : '';      // heure déjà connue : pas besoin de la retaper
+    other.style.display = dt ? '' : 'none';
+    check();
+    setTimeout(function () { try { panel.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e) {} }, 60);
   };
+  other.onclick = function () { other.style.display = 'none'; row.style.display = ''; try { tin.focus(); } catch (e) {} };
   tin.onchange = check;
   box.onchange = function () { go.disabled = !box.checked; };
   go.onclick = function () { if (cur && box.checked) o.onForce(cur); };
   return {
-    reset: function () { w.style.display = ''; panel.style.display = 'none'; tin.value = ''; clearResult(); },
+    reset: function () { w.style.display = ''; panel.style.display = 'none'; tin.value = ''; row.style.display = ''; other.style.display = 'none'; clearResult(); paintLink(); },
     hide: function () { w.style.display = 'none'; }
   };
 }

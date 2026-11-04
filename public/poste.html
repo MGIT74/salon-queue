@@ -98,7 +98,7 @@
 .cal-day.salon-closed::after{content:'Fermé';display:block;font-size:10px;font-weight:700;color:var(--red,#e65c5c);margin-top:2px}
 .salon-closure-banner{padding:10px 13px;border-radius:9px;margin:0 0 12px;background:rgba(160,100,100,.13);color:var(--red,#e65c5c);font-weight:650;font-size:13px}
 </style>
-<link rel="stylesheet" href="/app.css?v=57">
+<link rel="stylesheet" href="/app.css?v=58">
 <style>
   html, body { min-height: 100%; }
   .wrap { max-width: 480px; margin: 0 auto; padding: 20px 18px 40px; }
@@ -806,7 +806,7 @@
   </button>
 </div>
 
-<script src="/app.js?v=63"></script>
+<script src="/app.js?v=64"></script>
 <script src="/queue-sim.js?v=1"></script>
 <script src="/autorefresh.js?v=3"></script>
 <script src="/staff-group.js?v=6"></script>
@@ -3126,7 +3126,7 @@ function openPosteAddAppointment(dateStr, barberId) {
     barberApi('/api/appointments/availability?date=' + dateStr + '&service_id=' + state.serviceId + '&barber_id=' + targetId + '&extras=' + state.extraIds.join(',') + (paAllHours ? '&all=1' : ''), { actingAs: targetId })
       .then(function (r) {
         paShowAllHoursLink(r);
-        if (!r.slots.length) { slotsEl.innerHTML = '<span class="hint" style="margin:0">Aucun créneau disponible ce jour-là</span>'; return; }
+        if (!r.slots.length) { slotsEl.innerHTML = '<span class="hint" style="margin:0">Aucun créneau disponible ce jour-là' + (r.duration_min ? ' pour ' + formatMinutes(r.duration_min) : '') + '.</span>'; return; }
 
         slotsByHalf.morning = r.slots.slice();   // plus de Matin / Après-midi : toutes les heures d'un coup
         slotsByHalf.afternoon = [];
@@ -3483,7 +3483,7 @@ function adReschedule() {
     slotsEl.innerHTML = '<span class="hint" style="margin:0">Chargement…</span>';
     barberApi('/api/appointments/availability?date=' + date + '&service_id=' + a.service_id + '&barber_id=' + barberId + '&exclude_appointment_id=' + a.id, { actingAs: barberId })
       .then(function (r) {
-        if (!r.slots.length) { slotsEl.innerHTML = '<span class="hint" style="margin:0">Aucun créneau disponible ce jour-là</span>'; return; }
+        if (!r.slots.length) { slotsEl.innerHTML = '<span class="hint" style="margin:0">Aucun créneau disponible ce jour-là' + (r.duration_min ? ' pour ' + formatMinutes(r.duration_min) : '') + '.</span>'; return; }
         byHalf.morning = r.slots.slice();   // plus de Matin / Après-midi : toutes les heures d'un coup
         byHalf.afternoon = [];
         if (!byHalf.morning.length) { toggleEl.style.display = 'none'; curHalf = 'afternoon'; renderHalf(); }

@@ -63,6 +63,8 @@ const call = async (method, p, body, h) => { const r = await fetch(BASE + p, { m
   const app = read('app.js'), p = read('poste.html'), c = read('caisse.html'), d = read('dashboard.html');
   check('fenêtre commune (lien, aperçu, case obligatoire, bouton orange)', /function staffForceHtml\(p\)/.test(app) && /function staffForceInit\(o\)/.test(app) && app.includes('Je prends la responsabilité de ce débordement') && app.includes("go.disabled = !box.checked"));
   check('poste, caisse, admin : « Forcer » dans l\'étape Créneau + force / force_ack envoyés', [[p, 'pa'], [c, 'pa'], [d, 'aa']].every(([h, x]) => h.includes("staffForceHtml('" + x + "')") && h.includes('force: !!state.force, force_ack: !!state.force')));
+  check('heure touchée dans l\'agenda : « Forcer le RDV à 16:40 », un toucher -> avertissement, « Changer l\'heure… »', app.includes("'⚠ Forcer le RDV à <span class=\"force-tm\">'") && app.includes("row.style.display = dt ? 'none' : ''") && app.includes('Changer l\\\'heure…'));
+  check('« Aucun créneau » : toute la largeur + durée', fs.readFileSync(path.join(__dirname, '../../public/app.css'), 'utf8').includes('.aa-slots > .hint') && p.includes("(r.duration_min ? ' pour ' + formatMinutes(r.duration_min) : '')"));
   check('pages clients : pas de « Forcer »', ['rdv.html', 'compte.html', 'kiosk.html'].every((f) => !read(f).includes('staffForce')));
   check('tiroir : « RDV forcé par … » ; agenda du poste : contour, ⚠ Forcé, hachures', app.includes('forcedInfoHtml(a)') && p.includes("(a.forced_by ? ' forced' : '')") && /function pdForcedHatchHtml\(it, items\)/.test(p));
   await pool.end();
