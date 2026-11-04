@@ -889,6 +889,10 @@ body .tfx > button { transition: color .25s ease, transform .1s ease; }
 .cat-color-hex { margin-left: auto; width: 92px; padding: 6px 9px; border: none; border-radius: 8px; background: var(--card); color: var(--ink); font: inherit; font-size: 13px; font-variant-numeric: tabular-nums; text-transform: lowercase; outline: none; }
 .cat-color-hex.bad, .cp-hex.bad { box-shadow: inset 0 0 0 1.5px var(--red); }
 .modal-box.cat-color-box { max-width: 460px; }
+.barber-color-row { max-width: 520px; }
+.barber-color-row + .cp-pop { max-width: 520px; margin-top: 8px; }
+.barber-color-name { flex: 1; min-width: 0; font-weight: 600; font-size: 14px; display: inline-flex; align-items: center; gap: 8px; }
+.barber-color-name::before { content: ''; width: 10px; height: 10px; border-radius: 50%; background: var(--c); flex: none; }
 /* Sélecteur de couleur maison (fenêtre « Couleurs dans l'agenda ») */
 .cp-pop { margin: -2px 0 4px; padding: 12px; border-radius: 14px; background: var(--card); box-shadow: 0 0 0 1px var(--sep), var(--shadow-lg); display: flex; flex-direction: column; gap: 10px; }
 .cp-head { display: flex; align-items: center; justify-content: space-between; font-size: 14px; }

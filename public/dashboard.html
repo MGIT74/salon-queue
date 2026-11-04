@@ -55,7 +55,7 @@
 .cal-day.salon-closed::after{content:'Fermé';display:block;font-size:10px;font-weight:700;color:var(--red,#e65c5c);margin-top:2px}
 .salon-closure-banner{padding:10px 13px;border-radius:9px;margin:0 0 12px;background:rgba(160,100,100,.13);color:var(--red,#e65c5c);font-weight:650;font-size:13px}
 </style>
-<link rel="stylesheet" href="/app.css?v=54">
+<link rel="stylesheet" href="/app.css?v=55">
 <style>
   .wrap { max-width: none; margin: 0; padding: clamp(16px,1.8vw,28px); }
 
@@ -5200,12 +5200,13 @@ function renderScheduleTab(b) {
     '</div>' +
     '</div>';
 
+  // Même sélecteur que « Couleurs dans l'agenda » (openColorPicker) : carré + code, la croix pour fermer.
   var colorPicker = '<div style="margin-bottom:20px">' +
     '<label class="hint" style="display:block;margin-bottom:8px">Couleur dans l\'agenda</label>' +
-    '<div style="display:flex;align-items:center;gap:10px">' +
-    '<input type="color" id="barber-color-' + b.id + '" value="' + currentColor + '" onchange="document.getElementById(\'barber-color-hex-' + b.id + '\').textContent = this.value" ' +
-    'style="width:44px;height:44px;border:none;border-radius:12px;padding:0;cursor:pointer;background:none">' +
-    '<span class="hint" id="barber-color-hex-' + b.id + '" style="margin:0">' + currentColor + '</span>' +
+    '<div class="cat-color-row barber-color-row" id="barber-color-row-' + b.id + '">' +
+    '<button type="button" class="cat-color-sq" id="barber-color-sq-' + b.id + '" style="background:' + esc(currentColor) + '" aria-label="Choisir la couleur de ' + esc(b.name) + '" onclick="openBarberColorPicker(\'' + b.id + '\')"></button>' +
+    '<span class="barber-color-name" id="barber-color-name-' + b.id + '" style="--c:' + esc(currentColor) + '">' + esc(b.name) + '</span>' +
+    '<input type="text" class="cat-color-hex" id="barber-color-' + b.id + '" value="' + esc(currentColor) + '" maxlength="7" spellcheck="false" autocomplete="off" aria-label="Code couleur" oninput="barberColorTyped(\'' + b.id + '\')">' +
     '<button class="btn btn-soft" style="padding:8px 14px;font-size:13px" onclick="setBarberColor(\'' + b.id + '\', document.getElementById(\'barber-color-' + b.id + '\').value)">Enregistrer</button>' +
     '</div></div>';
 
@@ -5240,7 +5241,28 @@ function renderScheduleTab(b) {
   return timerToggle + colorPicker + days + '<button class="btn btn-primary" style="margin-top:16px" onclick="saveSchedule(\'' + b.id + '\')">Enregistrer les horaires</button>';
 }
 
+function barberColorShow(id, c) {
+  document.getElementById('barber-color-sq-' + id).style.background = c;
+  document.getElementById('barber-color-name-' + id).style.setProperty('--c', c);
+}
+function openBarberColorPicker(id) {
+  var inp = document.getElementById('barber-color-' + id);
+  toggleColorPicker(document.getElementById('barber-color-row-' + id), inp.value, 'Couleur — ' + document.getElementById('barber-color-name-' + id).textContent,
+    function (c) { inp.value = c; inp.classList.remove('bad'); barberColorShow(id, c); }, document.getElementById('barber-color-sq-' + id));
+}
+// Code saisi à la main (#rrggbb).
+function barberColorTyped(id) {
+  var inp = document.getElementById('barber-color-' + id), v = inp.value.trim();
+  if (v && v.charAt(0) !== '#') v = '#' + v;
+  var ok = /^#[0-9a-fA-F]{6}$/.test(v);
+  inp.classList.toggle('bad', !ok);
+  if (ok) barberColorShow(id, v.toLowerCase());
+}
 function setBarberColor(id, color) {
+  color = String(color || '').trim(); if (color && color.charAt(0) !== '#') color = '#' + color;
+  if (!/^#[0-9a-fA-F]{6}$/.test(color)) { toast('Code couleur invalide (ex. #0a84ff)', true); return; }
+  if (colorPickerClose) colorPickerClose();
+  color = color.toLowerCase();
   api('/api/barbers/' + id, { method: 'PUT', body: { color: color } })
     .then(function () {
       toast('Couleur mise à jour');
@@ -9218,6 +9240,63 @@ function catHsvToHex(h, s, v) {
   var f = function (n) { var k = (n + h / 60) % 6; return v - v * s * Math.max(0, Math.min(k, 4 - k, 1)); };
   return catRgbToHex(f(5) * 255, f(3) * 255, f(1) * 255);
 }
+// Sélecteur commun (couleurs de l'agenda, couleur d'un coiffeur) : s'ouvre sous afterEl ; onChange(hex) à chaque
+// changement. Se ferme par la croix, OK, Échap ou un clic ailleurs. Un seul ouvert à la fois.
+var colorPickerClose = null;
+function openColorPicker(afterEl, hex, title, onChange, trigger) {
+  if (colorPickerClose) colorPickerClose();
+  var hsv = catHexToHsv(/^#[0-9a-fA-F]{6}$/.test(hex || '') ? hex.toLowerCase() : '#0a84ff');
+  var pop = document.createElement('div');
+  pop.className = 'cp-pop';
+  pop.innerHTML = '<div class="cp-head"><b>' + esc(title) + '</b><button type="button" class="cp-x" aria-label="Fermer">✕</button></div>' +
+    '<div class="cp-sv"><div class="cp-knob"></div></div>' +
+    '<input type="range" class="cp-hue" min="0" max="359" step="1" aria-label="Teinte">' +
+    '<div class="cp-foot"><span class="cp-prev"></span><input type="text" class="cp-hex" maxlength="7" spellcheck="false" aria-label="Code couleur">' +
+    '<button type="button" class="btn btn-primary cp-ok">OK</button></div>';
+  afterEl.insertAdjacentElement('afterend', pop);
+  var sv = pop.querySelector('.cp-sv'), knob = pop.querySelector('.cp-knob'), hue = pop.querySelector('.cp-hue'), hexIn = pop.querySelector('.cp-hex'), prev = pop.querySelector('.cp-prev');
+  function paint(fromHex) {
+    var c = catHsvToHex(hsv.h, hsv.s, hsv.v);
+    sv.style.background = 'linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, hsl(' + hsv.h + ', 100%, 50%))';
+    knob.style.left = (hsv.s * 100) + '%'; knob.style.top = ((1 - hsv.v) * 100) + '%'; knob.style.background = c;
+    hue.value = Math.round(hsv.h); prev.style.background = c;
+    if (!fromHex) { hexIn.value = c; hexIn.classList.remove('bad'); }
+    onChange(c);
+  }
+  function pick(e) {
+    var r = sv.getBoundingClientRect();
+    hsv.s = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+    hsv.v = 1 - Math.min(1, Math.max(0, (e.clientY - r.top) / r.height));
+    paint();
+  }
+  sv.onpointerdown = function (e) { e.preventDefault(); sv.setPointerCapture(e.pointerId); pick(e); sv.onpointermove = pick; };
+  sv.onpointerup = sv.onpointercancel = function () { sv.onpointermove = null; };
+  hue.oninput = function () { hsv.h = Number(hue.value); paint(); };
+  hexIn.oninput = function () {
+    var v = hexIn.value.trim(); if (v && v.charAt(0) !== '#') v = '#' + v;
+    var ok = /^#[0-9a-fA-F]{6}$/.test(v);
+    hexIn.classList.toggle('bad', !ok);
+    if (ok) { hsv = catHexToHsv(v.toLowerCase()); paint(true); }
+  };
+  function outside(e) { if (!pop.contains(e.target) && !(trigger && trigger.contains(e.target))) close(); }
+  function onKey(e) { if (e.key === 'Escape') { e.stopPropagation(); close(); } }
+  function close() {
+    pop.remove(); colorPickerClose = null;
+    document.removeEventListener('pointerdown', outside, true); document.removeEventListener('keydown', onKey, true);
+  }
+  pop.querySelector('.cp-x').onclick = close;
+  pop.querySelector('.cp-ok').onclick = close;
+  setTimeout(function () { document.addEventListener('pointerdown', outside, true); document.addEventListener('keydown', onKey, true); }, 0);
+  colorPickerClose = close;
+  paint();
+  return close;
+}
+// Ouvre / referme le sélecteur sous une ligne (clic sur le carré de couleur).
+function toggleColorPicker(rowEl, hex, title, onChange, trigger) {
+  var open = rowEl.nextElementSibling && rowEl.nextElementSibling.classList.contains('cp-pop');
+  if (open) { if (colorPickerClose) colorPickerClose(); return; }
+  openColorPicker(rowEl, hex, title, onChange, trigger);
+}
 function openCatColorsDialog(focus) {
   var row = function (k, label, icon) {
     return '<div class="cat-color-row' + (k === focus ? ' focus' : '') + '" data-k="' + k + '">' +
@@ -9234,54 +9313,15 @@ function openCatColorsDialog(focus) {
   var box = overlay.querySelector('.modal-box');
   box.classList.add('cat-color-box');
   fillCatColorInputs();
-  var pop = null;
-  function closePicker() { if (pop) { pop.remove(); pop = null; } }
-  function openPicker(rowEl) {
-    closePicker();
-    var k = rowEl.getAttribute('data-k'), label = rowEl.querySelector('.cat-chip').textContent.replace(/^[^A-Za-zÀ-ÿ]+/, '');
-    var hsv = catHexToHsv(CAT_COLORS[k]);
-    pop = document.createElement('div');
-    pop.className = 'cp-pop';
-    pop.innerHTML = '<div class="cp-head"><b>Couleur — ' + esc(label) + '</b><button type="button" class="cp-x" aria-label="Fermer">✕</button></div>' +
-      '<div class="cp-sv"><div class="cp-knob"></div></div>' +
-      '<input type="range" class="cp-hue" min="0" max="359" step="1" aria-label="Teinte">' +
-      '<div class="cp-foot"><span class="cp-prev"></span><input type="text" class="cp-hex" maxlength="7" spellcheck="false" aria-label="Code couleur">' +
-      '<button type="button" class="btn btn-primary cp-ok">OK</button></div>';
-    rowEl.insertAdjacentElement('afterend', pop);
-    var sv = pop.querySelector('.cp-sv'), knob = pop.querySelector('.cp-knob'), hue = pop.querySelector('.cp-hue'), hex = pop.querySelector('.cp-hex'), prev = pop.querySelector('.cp-prev');
-    function paint(fromHex) {
-      var c = catHsvToHex(hsv.h, hsv.s, hsv.v);
-      sv.style.background = 'linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, hsl(' + hsv.h + ', 100%, 50%))';
-      knob.style.left = (hsv.s * 100) + '%'; knob.style.top = ((1 - hsv.v) * 100) + '%'; knob.style.background = c;
-      hue.value = Math.round(hsv.h); prev.style.background = c;
-      if (!fromHex) { hex.value = c; hex.classList.remove('bad'); }
-      var o = {}; o[k] = c; applyCatColors(o); fillCatColorInputs();   // aperçu immédiat (pas encore enregistré)
-    }
-    function pick(e) {
-      var r = sv.getBoundingClientRect();
-      hsv.s = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
-      hsv.v = 1 - Math.min(1, Math.max(0, (e.clientY - r.top) / r.height));
-      paint();
-    }
-    sv.onpointerdown = function (e) { e.preventDefault(); sv.setPointerCapture(e.pointerId); pick(e); sv.onpointermove = pick; };
-    sv.onpointerup = sv.onpointercancel = function () { sv.onpointermove = null; };
-    hue.oninput = function () { hsv.h = Number(hue.value); paint(); };
-    hex.oninput = function () {
-      var v = hex.value.trim(); if (v && v.charAt(0) !== '#') v = '#' + v;
-      var ok = /^#[0-9a-fA-F]{6}$/.test(v);
-      hex.classList.toggle('bad', !ok);
-      if (ok) { hsv = catHexToHsv(v.toLowerCase()); paint(true); }
-    };
-    pop.querySelector('.cp-x').onclick = closePicker;
-    pop.querySelector('.cp-ok').onclick = closePicker;
-    paint();
-  }
+  var closePicker = function () { if (colorPickerClose) colorPickerClose(); };
   box.addEventListener('click', function (e) {
     var sq = e.target.closest('.cat-color-sq');
-    if (sq) { var r = sq.closest('.cat-color-row'); if (pop && pop.previousElementSibling === r) closePicker(); else openPicker(r); return; }
-    if (pop && !e.target.closest('.cp-pop')) closePicker();   // clic ailleurs dans la fenêtre : ferme aussi
+    if (!sq) return;
+    var r = sq.closest('.cat-color-row'), k = r.getAttribute('data-k');
+    toggleColorPicker(r, CAT_COLORS[k], 'Couleur — ' + { service: 'Prestation', extra: 'Supplément', product: 'Produit' }[k], function (c) {
+      var o = {}; o[k] = c; applyCatColors(o); fillCatColorInputs();   // aperçu immédiat (pas encore enregistré)
+    }, sq);
   });
-  box.addEventListener('keydown', function (e) { if (e.key === 'Escape' && pop) { e.stopPropagation(); closePicker(); } }, true);
   overlay.querySelector('#cat-color-cancel').onclick = function () { closePicker(); applyCatColors(saved); _closeModal(overlay); };
   overlay.querySelector('#cat-color-reset').onclick = function () { closePicker(); applyCatColors(CAT_COLOR_DEFAULTS); fillCatColorInputs(); };
   overlay.querySelector('#cat-color-save').onclick = function () { closePicker(); saveCatColors(function () { _closeModal(overlay); }); };
