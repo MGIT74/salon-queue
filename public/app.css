@@ -880,17 +880,27 @@ body .tfx > button { transition: color .25s ease, transform .1s ease; }
 .cat-chips { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 3px; min-width: 0; }
 .cat-dots { display: inline-flex; gap: 3px; vertical-align: middle; }
 .cat-dots i { width: 9px; height: 9px; border-radius: 50%; background: var(--k); border: 1.5px solid #fff; flex: none; }
-.cat-color-rows { display: flex; flex-direction: column; gap: 14px; }
-.cat-color-row { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-radius: 14px; background: var(--fill); }
+.cat-color-rows { display: flex; flex-direction: column; gap: 8px; }
+.cat-color-row { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border-radius: 14px; background: var(--fill); }
 .cat-color-row.focus { box-shadow: inset 0 0 0 2px var(--k, var(--accent)); }
 .cat-color-row[data-k="service"] { --k: var(--cat-service); } .cat-color-row[data-k="extra"] { --k: var(--cat-extra); } .cat-color-row[data-k="product"] { --k: var(--cat-product); }
-.cat-color-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.cat-color-head .cat-chip { font-size: 13px; padding: 3px 9px 3px 5px; }
-.cat-color-hex { width: 92px; padding: 6px 9px; border: none; border-radius: 8px; background: var(--card); color: var(--ink); font: inherit; font-size: 13px; font-variant-numeric: tabular-nums; text-transform: lowercase; outline: none; }
-.cat-color-hex.bad { box-shadow: inset 0 0 0 1.5px var(--red); }
-.cat-swatches { display: grid; grid-template-columns: repeat(12, 1fr); gap: 6px; }
-.cat-swatch { aspect-ratio: 1; min-width: 0; border: none; border-radius: 50%; cursor: pointer; padding: 0; box-shadow: inset 0 0 0 1px rgba(0,0,0,.12); transition: transform .1s ease; }
-.cat-swatch:hover { transform: scale(1.12); }
-.cat-swatch.on { box-shadow: 0 0 0 2px var(--fill), 0 0 0 4px var(--ink); }
-@media (max-width: 520px) { .cat-swatches { grid-template-columns: repeat(6, 1fr); } }
+.cat-color-row .cat-chip { font-size: 13px; padding: 3px 9px 3px 5px; min-width: 120px; }
+.cat-color-sq { width: 40px; height: 40px; flex: none; border: none; border-radius: 10px; cursor: pointer; padding: 0; box-shadow: inset 0 0 0 1px rgba(0,0,0,.15); }
+.cat-color-hex { margin-left: auto; width: 92px; padding: 6px 9px; border: none; border-radius: 8px; background: var(--card); color: var(--ink); font: inherit; font-size: 13px; font-variant-numeric: tabular-nums; text-transform: lowercase; outline: none; }
+.cat-color-hex.bad, .cp-hex.bad { box-shadow: inset 0 0 0 1.5px var(--red); }
 .modal-box.cat-color-box { max-width: 460px; }
+/* Sélecteur de couleur maison (fenêtre « Couleurs dans l'agenda ») */
+.cp-pop { margin: -2px 0 4px; padding: 12px; border-radius: 14px; background: var(--card); box-shadow: 0 0 0 1px var(--sep), var(--shadow-lg); display: flex; flex-direction: column; gap: 10px; }
+.cp-head { display: flex; align-items: center; justify-content: space-between; font-size: 14px; }
+.cp-x { width: 30px; height: 30px; border: none; border-radius: 50%; background: var(--fill); color: var(--grey); font-size: 14px; cursor: pointer; }
+.cp-x:hover { color: var(--ink); }
+.cp-sv { position: relative; height: 150px; border-radius: 10px; cursor: crosshair; touch-action: none; }
+.cp-knob { position: absolute; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.4), 0 1px 4px rgba(0,0,0,.4); pointer-events: none; }
+.cp-hue { -webkit-appearance: none; appearance: none; width: 100%; height: 14px; border-radius: 99px; outline: none; margin: 0;
+  background: linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00); }
+.cp-hue::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%; background: #fff; border: none; box-shadow: 0 0 0 1px rgba(0,0,0,.3), 0 1px 4px rgba(0,0,0,.4); cursor: pointer; }
+.cp-hue::-moz-range-thumb { width: 20px; height: 20px; border-radius: 50%; background: #fff; border: none; box-shadow: 0 0 0 1px rgba(0,0,0,.3), 0 1px 4px rgba(0,0,0,.4); cursor: pointer; }
+.cp-foot { display: flex; align-items: center; gap: 10px; }
+.cp-prev { width: 34px; height: 34px; border-radius: 50%; flex: none; box-shadow: inset 0 0 0 1px rgba(0,0,0,.15); }
+.cp-hex { flex: 1; min-width: 0; padding: 8px 10px; border: none; border-radius: 8px; background: var(--fill); color: var(--ink); font: inherit; font-size: 14px; text-transform: lowercase; outline: none; }
+.cp-foot .cp-ok { padding: 8px 18px; }

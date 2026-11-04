@@ -56,13 +56,13 @@ check('points de couleur (petit bloc)', (lib.catDotsHtml(items).match(/<i class=
   check('poste : applique les couleurs du salon', p.includes('applyCatColors(d.cat_colors)'));
   check('admin : icône réglages à côté de « + Ajouter » (3 menus) -> fenêtre, plus dans Compte',
     ['service', 'extra', 'product'].every((x) => d.includes('onclick="openCatColorsDialog(\'' + x + '\')"')) && /function openCatColorsDialog\(focus\)/.test(d) && /function saveCatColors\(done\)/.test(d) && !d.includes('Couleurs des 3 menus</h4>'));
-  check('fenêtre : pastilles cliquables + code #rrggbb, pas le sélecteur du navigateur (qu\'il fallait fermer en cliquant ailleurs)',
-    /var CAT_COLOR_SWATCHES = \[/.test(d) && d.includes('class="cat-swatch"') && d.includes('class="cat-color-hex"') && !/openCatColorsDialog[\s\S]{0,1500}type="color"/.test(d) && css.includes('.cat-swatch.on'));
+  check('fenêtre : sélecteur de couleur maison avec une croix pour le fermer (plus celui du navigateur)',
+    d.includes('class="cp-x" aria-label="Fermer"') && d.includes('class="cp-sv"') && d.includes('class="cp-hue"') && /function catHsvToHex\(/.test(d) && !/openCatColorsDialog[\s\S]{0,1500}type="color"/.test(d) && css.includes('.cp-pop {'));
   check('poste, agenda Jour : heure de fin + étiquettes (petit bloc : points)', p.includes("'<span class=\"t\">' + pdHM(it.start) + ' – ' + pdHM(it.end) + '</span>") && p.includes('(roomy ? catChipsHtml(cats)') && p.includes(': !narrow ? catDotsHtml(cats)'));
   check('caisse, frise : heure de fin', c.includes("esc(it.timeLabel) + ' – ' + tbHM(it.startMin + it.durMin) + '</span>"));
   check('heures : plus de Matin / Après-midi (rdv, compte, admin, poste, caisse, groupe)',
     [rdv, compte, p, c, d].every((h) => !/s\.time < '12:00'/.test(h) && !h.includes("'le matin'")) && gb.includes('var morning = (q.slots || []).slice(), aft = [];'));
-  check('versions rechargées (app.js v=60, app.css v=53, group-booking v=29)', [d, p, c, rdv, compte, k].every((h) => h.includes('app.js?v=60') && h.includes('app.css?v=53')) && rdv.includes('group-booking.js?v=29'));
+  check('versions rechargées (app.js v=60, app.css v=54, group-booking v=29)', [d, p, c, rdv, compte, k].every((h) => h.includes('app.js?v=60') && h.includes('app.css?v=54')) && rdv.includes('group-booking.js?v=29'));
   await pool.end();
   console.log(`\n${pass} OK, ${fail} ECHEC`);
   process.exit(fail ? 1 : 0);
