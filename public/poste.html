@@ -558,6 +558,7 @@
   .pd-block.narrow .pd-nudges { flex-direction: column; gap: 2px; }
   @media (hover: none) { .pd-block.can-nudge .pd-nudges { display: flex; opacity: .9; } .pd-nudge { padding: 5px 10px; } }
   .pd-block.nudged { box-shadow: 0 0 0 2px var(--fill), 0 0 0 4px #30d158; z-index: 3; }
+  .pd-block .pd-moved { font-style: normal; display: inline-block; margin-left: 5px; padding: 0 5px; border-radius: 99px; background: #fff; color: #111; font-size: 10px; font-weight: 800; line-height: 1.45; vertical-align: 1px; }
   .pd-nudge-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 10px; padding: 8px 8px 8px 14px; border-radius: 14px; background: var(--fill); font-size: 13.5px; }
   .pd-nudge-txt { flex: 1; min-width: 0; }
   .pd-nudge-more { color: var(--grey); }
@@ -753,6 +754,8 @@
       <button class="btn btn-soft" style="flex:1 1 100%" onclick="adEditServices()">Modifier la prestation</button>
       <button class="btn btn-soft" style="flex:1" onclick="adReschedule()">Déplacer</button>
       <button class="btn btn-soft" style="flex:1;color:var(--red)" onclick="adCancel()">Annuler le RDV</button>
+      <!-- Décalé de 5 min depuis l'agenda : remettre à l'heure réservée par le client. -->
+      <button class="btn btn-soft" id="ad-restore-time" style="flex:1 1 100%;display:none" onclick="adRestoreClientTime()"></button>
     </div>
     <div class="appt-drawer-section" id="ad-info"></div>
     <div class="appt-drawer-section" id="ad-edit-section" style="display:none">
@@ -795,7 +798,7 @@
   </button>
 </div>
 
-<script src="/app.js?v=60"></script>
+<script src="/app.js?v=61"></script>
 <script src="/queue-sim.js?v=1"></script>
 <script src="/autorefresh.js?v=3"></script>
 <script src="/staff-group.js?v=6"></script>
@@ -1871,7 +1874,10 @@ function posteDayHtml(dateStr) {
         else if (z[0] >= it.end) nextStart = Math.min(nextStart, z[0]);
         else { prevEnd = Infinity; nextStart = -Infinity; }   // chevauchement déjà là : on ne touche pas
       });
-    return [it.start - prevEnd >= PD_NUDGE_MIN, nextStart - it.end >= PD_NUDGE_MIN];
+    // 5 min au total autour de l'heure réservée par le client (comme le serveur).
+    var ct = it.a.client_time ? pdMin(it.a.client_time.slice(11, 16)) : it.start;
+    return [it.start - prevEnd >= PD_NUDGE_MIN && it.start - PD_NUDGE_MIN >= ct - PD_NUDGE_MIN,
+      nextStart - it.end >= PD_NUDGE_MIN && it.start + PD_NUDGE_MIN <= ct + PD_NUDGE_MIN];
   }
 
   // 1) La recherche client est dans l'en-tête du coup d'œil (gain de place).
@@ -1973,9 +1979,9 @@ function posteDayHtml(dateStr) {
         (canNudge ? 'data-up="' + (room[0] ? 1 : 0) + '" data-down="' + (room[1] ? 1 : 0) + '" data-start="' + it.start + '" ' : '') +
         'data-q="' + esc(normText([a.client_name, a.email, a.phone].join(' ')) + ' ' + String(a.phone || '').replace(/\D/g, '')) + '" ' +
         'style="top:' + Math.round((it.start - R0) * PX) + 'px;height:' + h + 'px;' + pdLaneCss(it) + '--c:' + color + ';--fg:' + fg + '" ' +
-        'title="' + esc(pdHM(it.start) + ' – ' + pdHM(it.end) + ' — ' + a.client_name + ' — ' + (cats.length ? cats.map(function (c) { return c.name; }).join(' + ') : (a.service_name || '')) + ' — ' + b.name) + '" ' +
+        'title="' + esc(pdHM(it.start) + ' – ' + pdHM(it.end) + (a.client_time ? ' (heure du client : ' + a.client_time.slice(11, 16) + ')' : '') + ' — ' + a.client_name + ' — ' + (cats.length ? cats.map(function (c) { return c.name; }).join(' + ') : (a.service_name || '')) + ' — ' + b.name) + '" ' +
         'onclick="event.stopPropagation();openPosteClientDrawer(\'' + a.id + '\')">' +
-        '<span class="t">' + pdHM(it.start) + ' – ' + pdHM(it.end) + '</span><span class="n">' + esc(a.client_name) + '</span>' +
+        '<span class="t">' + pdHM(it.start) + ' – ' + pdHM(it.end) + (a.client_time ? pdMovedIconHtml(a) : '') + '</span><span class="n">' + esc(a.client_name) + '</span>' +
         (roomy ? catChipsHtml(cats).replace('cat-chips', h < 80 ? 'cat-chips one' : 'cat-chips') : !narrow ? catDotsHtml(cats) : '') +
         (label && !narrow ? '<span class="l">' + label + '</span>' : '') +
         // Décaler de 5 min : flèches au survol (toucher sur tablette), ou glisser le bloc.
@@ -2019,6 +2025,11 @@ function posteDayHtml(dateStr) {
    annulé : bandeau « Revenir en arrière » en haut de l'agenda (les décalages du jour, du plus récent au plus ancien). */
 var PD_NUDGE_MIN = 5;
 var pdNudgeFlash = null, pdNudgeBusy = false, pdNudgeMem = {};
+// Petit signe ⇅ : ce RDV a été décalé (client non prévenu) ; son heure à lui en info-bulle et dans le tiroir.
+function pdMovedIconHtml(a) {
+  var d = pdMin(a.scheduled_at.slice(11, 16)) - pdMin(a.client_time.slice(11, 16));
+  return '<i class="pd-moved" title="Décalé de ' + (d > 0 ? '+' : '') + d + ' min — heure du client : ' + a.client_time.slice(11, 16) + '">⇅ ' + (d > 0 ? '+' : '') + d + '</i>';
+}
 function pdNudgeKey(dateStr) { return 'poste_nudge_' + (typeof SALON_SLUG !== 'undefined' ? SALON_SLUG : '') + '_' + dateStr; }
 function pdNudgeList(dateStr) {
   try { var v = JSON.parse(localStorage.getItem(pdNudgeKey(dateStr)) || 'null'); if (Array.isArray(v)) return v; } catch (e) {}
@@ -2046,7 +2057,10 @@ function pdNudge(id, minutes, undo) {
   return barberApi('/api/appointments/' + encodeURIComponent(id) + '/nudge', { method: 'PUT', actingAs: a.barber_id || undefined, body: { minutes: minutes } })
     .then(function (r) {
       var list = pdNudgeList(dateStr);
-      if (undo) { list.pop(); toast('Heure d\'avant remise : ' + a.client_name + ' à ' + r.to); }
+      if (undo) {
+        for (var i = list.length - 1; i >= 0; i--) if (list[i].id === id) { list.splice(i, 1); break; }
+        toast(r.client_time ? 'Heure d\'avant remise : ' + a.client_name + ' à ' + r.to : a.client_name + ' : remis à son heure (' + r.to + ')');
+      }
       else { list.push({ id: id, name: a.client_name, from: r.from, to: r.to, minutes: minutes }); toast(a.client_name + ' : ' + r.from + ' → ' + r.to + ' (client non prévenu)'); }
       pdNudgeSave(dateStr, list.slice(-30));
       pdNudgeFlash = id;
@@ -2055,6 +2069,16 @@ function pdNudge(id, minutes, undo) {
     })
     .catch(function (e) { toast(e.message, true); renderCalDay(); })
     .then(function () { pdNudgeBusy = false; });
+}
+// Tiroir : remettre le RDV à l'heure réservée par le client (depuis n'importe quel appareil, n'importe quand).
+function adRestoreClientTime() {
+  var a = adAppt;
+  if (!a || !a.client_time) return;
+  var diff = pdMin(a.client_time.slice(11, 16)) - pdMin(a.scheduled_at.slice(11, 16));
+  if (!diff) return;
+  closeApptDrawer();
+  calApptById[a.id] = a;
+  pdNudge(a.id, diff, true);
 }
 function pdNudgeUndo(dateStr) {
   var list = pdNudgeList(dateStr), last = list[list.length - 1];
@@ -3247,6 +3271,9 @@ function openApptDrawer(a) {
   // Les coordonnées restent modifiables même avant l'entrée du RDV dans la file.
   document.getElementById('ad-edit-btn').style.display = a.status !== 'cancelled' ? 'flex' : 'none';
   document.getElementById('ad-actions').style.display = adIsUpcoming(a) ? 'flex' : 'none';
+  var rt = document.getElementById('ad-restore-time');
+  rt.style.display = a.client_time ? '' : 'none';
+  if (a.client_time) rt.textContent = '↩ Remettre à l\'heure du client (' + a.client_time.slice(11, 16) + ')';
   adRenderInfo();
   var noteBox = document.getElementById('ad-note-box');
   // Note interne : toujours modifiable, même pour un RDV à venir (pas encore dans la file).

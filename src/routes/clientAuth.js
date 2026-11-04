@@ -231,7 +231,7 @@ router.get('/me', requireClient, wrap(async (req, res) => {
   // 'confirmed' indéfiniment côté appointments, seule la file liée
   // (promoted_queue_id) sait qu'il est déjà 'done'.
   const [upcomingRows] = await pool.query(
-    `SELECT a.id, a.scheduled_at, a.cancel_token, a.service_id, a.barber_id, a.client_note, a.client_name, a.group_id,
+    `SELECT a.id, COALESCE(a.client_time, a.scheduled_at) AS scheduled_at, a.cancel_token, a.service_id, a.barber_id, a.client_note, a.client_name, a.group_id,
             ${serviceNameSql()} AS service_name, COALESCE(bsp.price_cents, s.price_cents) AS service_price_cents,
             bar.name AS barber_name, sl.slug AS salon_slug, sl.name AS salon_name
      FROM appointments a

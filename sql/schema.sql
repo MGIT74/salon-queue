@@ -1483,3 +1483,9 @@ CREATE TABLE IF NOT EXISTS booking_verifications (
 SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'queue' AND column_name = 'taken_from_barber_id');
 SET @sql := IF(@c = 0, 'ALTER TABLE queue ADD COLUMN taken_from_barber_id CHAR(36) NULL, ADD COLUMN taken_by_barber_id CHAR(36) NULL, ADD COLUMN taken_at DATETIME NULL', 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Décaler un RDV de 5 min depuis l'agenda du poste (client non prévenu) : heure réservée par le client, gardée
+-- tant que le RDV est décalé (NULL = pas décalé). Les rappels et le compte client montrent cette heure-là.
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'appointments' AND column_name = 'client_time');
+SET @sql := IF(@c = 0, 'ALTER TABLE appointments ADD COLUMN client_time DATETIME NULL', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;

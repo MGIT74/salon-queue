@@ -621,6 +621,8 @@ async function buildApptItems(salonId, rows) {
         // faisait apparaître un RDV déjà terminé comme "encore à venir"
         // pendant ce délai (bouton Annuler resté actif à tort).
         scheduled_at: r.scheduled_at,
+        // Décalé de 5 min depuis l'agenda du poste : heure réservée par le client (null = pas décalé).
+        client_time: r.client_time ? String(r.client_time).slice(0, 19) : null,
         created_at: utcIso(r.created_at),
         // Coupe faite avec le Timer : vraie heure de début / fin (UTC). Sans Timer (« Je prends ») : début vide.
         queue_start_at: r.queue_start_at ? utcIso(r.queue_start_at) : null,
@@ -1706,6 +1708,8 @@ router.put('/:id/reschedule', requireAdminOrBarber, wrap(withBookingLock(async (
 
   const newScheduledAt = date + ' ' + time + ':00';
   await applyMove(appt, date, time, finalBarberId, rdvSettings, extraIds, productSelections);
+  // « Déplacer » : le client est prévenu, la nouvelle heure devient la sienne (plus de marque « décalé »).
+  await pool.query('UPDATE appointments SET client_time = NULL WHERE id = ?', [appt.id]);
 
   if (appt.email) {
     try {
@@ -1751,6 +1755,11 @@ router.put('/:id/nudge', requireAdminOrBarber, wrap(withBookingLock(async (req, 
   const from = hm.slice(0, 5), t = timeToMinutes(from) + minutes;
   if (t < 0 || t >= 24 * 60) return res.status(409).json({ error: 'Impossible de changer de jour.' });
   const to = minutesToTime(t);
+  // 5 min AU TOTAL par rapport à l'heure réservée par le client (sinon on le décalerait de 15 min sans le prévenir).
+  const clientHm = appt.client_time ? String(appt.client_time).split(' ')[1].slice(0, 5) : from;
+  if (Math.abs(t - timeToMinutes(clientHm)) > NUDGE_MAX_MIN) {
+    return res.status(409).json({ error: 'Déjà décalé de 5 min par rapport à l\'heure du client (' + clientHm + ') : pour aller plus loin, utilisez « Déplacer » (le client est prévenu).' });
+  }
   const rdvSettings = await getSettings(req.salon.id);
   if (`${date} ${to}:00` <= nowParisDatetimeString(rdvSettings.timezone)) return res.status(409).json({ error: 'Cette heure est déjà passée.' });
   const [extraLinks] = await pool.query(
@@ -1765,7 +1774,10 @@ router.put('/:id/nudge', requireAdminOrBarber, wrap(withBookingLock(async (req, 
   if (!ok.length) return res.status(409).json({ error: "Pas de place : l'heure " + to + ' est déjà prise (ou en dehors des horaires).' });
   const [productLinks] = await pool.query('SELECT product_id, quantity FROM appointment_products WHERE appointment_id = ?', [appt.id]);
   await applyMove(appt, date, to, appt.barber_id, rdvSettings, extraLinks.map((e) => e.id), productLinks.map((p) => ({ id: p.product_id, quantity: p.quantity })));
-  res.json({ ok: true, from, to, minutes });   // pas d'email : 5 min, le client n'est pas dérangé
+  // Garde l'heure du client tant que le RDV est décalé ; revenu à son heure : plus de marque.
+  const clientTime = to === clientHm ? null : date + ' ' + clientHm + ':00';
+  await pool.query('UPDATE appointments SET client_time = ? WHERE id = ?', [clientTime, appt.id]);
+  res.json({ ok: true, from, to, minutes, client_time: clientTime });   // pas d'email : 5 min, le client n'est pas dérangé
 })));
 
 /**

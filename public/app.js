@@ -835,6 +835,9 @@ function apptInfoRowsHtml(a) {
   var p = a.pricing, extras = p && p.extras && p.extras.length && (p.service_price_cents || p.service_duration_min)
     ? ' + ' + p.extras.map(function (x) { return x.name; }).join(' + ') : '';
   return '<div class="detail-row"><span class="detail-label">Quand</span><span class="detail-value" style="text-transform:capitalize">' + esc(apptWhenLabel(a)) + '</span></div>' +
+    // Décalé de 5 min depuis l'agenda du poste (client non prévenu) : son heure à lui reste visible.
+    (a.client_time ? '<div class="detail-row"><span class="detail-label">⇅ Heure du client</span><span class="detail-value">' + esc(a.client_time.slice(11, 16)) +
+      ' <span style="color:var(--grey);font-weight:400">· décalé à ' + esc(String(a.scheduled_at || '').slice(11, 16)) + ', client non prévenu</span></span></div>' : '') +
     '<div class="detail-row"><span class="detail-label">Coiffeur</span><span class="detail-value">' + esc(a.barber_name || 'Non assigné') + '</span></div>' +
     '<div class="detail-row"><span class="detail-label">Prestation</span><span class="detail-value">' + esc((a.service_name || '') + extras) + '</span></div>' +
     apptPricingHtml(a) +

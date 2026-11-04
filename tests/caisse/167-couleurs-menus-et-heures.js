@@ -60,11 +60,11 @@ check('points de couleur (petit bloc)', (lib.catDotsHtml(items).match(/<i class=
     d.includes('class="cp-x" aria-label="Fermer"') && d.includes('class="cp-sv"') && d.includes('class="cp-hue"') && /function catHsvToHex\(/.test(d) && !/openCatColorsDialog[\s\S]{0,1500}type="color"/.test(d) && css.includes('.cp-pop {'));
   check('couleur d\'un coiffeur : même sélecteur (croix pour fermer), plus celui du navigateur',
     d.includes('onclick="openBarberColorPicker(') && /function openBarberColorPicker\(id\)[\s\S]{0,300}toggleColorPicker\(/.test(d) && /function openColorPicker\(afterEl, hex, title, onChange, trigger\)/.test(d) && !d.includes('type="color" id="barber-color-'));
-  check('poste, agenda Jour : heure de fin + étiquettes (petit bloc : points)', p.includes("'<span class=\"t\">' + pdHM(it.start) + ' – ' + pdHM(it.end) + '</span>") && p.includes('(roomy ? catChipsHtml(cats)') && p.includes(': !narrow ? catDotsHtml(cats)'));
+  check('poste, agenda Jour : heure de fin + étiquettes (petit bloc : points)', p.includes("'<span class=\"t\">' + pdHM(it.start) + ' – ' + pdHM(it.end) + (a.client_time ? pdMovedIconHtml(a) : '') + '</span>") && p.includes('(roomy ? catChipsHtml(cats)') && p.includes(': !narrow ? catDotsHtml(cats)'));
   check('caisse, frise : heure de fin', c.includes("esc(it.timeLabel) + ' – ' + tbHM(it.startMin + it.durMin) + '</span>"));
   check('heures : plus de Matin / Après-midi (rdv, compte, admin, poste, caisse, groupe)',
     [rdv, compte, p, c, d].every((h) => !/s\.time < '12:00'/.test(h) && !h.includes("'le matin'")) && gb.includes('var morning = (q.slots || []).slice(), aft = [];'));
-  check('versions rechargées (app.js v=60, app.css v=55, group-booking v=29)', [d, p, c, rdv, compte, k].every((h) => h.includes('app.js?v=60') && h.includes('app.css?v=55')) && rdv.includes('group-booking.js?v=29'));
+  check('versions rechargées (app.js v=61, app.css v=55, group-booking v=29)', [d, p, c, rdv, compte, k].every((h) => h.includes('app.js?v=61') && h.includes('app.css?v=55')) && rdv.includes('group-booking.js?v=29'));
   await pool.end();
   console.log(`\n${pass} OK, ${fail} ECHEC`);
   process.exit(fail ? 1 : 0);

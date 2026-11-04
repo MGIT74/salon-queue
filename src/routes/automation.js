@@ -770,7 +770,7 @@ router.get('/sms-reminders/due', requireAutomationKey, wrap(async (req, res) => 
     const to = tomorrow + ' 23:59:59';
 
     const [appts] = await pool.query(
-      `SELECT a.id, a.client_name, a.phone, a.scheduled_at, a.created_at, b.name AS barber_name,
+      `SELECT a.id, a.client_name, a.phone, COALESCE(a.client_time, a.scheduled_at) AS scheduled_at, a.created_at, b.name AS barber_name,
               l.status AS log_status, l.attempts AS log_attempts,
               (l.updated_at > DATE_SUB(NOW(), INTERVAL ? MINUTE)) AS log_recent
        FROM appointments a
