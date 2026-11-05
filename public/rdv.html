@@ -180,18 +180,20 @@
 /* Calendrier client intégré au thème personnalisable du salon. */
 .slots-grid.is-loading{opacity:.45;pointer-events:none}
 /* Réservation à plusieurs : venir ensemble (à la suite / en même temps) */
-.gt-box{margin-top:18px}
+.gt-box{margin-top:18px;container-type:inline-size}
+@container (max-width:380px){.gt-box .gt-ic{display:none}.gt-box .gt-opt{padding:11px 12px}}
 .gt-title{font-size:13.5px;font-weight:700;color:var(--grey);margin:0 0 8px}
 .gt-opt{display:flex;align-items:center;gap:12px;width:100%;box-sizing:border-box;background:var(--fill);border:2px solid transparent;border-radius:16px;padding:11px 13px;margin:0 0 8px;font:inherit;color:var(--ink);text-align:left;cursor:pointer}
 .gt-opt.sel{border-color:var(--blue);background:rgba(var(--accent-rgb,0,122,255),.10)}
 .gt-opt.off{opacity:.55;cursor:default}
 .gt-ic{width:38px;height:38px;border-radius:12px;background:var(--card);color:var(--blue);display:flex;align-items:center;justify-content:center;flex:none}
 .gt-opt.off .gt-ic{color:var(--grey)}
+.gt-txt{flex:1;min-width:0}
 .gt-t1{display:block;font-size:14.5px;font-weight:700}
 .gt-t2{display:block;font-size:12.5px;color:var(--grey);margin-top:2px;line-height:1.35}
-.gt-tm{margin-left:auto;font-size:15px;font-weight:800;white-space:nowrap;padding-left:8px}
+.gt-tm{color:var(--ink);font-size:14px;font-weight:800}
 /* Bouton bien visible : « Choisir » (devient « ✓ Choisi ») - sinon l'option passait pour une simple info. */
-.gt-cta{flex:none;margin-left:10px;background:var(--blue);color:#fff;border-radius:999px;padding:8px 14px;font-size:13.5px;font-weight:700;white-space:nowrap;transition:transform .12s ease,filter .12s ease}
+.gt-cta{flex:none;margin-left:6px;background:var(--blue);color:#fff;border-radius:999px;padding:8px 14px;font-size:13.5px;font-weight:700;white-space:nowrap;transition:transform .12s ease,filter .12s ease}
 button.gt-opt:hover{border-color:rgba(var(--accent-rgb,0,122,255),.45)}
 button.gt-opt:hover .gt-cta{filter:brightness(1.1)}
 button.gt-opt:active .gt-cta{transform:scale(.96)}
@@ -1064,7 +1066,7 @@ function gtOptHtml(o, i) {
   if (!o.time) return '<div class="gt-opt off">' + gtIcon(o.kind) + '<span><span class="gt-t1">' + title + '</span><span class="gt-t2">' + esc(o.why) + '</span></span></div>';
   var on = selSlot && selSlot.keepBarber && selSlot.time === o.time && String(selSlot.barberId) === String(o.barberId);
   return '<button type="button" class="gt-opt' + (on ? ' sel' : '') + '" onclick="gtPick(' + i + ')">' + gtIcon(o.kind) +
-    '<span><span class="gt-t1">' + title + '</span><span class="gt-t2">' + esc(o.sub) + '</span></span><span class="gt-tm">' + esc(o.time) + '</span>' +
+    '<span class="gt-txt"><span class="gt-t1">' + title + '</span><span class="gt-t2"><b class="gt-tm">' + esc(o.time) + '</b> · ' + esc(o.sub) + '</span></span>' +
     '<span class="gt-cta"><span class="off">Choisir</span><span class="on">✓ Choisi</span></span></button>';
 }
 function renderTogether(slots) {
