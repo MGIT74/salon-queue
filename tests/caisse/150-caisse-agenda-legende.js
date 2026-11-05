@@ -18,5 +18,6 @@ check('« moi » = le coiffeur de la bulle active', /function pdMe\(\) \{[\s\S]{
 check('tiroir et « Ajouter un RDV » de la caisse (heure touchée gardée pour « Forcer »)', caisse.includes("function openPosteAddAppointment(dateStr, barberId) { openCaisseAddAppointment(dateStr, barberId, pdPrefTime); }") && caisse.includes('openAgendaClientDrawer(id);'));
 check('clients sans RDV déjà démarrés : toujours dans la vue Jour (fiche « consultation »)', /function pdWalkInsOfDay\(dateStr\)/.test(caisse) && caisse.includes("openAgendaWalkInDrawer(String(id).slice(2))"));
 check('ouverture de l\'onglet : relu à chaque fois, vue Jour d\'abord', caisse.includes('if (!calViewReady) { calViewReady = true; setCalView(calViewMode); }'));
+check('pas de 2e rangée de photos des coiffeurs (les bulles de la caisse suffisent)', !caisse.includes('id="cal-barber-picker"'));
 console.log('\n' + pass + ' OK, ' + fail + ' ECHEC');
 process.exit(fail ? 1 : 0);
