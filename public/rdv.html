@@ -190,6 +190,13 @@
 .gt-t1{display:block;font-size:14.5px;font-weight:700}
 .gt-t2{display:block;font-size:12.5px;color:var(--grey);margin-top:2px;line-height:1.35}
 .gt-tm{margin-left:auto;font-size:15px;font-weight:800;white-space:nowrap;padding-left:8px}
+/* Bouton bien visible : « Choisir » (devient « ✓ Choisi ») - sinon l'option passait pour une simple info. */
+.gt-cta{flex:none;margin-left:10px;background:var(--blue);color:#fff;border-radius:999px;padding:8px 14px;font-size:13.5px;font-weight:700;white-space:nowrap;transition:transform .12s ease,filter .12s ease}
+button.gt-opt:hover{border-color:rgba(var(--accent-rgb,0,122,255),.45)}
+button.gt-opt:hover .gt-cta{filter:brightness(1.1)}
+button.gt-opt:active .gt-cta{transform:scale(.96)}
+.gt-opt.sel .gt-cta{background:var(--green,#1f9d55)}
+.gt-cta .on{display:none}.gt-opt.sel .gt-cta .on{display:inline}.gt-opt.sel .gt-cta .off{display:none}
 .gt-day{display:inline-flex;align-items:center;gap:6px;background:var(--fill);border:none;border-radius:999px;padding:9px 14px;font:inherit;font-size:13.5px;font-weight:600;color:var(--blue);cursor:pointer}
 .closure-calendar{position:relative;width:100%;max-width:390px;margin:4px 0 18px;color:inherit}
 .closure-calendar input[type=date]{display:none}
@@ -1057,7 +1064,8 @@ function gtOptHtml(o, i) {
   if (!o.time) return '<div class="gt-opt off">' + gtIcon(o.kind) + '<span><span class="gt-t1">' + title + '</span><span class="gt-t2">' + esc(o.why) + '</span></span></div>';
   var on = selSlot && selSlot.keepBarber && selSlot.time === o.time && String(selSlot.barberId) === String(o.barberId);
   return '<button type="button" class="gt-opt' + (on ? ' sel' : '') + '" onclick="gtPick(' + i + ')">' + gtIcon(o.kind) +
-    '<span><span class="gt-t1">' + title + '</span><span class="gt-t2">' + esc(o.sub) + '</span></span><span class="gt-tm">' + esc(o.time) + '</span></button>';
+    '<span><span class="gt-t1">' + title + '</span><span class="gt-t2">' + esc(o.sub) + '</span></span><span class="gt-tm">' + esc(o.time) + '</span>' +
+    '<span class="gt-cta"><span class="off">Choisir</span><span class="on">✓ Choisi</span></span></button>';
 }
 function renderTogether(slots) {
   var box = document.getElementById('grp-together');

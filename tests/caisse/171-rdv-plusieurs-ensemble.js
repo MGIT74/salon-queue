@@ -15,6 +15,7 @@ check('option impossible : grisée avec la raison', /gt-opt off/.test(fnSrc('gtO
 check('autre jour : lien « Le même jour que X »', /Le même jour que /.test(rt) && /function gtSameDay\(\)/.test(rdv));
 check('choisir une option garde ce coiffeur (même avec « Premier disponible »)', /keepBarber: true/.test(fnSrc('gtPick')) && rdv.includes("any: selBarber === '' && !selSlot.keepBarber"));
 check('relu à chaque chargement des créneaux', /renderTogether\(null\);/.test(fnSrc('loadSlots')) && /renderTogether\(r\.slots\);/.test(fnSrc('loadSlots')));
+check('option = vrai bouton : « Choisir » (devient « ✓ Choisi »)', /<span class="gt-cta"><span class="off">Choisir<\/span><span class="on">✓ Choisi<\/span><\/span>/.test(rdv) && /\.gt-cta\{/.test(rdv));
 check('pas de bordure colorée à gauche (style « IA »)', !/\.gt-[a-z]+\{[^}]*border-left/.test(rdv));
 console.log('\n' + pass + ' OK, ' + fail + ' ECHEC');
 process.exit(fail ? 1 : 0);
