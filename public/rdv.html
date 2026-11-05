@@ -1084,13 +1084,20 @@ function renderTogether(slots) {
   var refStart = gtMin(ref.time), refEnd = refStart + (Number(ref.dur) || 0);
   var wantAfter = selBarber === '' || String(selBarber) === String(ref.barber_id);
   var wantSame = String(selBarber) !== String(ref.barber_id);
+  // Les deux raccourcis demandent TOUTES les heures (?all=1) : la grille, elle, montre les heures « à la suite »
+  // (pas de la prestation / du supplément), où l'heure exacte de X n'est pas forcément.
+  var held = GroupBooking.cartHeld(grp.cart, selDate, grp.editIndex);
+  var base = '/api/appointments/availability?all=1&date=' + selDate + '&service_id=' + selService + '&extras=' + selExtras.join(',') +
+    (held ? '&held=' + encodeURIComponent(held) : '');
   // En même temps : même heure de début, autre coiffeur (les créneaux reçus excluent déjà le coiffeur de X à cette heure).
-  var same = null;
+  var same = null, sameReq = Promise.resolve();
   if (wantSame) {
     same = { kind: 'same', name: name };
-    var s = (slots || []).filter(function (x) { return x.time === ref.time && String(x.barber_id) !== String(ref.barber_id); })[0];
-    if (s) { same.time = s.time; same.barberId = s.barber_id; same.sub = (selBarber === '' ? 'Autre coiffeur : ' : '') + gtBarberName(s.barber_id); }
-    else same.why = selBarber ? gtBarberName(selBarber) + ' n\'est pas libre à ' + ref.time : 'Aucun autre coiffeur libre à ' + ref.time;
+    sameReq = api(base + (selBarber ? '&barber_id=' + encodeURIComponent(selBarber) : '')).then(function (r) {
+      var s = (r.slots || []).filter(function (x) { return x.time === ref.time && String(x.barber_id) !== String(ref.barber_id); })[0];
+      if (s) { same.time = s.time; same.barberId = s.barber_id || selBarber; same.sub = (selBarber === '' ? 'Autre coiffeur : ' : '') + gtBarberName(same.barberId); }
+      else same.why = selBarber ? gtBarberName(selBarber) + ' n\'est pas libre à ' + ref.time : 'Aucun autre coiffeur libre à ' + ref.time;
+    }).catch(function () { same = null; });
   }
   function paintBox(after) {
     if (req !== gtReq) return;
@@ -1099,12 +1106,10 @@ function renderTogether(slots) {
     box.innerHTML = '<div class="gt-title">Pour venir ensemble avec ' + esc(name) + '</div>' + gtOpts.map(gtOptHtml).join('');
     box.style.display = '';
   }
-  if (!wantAfter) return paintBox(null);
+  if (!wantAfter) { sameReq.then(function () { paintBox(null); }); return; }
   // À la suite : créneaux du coiffeur de X (ceux du panier déjà retenus), le premier à partir de sa fin.
   var after = { kind: 'after', name: name };
-  var held = GroupBooking.cartHeld(grp.cart, selDate, grp.editIndex);
-  var url = '/api/appointments/availability?date=' + selDate + '&service_id=' + selService + '&extras=' + selExtras.join(',') +
-    '&barber_id=' + encodeURIComponent(ref.barber_id) + (held ? '&held=' + encodeURIComponent(held) : '');
+  var url = base + '&barber_id=' + encodeURIComponent(ref.barber_id);
   var bName = gtBarberName(ref.barber_id) || ref.barber_name || '';
   box.innerHTML = '<div class="gt-title">Pour venir ensemble avec ' + esc(name) + '</div><div class="gt-t2" style="margin:0 0 8px">Recherche…</div>';
   box.style.display = '';
@@ -1116,8 +1121,8 @@ function renderTogether(slots) {
       after.time = best.time; after.barberId = best.barber_id || ref.barber_id;
       after.sub = (selBarber === '' ? 'Même coiffeur : ' : '') + bName + (wait > 0 ? ' · ' + wait + ' min d\'attente' : '');
     } else after.why = bName + ' n\'a pas de place juste après (' + gtHM(refEnd) + ')';
-    paintBox(after);
-  }).catch(function () { paintBox(null); });
+    return sameReq.then(function () { paintBox(after); });
+  }).catch(function () { sameReq.then(function () { paintBox(null); }); });
 }
 function gtPick(i) {
   var o = gtOpts[i];

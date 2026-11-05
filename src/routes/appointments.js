@@ -445,8 +445,9 @@ router.get('/availability', wrap(async (req, res) => {
   const optsFor = (bid) => Object.assign({}, slotOpts, held.length ? { extraBusy: groupBooking.heldRanges(held, bid, date, bufferMinForHeld) } : {});
 
   // Heures « à la suite » selon la durée du RDV (packSlots), sauf : ?all=1 (l'équipe veut toutes les heures),
-  // déplacement d'un RDV existant, réservation à plusieurs (les personnes s'enchaînent à l'heure exacte).
-  const packed = req.query.all !== '1' && !req.query.exclude_appointment_id && !held.length;
+  // déplacement d'un RDV existant. Réservation à plusieurs aussi (même pas que seul, prestation ou supplément seul) :
+  // l'heure exacte « à la suite / en même temps » d'une autre personne est donnée par les raccourcis de la page (?all=1).
+  const packed = req.query.all !== '1' && !req.query.exclude_appointment_id;
   const bufferMin = Number(rdvSettings.rdv_buffer_min) || 0;
 
   if (barber_id) {

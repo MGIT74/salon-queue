@@ -53,7 +53,11 @@ const get = async (q, h) => (await fetch(BASE + '/api/appointments/availability?
       body: JSON.stringify({ client_name: 'T163 Libre', service_id: 'sv1', extras: ['t163-x10'], barber_id: 'b1', date: DAY, time: '09:10' }) });
     check('équipe : RDV possible à une heure libre qui n\'est pas « à la suite » (09:10)', res.status === 200, res.status);
     r = await get('&service_id=sv1&barber_id=b1&held=' + encodeURIComponent('b1|' + DAY + '|12:00|30'));
-    check('réservation à plusieurs (créneaux tenus) : toutes les heures', r.packed === false, JSON.stringify(r).slice(0, 80));
+    // Réservation à plusieurs : même pas que seul (prestation ou supplément seul) ; l'heure exacte « à la suite » de
+    // l'autre personne reste proposée (premier créneau après le créneau tenu) ; ?all=1 pour les raccourcis de la page.
+    check('réservation à plusieurs (créneaux tenus) : heures à la suite aussi, reprise juste après le créneau tenu', r.packed === true && r.slots.some((s) => s.time === '12:30'), JSON.stringify(r.slots.map((s) => s.time)));
+    r = await get('&service_id=sv1&barber_id=b1&all=1&held=' + encodeURIComponent('b1|' + DAY + '|12:00|30'));
+    check('réservation à plusieurs + ?all=1 : toutes les heures (raccourcis « à la suite / en même temps »)', r.packed === false, r.slots.length);
     // Premier disponible : réunion des heures à la suite de chaque coiffeur.
     r = await get('&service_id=sv1&extras=t163-x10');
     check('« Premier disponible » : heures à la suite aussi', r.packed === true && r.slots.length <= r.all_count, r.slots.length + '/' + r.all_count);

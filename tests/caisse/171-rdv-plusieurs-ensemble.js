@@ -16,6 +16,7 @@ check('autre jour : lien « Le même jour que X »', /Le même jour que /.test(r
 check('choisir une option garde ce coiffeur (même avec « Premier disponible »)', /keepBarber: true/.test(fnSrc('gtPick')) && rdv.includes("any: selBarber === '' && !selSlot.keepBarber"));
 check('relu à chaque chargement des créneaux', /renderTogether\(null\);/.test(fnSrc('loadSlots')) && /renderTogether\(r\.slots\);/.test(fnSrc('loadSlots')));
 check('option = vrai bouton : « Choisir » (devient « ✓ Choisi »)', /<span class="gt-cta"><span class="off">Choisir<\/span><span class="on">✓ Choisi<\/span><\/span>/.test(rdv) && /\.gt-cta\{/.test(rdv));
+check('raccourcis calculés sur toutes les heures (?all=1) : la grille, elle, suit le pas de la prestation / du supplément', /availability\?all=1&date=/.test(rt) && !/!held\.length/.test(fs.readFileSync(path.join(__dirname, '../../src/routes/appointments.js'), 'utf8').match(/const packed = [^\n]*/)[0]));
 check('pas de bordure colorée à gauche (style « IA »)', !/\.gt-[a-z]+\{[^}]*border-left/.test(rdv));
 console.log('\n' + pass + ' OK, ' + fail + ' ECHEC');
 process.exit(fail ? 1 : 0);
