@@ -3249,7 +3249,7 @@
 
 <script src="/app.js?v=65"></script>
 <script src="/autorefresh.js?v=3"></script>
-<script src="/staff-group.js?v=6"></script>
+<script src="/staff-group.js?v=7"></script>
 <script src="/daterange.js?v=4"></script>
 <script>
   // Le lien "Creer mon salon" n'a de sens que si l'inscription est ouverte sur
@@ -8720,6 +8720,8 @@ function aaOpenGroup() {
   _closeModal(ctx.overlay);
   StaffGroupBooking.open({
     api: api, client: client,
+    // « ‹ Retour » : la fenêtre « Ajouter un RDV » revient sur « Qui appelle ? », client déjà rempli.
+    onBack: function (c) { openAdminAddAppointment(ctx.dateStr, ctx.barberId, ctx.prefTime); if (aaGroupCtx) { aaGoStep('client', 'group'); StaffGroupBooking.fillClient(aaGroupCtx.overlay, 'aa', c); } },
     onDone: function () {
       refreshQueue();
       Object.keys(calMonthCache).forEach(function (k) { delete calMonthCache[k]; });
@@ -8779,6 +8781,8 @@ function openAdminAddAppointment(dateStr, preselectedBarberId, prefTime) {
     '</div>' +
     '<button id="aa-close-x" style="background:var(--fill);border:none;width:30px;height:30px;border-radius:50%;color:var(--grey);font-size:14px;cursor:pointer;flex-shrink:0;margin-left:10px">✕</button>' +
     '</div>' +
+    // Une personne | Plusieurs personnes : en grand, tout en haut (le choix vient en premier, on peut changer d'avis).
+    StaffGroupBooking.modeSwitchHtml('aa', 'aaStartSolo()', "aaGoStep('client', 'group')") +
 
     '<div id="aa-step-barber" style="display:none">' +
       '<button class="aa-back" onclick="aaGoStep(\'extras\')">‹ Retour</button>' +
@@ -8787,7 +8791,6 @@ function openAdminAddAppointment(dateStr, preselectedBarberId, prefTime) {
     '</div>' +
 
     '<div id="aa-step-service" style="display:none">' +
-      '<button type="button" class="aa-group-link" onclick="aaGoStep(\'client\', \'group\')"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M17.5 14.2c2.3.3 3.5 2.2 3.5 5.8"/></svg>Plusieurs personnes ?</button>' +
       '<div class="aa-step-title">Prestation</div>' +
       '<div class="item-grid compact" id="aa-service-grid"></div>' +
     '</div>' +
@@ -8834,7 +8837,7 @@ function openAdminAddAppointment(dateStr, preselectedBarberId, prefTime) {
         '<div class="modal-actions aa-final-only"><button class="btn btn-soft" id="aa-cancel-btn">Annuler</button>' +
         '<button class="btn btn-primary" id="aa-save-btn">Ajouter le RDV</button></div><div class="sgb-who-choice">')
   );
-  aaGroupCtx = { overlay: overlay, dateStr: dateStr, barberId: preselectedBarberId || null };
+  aaGroupCtx = { overlay: overlay, dateStr: dateStr, barberId: preselectedBarberId || null, prefTime: prefTime || null };
   var flowRefresh = vitrineFlow(overlay, function () {
     function pick(list, ids) { return list.filter(function (x) { return ids.indexOf(String(x.id)) !== -1; }); }
     return {
@@ -8861,6 +8864,7 @@ function openAdminAddAppointment(dateStr, preselectedBarberId, prefTime) {
 
   window.aaGoStep = function (step, mode) {
     STEPS.forEach(function (s) { overlay.querySelector('#aa-step-' + s).style.display = s === step ? 'flex' : 'none'; });
+    StaffGroupBooking.syncMode(overlay, 'aa', step, mode);
     overlay.querySelector('#aa-client-pill').style.display = 'none';
     if (step === 'datetime') aaLoadSlots();
     if (step === 'barber') aaRenderBarbers();

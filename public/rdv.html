@@ -1287,7 +1287,8 @@ function openGroupBooking(startOnWho) {
       } : null,
       saveLabel: staffAccount() ? 'Enregistrer ce prénom dans les proches de ' + staffClientName() : null,
       whoSub: STAFF_BRIDGE ? 'Cochez les personnes à inscrire : le client et/ou ses accompagnants (enfants, amis…).' : null,
-      onExit: STAFF_BRIDGE ? function () { STAFF_BRIDGE.close(); } : null,
+      // « ‹ Retour » du 1er écran : revient à « Qui appelle ? » de la fenêtre « Ajouter un RDV » (client déjà rempli).
+      onExit: STAFF_BRIDGE ? function () { if (STAFF_BRIDGE.back) STAFF_BRIDGE.back(); else STAFF_BRIDGE.close(); } : null,
       onContinue: function (people, payload) {
         groupPeople = people; groupPayload = payload;
         var self = people[0];

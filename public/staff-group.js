@@ -24,7 +24,9 @@
       client: cfg.client || null,
       api: function (url, opts) { return cfg.api(url, opts); },
       done: function (r) { created = r; },
-      close: function () { close(); if (created && cfg.onDone) cfg.onDone(created); }
+      close: function () { close(); if (created && cfg.onDone) cfg.onDone(created); },
+      // « ‹ Retour » du 1er écran (rdv.html) : retour à « Qui appelle ? », client déjà rempli (cfg.onBack).
+      back: cfg.onBack ? function () { if (created) return window.StaffBookingBridge.close(); close(); cfg.onBack(cfg.client); } : null
     };
     if (!document.getElementById('sgb-style')) {
       var st = document.createElement('style'); st.id = 'sgb-style';
@@ -67,21 +69,61 @@
         '.sgb-client-pill span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
         '.sgb-who-choice{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px}' +
         '.sgb-who-choice .btn{display:flex;align-items:center;justify-content:center;gap:8px;min-height:52px;width:100%}' +
-        '@media (max-width:520px){.sgb-who-choice{grid-template-columns:1fr}}';
+        '@media (max-width:520px){.sgb-who-choice{grid-template-columns:1fr}}' +
+        // « Une personne | Plusieurs personnes » : deux grands onglets en haut de la fenêtre.
+        '.sgb-mode{display:grid;grid-template-columns:1fr 1fr;gap:4px;background:var(--fill);border-radius:14px;padding:4px;margin:10px 0 16px}' +
+        '.sgb-mode button{display:flex;align-items:center;justify-content:center;gap:8px;min-height:44px;border:none;border-radius:11px;background:transparent;color:var(--grey);font-family:inherit;font-size:14.5px;font-weight:700;cursor:pointer}' +
+        '.modal-flow > .sgb-mode{flex:none;margin:4px 26px 12px}' +
+        '@media (min-width:900px){.modal-flow > .sgb-mode{margin:4px 32px 12px}}' +
+        '.sgb-mode button.on{background:var(--blue,#0a84ff);color:#fff}' +
+        '.sgb-mode button:not(.on):hover{color:var(--ink)}' +
+        '.sgb-who-choice{grid-template-columns:1fr}';   // un seul bouton « Continuer » (plus de « Une personne » en double)
       document.head.appendChild(st);
     }
+    // Mode « Plusieurs personnes » (.sgb-group-only) : « ‹ Retour », « Qui appelle ? », un seul bouton « Continuer ».
     return '<div id="' + P + '-step-client">' +
-      '<div class="aa-step-title">Client</div>' +
-      '<p class="hint" style="margin:-4px 0 10px;font-size:13px;color:var(--grey)">Tapez au moins 3 lettres du nom : les clients déjà connus s\'affichent.</p>' +
+      '<button type="button" class="aa-back sgb-group-only" style="display:none" onclick="' + soloClick + '">‹ Retour</button>' +
+      '<div class="aa-step-title sgb-solo-only">Client</div>' +
+      '<div class="aa-step-title sgb-group-only" style="display:none">Qui appelle ?</div>' +
+      '<p class="hint sgb-solo-only" style="margin:-4px 0 10px;font-size:13px;color:var(--grey)">Tapez au moins 3 lettres du nom : les clients déjà connus s\'affichent.</p>' +
+      '<p class="hint sgb-group-only" style="display:none;margin:-4px 0 10px;font-size:13px;color:var(--grey)">3 lettres du nom : les clients connus s\'affichent, avec leurs proches à l\'étape suivante.</p>' +
       '<div class="fld" style="margin-bottom:10px"><label>Nom du client</label><input class="modal-input" id="' + P + '-name" type="text" autocomplete="off"></div>' +
       '<div class="fld" style="margin-bottom:10px"><label>Email (optionnel)</label><input class="modal-input" id="' + P + '-email" type="email" autocomplete="off"></div>' +
       '<div class="fld" style="margin-bottom:14px"><label>Téléphone (optionnel)</label><input class="modal-input" id="' + P + '-phone" type="tel" autocomplete="off"></div>' +
       '<div class="modal-error" id="' + P + '-client-error" style="display:none"></div>' +
       '<div class="sgb-who-choice">' +
-        '<button type="button" class="btn btn-primary" onclick="' + soloClick + '">' + PERSON_SVG + 'Une personne</button>' +
-        '<button type="button" class="btn btn-soft sgb-open" onclick="' + groupClick + '"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M17.5 14.2c2.3.3 3.5 2.2 3.5 5.8"/></svg>Plusieurs personnes</button>' +
+        '<button type="button" class="btn btn-primary sgb-open" onclick="' + groupClick + '">Continuer → choisir les personnes</button>' +
       '</div>' +
     '</div>';
+  }
+
+  var GROUP_SVG = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M17.5 14.2c2.3.3 3.5 2.2 3.5 5.8"/></svg>';
+  /** Deux grands onglets en haut de « Ajouter un RDV » : « Une personne » (par défaut) | « Plusieurs personnes ». */
+  function modeSwitchHtml(P, soloClick, groupClick) {
+    return '<div class="sgb-mode" id="' + P + '-mode" role="tablist">' +
+      '<button type="button" data-mode="solo" class="on" onclick="' + soloClick + '">' + PERSON_SVG + 'Une personne</button>' +
+      '<button type="button" data-mode="group" onclick="' + groupClick + '">' + GROUP_SVG + 'Plusieurs personnes</button></div>';
+  }
+  /** À chaque étape : onglets visibles seulement au début (prestation) et sur « Qui appelle ? » ; textes du mode groupe. */
+  function syncMode(overlay, P, step, mode) {
+    var group = step === 'client' && mode === 'group';
+    var sw = overlay.querySelector('#' + P + '-mode');
+    if (sw) {
+      sw.style.display = (step === 'service' || group) ? '' : 'none';
+      sw.querySelectorAll('button').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-mode') === (group ? 'group' : 'solo')); });
+    }
+    var box = overlay.querySelector('#' + P + '-step-client');
+    if (!box) return;
+    box.querySelectorAll('.sgb-group-only').forEach(function (el) { el.style.display = group ? '' : 'none'; });
+    box.querySelectorAll('.sgb-solo-only').forEach(function (el) { el.style.display = group ? 'none' : ''; });
+  }
+  /** Retour depuis la réservation à plusieurs : le client déjà saisi est remis dans les champs. */
+  function fillClient(overlay, P, c) {
+    if (!c) return;
+    var set = function (k, v) { var el = overlay.querySelector('#' + P + '-' + k); if (el) el.value = v || ''; };
+    set('name', c.name); set('email', c.email); set('phone', c.phone);
+    var n = overlay.querySelector('#' + P + '-name');
+    if (n && c.account_id) n._clientPick = { account_id: c.account_id, relatives: (c.relatives || []).slice() };
   }
 
   /** Nom du client affiché en haut de la fenêtre pendant toutes les étapes suivantes (clic = revenir le modifier). */
@@ -107,5 +149,6 @@
     return c;
   }
 
-  window.StaffGroupBooking = { open: open, close: close, buttonHtml: buttonHtml, clientStepHtml: clientStepHtml, clientPillHtml: clientPillHtml, readClient: readClient, escH: escH };
+  window.StaffGroupBooking = { open: open, close: close, buttonHtml: buttonHtml, clientStepHtml: clientStepHtml, clientPillHtml: clientPillHtml, readClient: readClient, escH: escH,
+    modeSwitchHtml: modeSwitchHtml, syncMode: syncMode, fillClient: fillClient };
 })();

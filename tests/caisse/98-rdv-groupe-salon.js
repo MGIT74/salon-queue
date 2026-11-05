@@ -2,6 +2,7 @@
 // Mon poste passent par POST /api/appointments/admin-group (email facultatif, coiffeur au choix par personne).
 const { execSync } = require('child_process');
 const fs = require('fs');
+const path = require('path');
 const BASE = 'http://127.0.0.1:3999';
 const sql = (q) => execSync(`mariadb -uroot salonq -N -e "${q.replace(/"/g, '\\"')}"`).toString().trim();
 const ADMIN = { 'Content-Type': 'application/json', 'X-Salon-Slug': 'test', 'X-Admin-Password': 'adminpw' };
@@ -33,7 +34,7 @@ const check = (n, ok, extra) => { (ok ? pass++ : fail++); console.log((ok ? '  O
 
   const files = ['dashboard', 'caisse', 'poste'].map((f) => fs.readFileSync(__dirname + '/../../public/' + f + '.html', 'utf8'));
   check('« Plusieurs personnes » dans Ajouter un RDV : dashboard, caisse, Mon poste', files.every((h) => /staff-group\.js/.test(h) && /StaffGroupBooking\.open\(/.test(h)));
-  check('Mon poste aussi : prestation d\'abord, le client a la fin ; « Plusieurs personnes ? » ouvre la fiche client (client d\'abord)', /clientStepHtml\('pa', 'paStartSolo\(\)', 'paOpenGroup\(\)'\)/.test(files[2]) && /STEPS = \['service', 'extras', 'datetime', 'products', 'client'\]/.test(files[2]) && /paGoStep\(\\'client\\', \\'group\\'\)/.test(files[2]) && /clientPillHtml\('pa'/.test(files[2]) && /client: client/.test(files[2]));
+  check('Mon poste aussi : prestation d\'abord, le client a la fin ; « Plusieurs personnes ? » ouvre la fiche client (client d\'abord)', /clientStepHtml\('pa', 'paStartSolo\(\)', 'paOpenGroup\(\)'\)/.test(files[2]) && /STEPS = \['service', 'extras', 'datetime', 'products', 'client'\]/.test(files[2]) && /modeSwitchHtml\('pa', 'paStartSolo\(\)', "paGoStep\('client', 'group'\)"\)/.test(files[2]) && /clientPillHtml\('pa'/.test(files[2]) && /client: client/.test(files[2]));
   check('dashboard et caisse : prestation d\'abord, le client a la fin (« Une personne » / « Plusieurs personnes » depuis la fiche a plusieurs)', /clientStepHtml\('aa', 'aaStartSolo\(\)', 'aaOpenGroup\(\)'\)/.test(files[0]) && /clientStepHtml\('pa', 'paStartSolo\(\)', 'paOpenGroup\(\)'\)/.test(files[1]) && /STEPS = \['service', 'extras', 'barber', 'datetime', 'products', 'client'\]/.test(files[0]) && /STEPS = \['service', 'extras', 'datetime', 'products', 'client'\]/.test(files[1]));
   check('nom du client affiche en haut pendant toute la prise de RDV (seul ou a plusieurs)', /clientPillHtml\('aa'/.test(files[0]) && /clientPillHtml\('pa'/.test(files[1]) && /client: client/.test(files[0]) && /client: client/.test(files[1]));
   const sg = fs.readFileSync(__dirname + '/../../public/staff-group.js', 'utf8');
@@ -43,6 +44,7 @@ const check = (n, ok, extra) => { (ok ? pass++ : fail++); console.log((ok ? '  O
   const hr = await H('/rdv.html'), hd = await H('/dashboard.html');
   check('rdv.html affichable seulement par notre propre domaine, les autres pages restent interdites en iframe', hr.xfo === 'SAMEORIGIN' && /frame-ancestors 'self'/.test(hr.csp) && hd.xfo === 'DENY' && /frame-ancestors 'none'/.test(hd.csp));
   sql('DELETE FROM appointments');
+  check('« Une personne | Plusieurs personnes » en grand en haut de « Ajouter un RDV » (dashboard, caisse, Mon poste), « ‹ Retour » partout, un seul bouton « Continuer »', /modeSwitchHtml\('aa', 'aaStartSolo\(\)'/.test(files[0]) && files.slice(1).every((h) => /modeSwitchHtml\('pa', 'paStartSolo\(\)'/.test(h)) && files.every((h) => /syncMode\(overlay, '(aa|pa)', step, mode\)/.test(h) && /onBack: function \(c\)/.test(h) && !/class="aa-group-link"/.test(h)) && /Continuer → choisir les personnes/.test(fs.readFileSync(path.join(__dirname, '../../public/staff-group.js'), 'utf8')) && !/'Une personne<\/button>'/.test(fs.readFileSync(path.join(__dirname, '../../public/staff-group.js'), 'utf8').match(/function clientStepHtml[\s\S]*?\n  \}/)[0]));
   console.log('\nRESULTAT : ' + pass + ' verifications reussies, ' + fail + ' echec(s)');
-  process.exit(fail ? 1 : 0);
+process.exit(fail ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(2); });
