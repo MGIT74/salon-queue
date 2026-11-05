@@ -752,6 +752,7 @@
   .aa-slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px,1fr)); gap: 7px; margin-bottom: 6px; }
   .aa-slot { border: none; background: var(--fill); color: var(--ink); border-radius: 10px; padding: 10px 4px; cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 600; }
   .aa-slot.sel { background: var(--blue); color: #fff; }
+  .aa-slot.pref:not(.sel) { box-shadow: inset 0 0 0 2px var(--blue); }   /* heure touchée pas libre : le créneau suivant est entouré */
   .aa-group-link { display: inline-flex; align-items: center; gap: 7px; align-self: flex-end; background: var(--fill); border: none; border-radius: 999px; padding: 7px 13px; font-family: inherit; font-size: 13.5px; font-weight: 600; color: var(--ink); cursor: pointer; margin-bottom: 10px; }
   .aa-group-link:hover { background: var(--fill-2); }
   .aa-back { background: none; border: none; padding: 0; font-family: inherit; font-size: 13.5px; color: var(--blue); font-weight: 500; cursor: pointer; margin-bottom: 14px; }
@@ -1446,7 +1447,7 @@
   </div>
 </div>
 
-<script src="/app.js?v=65"></script>
+<script src="/app.js?v=66"></script>
 <script src="/queue-sim.js?v=1"></script>
 <script src="/staff-group.js?v=7"></script>
 <script src="/autorefresh.js?v=3"></script>
@@ -4450,6 +4451,8 @@ function openCaisseAddAppointment(dateStr, barberId, prefTime) {
       '<div class="aa-slots" id="pa-slots"><span class="hint" style="margin:0">Chargement…</span></div>' +
       '<button type="button" class="aa-all-hours" id="pa-all-hours" style="display:none" onclick="paToggleAllHours()"></button>' +
       staffForceHtml('pa') +
+      // Heure touchée dans l'agenda et libre : déjà sélectionnée, « Continuer à HH:MM » (comme Mon poste).
+      '<div class="step-bar"><button type="button" class="btn btn-primary" id="pa-dt-next" style="width:100%;display:none" onclick="paGoStep(\'products\')"></button></div>' +
     '</div>' +
 
     // Derniere etape : le client (clients connus proposes des 3 lettres), puis Enregistrer. Au telephone, on cherche
@@ -4589,7 +4592,7 @@ function openCaisseAddAppointment(dateStr, barberId, prefTime) {
   };
 
   // Heures « à la suite » selon la durée du RDV (serveur) ; l'équipe peut voir toutes les heures libres.
-  var paAllHours = false;
+  var paAllHours = !!prefTime;   // heure touchée dans l'agenda : toutes les heures (comme Mon poste), elle y est sélectionnée
   window.paToggleAllHours = function () { paAllHours = !paAllHours; state.time = null; paLoadSlots(); };
   function paShowAllHoursLink(r) {
     var b = overlay.querySelector('#pa-all-hours');
@@ -4622,6 +4625,24 @@ function openCaisseAddAppointment(dateStr, barberId, prefTime) {
           toggleEl.style.display = 'none';
           paShowHalf('morning');
         }
+        // Heure touchée dans l'agenda (ou déjà choisie) : libre -> déjà sélectionnée, bouton « Continuer à HH:MM » ;
+        // pas libre -> le créneau suivant est seulement entouré (et « Forcer le RDV à HH:MM » est proposé).
+        var want = state.time || prefTime;
+        var hit = want ? r.slots.filter(function (x) { return x.time === want; })[0] : null;
+        var nx = overlay.querySelector('#pa-dt-next');
+        if (hit) {
+          state.time = want;
+          var el = slotsEl.querySelector('.aa-slot[data-time="' + want + '"]');
+          if (el) { el.classList.add('sel'); try { el.scrollIntoView({ block: 'nearest' }); } catch (e) {} }
+          nx.textContent = 'Continuer à ' + want; nx.style.display = '';
+        } else {
+          state.time = null; nx.style.display = 'none';
+          if (prefTime) {
+            var near = [].slice.call(slotsEl.querySelectorAll('.aa-slot[data-time]')).filter(function (c) { return c.dataset.time >= prefTime; })[0];
+            if (near) { near.classList.add('pref'); try { near.scrollIntoView({ block: 'nearest' }); } catch (e) {} }
+          }
+        }
+        if (typeof flowRefresh === 'function') flowRefresh();
       })
       .catch(function (e) { slotsEl.innerHTML = ''; toast(e.message, true); });
   }

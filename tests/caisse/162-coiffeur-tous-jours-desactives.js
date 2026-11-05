@@ -56,7 +56,7 @@ check('un seul jour actif : seulement ce jour-là', lib.barberBookableOn(monOnly
   const c = fs.readFileSync(path.join(__dirname, '../../public/caisse.html'), 'utf8');
   check('admin, poste, caisse : la liste des coiffeurs de la prise de RDV filtre par hasBookableSchedule',
     /isBookableForAdmin\(b, dateStr\) \{[\s\S]{0,600}hasBookableSchedule\(b\)/.test(d) && p.includes('hasBookableSchedule(b) && barberDoesChoice(') && c.includes('hasBookableSchedule(b) && barberDoesChoice('));
-  check('app.js rechargé (v=65)', d.includes('app.js?v=65') && p.includes('app.js?v=65') && c.includes('app.js?v=65'));
+  check('app.js rechargé (v=66)', d.includes('app.js?v=66') && p.includes('app.js?v=66') && c.includes('app.js?v=66'));
   await pool.end();
   console.log(`\n${pass} OK, ${fail} ECHEC`);
   process.exit(fail ? 1 : 0);
