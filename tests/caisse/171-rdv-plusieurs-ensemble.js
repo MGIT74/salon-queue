@@ -12,7 +12,7 @@ check('« à la suite » : même coiffeur, premier créneau à partir de sa fin,
 check('« en même temps » : même heure de début, autre coiffeur', /x\.time === ref\.time && String\(x\.barber_id\) !== String\(ref\.barber_id\)/.test(rt));
 check('même coiffeur choisi -> seulement « à la suite » ; autre coiffeur -> seulement « en même temps »', /var wantAfter = selBarber === '' \|\| String\(selBarber\) === String\(ref\.barber_id\);/.test(rt) && /var wantSame = String\(selBarber\) !== String\(ref\.barber_id\);/.test(rt));
 check('option impossible : grisée avec la raison', /gt-opt off/.test(fnSrc('gtOptHtml')) && /n\\'a pas de place juste après/.test(rt) && /Aucun autre coiffeur libre à /.test(rt));
-check('autre jour : lien « Le même jour que X »', /Le même jour que /.test(rt) && /function gtSameDay\(\)/.test(rdv));
+check('autre jour : lien « Le même jour que X »', /Le même jour que /.test(rt) && /function gtSameDay\(date\)/.test(rdv));
 check('choisir une option garde ce coiffeur (même avec « Premier disponible »)', /keepBarber: true/.test(fnSrc('gtPick')) && rdv.includes("any: selBarber === '' && !selSlot.keepBarber"));
 check('relu à chaque chargement des créneaux', /renderTogether\(null\);/.test(fnSrc('loadSlots')) && /renderTogether\(r\.slots\);/.test(fnSrc('loadSlots')));
 check('option = vrai bouton : « Choisir » (devient « ✓ Choisi »)', /<span class="gt-cta"><span class="off">Choisir<\/span><span class="on">✓ Choisi<\/span><\/span>/.test(rdv) && /\.gt-cta\{/.test(rdv));
