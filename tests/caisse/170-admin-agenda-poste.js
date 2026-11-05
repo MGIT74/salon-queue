@@ -13,7 +13,7 @@ const norm = (t) => t && t.replace(/\(!pdMe\(\) \|\| (pdIsPhone\(\)|phone) \?/g,
   .replace(/pdMe\(\)/g, 'me').replace(/pdBarbers\(\)/g, 'barbers').replace(/pdActive\((services|extras)\)/g, '$1')
   .replace(/\bapi\(/g, 'barberApi(').replace(/'admin_(day|glance)_/g, "'poste_$1_");
 const SAME = ['posteDayHtml', 'pdWeekHtml', 'pdMonthHtml', 'renderCalDay', 'renderCalWeek', 'renderCalMonth', 'setCalView', 'calGoToday', 'calShiftPeriod',
-  'loadAgendaPeriod', 'pdNudge', 'pdMovedDialog', 'adRestoreClientTime', 'pdForcedHatchHtml', 'renderCalendarLegend', 'renderCalBarberPicker', 'pdColAdd', 'pdGlanceAdd', 'pdShowDay', 'pdRunSearch'];
+  'loadAgendaPeriod', 'pdNudge', 'pdMovedDialog', 'adRestoreClientTime', 'pdForcedHatchHtml', 'renderCalendarLegend', 'pdColAdd', 'pdGlanceAdd', 'pdShowDay', 'pdRunSearch'];
 const diff = SAME.filter((n) => !fnSrc(dash, n) || norm(fnSrc(dash, n)) !== norm(fnSrc(poste, n)));
 check('mêmes fonctions que l\'agenda du poste (Jour, Semaine, Mois, légende, décaler, forcés, recherche...)', diff.length === 0, diff.join(', '));
 const old = ['renderMonthView', 'renderWeekView', 'renderDayView', 'renderExpandPanel', 'appointmentsForRange', 'selectCalendarDay'].filter((n) => dash.includes('function ' + n + '('));
@@ -31,6 +31,7 @@ check('tiroir : « Remettre à l\'heure du client » (RDV décalé de 5 min)', d
 check('ouverture de l\'onglet : relu à chaque fois, vue Jour d\'abord', /function loadRdvTab\(\) \{[\s\S]{0,1200}if \(!calViewReady\) \{ calViewReady = true; setCalView\(calViewMode\); \}/.test(dash));
 check('liste « À venir » relue avec l\'agenda ; un jour choisi (Mois / Semaine) la filtre', /function loadCalendarPeriod\(\) \{[\s\S]{0,160}loadAgendaPeriod\(\)\.then\(function \(\) \{ renderRdvList\(\); \}\)/.test(dash) && /selectCalDay = function \(dateStr\) \{/.test(dash));
 check('planning du jour du Dashboard (accueil) gardé', /function renderDayTimelineHtml\(dateStr, dayAppts\)/.test(dash) && /function rerenderAllTimelines\(\) \{[\s\S]{0,700}renderCalDay\(\)/.test(dash) && !/renderDayView\(\)/.test(dash));
-check('ouverture directe sur Rendez-vous : redessiné quand les coiffeurs arrivent', /barbers = r\.items; onDuty = r\.on_duty;\s*\/\/[^\n]*\n\s*if \(calBooted\) rerenderAllTimelines\(\);/.test(dash));
+check('ouverture directe sur Rendez-vous : redessiné quand les coiffeurs arrivent', /barbers = r\.items; onDuty = r\.on_duty;\s*\/\/[^\n]*\n\s*if \(calBooted\) \{ rerenderAllTimelines\(\); renderCalendarLegend\(neededMonthKeys\(\)\); \}/.test(dash));
+check('photos de tous les coiffeurs actifs toujours en haut (même sans RDV sur la période)', /function renderCalBarberPicker\(names, seen\) \{[\s\S]{0,400}pdBarbers\(\)\.forEach\(function \(b\) \{ all\.push\(b\.id\);/.test(dash) && dash.includes('id="cal-barber-picker"'));
 console.log('\n' + pass + ' OK, ' + fail + ' ECHEC');
 process.exit(fail ? 1 : 0);

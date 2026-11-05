@@ -4148,7 +4148,7 @@ function loadBarbers() {
   return api('/api/barbers?all=1').then(function (r) {
     barbers = r.items; onDuty = r.on_duty;
     // Agenda du menu Rendez-vous déjà affiché (ouverture directe sur ce menu) : redessiné avec les coiffeurs.
-    if (calBooted) rerenderAllTimelines();
+    if (calBooted) { rerenderAllTimelines(); renderCalendarLegend(neededMonthKeys()); }
     document.getElementById('s-duty').textContent = onDuty;
     renderSeg(); renderBarbers(); updateLeaveKpi();
   }).catch(function (err) { toast(err.message, true); });
@@ -6913,6 +6913,11 @@ function renderCalendarLegend(keys) {
 function renderCalBarberPicker(names, seen) {
   var el = document.getElementById('cal-barber-picker');
   if (!el) return;
+  // Admin : les photos de TOUS les coiffeurs actifs restent en haut, même sans RDV sur la période (puis ceux qui ont un RDV).
+  seen = Object.assign({}, seen); var all = [];
+  pdBarbers().forEach(function (b) { all.push(b.id); if (!seen[b.id]) seen[b.id] = b.name; });
+  names.forEach(function (bid) { if (all.indexOf(bid) === -1) all.push(bid); });
+  names = all;
   el.innerHTML = names.length === 0 ? '' : names.map(function (bid) {
     var isSelected = calBarberFilter === bid;
     var dimmed = calBarberFilter && !isSelected;
