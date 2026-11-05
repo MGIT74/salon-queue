@@ -192,6 +192,7 @@ const suite = [
   ['169-rdv-force.js', false, ['exit']],
   ['170-admin-agenda-poste.js', false, ['exit']],
   ['171-rdv-plusieurs-ensemble.js', false, ['exit']],
+  ['172-fiche-coiffeur-historique.js', false, ['exit']],
 ];
 
 let bad = 0;

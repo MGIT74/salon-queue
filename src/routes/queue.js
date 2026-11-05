@@ -1284,6 +1284,11 @@ router.get('/history', requireAdmin, wrap(async (req, res) => {
     conditions.push('q.checkin_at <= ?');
     params.push(req.query.date_to + ' 23:59:59');
   }
+  // Fiche d'un coiffeur : seulement ses passages.
+  if (req.query.barber_id) {
+    conditions.push('q.barber_id = ?');
+    params.push(req.query.barber_id);
+  }
   const whereClause = conditions.join(' AND ');
 
   const [[{ total }]] = await pool.query(

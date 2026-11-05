@@ -1631,9 +1631,35 @@
   .bc-tip-r b { margin-left: auto; color: var(--ink); font-variant-numeric: tabular-nums; }
   .bp-stats .stat-tile.wide { grid-column: span 2; }
   @media (max-width: 980px) { .bp-stats .stats-grid, .bp-stats .stats-grid.bento { grid-template-columns: repeat(2, minmax(0, 1fr)); } .bp-stats .stat-tile, .bp-stats .stats-grid.bento .stat-tile, .bp-stats .stats-grid.bento .stat-tile:nth-child(n+4) { grid-column: auto; } .bp-stats .stat-tile.wide, .bp-stats .stats-grid.bento .stat-tile.wide { grid-column: 1 / -1; } }
-  .bp-layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 18px; align-items: stretch; margin-bottom: 18px; }
+  .bp-layout { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 18px; align-items: stretch; margin-bottom: 18px; }
   .bp-side { min-width: 0; }
-  .bp-side .bp-profile { height: 100%; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+  /* Profil en haut, puis l'historique du coiffeur, qui prend toute la hauteur restante (défilement à l'intérieur). */
+  .bp-side { position: relative; }
+  .bp-side .bp-profile { position: absolute; inset: 0; box-sizing: border-box; display: flex; flex-direction: column; justify-content: flex-start; align-items: center; }
+  .bp-hist { align-self: stretch; text-align: left; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--sep); display: flex; flex-direction: column; min-height: 0; flex: 1; }
+  .bp-hist-head { display: flex; align-items: baseline; gap: 6px; margin-bottom: 8px; }
+  .bp-hist-head b { font-size: 15px; }
+  .bp-hist-period { font-size: 12px; color: var(--grey); }
+  .bp-hist-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; background: var(--fill); border-radius: 12px; padding: 3px; margin-bottom: 6px; }
+  .bp-hist-tabs button { border: none; background: transparent; color: var(--grey); font: inherit; font-size: 12.5px; font-weight: 700; padding: 7px 4px; border-radius: 9px; cursor: pointer; }
+  .bp-hist-tabs button.on { background: var(--card); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.18); }
+  .bp-hist-list { flex: 1; min-height: 0; overflow-y: auto; margin: 0 -4px; padding: 0 4px; }
+  .bp-hist-it { display: flex; gap: 10px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--sep); font-size: 12.5px; }
+  .bp-hist-it:last-child { border-bottom: none; }
+  .bp-hist-tm { font-weight: 800; width: 42px; flex: none; font-variant-numeric: tabular-nums; }
+  .bp-hist-tm small { display: block; font-weight: 600; color: var(--grey); font-size: 10.5px; }
+  .bp-hist-mid { flex: 1; min-width: 0; }
+  .bp-hist-mid b { display: block; font-size: 13px; overflow: hidden; text-overflow: ellipsis; }
+  .bp-hist-mid small { display: block; color: var(--grey); line-height: 1.35; }
+  .bp-hist-amt { font-weight: 800; white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums; }
+  .bp-hist-amt small { display: block; font-weight: 600; color: var(--grey); font-size: 10.5px; }
+  .bp-hist-tot { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--grey); padding-top: 8px; }
+  .bp-hist-tot:empty { display: none; }
+  .bp-hist-tot b { color: var(--ink); }
+  .bp-badge { display: inline-flex; align-items: center; font-size: 10.5px; font-weight: 800; padding: 2px 7px; border-radius: 999px; margin-left: 6px; vertical-align: 1px; white-space: nowrap; }
+  .bp-badge.green { background: rgba(52,199,89,.16); color: var(--green); }
+  .bp-badge.blue { background: rgba(var(--accent-rgb), .16); color: var(--blue); }
+  .bp-badge.red { background: rgba(255,59,48,.14); color: var(--red); }
   .bp-main { min-width: 0; }
   .bp-tabbody.fade { animation: bpTabIn .32s cubic-bezier(.22,.8,.3,1) both; }
   @keyframes bpTabIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
@@ -1682,6 +1708,8 @@
   @media (max-width: 980px) {
     .bp-layout { grid-template-columns: minmax(0, 1fr); }
     .bp-side { order: -1; }
+    .bp-side .bp-profile { position: static; }
+    .bp-hist-list { max-height: 420px; }
   }
   @media (max-width: 640px) {
         .bp-panel { padding: 14px; }
@@ -5462,6 +5490,7 @@ function renderBarbers() {
 function populateBarberTab(id, skipStats) {
   var tab = barberDetailTab[id] || 'horaires';
   if (!skipStats) loadBarberStats(id);   // le bloc Statistiques est toujours affiché en haut de la fiche
+  else { var hp = document.getElementById('bp-hist-period-' + id); if (hp && bpHistData[id]) hp.textContent = bpHistData[id].label || ''; bpHistRender(id); }   // historique : déjà lu, redessiné
   if (tab === 'conges') { if (barberLeaves[id]) renderLeavesList(id); else loadBarberLeaves(id); }
   else if (tab === 'prestations') loadBarberCapabilities(id);
 }
@@ -5538,6 +5567,16 @@ function renderBarberDetail(b) {
     '<div class="bp-role">' + (currentSalonName ? esc(currentSalonName) : 'Coiffeur') + '</div>' +
     '<div class="bp-chips">' + leaveBadgeHtml(b) + barberStatusChips(b, true) + '</div>' +
     '<button type="button" class="bp-delete" onclick="event.stopPropagation();openRemoveBarber(\'' + b.id + '\')">Supprimer ce coiffeur</button>' +
+    // Historique du coiffeur sur la période des statistiques : ses prestations et ses encaissements (paiements d'avance marqués).
+    '<div class="bp-hist" id="bp-hist-' + b.id + '">' +
+      '<div class="bp-hist-head"><b>Historique</b><span class="bp-hist-period" id="bp-hist-period-' + b.id + '"></span></div>' +
+      '<div class="bp-hist-tabs">' +
+        '<button type="button" data-k="done" class="' + (bpHistTab[b.id] === 'pay' ? '' : 'on') + '" onclick="bpHistSwitch(\'' + b.id + '\',\'done\')">Prestations <span id="bp-hist-n-done-' + b.id + '"></span></button>' +
+        '<button type="button" data-k="pay" class="' + (bpHistTab[b.id] === 'pay' ? 'on' : '') + '" onclick="bpHistSwitch(\'' + b.id + '\',\'pay\')">Encaissements <span id="bp-hist-n-pay-' + b.id + '"></span></button>' +
+      '</div>' +
+      '<div class="bp-hist-list" id="bp-hist-list-' + b.id + '"><div class="hint" style="margin:0">Chargement…</div></div>' +
+      '<div class="bp-hist-tot" id="bp-hist-tot-' + b.id + '"></div>' +
+    '</div>' +
     '</div></aside>';
 
   // Bento : statistiques à gauche, carte profil à droite (même hauteur), puis le panneau d'onglets pleine largeur dessous.
@@ -5901,6 +5940,80 @@ function localDateStr(d) {
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
 
+/* ---------- Fiche coiffeur : historique (prestations + encaissements) de la période des statistiques ---------- */
+var bpHistTab = {};    // { [barberId]: 'done' | 'pay' }
+var bpHistData = {};   // { [barberId]: { done: [], pay: [] } }
+var BP_PAY_LABEL = { especes: 'espèces', cb: 'CB', partage: 'espèces + CB', autre: 'autre' };
+function bpHistSwitch(id, k) {
+  bpHistTab[id] = k;
+  var box = document.getElementById('bp-hist-' + id); if (!box) return;
+  box.querySelectorAll('.bp-hist-tabs button').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-k') === k); });
+  bpHistRender(id);
+}
+function loadBarberHistory(id, from, to, label) {
+  var per = document.getElementById('bp-hist-period-' + id);
+  if (per) per.textContent = label ? '· ' + label : '';
+  var seq = (bpHistData[id] && bpHistData[id].seq || 0) + 1;
+  bpHistData[id] = { seq: seq, done: null, pay: null, label: label ? '· ' + label : '' };
+  var q = '&date_from=' + from + '&date_to=' + to + '&barber_id=' + encodeURIComponent(id);
+  Promise.all([
+    api('/api/queue/history?per_page=100' + q).then(function (r) { return r.items || []; }).catch(function () { return []; }),
+    api('/api/sales?' + q.slice(1)).then(function (r) { return r.items || []; }).catch(function () { return []; })
+  ]).then(function (r) {
+    if (!bpHistData[id] || bpHistData[id].seq !== seq) return;
+    bpHistData[id].done = r[0].filter(function (x) { return x.status === 'done' || x.status === 'cancelled' || x.status === 'in_progress'; });
+    bpHistData[id].pay = r[1];
+    bpHistRender(id);
+  });
+}
+/** Part d'une vente qui revient à ce coiffeur : ses lignes (ou les lignes sans coiffeur de son ticket). */
+function bpSaleShare(s, id) {
+  var mine = (s.items || []).filter(function (it) { return it.barber_id ? it.barber_id === id : s.barber_id === id; });
+  var cents = mine.reduce(function (t, it) { return t + (Number(it.unit_price_cents) || 0) * (Number(it.quantity) || 1); }, 0);
+  if (s.barber_id === id && mine.length === (s.items || []).length) cents = Number(s.total_price_cents) || cents;   // tout le ticket : le total réel (remises comprises)
+  return { items: mine, cents: cents };
+}
+function bpHistRender(id) {
+  var d = bpHistData[id], list = document.getElementById('bp-hist-list-' + id), tot = document.getElementById('bp-hist-tot-' + id);
+  if (!d || !list) return;
+  if (!d.done || !d.pay) { list.innerHTML = '<div class="hint" style="margin:0">Chargement…</div>'; tot.innerHTML = ''; return; }
+  var nd = document.getElementById('bp-hist-n-done-' + id), np = document.getElementById('bp-hist-n-pay-' + id);
+  if (nd) nd.textContent = '(' + d.done.length + ')';
+  if (np) np.textContent = '(' + d.pay.length + ')';
+  var multiDay = function (iso) { return new Date(iso).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }); };
+  var hm = function (iso) { return new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }); };
+  var days = {};
+  var tab = bpHistTab[id] === 'pay' ? 'pay' : 'done';
+  if (tab === 'done') {
+    d.done.forEach(function (x) { days[multiDay(x.start_at || x.checkin_at)] = 1; });
+    var many = Object.keys(days).length > 1;
+    list.innerHTML = d.done.length ? d.done.map(function (x) {
+      var at = x.start_at || x.checkin_at, st = x.status === 'cancelled' ? '<span class="bp-badge red">Absent / annulé</span>' : x.status === 'in_progress' ? '<span class="bp-badge blue">En cours</span>' : '';
+      var what = [x.service_name || ''].concat(x.extra_names || []).filter(Boolean).join(' + ') || 'Prestation';
+      var mins = x.start_at && x.end_at ? Math.round((new Date(x.end_at) - new Date(x.start_at)) / 60000) : 0;
+      return '<div class="bp-hist-it"><span class="bp-hist-tm">' + (many ? '<small>' + multiDay(at) + '</small>' : '') + hm(at) + '</span>' +
+        '<div class="bp-hist-mid"><b>' + esc(x.client_name || 'Client') + st + '</b><small>' + esc(what) + (mins > 0 ? ' · ' + formatMinutes(mins) : '') + (x.is_appointment ? ' · RDV' : '') + '</small></div>' +
+        '<div class="bp-hist-amt">' + (x.total_price_cents ? eur(x.total_price_cents) : '') + '</div></div>';
+    }).join('') : '<div class="hint" style="margin:0;text-align:center;padding:12px 0">Aucune prestation sur cette période</div>';
+    tot.innerHTML = '';
+  } else {
+    d.pay.forEach(function (s) { days[multiDay(s.created_at)] = 1; });
+    var many2 = Object.keys(days).length > 1, sum = 0;
+    list.innerHTML = d.pay.length ? d.pay.map(function (s) {
+      var sh = bpSaleShare(s, id); sum += sh.cents;
+      var who = []; (s.items || []).forEach(function (it) { if (it.person_name && who.indexOf(it.person_name) === -1) who.push(it.person_name); });
+      var other = s.barber_id && s.barber_id !== id ? (barbers.find(function (b) { return b.id === s.barber_id; }) || {}).name : '';
+      var badge = s.advance ? '<span class="bp-badge green">✓ Payé d\'avance</span>' : s.balance ? '<span class="bp-badge blue">Reste à payer réglé</span>' : '';
+      var what = sh.items.map(function (it) { return (Number(it.quantity) > 1 ? it.quantity + ' × ' : '') + it.item_name; }).join(' + ');
+      return '<div class="bp-hist-it"><span class="bp-hist-tm">' + (many2 ? '<small>' + multiDay(s.created_at) + '</small>' : '') + hm(s.created_at) + '</span>' +
+        '<div class="bp-hist-mid"><b>' + esc(who.join(', ') || s.client_name || 'Vente') + badge + '</b><small>' + esc(what) + ' · ' + esc(BP_PAY_LABEL[s.payment_method] || s.payment_method || '') +
+          (s.ticket_number ? ' · ticket #' + esc(s.ticket_number) : '') + (other ? ' · ticket de ' + esc(other) : '') + '</small></div>' +
+        '<div class="bp-hist-amt">' + eur(sh.cents) + (s.advance ? '<small>avant sa coupe</small>' : '') + '</div></div>';
+    }).join('') : '<div class="hint" style="margin:0;text-align:center;padding:12px 0">Aucun encaissement sur cette période</div>';
+    tot.innerHTML = d.pay.length ? '<span>' + d.pay.length + ' encaissement' + (d.pay.length > 1 ? 's' : '') + '</span><b>' + eur(sum) + '</b>' : '';
+  }
+}
+
 function loadBarberStats(id) {
   if (id === 'salon') return loadDashSalon();   // filtre global du tableau de bord
   var st = barberStatsState[id];
@@ -5917,6 +6030,7 @@ function loadBarberStats(id) {
 
   var loadingGrid = document.getElementById('stats-grid-' + id);
   if (loadingGrid) loadingGrid.classList.add('loading');
+  loadBarberHistory(id, localDateStr(range.start), localDateStr(endInclusive), range.label);
   api('/api/barbers/' + id + '/stats?' + qs)
     .then(function (r) {
       var grid = document.getElementById('stats-grid-' + id);

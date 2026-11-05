@@ -449,7 +449,8 @@ router.get('/', requireAdminOrBarber, wrap(async (req, res) => {
   }
 
   const [sales] = await pool.query(
-    `SELECT s.*, b.name AS barber_name FROM sales s LEFT JOIN barbers b ON b.id = s.barber_id
+    `SELECT s.*, b.name AS barber_name, qq.client_name AS client_name FROM sales s LEFT JOIN barbers b ON b.id = s.barber_id
+     LEFT JOIN queue qq ON qq.id = s.queue_id
      WHERE ${conditions.join(' AND ')} ORDER BY s.created_at DESC LIMIT 500`,
     params
   );
@@ -461,12 +462,27 @@ router.get('/', requireAdminOrBarber, wrap(async (req, res) => {
       'SELECT si.*, q.client_name AS person_name FROM sale_items si LEFT JOIN queue q ON q.id = si.queue_id WHERE si.sale_id IN (?)', [ids]);
     items.forEach((it) => { (itemsBySale[it.sale_id] = itemsBySale[it.sale_id] || []).push(it); });
   }
+  // Paiement d'avance (client réglé avant sa coupe) / reste à payer (complément réglé ensuite) : la vente est
+  // passée au moment où le passage a été marqué prepaid_at / balance_paid_at (même transaction, à la seconde près).
+  let flagsBySale = {};
+  if (ids.length) {
+    const [flags] = await pool.query(
+      `SELECT s.id AS sale_id,
+              MAX(q.prepaid_at IS NOT NULL AND ABS(TIMESTAMPDIFF(SECOND, q.prepaid_at, s.created_at)) <= 120) AS advance,
+              MAX(q.balance_paid_at IS NOT NULL AND ABS(TIMESTAMPDIFF(SECOND, q.balance_paid_at, s.created_at)) <= 120) AS balance
+       FROM sales s
+       JOIN queue q ON q.id = s.queue_id OR q.id IN (SELECT si.queue_id FROM sale_items si WHERE si.sale_id = s.id AND si.queue_id IS NOT NULL)
+       WHERE s.id IN (?) GROUP BY s.id`, [ids]);
+    flags.forEach((f) => { flagsBySale[f.sale_id] = { advance: !!Number(f.advance), balance: !!Number(f.balance) }; });
+  }
 
   res.json({
     ok: true,
     items: sales.map((s) => Object.assign({}, s, {
       created_at: utcIso(s.created_at),
-      items: itemsBySale[s.id] || []
+      items: itemsBySale[s.id] || [],
+      advance: !!(flagsBySale[s.id] && flagsBySale[s.id].advance && !flagsBySale[s.id].balance),
+      balance: !!(flagsBySale[s.id] && flagsBySale[s.id].balance)
     })),
     total_revenue_cents: sales.reduce((a, s) => a + s.total_price_cents, 0)
   });
