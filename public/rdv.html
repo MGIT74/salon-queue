@@ -1128,7 +1128,8 @@ function gtPick(i) {
   var o = gtOpts[i];
   if (!o || !o.time) return;
   selSlot = { time: o.time, barberId: String(o.barberId), keepBarber: true };
-  document.querySelectorAll('.slot-btn').forEach(function (b) { b.classList.toggle('sel', b.dataset.time === o.time && String(b.dataset.barber) === String(o.barberId)); });
+  // La case de la grille à la même heure s'allume aussi (« Premier disponible » : quel que soit son coiffeur).
+  document.querySelectorAll('.slot-btn').forEach(function (b) { b.classList.toggle('sel', b.dataset.time === o.time && (String(b.dataset.barber) === String(o.barberId) || selBarber === '')); });
   document.querySelectorAll('.gt-opt').forEach(function (b) { b.classList.remove('sel'); });
   var btns = document.querySelectorAll('#grp-together button.gt-opt'); var k = 0;
   gtOpts.forEach(function (x, j) { if (x.time) { if (j === i && btns[k]) btns[k].classList.add('sel'); k++; } });
@@ -1147,6 +1148,9 @@ function selectSlot(btn) {
   document.querySelectorAll('.gt-opt.sel').forEach(function (b) { b.classList.remove('sel'); });
   btn.classList.add('sel');
   selSlot = { time: btn.dataset.time, barberId: btn.dataset.barber };
+  // Même heure qu'un raccourci « À la suite / En même temps » : le raccourci s'active aussi (avec son coiffeur).
+  var gi = gtOpts.findIndex(function (o) { return o && o.time === selSlot.time && (String(o.barberId) === String(selSlot.barberId) || selBarber === ''); });
+  if (gi !== -1) { gtPick(gi); return; }
   if (typeof dtBarberChoice === 'function' && dtBarberChoice()) renderDtBarbers();
   document.getElementById('date-next-btn').disabled = false;
 }
