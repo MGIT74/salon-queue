@@ -203,4 +203,5 @@ node tests/caisse/166-note-rdv-a-venir.js  # Note interne modifiable depuis le t
 node tests/caisse/167-couleurs-menus-et-heures.js  # Couleurs des 3 menus (personnalisables), etiquettes dans l'agenda, heures sans Matin / Apres-midi
 node tests/caisse/168-decaler-5-min.js  # Poste, agenda : decaler un RDV de 5 min (glisser / fleches), sans prevenir le client, Revenir en arriere
 node tests/caisse/169-rdv-force.js  # Forcer un RDV dans un creneau trop court (equipe), case de responsabilite, trace forced_by
+node tests/caisse/170-admin-agenda-poste.js  # Admin > Rendez-vous : meme agenda que Mon poste / la caisse (Parametres et liste A venir gardes)
 ```

@@ -18,7 +18,8 @@ const CLOSURES = (s) => 'var rdvSalonClosures = [];\n' + (s.match(/^function rdv
 // Jour passe : meme regle que app.js (date du jour = date locale du test)
 const PASTDAY = "function isPastDay(d) { var t = new Date(); return String(d) < t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0'); }";
 function fnSrc(src, name) { const i = src.indexOf('function ' + name + '('); if (i === -1) throw new Error('introuvable: ' + name); const j = src.indexOf('\nfunction ', i + 10); return src.slice(i, j === -1 ? undefined : j); }
-const varsBlock = dash.slice(dash.indexOf('var rdvSlotStepMin = 15;'), dash.indexOf('})();', dash.indexOf('installTimelineAutoScroll')) + 5);
+// Variables du planning (dans le code de l'agenda copié du poste) ; les horaires du salon sont fixés par le test.
+const varsBlock = dash.slice(dash.indexOf('var rdvSlotStepMin = 15;'), dash.indexOf('})();', dash.indexOf('installTimelineAutoScroll')) + 5).replace('var salonScheduleByWeekday = null;', '');
 
 function makeWin() {
   const dom = new JSDOM('<div id="dash-timeline"></div>', { runScripts: 'outside-only', url: 'http://localhost/' });

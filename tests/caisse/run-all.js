@@ -190,6 +190,7 @@ const suite = [
   ['167-couleurs-menus-et-heures.js', false, ['exit']],
   ['168-decaler-5-min.js', false, ['exit']],
   ['169-rdv-force.js', false, ['exit']],
+  ['170-admin-agenda-poste.js', false, ['exit']],
 ];
 
 let bad = 0;
