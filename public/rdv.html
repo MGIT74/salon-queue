@@ -1080,7 +1080,7 @@ function renderTogether(slots) {
   var ref = gtRef();
   gtOpts = [];
   if (!ref || slots === null || !selDate) { box.style.display = 'none'; box.innerHTML = ''; return; }
-  var name = ref.isSelf ? 'vous' : ref.name;
+  var name = ref.isSelf && !STAFF_BRIDGE ? 'vous' : (ref.name || 'vous');   // salon (admin, poste, caisse) : le prénom du client, comme les autres
   if (ref.date !== selDate) {
     var d = new Date(ref.date + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
     box.innerHTML = '<button type="button" class="gt-day" onclick="gtSameDay()">↩ Le même jour que ' + esc(name) + ' (' + esc(d) + ')</button>';
