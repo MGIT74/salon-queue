@@ -18,6 +18,9 @@ check('relu à chaque chargement des créneaux', /renderTogether\(null\);/.test(
 check('option = vrai bouton : « Choisir » (devient « ✓ Choisi »)', /<span class="gt-cta"><span class="off">Choisir<\/span><span class="on">✓ Choisi<\/span><\/span>/.test(rdv) && /\.gt-cta\{/.test(rdv));
 check('raccourcis calculés sur toutes les heures (?all=1) : la grille, elle, suit le pas de la prestation / du supplément', /availability\?all=1&date=/.test(rt) && !/!held\.length/.test(fs.readFileSync(path.join(__dirname, '../../src/routes/appointments.js'), 'utf8').match(/const packed = [^\n]*/)[0]));
 check('cliquer la même heure dans la grille active aussi le raccourci (et inversement)', /gtOpts\.findIndex\(function \(o\) \{ return o && o\.time === selSlot\.time/.test(fnSrc('selectSlot')) && /if \(gi !== -1\) \{ gtPick\(gi\); return; \}/.test(fnSrc('selectSlot')));
+const compte = fs.readFileSync(path.join(__dirname, '../../public/compte.html'), 'utf8');
+check('compte client : mêmes raccourcis « À la suite / En même temps » à l\'heure de la 2e personne', compte.includes('id="bk-grp-together"') && /function bkRenderTogether\(slots\)/.test(compte) && /bkRenderTogether\(r\.slots\);/.test(compte) && /bkGtOpts\.findIndex/.test(compte) && compte.includes("any: selBookBarber === '' && !selBookSlot.keepBarber") && compte.includes('.gt-cta{'));
+check('pour soi-même : « Juste après vous » (pas « À la suite de vous »)', rdv.includes("'Juste après vous'") && compte.includes("'Juste après vous'"));
 check('pas de bordure colorée à gauche (style « IA »)', !/\.gt-[a-z]+\{[^}]*border-left/.test(rdv));
 console.log('\n' + pass + ' OK, ' + fail + ' ECHEC');
 process.exit(fail ? 1 : 0);

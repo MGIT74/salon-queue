@@ -1066,7 +1066,7 @@ function gtIcon(kind) {
     (kind === 'after' ? '<path d="M4 12h12"/><path d="m12 6 6 6-6 6"/>' : '<path d="M4 8h14"/><path d="M4 16h14"/>') + '</svg></span>';
 }
 function gtOptHtml(o, i) {
-  var title = (o.kind === 'after' ? 'À la suite de ' : 'En même temps que ') + esc(o.name);
+  var title = (o.kind === 'after' ? (o.name === 'vous' ? 'Juste après vous' : 'À la suite de ' + esc(o.name)) : 'En même temps que ' + esc(o.name));
   if (!o.time) return '<div class="gt-opt off">' + gtIcon(o.kind) + '<span><span class="gt-t1">' + title + '</span><span class="gt-t2">' + esc(o.why) + '</span></span></div>';
   var on = selSlot && selSlot.keepBarber && selSlot.time === o.time && String(selSlot.barberId) === String(o.barberId);
   return '<button type="button" class="gt-opt' + (on ? ' sel' : '') + '" onclick="gtPick(' + i + ')">' + gtIcon(o.kind) +

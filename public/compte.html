@@ -307,6 +307,27 @@
 <style>
 /* Calendrier client intégré au thème personnalisable du salon. */
 .slots-grid.is-loading{opacity:.45;pointer-events:none}
+/* Réservation à plusieurs : venir ensemble (à la suite / en même temps) */
+.gt-box{margin-top:18px;container-type:inline-size}
+@container (max-width:380px){.gt-box .gt-ic{display:none}.gt-box .gt-opt{padding:11px 12px}}
+.gt-title{font-size:13.5px;font-weight:700;color:var(--grey);margin:0 0 8px}
+.gt-opt{display:flex;align-items:center;gap:12px;width:100%;box-sizing:border-box;background:var(--fill);border:2px solid transparent;border-radius:16px;padding:11px 13px;margin:0 0 8px;font:inherit;color:var(--ink);text-align:left;cursor:pointer}
+.gt-opt.sel{border-color:var(--blue);background:rgba(var(--accent-rgb,0,122,255),.10)}
+.gt-opt.off{opacity:.55;cursor:default}
+.gt-ic{width:38px;height:38px;border-radius:12px;background:var(--card);color:var(--blue);display:flex;align-items:center;justify-content:center;flex:none}
+.gt-opt.off .gt-ic{color:var(--grey)}
+.gt-txt{flex:1;min-width:0}
+.gt-t1{display:block;font-size:14.5px;font-weight:700}
+.gt-t2{display:block;font-size:12.5px;color:var(--grey);margin-top:2px;line-height:1.35}
+.gt-tm{color:var(--ink);font-size:14px;font-weight:800}
+/* Bouton bien visible : « Choisir » (devient « ✓ Choisi ») - sinon l'option passait pour une simple info. */
+.gt-cta{flex:none;margin-left:6px;background:var(--blue);color:#fff;border-radius:999px;padding:8px 14px;font-size:13.5px;font-weight:700;white-space:nowrap;transition:transform .12s ease,filter .12s ease}
+button.gt-opt:hover{border-color:rgba(var(--accent-rgb,0,122,255),.45)}
+button.gt-opt:hover .gt-cta{filter:brightness(1.1)}
+button.gt-opt:active .gt-cta{transform:scale(.96)}
+.gt-opt.sel .gt-cta{background:var(--green,#1f9d55)}
+.gt-cta .on{display:none}.gt-opt.sel .gt-cta .on{display:inline}.gt-opt.sel .gt-cta .off{display:none}
+.gt-day{display:inline-flex;align-items:center;gap:6px;background:var(--fill);border:none;border-radius:999px;padding:9px 14px;font:inherit;font-size:13.5px;font-weight:600;color:var(--blue);cursor:pointer}
 .closure-calendar{position:relative;width:100%;max-width:390px;margin:4px 0 18px;color:inherit}
 .closure-calendar input[type=date]{display:none}
 .closure-cal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:4px 0 14px;padding:0 4px}
@@ -755,6 +776,8 @@
       </div>
       <div class="dt-slots">
         <div class="dt-barbers" id="bk-dt-barbers" style="display:none;margin-top:20px"></div>
+        <!-- Réservation à plusieurs : « À la suite de X » / « En même temps que X » (comme la prise de RDV en ligne). -->
+        <div class="gt-box" id="bk-grp-together" style="display:none"></div>
         <div class="eyebrow" style="margin-top:20px">Créneaux disponibles</div>
         <div id="bk-half-toggle" class="half-toggle" style="display:none;margin-bottom:14px">
           <button id="bk-half-morning" onclick="showBookHalf('morning')">Matin</button>
@@ -1325,7 +1348,8 @@ function bkCartAddCurrent() {
   var p = bkGrp.people[bkGrp.current];
   var e = {
     person: bkGrp.current, name: p.name, isSelf: p.isSelf, relativeId: p.relativeId,
-    any: selBookBarber === '', barber_id: selBookSlot.barberId, barber_name: selBookBarber === '' ? 'Premier disponible' : (b ? b.name : ''),
+    // « À la suite / En même temps » : le coiffeur de l'option est gardé (même si « Premier disponible » était choisi).
+    any: selBookBarber === '' && !selBookSlot.keepBarber, barber_id: selBookSlot.barberId, barber_name: selBookBarber === '' && !selBookSlot.keepBarber ? 'Premier disponible' : (b ? b.name : ''),
     service_id: selBookService, service_name: svc ? svc.name : '', extras: ex.map(function (x) { return x.id; }), extra_names: ex.map(function (x) { return x.name; }),
     products: pr.map(function (x) { return x.id; }), product_names: pr.map(function (x) { return x.name; }),
     date: selBookDate, time: selBookSlot.time,
@@ -1857,7 +1881,7 @@ function refreshBookRecap() {
   vitrineRecapFill({
     service: selBookService === EXTRAS_ONLY ? EXTRAS_ONLY_SERVICE : svcList.find(function (x) { return String(x.id) === String(selBookService); }),
     extras: pick(extList, selBookExtras.map(String)), products: pick(bookProducts, selBookProducts.map(String)),
-    barber: anyB ? anyBarberLabel(bookBarbers, selBookSlot && selBookSlot.barberId) : (b ? b.name : ''), time: selBookSlot ? selBookSlot.time : '',
+    barber: anyB && !(selBookSlot && selBookSlot.keepBarber) ? anyBarberLabel(bookBarbers, selBookSlot && selBookSlot.barberId) : (anyB ? bkGtBarberName(selBookSlot.barberId) : (b ? b.name : '')), time: selBookSlot ? selBookSlot.time : '',
     when: selBookDate ? new Date(selBookDate + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' }) : '',
     // A plusieurs : la personne en cours, et au-dessus les RDV deja valides du groupe (heure, coiffeur) + total du groupe.
     who: bkGrp && bkGrp.people[bkGrp.current] ? (bkGrp.people[bkGrp.current].isSelf ? 'Moi' : bkGrp.people[bkGrp.current].name) : '',
@@ -1963,6 +1987,7 @@ function loadBookSlots() {
   selBookDate = document.getElementById('bk-date').value;
   selBookSlot = null;
   document.getElementById('bk-date-next-btn').disabled = true;
+  bkRenderTogether(null);
   if (!selBookDate) return;
 
   renderBookDtBarbers();   // coiffeurs au-dessus des creneaux (changer sans recommencer)
@@ -1992,6 +2017,7 @@ function loadBookSlots() {
   apiForBooking(url).then(function (r) {
     if (reqId !== slotsEl.__req) return;   // un autre jour a ete choisi entre-temps
     slotsEl.classList.remove('is-loading');
+    bkRenderTogether(r.slots);
     if (r.slots.length === 0) {
       toggleEl.style.display = 'none';
       document.getElementById('bk-slots-grid').innerHTML = '<div class="empty">Aucun créneau disponible ce jour-là</div>';
@@ -2012,10 +2038,121 @@ function loadBookSlots() {
   }).catch(function (e) { if (reqId === slotsEl.__req) slotsEl.classList.remove('is-loading'); toast(e.message, true); });
 }
 
+/* ---------- Réservation à plusieurs : venir ensemble ----------
+   La personne d'avant (dernière du panier) est déjà placée. À l'étape de l'heure, deux raccourcis :
+   « À la suite de X » = même coiffeur, premier créneau libre après sa fin (45 min d'attente au plus) ;
+   « En même temps que X » = même heure de début, chez un autre coiffeur libre.
+   Si la personne a choisi le même coiffeur que X : seulement « à la suite » ; un autre coiffeur : seulement « en même temps ».
+   Autre jour que X : un lien pour revenir sur son jour. Une option impossible reste visible, grisée, avec la raison. */
+var BK_GT_MAX_WAIT = 45;
+var bkGtReq = 0, bkGtOpts = [];
+function bkGtRef() {
+  if (!bkGrp || !bkGrp.cart.length) return null;
+  for (var i = bkGrp.cart.length - 1; i >= 0; i--) {
+    var e = bkGrp.cart[i];
+    if (i !== bkGrp.editIndex && e.person !== bkGrp.current && e.time && e.barber_id) return e;
+  }
+  return null;
+}
+function bkGtMin(t) { return Number(String(t).slice(0, 2)) * 60 + Number(String(t).slice(3, 5)); }
+function bkGtHM(m) { return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); }
+function bkGtBarberName(id) { var b = bookBarbers.find(function (x) { return String(x.id) === String(id); }); return b ? b.name : ''; }
+function bkGtIcon(kind) {
+  return '<span class="gt-ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+    (kind === 'after' ? '<path d="M4 12h12"/><path d="m12 6 6 6-6 6"/>' : '<path d="M4 8h14"/><path d="M4 16h14"/>') + '</svg></span>';
+}
+function bkGtOptHtml(o, i) {
+  var title = (o.kind === 'after' ? (o.name === 'vous' ? 'Juste après vous' : 'À la suite de ' + esc(o.name)) : 'En même temps que ' + esc(o.name));
+  if (!o.time) return '<div class="gt-opt off">' + bkGtIcon(o.kind) + '<span><span class="gt-t1">' + title + '</span><span class="gt-t2">' + esc(o.why) + '</span></span></div>';
+  var on = selBookSlot && selBookSlot.keepBarber && selBookSlot.time === o.time && String(selBookSlot.barberId) === String(o.barberId);
+  return '<button type="button" class="gt-opt' + (on ? ' sel' : '') + '" onclick="bkGtPick(' + i + ')">' + bkGtIcon(o.kind) +
+    '<span class="gt-txt"><span class="gt-t1">' + title + '</span><span class="gt-t2"><b class="gt-tm">' + esc(o.time) + '</b> · ' + esc(o.sub) + '</span></span>' +
+    '<span class="gt-cta"><span class="off">Choisir</span><span class="on">✓ Choisi</span></span></button>';
+}
+function bkRenderTogether(slots) {
+  var box = document.getElementById('bk-grp-together');
+  if (!box) return;
+  var req = ++bkGtReq;
+  var ref = bkGtRef();
+  bkGtOpts = [];
+  if (!ref || slots === null || !selBookDate) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  var name = ref.isSelf ? 'vous' : (ref.name || 'vous');   // salon (admin, poste, caisse) : le prénom du client, comme les autres
+  if (ref.date !== selBookDate) {
+    var d = new Date(ref.date + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+    box.innerHTML = '<button type="button" class="gt-day" onclick="bkGtSameDay()">↩ Le même jour que ' + esc(name) + ' (' + esc(d) + ')</button>';
+    box.style.display = '';
+    return;
+  }
+  var refStart = bkGtMin(ref.time), refEnd = refStart + (Number(ref.dur) || 0);
+  var wantAfter = selBookBarber === '' || String(selBookBarber) === String(ref.barber_id);
+  var wantSame = String(selBookBarber) !== String(ref.barber_id);
+  // Les deux raccourcis demandent TOUTES les heures (?all=1) : la grille, elle, montre les heures « à la suite »
+  // (pas de la prestation / du supplément), où l'heure exacte de X n'est pas forcément.
+  var held = GroupBooking.cartHeld(bkGrp.cart, selBookDate, bkGrp.editIndex);
+  var base = '/api/appointments/availability?all=1&date=' + selBookDate + '&service_id=' + selBookService + '&extras=' + selBookExtras.join(',') +
+    (held ? '&held=' + encodeURIComponent(held) : '');
+  // En même temps : même heure de début, autre coiffeur (les créneaux reçus excluent déjà le coiffeur de X à cette heure).
+  var same = null, sameReq = Promise.resolve();
+  if (wantSame) {
+    same = { kind: 'same', name: name };
+    sameReq = apiForBooking(base + (selBookBarber ? '&barber_id=' + encodeURIComponent(selBookBarber) : '')).then(function (r) {
+      var s = (r.slots || []).filter(function (x) { return x.time === ref.time && String(x.barber_id) !== String(ref.barber_id); })[0];
+      if (s) { same.time = s.time; same.barberId = s.barber_id || selBookBarber; same.sub = (selBookBarber === '' ? 'Autre coiffeur : ' : '') + bkGtBarberName(same.barberId); }
+      else same.why = selBookBarber ? bkGtBarberName(selBookBarber) + ' n\'est pas libre à ' + ref.time : 'Aucun autre coiffeur libre à ' + ref.time;
+    }).catch(function () { same = null; });
+  }
+  function paintBox(after) {
+    if (req !== bkGtReq) return;
+    bkGtOpts = [after, same].filter(Boolean);
+    if (!bkGtOpts.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
+    box.innerHTML = '<div class="gt-title">Pour venir ensemble avec ' + esc(name) + '</div>' + bkGtOpts.map(bkGtOptHtml).join('');
+    box.style.display = '';
+  }
+  if (!wantAfter) { sameReq.then(function () { paintBox(null); }); return; }
+  // À la suite : créneaux du coiffeur de X (ceux du panier déjà retenus), le premier à partir de sa fin.
+  var after = { kind: 'after', name: name };
+  var url = base + '&barber_id=' + encodeURIComponent(ref.barber_id);
+  var bName = bkGtBarberName(ref.barber_id) || ref.barber_name || '';
+  box.innerHTML = '<div class="gt-title">Pour venir ensemble avec ' + esc(name) + '</div><div class="gt-t2" style="margin:0 0 8px">Recherche…</div>';
+  box.style.display = '';
+  apiForBooking(url).then(function (r) {
+    var best = (r.slots || []).filter(function (x) { var m = bkGtMin(x.time); return m >= refEnd && m - refEnd <= BK_GT_MAX_WAIT; })
+      .sort(function (a, b) { return bkGtMin(a.time) - bkGtMin(b.time); })[0];
+    if (best) {
+      var wait = bkGtMin(best.time) - refEnd;
+      after.time = best.time; after.barberId = best.barber_id || ref.barber_id;
+      after.sub = (selBookBarber === '' ? 'Même coiffeur : ' : '') + bName + (wait > 0 ? ' · ' + wait + ' min d\'attente' : '');
+    } else after.why = bName + ' n\'a pas de place juste après (' + bkGtHM(refEnd) + ')';
+    return sameReq.then(function () { paintBox(after); });
+  }).catch(function () { sameReq.then(function () { paintBox(null); }); });
+}
+function bkGtPick(i) {
+  var o = bkGtOpts[i];
+  if (!o || !o.time) return;
+  selBookSlot = { time: o.time, barberId: String(o.barberId), keepBarber: true };
+  // La case de la grille à la même heure s'allume aussi (« Premier disponible » : quel que soit son coiffeur).
+  document.querySelectorAll('#bk-slots-grid .slot-btn').forEach(function (b) { b.classList.toggle('sel', b.dataset.time === o.time && (String(b.dataset.barber) === String(o.barberId) || selBookBarber === '')); });
+  document.querySelectorAll('.gt-opt').forEach(function (b) { b.classList.remove('sel'); });
+  var btns = document.querySelectorAll('#bk-grp-together button.gt-opt'); var k = 0;
+  bkGtOpts.forEach(function (x, j) { if (x.time) { if (j === i && btns[k]) btns[k].classList.add('sel'); k++; } });
+  renderBookDtBarbers();
+  document.getElementById('bk-date-next-btn').disabled = false;
+}
+function bkGtSameDay() {
+  var ref = bkGtRef(); if (!ref) return;
+  document.getElementById('bk-date').value = ref.date;
+  if (window.bkPickOpenDay) window.bkPickOpenDay(false);
+  loadBookSlots();
+}
+
 function selectBookSlot(btn) {
   document.querySelectorAll('#bk-slots-grid .slot-btn').forEach(function (b) { b.classList.remove('sel'); });
+  document.querySelectorAll('#bk-grp-together .gt-opt.sel').forEach(function (b) { b.classList.remove('sel'); });
   btn.classList.add('sel');
   selBookSlot = { time: btn.dataset.time, barberId: btn.dataset.barber };
+  // Même heure qu'un raccourci « À la suite / En même temps » : le raccourci s'active aussi (avec son coiffeur).
+  var gi = bkGtOpts.findIndex(function (o) { return o && o.time === selBookSlot.time && (String(o.barberId) === String(selBookSlot.barberId) || selBookBarber === ''); });
+  if (gi !== -1) { bkGtPick(gi); return; }
   renderBookDtBarbers();
   document.getElementById('bk-date-next-btn').disabled = false;
 }
