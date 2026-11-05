@@ -1356,8 +1356,8 @@
     Agenda
   </button>
   <button id="nav-timer" onclick="switchCaisseTab('timer')">
-    <svg class="ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>
-    Timer
+    <span id="nav-timer-ic"><svg class="ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg></span>
+    <span id="nav-timer-label">Timer</span>
   </button>
   <button id="nav-caisse" class="on" onclick="switchCaisseTab('caisse')">
     <svg class="ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2.5"/><path d="M2 10h20"/><path d="M6 15h4"/></svg>
@@ -1752,6 +1752,8 @@ function showApp() {
   refreshCaisseLockState();
   loadTicketDraft(activeBarberId);
   loadBarberBubbles();
+  // Réglages des coiffeurs (Timer activé / désactivé par l'admin...) suivis pendant la journée, sans recharger.
+  if (!window.__barbersRefreshTimer) window.__barbersRefreshTimer = setInterval(function () { if (!document.hidden && me) loadBarberBubbles(); }, 30000);
   loadCatalog();
   loadPendingPayments();
   restoreChargedSale();
@@ -1884,7 +1886,23 @@ function loadBarberBubbles() {
     .catch(function () {});
 }
 
+// Comme « Mon poste » : coiffeur de la bulle active sans Timer (désactivé par l'admin) -> l'onglet s'appelle
+// « Salle d'attente » (icône chaises), sinon « Timer ». Icônes en fonctions (disponibles dès le chargement).
+function navTimerIcon() { return '<svg class="ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>'; }
+function navWaitIcon() { return '<svg class="ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11V7a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v4"/><path d="M13 11V7a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v4"/><path d="M3 11h18v4H3z"/><path d="M5 15v4M19 15v4"/></svg>'; }
+function updateNavTimerLabel() {
+  var lb = document.getElementById('nav-timer-label'), ic = document.getElementById('nav-timer-ic');
+  if (!lb || !ic) return;
+  var b = activeBarberId && (allBarbers || []).find(function (x) { return x.id === activeBarberId; });
+  var noTimer = !!(b && (b.timer_enabled === 0 || b.timer_enabled === false));
+  var mode = noTimer ? 'wait' : 'timer';
+  if (ic.getAttribute('data-mode') === mode) return;
+  ic.setAttribute('data-mode', mode);
+  lb.textContent = noTimer ? 'Salle d\'attente' : 'Timer';
+  ic.innerHTML = noTimer ? navWaitIcon() : navTimerIcon();
+}
 function renderBarberBubbles() {
+  updateNavTimerLabel();
   var box = document.getElementById('barber-bubbles');
   var list = clotureVerifiedBarber
     ? allBarbers.filter(function (b) { return b.id === clotureVerifiedBarber.id; })

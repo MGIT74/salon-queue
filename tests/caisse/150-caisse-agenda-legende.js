@@ -19,5 +19,6 @@ check('tiroir et « Ajouter un RDV » de la caisse (heure touchée gardée pour 
 check('clients sans RDV déjà démarrés : toujours dans la vue Jour (fiche « consultation »)', /function pdWalkInsOfDay\(dateStr\)/.test(caisse) && caisse.includes("openAgendaWalkInDrawer(String(id).slice(2))"));
 check('ouverture de l\'onglet : relu à chaque fois, vue Jour d\'abord', caisse.includes('if (!calViewReady) { calViewReady = true; setCalView(calViewMode); }'));
 check('pas de 2e rangée de photos des coiffeurs (les bulles de la caisse suffisent)', !caisse.includes('id="cal-barber-picker"'));
+check('onglet « Timer » -> « Salle d\'attente » si le coiffeur de la bulle n\'a pas le Timer (comme le poste)', /function updateNavTimerLabel\(\)[\s\S]{0,400}activeBarberId/.test(caisse) && caisse.includes("lb.textContent = noTimer ? 'Salle d\\'attente' : 'Timer'") && caisse.includes('function renderBarberBubbles() {\n  updateNavTimerLabel();'));
 console.log('\n' + pass + ' OK, ' + fail + ' ECHEC');
 process.exit(fail ? 1 : 0);
