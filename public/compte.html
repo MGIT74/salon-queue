@@ -327,7 +327,7 @@ button.gt-opt:hover .gt-cta{filter:brightness(1.1)}
 button.gt-opt:active .gt-cta{transform:scale(.96)}
 .gt-opt.sel .gt-cta{background:var(--green,#1f9d55)}
 .gt-cta .on{display:none}.gt-opt.sel .gt-cta .on{display:inline}.gt-opt.sel .gt-cta .off{display:none}
-.gt-day{display:inline-flex;align-items:center;gap:6px;background:var(--fill);border:none;border-radius:999px;padding:9px 14px;font:inherit;font-size:13.5px;font-weight:600;color:var(--blue);cursor:pointer}
+.gt-day{margin:0 6px 6px 0;display:inline-flex;align-items:center;gap:6px;background:var(--fill);border:none;border-radius:999px;padding:9px 14px;font:inherit;font-size:13.5px;font-weight:600;color:var(--blue);cursor:pointer}
 .closure-calendar{position:relative;width:100%;max-width:390px;margin:4px 0 18px;color:inherit}
 .closure-calendar input[type=date]{display:none}
 .closure-cal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:4px 0 14px;padding:0 4px}
@@ -2046,11 +2046,12 @@ function loadBookSlots() {
    Autre jour que X : un lien pour revenir sur son jour. Une option impossible reste visible, grisée, avec la raison. */
 var BK_GT_MAX_WAIT = 45;
 var bkGtReq = 0, bkGtOpts = [];
-function bkGtRef() {
+// date : la dernière personne du panier CE jour-là (raccourcis « à la suite / en même temps ») ; sans date : la dernière.
+function bkGtRef(date) {
   if (!bkGrp || !bkGrp.cart.length) return null;
   for (var i = bkGrp.cart.length - 1; i >= 0; i--) {
     var e = bkGrp.cart[i];
-    if (i !== bkGrp.editIndex && e.person !== bkGrp.current && e.time && e.barber_id) return e;
+    if (i !== bkGrp.editIndex && e.person !== bkGrp.current && e.time && e.barber_id && (!date || e.date === date)) return e;
   }
   return null;
 }
@@ -2073,13 +2074,24 @@ function bkRenderTogether(slots) {
   var box = document.getElementById('bk-grp-together');
   if (!box) return;
   var req = ++bkGtReq;
-  var ref = bkGtRef();
+  var ref = bkGtRef(selBookDate) || bkGtRef();
   bkGtOpts = [];
   if (!ref || slots === null || !selBookDate) { box.style.display = 'none'; box.innerHTML = ''; return; }
   var name = ref.isSelf ? 'vous' : (ref.name || 'vous');   // salon (admin, poste, caisse) : le prénom du client, comme les autres
   if (ref.date !== selBookDate) {
-    var d = new Date(ref.date + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
-    box.innerHTML = '<button type="button" class="gt-day" onclick="bkGtSameDay()">↩ Le même jour que ' + esc(name) + ' (' + esc(d) + ')</button>';
+    // Personne du panier ce jour-là : un bouton par jour déjà pris (« Le même jour que Eric », « … que Tom »…),
+    // les prénoms d'un même jour réunis sur un seul bouton.
+    var days = {}, order = [];
+    bkGrp.cart.forEach(function (e, k) {
+      if (k === bkGrp.editIndex || e.person === bkGrp.current || !e.date) return;
+      if (!days[e.date]) { days[e.date] = []; order.push(e.date); }
+      days[e.date].push(e.isSelf ? 'vous' : (e.name || 'vous'));
+    });
+    box.innerHTML = order.map(function (dd) {
+      var d = new Date(dd + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+      var who = days[dd].length > 1 ? days[dd].slice(0, -1).join(', ') + ' et ' + days[dd][days[dd].length - 1] : days[dd][0];
+      return '<button type="button" class="gt-day" onclick="bkGtSameDay(\'' + dd + '\')">↩ Le même jour que ' + esc(who) + ' (' + esc(d) + ')</button>';
+    }).join('');
     box.style.display = '';
     return;
   }
@@ -2138,9 +2150,9 @@ function bkGtPick(i) {
   renderBookDtBarbers();
   document.getElementById('bk-date-next-btn').disabled = false;
 }
-function bkGtSameDay() {
+function bkGtSameDay(date) {
   var ref = bkGtRef(); if (!ref) return;
-  document.getElementById('bk-date').value = ref.date;
+  document.getElementById('bk-date').value = date || ref.date;
   if (window.bkPickOpenDay) window.bkPickOpenDay(false);
   loadBookSlots();
 }

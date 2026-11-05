@@ -21,6 +21,7 @@ check('cliquer la même heure dans la grille active aussi le raccourci (et inver
 const compte = fs.readFileSync(path.join(__dirname, '../../public/compte.html'), 'utf8');
 check('compte client : mêmes raccourcis « À la suite / En même temps » à l\'heure de la 2e personne', compte.includes('id="bk-grp-together"') && /function bkRenderTogether\(slots\)/.test(compte) && /bkRenderTogether\(r\.slots\);/.test(compte) && /bkGtOpts\.findIndex/.test(compte) && compte.includes("any: selBookBarber === '' && !selBookSlot.keepBarber") && compte.includes('.gt-cta{'));
 check('pour soi-même : « Juste après vous » (pas « À la suite de vous »)', rdv.includes("'Juste après vous'") && compte.includes("'Juste après vous'"));
+check('autre jour : un bouton « Le même jour que … » par jour du panier (prénoms d\'un même jour réunis), en ligne et compte', [rdv, compte].every((h) => /days\[dd\]\.slice\(0, -1\)\.join\(', '\) \+ ' et '/.test(h) && /SameDay\(date\) \{/.test(h)) && /var ref = gtRef\(selDate\) \|\| gtRef\(\);/.test(rdv) && /var ref = bkGtRef\(selBookDate\) \|\| bkGtRef\(\);/.test(compte));
 check('pas de bordure colorée à gauche (style « IA »)', !/\.gt-[a-z]+\{[^}]*border-left/.test(rdv));
 console.log('\n' + pass + ' OK, ' + fail + ' ECHEC');
 process.exit(fail ? 1 : 0);
