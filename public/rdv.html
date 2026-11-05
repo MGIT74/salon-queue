@@ -284,7 +284,7 @@ button.gt-opt:active .gt-cta{transform:scale(.96)}
     try { if (/[?&](cancel|service)=/.test(location.search)) document.getElementById('p-start').classList.remove('on'); } catch (e) {}
     // Client deja connecte (meme navigateur) : une seule carte « Réserver avec mon compte ».
     try { if (localStorage.getItem('client_token')) { document.getElementById('start-signup').style.display = 'none'; document.getElementById('start-login-title').textContent = 'Réserver avec mon compte'; document.getElementById('start-login-sub').textContent = 'Vous êtes déjà connecté'; } } catch (e) {}
-    try { if (/[?&]staff=1(&|$)/.test(location.search)) { document.getElementById('p-start').classList.remove('on'); var gp = document.getElementById('p-group'); gp.classList.add('on'); gp.classList.remove('gb-pick'); document.getElementById('gb-top').innerHTML = ''; document.getElementById('gb-body').innerHTML = ''; } } catch (e) {}
+    try { if (/[?&]staff=1(&|$)/.test(location.search)) { document.documentElement.classList.add('staff-mode'); document.body.classList.add('staff-mode'); document.getElementById('p-start').classList.remove('on'); var gp = document.getElementById('p-group'); gp.classList.add('on'); gp.classList.remove('gb-pick'); document.getElementById('gb-top').innerHTML = ''; document.getElementById('gb-body').innerHTML = ''; } } catch (e) {}
   </script>
 
   <section class="panel" id="p-cart">
@@ -490,6 +490,10 @@ button.gt-opt:active .gt-cta{transform:scale(.96)}
 <script src="/group-booking.js?v=29"></script>
 <style>
 body.staff-mode .gift-summary-box,body.staff-mode .theme-btn,body.staff-mode .login-hint{display:none!important}
+/* Mode salon (fenêtre de l'admin / caisse / Mon poste) : la page EST la fenêtre - pas de fond noir ni de carte dans la carte. */
+html.staff-mode,body.staff-mode{background:var(--card)!important}
+body.staff-mode{padding:0!important;align-items:stretch}
+body.staff-mode .wrap{box-shadow:none!important;border-radius:0!important;max-width:none!important;min-height:100vh;margin:0}
 #p-start .gb-choices{max-width:960px}
 /* « Créer un compte » mis en avant : bordure accent, badge « Le plus populaire », avantage fidélité. */
 #p-start .gb-choices{overflow:visible}
