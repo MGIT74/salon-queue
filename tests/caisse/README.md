@@ -204,4 +204,5 @@ node tests/caisse/167-couleurs-menus-et-heures.js  # Couleurs des 3 menus (perso
 node tests/caisse/168-decaler-5-min.js  # Poste, agenda : decaler un RDV de 5 min (glisser / fleches), sans prevenir le client, Revenir en arriere
 node tests/caisse/169-rdv-force.js  # Forcer un RDV dans un creneau trop court (equipe), case de responsabilite, trace forced_by
 node tests/caisse/170-admin-agenda-poste.js  # Admin > Rendez-vous : meme agenda que Mon poste / la caisse (Parametres et liste A venir gardes)
+node tests/caisse/171-rdv-plusieurs-ensemble.js  # RDV en ligne a plusieurs : « A la suite de X » / « En meme temps que X » a l'etape de l'heure
 ```
