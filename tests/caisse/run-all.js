@@ -193,6 +193,7 @@ const suite = [
   ['170-admin-agenda-poste.js', false, ['exit']],
   ['171-rdv-plusieurs-ensemble.js', false, ['exit']],
   ['172-fiche-coiffeur-historique.js', false, ['exit']],
+  ['173-caisse-z-impression-apres-cloture.js', false, ['exit']],
 ];
 
 let bad = 0;

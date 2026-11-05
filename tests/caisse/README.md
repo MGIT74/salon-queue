@@ -206,4 +206,5 @@ node tests/caisse/169-rdv-force.js  # Forcer un RDV dans un creneau trop court (
 node tests/caisse/170-admin-agenda-poste.js  # Admin > Rendez-vous : meme agenda que Mon poste / la caisse (Parametres et liste A venir gardes)
 node tests/caisse/171-rdv-plusieurs-ensemble.js  # RDV en ligne a plusieurs : « A la suite de X » / « En meme temps que X » a l'etape de l'heure
 node tests/caisse/172-fiche-coiffeur-historique.js  # Fiche coiffeur : profil en haut + historique (prestations, encaissements), « Payé d'avance » marque (aussi en caisse)
+node tests/caisse/173-caisse-z-impression-apres-cloture.js  # Caisse : le ticket Z s'imprime apres la cloture (session gardee tant que le Z est affiche)
 ```

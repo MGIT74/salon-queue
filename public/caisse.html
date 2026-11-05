@@ -2024,7 +2024,10 @@ function refreshCaisseLockState() {
         // Caisse fermée (fermeture automatique, Z en attente, avant l'ouverture) : la session du coiffeur se
         // termine et la tablette revient à l'écran « Caisse fermée ». À l'ouverture, il faudra donc TOUJOURS
         // retaper un code PIN (comme avant, quand le Z fait sur la tablette ramenait à l'écran de départ).
-        if (me && !paymentInFlight) { logout(); showLoginOrLocked(); }
+        // Sauf pendant l'affichage du ticket Z (juste après la clôture) : la session reste ouverte pour pouvoir
+        // l'imprimer ; c'est sa fermeture qui ramène à l'écran « Caisse fermée » (closeZTicket -> resetAfterClosing).
+        var zOpen = document.getElementById('z-overlay') && document.getElementById('z-overlay').classList.contains('on');
+        if (me && !paymentInFlight && !zOpen) { logout(); showLoginOrLocked(); }
       } else {
         panel.classList.remove('day-closed');
       }
@@ -4782,6 +4785,14 @@ var ZTICKET_METHOD_LABELS = { especes: 'Espèces', cb: 'Carte bancaire', autre: 
 
 // Ticket Z affiché (pour l'envoyer au pont d'impression depuis le bouton Imprimer).
 var currentZClosing = null, currentZSalonName = '';
+// Coiffeur connecté quand le ticket Z s'est affiché : l'impression marche même si la session a été fermée entre-temps
+// (caisse fermée après la clôture, déconnexion automatique pour inactivité).
+var zSessionMe = null;
+function zApi(path, opts) {
+  var prev = me;
+  if (!me && zSessionMe) me = zSessionMe;   // barberApi lit « me » tout de suite (en-têtes), puis on le remet
+  try { return barberApi(path, opts); } finally { me = prev; }
+}
 
 /**
  * Bouton "Imprimer" du ticket Z : envoi silencieux à l'imprimante du salon via le pont (comme les
@@ -4793,14 +4804,14 @@ function printZNow() {
   if (btn) btn.disabled = true;
   var done = function () { if (btn) btn.disabled = false; };
   // Comme dans Admin : relire la configuration actuelle du pont avant chaque impression.
-  barberApi('/api/settings/public').then(function (cfg) {
+  zApi('/api/settings/public').then(function (cfg) {
     if (!cfg.tpe_bridge_url) {
       done();
       toast('Pont d\'impression non configuré. Vérifiez la connexion dans les réglages.', true);
       return;
     }
     var text = buildZText(currentZClosing, { salonName: currentZSalonName });
-    return barberApi('/api/tpe/print', {
+    return zApi('/api/tpe/print', {
       method: 'POST',
       body: { text: text, mode: cfg.tpe_print_mode === 'text' ? 'text' : 'escpos' }
     }).then(function (result) {
@@ -4812,13 +4823,15 @@ function printZNow() {
         toast('Impression du ticket Z échouée. Vérifiez le pont et réessayez.', true);
       }
     });
-  }).catch(function () {
+  }).catch(function (e) {
     done();
-    toast('Pont d\'impression indisponible. Vérifiez la connexion et réessayez.', true);
+    // Le vrai motif (session, connexion...) plutôt qu'un « pont indisponible » qui n'était pas la cause.
+    toast('Impression du ticket Z impossible : ' + ((e && e.message) || 'serveur injoignable') + '. Réessayez.', true);
   });
 }
 
 function printZTicket(id) {
+  if (me) zSessionMe = me;
   barberApi('/api/owner/caisse/closings/' + id).then(function (r) {
     var salonName = (document.getElementById('salon-name-tag') && document.getElementById('salon-name-tag').textContent) || 'Salon';
     var periodEndTxt = new Date(r.period_end).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' });
@@ -6634,9 +6647,9 @@ function printReceiptSilent() {
         toast('Impression échouée. Vérifiez le pont et réessayez.', true);
       }
     });
-  }).catch(function () {
+  }).catch(function (e) {
     done();
-    toast('Pont d\'impression indisponible. Vérifiez la connexion et réessayez.', true);
+    toast('Impression impossible : ' + ((e && e.message) || 'serveur injoignable') + '. Réessayez.', true);
   });
 }
 
