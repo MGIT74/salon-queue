@@ -570,6 +570,31 @@ function subscribeQueue(onChange) {
 
 initTheme();
 
+/* iPhone / iPad (Safari) : le menu du bas (position fixe) restait parfois au milieu de l'écran.
+   Causes connues de Safari : un double-toucher (ex. sur les flèches ▲ ▼ de l'agenda) zoome la page malgré
+   « user-scalable=no », et après la fermeture du clavier Safari garde un décalage d'écran ; les éléments fixes
+   restent alors « collés » au mauvais endroit jusqu'au prochain défilement.
+   - Pages « appli » (Mon poste, caisse, borne : user-scalable=no) : plus de zoom au double-toucher ni au pincement.
+   - Partout : après le clavier / un changement de taille d'écran, la position est recalculée (petit défilement nul). */
+(function () {
+  if (typeof document === 'undefined' || typeof window === 'undefined') return;
+  var vp = document.querySelector('meta[name="viewport"]');
+  if (vp && /user-scalable\s*=\s*no/.test(vp.getAttribute('content') || '')) {
+    document.documentElement.style.touchAction = 'manipulation';
+    ['gesturestart', 'gesturechange'].forEach(function (t) { document.addEventListener(t, function (e) { e.preventDefault(); }, { passive: false }); });
+  }
+  var t = null;
+  function reflow() {
+    clearTimeout(t);
+    t = setTimeout(function () { try { window.scrollTo(window.scrollX || 0, window.scrollY || 0); } catch (e) {} }, 60);
+  }
+  document.addEventListener('focusout', function (e) {
+    var el = e.target;
+    if (el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) reflow();
+  });
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', reflow);
+})();
+
 /* ============ Fenêtres modales professionnelles ============
    Remplacent alert()/confirm()/prompt() natifs par des fenêtres stylées
    cohérentes avec le reste de l'app. Toutes renvoient une Promise. */
