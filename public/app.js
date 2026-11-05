@@ -2290,23 +2290,35 @@ function staffForceInit(o) {
       .catch(function (e) { if (my === seq) res.innerHTML = '<div class="force-err">' + esc(e.message) + '</div>'; });
   }
   var row = w.querySelector('.force-row'), other = w.querySelector('.force-other');
-  // Heure touchée dans l'agenda : le lien la montre (« Forcer le RDV à 16:40 ») SEULEMENT si elle n'est pas libre.
-  // Libre = dans TOUTES les heures libres du coiffeur (?all=1), pas seulement les heures « à la suite » affichées :
-  // sinon une heure libre (ex. 16:05 entre 15:45 et 16:15) passait pour « à forcer ».
-  var freeKnown = null, freeSeq = 0;
+  // « Forcer » n'apparaît QUE dans un cas : l'heure touchée dans l'agenda tombe dans un espace LIBRE, mais trop court
+  // pour la durée de la prestation (elle déborderait sur le RDV suivant). Jamais sinon :
+  //  - heure libre et assez longue -> elle est simplement sélectionnée (pas besoin de forcer) ;
+  //  - heure déjà occupée par un RDV, hors horaires, pause... -> rien à forcer ;
+  //  - « + Ajouter un RDV » sans heure touchée -> pas de « Forcer ».
+  var forceAt = '', freeSeq = 0;
   function loadFree() {
-    freeKnown = null;
+    forceAt = ''; w.style.display = 'none';
     var dt = (o.defaultTime && o.defaultTime()) || '', p = o.params();
     if (!dt || !p.barber_id) return;
     var my = ++freeSeq;
     o.api('/api/appointments/availability?all=1&date=' + p.date + '&service_id=' + encodeURIComponent(p.service_id || '') +
       '&barber_id=' + encodeURIComponent(p.barber_id) + '&extras=' + (p.extras || []).join(','), { actingAs: p.barber_id })
-      .then(function (r) { if (my !== freeSeq) return; freeKnown = {}; (r.slots || []).forEach(function (s) { freeKnown[s.time] = 1; }); paintLink(); })
+      .then(function (r) {
+        if (my !== freeSeq || (r.slots || []).some(function (x) { return x.time === dt; })) return;   // libre : pas de « Forcer »
+        return o.api('/api/appointments/force-check?barber_id=' + encodeURIComponent(p.barber_id) + '&date=' + p.date + '&time=' + dt +
+          '&service_id=' + encodeURIComponent(p.service_id || '') + '&extras=' + (p.extras || []).join(','), { actingAs: p.barber_id })
+          .then(function (c) {
+            if (my !== freeSeq || !c || !c.ok) return;
+            var ov = c.overlaps || [];
+            // Espace libre trop court : ça déborde sur un RDV qui commence APRÈS l'heure touchée (aucun RDV en cours à cette heure).
+            if (!ov.length || ov.some(function (x) { return x.time <= dt; })) return;
+            forceAt = dt; paintLink(); w.style.display = '';
+          });
+      })
       .catch(function () {});
   }
   function paintLink() {
-    var dt = (o.defaultTime && o.defaultTime()) || '';
-    if (dt && (!freeKnown || freeKnown[dt])) dt = '';   // pas encore vérifiée, ou libre : lien général « à une autre heure »
+    var dt = forceAt;   // seulement l'heure touchée dans un espace libre trop court (voir loadFree)
     link.innerHTML = dt ? '⚠ Forcer le RDV à <span class="force-tm">' + esc(dt) + '</span><span class="force-chev" aria-hidden="true">›</span>' : '⚠ Forcer un RDV à une autre heure…';
     return dt;
   }
@@ -2326,8 +2338,8 @@ function staffForceInit(o) {
   box.onchange = function () { go.disabled = !box.checked; };
   go.onclick = function () { if (cur && box.checked) o.onForce(cur); };
   return {
-    reset: function () { w.style.display = ''; panel.style.display = 'none'; tin.value = ''; row.style.display = ''; other.style.display = 'none'; clearResult(); freeKnown = null; paintLink(); loadFree(); },
-    hide: function () { w.style.display = 'none'; }
+    reset: function () { w.style.display = ''; panel.style.display = 'none'; tin.value = ''; row.style.display = ''; other.style.display = 'none'; clearResult(); loadFree(); },
+    hide: function () { freeSeq++; w.style.display = 'none'; }
   };
 }
 // Ligne du tiroir d'un RDV forcé (admin, poste, caisse).
