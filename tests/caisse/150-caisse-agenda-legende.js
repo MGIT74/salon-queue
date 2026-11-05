@@ -1,24 +1,22 @@
-// Caisse > Agenda : legende des couleurs des coiffeurs sous le calendrier (Mois et Semaine), comme dans l'admin.
-const fs = require('fs'), path = require('path'), vm = require('vm');
+// Caisse > Agenda : copie conforme de l'agenda de « Mon poste » (vues Jour / Semaine / Mois, légende des coiffeurs,
+// « Aujourd'hui », décaler de 5 min, RDV forcés...) + les clients sans RDV déjà démarrés (spécifique caisse).
+const fs = require('fs'), path = require('path');
 const caisse = fs.readFileSync(path.join(__dirname, '../../public/caisse.html'), 'utf8');
+const poste = fs.readFileSync(path.join(__dirname, '../../public/poste.html'), 'utf8');
 let pass = 0, fail = 0;
 const check = (n, ok, x = '') => { (ok ? pass++ : fail++); console.log((ok ? '  OK   ' : '  ECHEC') + ' ' + n + (x ? '  [' + x + ']' : '')); };
-const fnSrc = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i === -1) throw new Error('introuvable: ' + name); const j = src.indexOf('\nfunction ', i + 10); const k = src.indexOf('\n/**', i + 10); const ends = [j, k].filter((x) => x > -1); return src.slice(i, ends.length ? Math.min.apply(null, ends) : undefined); };
-const ctx = vm.createContext({
-  allBarbers: [{ id: 'b1', name: 'Alice', color: '#ff0000' }, { id: 'b2', name: 'Bob', color: '#0000ff' }],
-  barberColorOf: (id, list) => (list.find((b) => b.id === id) || {}).color || '#888',
-  esc: (s) => String(s).replace(/</g, '&lt;'),
-});
-vm.runInContext(fnSrc(caisse, 'calLegendHtml'), ctx);
-const html = ctx.calLegendHtml([{ barber_id: 'b1', barber_name: 'Alice' }, { barber_id: 'b2' }, { barber_id: 'b1', barber_name: 'Alice' }, { barber_id: null }]);
-check('un nom par coiffeur ayant un RDV, sans doublon', (html.match(/Alice/g) || []).length === 1 && /Bob/.test(html));
-check('meme couleur que les points du calendrier (couleur de la fiche)', /background:#ff0000[^]*Alice/.test(html) && /background:#0000ff[^]*Bob/.test(html));
-check('RDV sans coiffeur : « Non assigné » en gris', /background:var\(--grey\)"><\/span>Non assigné/.test(html));
-check('aucun RDV : message', /Aucun coiffeur avec un RDV/.test(ctx.calLegendHtml([])));
-check('affichee en vue Mois', /html \+= calLegendHtml\(monthAppts\);/.test(caisse));
-check('affichee en vue Semaine', /html \+= calLegendHtml\(weekAppts\);/.test(caisse));
-check('affichee en vue Jour (sous la frise)', /renderAgendaTimeline\(ymd\(calAnchor\)\) \+\s*calLegendHtml\(apptsForRange\(calAnchor, calAnchor\)\.filter\(/.test(caisse));
-check('vue Jour : meme filtre que la frise (coiffeur selectionne)', /calLegendHtml\(apptsForRange\(calAnchor, calAnchor\)\.filter\(function \(a\) \{ return !activeBarberId \|\| a\.barber_id === activeBarberId; \}\)\)/.test(caisse));
-check('styles de la legende presents', /\.cal-legend \{/.test(caisse) && /\.cal-legend-dot \{/.test(caisse));
+const fnSrc = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i === -1) return null; const j = src.indexOf('\nfunction ', i + 10); return src.slice(i, j > -1 ? j : undefined); };
+// Les fonctions de l'agenda du poste se retrouvent à l'identique dans la caisse (à l'adaptation près : « moi » = la bulle active,
+// la liste des coiffeurs = allBarbers, le catalogue = catalog.*).
+const norm = (t) => t && t.replace(/pdMe\(\)/g, 'me').replace(/\ballBarbers\b/g, 'barbers').replace(/catalog\.(services|extras)/g, '$1').replace(/'caisse_(day|glance)_/g, "'poste_$1_");
+const SAME = ['posteDayHtml', 'pdWeekHtml', 'pdMonthHtml', 'renderCalDay', 'renderCalWeek', 'renderCalMonth', 'setCalView', 'calGoToday', 'pdNudge', 'pdMovedDialog', 'pdForcedHatchHtml', 'renderCalendarLegend', 'pdColAdd', 'pdShowDay'];
+const diff = SAME.filter((n) => norm(fnSrc(caisse, n)) !== norm(fnSrc(poste, n)));
+check('mêmes fonctions que l\'agenda du poste (Jour, Semaine, Mois, légende, décaler, forcés...)', diff.length === 0, diff.join(', '));
+check('même écran : ‹ date [Aujourd\'hui] [Jour | Semaine | Mois] ›, légende, panneau latéral', caisse.includes('id="cal-today-btn" onclick="calGoToday()"') && /<button id="cal-view-day" class="on"[^\n]*Jour<\/button>/.test(caisse) && caisse.includes('<div class="cal-legend" id="cal-legend"></div>') && caisse.includes('id="cal-side"'));
+check('mêmes styles (copiés du poste)', caisse.includes('AGENDA : copie conforme des styles de « Mon poste »') && /\.pd-block \{ position: absolute;/.test(caisse) && /\.cal-legend \{/.test(caisse));
+check('« moi » = le coiffeur de la bulle active', /function pdMe\(\) \{[\s\S]{0,120}activeBarberId/.test(caisse));
+check('tiroir et « Ajouter un RDV » de la caisse (heure touchée gardée pour « Forcer »)', caisse.includes("function openPosteAddAppointment(dateStr, barberId) { openCaisseAddAppointment(dateStr, barberId, pdPrefTime); }") && caisse.includes('openAgendaClientDrawer(id);'));
+check('clients sans RDV déjà démarrés : toujours dans la vue Jour (fiche « consultation »)', /function pdWalkInsOfDay\(dateStr\)/.test(caisse) && caisse.includes("openAgendaWalkInDrawer(String(id).slice(2))"));
+check('ouverture de l\'onglet : relu à chaque fois, vue Jour d\'abord', caisse.includes('if (!calViewReady) { calViewReady = true; setCalView(calViewMode); }'));
 console.log('\n' + pass + ' OK, ' + fail + ' ECHEC');
 process.exit(fail ? 1 : 0);

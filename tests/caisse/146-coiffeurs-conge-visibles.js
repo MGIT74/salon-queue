@@ -39,7 +39,7 @@ check('Deplacer (admin, caisse, poste) : autre coiffeur -> son premier jour disp
 // Ajouter un RDV a un coiffeur absent ce jour-la (ligne du planning, ou fenetre avec ce coiffeur) : message, pas de fenetre.
 check('outil commun : raison de l\'absence (conge / sans RDV / ne travaille pas)', /function barberOffReason\(b, dateStr\)/.test(app) && app.includes("return 'ne travaille pas ce jour-là';"));
 check('admin : coiffeur absent -> ligne avec message, ajout refuse', d.includes("data-off-reason=\"' + esc(b.offReason) + '\"") && d.includes('if (preOff) { toast(preB.name + \' \' + preOff') && d.includes('barberBookableOn(b, dateStr)));'));
-check('caisse : ajout refuse pour un coiffeur absent', ca.includes("if (offWhy) { toast(barber.name + ' ' + offWhy") && ca.includes('data-off-reason="\' + esc(barberOffReason(rowBarber, dateStr))'));
+check('caisse : ajout refuse pour un coiffeur absent', ca.includes("if (offWhy) { toast(barber.name + ' ' + offWhy") && ca.includes(": offWhy ? ' onclick=\"toast("));
 check('poste : ajout refuse pour un coiffeur absent', po.includes("if (offWhy) { toast(target.name + ' ' + offWhy") && po.includes(": offWhy ? ' onclick=\"toast("));
 console.log(`\n${pass} OK, ${fail} ECHEC`);
 process.exit(fail ? 1 : 0);

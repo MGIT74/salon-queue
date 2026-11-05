@@ -52,7 +52,7 @@ const check = (n, ok, x = '') => { (ok ? pass++ : fail++); console.log((ok ? '  
   check('"Client En Attente" absent de la frise', !/Client En Attente/.test(view.innerHTML));
 
   console.log('\n[D] Cliquer le bloc "Client En Cours" ouvre une fiche simple avec les bonnes infos');
-  var block = Array.from(view.querySelectorAll('.timeline-block')).find(function (el) { return el.textContent.indexOf('Client En Cours') !== -1; });
+  var block = Array.from(view.querySelectorAll('.timeline-block, .pd-block')).find(function (el) { return el.textContent.indexOf('Client En Cours') !== -1; });
   check('le bloc existe et est cliquable', Boolean(block));
   if (block) {
     block.dispatchEvent(new w.MouseEvent('click', { bubbles: true }));

@@ -52,7 +52,7 @@ check('points de couleur (petit bloc)', (lib.catDotsHtml(items).match(/<i class=
   check('nulle part ailleurs : cartes, onglets, titres d\'étape, fenêtre « Modifier la prestation » sans couleur',
     !app.includes('item-kind') && !/class="item-card k-/.test(app) && !css.includes('.item-card.k-service') && !css.includes('.cat-head') && !app.includes('finished-edit-card k-') &&
     [d, p, c, rdv, compte, k].every((h) => !h.includes('cat-head')) && c.includes('<button class="on" data-cat="services">Prestations</button>'));
-  check('pas de couleur côté client (réservation, compte, borne) ni à la caisse', [rdv, compte, k, c].every((h) => !h.includes('applyCatColors(') && !h.includes('catDotsHtml(') && !h.includes('catChipsHtml(')) && !app.includes('productChipsHtml'));
+  check('pas de couleur côté client (réservation, compte, borne)', [rdv, compte, k].every((h) => !h.includes('applyCatColors(') && !h.includes('catDotsHtml(') && !h.includes('catChipsHtml(')) && !app.includes('productChipsHtml'));
   check('poste : applique les couleurs du salon', p.includes('applyCatColors(d.cat_colors)'));
   check('admin : icône réglages à côté de « + Ajouter » (3 menus) -> fenêtre, plus dans Compte',
     ['service', 'extra', 'product'].every((x) => d.includes('onclick="openCatColorsDialog(\'' + x + '\')"')) && /function openCatColorsDialog\(focus\)/.test(d) && /function saveCatColors\(done\)/.test(d) && !d.includes('Couleurs des 3 menus</h4>'));
@@ -61,7 +61,7 @@ check('points de couleur (petit bloc)', (lib.catDotsHtml(items).match(/<i class=
   check('couleur d\'un coiffeur : même sélecteur (croix pour fermer), plus celui du navigateur',
     d.includes('onclick="openBarberColorPicker(') && /function openBarberColorPicker\(id\)[\s\S]{0,300}toggleColorPicker\(/.test(d) && /function openColorPicker\(afterEl, hex, title, onChange, trigger\)/.test(d) && !d.includes('type="color" id="barber-color-'));
   check('poste, agenda Jour : heure de fin + étiquettes (petit bloc : points)', p.includes("'<span class=\"t\">' + pdHM(it.start) + ' – ' + pdHM(it.end) + (a.client_time ? pdMovedIconHtml(a) : '') + '</span>") && p.includes('(roomy ? catChipsHtml(cats)') && p.includes(': !narrow ? catDotsHtml(cats)'));
-  check('caisse, frise : heure de fin', c.includes("esc(it.timeLabel) + ' – ' + tbHM(it.startMin + it.durMin) + '</span>"));
+  check('caisse : agenda copié de Mon poste (heure de fin + étiquettes, comme le poste)', c.includes("'<span class=\"t\">' + pdHM(it.start) + ' – ' + pdHM(it.end)") && c.includes('(roomy ? catChipsHtml(cats)'));
   check('heures : plus de Matin / Après-midi (rdv, compte, admin, poste, caisse, groupe)',
     [rdv, compte, p, c, d].every((h) => !/s\.time < '12:00'/.test(h) && !h.includes("'le matin'")) && gb.includes('var morning = (q.slots || []).slice(), aft = [];'));
   check('versions rechargées (app.js v=64, app.css v=58, group-booking v=29)', [d, p, c, rdv, compte, k].every((h) => h.includes('app.js?v=64') && h.includes('app.css?v=58')) && rdv.includes('group-booking.js?v=29'));

@@ -6,7 +6,7 @@ const check = (n, ok, extra) => { (ok ? pass++ : fail++); console.log((ok ? '  O
 const html = fs.readFileSync(__dirname + '/../../public/caisse.html', 'utf8');
 
 check('Timer : un clic sur un suivant appelle openNextClient()', /class=\\"next-info\\" onclick=\\"openNextClient\(/.test(html.replace(/"/g, '\\"').replace(/\\\\"/g, '\\"')) || /next-info\\" onclick=\\"openNextClient/.test(html) || html.includes("next-info\" onclick=\"openNextClient("));
-check('Agenda : la frise appelle toujours openAgendaClientDrawer()', html.includes("'openAgendaClientDrawer(\\'' + it.id + '\\')'") || /openAgendaClientDrawer\(\\'/.test(html));
+check('Agenda (copié du poste) : un RDV ouvre toujours openAgendaClientDrawer()', /function openPosteClientDrawer\(id\) \{[\s\S]{0,200}openAgendaClientDrawer\(id\);/.test(html));
 
 check('Caisse : pastille de categorie active lisible en sombre (texte = couleur de carte, plus #fff sur fond clair)', html.includes("(f === value ? 'var(--card, #fff)' : 'inherit')") && !html.includes("(f === value ? '#fff' : 'inherit')"));
 

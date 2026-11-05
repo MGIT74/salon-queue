@@ -18,6 +18,6 @@ pages.forEach((f) => rd(f).split('\n').forEach((l, i) => {
 }));
 check('aucun ecran n\'ignore la couleur choisie', bad.length === 0, bad.join(', '));
 const c = rd('caisse.html');
-check('agenda de la caisse (points du mois + frise du jour + legende) : couleur choisie', (c.match(/barberColorOf\(bid, allBarbers\)/g) || []).length === 3);
+check('agenda de la caisse (copie de Mon poste) : couleur choisie dans la fiche du coiffeur', c.includes('rdvBarberColors[b.id] = b.color || stableColorForId(b.id)') && c.includes('function barberColor(bid) { return rdvBarberColors[bid] || stableColorForId(bid); }'));
 console.log(`\n${pass} OK, ${fail} ECHEC`);
 process.exit(fail ? 1 : 0);
