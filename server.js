@@ -62,6 +62,8 @@ function securityHeaders(req, res, next) {
   const sameOriginFrame = req.path === '/rdv.html';
   res.setHeader('X-Frame-Options', sameOriginFrame ? 'SAMEORIGIN' : 'DENY');
   res.setHeader('X-Content-Type-Options', 'nosniff');
+  // Application métier : demander aux moteurs de recherche de ne rien indexer.
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive, nosnippet');
   res.setHeader('Referrer-Policy', 'same-origin');
   res.setHeader(
     'Content-Security-Policy',
