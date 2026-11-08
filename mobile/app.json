@@ -1,0 +1,20 @@
+{
+  "expo": {
+    "name": "The Barber One",
+    "slug": "the-barber-one",
+    "scheme": "thebarberone",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.thebarberone.app"
+    },
+    "android": {
+      "package": "com.thebarberone.app"
+    },
+    "extra": {
+      "apiBaseUrl": "https://app.thebarberone.com"
+    }
+  }
+}
