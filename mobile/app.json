@@ -15,6 +15,9 @@
     },
     "extra": {
       "apiBaseUrl": "https://app.thebarberone.com"
-    }
+    },
+    "plugins": [
+      "expo-secure-store"
+    ]
   }
 }

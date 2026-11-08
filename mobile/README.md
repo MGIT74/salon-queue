@@ -36,13 +36,18 @@ Installer **Expo Go** sur le téléphone et scanner le QR code. Si Expo Go n'est
 
 ```
 mobile/
-  App.tsx                  NavigationContainer + thème + RootNavigator
+  App.tsx                  NavigationContainer + thème clair/sombre + RootNavigator
   src/
     api/transport.ts       transport API typé (X-Salon-Slug, 3 sessions) — non branché
+    auth/session.ts        persistance des sessions via expo-secure-store (Keychain/Keystore)
+    components/            composants partagés (ScreenPlaceholder…)
     docs/API_AUDIT.md      audit des endpoints et mécanismes d'authentification
-    navigation/            types + RootNavigator + 4 navigateurs d'espace
+    hooks/useTheme.ts      palette claire/sombre selon le mode système
+    navigation/            RootNavigator + 4 navigateurs d'espace (types dans navigation/types.ts)
     screens/               Accueil + écrans par espace (placeholders documentés)
-    theme/theme.ts         palette et métriques partagées
+    theme/theme.ts         design system : palettes, espacements, arrondis
+    types/api.ts           formes de réponses auditée du serveur (client-auth pour l'instant)
+    utils/format.ts        formatage affichage (prix en centimes, durées)
 ```
 
 ## Consignes OpenCode
