@@ -1,6 +1,6 @@
 // Rendez-vous du client : liste des RDV à venir + réservation en ligne.
 import React from 'react';
-import { ScreenPlaceholder } from '../shared/ScreenPlaceholder';
+import { ScreenPlaceholder } from '../../components/ScreenPlaceholder';
 
 export function RdvScreen() {
   return (

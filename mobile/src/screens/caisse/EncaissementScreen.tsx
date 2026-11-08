@@ -4,10 +4,13 @@
 // le mobile — aucune clé, aucun appel — jusqu'à décision contraire.
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { ScreenPlaceholder } from '../shared/ScreenPlaceholder';
-import { colors, radius, spacing } from '../../theme/theme';
+import { ScreenPlaceholder } from '../../components/ScreenPlaceholder';
+import { useTheme } from '../../hooks/useTheme';
+import { Palette, radius, spacing } from '../../theme/theme';
 
 export function EncaissementScreen() {
+  const t = useTheme();
+  const styles = stylesFor(t);
   return (
     <View style={styles.container}>
       <View style={styles.notice}>
@@ -26,16 +29,17 @@ export function EncaissementScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  notice: {
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.md,
-    padding: spacing.md,
-    borderRadius: radius.button,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-    backgroundColor: colors.surface,
-  },
-  noticeText: { color: colors.textSecondary, fontSize: 13, lineHeight: 19 },
-});
+const stylesFor = (t: Palette) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: t.background },
+    notice: {
+      marginHorizontal: spacing.lg,
+      marginTop: spacing.md,
+      padding: spacing.md,
+      borderRadius: radius.button,
+      borderWidth: 1,
+      borderColor: t.surfaceBorder,
+      backgroundColor: t.surface,
+    },
+    noticeText: { color: t.textSecondary, fontSize: 13, lineHeight: 19 },
+  });

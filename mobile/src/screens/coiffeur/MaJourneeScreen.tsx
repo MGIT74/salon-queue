@@ -1,6 +1,6 @@
 // Ma journée (coiffeur) : file à traiter, actions de coupe, RDV à venir.
 import React from 'react';
-import { ScreenPlaceholder } from '../shared/ScreenPlaceholder';
+import { ScreenPlaceholder } from '../../components/ScreenPlaceholder';
 
 export function MaJourneeScreen() {
   return (

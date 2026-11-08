@@ -1,28 +1,32 @@
 import React from 'react';
+import { useColorScheme } from 'react-native';
 import { DarkTheme, NavigationContainer } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 import { RootNavigator } from './src/navigation/RootNavigator';
-import { colors } from './src/theme/theme';
-
-// Thème React Navigation calé sur le thème "salon" : même fond, même
-// accent doré, bordures discrètes — cohérence entre la barre système,
-// les onglets et les écrans (qui lisent src/theme/theme.ts).
-const NavigationTheme = {
-  ...DarkTheme,
-  colors: {
-    ...DarkTheme.colors,
-    primary: colors.accent,
-    background: colors.background,
-    card: colors.surface,
-    text: colors.textPrimary,
-    border: colors.surfaceBorder,
-  },
-};
+import { themeFor } from './src/theme/theme';
 
 export default function App() {
+  const scheme = useColorScheme();
+  const palette = themeFor(scheme);
+
+  // Thème React Navigation calculé depuis la palette active (clair/sombre) :
+  // fond, cartes et accent identiques à ceux des écrans — chrome de
+  // navigation et contenu ne peuvent pas se désynchroniser.
+  const navigationTheme = {
+    ...DarkTheme,
+    colors: {
+      ...DarkTheme.colors,
+      primary: palette.accent,
+      background: palette.background,
+      card: palette.surface,
+      text: palette.textPrimary,
+      border: palette.surfaceBorder,
+    },
+  };
+
   return (
-    <NavigationContainer theme={NavigationTheme}>
-      <StatusBar style="light" />
+    <NavigationContainer theme={navigationTheme}>
+      <StatusBar style={palette.scheme === 'dark' ? 'light' : 'dark'} />
       <RootNavigator />
     </NavigationContainer>
   );

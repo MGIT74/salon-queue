@@ -1,7 +1,7 @@
 // Journées de caisse : périodes (pont/rotation), recomptages, clôtures Z.
 // Paiement Nepting exclu (voir EncaissementScreen).
 import React from 'react';
-import { ScreenPlaceholder } from '../shared/ScreenPlaceholder';
+import { ScreenPlaceholder } from '../../components/ScreenPlaceholder';
 
 export function JourneesScreen() {
   return (

@@ -1,6 +1,6 @@
 // Réglages (administration) : salon, SMTP, SMS, TVA, calendrier.
 import React from 'react';
-import { ScreenPlaceholder } from '../shared/ScreenPlaceholder';
+import { ScreenPlaceholder } from '../../components/ScreenPlaceholder';
 
 export function ReglagesScreen() {
   return (

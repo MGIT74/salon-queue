@@ -1,6 +1,6 @@
 // Tableau de bord (administration) : statistiques du salon.
 import React from 'react';
-import { ScreenPlaceholder } from '../shared/ScreenPlaceholder';
+import { ScreenPlaceholder } from '../../components/ScreenPlaceholder';
 
 export function DashboardScreen() {
   return (

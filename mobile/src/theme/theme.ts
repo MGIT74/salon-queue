@@ -1,8 +1,24 @@
-// Thème unique de l'application mobile The Barber One.
-// Toutes les couleurs et métriques passent par ici : les futurs écrans
-// réutilisent ces valeurs, les navigateurs en dérivent le thème React
-// Navigation. Garde-fou : ne jamais colorer en dur dans un écran.
-export const colors = {
+// Design system The Barber One — métriques + palettes claire/sombre.
+// Identité : fond sombre « barbershop » (doré sur #101010) et une palette
+// claire équivalente pour les iPhone/Android réglés en mode clair.
+// Les écrans consomment via useTheme() (src/hooks/useTheme.ts), les
+// navigateurs construisent leurs options à partir de la même palette.
+// Règle du projet : ne JAMAIS coder une couleur en dur dans un écran.
+export type Palette = {
+  scheme: 'light' | 'dark';
+  background: string;
+  surface: string;
+  surfaceBorder: string;
+  accent: string;
+  accentText: string;
+  textPrimary: string;
+  textSecondary: string;
+  textMuted: string;
+  danger: string;
+};
+
+export const darkPalette: Palette = {
+  scheme: 'dark',
   background: '#101010',
   surface: '#202020',
   surfaceBorder: '#383838',
@@ -12,7 +28,25 @@ export const colors = {
   textSecondary: '#bbbbbb',
   textMuted: '#b7b7b7',
   danger: '#c0392b',
-} as const;
+};
+
+export const lightPalette: Palette = {
+  scheme: 'light',
+  background: '#f7f3ec',
+  surface: '#ffffff',
+  surfaceBorder: '#e4dccd',
+  // Doré foncé : le #c7a77a clair du thème sombre ne passe pas sur fond clair.
+  accent: '#8a5c28',
+  accentText: '#ffffff',
+  textPrimary: '#17140f',
+  textSecondary: '#4a453d',
+  textMuted: '#7a7365',
+  danger: '#a31212',
+};
+
+export function themeFor(scheme: 'light' | 'dark' | null | undefined): Palette {
+  return scheme === 'light' ? lightPalette : darkPalette;
+}
 
 export const spacing = {
   xs: 4,

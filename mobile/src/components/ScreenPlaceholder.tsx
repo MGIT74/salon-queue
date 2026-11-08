@@ -3,7 +3,8 @@
 // Chaque écran réel remplacera progressivement ce contenu.
 import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { colors, radius, spacing } from '../../theme/theme';
+import { Palette, radius, spacing } from '../theme/theme';
+import { useTheme } from '../hooks/useTheme';
 
 export type ScreenPlaceholderProps = {
   description: string;
@@ -12,6 +13,8 @@ export type ScreenPlaceholderProps = {
 };
 
 export function ScreenPlaceholder({ description, checklist = [], authNote }: ScreenPlaceholderProps) {
+  const t = useTheme();
+  const styles = stylesFor(t);
   return (
     <ScrollView contentContainerStyle={styles.content}>
       <View style={styles.panel}>
@@ -30,34 +33,34 @@ export function ScreenPlaceholder({ description, checklist = [], authNote }: Scr
   );
 }
 
-const styles = StyleSheet.create({
-  content: {
-    padding: spacing.lg,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.xl,
-    gap: spacing.md,
-  },
-  panel: {
-    backgroundColor: colors.surface,
-    borderColor: colors.surfaceBorder,
-    borderWidth: 1,
-    borderRadius: radius.card,
-    padding: spacing.lg,
-    gap: spacing.sm + 2,
-  },
-  status: {
-    color: colors.accent,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    fontSize: 11,
-    letterSpacing: 2,
-  },
-  description: {
-    color: colors.textSecondary,
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  checklist: { gap: 6, marginTop: 4 },
-  checklistItem: { color: colors.textMuted, fontSize: 14, lineHeight: 20 },
-  authNote: { color: colors.textMuted, fontSize: 13, fontStyle: 'italic', marginTop: 4 },
-});
+const stylesFor = (t: Palette) =>
+  StyleSheet.create({
+    content: {
+      padding: spacing.lg,
+      paddingBottom: spacing.xl,
+      gap: spacing.md,
+    },
+    panel: {
+      backgroundColor: t.surface,
+      borderColor: t.surfaceBorder,
+      borderWidth: 1,
+      borderRadius: radius.card,
+      padding: spacing.lg,
+      gap: spacing.sm + 2,
+    },
+    status: {
+      color: t.accent,
+      fontWeight: '700',
+      textTransform: 'uppercase',
+      fontSize: 11,
+      letterSpacing: 2,
+    },
+    description: {
+      color: t.textSecondary,
+      fontSize: 15,
+      lineHeight: 22,
+    },
+    checklist: { gap: 6, marginTop: 4 },
+    checklistItem: { color: t.textMuted, fontSize: 14, lineHeight: 20 },
+    authNote: { color: t.textMuted, fontSize: 13, fontStyle: 'italic', marginTop: 4 },
+  });

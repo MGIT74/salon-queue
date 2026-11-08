@@ -3,6 +3,7 @@
 // X-Admin-Password côté transport (src/api/transport.ts).
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../hooks/useTheme';
 import { tabBarScreenOptions } from './screenOptions';
 import { AdminTabsParamList } from './types';
 import { CatalogueScreen } from '../screens/admin/CatalogueScreen';
@@ -13,8 +14,9 @@ import { ReglagesScreen } from '../screens/admin/ReglagesScreen';
 const AdminTabs = createBottomTabNavigator<AdminTabsParamList>();
 
 export function AdminNavigator() {
+  const t = useTheme();
   return (
-    <AdminTabs.Navigator screenOptions={tabBarScreenOptions}>
+    <AdminTabs.Navigator screenOptions={tabBarScreenOptions(t)}>
       <AdminTabs.Screen
         name="AdminDashboard"
         component={DashboardScreen}

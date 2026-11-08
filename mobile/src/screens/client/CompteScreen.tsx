@@ -1,6 +1,6 @@
 // Compte client : profil, fidélité, proches, cartes cadeaux.
 import React from 'react';
-import { ScreenPlaceholder } from '../shared/ScreenPlaceholder';
+import { ScreenPlaceholder } from '../../components/ScreenPlaceholder';
 
 export function CompteScreen() {
   return (

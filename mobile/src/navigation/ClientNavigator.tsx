@@ -2,6 +2,7 @@
 // Préparé pour les API publiques/client sans auth admin ou coiffeur.
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../hooks/useTheme';
 import { tabBarScreenOptions } from './screenOptions';
 import { ClientTabsParamList } from './types';
 import { CompteScreen } from '../screens/client/CompteScreen';
@@ -11,8 +12,9 @@ import { RdvScreen } from '../screens/client/RdvScreen';
 const ClientTabs = createBottomTabNavigator<ClientTabsParamList>();
 
 export function ClientNavigator() {
+  const t = useTheme();
   return (
-    <ClientTabs.Navigator screenOptions={tabBarScreenOptions}>
+    <ClientTabs.Navigator screenOptions={tabBarScreenOptions(t)}>
       <ClientTabs.Screen
         name="ClientFile"
         component={FileScreen}

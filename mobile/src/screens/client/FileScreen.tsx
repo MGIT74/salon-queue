@@ -1,6 +1,6 @@
 // File d'attente côté client : position en temps réel et rappel de tour.
 import React from 'react';
-import { ScreenPlaceholder } from '../shared/ScreenPlaceholder';
+import { ScreenPlaceholder } from '../../components/ScreenPlaceholder';
 
 export function FileScreen() {
   return (

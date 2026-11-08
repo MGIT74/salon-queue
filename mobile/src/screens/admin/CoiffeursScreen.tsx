@@ -1,6 +1,6 @@
 // Coiffeurs (administration) : équipe, horaires hebdo, congés, PIN.
 import React from 'react';
-import { ScreenPlaceholder } from '../shared/ScreenPlaceholder';
+import { ScreenPlaceholder } from '../../components/ScreenPlaceholder';
 
 export function CoiffeursScreen() {
   return (

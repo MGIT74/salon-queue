@@ -1,6 +1,6 @@
 // Catalogue (administration) : prestations, suppléments, produits, catégories.
 import React from 'react';
-import { ScreenPlaceholder } from '../shared/ScreenPlaceholder';
+import { ScreenPlaceholder } from '../../components/ScreenPlaceholder';
 
 export function CatalogueScreen() {
   return (
