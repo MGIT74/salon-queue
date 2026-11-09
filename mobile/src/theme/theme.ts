@@ -20,13 +20,13 @@ export type Palette = {
 export const darkPalette: Palette = {
   scheme: 'dark',
   background: '#101010',
-  surface: '#202020',
-  surfaceBorder: '#383838',
+  surface: '#1a1a1e',
+  surfaceBorder: '#2e2e34',
   accent: '#c7a77a',
   accentText: '#101010',
   textPrimary: '#ffffff',
-  textSecondary: '#bbbbbb',
-  textMuted: '#b7b7b7',
+  textSecondary: '#b9b9bf',
+  textMuted: '#8e8e94',
   danger: '#c0392b',
 };
 

@@ -9,6 +9,7 @@ import { fetchClientMe, logoutClient } from '../../api/endpoints';
 import { ClientMeResponse } from '../../types/api';
 import { useAuth } from '../../auth/AuthContext';
 import { SessionBanner } from '../../components/SessionBanner';
+import { Card } from '../../components/Card';
 import { LoadingView } from '../../components/AuthForm';
 import { useTheme } from '../../hooks/useTheme';
 import { Palette, radius, spacing } from '../../theme/theme';
@@ -144,16 +145,6 @@ export function CompteScreen() {
         )}
       </Card>
     </ScrollView>
-  );
-}
-
-function Card({ title, children, t }: { title: string; children: React.ReactNode; t: Palette }) {
-  const styles = stylesFor(t);
-  return (
-    <View style={styles.card}>
-      <Text style={styles.cardTitle}>{title}</Text>
-      <View style={styles.cardBody}>{children}</View>
-    </View>
   );
 }
 
