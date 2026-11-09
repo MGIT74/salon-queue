@@ -2,6 +2,7 @@ import React from 'react';
 import { useColorScheme } from 'react-native';
 import { DarkTheme, NavigationContainer } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
+import { AuthProvider } from './src/auth/AuthContext';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { themeFor } from './src/theme/theme';
 
@@ -25,9 +26,11 @@ export default function App() {
   };
 
   return (
-    <NavigationContainer theme={navigationTheme}>
-      <StatusBar style={palette.scheme === 'dark' ? 'light' : 'dark'} />
-      <RootNavigator />
-    </NavigationContainer>
+    <AuthProvider>
+      <NavigationContainer theme={navigationTheme}>
+        <StatusBar style={palette.scheme === 'dark' ? 'light' : 'dark'} />
+        <RootNavigator />
+      </NavigationContainer>
+    </AuthProvider>
   );
 }
