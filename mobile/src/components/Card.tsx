@@ -13,7 +13,7 @@ export function Card({ title, children, t, tone }: {
   const styles = stylesFor(t, tone === 'warn');
   return (
     <View style={styles.card}>
-      <Text style={[styles.cardTitle, tone === 'warn' && { color: t.danger }]}>{title}</Text>
+      <Text style={[styles.cardTitle, tone === 'warn' && { color: t.red }]}>{title}</Text>
       <View style={styles.cardBody}>{children}</View>
     </View>
   );
@@ -22,15 +22,15 @@ export function Card({ title, children, t, tone }: {
 const stylesFor = (t: Palette, warn: boolean) =>
   StyleSheet.create({
     card: {
-      backgroundColor: t.surface,
-      borderColor: warn ? t.danger : t.surfaceBorder,
+      backgroundColor: t.card,
+      borderColor: warn ? t.red : t.sep,
       borderWidth: 1,
       borderRadius: radius.card,
       padding: spacing.md + 2,
       gap: spacing.sm + 2,
     },
     cardTitle: {
-      color: t.accent,
+      color: t.blue,
       fontSize: 12,
       fontWeight: '700',
       textTransform: 'uppercase',

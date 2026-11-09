@@ -121,7 +121,7 @@ export function RdvScreen() {
 
         <Card title="Rendez-vous à venir" t={t}>
           {me.loading && !me.data ? (
-            <ActivityIndicator color={t.accent} />
+            <ActivityIndicator color={t.blue} />
           ) : me.error ? (
             <Text style={styles.text}>
               Impossible de charger vos rendez-vous
@@ -284,7 +284,7 @@ function BookingWizard({ t, onDone, onCancel }: WizardProps) {
 
   if (error && !services && step === 'service') {
     return (
-      <ScrollView style={{ flex: 1, backgroundColor: t.background }} contentContainerStyle={styles.content}>
+      <ScrollView style={{ flex: 1, backgroundColor: t.bg }} contentContainerStyle={styles.content}>
         <FormErrorView error={error} t={t} />
         <TouchableOpacity style={styles.cta} accessibilityRole="button" onPress={onCancel}>
           <Text style={styles.ctaLabel}>Retour</Text>
@@ -303,7 +303,7 @@ function BookingWizard({ t, onDone, onCancel }: WizardProps) {
   ];
 
   return (
-    <View style={{ flex: 1, backgroundColor: t.background }}>
+    <View style={{ flex: 1, backgroundColor: t.bg }}>
       <View style={styles.stepBar}>
         {steps.map((s, i) => (
           <View key={s.id} style={[styles.stepDot, step === s.id && styles.stepDotActive]}>
@@ -399,7 +399,7 @@ function BookingWizard({ t, onDone, onCancel }: WizardProps) {
               })}
             </ScrollView>
             {slotsLoading ? (
-              <ActivityIndicator color={t.accent} style={{ marginTop: spacing.md }} />
+              <ActivityIndicator color={t.blue} style={{ marginTop: spacing.md }} />
             ) : slotsError ? (
               <FormErrorView error={slotsError} t={t} />
             ) : slots && slots.length > 0 ? (
@@ -494,7 +494,7 @@ function ConfirmStep({ t, error, date, slot, service, extraNames, barberName, no
         value={note}
         onChangeText={(v) => onChangeNote(v.slice(0, 500))}
         placeholder="Allergies, coupe déjà vue, accompagnant…"
-        placeholderTextColor={t.textMuted}
+        placeholderTextColor={t.grey}
         multiline
       />
       <TouchableOpacity style={styles.ghost} onPress={onBackDate} accessibilityRole="button">
@@ -502,7 +502,7 @@ function ConfirmStep({ t, error, date, slot, service, extraNames, barberName, no
       </TouchableOpacity>
       <FormErrorView error={error} t={t} />
       <TouchableOpacity style={[styles.cta, busy && { opacity: 0.5 }]} disabled={busy} onPress={onConfirm} accessibilityRole="button">
-        {busy ? <ActivityIndicator color={t.accentText} /> : <Text style={styles.ctaLabel}>Confirmer le rendez-vous</Text>}
+        {busy ? <ActivityIndicator color={'#fff'} /> : <Text style={styles.ctaLabel}>Confirmer le rendez-vous</Text>}
       </TouchableOpacity>
     </View>
   );
@@ -512,68 +512,68 @@ function ConfirmStep({ t, error, date, slot, service, extraNames, barberName, no
 
 const stylesFor = (t: Palette) =>
   StyleSheet.create({
-    container: { flex: 1, backgroundColor: t.background },
+    container: { flex: 1, backgroundColor: t.bg },
     content: { padding: spacing.lg, paddingBottom: spacing.xl + spacing.md, gap: spacing.md },
-    text: { color: t.textSecondary, fontSize: 15, lineHeight: 21 },
-    big: { color: t.textPrimary, fontSize: 22, fontWeight: '700' },
-    note: { color: t.textMuted, fontSize: 13, fontStyle: 'italic', lineHeight: 19 },
-    cta: { backgroundColor: t.accent, borderRadius: radius.button, paddingVertical: 15, alignItems: 'center' },
-    ctaLabel: { color: t.accentText, fontWeight: '700', fontSize: 16 },
+    text: { color: t.grey, fontSize: 15, lineHeight: 21 },
+    big: { color: t.ink, fontSize: 22, fontWeight: '700' },
+    note: { color: t.grey, fontSize: 13, fontStyle: 'italic', lineHeight: 19 },
+    cta: { backgroundColor: t.blue, borderRadius: radius.button, paddingVertical: 15, alignItems: 'center' },
+    ctaLabel: { color: '#fff', fontWeight: '700', fontSize: 16 },
     rdvRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md, paddingVertical: 4 },
-    rdvWhen: { color: t.textPrimary, fontWeight: '700', fontSize: 15 },
-    cancelLink: { color: t.danger, fontWeight: '600', fontSize: 13 },
+    rdvWhen: { color: t.ink, fontWeight: '700', fontSize: 15 },
+    cancelLink: { color: t.red, fontWeight: '600', fontSize: 13 },
     stepBar: {
       flexDirection: 'row', gap: spacing.xs, paddingHorizontal: spacing.lg,
       paddingTop: spacing.md, paddingBottom: spacing.sm, flexWrap: 'wrap',
     },
     stepDot: {
-      borderColor: t.surfaceBorder, borderWidth: StyleSheet.hairlineWidth, backgroundColor: t.surface,
+      borderColor: t.sep, borderWidth: StyleSheet.hairlineWidth, backgroundColor: t.card,
       borderRadius: 100, paddingHorizontal: 10, paddingVertical: 4,
     },
-    stepDotActive: { backgroundColor: t.accent, borderColor: t.accent },
-    stepText: { color: t.textMuted, fontSize: 11, fontWeight: '700' },
-    stepTextActive: { color: t.accentText },
+    stepDotActive: { backgroundColor: t.blue, borderColor: t.blue },
+    stepText: { color: t.grey, fontSize: 11, fontWeight: '700' },
+    stepTextActive: { color: '#fff' },
     choice: {
-      backgroundColor: t.surface, borderColor: t.surfaceBorder, borderWidth: StyleSheet.hairlineWidth,
+      backgroundColor: t.card, borderColor: t.sep, borderWidth: StyleSheet.hairlineWidth,
       borderRadius: radius.card, padding: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.md,
     },
-    choiceOn: { borderColor: t.accent, borderWidth: 1.5 },
-    choiceTitle: { color: t.textPrimary, fontSize: 16, fontWeight: '700' },
-    choiceSub: { color: t.textMuted, fontSize: 13 },
-    radio: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: t.textMuted },
-    radioOn: { backgroundColor: t.accent, borderColor: t.accent },
+    choiceOn: { borderColor: t.blue, borderWidth: 1.5 },
+    choiceTitle: { color: t.ink, fontSize: 16, fontWeight: '700' },
+    choiceSub: { color: t.grey, fontSize: 13 },
+    radio: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: t.grey },
+    radioOn: { backgroundColor: t.blue, borderColor: t.blue },
     extraBlock: { gap: spacing.sm, marginTop: spacing.sm },
-    extrasTitle: { color: t.textSecondary, fontSize: 13, fontWeight: '700' },
+    extrasTitle: { color: t.grey, fontSize: 13, fontWeight: '700' },
     chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
     chip: {
-      borderColor: t.surfaceBorder, borderWidth: StyleSheet.hairlineWidth, backgroundColor: t.surface,
+      borderColor: t.sep, borderWidth: StyleSheet.hairlineWidth, backgroundColor: t.card,
       borderRadius: 100, paddingHorizontal: 12, paddingVertical: 7,
     },
-    chipOn: { backgroundColor: t.accent, borderColor: t.accent },
-    chipText: { color: t.textSecondary, fontSize: 13, fontWeight: '600' },
-    chipTextOn: { color: t.accentText },
+    chipOn: { backgroundColor: t.blue, borderColor: t.blue },
+    chipText: { color: t.grey, fontSize: 13, fontWeight: '600' },
+    chipTextOn: { color: '#fff' },
     dayRow: { marginBottom: spacing.sm },
     dayChip: {
-      borderColor: t.surfaceBorder, borderWidth: StyleSheet.hairlineWidth, backgroundColor: t.surface,
+      borderColor: t.sep, borderWidth: StyleSheet.hairlineWidth, backgroundColor: t.card,
       borderRadius: radius.button, paddingHorizontal: 12, paddingVertical: 8, marginRight: spacing.sm,
     },
-    dayChipOn: { backgroundColor: t.accent, borderColor: t.accent },
+    dayChipOn: { backgroundColor: t.blue, borderColor: t.blue },
     dayChipOff: { opacity: 0.35 },
-    dayChipText: { color: t.textSecondary, fontSize: 13, fontWeight: '600' },
-    dayChipTextOn: { color: t.accentText },
+    dayChipText: { color: t.grey, fontSize: 13, fontWeight: '600' },
+    dayChipTextOn: { color: '#fff' },
     slotGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
     slotChip: {
-      backgroundColor: t.surface, borderColor: t.surfaceBorder, borderWidth: StyleSheet.hairlineWidth,
+      backgroundColor: t.card, borderColor: t.sep, borderWidth: StyleSheet.hairlineWidth,
       borderRadius: radius.button, paddingHorizontal: 12, paddingVertical: 8, flexGrow: 1, minWidth: 130,
     },
-    slotChipOn: { borderWidth: 1.5, borderColor: t.accent, backgroundColor: t.accent },
-    slotTime: { color: t.textPrimary, fontSize: 16, fontWeight: '700' },
-    slotTextOn: { color: t.accentText },
-    slotSub: { color: t.textMuted, fontSize: 12, marginTop: 2 },
+    slotChipOn: { borderWidth: 1.5, borderColor: t.blue, backgroundColor: t.blue },
+    slotTime: { color: t.ink, fontSize: 16, fontWeight: '700' },
+    slotTextOn: { color: '#fff' },
+    slotSub: { color: t.grey, fontSize: 12, marginTop: 2 },
     noteInput: {
-      backgroundColor: t.surface, borderColor: t.surfaceBorder, borderWidth: StyleSheet.hairlineWidth,
-      borderRadius: radius.button, color: t.textPrimary, padding: spacing.md, minHeight: 80, textAlignVertical: 'top',
+      backgroundColor: t.card, borderColor: t.sep, borderWidth: StyleSheet.hairlineWidth,
+      borderRadius: radius.button, color: t.ink, padding: spacing.md, minHeight: 80, textAlignVertical: 'top',
     },
     ghost: { alignItems: 'center', paddingVertical: 6 },
-    ghostLabel: { color: t.textMuted, fontSize: 14, fontWeight: '600' },
+    ghostLabel: { color: t.grey, fontSize: 14, fontWeight: '600' },
   });

@@ -1,15 +1,14 @@
-// Connexion de l'espace client — API réelle POST /api/client-auth/login.
-// Le jeton de session (X-Client-Token) est ensuite conservé dans le
-// SecureStore par le AuthProvider. La création de compte viendra avec la
-// Phase 3 ; rien de fictif ici : seul un compte réel peut se connecter.
+// Connexion Espace client — même carton que le web (compte.html #login-screen)
+// : Email + Mot de passe, flux API POST /api/client-auth/login (session 90 j).
 import React, { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { FormErrorView, LabeledField, SubmitButton } from '../../components/AuthForm';
 import { useAuth } from '../../auth/AuthContext';
 import { useTheme } from '../../hooks/useTheme';
-import { Palette, brand, radius, spacing } from '../../theme/theme';
+import { Palette, radius, spacing } from '../../theme/theme';
 
-export function ClientLoginScreen() {
+export function ClientLoginScreen({ onBack }: { onBack: () => void }) {
   const { salonRef, loginClient } = useAuth();
   const [salonSlug, setSalonSlug] = useState(salonRef?.slug ?? '');
   const [email, setEmail] = useState('');
@@ -36,40 +35,44 @@ export function ClientLoginScreen() {
   return (
     <KeyboardAvoidingView style={styles.safe} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={styles.brand}>THE BARBER ONE</Text>
-        <Text style={styles.title}>Connexion client</Text>
-        <Text style={styles.subtitle}>
-          Identifiez-vous avec l'email utilisé chez votre salon (le salon doit vous avoir activé
-          l'espace client).
-        </Text>
-        <LabeledField
-          label="Salon (identifiant, ex. le-salon)"
-          t={t}
-          value={salonSlug}
-          onChangeText={setSalonSlug}
-          placeholder="Laisser vide si un seul salon"
-        />
-        <LabeledField
-          label="Email"
-          t={t}
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          textContentType="emailAddress"
-        />
-        <LabeledField
-          label="Mot de passe"
-          t={t}
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          textContentType="password"
-        />
-        <FormErrorView error={error} t={t} />
-        <SubmitButton label="Se connecter" t={t} busy={busy} disabled={!email.trim() || !password} onPress={submit} />
-        <Text style={styles.hint}>
-          Créer un compte client : prévu à la Phase 3 (réservation, historique, fidélité).
-        </Text>
+        <TouchableOpacity style={styles.back} onPress={onBack} accessibilityRole="button">
+          <Ionicons name="chevron-back" size={20} color={t.blue} />
+          <Text style={styles.backLabel}>Retour</Text>
+        </TouchableOpacity>
+
+        <View style={styles.formCard}>
+          <View style={styles.glowIcon}>
+            <Ionicons name="person-outline" size={24} color={t.blue} />
+          </View>
+          <Text style={styles.title}>Espace client</Text>
+          <Text style={styles.sub}>Email et mot de passe de votre compte chez le salon.</Text>
+          <LabeledField
+            label="Salon (identifiant, ex. le-salon)"
+            t={t}
+            value={salonSlug}
+            onChangeText={setSalonSlug}
+            placeholder="Laisser vide si un seul salon"
+          />
+          <LabeledField
+            label="Email"
+            t={t}
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            textContentType="emailAddress"
+          />
+          <LabeledField
+            label="Mot de passe"
+            t={t}
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            textContentType="password"
+          />
+          <FormErrorView error={error} t={t} />
+          <SubmitButton label="Se connecter" t={t} busy={busy} disabled={!email.trim() || !password} onPress={submit} />
+          <Text style={styles.hint}>Pas encore de compte ? Créez-le depuis la page du salon (compte.html).</Text>
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -77,10 +80,27 @@ export function ClientLoginScreen() {
 
 const stylesFor = (t: Palette) =>
   StyleSheet.create({
-    safe: { flex: 1, backgroundColor: t.background },
-    content: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl, gap: spacing.md, paddingTop: spacing.lg },
-    brand: { color: t.accent, fontWeight: '700', letterSpacing: brand.letterSpacing, fontSize: 13 },
-    title: { color: t.textPrimary, fontSize: 28, fontWeight: '700', marginTop: spacing.sm },
-    subtitle: { color: t.textMuted, fontSize: 15, lineHeight: 22, marginBottom: spacing.md },
-    hint: { color: t.textMuted, fontSize: 13, fontStyle: 'italic', marginTop: spacing.md, textAlign: 'center' },
+    safe: { flex: 1, backgroundColor: t.bg },
+    content: { padding: spacing.lg, paddingBottom: spacing.xl, gap: spacing.md, paddingTop: spacing.md },
+    back: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    backLabel: { color: t.blue, fontSize: 15, fontWeight: '600' },
+    formCard: {
+      backgroundColor: t.card,
+      borderColor: t.sep,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderRadius: radius.card,
+      padding: spacing.lg,
+      gap: spacing.md,
+    },
+    glowIcon: {
+      width: 48,
+      height: 48,
+      borderRadius: 12,
+      backgroundColor: t.blueSoft,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    title: { color: t.ink, fontSize: 22, fontWeight: '700', letterSpacing: -0.4 },
+    sub: { color: t.grey, fontSize: 14, lineHeight: 20, marginBottom: spacing.xs },
+    hint: { color: t.grey, fontSize: 12.5, fontStyle: 'italic', textAlign: 'center' },
   });

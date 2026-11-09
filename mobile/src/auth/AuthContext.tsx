@@ -1,11 +1,9 @@
-// Contexte d'authentification TBO (Phase 2). Trois univers strictement
-// séparés, conformes à l'audit : mot de passe admin, PIN coiffeur, session
-// client opaque. Persistance expo-secure-store (src/auth/session.ts).
-// Le mot de passe admin est conservé dans le SecureStore car le serveur le
-// revalide à CHAQUE appel (en-tête X-Admin-Password, aucun jeton émis) —
-// il s'agit d'un identifiant saisi par l'utilisateur à la connexion, pas
-// d'un secret packagé dans le bundle. Aucune clé Nepting jamais stockée.
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+// Contexte d'authentification TBO — PARCOURS WEB ORIGINAL.
+// Admin : EMAIL + mot de passe → POST /api/signup/login-lookup → salons de
+// l'enseigne (sélecteur du menu latéral) ; chaque appel ensuite avec
+// X-Admin-Password. Coiffeur : PIN (X-Barber-Id / X-Barber-Pin). Client :
+// jeton opaque X-Client-Token. Persistance expo-secure-store seulement.
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AdminSession,
   BarberSession,
@@ -19,7 +17,7 @@ import {
   saveSalonRef,
   saveSession,
 } from './session';
-import { loginAdmin as apiLoginAdmin, loginBarber as apiLoginBarber, loginClient as apiLoginClient } from '../api/endpoints';
+import { loginOwnerSalons } from '../api/endpoints';
 
 export type AuthState = {
   /** Lancement effectué (sessions rechargées du SecureStore). */
@@ -31,9 +29,11 @@ export type AuthState = {
 };
 
 export type AuthContextValue = AuthState & {
-  loginAdmin(salonSlug: string, adminPassword: string): Promise<void>;
+  loginAdmin(email: string, password: string): Promise<void>;
   loginBarber(salonSlug: string, pin: string): Promise<void>;
   loginClient(salonSlug: string, email: string, password: string): Promise<void>;
+  /** Sélecteur d'enseigne du menu latéral (web : salon-switcher). */
+  switchAdminSalon(slug: string): Promise<void>;
   logout(kind: SessionKind): Promise<void>;
 };
 
@@ -43,6 +43,8 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AuthState>(emptyState);
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
   useEffect(() => {
     let cancelled = false;
@@ -66,52 +68,91 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const commit = useCallback(async (salonSlug: string, sessions: TboSession[]) => {
-    const slug = salonSlug.trim();
-    if (slug) await saveSalonRef({ slug });
+    if (salonSlug) await saveSalonRef({ slug: salonSlug });
     for (const s of sessions) await saveSession(s);
   }, []);
 
-  const loginAdminImpl = useCallback(async (salonSlug: string, adminPassword: string) => {
-    await apiLoginAdmin(salonSlug.trim(), adminPassword);
-    const session: AdminSession = { kind: 'admin', salonSlug: salonSlug.trim(), adminPassword };
-    await commit(salonSlug, [session]);
-    setState((prev) => ({ ...prev, salonRef: salonSlug.trim() ? { slug: salonSlug.trim() } : prev.salonRef, admin: session }));
-  }, [commit]);
+  const loginAdminImpl = useCallback(
+    async (email: string, password: string) => {
+      const { salons } = await loginOwnerSalons(email.trim(), password);
+      const session: AdminSession = {
+        kind: 'admin',
+        salonSlug: salons[0]?.slug ?? '',
+        adminPassword: password,
+        email: email.trim(),
+        salons,
+      };
+      await commit(session.salonSlug, [session]);
+      setState((prev) => ({
+        ...prev,
+        salonRef: session.salonSlug ? { slug: session.salonSlug, name: salons[0]?.name } : prev.salonRef,
+        admin: session,
+      }));
+    },
+    [commit]
+  );
 
-  const loginBarberImpl = useCallback(async (salonSlug: string, pin: string) => {
-    const { barber } = await apiLoginBarber(salonSlug.trim(), pin, 'poste');
-    const session: BarberSession = {
-      kind: 'barber',
-      salonSlug: salonSlug.trim(),
-      barberId: String(barber.id),
-      barberPin: pin.trim(),
-      barberName: barber.name,
-    };
-    await commit(salonSlug, [session]);
-    setState((prev) => ({ ...prev, salonRef: salonSlug.trim() ? { slug: salonSlug.trim() } : prev.salonRef, barber: session }));
-  }, [commit]);
+  const switchAdminSalon = useCallback(async (slug: string) => {
+    const current = stateRef.current.admin;
+    if (!current || current.salonSlug === slug) return;
+    const next: AdminSession = { ...current, salonSlug: slug };
+    await saveSession(next);
+    await saveSalonRef({ slug });
+    setState((prev) => ({ ...prev, admin: next, salonRef: { slug } }));
+  }, []);
 
-  const loginClientImpl = useCallback(async (salonSlug: string, email: string, password: string) => {
-    const { token } = await apiLoginClient(salonSlug.trim(), email.trim(), password);
-    const session: ClientSession = { kind: 'client', salonSlug: salonSlug.trim(), clientToken: token };
-    await commit(salonSlug, [session]);
-    setState((prev) => ({ ...prev, salonRef: salonSlug.trim() ? { slug: salonSlug.trim() } : prev.salonRef, client: session }));
-  }, [commit]);
+  const loginBarberImpl = useCallback(
+    async (salonSlug: string, pin: string) => {
+      // Import différé évité : appel direct (endpoints n'importe pas le contexte).
+      const { loginBarber: apiLoginBarber } = await import('../api/endpoints');
+      const { barber } = await apiLoginBarber(salonSlug.trim(), pin, 'poste');
+      const session: BarberSession = {
+        kind: 'barber',
+        salonSlug: salonSlug.trim(),
+        barberId: String(barber.id),
+        barberPin: pin.trim(),
+        barberName: barber.name,
+      };
+      await commit(salonSlug, [session]);
+      setState((prev) => ({
+        ...prev,
+        salonRef: salonSlug.trim() ? { slug: salonSlug.trim() } : prev.salonRef,
+        barber: session,
+      }));
+    },
+    [commit]
+  );
+
+  const loginClientImpl = useCallback(
+    async (salonSlug: string, email: string, password: string) => {
+      const { loginClient: apiLoginClient } = await import('../api/endpoints');
+      const { token } = await apiLoginClient(salonSlug.trim(), email.trim(), password);
+      const session: ClientSession = { kind: 'client', salonSlug: salonSlug.trim(), clientToken: token };
+      await commit(salonSlug, [session]);
+      setState((prev) => ({
+        ...prev,
+        salonRef: salonSlug.trim() ? { slug: salonSlug.trim() } : prev.salonRef,
+        client: session,
+      }));
+    },
+    [commit]
+  );
 
   const logout = useCallback(async (kind: SessionKind) => {
     await clearSession(kind);
-    setState((prev) => ({ ...prev, [kind]: null } as AuthState & Record<SessionKind, TboSession | null>));
+    setState((prev) => ({ ...prev, [kind]: null }));
   }, []);
 
   const value = useMemo<AuthContextValue>(
     () => ({
       ...state,
       loginAdmin: loginAdminImpl,
+      switchAdminSalon,
       loginBarber: loginBarberImpl,
       loginClient: loginClientImpl,
       logout,
     }),
-    [state, loginAdminImpl, loginBarberImpl, logout, loginClientImpl]
+    [state, loginAdminImpl, switchAdminSalon, loginBarberImpl, loginClientImpl, logout]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

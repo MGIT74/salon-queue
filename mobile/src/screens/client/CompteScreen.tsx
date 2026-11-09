@@ -150,23 +150,23 @@ export function CompteScreen() {
 
 const stylesFor = (t: Palette) =>
   StyleSheet.create({
-    container: { flex: 1, backgroundColor: t.background },
+    container: { flex: 1, backgroundColor: t.bg },
     content: { padding: spacing.lg, paddingBottom: spacing.xl, gap: spacing.md },
     card: {
-      backgroundColor: t.surface,
-      borderColor: t.surfaceBorder,
+      backgroundColor: t.card,
+      borderColor: t.sep,
       borderWidth: 1,
       borderRadius: radius.card,
       padding: spacing.md,
       gap: spacing.sm,
     },
-    cardTitle: { color: t.accent, fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1.5 },
+    cardTitle: { color: t.blue, fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1.5 },
     cardBody: { gap: spacing.xs + 2 },
     row: { gap: 2 },
-    text: { color: t.textSecondary, fontSize: 15, lineHeight: 21 },
-    big: { color: t.textPrimary, fontSize: 24, fontWeight: '700' },
-    sectionTitle: { color: t.textPrimary, fontSize: 18, fontWeight: '700' },
+    text: { color: t.grey, fontSize: 15, lineHeight: 21 },
+    big: { color: t.ink, fontSize: 24, fontWeight: '700' },
+    sectionTitle: { color: t.ink, fontSize: 18, fontWeight: '700' },
     errorBox: { padding: spacing.lg, justifyContent: 'center', gap: spacing.md },
-    retry: { backgroundColor: t.accent, borderRadius: radius.button, paddingVertical: 12, alignItems: 'center', marginTop: spacing.sm },
-    retryLabel: { color: t.accentText, fontWeight: '700' },
+    retry: { backgroundColor: t.blue, borderRadius: radius.button, paddingVertical: 12, alignItems: 'center', marginTop: spacing.sm },
+    retryLabel: { color: '#fff', fontWeight: '700' },
   });

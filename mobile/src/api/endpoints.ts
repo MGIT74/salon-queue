@@ -92,9 +92,33 @@ export async function loginBarber(salonSlug: string, pin: string, source: 'poste
   });
 }
 
-/* ---------- Admin / propriétaire (X-Admin-Password à chaque appel) ---------- */
+/* ---------- Admin / propriétaire — PARCOURS WEB ORIGINAL ---------- */
 
-/** POST /api/login : vérifie le mot de passe propriétaire (rate limité). */
+/**
+ * POST /api/signup/login-lookup : connexion par EMAIL + mot de passe
+ * (formulaire "Dashboard" du web). Renvoie les salons actifs de
+ * l'enseigne : c'est le "sélecteur d'enseigne" du menu latéral.
+ */
+export type OwnerSalonsResponse = { ok: true; salons: { slug: string; name: string }[] };
+
+export async function loginOwnerSalons(email: string, password: string): Promise<OwnerSalonsResponse> {
+  return apiRequest<OwnerSalonsResponse>({
+    path: 'api/signup/login-lookup',
+    method: 'POST',
+    salonSlug: '',
+    body: { email, password },
+  });
+}
+
+/** GET /api/signup/status : le web n'affiche "Créer mon salon" que si l'inscription est ouverte. */
+export type SignupStatusResponse = { ok: boolean; enabled?: boolean };
+
+export async function fetchSignupStatus(): Promise<SignupStatusResponse> {
+  const request: ApiRequest = { path: 'api/signup/status', salonSlug: '' };
+  return apiRequest<SignupStatusResponse>(request);
+}
+
+/** POST /api/login : vérification X-Admin-Password pour un salon précis. */
 export async function loginAdmin(salonSlug: string, adminPassword: string): Promise<ApiOkResponse> {
   return apiRequest<ApiOkResponse>({
     path: 'api/login',

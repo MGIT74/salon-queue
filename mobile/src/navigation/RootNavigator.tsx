@@ -1,34 +1,25 @@
-// Racine de la navigation : écran de chargement pendant la reprise des
-// sessions persistées (expo-secure-store), puis Accueil et les 4 espaces.
-// Les écrans d'espace passent par un navigateur scellé par univers ;
-// l'en-tête racine fournit le retour natif vers l'Accueil.
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
+// ÉCRAN D'ACCUEIL RACINE — remplace l'écran provisoire « 4 espaces ».
+// Routeur de session fidèle au web :
+//   - session admin (enseigne) → Dashboard (menu latéral du web)
+//   - session coiffeur → Mon poste (poste.html)
+//   - session client → Espace client (compte.html : barre bas Accueil/Réserver/Compte/Déconnexion)
+//   - aucune session → parcours public (connexions, comme les 3 URL web).
+// Un utilisateur authentifié ne choisit JAMAIS son rôle manuellement.
 import { LoadingView } from '../components/AuthForm';
 import { useAuth } from '../auth/AuthContext';
 import { useTheme } from '../hooks/useTheme';
-import { HomeScreen } from '../screens/HomeScreen';
-import { AdminNavigator } from './AdminNavigator';
-import { CaisseNavigator } from './CaisseNavigator';
-import { ClientNavigator } from './ClientNavigator';
-import { CoiffeurNavigator } from './CoiffeurNavigator';
-import { rootStackScreenOptions } from './screenOptions';
-import { RootStackParamList } from './types';
-
-const RootStack = createNativeStackNavigator<RootStackParamList>();
+import { AdminShell } from '../screens/admin/AdminShell';
+import { PublicEntryScreen } from '../screens/PublicEntryScreen';
+import { CompteShell } from '../screens/client/CompteShell';
+import { PosteShell } from '../screens/poste/PosteShell';
 
 export function RootNavigator() {
   const t = useTheme();
-  const { ready } = useAuth();
+  const { ready, admin, barber, client } = useAuth();
 
-  if (!ready) return <LoadingView t={t} label="Ouverture de l'application…" />;
-
-  return (
-    <RootStack.Navigator screenOptions={rootStackScreenOptions(t)}>
-      <RootStack.Screen name="Accueil" component={HomeScreen} options={{ headerShown: false }} />
-      <RootStack.Screen name="Client" component={ClientNavigator} options={{ title: 'Espace client' }} />
-      <RootStack.Screen name="Coiffeur" component={CoiffeurNavigator} options={{ title: 'Espace coiffeur' }} />
-      <RootStack.Screen name="Caisse" component={CaisseNavigator} options={{ title: 'Espace caisse' }} />
-      <RootStack.Screen name="Admin" component={AdminNavigator} options={{ title: 'Administration' }} />
-    </RootStack.Navigator>
-  );
+  if (!ready) return <LoadingView t={t} label="Chargement…" />;
+  if (admin) return <AdminShell />;
+  if (barber) return <PosteShell />;
+  if (client) return <CompteShell />;
+  return <PublicEntryScreen />;
 }

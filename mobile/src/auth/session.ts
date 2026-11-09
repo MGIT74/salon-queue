@@ -13,7 +13,15 @@ import * as SecureStore from 'expo-secure-store';
 
 export type SalonRef = { slug: string; name?: string };
 
-export type AdminSession = { kind: 'admin'; salonSlug: string; adminPassword: string; impersonationToken?: string };
+/** Session admin = propriétaire : session résolue par EMAIL (parcours web). */
+export type AdminSession = {
+  kind: 'admin';
+  salonSlug: string;
+  adminPassword: string;
+  email: string;
+  /** Salons de l'enseigne (POST /api/signup/login-lookup) — sélecteur du menu. */
+  salons: { slug: string; name: string }[];
+};
 export type BarberSession = { kind: 'barber'; salonSlug: string; barberId: string; barberPin: string; barberName: string };
 export type ClientSession = { kind: 'client'; salonSlug: string; clientToken: string };
 

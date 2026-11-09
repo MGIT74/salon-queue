@@ -20,7 +20,7 @@ export function LabeledField({ label, t, ...inputProps }: { label: string; t: Pa
       <Text style={styles.label}>{label}</Text>
       <TextInput
         style={styles.input}
-        placeholderTextColor={t.textMuted}
+        placeholderTextColor={t.grey}
         autoCapitalize="none"
         autoCorrect={false}
         {...inputProps}
@@ -59,7 +59,7 @@ export function SubmitButton({ label, t, busy, disabled, onPress }: {
       accessibilityRole="button"
     >
       {busy ? (
-        <ActivityIndicator color={t.accentText} />
+        <ActivityIndicator color={'#fff'} />
       ) : (
         <Text style={styles.submitLabel}>{label}</Text>
       )}
@@ -72,7 +72,7 @@ export function LoadingView({ t, label }: { t: Palette; label?: string }) {
   const styles = stylesFor(t);
   return (
     <View style={styles.loading}>
-      <ActivityIndicator color={t.accent} />
+      <ActivityIndicator color={t.blue} />
       {label ? <Text style={styles.loadingLabel}>{label}</Text> : null}
     </View>
   );
@@ -81,27 +81,27 @@ export function LoadingView({ t, label }: { t: Palette; label?: string }) {
 const stylesFor = (t: Palette) =>
   StyleSheet.create({
     field: { gap: 6 },
-    label: { color: t.textSecondary, fontSize: 13, fontWeight: '600' },
+    label: { color: t.grey, fontSize: 13, fontWeight: '600' },
     input: {
-      backgroundColor: t.surface,
-      borderColor: t.surfaceBorder,
+      backgroundColor: t.card,
+      borderColor: t.sep,
       borderWidth: 1,
       borderRadius: radius.button,
-      color: t.textPrimary,
+      color: t.ink,
       paddingHorizontal: 14,
       paddingVertical: 12,
       fontSize: 16,
     },
-    error: { color: t.danger, fontSize: 14, lineHeight: 20 },
+    error: { color: t.red, fontSize: 14, lineHeight: 20 },
     submit: {
-      backgroundColor: t.accent,
+      backgroundColor: t.blue,
       borderRadius: radius.button,
       paddingVertical: 14,
       alignItems: 'center',
       marginTop: spacing.sm,
     },
     submitDisabled: { opacity: 0.5 },
-    submitLabel: { color: t.accentText, fontWeight: '700', fontSize: 16 },
-    loading: { flex: 1, backgroundColor: t.background, alignItems: 'center', justifyContent: 'center', gap: 12 },
-    loadingLabel: { color: t.textMuted, fontSize: 14 },
+    submitLabel: { color: '#fff', fontWeight: '700', fontSize: 16 },
+    loading: { flex: 1, backgroundColor: t.bg, alignItems: 'center', justifyContent: 'center', gap: 12 },
+    loadingLabel: { color: t.grey, fontSize: 14 },
   });
