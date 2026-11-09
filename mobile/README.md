@@ -17,20 +17,36 @@ Installer **Expo Go** sur le téléphone et scanner le QR code. Si Expo Go n'est
 
 ## État actuel
 
+- **Phase 2 : authentifications réelles branchées** sur les API TBO :
+  - Client : `POST /api/client-auth/login` + session 90 j (`X-Client-Token`); l'onglet Compte affiche
+    le profil réel (`GET /api/client-auth/me`) — points de fidélité, RDV à venir, dernier passage,
+    cartes cadeaux — avec déconnexion serveur et gestion de session expirée (401).
+  - Coiffeur : `POST /api/barbers/login` par code PIN → « Ma journée » (file/réelles : Phase 4).
+  - Admin : `POST /api/login` (mot de passe propriétaire, `X-Admin-Password` revalidé à chaque appel).
+  - Persistance : `src/auth/session.ts` via expo-secure-store (Keychain iOS / Keystore Android),
+    trois univers strictement séparés, salon actif (`X-Salon-Slug`) mémorisé. Gestion des erreurs
+    serveur : 429 + Retry-After, 403 email non vérifié, 400 needs_salon (salon non précisé).
+  - Gardes d'espace côté app = UX seule : la sécurité reste 100 % côté serveur.
 - Navigation en place (`src/navigation/`) : Accueil → Client (onglets : File, Rendez-vous, Compte),
   Coiffeur (Ma journée), Caisse (Encaissement, Journées) et Administration (Dashboard, Catalogue,
-  Coiffeurs, Réglages), avec navigation typée (`src/navigation/types.ts`).
+  Coiffeurs, Réglages), avec navigation typée (`src/navigation/types.ts`), en-tête racine, retour natif.
+- Design system clair/sombre (`src/theme/` + `src/hooks/useTheme.ts`) : palette sombre « barbershop »,
+  palette claire équivalente, appliquées aux écrans et au chrome de navigation.
 - Écrans en préparation (`src/screens/`) : chaque écran affiche son périmètre, ses endpoints visés
   et l'authentification requise, tirés de l'audit `docs/API_AUDIT.md`.
-- Couche transport API (`src/api/transport.ts`) : squelette typé (en-têtes `X-Salon-Slug`,
-  auth admin/coiffeur/client) — aucun appel effectué pour l'instant.
-- **Nepting (`/api/tpe`) volontairement débranché** sur le mobile (aucun appel, aucune clé).
-- Aucune authentification connectée : PIN coiffeur, mot de passe propriétaire et compte client
-  s'ajouteront à l'étape de branchement (stockage expo-secure-store).
+- Couche transport API (`src/api/transport.ts`, `src/api/endpoints.ts`) : appels typés réels.
+- **Nepting (`/api/tpe`) volontairement débranché** sur le mobile (aucun appel, aucune clé) ;
+  caisse sans données réelles (Phase 5).
 - La base MySQL reste côté serveur : le mobile communiquera uniquement avec les API HTTPS de TBO.
-- Les accès caisse, coiffeur et admin doivent être autorisés **côté serveur** selon le compte
-  connecté. Ne pas exposer les clés TPE dans l'application.
 - Ne pas déployer cette branche sur l'environnement web XCloud.
+
+### Tester l'authentification sur iPhone (Expo Go)
+
+1. `cd mobile && npm install && npx expo start`
+2. Scanner le QR avec Expo Go.
+3. Espace client : email + mot de passe d'un compte client du salon (champ salon : identifiant si plusieurs salons, vide si un seul).
+4. Espace coiffeur : code PIN d'un coiffeur actif ; Administration : mot de passe propriétaire.
+5. Fermer puis rouvrir l'app : les sessions sont restituées (SecureStore). Le bouton Déconnexion détruit la session côté serveur (client).
 
 ## Arborescence mobile
 
@@ -38,9 +54,9 @@ Installer **Expo Go** sur le téléphone et scanner le QR code. Si Expo Go n'est
 mobile/
   App.tsx                  NavigationContainer + thème clair/sombre + RootNavigator
   src/
-    api/transport.ts       transport API typé (X-Salon-Slug, 3 sessions) — non branché
-    auth/session.ts        persistance des sessions via expo-secure-store (Keychain/Keystore)
-    components/            composants partagés (ScreenPlaceholder…)
+    api/                   transport typé (X-Salon-Slug, 3 sessions) + endpoints auth réels
+    auth/                  contexte d'authentification + persistance expo-secure-store
+    components/            composants partagés (ScreenPlaceholder, SessionBanner, AuthForm…)
     docs/API_AUDIT.md      audit des endpoints et mécanismes d'authentification
     hooks/useTheme.ts      palette claire/sombre selon le mode système
     navigation/            RootNavigator + 4 navigateurs d'espace (types dans navigation/types.ts)
