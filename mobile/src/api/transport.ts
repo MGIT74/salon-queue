@@ -23,6 +23,8 @@ export type ApiRequest = {
   salonSlug: string;
   auth?: ApiAuth;
   body?: unknown;
+  /** Paramètres d'URL (GET) — sérialisés proprement, ex. ?date=&service_id=. */
+  query?: Record<string, string>;
 };
 
 export type ApiErrorExtras = {
@@ -110,7 +112,8 @@ export async function apiRequest<TResponse>(request: ApiRequest, signal?: AbortS
   };
   if (request.body !== undefined) headers['Content-Type'] = 'application/json';
 
-  const response = await fetch(joinUrl(apiBaseUrl(), request.path), {
+  const qs = request.query ? '?' + new URLSearchParams(request.query).toString() : '';
+  const response = await fetch(joinUrl(apiBaseUrl(), request.path) + qs, {
     method,
     headers,
     body: request.body !== undefined ? JSON.stringify(request.body) : undefined,

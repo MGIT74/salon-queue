@@ -13,9 +13,8 @@ export type RootStackParamList = {
   Admin: undefined;
 };
 
-/** Espace Client : file d'attente, rendez-vous en ligne, compte client. */
+/** Espace Client : rendez-vous en ligne (réservation + gestion) et compte. */
 export type ClientTabsParamList = {
-  ClientFile: undefined;
   ClientRdv: undefined;
   ClientCompte: undefined;
 };

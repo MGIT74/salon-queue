@@ -9,7 +9,6 @@ import { tabBarScreenOptions } from './screenOptions';
 import { ClientTabsParamList } from './types';
 import { ClientLoginScreen } from '../screens/client/ClientLoginScreen';
 import { CompteScreen } from '../screens/client/CompteScreen';
-import { FileScreen } from '../screens/client/FileScreen';
 import { RdvScreen } from '../screens/client/RdvScreen';
 
 const ClientTabs = createBottomTabNavigator<ClientTabsParamList>();
@@ -22,15 +21,6 @@ export function ClientNavigator() {
 
   return (
     <ClientTabs.Navigator screenOptions={tabBarScreenOptions(t)}>
-      <ClientTabs.Screen
-        name="ClientFile"
-        component={FileScreen}
-        options={{
-          title: 'Ma file',
-          tabBarLabel: 'File',
-          tabBarIcon: ({ color, size }) => <Ionicons name="time-outline" size={size} color={color} />,
-        }}
-      />
       <ClientTabs.Screen
         name="ClientRdv"
         component={RdvScreen}

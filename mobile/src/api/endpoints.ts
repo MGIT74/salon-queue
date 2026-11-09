@@ -1,8 +1,18 @@
-// Endpoints d'authentification et de salon — formes de réponses lues
-// directement dans le code serveur (docs/API_AUDIT.md). Aucune invention :
-// chaque type est vérifié dans la route correspondante.
+// Endpoints d'authentification, de salon et de réservation — formes de
+// réponses lues directement dans le code serveur (docs/API_AUDIT.md).
+// Aucune invention : chaque type est vérifié dans la route correspondante.
 import { ApiRequest, apiRequest } from './transport';
-import { ApiOkResponse, ClientLoginResponse, ClientMeResponse } from '../types/api';
+import {
+  ApiOkResponse,
+  AvailabilityDaysResponse,
+  AvailabilityResponse,
+  BarbersListResponse,
+  BookingResponse,
+  CancelResponse,
+  CatalogListResponse,
+  ClientLoginResponse,
+  ClientMeResponse,
+} from '../types/api';
 
 /* ---------- Salon (résolution/validation X-Salon-Slug) ---------- */
 
@@ -92,4 +102,100 @@ export async function loginAdmin(salonSlug: string, adminPassword: string): Prom
     salonSlug,
     auth: { kind: 'admin', adminPassword },
   });
+}
+
+/* ---------- Réservation (Phase 3) — routes publiques / client ---------- */
+
+/** GET /api/catalog/services (public) : prestations actives du salon. */
+export async function fetchServices(salonSlug: string): Promise<CatalogListResponse> {
+  return apiRequest<CatalogListResponse>({ path: 'api/catalog/services', salonSlug });
+}
+
+/** GET /api/catalog/extras (public) : suppléments actifs du salon. */
+export async function fetchExtras(salonSlug: string): Promise<CatalogListResponse> {
+  return apiRequest<CatalogListResponse>({ path: 'api/catalog/extras', salonSlug });
+}
+
+/** GET /api/barbers (public) : équipe du salon + état du jour (congés, pauses, horaires). */
+export async function fetchBarbers(salonSlug: string): Promise<BarbersListResponse> {
+  return apiRequest<BarbersListResponse>({ path: 'api/barbers', salonSlug });
+}
+
+/**
+ * GET /api/appointments/availability : créneaux d'une date. `barber_id`
+ * absent = « Premier disponible » (renvoie le coiffeur choisi par le
+ * serveur pour chaque heure). Heures renvoyées en heure DU SALON.
+ */
+export async function fetchAvailability(
+  salonSlug: string,
+  params: { date: string; service_id: string | null; extras?: string[]; barber_id?: string | null }
+): Promise<AvailabilityResponse> {
+  const query: Record<string, string> = { date: params.date };
+  if (params.service_id) query.service_id = params.service_id;
+  if (params.extras && params.extras.length) query.extras = params.extras.join(',');
+  if (params.barber_id) query.barber_id = params.barber_id;
+  const request: ApiRequest = { path: 'api/appointments/availability', salonSlug, query };
+  return apiRequest<AvailabilityResponse>(request);
+}
+
+/**
+ * GET /api/appointments/availability-days : jours (YYYY-MM-DD) ayant au
+ * moins un créneau sur la période — pour griser le calendrier.
+ */
+export async function fetchAvailabilityDays(
+  salonSlug: string,
+  params: { from: string; to: string; service_id: string | null; extras?: string[]; barber_id?: string | null }
+): Promise<AvailabilityDaysResponse> {
+  const query: Record<string, string> = { from: params.from, to: params.to, all: '1' };
+  if (params.service_id) query.service_id = params.service_id;
+  if (params.extras && params.extras.length) query.extras = params.extras.join(',');
+  if (params.barber_id) query.barber_id = params.barber_id;
+  const request: ApiRequest = { path: 'api/appointments/availability-days', salonSlug, query };
+  return apiRequest<AvailabilityDaysResponse>(request);
+}
+
+/**
+ * POST /api/appointments : CONFIRME la réservation. Avec la session client
+ * (X-Client-Token, email vérifié) le serveur n'exige pas de code de
+ * vérification (cf. guestEmailVerified). Le corps correspond 1:1 à
+ * bookSingle() : { client_name, email, phone, service_id, barber_id?,
+ * extras?, date, time, client_note? }.
+ */
+export async function bookAppointment(
+  salonSlug: string,
+  input: {
+    client_name: string;
+    email: string;
+    phone?: string;
+    service_id: string | null;
+    extras?: string[];
+    barber_id?: string | null;
+    date: string;
+    time: string;
+    client_note?: string;
+  },
+  clientToken: string
+): Promise<BookingResponse> {
+  return apiRequest<BookingResponse>({
+    path: 'api/appointments',
+    method: 'POST',
+    salonSlug,
+    auth: { kind: 'client', clientToken },
+    body: {
+      client_name: input.client_name,
+      email: input.email,
+      phone: input.phone,
+      service_id: input.service_id,
+      ...(input.extras && input.extras.length ? { extras: input.extras } : {}),
+      ...(input.barber_id ? { barber_id: input.barber_id } : {}),
+      date: input.date,
+      time: input.time,
+      ...(input.client_note ? { client_note: input.client_note } : {}),
+    },
+  });
+}
+
+/** POST /api/appointments/cancel — les règles (délai, RDV honoré…) sont côté serveur. */
+export async function cancelAppointment(salonSlug: string, token: string): Promise<CancelResponse> {
+  return apiRequest<CancelResponse>({ path: 'api/appointments/cancel', method: 'POST', salonSlug, body: { token } });
 }
