@@ -15,3 +15,14 @@ export function formatDurationMinutes(minutes: number): string {
   if (hours > 0) return `${hours} h`;
   return `${rest} min`;
 }
+
+/**
+ * Affiche une date/heure RENVOYÉE PAR LE SERVEUR en heure du salon
+ * (ex. "2026-11-09T14:30:00" ou "2026-11-09 14:30:00") : affichage brut
+ * de cette heure de salon — JAMAIS de re-conversion vers l'heure du
+ * téléphone (règle apprise de l'audit, docs/API_AUDIT.md §4.6).
+ */
+export function formatSalonDate(value: string): string {
+  const spaced = value.replace('T', ' ');
+  return spaced.length >= 16 ? spaced.slice(0, 16) : spaced;
+}

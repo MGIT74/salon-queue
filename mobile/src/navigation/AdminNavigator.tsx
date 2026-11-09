@@ -1,11 +1,14 @@
-// Espace Administration (propriétaire de l'enseigne) : tableau de bord,
-// catalogue, coiffeurs et réglages. Préparé pour l'authentification par
-// X-Admin-Password côté transport (src/api/transport.ts).
+// Espace Administration : garde par session propriétaire (X-Admin-Pass-
+// word revalidé par le serveur à chaque appel). Sans session : connexion
+// réelle ; avec session : onglets Dashboard / Catalogue / Coiffeurs /
+// Réglages (leurs données réelles arrivent en Phase 5).
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../auth/AuthContext';
 import { useTheme } from '../hooks/useTheme';
 import { tabBarScreenOptions } from './screenOptions';
 import { AdminTabsParamList } from './types';
+import { AdminLoginScreen } from '../screens/admin/AdminLoginScreen';
 import { CatalogueScreen } from '../screens/admin/CatalogueScreen';
 import { CoiffeursScreen } from '../screens/admin/CoiffeursScreen';
 import { DashboardScreen } from '../screens/admin/DashboardScreen';
@@ -15,6 +18,10 @@ const AdminTabs = createBottomTabNavigator<AdminTabsParamList>();
 
 export function AdminNavigator() {
   const t = useTheme();
+  const { admin } = useAuth();
+
+  if (!admin) return <AdminLoginScreen />;
+
   return (
     <AdminTabs.Navigator screenOptions={tabBarScreenOptions(t)}>
       <AdminTabs.Screen

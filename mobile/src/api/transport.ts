@@ -105,7 +105,7 @@ export async function apiRequest<TResponse>(request: ApiRequest, signal?: AbortS
   const method = request.method ?? 'GET';
   const headers: Record<string, string> = {
     Accept: 'application/json',
-    'X-Salon-Slug': request.salonSlug,
+    ...(request.salonSlug.trim() ? { 'X-Salon-Slug': request.salonSlug.trim() } : {}),
     ...authHeaders(request.auth),
   };
   if (request.body !== undefined) headers['Content-Type'] = 'application/json';
