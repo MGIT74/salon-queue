@@ -57,7 +57,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           readSession('client'),
         ]);
         if (cancelled) return;
-        setState({ ready: true, salonRef, admin, barber, client });
+        // Migration de sessions créées par des versions antérieures :
+        // sans la forme attendue (salons[], email), on repart sur une
+        // reconnexion propre plutôt que de laisser l'app planter.
+        let adminOk = admin;
+        if (admin && (!Array.isArray(admin.salons) || typeof admin.email !== 'string')) {
+          adminOk = null;
+          void clearSession('admin');
+        }
+        setState({ ready: true, salonRef, admin: adminOk, barber, client });
       } finally {
         if (!cancelled) setState((prev) => ({ ...prev, ready: true }));
       }

@@ -22,7 +22,8 @@ export function AdminShell() {
 
   const def = (key: AdminSectionKey): AdminSectionDef | undefined => ADMIN_SECTIONS.find((s) => s.key === key);
   const current = def(section);
-  const salonName = admin.salons.find((s) => s.slug === admin.salonSlug)?.name ?? admin.salonSlug ?? 'Salon';
+  const salonName =
+    (admin.salons ?? []).find((s) => s.slug === admin.salonSlug)?.name ?? admin.salonSlug ?? 'Salon';
 
   return (
     <SafeAreaView style={styles.safe}>
