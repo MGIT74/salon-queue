@@ -17,6 +17,15 @@ Installer **Expo Go** sur le téléphone et scanner le QR code. Si Expo Go n'est
 
 ## État actuel
 
+- **Phase 3 en cours : réservation réelle dans l'espace client** — assistant en 4 étapes
+  (prestation + suppléments → coiffeur (« premier disponible » ou choix) → jour + créneau
+  (heures du salon) → récapitulatif + note). Client connecté = sans code de vérification
+  (le serveur accepte la session vérifiée). Liste des RDV à venir en direct (polling 6 s)
+  + annulation par `cancel_token` (règles serveur : délai, RDV honoré).
+- Design system v2 : accueil en héros + cartes icônées, `components/Card.tsx` partagé
+  (fidélité, RDV), placeholders en pilule « bientôt », palette claire/sombre affinée.
+- L'espace client tient maintenant 2 onglets : **Rendez-vous** et **Compte** — la file
+  sans RDV reste sur la borne du salon (hors périmètre mobile client).
 - **Phase 2 : authentifications réelles branchées** sur les API TBO :
   - Client : `POST /api/client-auth/login` + session 90 j (`X-Client-Token`); l'onglet Compte affiche
     le profil réel (`GET /api/client-auth/me`) — points de fidélité, RDV à venir, dernier passage,
