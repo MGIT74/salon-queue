@@ -144,3 +144,24 @@ export type BookingResponse = { ok: true; id: string; barber_id: string | null; 
 
 /** POST /api/appointments/cancel (via cancel_token du RDV). */
 export type CancelResponse = { ok: true };
+
+/* ---------- File d'attente (GET /api/queue, actions opérateur) ---------- */
+
+export type QueueStatus = 'waiting' | 'in_progress' | 'done' | 'cancelled';
+
+/** Ligne de file (GET /public → sans email/téléphone ; avec session admin, plus de champs). */
+export type QueueEntry = {
+  id: number;
+  status: QueueStatus;
+  position: number | null;
+  client_name: string | null;
+  barber_id: string | null;
+  checkin_at: string;
+  start_at: string | null;
+  is_appointment: number | boolean | null;
+  service: { id: string; name: string; price_cents: number; duration_min: number } | null;
+  extras: { id: string; name: string; price_cents: number }[];
+  [key: string]: unknown;
+};
+
+export type QueueResponse = { ok: true; queue: QueueEntry[] };

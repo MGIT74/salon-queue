@@ -6,6 +6,7 @@ import React, { useState } from 'react';
 import { Modal, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../auth/AuthContext';
+import { QueueBoard } from '../../components/QueueBoard';
 import { ScreenPlaceholder } from '../../components/ScreenPlaceholder';
 import { useTheme } from '../../hooks/useTheme';
 import { Palette, APP_VERSION, radius, spacing } from '../../theme/theme';
@@ -34,7 +35,12 @@ export function AdminShell() {
       </View>
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content}>
-        {current ? (
+        {section === 'queue' ? (
+          <>
+            <Text style={styles.sectionTitle}>File d'attente</Text>
+            <QueueBoard />
+          </>
+        ) : current ? (
           <>
             <Text style={styles.sectionTitle}>{current.label}</Text>
             <ScreenPlaceholder phase={current.phase} description={current.desc} checklist={listFor(current)} />

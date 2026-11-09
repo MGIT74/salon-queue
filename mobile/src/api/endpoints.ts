@@ -223,3 +223,48 @@ export async function bookAppointment(
 export async function cancelAppointment(salonSlug: string, token: string): Promise<CancelResponse> {
   return apiRequest<CancelResponse>({ path: 'api/appointments/cancel', method: 'POST', salonSlug, body: { token } });
 }
+
+/* ---------- File d'attente (opérateur : admin OU coiffeur) ---------- */
+
+import { ApiAuth } from './transport';
+import { QueueResponse } from '../types/api';
+
+/**
+ * GET /api/queue : file en direct (le serveur trie et recalcule). Route
+ * publique, mais en envoyant la session (admin ou coiffeur) le serveur
+ * ajoute email/téléphone/note de chaque client — nécessaire aux actions.
+ */
+export async function fetchQueue(salonSlug: string, auth: ApiAuth): Promise<QueueResponse> {
+  const request: ApiRequest = { path: 'api/queue', salonSlug, auth };
+  return apiRequest<QueueResponse>(request);
+}
+
+/** POST /api/queue/:id/start — rules serveur : ordre d'arrivée, 1 coupe en cours par coiffeur. */
+export async function queueStart(salonSlug: string, id: number, auth: ApiAuth, opts?: { barber_id?: string }): Promise<ApiOkResponse> {
+  return apiRequest<ApiOkResponse>({
+    path: `api/queue/${id}/start`,
+    method: 'POST',
+    salonSlug,
+    auth,
+    ...(opts && opts.barber_id ? { body: { barber_id: opts.barber_id } } : {}),
+  });
+}
+
+/** POST /api/queue/:id/finish — coupe terminée (rappel : encaissement à part, côté Caisse). */
+export async function queueFinish(salonSlug: string, id: number, auth: ApiAuth): Promise<ApiOkResponse> {
+  return apiRequest<ApiOkResponse>({ path: `api/queue/${id}/finish`, method: 'POST', salonSlug, auth });
+}
+
+/**
+ * POST /api/queue/:id/cancel — annulation ; reason 'client_notified' =
+ * « client ayant prévenu » (valide uniquement pour un RDV confirmé).
+ */
+export async function queueCancel(salonSlug: string, id: number, auth: ApiAuth, reason?: 'client_notified'): Promise<ApiOkResponse> {
+  return apiRequest<ApiOkResponse>({
+    path: `api/queue/${id}/cancel`,
+    method: 'POST',
+    salonSlug,
+    auth,
+    ...(reason ? { body: { reason } } : {}),
+  });
+}
