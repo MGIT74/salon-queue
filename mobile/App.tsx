@@ -6,9 +6,10 @@ import { RootNavigator } from './src/navigation/RootNavigator';
 import { setSchemeForTheme, themeFor } from './src/theme/theme';
 import Maquette from './maquette/Maquette';
 
-// Branche feat/mobile-maquette : l'app s'ouvre sur la MAQUETTE (données fictives, aucun appel serveur).
-// Mettre false pour retrouver l'app branchée.
-const SHOW_MAQUETTE = true;
+// Maquette de design (données fictives, aucun appel serveur) : modèle visuel des vrais écrans.
+// Par défaut l'app s'ouvre sur l'app branchée. Pour ouvrir la maquette :
+//   EXPO_PUBLIC_MAQUETTE=1 npx expo start -c
+const SHOW_MAQUETTE = process.env.EXPO_PUBLIC_MAQUETTE === '1';
 
 // L'app suit le thème système exactement comme app.css ([data-theme=dark]).
 // Le palette est POSÉE ici (setSchemeForTheme) pour les alias legacy.
