@@ -194,6 +194,7 @@ const suite = [
   ['171-rdv-plusieurs-ensemble.js', false, ['exit']],
   ['172-fiche-coiffeur-historique.js', false, ['exit']],
   ['173-caisse-z-impression-apres-cloture.js', false, ['exit']],
+  ['174-caisse-cloture-apres-heure-fermeture.js', false, ['exit']],
 ];
 
 let bad = 0;
