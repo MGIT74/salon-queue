@@ -8,7 +8,7 @@
 //   bandeau « Revenir en arrière », pastille ⇅ dans l'en-tête → « ↩ Remettre à l'heure du client » ;
 // - zoom de la grille ; fiche du RDV : Modifier, Modifier la prestation, Déplacer, Annuler le RDV, historique.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, LayoutChangeEvent, PanResponder, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Animated, LayoutChangeEvent, PanResponder, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BREAKS, CATALOG, CLIENTS_LIST, HOURS, NOW_MIN, NUDGE, OFF, SERVICES, STAFF, Staff, apptsForDay, Appt, eur, hm } from './data';
 import { Avatar, Go, Pill, Segmented, Sheet, SoftButton, useT } from './ui';
@@ -98,8 +98,17 @@ export function Agenda({ meId, showAll }: { meId?: string; showAll?: boolean }) 
     setFlash(id); setToast({ text: `${a.client} remis à ${hm(a.clientTime)} (heure réservée)` });
   };
 
-  const team = STAFF;
-  const cols = showAll || !meId ? team.filter((s) => s.id === focus) : team.filter((s) => s.id === focus);
+  /* Tablette (≥ 700 px) : toutes les colonnes côte à côte, ordre changé en glissant les noms (comme le web) ;
+     téléphone : une seule colonne, choisie en touchant sa ligne dans le coup d'œil. */
+  const { width } = useWindowDimensions();
+  const wide = width >= 700;
+  const [order, setOrder] = useState<string[]>(STAFF.map((s) => s.id));
+  const team = order.map((id) => STAFF.find((s) => s.id === id)!) as Staff[];
+  const cols = wide ? team : team.filter((s) => s.id === focus);
+  const move = (id: string, by: number) => setOrder((o) => {
+    const i = o.indexOf(id); const j = Math.max(0, Math.min(o.length - 1, i + by)); if (i === j) return o;
+    const n = [...o]; n.splice(i, 1); n.splice(j, 0, id); return n;
+  });
   const found = q.trim() ? items.filter((a) => a.client.toLowerCase().includes(q.trim().toLowerCase())) : [];
   const date = dateOf(offset);
   const label = view === 'month' ? date.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
@@ -176,34 +185,37 @@ export function Agenda({ meId, showAll }: { meId?: string; showAll?: boolean }) 
               ) : null}
             </View>
 
-            {/* Colonne du coiffeur choisi */}
-            {cols.map((b) => {
-              const its = items.filter((i) => i.barberId === b.id);
-              const moved = its.filter((i) => i.clientTime !== undefined && i.clientTime !== i.start);
-              const why = offWhy(b.id, offset);
-              return (
-                <View key={b.id} style={[st.panel, { backgroundColor: t.card, marginTop: 12, paddingHorizontal: 8 }]}>
-                  <View style={[st.row, { paddingHorizontal: 6, marginBottom: 10 }]}>
-                    <Avatar initials={b.initials} color={b.color} size={30} />
-                    <Text style={{ color: t.ink, fontWeight: '700', flex: 1 }}>{b.name}{b.id === meId ? ' · moi' : ''}</Text>
-                    {moved.length ? (
-                      <Pressable onPress={() => setMovedOf(b.id)} style={[st.movedBadge, { backgroundColor: t.blueSoft }]}>
-                        <Text style={{ color: t.blue, fontWeight: '800', fontSize: 12.5 }}>⇅ {moved.length}</Text>
-                      </Pressable>
-                    ) : null}
-                    {!closed && !past && !why ? (
-                      <Pressable onPress={() => setAdding({ barberId: b.id, time: freeSpans(b.id)[0]?.[0] ?? 15 * 60 })} style={[st.addRdv, { backgroundColor: t.blue }]}>
-                        <Text style={{ color: '#fff', fontWeight: '700' }}>+ RDV</Text>
-                      </Pressable>
-                    ) : null}
+            {/* Colonnes des coiffeurs */}
+            <View style={[st.panel, { backgroundColor: t.card, marginTop: 12, paddingHorizontal: 8 }]}>
+              <View style={[st.row, { justifyContent: 'space-between', marginBottom: 6 }]}>
+                <Text style={{ color: t.grey, fontSize: 13, marginLeft: 6 }}>{wide ? 'Glissez un nom pour changer l\'ordre des coiffeurs' : `${items.filter((i) => i.barberId === focus).length} RDV ce jour`}</Text>
+                <Zoom px={px} setPx={setPx} />
+              </View>
+              <HScroll on={wide}>
+                <View style={{ flexDirection: 'row', minWidth: wide ? Math.max(width - 70, cols.length * 200 + 52) : undefined }}>
+                  <View style={{ width: 46 }}>
+                    <View style={{ height: 48 }} />
+                    <HourGutter px={px} />
                   </View>
-                  <Zoom px={px} setPx={setPx} />
-                  <DayColumn staff={b} items={its} px={px} nowMin={nowMin} why={why} closed={closed} past={past}
-                    free={freeSpans(b.id)} nextId={meNext?.id} flash={flash} nudgeRoom={nudgeRoom}
-                    onOpen={(id) => setOpenId(id)} onNudge={nudge} onAdd={(time) => setAdding({ barberId: b.id, time })} />
+                  {cols.map((b, i) => {
+                    const its = items.filter((x) => x.barberId === b.id);
+                    const moved = its.filter((x) => x.clientTime !== undefined && x.clientTime !== x.start);
+                    const why = offWhy(b.id, offset);
+                    return (
+                      <View key={b.id} style={{ flex: 1, minWidth: wide ? 190 : undefined, marginLeft: i ? 8 : 0 }}>
+                        <ColHead staff={b} me={b.id === meId} draggable={wide && cols.length > 1} colW={200} moved={moved.length}
+                          canAdd={!closed && !past && !why}
+                          onMoved={() => setMovedOf(b.id)} onAdd={() => setAdding({ barberId: b.id, time: freeSpans(b.id)[0]?.[0] ?? 15 * 60 })}
+                          onDrop={(by) => move(b.id, by)} />
+                        <DayColumn staff={b} items={its} px={px} nowMin={nowMin} why={why} closed={closed} past={past}
+                          free={freeSpans(b.id)} nextId={meNext?.id} flash={flash} nudgeRoom={nudgeRoom}
+                          onOpen={(id) => setOpenId(id)} onNudge={nudge} onAdd={(time) => setAdding({ barberId: b.id, time })} />
+                      </View>
+                    );
+                  })}
                 </View>
-              );
-            })}
+              </HScroll>
+            </View>
           </>
         )}
       </ScrollView>
@@ -258,6 +270,53 @@ export function Agenda({ meId, showAll }: { meId?: string; showAll?: boolean }) 
 function weekStart(offset: number) { const d = dateOf(offset); const dow = (d.getDay() + 6) % 7; d.setDate(d.getDate() - dow); return d; }
 const offsetOf = (d: Date) => Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12).getTime() - dateOf(0).getTime()) / 86400000);
 
+/** Sur tablette, les colonnes défilent à gauche / à droite s'il y a beaucoup de coiffeurs (heures collées à gauche). */
+function HScroll({ on, children }: { on: boolean; children: React.ReactNode }) {
+  return on ? <ScrollView horizontal showsHorizontalScrollIndicator={false}>{children}</ScrollView> : <View>{children}</View>;
+}
+
+function HourGutter({ px }: { px: number }) {
+  const { t } = useT();
+  const hours: number[] = [];
+  for (let m = R0; m <= R1; m += 30) hours.push(m);
+  return (
+    <View style={{ height: SPAN * px + 16 }}>
+      {hours.map((m) => (
+        <Text key={m} style={{ position: 'absolute', right: 6, top: (m - R0) * px, color: t.grey, fontSize: m % 60 === 0 ? 12 : 10 }}>{hm(m)}</Text>
+      ))}
+    </View>
+  );
+}
+
+/** En-tête de colonne : photo, nom, ⇅ (RDV décalés), + RDV ; sur tablette, se glisse à gauche / à droite pour changer l'ordre. */
+function ColHead({ staff, me, draggable, colW, moved, canAdd, onMoved, onAdd, onDrop }: {
+  staff: Staff; me: boolean; draggable: boolean; colW: number; moved: number; canAdd: boolean; onMoved: () => void; onAdd: () => void; onDrop: (by: number) => void;
+}) {
+  const { t } = useT();
+  const dx = useRef(new Animated.Value(0)).current;
+  const [drag, setDrag] = useState(false);
+  const pan = useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => draggable,
+    onMoveShouldSetPanResponder: (_e, g) => draggable && Math.abs(g.dx) > 4,
+    onPanResponderTerminationRequest: () => false,
+    onPanResponderGrant: () => setDrag(true),
+    onPanResponderMove: (_e, g) => dx.setValue(g.dx),
+    onPanResponderRelease: (_e, g) => { setDrag(false); dx.setValue(0); const by = Math.round(g.dx / colW); if (by) onDrop(by); },
+    onPanResponderTerminate: () => { setDrag(false); dx.setValue(0); },
+  }), [draggable, colW]);
+  return (
+    <Animated.View style={[st.row, { height: 44, marginBottom: 4, paddingHorizontal: 6, borderRadius: 12, gap: 6, backgroundColor: drag ? t.blueSoft : 'transparent', transform: [{ translateX: dx }], zIndex: drag ? 10 : 1 }]}>
+      <View {...pan.panHandlers} style={[st.row, { flex: 1, gap: 6 }]}>
+        {draggable ? <Ionicons name="reorder-three" size={18} color={t.grey} /> : null}
+        <Avatar initials={staff.initials} color={staff.color} size={28} />
+        <Text style={{ color: t.ink, fontWeight: '700', flexShrink: 1 }} numberOfLines={1}>{staff.name}{me ? ' · moi' : ''}</Text>
+      </View>
+      {moved ? <Pressable onPress={onMoved} style={[st.movedBadge, { backgroundColor: t.blueSoft }]}><Text style={{ color: t.blue, fontWeight: '800', fontSize: 12.5 }}>⇅ {moved}</Text></Pressable> : null}
+      {canAdd ? <Pressable onPress={onAdd} style={[st.addRdv, { backgroundColor: t.blue, paddingHorizontal: 11 }]}><Text style={{ color: '#fff', fontWeight: '700' }}>+ RDV</Text></Pressable> : null}
+    </Animated.View>
+  );
+}
+
 function Legend({ sw, label }: { sw: object; label: string }) {
   const { t } = useT();
   return <View style={[st.row, { gap: 5 }]}><View style={[{ width: 14, height: 8, borderRadius: 2 }, sw]} /><Text style={{ color: t.grey, fontSize: 12 }}>{label}</Text></View>;
@@ -267,7 +326,7 @@ function Zoom({ px, setPx }: { px: number; setPx: (v: number) => void }) {
   const { t } = useT();
   const pct = (px - 1) / 2;
   return (
-    <View style={[st.row, { alignSelf: 'flex-end', backgroundColor: t.fill, borderRadius: 99, paddingHorizontal: 10, paddingVertical: 6, marginBottom: 8, gap: 8 }]}>
+    <View style={[st.row, { backgroundColor: t.fill, borderRadius: 99, paddingHorizontal: 10, paddingVertical: 6, gap: 8 }]}>
       <Pressable onPress={() => setPx(Math.max(1, +(px - 0.4).toFixed(1)))} hitSlop={8}><Ionicons name="remove-circle-outline" size={20} color={t.ink} /></Pressable>
       <View style={{ width: 90, height: 4, borderRadius: 2, backgroundColor: t.fill2 }}>
         <View style={{ position: 'absolute', left: `${pct * 100}%`, top: -5, width: 14, height: 14, borderRadius: 7, marginLeft: -7, backgroundColor: t.blue }} />
@@ -325,12 +384,9 @@ function DayColumn({ staff, items, px, nowMin, why, closed, past, free, nextId, 
     return out;
   }, [items]);
   return (
-    <View style={{ height: SPAN * px + 16, marginLeft: 46, opacity: past ? 0.85 : 1 }}>
+    <View style={{ height: SPAN * px + 16, opacity: past ? 0.85 : 1 }}>
       {hours.map((m) => (
-        <View key={m} style={{ position: 'absolute', left: -46, right: 0, top: (m - R0) * px, flexDirection: 'row', alignItems: 'center' }}>
-          <Text style={{ width: 40, color: t.grey, fontSize: m % 60 === 0 ? 12 : 10, textAlign: 'right', marginRight: 6 }}>{hm(m)}</Text>
-          <View style={{ flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: t.sep, opacity: m % 60 === 0 ? 1 : 0.45 }} />
-        </View>
+        <View key={m} style={{ position: 'absolute', left: 0, right: 0, top: (m - R0) * px + 7, height: StyleSheet.hairlineWidth, backgroundColor: t.sep, opacity: m % 60 === 0 ? 1 : 0.45 }} />
       ))}
       {why ? <View style={[st.colOff, { backgroundColor: t.fill }]}><Text style={{ color: t.grey, fontWeight: '600' }}>{why.charAt(0).toUpperCase() + why.slice(1)}</Text></View> : null}
       {!why && (BREAKS[staff.id] ?? []).map(([s, e]) => (
@@ -350,7 +406,7 @@ function DayColumn({ staff, items, px, nowMin, why, closed, past, free, nextId, 
           onOpen={() => onOpen(it.id)} onNudge={(d) => onNudge(it.id, d)} />
       ))}
       {nowMin >= R0 && nowMin <= R1 ? (
-        <View pointerEvents="none" style={{ position: 'absolute', left: -6, right: 0, top: (nowMin - R0) * px, flexDirection: 'row', alignItems: 'center' }}>
+        <View pointerEvents="none" style={{ position: 'absolute', left: -6, right: 0, top: (nowMin - R0) * px + 3, flexDirection: 'row', alignItems: 'center' }}>
           <View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: t.red }} /><View style={{ flex: 1, height: 2, backgroundColor: t.red }} />
         </View>
       ) : null}
