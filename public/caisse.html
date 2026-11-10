@@ -1714,6 +1714,8 @@ function logout() {
   me = null;
   activeBarberId = null;
   allBarbers = [];
+  // Plus de session : on arrête d'interroger les encaissements en attente (sinon refus en boucle toutes les 5 s).
+  clearInterval(pendingPaymentsInterval); pendingPaymentsInterval = null;
   try { sessionStorage.removeItem('caisse-session'); } catch (e) {}
   pinBuffer = '';
   clearTimeout(inactivityTimer);
@@ -2026,8 +2028,11 @@ function refreshCaisseLockState() {
         // retaper un code PIN (comme avant, quand le Z fait sur la tablette ramenait à l'écran de départ).
         // Sauf pendant l'affichage du ticket Z (juste après la clôture) : la session reste ouverte pour pouvoir
         // l'imprimer ; c'est sa fermeture qui ramène à l'écran « Caisse fermée » (closeZTicket -> resetAfterClosing).
+        // Idem pendant une clôture en cours (onglet Clôture ouvert avec le code PIN) : si l'heure de fermeture
+        // automatique passe pendant les confirmations, la clôture doit pouvoir aller au bout et proposer le Z.
         var zOpen = document.getElementById('z-overlay') && document.getElementById('z-overlay').classList.contains('on');
-        if (me && !paymentInFlight && !zOpen) { logout(); showLoginOrLocked(); }
+        var closingOpen = !!clotureVerifiedBarber && document.getElementById('panel-cloture').classList.contains('on');
+        if (me && !paymentInFlight && !zOpen && !closingOpen) { logout(); showLoginOrLocked(); }
       } else {
         panel.classList.remove('day-closed');
       }
@@ -4736,6 +4741,7 @@ function loadMarketingSettings() {
 }
 
 function startCaisseClosing() {
+  if (me) zSessionMe = me;   // la clôture et le Z gardent la session du coiffeur jusqu'au bout
   Promise.all([
     barberApi('/api/owner/caisse/current-period'),
     barberApi('/api/owner/caisse/suggested-float')
@@ -4766,7 +4772,7 @@ function startCaisseClosing() {
         { title: '2/2 — Dernière confirmation', danger: true, confirmLabel: 'Clôturer définitivement' }
       ).then(function (ok2) {
         if (!ok2) return;
-        barberApi('/api/owner/caisse/close', { method: 'POST', body: { starting_cash_cents: floatCents, closed_by_barber_id: clotureVerifiedBarber ? clotureVerifiedBarber.id : null } })
+        zApi('/api/owner/caisse/close', { method: 'POST', body: { starting_cash_cents: floatCents, closed_by_barber_id: clotureVerifiedBarber ? clotureVerifiedBarber.id : null } })
           .then(function (r2) {
             // La journée est close : dès que le ticket Z est fermé, la caisse revient d'elle-même
             // à l'écran de départ (voir closeZTicket), sans rafraîchir la page à la main.
@@ -4832,7 +4838,7 @@ function printZNow() {
 
 function printZTicket(id) {
   if (me) zSessionMe = me;
-  barberApi('/api/owner/caisse/closings/' + id).then(function (r) {
+  zApi('/api/owner/caisse/closings/' + id).then(function (r) {
     var salonName = (document.getElementById('salon-name-tag') && document.getElementById('salon-name-tag').textContent) || 'Salon';
     var periodEndTxt = new Date(r.period_end).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' });
     var periodStartTxt = r.period_start
