@@ -2,7 +2,7 @@
 // fond gris clair, cartes blanches arrondies, nom du salon en petites capitales, gros titre,
 // barre du bas avec l'onglet actif souligné en bleu, bouton bleu « .go » pleine largeur.
 import React, { createContext, useContext } from 'react';
-import { Pressable, StyleSheet, Text, View, ViewStyle } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Palette } from '../src/theme/theme';
 
@@ -117,6 +117,101 @@ export function Avatar({ initials, color, size = 44 }: { initials: string; color
   return (
     <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: color, alignItems: 'center', justifyContent: 'center' }}>
       <Text style={{ color: '#fff', fontWeight: '700', fontSize: size * 0.4 }}>{initials}</Text>
+    </View>
+  );
+}
+
+/** Sélecteur segmenté (Jour / Semaine / Mois, Prestations / Suppléments / Produits). */
+export function Segmented<K extends string>({ items, value, onChange, style }: { items: { key: K; label: string }[]; value: K; onChange: (k: K) => void; style?: ViewStyle }) {
+  const { t } = useT();
+  return (
+    <View style={[{ flexDirection: 'row', backgroundColor: t.fill, borderRadius: 14, padding: 4 }, style]}>
+      {items.map((it) => {
+        const on = it.key === value;
+        return (
+          <Pressable key={it.key} onPress={() => onChange(it.key)} style={[{ flex: 1, paddingVertical: 9, borderRadius: 11, alignItems: 'center' }, on && { backgroundColor: t.card, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 4, shadowOffset: { width: 0, height: 1 }, elevation: 1 }]}>
+            <Text style={{ color: t.ink, fontWeight: on ? '700' : '500', fontSize: 14 }}>{it.label}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+/** Bulles des coiffeurs (caisse, agenda, rendez-vous du web) : la bulle choisie a un anneau bleu. */
+export function Bubbles({ people, value, onChange, size = 46 }: { people: { id: string; initials: string; color: string }[]; value: string | null; onChange?: (id: string) => void; size?: number }) {
+  const { t } = useT();
+  return (
+    <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
+      {people.map((p) => {
+        const on = p.id === value;
+        return (
+          <Pressable key={p.id} onPress={() => onChange?.(p.id)} style={{ padding: 3, borderRadius: 99, borderWidth: 3, borderColor: on ? t.blue : 'transparent' }}>
+            <Avatar initials={p.initials} color={p.color} size={size} />
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+/** Pastille de texte (RDV, Payé d'avance, Sans RDV...). */
+export function Pill({ label, tone = 'blue', icon }: { label: string; tone?: 'blue' | 'grey' | 'green' | 'orange' | 'red'; icon?: IconName }) {
+  const { t } = useT();
+  const fg = tone === 'blue' ? t.blue : tone === 'green' ? t.green : tone === 'orange' ? t.orange : tone === 'red' ? t.red : t.ink;
+  const bg = tone === 'blue' ? t.blueSoft : tone === 'grey' ? t.fill : fg + '22';
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: bg, borderRadius: 99, paddingHorizontal: 9, paddingVertical: 4, alignSelf: 'flex-start' }}>
+      {icon ? <Ionicons name={icon} size={12} color={fg} /> : null}
+      <Text style={{ color: fg, fontSize: 12, fontWeight: '700' }}>{label}</Text>
+    </View>
+  );
+}
+
+/** Feuille qui monte du bas (fenêtres du web : confirmer, encaisser, ticket Z...). */
+export function Sheet({ visible, onClose, title, children }: { visible: boolean; onClose: () => void; title?: string; children: React.ReactNode }) {
+  const { t } = useT();
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,.35)' }} onPress={onClose} />
+      <View style={{ backgroundColor: t.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '88%', paddingBottom: 30 }}>
+        <View style={{ alignItems: 'center', paddingTop: 8 }}><View style={{ width: 40, height: 5, borderRadius: 3, backgroundColor: t.fill2 }} /></View>
+        {title ? <Text style={{ color: t.ink, fontSize: 19, fontWeight: '700', textAlign: 'center', marginTop: 12, marginBottom: 4 }}>{title}</Text> : null}
+        <ScrollView contentContainerStyle={{ padding: 18 }}>{children}</ScrollView>
+      </View>
+    </Modal>
+  );
+}
+
+/** Pavé du code PIN (poste.html / caisse.html) : 4 pastilles + clavier. */
+export function PinPad({ title, sub, onDone, error }: { title: string; sub: string; onDone: (pin: string) => void; error?: string }) {
+  const { t } = useT();
+  const [pin, setPin] = React.useState('');
+  const press = (k: string) => {
+    if (k === 'del') return setPin((p) => p.slice(0, -1));
+    if (pin.length >= 4) return;
+    const next = pin + k;
+    setPin(next);
+    if (next.length === 4) setTimeout(() => { onDone(next); setPin(''); }, 150);
+  };
+  const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'];
+  return (
+    <View style={{ alignItems: 'center', paddingHorizontal: 30 }}>
+      <Text style={{ color: t.ink, fontSize: 24, fontWeight: '700' }}>{title}</Text>
+      <Text style={{ color: t.grey, fontSize: 15, marginTop: 6, textAlign: 'center' }}>{sub}</Text>
+      <View style={{ flexDirection: 'row', gap: 16, marginVertical: 26 }}>
+        {[0, 1, 2, 3].map((i) => (
+          <View key={i} style={{ width: 16, height: 16, borderRadius: 8, backgroundColor: i < pin.length ? t.ink : 'transparent', borderWidth: 2, borderColor: i < pin.length ? t.ink : t.sep }} />
+        ))}
+      </View>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', width: 282, gap: 14, justifyContent: 'center' }}>
+        {keys.map((k, i) => k === '' ? <View key={i} style={{ width: 84, height: 70 }} /> : (
+          <Pressable key={i} onPress={() => press(k)} style={({ pressed }) => ({ width: 84, height: 70, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: k === 'del' ? 'transparent' : pressed ? t.fill2 : t.card })}>
+            {k === 'del' ? <Ionicons name="backspace-outline" size={26} color={t.ink} /> : <Text style={{ color: t.ink, fontSize: 28, fontWeight: '500' }}>{k}</Text>}
+          </Pressable>
+        ))}
+      </View>
+      <Text style={{ color: t.red, marginTop: 16, minHeight: 20 }}>{error ?? ''}</Text>
     </View>
   );
 }

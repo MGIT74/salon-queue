@@ -1,10 +1,10 @@
 // MAQUETTE — espace client (compte.html) et prise de RDV (rdv.html), version téléphone.
 // Mêmes intitulés, même ordre, mêmes cartes que le web ; données fictives (data.ts).
 import React, { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradientFallback } from './gradient';
-import { Avatar, BackLink, Card, Eyebrow, Go, SoftButton, useT } from './ui';
+import { Avatar, BackLink, Card, Eyebrow, Go, Pill, Sheet, SoftButton, useT } from './ui';
 import { BARBERS, CLIENT, Day, EXTRAS, SERVICES, Salon, dur, eur, nextDays, slotsFor } from './data';
 
 /* ------------------------------------------------------------------ Accueil */
@@ -12,27 +12,56 @@ import { BARBERS, CLIENT, Day, EXTRAS, SERVICES, Salon, dur, eur, nextDays, slot
 export function HomeTab({ onBook }: { onBook: () => void }) {
   const { t } = useT();
   const next = CLIENT.nextAppointment;
+  const [sheet, setSheet] = useState<'note' | 'cancel' | null>(null);
+  const [cancelled, setCancelled] = useState(false);
+  const [note, setNote] = useState('');
   return (
     <ScrollView contentContainerStyle={st.page} showsVerticalScrollIndicator={false}>
       <Text style={[st.hello, { color: t.ink }]}>Bonjour {CLIENT.name}</Text>
 
       <Eyebrow>Prochain rendez-vous</Eyebrow>
-      <Card>
-        <View style={st.row}>
-          <View style={[st.dateBadge, { backgroundColor: t.blueSoft }]}>
-            <Text style={[st.dateBadgeDay, { color: t.blue }]}>SAM</Text>
-            <Text style={[st.dateBadgeNum, { color: t.blue }]}>14</Text>
+      {cancelled ? (
+        <Card style={{ backgroundColor: t.fill }}>
+          <Text style={[st.meta, { color: t.grey, marginTop: 0 }]}>Aucun rendez-vous à venir.</Text>
+          <Pressable onPress={onBook} style={{ marginTop: 10 }}><Text style={{ color: t.blue, fontWeight: '600' }}>Prendre rendez-vous</Text></Pressable>
+        </Card>
+      ) : (
+        <Card>
+          <View style={st.row}>
+            <View style={[st.dateBadge, { backgroundColor: t.blueSoft }]}>
+              <Text style={[st.dateBadgeDay, { color: t.blue }]}>SAM</Text>
+              <Text style={[st.dateBadgeNum, { color: t.blue }]}>14</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[st.strong, { color: t.ink }]}>{next.day} · {next.time}</Text>
+              <Text style={[st.meta, { color: t.grey }]}>{next.service} avec {next.barber} · {eur(next.priceCents)}</Text>
+            </View>
           </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[st.strong, { color: t.ink }]}>{next.day} · {next.time}</Text>
-            <Text style={[st.meta, { color: t.grey }]}>{next.service} avec {next.barber} · {eur(next.priceCents)}</Text>
+          {note ? <Text style={[st.meta, { color: t.ink, marginTop: 10, fontStyle: 'italic' }]}>Note : {note}</Text> : null}
+          <View style={[st.row, { marginTop: 14, gap: 10 }]}>
+            <View style={{ flex: 1 }}><SoftButton label={note ? 'Modifier la note' : 'Ajouter une note'} onPress={() => setSheet('note')} /></View>
+            <View style={{ flex: 1 }}><SoftButton label="Annuler" danger onPress={() => setSheet('cancel')} /></View>
           </View>
-        </View>
-        <View style={[st.row, { marginTop: 14, gap: 10 }]}>
-          <View style={{ flex: 1 }}><SoftButton label="Ajouter une note" onPress={() => {}} /></View>
-          <View style={{ flex: 1 }}><SoftButton label="Annuler" danger onPress={() => {}} /></View>
-        </View>
-      </Card>
+        </Card>
+      )}
+
+      <Sheet visible={sheet === 'note'} onClose={() => setSheet(null)} title="Note pour votre coiffeur">
+        <Text style={[st.meta, { color: t.grey, marginBottom: 10, textAlign: 'center' }]}>Elle sera visible par {next.barber} sur son poste.</Text>
+        <TextInput value={note} onChangeText={setNote} placeholder="Ex : dégradé américain, je serai 5 min en retard…" placeholderTextColor={t.grey} multiline
+          style={[st.input, { backgroundColor: t.fill, borderColor: t.fill, color: t.ink, minHeight: 90, textAlignVertical: 'top' }]} />
+        <View style={{ height: 14 }} />
+        <Go label="Enregistrer la note" onPress={() => setSheet(null)} />
+      </Sheet>
+      <Sheet visible={sheet === 'cancel'} onClose={() => setSheet(null)} title="Annuler ce rendez-vous ?">
+        <Text style={[st.doneSub, { color: t.grey, marginTop: 0 }]}>{next.day} à {next.time} · {next.service} avec {next.barber}</Text>
+        <Text style={[st.doneSub, { color: t.grey }]}>Le créneau sera rendu aux autres clients. Cette action est définitive.</Text>
+        <View style={{ height: 18 }} />
+        <Pressable onPress={() => { setCancelled(true); setSheet(null); }} style={({ pressed }) => [st.dangerBtn, { backgroundColor: t.red, opacity: pressed ? 0.85 : 1 }]}>
+          <Text style={{ color: '#fff', fontWeight: '700', fontSize: 16 }}>Annuler le rendez-vous</Text>
+        </Pressable>
+        <View style={{ height: 10 }} />
+        <SoftButton label="Garder mon rendez-vous" onPress={() => setSheet(null)} />
+      </Sheet>
 
       <Eyebrow>Fidélité</Eyebrow>
       <LinearGradientFallback colors={['#0a84ff', '#5e5ce6']} style={st.cardArt}>
@@ -98,59 +127,144 @@ export function HomeTab({ onBook }: { onBook: () => void }) {
 
 /* --------------------------------------------------------- Prise de RDV */
 
-type Step = 'who' | 'service' | 'barber' | 'slot' | 'confirm' | 'done';
+type Step = 'who' | 'name' | 'service' | 'barber' | 'slot' | 'confirm' | 'cart' | 'done';
 const STEPS: Step[] = ['service', 'barber', 'slot', 'confirm'];
+type Person = { name: string; serviceId: string; extras: string[]; barberId: string; dayKey: string; slot: string };
+
+const toMin = (h: string) => Number(h.slice(0, 2)) * 60 + Number(h.slice(3, 5));
+const toHm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+const endOf = (p: Person) => {
+  const m = toMin(p.slot) + (SERVICES.find((x) => x.id === p.serviceId)?.minutes ?? 30);
+  return toHm(Math.ceil(m / 15) * 15);
+};
 
 export function BookTab({ salon, onFinished }: { salon: Salon; onFinished: () => void }) {
   const { t } = useT();
+  const days = useMemo(() => nextDays(10), []);
+  const firstOpen = days.find((d) => !d.closed)?.key ?? days[0].key;
   const [step, setStep] = useState<Step>('who');
+  const [group, setGroup] = useState(false);
+  const [cart, setCart] = useState<Person[]>([]);
+  const [name, setName] = useState('');
   const [serviceId, setServiceId] = useState<string | null>(null);
   const [extras, setExtras] = useState<string[]>([]);
   const [barberId, setBarberId] = useState<string | null>(null);
-  const days = useMemo(() => nextDays(10), []);
-  const [dayKey, setDayKey] = useState(days.find((d) => !d.closed)?.key ?? days[0].key);
+  const [dayKey, setDayKey] = useState(firstOpen);
   const [slot, setSlot] = useState<string | null>(null);
 
+  const idx = cart.length; // personne en cours de saisie
+  const who = idx === 0 ? 'vous' : name || `Personne ${idx + 1}`;
   const service = SERVICES.find((x) => x.id === serviceId) ?? null;
   const barber = BARBERS.find((x) => x.id === barberId) ?? null;
   const day = days.find((d) => d.key === dayKey) as Day;
   const extrasCents = EXTRAS.filter((e) => extras.includes(e.id)).reduce((a, e) => a + e.priceCents, 0);
   const total = (service?.priceCents ?? 0) + extrasCents;
-  const back = () => setStep(step === 'service' ? 'who' : STEPS[STEPS.indexOf(step) - 1]);
+  const cartTotal = cart.reduce((a, p) => a + (SERVICES.find((x) => x.id === p.serviceId)?.priceCents ?? 0)
+    + EXTRAS.filter((e) => p.extras.includes(e.id)).reduce((x, e) => x + e.priceCents, 0), 0);
+
+  const resetPerson = () => { setName(''); setServiceId(null); setExtras([]); setBarberId(null); setSlot(null); };
+  const resetAll = () => { resetPerson(); setCart([]); setGroup(false); setDayKey(firstOpen); setStep('who'); };
+  const back = () => {
+    if (step === 'name' || (step === 'service' && idx === 0)) { if (idx > 0) { setStep('cart'); resetPerson(); } else setStep('who'); return; }
+    if (step === 'service') return setStep('name');
+    setStep(STEPS[STEPS.indexOf(step) - 1]);
+  };
+  const commitPerson = () => {
+    if (!serviceId || !barberId || !slot) return;
+    setCart((c) => [...c, { name: idx === 0 ? 'Vous' : name || `Personne ${idx + 1}`, serviceId, extras, barberId, dayKey, slot }]);
+    resetPerson();
+    setStep('cart');
+  };
+  const nextStep = () => {
+    if (step === 'name') return setStep('service');
+    if (step === 'confirm') return setStep('done');
+    if (step === 'slot' && group) return commitPerson();
+    setStep(STEPS[STEPS.indexOf(step) + 1]);
+  };
+
+  /* Raccourcis « venir ensemble » du web (rdv.html) : même coiffeur → « Juste après vous » / « À la suite de X » ;
+     autre coiffeur → « En même temps que X » ; autre jour → « Le même jour que X ». */
+  const together = useMemo(() => {
+    if (step !== 'slot' || idx === 0) return { opts: [] as { label: string; sub: string; time: string; barberId: string }[], sameDays: [] as { label: string; key: string }[] };
+    const opts: { label: string; sub: string; time: string; barberId: string }[] = [];
+    const sameDays: { label: string; key: string }[] = [];
+    cart.forEach((p) => {
+      if (p.dayKey !== dayKey) {
+        if (!sameDays.find((x) => x.key === p.dayKey)) sameDays.push({ label: `Le même jour que ${p.name === 'Vous' ? 'vous' : p.name}`, key: p.dayKey });
+        return;
+      }
+      const sameBarber = barberId === p.barberId || barberId === 'any';
+      if (sameBarber) opts.push({ label: p.name === 'Vous' ? 'Juste après vous' : `À la suite de ${p.name}`, sub: `${endOf(p)} avec ${BARBERS.find((b) => b.id === p.barberId)?.name}`, time: endOf(p), barberId: p.barberId });
+      if (barberId !== p.barberId) {
+        const other = BARBERS.find((b) => b.id !== 'any' && b.id !== p.barberId && (barberId === 'any' || b.id === barberId));
+        if (other) opts.push({ label: `En même temps que ${p.name === 'Vous' ? 'vous' : p.name}`, sub: `${p.slot} avec ${other.name}`, time: p.slot, barberId: other.id });
+      }
+    });
+    return { opts, sameDays };
+  }, [step, idx, cart, dayKey, barberId]);
 
   if (step === 'done') {
+    const list = group ? cart : null;
     return (
       <View style={[st.page, { flex: 1, alignItems: 'center', justifyContent: 'center' }]}>
         <View style={[st.check, { backgroundColor: t.green }]}><Ionicons name="checkmark" size={34} color="#fff" /></View>
-        <Text style={[st.doneTitle, { color: t.ink }]}>Rendez-vous confirmé</Text>
-        <Text style={[st.doneSub, { color: t.grey }]}>
-          {day.dow} {day.num} {day.month} à {slot} · {service?.name} avec {barber?.id === 'any' ? 'le premier coiffeur disponible' : barber?.name}
-        </Text>
-        <Text style={[st.doneSub, { color: t.grey, marginTop: 6 }]}>Un email de confirmation et un rappel la veille vous seront envoyés.</Text>
+        <Text style={[st.doneTitle, { color: t.ink }]}>{list ? `${list.length} rendez-vous confirmés` : 'Rendez-vous confirmé'}</Text>
+        {list ? list.map((p, i) => {
+          const d = days.find((x) => x.key === p.dayKey) as Day;
+          return <Text key={i} style={[st.doneSub, { color: t.grey, marginTop: 4 }]}>{p.name} · {d.dow} {d.num} à {p.slot} · {SERVICES.find((x) => x.id === p.serviceId)?.name}</Text>;
+        }) : (
+          <Text style={[st.doneSub, { color: t.grey }]}>
+            {day.dow} {day.num} {day.month} à {slot} · {service?.name} avec {barber?.id === 'any' ? 'le premier coiffeur disponible' : barber?.name}
+          </Text>
+        )}
+        <Text style={[st.doneSub, { color: t.grey, marginTop: 10 }]}>Un email de confirmation et un rappel la veille vous seront envoyés.</Text>
         <View style={{ height: 22, alignSelf: 'stretch' }} />
-        <View style={{ alignSelf: 'stretch' }}><Go label="Retour à l'accueil" onPress={() => { setStep('who'); setServiceId(null); setBarberId(null); setSlot(null); setExtras([]); onFinished(); }} /></View>
+        <View style={{ alignSelf: 'stretch' }}><Go label="Retour à l'accueil" onPress={() => { resetAll(); onFinished(); }} /></View>
       </View>
     );
   }
 
+  const showBar = step !== 'who' && step !== 'cart';
+  const disabled = (step === 'service' && !service) || (step === 'barber' && !barber) || (step === 'slot' && !slot);
+
   return (
     <View style={{ flex: 1 }}>
       <ScrollView contentContainerStyle={st.page} showsVerticalScrollIndicator={false}>
-        {step !== 'who' ? <BackLink onPress={back} /> : null}
-        {step !== 'who' ? <Progress index={STEPS.indexOf(step)} /> : null}
+        {step !== 'who' && step !== 'cart' ? <BackLink onPress={back} /> : null}
+        {STEPS.includes(step) ? <Progress index={STEPS.indexOf(step)} /> : null}
+        {group && STEPS.includes(step) ? (
+          <View style={{ alignItems: 'center', marginBottom: 6 }}><Pill label={idx === 0 ? 'Vous' : who} icon="person" /></View>
+        ) : null}
 
         {step === 'who' && (
           <>
             <Text style={[st.question, { color: t.ink }]}>Pour qui est le rendez-vous ?</Text>
-            <ChoiceCard icon="person-outline" title="Juste moi" sub="Un rendez-vous pour une personne" onPress={() => setStep('service')} />
-            <ChoiceCard icon="people-outline" title="Plusieurs personnes" sub="Enfants, amis, famille — jusqu'à 6" accent onPress={() => setStep('service')} />
+            <ChoiceCard icon="person-outline" title="Juste moi" sub="Un rendez-vous pour une personne" onPress={() => { setGroup(false); setStep('service'); }} />
+            <ChoiceCard icon="people-outline" title="Plusieurs personnes" sub="Enfants, amis, famille — jusqu'à 6" accent onPress={() => { setGroup(true); setStep('service'); }} />
             <Text style={[st.foot, { color: t.grey }]}>{salon.name} · {salon.city}</Text>
+          </>
+        )}
+
+        {step === 'name' && (
+          <>
+            <Text style={[st.question, { color: t.ink }]}>Qui vient avec vous ?</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+              {['Léo (8 ans)', 'Sophie'].map((n) => (
+                <Pressable key={n} onPress={() => setName(n)} style={[st.chip, { backgroundColor: name === n ? t.blueSoft : t.card, borderColor: name === n ? t.blue : t.sep }]}>
+                  <Ionicons name="person-circle-outline" size={18} color={name === n ? t.blue : t.grey} />
+                  <Text style={{ color: t.ink, fontWeight: '500' }}>{n}</Text>
+                </Pressable>
+              ))}
+            </View>
+            <Text style={[st.meta, { color: t.grey, marginBottom: 6 }]}>Ou un autre prénom</Text>
+            <TextInput value={name} onChangeText={setName} placeholder="Prénom" placeholderTextColor={t.grey}
+              style={[st.input, { backgroundColor: t.card, borderColor: t.sep, color: t.ink }]} />
           </>
         )}
 
         {step === 'service' && (
           <>
-            <Text style={[st.question, { color: t.ink }]}>Quelle prestation ?</Text>
+            <Text style={[st.question, { color: t.ink }]}>{idx === 0 ? 'Quelle prestation ?' : `Prestation pour ${who}`}</Text>
             <View style={st.grid}>
               {SERVICES.map((x) => {
                 const on = x.id === serviceId;
@@ -204,6 +318,31 @@ export function BookTab({ salon, onFinished }: { salon: Salon; onFinished: () =>
         {step === 'slot' && (
           <>
             <Text style={[st.question, { color: t.ink }]}>Quand ?</Text>
+            {together.opts.length || together.sameDays.length ? (
+              <View style={[st.gtBox, { backgroundColor: t.blueSoft }]}>
+                <Text style={{ color: t.blue, fontWeight: '700', fontSize: 13, marginBottom: 8 }}>VENIR ENSEMBLE</Text>
+                {together.opts.map((o) => {
+                  const on = slot === o.time && barberId === o.barberId;
+                  return (
+                    <Pressable key={o.label} onPress={() => { setBarberId(o.barberId); setSlot(o.time); }}
+                      style={[st.gtOpt, { backgroundColor: on ? t.blue : t.card }]}>
+                      <Ionicons name={o.label.startsWith('En même') ? 'people-outline' : 'arrow-forward-circle-outline'} size={20} color={on ? '#fff' : t.blue} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ color: on ? '#fff' : t.ink, fontWeight: '700', fontSize: 15 }}>{o.label}</Text>
+                        <Text style={{ color: on ? 'rgba(255,255,255,.85)' : t.grey, fontSize: 13 }}>{o.sub}</Text>
+                      </View>
+                      {on ? <Ionicons name="checkmark-circle" size={20} color="#fff" /> : null}
+                    </Pressable>
+                  );
+                })}
+                {together.sameDays.map((d) => (
+                  <Pressable key={d.key} onPress={() => { setDayKey(d.key); setSlot(null); }} style={[st.gtOpt, { backgroundColor: t.card }]}>
+                    <Ionicons name="calendar-outline" size={20} color={t.blue} />
+                    <Text style={{ color: t.ink, fontWeight: '700', fontSize: 15, flex: 1 }}>{d.label}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 4 }}>
               {days.map((d) => {
                 const on = d.key === dayKey;
@@ -255,23 +394,55 @@ export function BookTab({ salon, onFinished }: { salon: Salon; onFinished: () =>
             </View>
           </>
         )}
+
+        {step === 'cart' && (
+          <>
+            <Text style={[st.question, { color: t.ink }]}>Votre réservation à plusieurs</Text>
+            <Card style={{ paddingVertical: 4 }}>
+              {cart.map((p, i) => {
+                const d = days.find((x) => x.key === p.dayKey) as Day;
+                const b = BARBERS.find((x) => x.id === p.barberId);
+                return (
+                  <View key={i} style={[st.row, { paddingVertical: 12, borderBottomWidth: i < cart.length - 1 ? StyleSheet.hairlineWidth : 0, borderColor: t.sep }]}>
+                    <Avatar initials={p.name[0]} color={b?.color ?? t.blue} size={38} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={[st.strong, { color: t.ink }]}>{p.name}</Text>
+                      <Text style={[st.meta, { color: t.grey }]}>{SERVICES.find((x) => x.id === p.serviceId)?.name} · {b?.id === 'any' ? 'Sans préférence' : b?.name}</Text>
+                    </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={[st.strong, { color: t.ink }]}>{p.slot}</Text>
+                      <Text style={[st.meta, { color: t.grey }]}>{d.dow} {d.num}</Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </Card>
+            {cart.length < 6 ? (
+              <Pressable onPress={() => { resetPerson(); setStep('name'); }} style={[st.addPerson, { borderColor: t.blue }]}>
+                <Ionicons name="person-add-outline" size={20} color={t.blue} />
+                <Text style={{ color: t.blue, fontWeight: '700', fontSize: 15 }}>Ajouter une personne</Text>
+              </Pressable>
+            ) : null}
+            <View style={[st.row, { justifyContent: 'space-between', marginVertical: 16, paddingHorizontal: 4 }]}>
+              <Text style={[st.meta, { color: t.grey, fontSize: 15 }]}>Total</Text>
+              <Text style={[st.big, { color: t.ink, fontSize: 22 }]}>{eur(cartTotal)}</Text>
+            </View>
+            <Go label={`Valider ${cart.length > 1 ? `les ${cart.length} rendez-vous` : 'le rendez-vous'}`} onPress={() => setStep('done')} />
+          </>
+        )}
       </ScrollView>
 
-      {step !== 'who' ? (
+      {showBar ? (
         <View style={[st.stepBar, { backgroundColor: t.card, borderColor: t.sep }]}>
           <View style={{ flex: 1 }}>
             <Text style={[st.meta, { color: t.grey }]} numberOfLines={1}>
-              {service ? `${service.name}${extras.length ? ` + ${extras.length}` : ''}` : 'Choisissez une prestation'}
-              {barber ? ` · ${barber.id === 'any' ? 'Sans préférence' : barber.name}` : ''}
+              {step === 'name' ? `Personne ${idx + 1}` : service ? `${service.name}${extras.length ? ` + ${extras.length}` : ''}` : 'Choisissez une prestation'}
+              {barber && step !== 'name' ? ` · ${barber.id === 'any' ? 'Sans préférence' : barber.name}` : ''}
             </Text>
-            <Text style={[st.strong, { color: t.ink }]}>{service ? eur(total) : '—'}</Text>
+            <Text style={[st.strong, { color: t.ink }]}>{step === 'name' ? who : service ? eur(total) : '—'}</Text>
           </View>
           <View style={{ width: 150 }}>
-            <Go
-              label={step === 'confirm' ? 'Confirmer' : 'Suivant'}
-              disabled={(step === 'service' && !service) || (step === 'barber' && !barber) || (step === 'slot' && !slot)}
-              onPress={() => setStep(step === 'confirm' ? 'done' : STEPS[STEPS.indexOf(step) + 1])}
-            />
+            <Go label={step === 'confirm' ? 'Confirmer' : step === 'slot' && group ? 'Ajouter' : 'Suivant'} disabled={disabled} onPress={nextStep} />
           </View>
         </View>
       ) : null}
@@ -383,8 +554,52 @@ const st = StyleSheet.create({
   dayNum: { fontSize: 20, fontWeight: '700', marginVertical: 1 },
   slots: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   slot: { width: '23%', flexGrow: 1, maxWidth: '25%', borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
+  dangerBtn: { borderRadius: 16, paddingVertical: 15, alignItems: 'center' },
+  gtBox: { borderRadius: 16, padding: 12, marginBottom: 14, gap: 8 },
+  gtOpt: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 12, padding: 12 },
+  input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, fontSize: 16 },
+  addPerson: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1.5, borderStyle: 'dashed', borderRadius: 16, paddingVertical: 14, marginTop: 12 },
   stepBar: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 18, paddingVertical: 10, borderTopWidth: StyleSheet.hairlineWidth },
   check: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center', marginBottom: 18 },
   doneTitle: { fontSize: 22, fontWeight: '800' },
   doneSub: { fontSize: 15, textAlign: 'center', marginTop: 10, lineHeight: 21 },
 });
+
+/* ---------------------------------------------------- Connexion (compte.html) */
+
+export function ClientLogin({ salon, onLogged, onBack }: { salon: Salon; onLogged: () => void; onBack: () => void }) {
+  const { t } = useT();
+  const [mode, setMode] = useState<'login' | 'signup'>('login');
+  const [email, setEmail] = useState('eric@exemple.fr');
+  const [pw, setPw] = useState('••••••••');
+  const field = (label: string, value: string, set: (v: string) => void, secure?: boolean) => (
+    <View style={{ marginBottom: 12 }}>
+      <Text style={[st.meta, { color: t.grey, marginBottom: 6 }]}>{label}</Text>
+      <TextInput value={value} onChangeText={set} secureTextEntry={secure} autoCapitalize="none" placeholderTextColor={t.grey}
+        style={[st.input, { backgroundColor: t.fill, borderColor: t.fill, color: t.ink }]} />
+    </View>
+  );
+  return (
+    <ScrollView contentContainerStyle={[st.page, { paddingTop: 8 }]} keyboardShouldPersistTaps="handled">
+      <BackLink onPress={onBack} label="Salons" />
+      <Card style={{ padding: 22, borderRadius: 24 }}>
+        <Text style={{ color: t.grey, fontSize: 13, fontWeight: '600', letterSpacing: 0.6, textAlign: 'center' }}>{(salon.name + ' ' + salon.city).toUpperCase()}</Text>
+        <Text style={{ color: t.ink, fontSize: 26, fontWeight: '700', textAlign: 'center', marginTop: 4 }}>{mode === 'login' ? 'Bon retour' : 'Créer un compte'}</Text>
+        <Text style={[st.meta, { color: t.grey, textAlign: 'center', marginBottom: 20 }]}>
+          {mode === 'login' ? 'Connectez-vous pour gérer votre compte' : 'Pour gérer vos rendez-vous, votre fidélité et vos cadeaux'}
+        </Text>
+        {mode === 'signup' ? field('Nom', '', () => {}) : null}
+        {field('Email', email, setEmail)}
+        {mode === 'signup' ? field('Téléphone', '', () => {}) : null}
+        {field('Mot de passe', pw, setPw, true)}
+        <View style={{ height: 6 }} />
+        <Go label={mode === 'login' ? 'Se connecter' : 'Créer mon compte'} onPress={onLogged} />
+        <View style={[st.row, { justifyContent: 'space-between', marginTop: 16 }]}>
+          <Pressable onPress={() => setMode(mode === 'login' ? 'signup' : 'login')}><Text style={{ color: t.blue, fontWeight: '600' }}>{mode === 'login' ? 'Créer un compte' : "J'ai déjà un compte"}</Text></Pressable>
+          {mode === 'login' ? <Pressable><Text style={{ color: t.blue, fontWeight: '500' }}>Mot de passe oublié ?</Text></Pressable> : null}
+        </View>
+      </Card>
+      <Text style={[st.foot, { color: t.grey, marginTop: 16 }]}>Maquette : n'importe quel identifiant fonctionne.</Text>
+    </ScrollView>
+  );
+}
