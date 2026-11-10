@@ -101,23 +101,52 @@ export const QUEUE_ITEMS: QueueItem[] = [
   { id: 'q5', client: 'Mehdi', service: 'Coupe', minutes: 30, priceCents: 2500, barberId: 'tom', status: 'in_progress', kind: 'RDV' },
 ];
 
-/** Rendez-vous du jour (heure du salon, minutes depuis minuit). */
-export type Appt = { id: string; barberId: string; client: string; service: string; start: number; minutes: number; priceCents: number; online: boolean; prepaid?: boolean };
+/** Rendez-vous (heure du salon, minutes depuis minuit). clientTime = heure réservée par le client quand le RDV
+ *  a été décalé de 5 min dans l'agenda ; forcedBy = RDV « forcé » qui chevauche le suivant ; noShow = client absent. */
+export type Appt = {
+  id: string; barberId: string; client: string; service: string; start: number; minutes: number; priceCents: number;
+  online: boolean; prepaid?: boolean; extras?: string[]; products?: string[]; clientTime?: number; forcedBy?: string; noShow?: boolean;
+  phone?: string; email?: string; note?: string;
+};
 export const APPTS: Appt[] = [
-  { id: 'r1', barberId: 'marco', client: 'Paul', service: 'Coupe', start: 9 * 60 + 30, minutes: 30, priceCents: 2500, online: true },
-  { id: 'r2', barberId: 'marco', client: 'Lucas B.', service: 'Coupe + barbe', start: 10 * 60 + 30, minutes: 45, priceCents: 3500, online: false },
-  { id: 'r3', barberId: 'marco', client: 'Nathan', service: 'Coupe', start: 11 * 60 + 15, minutes: 30, priceCents: 2500, online: true },
-  { id: 'r4', barberId: 'marco', client: 'Sam', service: 'Coupe + barbe', start: 14 * 60, minutes: 45, priceCents: 3500, online: true, prepaid: true },
-  { id: 'r5', barberId: 'marco', client: 'Eric D.', service: 'Coupe', start: 16 * 60 + 30, minutes: 30, priceCents: 2500, online: true },
-  { id: 'r6', barberId: 'tom', client: 'Mehdi', service: 'Coupe', start: 10 * 60 + 45, minutes: 30, priceCents: 2500, online: true },
-  { id: 'r7', barberId: 'tom', client: 'Léo (8 ans)', service: 'Coupe enfant', start: 11 * 60 + 50, minutes: 20, priceCents: 1800, online: true },
-  { id: 'r8', barberId: 'tom', client: 'Antoine', service: 'Barbe', start: 15 * 60, minutes: 20, priceCents: 1500, online: false },
-  { id: 'r9', barberId: 'yanis', client: 'Julien', service: 'Coupe + barbe', start: 9 * 60, minutes: 45, priceCents: 3500, online: true },
-  { id: 'r10', barberId: 'yanis', client: 'Rayan', service: 'Coupe', start: 13 * 60 + 30, minutes: 30, priceCents: 2500, online: true },
-  { id: 'r11', barberId: 'yanis', client: 'Kevin', service: 'Coupe', start: 17 * 60, minutes: 30, priceCents: 2500, online: false },
+  { id: 'r1', barberId: 'marco', client: 'Paul Martin', service: 'Coupe', start: 9 * 60 + 30, minutes: 30, priceCents: 2500, online: true, phone: '06 12 34 56 32', email: 'paul@exemple.fr' },
+  { id: 'r2', barberId: 'marco', client: 'Lucas B.', service: 'Coupe + barbe', start: 10 * 60 + 30, minutes: 45, priceCents: 3500, online: false, extras: ['Shampoing'] },
+  { id: 'r3', barberId: 'marco', client: 'Nathan', service: 'Coupe', start: 11 * 60 + 30, minutes: 30, priceCents: 2500, online: true, clientTime: 11 * 60 + 25, phone: '07 55 12 98 55' },
+  { id: 'r4', barberId: 'marco', client: 'Sam', service: 'Coupe + barbe', start: 14 * 60, minutes: 45, priceCents: 3500, online: true, prepaid: true, note: 'Dégradé américain, pas trop court sur le dessus' },
+  { id: 'r5', barberId: 'marco', client: 'Eric Dokatel', service: 'Coupe', start: 15 * 60, minutes: 30, priceCents: 2500, online: true, products: ['Cire coiffante'], email: 'eric@exemple.fr' },
+  { id: 'r5b', barberId: 'marco', client: 'Hugo', service: 'Barbe', start: 15 * 60 + 25, minutes: 20, priceCents: 1500, online: false, forcedBy: 'Marco' },
+  { id: 'r5c', barberId: 'marco', client: 'Bilal', service: 'Coupe', start: 16 * 60 + 30, minutes: 30, priceCents: 2500, online: true },
+  { id: 'r6', barberId: 'tom', client: 'Mehdi', service: 'Coupe', start: 9 * 60, minutes: 30, priceCents: 2500, online: true },
+  { id: 'r6b', barberId: 'tom', client: 'Ahmed', service: 'Coupe', start: 9 * 60 + 45, minutes: 30, priceCents: 2500, online: true, noShow: true },
+  { id: 'r7', barberId: 'tom', client: 'Léo (8 ans)', service: 'Coupe enfant', start: 11 * 60 + 10, minutes: 20, priceCents: 1800, online: true },
+  { id: 'r8', barberId: 'tom', client: 'Antoine', service: 'Barbe', start: 14 * 60 + 30, minutes: 20, priceCents: 1500, online: false },
+  { id: 'r8b', barberId: 'tom', client: 'Kevin', service: 'Coupe + barbe', start: 16 * 60, minutes: 45, priceCents: 3500, online: true, extras: ['Contours'] },
+  { id: 'r9', barberId: 'yanis', client: 'Julien', service: 'Coupe + barbe', start: 9 * 60, minutes: 45, priceCents: 3500, online: true, prepaid: true },
+  { id: 'r10', barberId: 'yanis', client: 'Rayan', service: 'Coupe', start: 11 * 60, minutes: 30, priceCents: 2500, online: true },
+  { id: 'r11', barberId: 'yanis', client: 'Sofiane', service: 'Coupe', start: 13 * 60 + 30, minutes: 30, priceCents: 2500, online: false },
+  { id: 'r12', barberId: 'yanis', client: 'Thomas', service: 'Coupe enfant', start: 17 * 60, minutes: 20, priceCents: 1800, online: true },
 ];
+/** « Maintenant » figé dans la maquette (11h20) pour montrer des RDV terminés, en cours et à venir. */
+export const NOW_MIN = 11 * 60 + 20;
+/** Pauses de la journée par coiffeur (horaires du web). */
+export const BREAKS: Record<string, [number, number][]> = { marco: [[12 * 60 + 30, 13 * 60 + 30]], tom: [[12 * 60, 13 * 60]], yanis: [[12 * 60 + 15, 13 * 60]] };
+/** Horaires de travail par coiffeur. */
+export const HOURS: Record<string, [number, number]> = { marco: [9 * 60, 19 * 60], tom: [9 * 60, 18 * 60], yanis: [9 * 60, 19 * 60] };
+/** Absences : jour (décalage depuis aujourd'hui) → coiffeur et raison, comme « en congé » du web. */
+export const OFF: Record<number, { barberId: string; why: string }[]> = { 1: [{ barberId: 'yanis', why: 'en congé' }], 2: [{ barberId: 'yanis', why: 'en congé' }] };
+
+/** RDV d'un autre jour : mêmes clients, heures décalées (stable selon le jour). Lundi = salon fermé. */
+export function apptsForDay(offset: number): Appt[] {
+  if (offset === 0) return APPTS;
+  const d = new Date(); d.setDate(d.getDate() + offset);
+  if (d.getDay() === 1 || d.getDay() === 0) return [];
+  const off = (OFF[offset] ?? []).map((o) => o.barberId);
+  return APPTS.filter((a, i) => (i + offset) % 3 !== 0 && !off.includes(a.barberId))
+    .map((a, i) => ({ ...a, id: a.id + '_' + offset, start: Math.min(18 * 60, a.start + ((offset * 35 + i * 10) % 90) - 30), clientTime: undefined, forcedBy: undefined, noShow: offset < 0 && i % 7 === 0 }));
+}
 export const DAY_START = 9 * 60;
 export const DAY_END = 19 * 60;
+export const NUDGE = 5;
 export const hm = (min: number) => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
 
 export type CatalogItem = { id: string; name: string; minutes?: number; priceCents: number; emoji: string; kind: 'svc' | 'extra' | 'product'; stock?: number };
