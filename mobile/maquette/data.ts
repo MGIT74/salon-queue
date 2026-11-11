@@ -161,12 +161,23 @@ export const CATALOG: CatalogItem[] = [
   { id: 'c-huile', name: 'Huile à barbe', priceCents: 1890, emoji: '🧴', kind: 'product', stock: 3 },
 ];
 
-export const PENDING_PAYMENTS = [
+/** Passages terminés à encaisser. prepaid = déjà payé d'avance (reste seulement ce qui a été ajouté depuis). */
+export type Pending = { id: string; client: string; service: string; priceCents: number; barberId: string; ago: string; loyalty?: boolean; prepaid?: { paidCents: number; extras: { name: string; priceCents: number }[] } };
+export const PENDING_PAYMENTS: Pending[] = [
   { id: 'pp1', client: 'Hugo', service: 'Coupe', priceCents: 2500, barberId: 'marco', ago: '12 min' },
-  { id: 'pp2', client: 'Mehdi', service: 'Coupe', priceCents: 2500, barberId: 'tom', ago: '3 min' },
+  { id: 'pp2', client: 'Mehdi', service: 'Coupe', priceCents: 2500, barberId: 'tom', ago: '3 min', loyalty: true },
+  { id: 'pp3', client: 'Julien', service: 'Coupe + barbe', priceCents: 3500, barberId: 'yanis', ago: '25 min', loyalty: true, prepaid: { paidCents: 3500, extras: [{ name: 'Shampoing', priceCents: 500 }] } },
 ];
+/** Cartes cadeaux vendues (code → solde). */
+export const GIFT_CARDS: Record<string, { balanceCents: number; from: string; to: string }> = {
+  'TBO-7F3K': { balanceCents: 5000, from: 'Sophie', to: 'Eric Dokatel' },
+  'TBO-Q2M9': { balanceCents: 2000, from: 'Karim', to: 'Nathan' },
+};
+/** Codes-barres des produits (douchette). */
+export const BARCODES: Record<string, string> = { '3760001000011': 'c-cire', '3760001000028': 'c-huile' };
 
-export const TODAY_SALES = [
+export type Sale = { id: string; ticket: number; time: string; client: string; items: string; method: string; priceCents: number; barberId: string };
+export const TODAY_SALES: Sale[] = [
   { id: 's1', ticket: 41, time: '09:42', client: 'Julien', items: 'Coupe + barbe', method: 'CB', priceCents: 3500, barberId: 'yanis' },
   { id: 's2', ticket: 42, time: '10:05', client: 'Paul', items: 'Coupe, Cire coiffante', method: 'Espèces', priceCents: 3990, barberId: 'marco' },
   { id: 's3', ticket: 43, time: '10:31', client: 'Sam', items: 'Coupe + barbe', method: 'CB', priceCents: 3500, barberId: 'marco' },

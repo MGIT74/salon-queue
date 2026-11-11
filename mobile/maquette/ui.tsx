@@ -2,7 +2,7 @@
 // fond gris clair, cartes blanches arrondies, nom du salon en petites capitales, gros titre,
 // barre du bas avec l'onglet actif souligné en bleu, bouton bleu « .go » pleine largeur.
 import React, { createContext, useContext } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View, ViewStyle } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, TextInputProps, View, ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Palette } from '../src/theme/theme';
 
@@ -212,6 +212,89 @@ export function PinPad({ title, sub, onDone, error }: { title: string; sub: stri
         ))}
       </View>
       <Text style={{ color: t.red, marginTop: 16, minHeight: 20 }}>{error ?? ''}</Text>
+    </View>
+  );
+}
+
+/** Champ de formulaire (libellé + saisie), comme les .fld du web. */
+export function Field({ label, style, ...props }: { label: string; style?: ViewStyle } & TextInputProps) {
+  const { t } = useT();
+  return (
+    <View style={[{ marginBottom: 12 }, style]}>
+      <Text style={{ color: t.grey, marginBottom: 6, fontWeight: '600' }}>{label}</Text>
+      <TextInput placeholderTextColor={t.grey} {...props}
+        style={[{ backgroundColor: t.fill, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 16, color: t.ink }, props.multiline ? { minHeight: 80, textAlignVertical: 'top' } : null]} />
+    </View>
+  );
+}
+
+/** Ligne avec interrupteur (réglages). */
+export function ToggleRow({ label, sub, value, onChange, last }: { label: string; sub?: string; value: boolean; onChange: (v: boolean) => void; last?: boolean }) {
+  const { t } = useT();
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth, borderColor: t.sep }}>
+      <View style={{ flex: 1 }}>
+        <Text style={{ color: t.ink, fontSize: 15.5 }}>{label}</Text>
+        {sub ? <Text style={{ color: t.grey, fontSize: 12.5, marginTop: 2 }}>{sub}</Text> : null}
+      </View>
+      <Switch value={value} onValueChange={onChange} trackColor={{ true: t.green, false: t.fill2 }} />
+    </View>
+  );
+}
+
+/** Ligne cliquable (libellé · valeur ›). */
+export function RowLink({ label, value, onPress, last, danger, icon }: { label: string; value?: string; onPress?: () => void; last?: boolean; danger?: boolean; icon?: IconName }) {
+  const { t } = useT();
+  return (
+    <Pressable onPress={onPress} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 13, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth, borderColor: t.sep, opacity: pressed ? 0.6 : 1 })}>
+      {icon ? <Ionicons name={icon} size={19} color={danger ? t.red : t.blue} /> : null}
+      <Text style={{ color: danger ? t.red : t.ink, fontSize: 15.5, flex: 1 }}>{label}</Text>
+      {value ? <Text style={{ color: t.grey, fontSize: 14, maxWidth: '50%' }} numberOfLines={1}>{value}</Text> : null}
+      {onPress ? <Ionicons name="chevron-forward" size={17} color={t.grey} /> : null}
+    </Pressable>
+  );
+}
+
+/** Pas à pas (−  valeur  +). */
+export function Stepper({ value, onChange, step = 1, min = 0, max = 9999, format }: { value: number; onChange: (v: number) => void; step?: number; min?: number; max?: number; format?: (v: number) => string }) {
+  const { t } = useT();
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+      <Pressable onPress={() => onChange(Math.max(min, value - step))} hitSlop={6} style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: t.fill, alignItems: 'center', justifyContent: 'center' }}><Text style={{ color: t.ink, fontSize: 18 }}>−</Text></Pressable>
+      <Text style={{ color: t.ink, fontWeight: '700', minWidth: 54, textAlign: 'center', fontVariant: ['tabular-nums'] }}>{format ? format(value) : value}</Text>
+      <Pressable onPress={() => onChange(Math.min(max, value + step))} hitSlop={6} style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: t.fill, alignItems: 'center', justifyContent: 'center' }}><Text style={{ color: t.ink, fontSize: 18 }}>+</Text></Pressable>
+    </View>
+  );
+}
+
+/** Petit message en bas d'écran (toast du web), avec action facultative. */
+export function useToast(): [React.ReactNode, (text: string, action?: { label: string; run: () => void }) => void] {
+  const { t } = useT();
+  const [msg, setMsg] = React.useState<{ text: string; action?: { label: string; run: () => void } } | null>(null);
+  React.useEffect(() => { if (!msg) return; const id = setTimeout(() => setMsg(null), 3200); return () => clearTimeout(id); }, [msg]);
+  const node = msg ? (
+    <View style={{ position: 'absolute', left: 14, right: 14, bottom: 12, borderRadius: 14, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: t.ink, zIndex: 50 }}>
+      <Text style={{ color: t.bg, fontWeight: '600', flex: 1 }}>{msg.text}</Text>
+      {msg.action ? <Pressable onPress={() => { msg.action!.run(); setMsg(null); }}><Text style={{ color: '#ffd60a', fontWeight: '800' }}>{msg.action.label}</Text></Pressable> : null}
+    </View>
+  ) : null;
+  return [node, (text, action) => setMsg({ text, action })];
+}
+
+/** Puces de choix (une ou plusieurs). */
+export function Chips<K extends string>({ items, value, onToggle }: { items: { key: K; label: string; color?: string }[]; value: K[]; onToggle: (k: K) => void }) {
+  const { t } = useT();
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+      {items.map((it) => {
+        const on = value.includes(it.key);
+        return (
+          <Pressable key={it.key} onPress={() => onToggle(it.key)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 99, backgroundColor: on ? t.blue : t.fill }}>
+            {it.color ? <View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: it.color }} /> : null}
+            <Text style={{ color: on ? '#fff' : t.ink, fontWeight: '600', fontSize: 13.5 }}>{it.label}</Text>
+          </Pressable>
+        );
+      })}
     </View>
   );
 }
