@@ -103,6 +103,7 @@ export function Agenda({ meId, showAll }: { meId?: string; showAll?: boolean }) 
   const { width } = useWindowDimensions();
   const wide = width >= 700;
   const [order, setOrder] = useState<string[]>(STAFF.map((s) => s.id));
+  const [dragging, setDragging] = useState(false);
   const team = order.map((id) => STAFF.find((s) => s.id === id)!) as Staff[];
   const cols = wide ? team : team.filter((s) => s.id === focus);
   const move = (id: string, by: number) => setOrder((o) => {
@@ -119,7 +120,7 @@ export function Agenda({ meId, showAll }: { meId?: string; showAll?: boolean }) 
 
   return (
     <View style={{ flex: 1 }}>
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 14, paddingBottom: 40 }}>
+      <ScrollView scrollEnabled={!dragging} contentContainerStyle={{ paddingHorizontal: 14, paddingBottom: 40 }}>
         {/* Barre de l'agenda */}
         <View style={[st.panel, { backgroundColor: t.card }]}>
           <View style={st.row}>
@@ -191,7 +192,7 @@ export function Agenda({ meId, showAll }: { meId?: string; showAll?: boolean }) 
                 <Text style={{ color: t.grey, fontSize: 13, marginLeft: 6 }}>{wide ? 'Glissez un nom pour changer l\'ordre des coiffeurs' : `${items.filter((i) => i.barberId === focus).length} RDV ce jour`}</Text>
                 <Zoom px={px} setPx={setPx} />
               </View>
-              <HScroll on={wide}>
+              <HScroll on={wide} enabled={!dragging && cols.length * 200 + 52 > width - 60}>
                 <View style={{ flexDirection: 'row', minWidth: wide ? Math.max(width - 70, cols.length * 200 + 52) : undefined }}>
                   <View style={{ width: 46 }}>
                     <View style={{ height: 48 }} />
@@ -202,15 +203,14 @@ export function Agenda({ meId, showAll }: { meId?: string; showAll?: boolean }) 
                     const moved = its.filter((x) => x.clientTime !== undefined && x.clientTime !== x.start);
                     const why = offWhy(b.id, offset);
                     return (
-                      <View key={b.id} style={{ flex: 1, minWidth: wide ? 190 : undefined, marginLeft: i ? 8 : 0 }}>
-                        <ColHead staff={b} me={b.id === meId} draggable={wide && cols.length > 1} colW={200} moved={moved.length}
-                          canAdd={!closed && !past && !why}
-                          onMoved={() => setMovedOf(b.id)} onAdd={() => setAdding({ barberId: b.id, time: freeSpans(b.id)[0]?.[0] ?? 15 * 60 })}
-                          onDrop={(by) => move(b.id, by)} />
+                      <DragCol key={b.id} first={i === 0} wide={wide} staff={b} me={b.id === meId} draggable={wide && cols.length > 1}
+                        index={i} count={cols.length} moved={moved.length} canAdd={!closed && !past && !why}
+                        onMoved={() => setMovedOf(b.id)} onAdd={() => setAdding({ barberId: b.id, time: freeSpans(b.id)[0]?.[0] ?? 15 * 60 })}
+                        onStep={(by) => move(b.id, by)} onDragging={setDragging}>
                         <DayColumn staff={b} items={its} px={px} nowMin={nowMin} why={why} closed={closed} past={past}
                           free={freeSpans(b.id)} nextId={meNext?.id} flash={flash} nudgeRoom={nudgeRoom}
                           onOpen={(id) => setOpenId(id)} onNudge={nudge} onAdd={(time) => setAdding({ barberId: b.id, time })} />
-                      </View>
+                      </DragCol>
                     );
                   })}
                 </View>
@@ -271,8 +271,8 @@ function weekStart(offset: number) { const d = dateOf(offset); const dow = (d.ge
 const offsetOf = (d: Date) => Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12).getTime() - dateOf(0).getTime()) / 86400000);
 
 /** Sur tablette, les colonnes défilent à gauche / à droite s'il y a beaucoup de coiffeurs (heures collées à gauche). */
-function HScroll({ on, children }: { on: boolean; children: React.ReactNode }) {
-  return on ? <ScrollView horizontal showsHorizontalScrollIndicator={false}>{children}</ScrollView> : <View>{children}</View>;
+function HScroll({ on, enabled, children }: { on: boolean; enabled: boolean; children: React.ReactNode }) {
+  return on ? <ScrollView horizontal scrollEnabled={enabled} bounces={false} overScrollMode="never" showsHorizontalScrollIndicator={false}>{children}</ScrollView> : <View>{children}</View>;
 }
 
 function HourGutter({ px }: { px: number }) {
@@ -288,31 +288,54 @@ function HourGutter({ px }: { px: number }) {
   );
 }
 
-/** En-tête de colonne : photo, nom, ⇅ (RDV décalés), + RDV ; sur tablette, se glisse à gauche / à droite pour changer l'ordre. */
-function ColHead({ staff, me, draggable, colW, moved, canAdd, onMoved, onAdd, onDrop }: {
-  staff: Staff; me: boolean; draggable: boolean; colW: number; moved: number; canAdd: boolean; onMoved: () => void; onAdd: () => void; onDrop: (by: number) => void;
+/** Colonne d'un coiffeur (en-tête + journée). Sur tablette, on attrape l'en-tête (≡, photo, nom) et SEULE cette colonne
+ *  suit le doigt ; en passant la moitié de la voisine, elle prend sa place (les autres glissent d'un cran). Le reste de
+ *  l'agenda ne bouge pas : défilements bloqués pendant le geste, pas d'effet élastique. */
+const COL_STEP = 198;
+function DragCol({ first, wide, staff, me, draggable, index, count, moved, canAdd, onMoved, onAdd, onStep, onDragging, children }: {
+  first: boolean; wide: boolean; staff: Staff; me: boolean; draggable: boolean; index: number; count: number; moved: number; canAdd: boolean;
+  onMoved: () => void; onAdd: () => void; onStep: (by: number) => void; onDragging: (v: boolean) => void; children: React.ReactNode;
 }) {
   const { t } = useT();
   const dx = useRef(new Animated.Value(0)).current;
   const [drag, setDrag] = useState(false);
+  const shift = useRef(0);
+  const step = useRef(COL_STEP);
+  const pos = useRef({ index, count }); pos.current = { index, count };
+  const cb = useRef({ onStep, onDragging }); cb.current = { onStep, onDragging };
   const pan = useMemo(() => PanResponder.create({
     onStartShouldSetPanResponder: () => draggable,
-    onMoveShouldSetPanResponder: (_e, g) => draggable && Math.abs(g.dx) > 4,
+    onStartShouldSetPanResponderCapture: () => draggable,
+    onMoveShouldSetPanResponderCapture: () => draggable,
     onPanResponderTerminationRequest: () => false,
-    onPanResponderGrant: () => setDrag(true),
-    onPanResponderMove: (_e, g) => dx.setValue(g.dx),
-    onPanResponderRelease: (_e, g) => { setDrag(false); dx.setValue(0); const by = Math.round(g.dx / colW); if (by) onDrop(by); },
-    onPanResponderTerminate: () => { setDrag(false); dx.setValue(0); },
-  }), [draggable, colW]);
+    onShouldBlockNativeResponder: () => true,
+    onPanResponderGrant: () => { shift.current = 0; setDrag(true); cb.current.onDragging(true); },
+    onPanResponderMove: (_e, g) => {
+      let x = g.dx - shift.current;
+      // Passé la moitié de la colonne voisine : on échange les places, la colonne reste sous le doigt.
+      const W = step.current;
+      if (x > W / 2 && pos.current.index < pos.current.count - 1) { cb.current.onStep(1); shift.current += W; x -= W; }
+      else if (x < -W / 2 && pos.current.index > 0) { cb.current.onStep(-1); shift.current -= W; x += W; }
+      const lo = pos.current.index === 0 ? -12 : -W, hi = pos.current.index === pos.current.count - 1 ? 12 : W;
+      dx.setValue(Math.max(lo, Math.min(hi, x)));
+    },
+    onPanResponderRelease: () => { Animated.spring(dx, { toValue: 0, useNativeDriver: true, speed: 30, bounciness: 0 }).start(); setDrag(false); cb.current.onDragging(false); },
+    onPanResponderTerminate: () => { dx.setValue(0); setDrag(false); cb.current.onDragging(false); },
+  }), [draggable]);
   return (
-    <Animated.View style={[st.row, { height: 44, marginBottom: 4, paddingHorizontal: 6, borderRadius: 12, gap: 6, backgroundColor: drag ? t.blueSoft : 'transparent', transform: [{ translateX: dx }], zIndex: drag ? 10 : 1 }]}>
-      <View {...pan.panHandlers} style={[st.row, { flex: 1, gap: 6 }]}>
-        {draggable ? <Ionicons name="reorder-three" size={18} color={t.grey} /> : null}
-        <Avatar initials={staff.initials} color={staff.color} size={28} />
-        <Text style={{ color: t.ink, fontWeight: '700', flexShrink: 1 }} numberOfLines={1}>{staff.name}{me ? ' · moi' : ''}</Text>
+    <Animated.View onLayout={(e) => { step.current = e.nativeEvent.layout.width + 8; }} style={{ flex: 1, minWidth: wide ? 190 : undefined, marginLeft: first ? 0 : 8, transform: [{ translateX: dx }], zIndex: drag ? 20 : 1,
+      opacity: drag ? 0.96 : 1, ...(drag ? { shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 8 } : {}),
+      backgroundColor: drag ? t.card : 'transparent', borderRadius: 12 }}>
+      <View style={[st.row, { height: 44, marginBottom: 4, paddingHorizontal: 6, borderRadius: 12, gap: 6, backgroundColor: drag ? t.blueSoft : 'transparent' }]}>
+        <View {...pan.panHandlers} style={[st.row, { flex: 1, gap: 6, height: '100%' }]}>
+          {draggable ? <Ionicons name="reorder-three" size={20} color={drag ? t.blue : t.grey} /> : null}
+          <Avatar initials={staff.initials} color={staff.color} size={28} />
+          <Text selectable={false} style={{ color: t.ink, fontWeight: '700', flexShrink: 1 }} numberOfLines={1}>{staff.name}{me ? ' · moi' : ''}</Text>
+        </View>
+        {moved ? <Pressable onPress={onMoved} style={[st.movedBadge, { backgroundColor: t.blueSoft }]}><Text style={{ color: t.blue, fontWeight: '800', fontSize: 12.5 }}>⇅ {moved}</Text></Pressable> : null}
+        {canAdd ? <Pressable onPress={onAdd} style={[st.addRdv, { backgroundColor: t.blue, paddingHorizontal: 11 }]}><Text style={{ color: '#fff', fontWeight: '700' }}>+ RDV</Text></Pressable> : null}
       </View>
-      {moved ? <Pressable onPress={onMoved} style={[st.movedBadge, { backgroundColor: t.blueSoft }]}><Text style={{ color: t.blue, fontWeight: '800', fontSize: 12.5 }}>⇅ {moved}</Text></Pressable> : null}
-      {canAdd ? <Pressable onPress={onAdd} style={[st.addRdv, { backgroundColor: t.blue, paddingHorizontal: 11 }]}><Text style={{ color: '#fff', fontWeight: '700' }}>+ RDV</Text></Pressable> : null}
+      {children}
     </Animated.View>
   );
 }
