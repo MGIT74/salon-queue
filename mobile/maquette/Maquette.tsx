@@ -7,7 +7,7 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { themeFor } from '../src/theme/theme';
-import { AccountTab, BookTab, ClientLogin, HomeTab } from './ClientScreens';
+import { AccountTab, BookTab, ClientLogin, HomeTab, Prefill } from './ClientScreens';
 import { AdminApp, AdminLogin } from './Admin';
 import { CaisseApp } from './Caisse';
 import { PinScreen, PosteApp } from './Poste';
@@ -33,6 +33,7 @@ type Screen =
   | { name: 'salons' }
   | { name: 'clientLogin'; salon: Salon }
   | { name: 'client'; salon: Salon }
+  | { name: 'guest'; salon: Salon }
   | { name: 'pro' }
   | { name: 'adminLogin' }
   | { name: 'admin' }
@@ -50,7 +51,13 @@ function Root() {
   return (
     <View style={{ flex: 1, backgroundColor: t.bg, paddingTop: insets.top }}>
       {screen.name === 'salons' && <SalonPicker onPick={(s) => setScreen({ name: 'clientLogin', salon: s })} onPoste={() => setScreen({ name: 'pro' })} />}
-      {screen.name === 'clientLogin' && <ClientLogin salon={screen.salon} onBack={home} onLogged={() => setScreen({ name: 'client', salon: screen.salon })} />}
+      {screen.name === 'clientLogin' && <ClientLogin salon={screen.salon} onBack={home} onGuest={() => setScreen({ name: 'guest', salon: screen.salon })} onLogged={() => setScreen({ name: 'client', salon: screen.salon })} />}
+      {screen.name === 'guest' && (
+        <View style={{ flex: 1 }}>
+          <PageHeader salon={`${screen.salon.name} ${screen.salon.city}`} title="Prendre rendez-vous" />
+          <BookTab salon={screen.salon} guest onFinished={home} onExitGuest={() => setScreen({ name: 'clientLogin', salon: screen.salon })} />
+        </View>
+      )}
       {screen.name === 'client' && <ClientApp salon={screen.salon} onExit={home} />}
       {screen.name === 'pro' && <ProHub onBack={home} go={(n) => setScreen({ name: n } as Screen)} />}
       {screen.name === 'adminLogin' && <AdminLogin onBack={() => setScreen({ name: 'pro' })} onLogged={() => setScreen({ name: 'admin' })} />}
@@ -157,19 +164,22 @@ type ClientTab = 'home' | 'book' | 'account' | 'logout';
 function ClientApp({ salon, onExit }: { salon: Salon; onExit: () => void }) {
   const insets = useSafeAreaInsets();
   const [tab, setTab] = useState<ClientTab>('home');
+  const [prefill, setPrefill] = useState<Prefill>(null);
+  const [bookKey, setBookKey] = useState(0);
+  const book = (p?: Prefill) => { setPrefill(p ?? null); setBookKey((k) => k + 1); setTab('book'); };
   const title = tab === 'book' ? 'Prendre rendez-vous' : tab === 'account' ? 'Mon profil' : 'Mon compte';
   return (
     <View style={{ flex: 1 }}>
       <PageHeader salon={`${salon.name} ${salon.city}`} title={title} />
       <View style={{ flex: 1 }}>
-        {tab === 'home' && <HomeTab onBook={() => setTab('book')} />}
-        {tab === 'book' && <BookTab salon={salon} onFinished={() => setTab('home')} />}
+        {tab === 'home' && <HomeTab onBook={book} onRebook={book} />}
+        {tab === 'book' && <BookTab key={bookKey} salon={salon} prefill={prefill} onFinished={() => { setPrefill(null); setTab('home'); }} />}
         {tab === 'account' && <AccountTab salon={salon} onChangeSalon={onExit} />}
       </View>
       <TabBar<ClientTab>
         bottomInset={insets.bottom}
         active={tab}
-        onChange={(k) => (k === 'logout' ? onExit() : setTab(k))}
+        onChange={(k) => (k === 'logout' ? onExit() : k === 'book' ? book() : setTab(k))}
         tabs={[
           { key: 'home', label: 'Accueil', icon: 'home-outline' },
           { key: 'book', label: 'Réserver', icon: 'calendar-outline' },

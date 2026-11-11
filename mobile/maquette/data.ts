@@ -2,7 +2,14 @@
 // Aucun appel au serveur : rien n'est lu ni écrit en production.
 
 export type Salon = { slug: string; name: string; city: string; address: string };
-export type Service = { id: string; name: string; minutes: number; priceCents: number; icon: string };
+export type Service = { id: string; name: string; minutes: number; priceCents: number; icon: string; cat: string };
+/** Catégories du menu (couleurs du salon, comme le web). */
+export const CATEGORIES = [
+  { id: 'coupes', name: 'Coupes', color: '#0a84ff' },
+  { id: 'barbe', name: 'Barbe', color: '#ff9f0a' },
+  { id: 'enfants', name: 'Enfants', color: '#30a46c' },
+  { id: 'soins', name: 'Soins', color: '#bf5af2' },
+];
 export type Barber = { id: string; name: string; initials: string; color: string };
 
 export const SALONS: Salon[] = [
@@ -12,15 +19,26 @@ export const SALONS: Salon[] = [
 ];
 
 export const SERVICES: Service[] = [
-  { id: 'coupe', name: 'Coupe', minutes: 30, priceCents: 2500, icon: 'cut-outline' },
-  { id: 'coupe-barbe', name: 'Coupe + barbe', minutes: 45, priceCents: 3500, icon: 'man-outline' },
-  { id: 'barbe', name: 'Barbe', minutes: 20, priceCents: 1500, icon: 'brush-outline' },
-  { id: 'enfant', name: 'Coupe enfant', minutes: 20, priceCents: 1800, icon: 'happy-outline' },
+  { id: 'coupe', name: 'Coupe', minutes: 30, priceCents: 2500, icon: 'cut-outline', cat: 'coupes' },
+  { id: 'coupe-barbe', name: 'Coupe + barbe', minutes: 45, priceCents: 3500, icon: 'man-outline', cat: 'coupes' },
+  { id: 'barbe', name: 'Barbe', minutes: 20, priceCents: 1500, icon: 'brush-outline', cat: 'barbe' },
+  { id: 'enfant', name: 'Coupe enfant', minutes: 20, priceCents: 1800, icon: 'happy-outline', cat: 'enfants' },
+  { id: 'soin', name: 'Soin du visage', minutes: 30, priceCents: 2800, icon: 'sparkles-outline', cat: 'soins' },
+  { id: 'color-barbe', name: 'Coloration barbe', minutes: 25, priceCents: 2000, icon: 'color-palette-outline', cat: 'barbe' },
 ];
 
 export const EXTRAS = [
   { id: 'shampoing', name: 'Shampoing', priceCents: 500 },
   { id: 'contours', name: 'Contours', priceCents: 300 },
+];
+export const PRODUCTS = [
+  { id: 'cire', name: 'Cire coiffante', priceCents: 1490, emoji: '🫙' },
+  { id: 'huile', name: 'Huile à barbe', priceCents: 1890, emoji: '🧴' },
+];
+/** Indicatifs téléphoniques proposés (sélecteur de pays du web). */
+export const PHONE_CC = [
+  { cc: '+33', flag: '🇫🇷', name: 'France' }, { cc: '+41', flag: '🇨🇭', name: 'Suisse' }, { cc: '+32', flag: '🇧🇪', name: 'Belgique' },
+  { cc: '+352', flag: '🇱🇺', name: 'Luxembourg' }, { cc: '+39', flag: '🇮🇹', name: 'Italie' }, { cc: '+44', flag: '🇬🇧', name: 'Royaume-Uni' },
 ];
 
 export const BARBERS: Barber[] = [
@@ -37,7 +55,12 @@ export const CLIENT = {
     { label: 'Coupe offerte', need: 500 },
     { label: 'Barbe offerte', need: 300 },
   ],
-  nextAppointment: { day: 'Samedi 14 novembre', time: '10:30', service: 'Coupe + barbe', barber: 'Marco', priceCents: 3500 },
+  nextAppointment: { day: 'Samedi 14 novembre', time: '10:30', service: 'Coupe + barbe', barber: 'Marco', priceCents: 3500, paidWithGift: true },
+  visits: [
+    { day: 'Samedi 17 octobre', service: 'Coupe', serviceId: 'coupe', barber: 'Tom', barberId: 'tom', priceCents: 2500, extras: [] as string[], products: ['Cire coiffante'], paid: 'CB' },
+    { day: 'Samedi 19 septembre', service: 'Coupe + barbe', serviceId: 'coupe-barbe', barber: 'Marco', barberId: 'marco', priceCents: 4000, extras: ['Shampoing'], products: [] as string[], paid: 'Espèces' },
+    { day: 'Samedi 22 août', service: 'Coupe', serviceId: 'coupe', barber: 'Marco', barberId: 'marco', priceCents: 2500, extras: [] as string[], products: [] as string[], paid: 'CB' },
+  ],
   lastVisit: { day: 'Samedi 17 octobre', service: 'Coupe', barber: 'Tom', priceCents: 2500 },
   giftCard: { amountCents: 5000, from: 'Sophie', code: 'TBO-7F3K' },
 };
