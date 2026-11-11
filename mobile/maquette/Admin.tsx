@@ -5,8 +5,9 @@ import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Agenda } from './Agenda';
+import * as M from './AdminManage';
 import { APPTS, BREAKS, CATALOG, CLIENTS_LIST, HOURS, NOW_MIN, QUEUE_ITEMS, SALONS, STAFF, Salon, TODAY_SALES, eur, hm } from './data';
-import { Avatar, BackLink, Bubbles, Card, Go, Pill, Segmented, Sheet, SoftButton, TabBar, useT } from './ui';
+import { Avatar, BackLink, Bubbles, Card, Go, Pill, Segmented, Sheet, SoftButton, TabBar, ToggleRow, useT, useToast } from './ui';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 type Sec = 'dashboard' | 'file' | 'prestations' | 'supplements' | 'produits' | 'marketing' | 'caisse' | 'rdv' | 'coiffeurs' | 'clients' | 'salons' | 'compte' | 'reglages';
@@ -56,11 +57,13 @@ export function AdminApp({ onExit }: { onExit: () => void }) {
   const [more, setMore] = useState(false);
   const [salon, setSalon] = useState<Salon>(SALONS[0]);
   const [pick, setPick] = useState(false);
+  const [imp, setImp] = useState(false);
   type Bar = 'file' | 'caisse' | 'rdv' | 'clients' | 'more';
   const barActive: Bar = (['file', 'caisse', 'rdv', 'clients'] as Sec[]).includes(sec) ? (sec as Bar) : 'more';
 
   return (
     <View style={{ flex: 1 }}>
+      {imp ? <M.ImpersonationBanner onExit={() => setImp(false)} /> : null}
       <View style={[st.top, { backgroundColor: t.card }]}>
         <Text style={{ color: t.ink, fontWeight: '700', fontSize: 16, flex: 1 }}>{salon.name} {salon.city}</Text>
         <Pressable onPress={() => setPick(true)} style={[st.switcher, { backgroundColor: t.fill }]}>
@@ -70,13 +73,17 @@ export function AdminApp({ onExit }: { onExit: () => void }) {
 
       <View style={{ flex: 1 }}>
         {sec === 'dashboard' && <DashboardSec go={setSec} />}
-        {sec === 'file' && <FileSec />}
+        {sec === 'file' && <M.FileSec />}
         {sec === 'rdv' && <RdvSec />}
-        {sec === 'clients' && <ClientsSec />}
+        {sec === 'clients' && <M.ClientsSec />}
         {sec === 'caisse' && <CaisseSec />}
         {sec === 'coiffeurs' && <CoiffeursSec />}
-        {(sec === 'prestations' || sec === 'supplements' || sec === 'produits') && <CatalogSec kind={sec === 'prestations' ? 'svc' : sec === 'supplements' ? 'extra' : 'product'} />}
-        {(sec === 'marketing' || sec === 'salons' || sec === 'compte' || sec === 'reglages') && <SettingsLike sec={sec} />}
+        {(sec === 'prestations' || sec === 'supplements' || sec === 'produits') && <M.CatalogSec key={sec} kind={sec === 'prestations' ? 'svc' : sec === 'supplements' ? 'extra' : 'product'} />}
+        {sec === 'marketing' && <M.MarketingSec />}
+        {sec === 'salons' && <M.SalonsSec />}
+        {sec === 'compte' && <M.CompteSec impersonating={imp} setImpersonating={setImp} />}
+        {sec === 'reglages' && <M.ReglagesSec />}
+        <M.AiChat />
       </View>
 
       <TabBar<Bar> bottomInset={insets.bottom} active={barActive} onChange={(k) => (k === 'more' ? setMore(true) : setSec(k))}
@@ -219,9 +226,11 @@ function Delta({ pc }: { pc: number }) {
 }
 
 /** Courbe « Encaissé » (barres par heure / jour) ; toucher une barre affiche sa valeur. */
-function RevChart({ v, buckets }: { v: number[]; buckets: string[] }) {
+function RevChart({ v, buckets, multi, onMulti }: { v: number[]; buckets: string[]; multi?: number[] | null; onMulti?: (x: number[]) => void }) {
   const { t } = useT();
-  const [sel, setSel] = useState<number | null>(null);
+  const [sel0, setSel0] = useState<number | null>(null);
+  const sel = multi ? null : sel0;
+  const setSel = (i: number | null) => { if (multi && onMulti && i !== null) onMulti(multi.includes(i) ? multi.filter((x) => x !== i) : [...multi, i]); else setSel0(i); };
   const max = Math.max(1, ...v);
   const dense = v.length > 12;
   return (
@@ -230,7 +239,7 @@ function RevChart({ v, buckets }: { v: number[]; buckets: string[] }) {
       <View style={[st.row, { alignItems: 'flex-end', height: 130, gap: dense ? 2 : 7, marginTop: 4 }]}>
         {v.map((x, i) => (
           <Pressable key={i} onPress={() => setSel(sel === i ? null : i)} style={{ flex: 1, alignItems: 'center', gap: 4, height: '100%', justifyContent: 'flex-end' }}>
-            <View style={{ width: '100%', height: Math.max(3, (x / max) * 104), borderRadius: dense ? 2 : 6, backgroundColor: sel === i ? t.blue : x === max ? t.blue : t.blueSoft }} />
+            <View style={{ width: '100%', height: Math.max(3, (x / max) * 104), borderRadius: dense ? 2 : 6, backgroundColor: multi ? (multi.includes(i) ? t.orange : t.blueSoft) : sel === i ? t.blue : x === max ? t.blue : t.blueSoft }} />
             {!dense || i % 5 === 0 ? <Text style={{ color: t.grey, fontSize: 10.5 }} numberOfLines={1}>{buckets[i]}</Text> : <Text style={{ fontSize: 10.5 }}> </Text>}
           </Pressable>
         ))}
@@ -351,112 +360,28 @@ function DashboardSec({ go }: { go: (s: Sec) => void }) {
   );
 }
 
-function FileSec() {
-  const { t } = useT();
-  const [me, setMe] = useState<string | null>(null);
-  const waiting = QUEUE_ITEMS.filter((q) => q.status === 'waiting');
-  const chair = QUEUE_ITEMS.filter((q) => q.status === 'in_progress');
-  return (
-    <Page>
-      <View style={[st.wrap, { gap: 10 }]}>
-        {[[String(waiting.length), 'en attente'], ['50 min', 'de file'], [eur(TODAY_SALES.reduce((a, s) => a + s.priceCents, 0)), "encaissé aujourd'hui"], [String(STAFF.length), 'coiffeurs en poste']].map(([v, k]) => (
-          <Card key={k} style={{ width: '48%', flexGrow: 1 }}>
-            <Text style={{ color: t.ink, fontSize: 22, fontWeight: '700' }}>{v}</Text><Text style={{ color: t.grey, fontSize: 13 }}>{k}</Text>
-          </Card>
-        ))}
-      </View>
-      <View style={[st.row, { marginTop: 18 }]}><Text style={{ color: t.grey }}>Je suis</Text><Bubbles people={STAFF} value={me} onChange={setMe} size={38} /></View>
-      <Text style={[st.section, { color: t.grey }]}>EN ATTENTE</Text>
-      {waiting.map((q, i) => {
-        const b = STAFF.find((s) => s.id === q.barberId)!;
-        return (
-          <Card key={q.id} style={{ marginBottom: 10 }}>
-            <View style={st.row}>
-              <View style={[st.pos, { backgroundColor: t.fill }]}><Text style={{ color: t.ink, fontWeight: '700' }}>{i + 1}</Text></View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ color: t.ink, fontSize: 17, fontWeight: '700' }}>{q.client}</Text>
-                <Text style={{ color: t.grey }}>{b.name}</Text>
-                <View style={{ marginTop: 6 }}><Pill label={q.service} /></View>
-              </View>
-              <View style={{ alignItems: 'flex-end' }}>
-                <Text style={{ color: t.ink, fontWeight: '700' }}>{q.minutes} min</Text>
-                <Text style={{ color: t.grey }}>{eur(q.priceCents)}</Text>
-                <Text style={{ color: t.orange, fontSize: 13 }}>dans ~{q.waitMin} min</Text>
-              </View>
-            </View>
-            <View style={[st.row, { marginTop: 12 }]}>
-              <View style={{ flex: 1 }}><SoftButton label="Démarrer" onPress={() => {}} /></View>
-              <Pressable><Text style={{ color: t.grey, fontWeight: '600' }}>Absent</Text></Pressable>
-            </View>
-          </Card>
-        );
-      })}
-      <Text style={[st.section, { color: t.grey }]}>AU FAUTEUIL</Text>
-      <Card style={{ paddingVertical: 4 }}>
-        {chair.map((q, i) => (
-          <View key={q.id} style={[st.row, { paddingVertical: 12, borderBottomWidth: i < chair.length - 1 ? StyleSheet.hairlineWidth : 0, borderColor: t.sep }]}>
-            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: t.green }} />
-            <Text style={{ color: t.ink, fontWeight: '600', flex: 1 }}>{STAFF.find((s) => s.id === q.barberId)!.name} — {q.client}</Text>
-            <Text style={{ color: t.grey }}>{q.service}</Text>
-          </View>
-        ))}
-      </Card>
-    </Page>
-  );
-}
-
 function RdvSec() {
   const { t } = useT();
+  const [view, setView] = useState<'agenda' | 'list'>('agenda');
+  if (view === 'list') return (
+    <View style={{ flex: 1 }}>
+      <View style={{ paddingHorizontal: 18, paddingTop: 16, paddingBottom: 10 }}>
+        <Text style={{ color: t.ink, fontSize: 26, fontWeight: '700', marginBottom: 10 }}>Rendez-vous</Text>
+        <Segmented value={view} onChange={setView} items={[{ key: 'agenda', label: 'Agenda' }, { key: 'list', label: 'Liste' }]} />
+      </View>
+      <M.RdvList />
+    </View>
+  );
   return (
     <View style={{ flex: 1 }}>
       <View style={[st.row, { justifyContent: 'space-between', paddingHorizontal: 18, paddingTop: 16, paddingBottom: 6 }]}>
         <Text style={{ color: t.ink, fontSize: 26, fontWeight: '700' }}>Rendez-vous</Text>
         <Pressable style={[st.row, st.outline, { borderColor: t.sep, gap: 6 }]}><Ionicons name="settings-outline" size={16} color={t.ink} /><Text style={{ color: t.ink, fontWeight: '600' }}>Paramètres</Text></Pressable>
       </View>
+      <View style={{ paddingHorizontal: 18, marginBottom: 10 }}><Segmented value={view} onChange={setView} items={[{ key: 'agenda', label: 'Agenda' }, { key: 'list', label: 'Liste' }]} /></View>
       <Text style={{ color: t.ink, paddingHorizontal: 18, marginBottom: 12, lineHeight: 20 }}>Réservés en ligne — ceux du jour apparaissent aussi automatiquement dans la file d'attente au moment prévu.</Text>
       <View style={{ flex: 1 }}><Agenda showAll /></View>
     </View>
-  );
-}
-
-function ClientsSec() {
-  const { t } = useT();
-  const [q, setQ] = useState('');
-  const [open, setOpen] = useState<(typeof CLIENTS_LIST)[number] | null>(null);
-  const list = CLIENTS_LIST.filter((c) => c.name.toLowerCase().includes(q.toLowerCase()));
-  return (
-    <Page title="Clients">
-      <View style={[st.row, st.search, { backgroundColor: t.card }]}>
-        <Ionicons name="search" size={18} color={t.grey} />
-        <TextInput value={q} onChangeText={setQ} placeholder="Rechercher un client…" placeholderTextColor={t.grey} style={{ flex: 1, color: t.ink, fontSize: 16, paddingVertical: 12 }} />
-      </View>
-      <Card style={{ paddingVertical: 4, marginTop: 14 }}>
-        {list.map((c, i) => (
-          <Pressable key={c.name} onPress={() => setOpen(c)} style={[st.row, { paddingVertical: 12, borderBottomWidth: i < list.length - 1 ? StyleSheet.hairlineWidth : 0, borderColor: t.sep }]}>
-            <Avatar initials={c.name[0]} color={['#0a84ff', '#e5484d', '#30a46c', '#ff9f0a', '#5e5ce6'][i % 5]} size={38} />
-            <View style={{ flex: 1 }}>
-              <Text style={{ color: t.ink, fontWeight: '600', fontSize: 15.5 }}>{c.name}</Text>
-              <Text style={{ color: t.grey, fontSize: 13 }}>{c.visits} passages · dernier {c.last}</Text>
-            </View>
-            {c.account ? <Pill label={`${c.loyalty} pts`} tone="green" /> : <Pill label="Sans compte" tone="grey" />}
-          </Pressable>
-        ))}
-      </Card>
-      <Sheet visible={!!open} onClose={() => setOpen(null)} title={open?.name}>
-        {open ? (
-          <View>
-            {[['Téléphone', open.phone], ['Passages', String(open.visits)], ['Dernier passage', open.last], ['Fidélité', open.account ? `${open.loyalty} points` : 'Pas de compte']].map(([k, v]) => (
-              <View key={k} style={[st.row, { justifyContent: 'space-between', paddingVertical: 11, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: t.sep }]}>
-                <Text style={{ color: t.grey }}>{k}</Text><Text style={{ color: t.ink, fontWeight: '600' }}>{v}</Text>
-              </View>
-            ))}
-            <Text style={{ color: t.grey, fontWeight: '600', marginTop: 16, marginBottom: 6 }}>Note interne</Text>
-            <TextInput placeholder="Visible par toute l'équipe" placeholderTextColor={t.grey} style={[st.input, { backgroundColor: t.fill, color: t.ink, minHeight: 70 }]} multiline />
-            <View style={{ height: 14 }} /><Go label="Prendre un RDV pour ce client" onPress={() => setOpen(null)} />
-          </View>
-        ) : null}
-      </Sheet>
-    </Page>
   );
 }
 
@@ -500,9 +425,13 @@ function CoiffeursSec() {
   const { t } = useT();
   const [on, setOn] = useState<Record<string, boolean>>({ marco: true, tom: true, yanis: true });
   const [open, setOpen] = useState<string | null>(null);
+  const [add, setAdd] = useState(false);
+  const [extra, setExtra] = useState<string[]>([]);
+  const [toastNode, toast] = useToast();
   if (open) return <BarberSheet id={open} onBack={() => setOpen(null)} />;
   return (
-    <Page title="Coiffeurs et horaires" right={<Pressable style={[st.addBtn, { backgroundColor: t.blue }]}><Text style={{ color: '#fff', fontWeight: '700' }}>+ Ajouter</Text></Pressable>}>
+    <View style={{ flex: 1 }}>
+    <Page title="Coiffeurs et horaires" right={<Pressable onPress={() => setAdd(true)} style={[st.addBtn, { backgroundColor: t.blue }]}><Text style={{ color: '#fff', fontWeight: '700' }}>+ Ajouter</Text></Pressable>}>
       {STAFF.map((s) => (
         <Card key={s.id} style={{ marginBottom: 10 }} onPress={() => setOpen(s.id)}>
           <View style={st.row}>
@@ -516,7 +445,15 @@ function CoiffeursSec() {
           </View>
         </Card>
       ))}
+      {extra.map((n) => (
+        <Card key={n} style={{ marginBottom: 10 }}>
+          <View style={st.row}><Avatar initials={n.slice(0, 2).toUpperCase()} color="#ff9f0a" size={46} /><View style={{ flex: 1 }}><Text style={{ color: t.ink, fontSize: 17, fontWeight: '700' }}>{n}</Text><Text style={{ color: t.grey, fontSize: 13 }}>Nouveau · horaires du salon</Text></View></View>
+        </Card>
+      ))}
+      <M.AddBarberSheet visible={add} onClose={() => setAdd(false)} onDone={(n) => { setExtra([...extra, n]); setAdd(false); toast(`${n} ajouté`); }} />
     </Page>
+    {toastNode}
+    </View>
   );
 }
 
@@ -537,17 +474,19 @@ function BarberSheet({ id, onBack }: { id: string; onBack: () => void }) {
   const mine = APPTS.filter((a) => a.barberId === id && a.start + a.minutes <= NOW_MIN);
   const sales = TODAY_SALES.filter((x) => x.barberId === id);
   const days = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+  const [toastNode, toast] = useToast();
+  const [pickDays, setPickDays] = useState<number[] | null>(null);
+  const [real, setReal] = useState(false);
+  const picked = pickDays && pickDays.length ? pickDays.reduce((a, i) => a + S.v[i], 0) : null;
   return (
+    <View style={{ flex: 1 }}>
     <Page>
       <BackLink onPress={onBack} label="Coiffeurs" />
       <Card style={{ alignItems: 'center', paddingVertical: 22 }}>
         <Avatar initials={b.initials} color={b.color} size={76} />
         <Text style={{ color: t.ink, fontSize: 24, fontWeight: '800', marginTop: 10 }}>{b.name}</Text>
         <View style={[st.row, { gap: 6, marginTop: 8 }]}><Pill label="RDV en ligne" /><Pill label="Timer activé" tone="grey" /><Pill label={`PIN ••${b.pin.slice(2)}`} tone="grey" /></View>
-        <View style={[st.row, { gap: 10, marginTop: 16, alignSelf: 'stretch' }]}>
-          <View style={{ flex: 1 }}><SoftButton label="Modifier le profil" onPress={() => {}} /></View>
-          <View style={{ flex: 1 }}><SoftButton label="Congés" onPress={() => {}} /></View>
-        </View>
+        <M.BarberEditors id={id} toast={toast} />
       </Card>
 
       <Text style={[st.h3(t), { marginTop: 20 }]}>Statistiques</Text>
@@ -562,7 +501,12 @@ function BarberSheet({ id, onBack }: { id: string; onBack: () => void }) {
       </View>
       <Card style={{ marginTop: 10 }}>
         <View style={[st.row, { justifyContent: 'space-between' }]}><Text style={{ color: t.ink, fontWeight: '700' }}>Encaissé</Text><Delta pc={S.delta} /></View>
-        <RevChart v={S.v} buckets={info.buckets} />
+        <RevChart v={S.v} buckets={info.buckets} multi={pickDays} onMulti={setPickDays} />
+        <View style={[st.row, { justifyContent: 'space-between', marginTop: 10 }]}>
+          <Pressable onPress={() => setPickDays(pickDays ? null : [])}><Text style={{ color: t.blue, fontWeight: '600' }}>{pickDays ? 'Terminer la sélection' : 'Sélectionner des jours'}</Text></Pressable>
+          {picked !== null ? <Text style={{ color: t.ink, fontWeight: '700' }}>{pickDays!.length} sélectionné(s) · {eur(picked)}</Text> : null}
+        </View>
+        <ToggleRow label="Plage réelle" sub={real ? `Première coupe 09:12 · dernière fin 18:47 · ${hm(18 * 60 + 47 - (9 * 60 + 12))} travaillées` : 'Utilise les heures de travail réelles au lieu des horaires prévus'} value={real} onChange={setReal} last />
       </Card>
 
       <View style={[st.row, { justifyContent: 'space-between', marginTop: 20 }]}>
@@ -609,52 +553,8 @@ function BarberSheet({ id, onBack }: { id: string; onBack: () => void }) {
         {CATALOG.filter((c) => c.kind !== 'product').map((c) => <View key={c.id} style={{ marginRight: 6, marginBottom: 6 }}><Pill label={`✓ ${c.name} · ${eur(c.priceCents)}`} tone="blue" /></View>)}
       </View>
     </Page>
-  );
-}
-
-function CatalogSec({ kind }: { kind: 'svc' | 'extra' | 'product' }) {
-  const { t } = useT();
-  const title = kind === 'svc' ? 'Prestations' : kind === 'extra' ? 'Suppléments' : 'Produits';
-  return (
-    <Page title={title} right={<Pressable style={[st.addBtn, { backgroundColor: t.blue }]}><Text style={{ color: '#fff', fontWeight: '700' }}>+ Ajouter</Text></Pressable>}>
-      <Card style={{ paddingVertical: 4 }}>
-        {CATALOG.filter((c) => c.kind === kind).map((c, i, a) => (
-          <View key={c.id} style={[st.row, { paddingVertical: 12, borderBottomWidth: i < a.length - 1 ? StyleSheet.hairlineWidth : 0, borderColor: t.sep }]}>
-            <View style={[st.emoji, { backgroundColor: t.blueSoft }]}><Text style={{ fontSize: 22 }}>{c.emoji}</Text></View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ color: t.ink, fontWeight: '600', fontSize: 15.5 }}>{c.name}</Text>
-              <Text style={{ color: t.grey, fontSize: 13 }}>{c.minutes ? `${c.minutes} min` : c.stock !== undefined ? `Stock : ${c.stock}` : 'Supplément'}</Text>
-            </View>
-            <Text style={{ color: t.ink, fontWeight: '700' }}>{eur(c.priceCents)}</Text>
-            <Ionicons name="chevron-forward" size={18} color={t.grey} />
-          </View>
-        ))}
-      </Card>
-    </Page>
-  );
-}
-
-function SettingsLike({ sec }: { sec: 'marketing' | 'salons' | 'compte' | 'reglages' }) {
-  const { t } = useT();
-  const groups: Record<typeof sec, { title: string; rows: string[] }> = {
-    marketing: { title: 'Marketing', rows: ['Programme de fidélité', 'Clients fidèles', 'Cadeaux vendus', 'Design de la carte fidélité (compte client)', 'Design de la carte cadeau (compte client)'] },
-    salons: { title: 'Mes salons', rows: [...SALONS.map((s) => `${s.name} · ${s.city}`), "Ajouter un salon à l'enseigne"] },
-    compte: { title: 'Compte', rows: ['Mon profil', 'Mot de passe'] },
-    reglages: { title: 'Réglages', rows: ['Général', 'Fuseau horaire', 'Logo du salon', 'Page de connexion', 'Pont local (impression + paiement CB, recommandé)', 'Importer des rendez-vous'] },
-  };
-  const g = groups[sec];
-  return (
-    <Page title={g.title}>
-      <Card style={{ paddingVertical: 4 }}>
-        {g.rows.map((r, i) => (
-          <View key={r} style={[st.row, { paddingVertical: 15, borderBottomWidth: i < g.rows.length - 1 ? StyleSheet.hairlineWidth : 0, borderColor: t.sep }]}>
-            <Text style={{ color: r.startsWith('Ajouter') ? t.blue : t.ink, fontSize: 15.5, flex: 1, fontWeight: r.startsWith('Ajouter') ? '600' : '400' }}>{r}</Text>
-            <Ionicons name="chevron-forward" size={18} color={t.grey} />
-          </View>
-        ))}
-      </Card>
-      <Text style={{ color: t.grey, fontSize: 12.5, textAlign: 'center', marginTop: 14 }}>Mêmes réglages que le web ; le détail de chaque écran sera repris tel quel.</Text>
-    </Page>
+    {toastNode}
+    </View>
   );
 }
 
