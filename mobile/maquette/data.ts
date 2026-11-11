@@ -133,7 +133,9 @@ export const BREAKS: Record<string, [number, number][]> = { marco: [[12 * 60 + 3
 /** Horaires de travail par coiffeur. */
 export const HOURS: Record<string, [number, number]> = { marco: [9 * 60, 19 * 60], tom: [9 * 60, 18 * 60], yanis: [9 * 60, 19 * 60] };
 /** Absences : jour (décalage depuis aujourd'hui) → coiffeur et raison, comme « en congé » du web. */
-export const OFF: Record<number, { barberId: string; why: string }[]> = { 1: [{ barberId: 'yanis', why: 'en congé' }], 2: [{ barberId: 'yanis', why: 'en congé' }] };
+export const OFF: Record<number, { barberId: string; why: string }[]> = { 1: [{ barberId: 'yanis', why: 'en congé' }], 2: [{ barberId: 'yanis', why: 'en congé' }], 3: [{ barberId: 'tom', why: 'en « sans RDV » ce jour-là' }] };
+/** Coiffeurs en « Sans RDV » aujourd'hui (étiquette du poste). */
+export const WALKIN_TODAY: string[] = ['Yanis'];
 
 /** RDV d'un autre jour : mêmes clients, heures décalées (stable selon le jour). Lundi = salon fermé. */
 export function apptsForDay(offset: number): Appt[] {

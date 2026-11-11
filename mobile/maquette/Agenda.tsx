@@ -10,8 +10,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, LayoutChangeEvent, PanResponder, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { BREAKS, CATALOG, CLIENTS_LIST, HOURS, NOW_MIN, NUDGE, OFF, SERVICES, STAFF, Staff, apptsForDay, Appt, eur, hm } from './data';
-import { Avatar, Go, Pill, Segmented, Sheet, SoftButton, useT } from './ui';
+import * as SecureStore from 'expo-secure-store';
+import { BREAKS, CATALOG, CLIENTS_LIST, HOURS, NOW_MIN, NUDGE, OFF, SERVICES, STAFF, Staff, WALKIN_TODAY, apptsForDay, Appt, eur, hm } from './data';
+import { Avatar, Chips, Go, Pill, Segmented, Sheet, SoftButton, useT } from './ui';
+
+const ORDER_KEY = 'tbo.maquette.agendaOrder';
 
 type St = 'todo' | 'inprogress' | 'done' | 'absent';
 type Item = Appt & { end: number; st: St };
@@ -40,7 +43,7 @@ export function Agenda({ meId, showAll }: { meId?: string; showAll?: boolean }) 
   const [px, setPx] = useState(1.6);
   const [store, setStore] = useState<Record<number, Appt[]>>({});
   const [openId, setOpenId] = useState<string | null>(null);
-  const [adding, setAdding] = useState<{ barberId: string; time: number } | null>(null);
+  const [adding, setAdding] = useState<{ barberId: string; time: number; client?: string } | null>(null);
   const [movedOf, setMovedOf] = useState<string | null>(null);
   const [toast, setToast] = useState<{ text: string; undo?: () => void } | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
@@ -102,10 +105,21 @@ export function Agenda({ meId, showAll }: { meId?: string; showAll?: boolean }) 
      téléphone : une seule colonne, choisie en touchant sa ligne dans le coup d'œil. */
   const { width } = useWindowDimensions();
   const wide = width >= 700;
-  const [order, setOrder] = useState<string[]>(STAFF.map((s) => s.id));
+  const [order, setOrderState] = useState<string[]>(STAFF.map((s) => s.id));
+  const [onlyMe, setOnlyMe] = useState(false);
+  const [barberFilter, setBarberFilter] = useState<string>('all');
+  // Ordre des coiffeurs gardé sur l'appareil (comme le web le garde dans le navigateur).
+  useEffect(() => {
+    try { SecureStore.getItemAsync(ORDER_KEY).then((raw) => {
+      try { const o = raw ? JSON.parse(raw) : null; if (Array.isArray(o) && o.length === STAFF.length && STAFF.every((x) => o.includes(x.id))) setOrderState(o); } catch { /* ignore */ }
+    }).catch(() => {}); } catch { /* stockage indisponible (web) */ }
+  }, []);
+  const setOrder = (fn: (o: string[]) => string[]) => setOrderState((o) => { const n = fn(o); if (n !== o) { try { SecureStore.setItemAsync(ORDER_KEY, JSON.stringify(n)).catch(() => {}); } catch { /* web */ } } return n; });
   const [dragging, setDragging] = useState(false);
   const team = order.map((id) => STAFF.find((s) => s.id === id)!) as Staff[];
-  const cols = wide ? team : team.filter((s) => s.id === focus);
+  const cols = !wide ? team.filter((s) => s.id === focus)
+    : meId && onlyMe ? team.filter((s) => s.id === meId)
+    : barberFilter !== 'all' ? team.filter((s) => s.id === barberFilter) : team;
   const move = (id: string, by: number) => setOrder((o) => {
     const i = o.indexOf(id); const j = Math.max(0, Math.min(o.length - 1, i + by)); if (i === j) return o;
     const n = [...o]; n.splice(i, 1); n.splice(j, 0, id); return n;
@@ -141,6 +155,26 @@ export function Agenda({ meId, showAll }: { meId?: string; showAll?: boolean }) 
           <>
             {closed ? <View style={[st.banner, { backgroundColor: t.fill }]}><Text style={{ color: t.ink, textAlign: 'center' }}>Salon fermé — aucun rendez-vous ne peut être ajouté ce jour.</Text></View> : null}
 
+            {meId && isToday && meNext ? (
+              <Pressable onPress={() => setOpenId(meNext.id)} style={[st.panel, st.row, { backgroundColor: t.blueSoft, marginTop: 12 }]}>
+                <Ionicons name="arrow-forward-circle" size={26} color={t.blue} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: t.blue, fontWeight: '800', fontSize: 12.5 }}>{meNext.st === 'inprogress' ? 'EN COURS' : 'PROCHAIN CLIENT'}</Text>
+                  <Text style={{ color: t.ink, fontWeight: '700', fontSize: 16 }}>{meNext.client} · {hm(meNext.start)}</Text>
+                  <Text style={{ color: t.grey, fontSize: 13 }}>{[meNext.service, ...(meNext.extras ?? [])].join(' + ')}</Text>
+                </View>
+                <Text style={{ color: t.blue, fontWeight: '700' }}>Ouvrir</Text>
+              </Pressable>
+            ) : null}
+            {wide && meId ? (
+              <Segmented style={{ marginTop: 12 }} value={onlyMe ? 'me' : 'team'} onChange={(v) => setOnlyMe(v === 'me')} items={[{ key: 'me', label: 'Moi seulement' }, { key: 'team', label: 'Équipe' }]} />
+            ) : null}
+            {wide && !meId ? (
+              <View style={{ marginTop: 12 }}>
+                <Chips items={[{ key: 'all', label: 'Tous les coiffeurs' }, ...team.map((x) => ({ key: x.id, label: x.name, color: x.color }))]} value={[barberFilter]} onToggle={(k) => setBarberFilter(k === barberFilter ? 'all' : k)} />
+              </View>
+            ) : null}
+
             {/* La journée en un coup d'œil */}
             <View style={[st.panel, { backgroundColor: t.fill, marginTop: 12 }]}>
               <View style={[st.row, { justifyContent: 'space-between' }]}>
@@ -157,7 +191,16 @@ export function Agenda({ meId, showAll }: { meId?: string; showAll?: boolean }) 
               </View>
               {q.trim() ? (
                 <View style={{ marginTop: 6 }}>
-                  {found.length === 0 ? <Text style={{ color: t.grey, paddingVertical: 6 }}>Aucun RDV ce jour pour « {q} »</Text> : found.map((a) => (
+                  {found.length === 0 ? (
+                    <View style={{ paddingVertical: 6 }}>
+                      <Text style={{ color: t.grey }}>Aucun RDV ce jour pour « {q} »</Text>
+                      {!closed && !past ? (
+                        <Pressable onPress={() => { setAdding({ barberId: meId ?? focus, time: freeSpans(meId ?? focus)[0]?.[0] ?? 15 * 60, client: q.trim() }); setQ(''); }} style={{ marginTop: 6 }}>
+                          <Text style={{ color: t.blue, fontWeight: '700' }}>+ Nouveau RDV pour « {q.trim()} »</Text>
+                        </Pressable>
+                      ) : null}
+                    </View>
+                  ) : found.map((a) => (
                     <Pressable key={a.id} onPress={() => { setFocus(a.barberId); setOpenId(a.id); setQ(''); }} style={[st.row, { paddingVertical: 7 }]}>
                       <Avatar initials={STAFF.find((s) => s.id === a.barberId)!.initials} color={STAFF.find((s) => s.id === a.barberId)!.color} size={22} />
                       <Text style={{ color: t.ink, flex: 1 }}>{a.client}</Text><Text style={{ color: t.grey }}>{hm(a.start)}</Text>
@@ -173,7 +216,7 @@ export function Agenda({ meId, showAll }: { meId?: string; showAll?: boolean }) 
                     <Legend sw={{ borderWidth: 1, borderStyle: 'dashed', borderColor: t.grey }} label="Absent" />
                     {isToday ? <Legend sw={{ width: 2, backgroundColor: t.red }} label="Maintenant" /> : null}
                   </View>
-                  {team.map((s) => (
+                  {(wide && meId && onlyMe ? team.filter((x) => x.id === meId) : team).map((s) => (
                     <GlanceRow key={s.id} staff={s} items={items.filter((i) => i.barberId === s.id)} focus={s.id === focus} me={s.id === meId}
                       off={offWhy(s.id, offset)} nowMin={nowMin} nextId={meNext?.id}
                       onPick={() => setFocus(s.id)} onAdd={(time) => !closed && !past && !offWhy(s.id, offset) && setAdding({ barberId: s.id, time })} />
@@ -245,7 +288,7 @@ export function Agenda({ meId, showAll }: { meId?: string; showAll?: boolean }) 
 
       <Sheet visible={!!adding} onClose={() => setAdding(null)} title="Ajouter un rendez-vous">
         {adding ? (
-          <AddAppt barberId={adding.barberId} time={adding.time} items={items}
+          <AddAppt barberId={adding.barberId} time={adding.time} items={items} client0={adding.client}
             onDone={(a) => { setDay(offset, (l) => [...l, a]); setAdding(null); setFocus(a.barberId); setFlash(a.id); setToast({ text: `RDV ajouté · ${a.client} à ${hm(a.start)}${a.forcedBy ? ' (forcé)' : ''}` }); }} />
         ) : null}
       </Sheet>
@@ -383,7 +426,7 @@ function GlanceRow({ staff, items, focus, me, off, nowMin, nextId, onPick, onAdd
         ))}
         {nowMin >= R0 ? <View style={{ position: 'absolute', top: 0, bottom: 0, width: 2, backgroundColor: t.red, left: `${((nowMin - R0) / SPAN) * 100}%` }} /> : null}
       </Pressable>
-      <Ionicons name="calendar-outline" size={16} color={off ? t.grey : t.blue} style={{ width: 22 }} />
+      <Ionicons name={WALKIN_TODAY.includes(staff.name) ? 'walk-outline' : 'calendar-outline'} size={16} color={off ? t.grey : t.blue} style={{ width: 22 }} />
     </View>
   );
 }
@@ -743,67 +786,115 @@ function ApptDrawer({ appt, offset, onClose, onRestore, onSave, onMove, onCancel
   );
 }
 
-/** « Ajouter un RDV » : Une personne / Plusieurs personnes, heure touchée présélectionnée (« Continuer à HH:MM »).
- *  « Forcer le RDV » seulement si l'heure touchée tombe dans un trou trop court pour la prestation (règle du web). */
-function AddAppt({ barberId, time, items, onDone }: { barberId: string; time: number; items: Item[]; onDone: (a: Appt) => void }) {
+/** « Ajouter un RDV » en étapes, comme le web : 1. client (suggestions) · 2. prestation · 3. suppléments ·
+ *  4. créneau (Matin / Après-midi, « Toutes les heures »). L'heure touchée est proposée d'emblée (« Continuer à HH:MM »).
+ *  « Forcer le RDV » seulement si l'heure tombe dans un trou trop court pour la prestation (règle du web). */
+function AddAppt({ barberId, time, items, client0, onDone }: { barberId: string; time: number; items: Item[]; client0?: string; onDone: (a: Appt) => void }) {
   const { t } = useT();
+  const [step, setStep] = useState(0);
   const [mode, setMode] = useState<'one' | 'group'>('one');
-  const [client, setClient] = useState('');
+  const [client, setClient] = useState(client0 ?? '');
   const [svc, setSvc] = useState(SERVICES[0].id);
+  const [extras, setExtras] = useState<string[]>([]);
   const [bid, setBid] = useState(barberId);
-  const [start, setStart] = useState(time);
+  const [half, setHalf] = useState<'am' | 'pm'>(time < 13 * 60 ? 'am' : 'pm');
+  const [allHours, setAllHours] = useState(false);
+  const [start, setStart] = useState<number>(time);
   const service = SERVICES.find((x) => x.id === svc)!;
-  const sugg = client.trim().length >= 2 ? CLIENTS_LIST.filter((c) => c.name.toLowerCase().includes(client.trim().toLowerCase())).slice(0, 3) : [];
-  const clash = items.find((i) => i.barberId === bid && i.st !== 'absent' && start < i.end && i.start < start + service.minutes);
+  const extraC = CATALOG.filter((c) => c.kind === 'extra' && extras.includes(c.name));
+  const sugg = client.trim().length >= 2 ? CLIENTS_LIST.filter((c) => c.name.toLowerCase().includes(client.trim().toLowerCase())).slice(0, 4) : [];
+  const busyAt = (m: number, d: number) => items.find((i) => i.barberId === bid && i.st !== 'absent' && m < i.end && i.start < m + d);
+  const clash = busyAt(start, service.minutes);
   const startsFree = !items.some((i) => i.barberId === bid && i.st !== 'absent' && start >= i.start && start < i.end);
   const canForce = !!clash && startsFree && clash.start > start;
-  const make = (forced: boolean) => onDone({ id: 'n' + Date.now(), barberId: bid, client: client || 'Nouveau client', service: service.name, start, minutes: service.minutes, priceCents: service.priceCents, online: false, forcedBy: forced ? STAFF.find((s) => s.id === bid)!.name : undefined });
+  const slots: { m: number; free: boolean }[] = [];
+  for (let m = half === 'am' ? 9 * 60 : 13 * 60; m < (half === 'am' ? 13 * 60 : 19 * 60); m += allHours ? 5 : 15) {
+    const br = (BREAKS[bid] ?? []).some(([s, e]) => m < e && s < m + service.minutes);
+    const free = !busyAt(m, service.minutes) && !br && m + service.minutes <= HOURS[bid][1];
+    if (free || allHours) slots.push({ m, free });
+  }
+  const make = (forced: boolean) => onDone({ id: 'n' + Date.now(), barberId: bid, client: client || 'Nouveau client', service: service.name, extras: extras.length ? extras : undefined,
+    start, minutes: service.minutes, priceCents: service.priceCents + extraC.reduce((a, c) => a + c.priceCents, 0), online: false, forcedBy: forced ? STAFF.find((s) => s.id === bid)!.name : undefined });
+  const steps = ['Client', 'Prestation', 'Suppléments', 'Créneau'];
   return (
     <View>
       <Segmented value={mode} onChange={setMode} items={[{ key: 'one', label: 'Une personne' }, { key: 'group', label: 'Plusieurs personnes' }]} />
-      <Text style={st.lbl(t)}>Client</Text>
-      <TextInput value={client} onChangeText={setClient} placeholder="Nom ou téléphone du client" placeholderTextColor={t.grey} style={[st.input, { backgroundColor: t.fill, color: t.ink }]} />
-      {sugg.map((c) => (
-        <Pressable key={c.name} onPress={() => setClient(c.name)} style={[st.row, { paddingVertical: 8 }]}>
-          <Ionicons name="person-circle-outline" size={20} color={t.blue} /><Text style={{ color: t.ink, flex: 1 }}>{c.name}</Text><Text style={{ color: t.grey, fontSize: 12.5 }}>{c.phone}</Text>
-        </Pressable>
-      ))}
-      <Text style={st.lbl(t)}>Prestation</Text>
-      <View style={st.wrap}>
-        {SERVICES.map((x) => (
-          <Pressable key={x.id} onPress={() => setSvc(x.id)} style={{ paddingHorizontal: 12, paddingVertical: 9, borderRadius: 10, backgroundColor: x.id === svc ? t.blue : t.fill }}>
-            <Text style={{ color: x.id === svc ? '#fff' : t.ink, fontWeight: '600' }}>{x.name} · {x.minutes} min</Text>
+      <View style={[st.row, { gap: 6, marginTop: 14 }]}>
+        {steps.map((x, i) => (
+          <Pressable key={x} onPress={() => i <= step && setStep(i)} style={{ flex: 1 }}>
+            <View style={{ height: 4, borderRadius: 2, backgroundColor: i <= step ? t.blue : t.fill2 }} />
+            <Text style={{ color: i === step ? t.blue : t.grey, fontSize: 11.5, fontWeight: '600', marginTop: 4, textAlign: 'center' }}>{x}</Text>
           </Pressable>
         ))}
       </View>
-      <Text style={st.lbl(t)}>Coiffeur</Text>
-      <View style={st.wrap}>
-        {STAFF.map((s) => (
-          <Pressable key={s.id} onPress={() => setBid(s.id)} style={[st.row, { gap: 6, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 99, backgroundColor: s.id === bid ? t.blueSoft : t.fill, borderWidth: 1.5, borderColor: s.id === bid ? t.blue : 'transparent' }]}>
-            <Avatar initials={s.initials} color={s.color} size={22} /><Text style={{ color: t.ink, fontWeight: '600' }}>{s.name}</Text>
-          </Pressable>
-        ))}
-      </View>
-      <Text style={st.lbl(t)}>Heure</Text>
-      <View style={[st.row, { gap: 8 }]}>
-        {[-15, -5, 0, 5, 15].map((d) => {
-          const m = start + d; const on = d === 0;
-          return (
-            <Pressable key={d} onPress={() => setStart(m)} style={{ flex: 1, paddingVertical: 11, borderRadius: 12, alignItems: 'center', backgroundColor: on ? t.blue : t.fill }}>
-              <Text style={{ color: on ? '#fff' : t.ink, fontWeight: '700', fontSize: 13.5 }}>{hm(m)}</Text>
+      {step === 0 ? (
+        <>
+          <Text style={st.lbl(t)}>Client</Text>
+          <TextInput value={client} onChangeText={setClient} placeholder="Nom ou téléphone du client" placeholderTextColor={t.grey} style={[st.input, { backgroundColor: t.fill, color: t.ink }]} />
+          {sugg.map((c) => (
+            <Pressable key={c.name} onPress={() => setClient(c.name)} style={[st.row, { paddingVertical: 9 }]}>
+              <Ionicons name="person-circle-outline" size={20} color={t.blue} /><Text style={{ color: t.ink, flex: 1 }}>{c.name}</Text><Text style={{ color: t.grey, fontSize: 12.5 }}>{c.phone}</Text>
             </Pressable>
-          );
-        })}
-      </View>
-      {mode === 'group' ? <Text style={{ color: t.grey, marginTop: 12, fontSize: 13 }}>Plusieurs personnes : on ajoute ensuite chaque personne, « À la suite de » (même coiffeur) ou « En même temps que » (autre coiffeur).</Text> : null}
-      {clash ? (
-        <View style={{ marginTop: 14, backgroundColor: 'rgba(255,159,10,.14)', borderRadius: 12, padding: 12 }}>
-          <Text style={{ color: '#b35a00', fontWeight: '700' }}>{canForce ? `Libre jusqu'à ${hm(clash.start)} seulement` : `Occupé : ${clash.client} à ${hm(clash.start)}`}</Text>
-          <Text style={{ color: t.ink, fontSize: 13, marginTop: 2 }}>{canForce ? `${service.name} dure ${service.minutes} min : il chevaucherait le RDV de ${clash.client}.` : 'Choisissez une autre heure ou un autre coiffeur.'}</Text>
-        </View>
+          ))}
+          {client.trim().length >= 2 && !sugg.length ? <Text style={{ color: t.grey, marginTop: 8 }}>Nouveau client : il sera créé avec ce nom.</Text> : null}
+          {mode === 'group' ? <Text style={{ color: t.grey, marginTop: 12, fontSize: 13 }}>Plusieurs personnes : chaque personne est ajoutée ensuite, « À la suite de » (même coiffeur) ou « En même temps que » (autre coiffeur).</Text> : null}
+        </>
+      ) : null}
+      {step === 1 ? (
+        <>
+          <Text style={st.lbl(t)}>Prestation</Text>
+          <View style={st.wrap}>
+            {SERVICES.map((x) => (
+              <Pressable key={x.id} onPress={() => setSvc(x.id)} style={{ paddingHorizontal: 12, paddingVertical: 9, borderRadius: 10, backgroundColor: x.id === svc ? t.blue : t.fill }}>
+                <Text style={{ color: x.id === svc ? '#fff' : t.ink, fontWeight: '600' }}>{x.name} · {x.minutes} min</Text>
+              </Pressable>
+            ))}
+          </View>
+          <Text style={st.lbl(t)}>Coiffeur</Text>
+          <View style={st.wrap}>
+            {STAFF.map((x) => (
+              <Pressable key={x.id} onPress={() => setBid(x.id)} style={[st.row, { gap: 6, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 99, backgroundColor: x.id === bid ? t.blueSoft : t.fill, borderWidth: 1.5, borderColor: x.id === bid ? t.blue : 'transparent' }]}>
+                <Avatar initials={x.initials} color={x.color} size={22} /><Text style={{ color: t.ink, fontWeight: '600' }}>{x.name}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </>
+      ) : null}
+      {step === 2 ? (
+        <>
+          <Text style={st.lbl(t)}>Suppléments (facultatif)</Text>
+          <Chips items={CATALOG.filter((c) => c.kind === 'extra').map((c) => ({ key: c.name, label: `${c.name} +${eur(c.priceCents)}` }))} value={extras}
+            onToggle={(k) => setExtras((e) => (e.includes(k) ? e.filter((x) => x !== k) : [...e, k]))} />
+        </>
+      ) : null}
+      {step === 3 ? (
+        <>
+          <Pressable onPress={() => setStart(time)} style={[st.panel, { backgroundColor: start === time ? t.blueSoft : t.fill, marginTop: 14, padding: 12 }]}>
+            <Text style={{ color: t.blue, fontWeight: '700' }}>Heure touchée dans l'agenda : {hm(time)}</Text>
+          </Pressable>
+          <Segmented style={{ marginTop: 12 }} value={half} onChange={setHalf} items={[{ key: 'am', label: 'Matin' }, { key: 'pm', label: 'Après-midi' }]} />
+          <Pressable onPress={() => setAllHours(!allHours)} style={[st.row, { marginTop: 10 }]}>
+            <Ionicons name={allHours ? 'checkbox' : 'square-outline'} size={20} color={t.blue} /><Text style={{ color: t.ink }}>Toutes les heures (pas de 5 min, même occupées)</Text>
+          </Pressable>
+          <View style={[st.wrap, { marginTop: 10 }]}>
+            {slots.length === 0 ? <Text style={{ color: t.grey }}>Aucun créneau libre</Text> : slots.map(({ m, free }) => (
+              <Pressable key={m} onPress={() => setStart(m)} style={{ width: '22%', flexGrow: 1, paddingVertical: 10, borderRadius: 12, alignItems: 'center', backgroundColor: m === start ? t.blue : free ? t.fill : 'transparent', borderWidth: free ? 0 : 1, borderColor: t.sep }}>
+                <Text style={{ color: m === start ? '#fff' : free ? t.ink : t.grey, fontWeight: '700' }}>{hm(m)}</Text>
+              </Pressable>
+            ))}
+          </View>
+          {clash ? (
+            <View style={{ marginTop: 14, backgroundColor: 'rgba(255,159,10,.14)', borderRadius: 12, padding: 12 }}>
+              <Text style={{ color: '#b35a00', fontWeight: '700' }}>{canForce ? `Libre jusqu'à ${hm(clash.start)} seulement` : `Occupé : ${clash.client} à ${hm(clash.start)}`}</Text>
+              <Text style={{ color: t.ink, fontSize: 13, marginTop: 2 }}>{canForce ? `${service.name} dure ${service.minutes} min : il chevaucherait le RDV de ${clash.client}.` : 'Choisissez une autre heure ou un autre coiffeur.'}</Text>
+            </View>
+          ) : null}
+        </>
       ) : null}
       <View style={{ height: 16 }} />
-      {canForce ? (
+      {step < 3 ? (
+        <Go label={step === 0 ? (client ? 'Continuer' : 'Continuer sans nom') : 'Continuer'} onPress={() => setStep(step + 1)} />
+      ) : canForce ? (
         <Pressable onPress={() => make(true)} style={{ backgroundColor: '#b35a00', borderRadius: 16, paddingVertical: 15, alignItems: 'center' }}><Text style={{ color: '#fff', fontWeight: '700', fontSize: 16 }}>⚠ Forcer le RDV à {hm(start)}</Text></Pressable>
       ) : (
         <Go label={`Continuer à ${hm(start)}`} disabled={!!clash} onPress={() => make(false)} />
