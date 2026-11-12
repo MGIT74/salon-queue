@@ -2,7 +2,8 @@
 // Avant : le serveur s'arrêtait à 500 RDV du mois (annulés et terminés compris, du plus ancien au
 // plus récent) -> à Oyonnax plus rien après le 13 novembre dans l'agenda, alors que la liste
 // « À venir » montrait bien les RDV du 26 ajoutés par les coiffeurs.
-const { execSync } = require('child_process');
+const { execSync, spawn } = require('child_process');
+const fs = require('fs'), path = require('path');
 const BASE = 'http://127.0.0.1:3999';
 const sql = (q) => execSync(`mariadb -uroot salonq -N -e "${q.replace(/"/g, '\\"')}"`).toString().trim();
 const ADMIN = { 'X-Salon-Slug': 'test', 'X-Admin-Password': 'adminpw' };
@@ -30,6 +31,24 @@ const check = (n, ok, extra) => { (ok ? pass++ : fail++); console.log((ok ? '  O
   check('le mois reste borné : ni le 28 février 23:59 ni le 1er avril 00:00', !ids.includes('t175-avril') && !ids.includes('t175-fevrier'));
   const r2 = await fetch(BASE + '/api/appointments?month=2031-12&all=1&caisse_view=1', { headers: ADMIN }).then((x) => x.json());
   check('décembre (passage à l\'année suivante) répond sans erreur', r2.ok === true && Array.isArray(r2.items), r2);
+
+  // Plafond atteint (serveur relancé avec AGENDA_MONTH_LIMIT=500) : alerte au super admin, une seule fois par heure.
+  sql("DELETE FROM server_errors WHERE message LIKE 'Agenda incomplet%'");
+  const env = { ...process.env, DB_HOST: '127.0.0.1', DB_USER: 'sq', DB_PASSWORD: 'sqpass', DB_NAME: 'salonq', PORT: '3997', SETTINGS_ENCRYPTION_KEY: 'testkeytestkeytestkeytestkey123456', AGENDA_MONTH_LIMIT: '500' };
+  const srv = spawn('node', ['server.js'], { cwd: path.join(__dirname, '../..'), env, stdio: 'ignore' });
+  try {
+    let up = false;
+    for (let i = 0; i < 40 && !up; i++) { await new Promise((r) => setTimeout(r, 250)); up = await fetch('http://127.0.0.1:3997/').then(() => true).catch(() => false); }
+    const get = () => fetch('http://127.0.0.1:3997/api/appointments?month=' + M + '&all=1&caisse_view=1', { headers: ADMIN }).then((x) => x.json());
+    const c1 = await get(); await get();
+    await new Promise((r) => setTimeout(r, 400));
+    check('plafond réglable par AGENDA_MONTH_LIMIT', (c1.items || []).length === 500, (c1.items || []).length);
+    const n = Number(sql("SELECT COUNT(*) FROM server_errors WHERE message LIKE 'Agenda incomplet%' AND salon_id='s1'"));
+    check('plafond atteint -> une alerte dans « Erreurs » du super admin (pas une par chargement)', n === 1, n);
+  } finally { srv.kill(); }
+  sql("DELETE FROM server_errors WHERE message LIKE 'Agenda incomplet%'");
+  const sa = fs.readFileSync(path.join(__dirname, '../../public/super-admin.html'), 'utf8');
+  check('pastille rouge du nombre de nouvelles erreurs sur l\'onglet « Erreurs »', sa.includes('function refreshErrorsBadge()') && sa.includes("dot.className = 'err-count'") && sa.includes('refreshErrorsBadge();\n}'));
 
   sql("DELETE FROM appointments WHERE id LIKE 't175-%'");
   console.log('\n' + pass + ' OK, ' + fail + ' ECHEC');

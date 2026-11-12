@@ -644,6 +644,23 @@ async function buildApptItems(salonId, rows) {
   });
 }
 
+// Plafond des RDV d'un mois envoyés à l'agenda (Mon poste, caisse, dashboard). Réglable sans toucher
+// au code par la variable AGENDA_MONTH_LIMIT. S'il est atteint, la fin du mois manque à l'agenda :
+// on le signale au super admin (onglet « Erreurs »), au plus une fois par heure et par salon / mois.
+const AGENDA_MONTH_LIMIT = Math.max(500, Number(process.env.AGENDA_MONTH_LIMIT) || 5000);
+const agendaCapWarned = new Map();
+function warnAgendaMonthCap(req, month, count) {
+  const key = req.salon.id + '|' + month;
+  const now = Date.now();
+  if (now - (agendaCapWarned.get(key) || 0) < 3600000) return;
+  agendaCapWarned.set(key, now);
+  if (agendaCapWarned.size > 1000) agendaCapWarned.clear();
+  const err = new Error(`Agenda incomplet : le salon a au moins ${count} RDV en ${month} (plafond AGENDA_MONTH_LIMIT = ${AGENDA_MONTH_LIMIT}). Les derniers jours du mois ne s'affichent plus dans l'agenda : augmenter AGENDA_MONTH_LIMIT ou passer l'agenda à un chargement par semaine.`);
+  err.code = 'AGENDA_MONTH_LIMIT';
+  err.stack = err.message;
+  require('../lib/errorLog').recordServerError(req, err);
+}
+
 router.get('/', requireAdminOrBarber, wrap(async (req, res) => {
   const conditions = ['a.salon_id = ?'];
   const params = [req.salon.id];
@@ -705,10 +722,11 @@ router.get('/', requireAdminOrBarber, wrap(async (req, res) => {
      LEFT JOIN barbers b ON b.id = a.barber_id
      LEFT JOIN queue q ON q.id = a.promoted_queue_id
      WHERE ${conditions.join(' AND ')}
-     ORDER BY a.scheduled_at ${orderDirection} LIMIT ${monthMatch ? 5000 : 500}`,
+     ORDER BY a.scheduled_at ${orderDirection} LIMIT ${monthMatch ? AGENDA_MONTH_LIMIT : 500}`,
     params
   );
 
+  if (monthMatch && rows.length >= AGENDA_MONTH_LIMIT) warnAgendaMonthCap(req, req.query.month, rows.length);
   res.json({ ok: true, items: await buildApptItems(req.salon.id, rows) });
 }));
 
