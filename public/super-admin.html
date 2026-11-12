@@ -134,6 +134,7 @@
   .owner-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
   .owner-name { font-size: 17px; font-weight: 600; }
   .owner-email { font-size: 13px; color: var(--grey); }
+  .err-count { margin-left: 6px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--red); color: #fff; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
   .badge { font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 999px; background: var(--fill); color: var(--grey); }
   .badge.on { background: var(--blue-soft); color: var(--blue); }
   .badge.off { background: rgba(255,59,48,0.12); color: var(--red); }
@@ -481,10 +482,36 @@ function superApi(path, opts) {
   });
 }
 
+var saBooted = false;
 function boot() {
+  saBooted = true;
   loadOverview();
   loadOwners();
+  refreshErrorsBadge();
 }
+
+// Pastille rouge sur l'onglet « Erreurs » : nombre d'erreurs arrivées depuis la dernière ouverture de l'onglet.
+var lastErrorsTop = 0;
+function errorsSeenId() { try { return Number(localStorage.getItem('sa.errorsSeenId')) || 0; } catch (e) { return 0; } }
+function markErrorsSeen() { try { localStorage.setItem('sa.errorsSeenId', String(lastErrorsTop)); } catch (e) {} paintErrorsBadge(0); }
+function paintErrorsBadge(n) {
+  var b = document.querySelector('#tabs button[data-t="errors"]');
+  if (!b) return;
+  var dot = b.querySelector('.err-count');
+  if (!n) { if (dot) dot.remove(); return; }
+  if (!dot) { dot = document.createElement('span'); dot.className = 'err-count'; b.appendChild(dot); }
+  dot.textContent = n > 99 ? '99+' : String(n);
+}
+function refreshErrorsBadge() {
+  superApi('/api/super/errors').then(function (r) {
+    lastErrorsTop = r.items.length ? r.items[0].id : 0;
+    var seen = errorsSeenId();
+    var onTab = document.getElementById('t-errors').classList.contains('on');
+    if (onTab) markErrorsSeen();
+    else paintErrorsBadge(r.items.filter(function (e) { return e.id > seen; }).length);
+  }).catch(function () {});
+}
+setInterval(function () { if (saBooted && document.visibilityState === 'visible') refreshErrorsBadge(); }, 120000);
 
 document.getElementById('tabs').addEventListener('click', function (e) {
   var b = e.target.closest('button');
@@ -495,7 +522,7 @@ document.getElementById('tabs').addEventListener('click', function (e) {
   document.getElementById('t-' + b.dataset.t).classList.add('on');
   if (b.dataset.t === 'overview') loadOverview();
   if (b.dataset.t === 'activity') loadActivity();
-  if (b.dataset.t === 'errors') loadErrors();
+  if (b.dataset.t === 'errors') { loadErrors(); refreshErrorsBadge(); }
   if (b.dataset.t === 'email') loadSmtp();
   if (b.dataset.t === 'ai-chat') loadAiChatOverview();
   if (b.dataset.t === 'sms') loadSmsOverview();
