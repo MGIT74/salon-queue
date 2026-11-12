@@ -658,7 +658,16 @@ router.get('/', requireAdminOrBarber, wrap(async (req, res) => {
     params.push(req.barberId);
   }
 
-  if (req.query.month) {
+  const monthMatch = /^(\d{4})-(\d{2})$/.exec(String(req.query.month || ''));
+  if (monthMatch) {
+    // Un mois précis (agendas de Mon poste, de la caisse et du dashboard) :
+    // plage [1er du mois, 1er du mois suivant[ - lisible par l'index sur
+    // scheduled_at, contrairement à DATE_FORMAT.
+    const y = Number(monthMatch[1]), m = Number(monthMatch[2]);
+    const next = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`;
+    conditions.push('a.scheduled_at >= ? AND a.scheduled_at < ?');
+    params.push(`${monthMatch[1]}-${monthMatch[2]}-01 00:00:00`, `${next}-01 00:00:00`);
+  } else if (req.query.month) {
     // Format attendu : YYYY-MM
     conditions.push('DATE_FORMAT(a.scheduled_at, "%Y-%m") = ?');
     params.push(req.query.month);
@@ -676,6 +685,10 @@ router.get('/', requireAdminOrBarber, wrap(async (req, res) => {
   // limite de 500 lignes se remplirait des plus VIEUX RDV et pourrait
   // exclure les RDV à venir les plus proches.
   const orderDirection = (req.query.all && !req.query.month) ? 'DESC' : 'ASC';
+  // Un mois précis est déjà borné par lui-même : 500 lignes coupaient la fin
+  // du mois dans l'agenda d'un salon chargé (annulés et terminés compris),
+  // p. ex. plus rien après le 13 alors que la liste « À venir » montrait le
+  // 26. On garde un plafond large par sécurité.
 
   const [rows] = await pool.query(
     `SELECT a.*, ${serviceNameSql()} AS service_name, COALESCE(bsp.duration_min, s.duration_min) AS service_duration_min, b.name AS barber_name,
@@ -692,7 +705,7 @@ router.get('/', requireAdminOrBarber, wrap(async (req, res) => {
      LEFT JOIN barbers b ON b.id = a.barber_id
      LEFT JOIN queue q ON q.id = a.promoted_queue_id
      WHERE ${conditions.join(' AND ')}
-     ORDER BY a.scheduled_at ${orderDirection} LIMIT 500`,
+     ORDER BY a.scheduled_at ${orderDirection} LIMIT ${monthMatch ? 5000 : 500}`,
     params
   );
 
