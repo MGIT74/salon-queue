@@ -593,6 +593,32 @@ initTheme();
     if (el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) reflow();
   });
   if (window.visualViewport) window.visualViewport.addEventListener('resize', reflow);
+
+  /* Appli ajoutée à l'écran d'accueil (iPhone) : après le clavier, iOS garde parfois une « fenêtre » réduite
+     à la hauteur qu'elle avait clavier ouvert. Les menus fixés en bas restent alors au milieu de l'écran, même
+     après un défilement (le recalage ci-dessus ne suffit pas). On compare la partie réellement visible de
+     l'écran (visualViewport) à cette fenêtre et on redescend les menus du bas de l'écart (variable --vv-shift,
+     appliquée dans app.css). Seulement vers le bas : clavier ouvert, les menus restent derrière, comme avant. */
+  var vv = window.visualViewport;
+  if (!vv) return;
+  var lastShift = -1;
+  function syncBottomBars() {
+    var shift = 0;
+    if (vv.scale <= 1.01) shift = Math.round(vv.height + vv.offsetTop - window.innerHeight);
+    if (shift < 2 || shift > 1000) shift = 0;
+    if (shift === lastShift) return;
+    lastShift = shift;
+    document.documentElement.style.setProperty('--vv-shift', shift + 'px');
+  }
+  vv.addEventListener('resize', syncBottomBars);
+  vv.addEventListener('scroll', syncBottomBars);
+  window.addEventListener('resize', syncBottomBars);
+  window.addEventListener('scroll', syncBottomBars, { passive: true });
+  window.addEventListener('pageshow', syncBottomBars);
+  window.addEventListener('orientationchange', function () { setTimeout(syncBottomBars, 300); });
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') setTimeout(syncBottomBars, 100); });
+  document.addEventListener('focusout', function () { setTimeout(syncBottomBars, 350); });
+  syncBottomBars();
 })();
 
 /* ============ Fenêtres modales professionnelles ============

@@ -936,3 +936,6 @@ body .tfx > button { transition: color .25s ease, transform .1s ease; }
 .force-tm { background: #ff9f0a; color: #111; border-radius: 99px; padding: 2px 10px; font-size: 13.5px; font-weight: 800; font-variant-numeric: tabular-nums; }
 .force-chev { margin-left: auto; font-size: 18px; line-height: 1; }
 .force-other { align-self: flex-start; border: none; background: none; padding: 2px 0; color: var(--accent); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+
+/* Menus du bas (Mon poste, caisse, espace client) : voir syncBottomBars dans app.js (iPhone, appli sur l'écran d'accueil). */
+.poste-footer, .caisse-footer, .client-footer { translate: 0 var(--vv-shift, 0px); }
