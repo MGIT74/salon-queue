@@ -33,6 +33,8 @@ function makeWin() {
   w.timelineZoom = 1;
   w.eval(ZOOMCTRL + '\n' + varsBlock + '\n' + CLOSURES(dash) + '\n' + PASTDAY + '\n' + fnSrc(dash, 'renderDayTimelineHtml') + '\n' + fnSrc(dash, 'rerenderAllTimelines') + '\n' + fnSrc(dash, 'adjustTimelineZoom'));
   w.__today = today;
+  // Le Dashboard affiche désormais le coup d'œil : ici on garde la frise pour tester son zoom (autres écrans).
+  w.renderDashGlance = () => { w.document.getElementById('dash-timeline').innerHTML = w.renderDayTimelineHtml(today, []); };
   return w;
 }
 function parse(w, step, zoom) {

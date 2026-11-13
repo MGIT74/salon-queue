@@ -2161,8 +2161,7 @@
       </div>
     </div>
 
-    <div class="dash-card" style="margin-bottom:16px">
-      <div class="dash-card-head"><h3>Planning du jour</h3></div>
+    <div class="dash-card dash-glance-card" style="margin-bottom:16px">
       <div id="dash-timeline"><div class="empty">Chargement…</div></div>
     </div>
   </div>
@@ -3987,19 +3986,17 @@ function loadDashboardTab() {
   var todayStr = salonToday();
   // Couleurs choisies dans « Coiffeurs » (pas la couleur par défaut) : chargées AVANT de dessiner le planning,
   // sinon, juste après un rafraîchissement de page, la frise retombait sur les couleurs automatiques.
+  // « La journée en un coup d'œil » : le même bloc que le menu Rendez-vous (vue Jour), pour aujourd'hui.
   loadSalonScheduleForTimeline().then(function () {
-    return api('/api/barbers?all=1').then(function (b) {
-      (b.items || []).forEach(function (x) { rdvBarberColors[x.id] = x.color || stableColorForId(x.id); rdvBarberPhotos[x.id] = x.photo_url || ''; });
+    return loadBarbers().then(function () {
+      (barbers || []).forEach(function (x) { rdvBarberColors[x.id] = x.color || stableColorForId(x.id); rdvBarberPhotos[x.id] = x.photo_url || ''; });
     }).catch(function () {});
   }).then(function () {
-    return api('/api/appointments?month=' + monthKey(new Date()));
-  }).then(function (r) {
-    var todayAppts = (r.items || []).filter(function (a) {
-      return a.scheduled_at.slice(0, 10) === todayStr && a.status !== 'cancelled';
-    });
-    todayAppts.forEach(function (a) { calAppointmentById[a.id] = a; });
-    dashTimelineCache = { dateStr: todayStr, appts: todayAppts };
-    document.getElementById('dash-timeline').innerHTML = renderDayTimelineHtml(todayStr, todayAppts);
+    var mk = todayStr.slice(0, 7);
+    return api('/api/appointments?month=' + mk + '&all=1&caisse_view=1').then(function (r) { calMonthCache[mk] = r.items || []; });
+  }).then(function () {
+    dashTimelineCache = { dateStr: todayStr };
+    renderDashGlance();
   }).catch(function () {
     document.getElementById('dash-timeline').innerHTML = '<div class="empty">Impossible de charger le chrono du jour</div>';
   });
@@ -7404,7 +7401,8 @@ function pdShortestItem(row) {
     .map(function (x) { return Number(x.duration_min); });
   return list.length ? Math.min.apply(null, list) : 15;
 }
-function posteDayHtml(dateStr) {
+function posteDayHtml(dateStr, opts) {
+  opts = opts || {};
   var closed = rdvIsSalonClosed(dateStr), past = isPastDay(dateStr);
   var nowStr = nowSalonDatetimeString(), isToday = nowStr.slice(0, 10) === dateStr;
   var nowMin = Number(nowStr.slice(11, 13)) * 60 + Number(nowStr.slice(14, 16));
@@ -7518,12 +7516,14 @@ function posteDayHtml(dateStr) {
   for (var t = R0; t <= R1; t += 60) ticks += '<span' + ((t - R0) % 180 ? ' class="minor"' : '') + ' style="left:' + pct(t) + '%">' + pdHM(t) + '</span>';
   ticks += pdGlanceStepTicks(R0, R1, pct);
   html += '<section class="pd-glance pd-g-day' + (pdGlanceFolded ? ' folded' : '') + '" aria-label="La journée en un coup d’œil">' +
-    '<div class="pd-glance-head">' + pdFoldBtnHtml('La journée en un coup d’œil') + pdSearchHtml() +
+    '<div class="pd-glance-head">' + pdFoldBtnHtml('La journée en un coup d’œil') + (opts.glanceOnly ? '<span style="flex:1"></span>' : pdSearchHtml()) +
     '<span class="pd-legend"><span><i style="background:var(--ink);opacity:.75"></i>À venir</span><span><i style="background:var(--ink);opacity:.25"></i>Terminé</span>' +
     '<span><i style="border:1px dashed var(--grey)"></i>Absent</span>' + (isToday ? '<span><i style="width:2px;background:var(--red)"></i>Maintenant</span>' : '') + '</span></div>' +
     rows +
     '<div class="pd-g-row" style="cursor:default;padding-top:0;padding-bottom:0" aria-hidden="true"><span></span><span class="pd-g-ticks">' + ticks + '</span><span class="pd-g-sum"></span></div>' +
     '</section>';
+  // Dashboard : seulement « La journée en un coup d'œil » (même bloc que le menu Rendez-vous).
+  if (opts.glanceOnly) return html;
 
   // (Plus de colonne de côté : l'agenda prend toute la largeur. Le prochain client reste marqué « Prochain »
   // dans l'agenda, les créneaux libres y sont dessinés avec « + Ajouter » ; Moi / Équipe et « + Ajouter » sont dans la barre de l'agenda.)
@@ -8492,6 +8492,7 @@ function adRefreshViews() { invalidateAgendaCache(); loadCalendarPeriod(); }
 function openPosteAddAppointment(dateStr, barberId) { openAdminAddAppointment(dateStr, barberId, pdPrefTime); }
 /** Relit l'agenda puis la liste des rendez-vous (appelé après chaque création / modification dans l'admin). */
 function loadCalendarPeriod() {
+  refreshDashGlance();
   if (!calBooted) { renderRdvList(); return Promise.resolve(); }
   return loadAgendaPeriod().then(function () { renderRdvList(); });
 }
@@ -8763,11 +8764,20 @@ function updateTimelineNowLines() {
  * entière à l'écran jusqu'à 250%). Ré-affiche tous les plannings jour actuellement visibles avec
  * les données déjà en mémoire, sans nouvel appel réseau.
  */
+/** Après un ajout / une modification : le coup d'œil du Dashboard est relu (RDV du mois d'aujourd'hui). */
+function refreshDashGlance() {
+  if (!dashTimelineCache) return;
+  var mk = dashTimelineCache.dateStr.slice(0, 7);
+  api('/api/appointments?month=' + mk + '&all=1&caisse_view=1').then(function (r) { calMonthCache[mk] = r.items || []; renderDashGlance(); }).catch(function () {});
+}
+function renderDashGlance() {
+  var el = document.getElementById('dash-timeline');
+  if (!el || !dashTimelineCache) return;
+  var html = posteDayHtml(dashTimelineCache.dateStr, { glanceOnly: true });
+  el.innerHTML = html || '<div class="empty">Aucun rendez-vous aujourd’hui</div>';
+}
 function rerenderAllTimelines() {
-  if (dashTimelineCache) {
-    var dashEl = document.getElementById('dash-timeline');
-    if (dashEl) dashEl.innerHTML = renderDayTimelineHtml(dashTimelineCache.dateStr, dashTimelineCache.appts);
-  }
+  if (dashTimelineCache && typeof renderDashGlance === 'function') renderDashGlance();
   // Agenda du menu Rendez-vous (code de « Mon poste ») : redessiné avec les données déjà en mémoire.
   var rdvTab = document.getElementById('t-rdv');
   if (typeof calBooted !== 'undefined' && calBooted && rdvTab && rdvTab.classList.contains('on')) {
