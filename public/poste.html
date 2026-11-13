@@ -1852,7 +1852,8 @@ function pdShortestItem(row) {
     .map(function (x) { return Number(x.duration_min); });
   return list.length ? Math.min.apply(null, list) : 15;
 }
-function posteDayHtml(dateStr) {
+function posteDayHtml(dateStr, opts) {
+  opts = opts || {};
   var closed = rdvIsSalonClosed(dateStr), past = isPastDay(dateStr);
   var nowStr = nowSalonDatetimeString(), isToday = nowStr.slice(0, 10) === dateStr;
   var nowMin = Number(nowStr.slice(11, 13)) * 60 + Number(nowStr.slice(14, 16));
@@ -1966,12 +1967,14 @@ function posteDayHtml(dateStr) {
   for (var t = R0; t <= R1; t += 60) ticks += '<span' + ((t - R0) % 180 ? ' class="minor"' : '') + ' style="left:' + pct(t) + '%">' + pdHM(t) + '</span>';
   ticks += pdGlanceStepTicks(R0, R1, pct);
   html += '<section class="pd-glance pd-g-day' + (pdGlanceFolded ? ' folded' : '') + '" aria-label="La journée en un coup d’œil">' +
-    '<div class="pd-glance-head">' + pdFoldBtnHtml('La journée en un coup d’œil') + pdSearchHtml() +
+    '<div class="pd-glance-head">' + pdFoldBtnHtml('La journée en un coup d’œil') + (opts.glanceOnly ? '<span style="flex:1"></span>' : pdSearchHtml()) +
     '<span class="pd-legend"><span><i style="background:var(--ink);opacity:.75"></i>À venir</span><span><i style="background:var(--ink);opacity:.25"></i>Terminé</span>' +
     '<span><i style="border:1px dashed var(--grey)"></i>Absent</span>' + (isToday ? '<span><i style="width:2px;background:var(--red)"></i>Maintenant</span>' : '') + '</span></div>' +
     rows +
     '<div class="pd-g-row" style="cursor:default;padding-top:0;padding-bottom:0" aria-hidden="true"><span></span><span class="pd-g-ticks">' + ticks + '</span><span class="pd-g-sum"></span></div>' +
     '</section>';
+  // Dashboard : seulement « La journée en un coup d'œil » (même bloc que le menu Rendez-vous).
+  if (opts.glanceOnly) return html;
 
   // (Plus de colonne de côté : l'agenda prend toute la largeur. Le prochain client reste marqué « Prochain »
   // dans l'agenda, les créneaux libres y sont dessinés avec « + Ajouter » ; Moi / Équipe et « + Ajouter » sont dans la barre de l'agenda.)
