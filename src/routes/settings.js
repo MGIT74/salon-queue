@@ -305,7 +305,7 @@ router.get('/sms', requireAdmin, wrap(async (req, res) => {
   const onlyBlocked = req.query.only === 'no_credit';
   const [log] = await pool.query(
     `SELECT kind, client_name, phone, sender, message, segments, status, error, scheduled_at, sent_at, updated_at
-     FROM sms_log WHERE salon_id = ?` + (onlyBlocked ? " AND status = 'no_credit'" : '') + ` ORDER BY updated_at DESC LIMIT ` + (onlyBlocked ? 200 : 50), [req.salon.id]);
+     FROM sms_log WHERE salon_id = ?` + (onlyBlocked ? " AND status = 'no_credit'" : '') + ` ORDER BY updated_at DESC LIMIT 200`, [req.salon.id]);
   const [[blocked]] = await pool.query(
     "SELECT COUNT(*) AS n FROM sms_log WHERE salon_id = ? AND status = 'no_credit' AND created_at >= DATE_FORMAT(NOW(), '%Y-%m-01')", [req.salon.id]);
   const [[counts]] = await pool.query(

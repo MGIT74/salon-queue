@@ -2996,8 +2996,20 @@
         </div>
 
         <div class="sms-sub">
-          <div class="sms-sub-title">Derniers SMS</div>
+          <div class="admin-head" style="margin-bottom:4px">
+            <div class="sms-sub-title" style="margin:0">Derniers SMS</div>
+            <div class="fld" style="margin:0"><label for="sms-per-page">Afficher</label>
+              <select id="sms-per-page" onchange="changeSmsPerPage(this.value)">
+                <option value="5" selected>5</option>
+                <option value="10">10</option>
+                <option value="20">20</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+              </select>
+            </div>
+          </div>
           <div id="sms-log"><div class="hint">Aucun SMS pour le moment.</div></div>
+          <div class="clients-pagination" id="sms-pagination"></div>
         </div>
       </div>
     </div>
@@ -12386,6 +12398,30 @@ function loadSmsSettings() {
         'Ces clients n\'ont pas reçu leur rappel (ils ne seront pas renvoyés). Contactez votre prestataire pour augmenter votre quota mensuel.' +
         ' <button class="btn btn-soft" style="padding:5px 12px;font-size:12.5px;margin-left:6px" onclick="smsToggleBlocked()">' + (smsOnlyBlocked ? 'Voir tous les SMS' : 'Voir uniquement les refusés') + '</button></div>'
       : '';
+    smsLogData = r.log; smsLogBanner = banner; smsPage = 1;
+    renderSmsLog();
+    smsPreview();
+  }).catch(function (e) { toast(e.message, true); });
+}
+
+// « Derniers SMS » : 5 par défaut, puis 10 / 20 / 50 / 100 par page (choix gardé sur cet appareil).
+var smsLogData = [], smsLogBanner = '', smsPage = 1, smsPerPage = 5;
+try { smsPerPage = [5, 10, 20, 50, 100].indexOf(Number(localStorage.getItem('dash.smsPerPage'))) >= 0 ? Number(localStorage.getItem('dash.smsPerPage')) : 5; } catch (e) {}
+function changeSmsPerPage(value) {
+  smsPerPage = Number(value) || 5; smsPage = 1;
+  try { localStorage.setItem('dash.smsPerPage', String(smsPerPage)); } catch (e) {}
+  renderSmsLog();
+}
+function goToSmsPage(p) {
+  var totalPages = Math.max(1, Math.ceil(smsLogData.length / smsPerPage));
+  if (p < 1 || p > totalPages) return;
+  smsPage = p; renderSmsLog();
+}
+function renderSmsLog() {
+  var sel = document.getElementById('sms-per-page');
+  if (sel) sel.value = String(smsPerPage);
+  var start = (smsPage - 1) * smsPerPage;
+  var r = { log: smsLogData.slice(start, start + smsPerPage) }, banner = smsLogBanner;
     document.getElementById('sms-log').innerHTML = banner + (r.log.length === 0
       ? '<div class="hint">Aucun SMS pour le moment.</div>'
       : r.log.map(function (l) {
@@ -12394,8 +12430,8 @@ function loadSmsSettings() {
             '<span class="sms-badge ' + l.status + '">' + smsStatusLabel(l.status) + (l.status === 'sent' ? ' · ' + l.segments + ' crédit' + (l.segments > 1 ? 's' : '') : '') + '</span>' +
             '<div class="sub">' + esc(l.message || '') + (l.error ? ' — ' + esc(l.error) : '') + '</div></div>';
         }).join(''));
-    smsPreview();
-  }).catch(function (e) { toast(e.message, true); });
+  if (smsLogData.length > smsPerPage) renderPaginationControls('sms-pagination', smsPage, smsPerPage, smsLogData.length, 'goToSmsPage');
+  else document.getElementById('sms-pagination').innerHTML = '';
 }
 
 function smsToggleBlocked() { smsOnlyBlocked = !smsOnlyBlocked; loadSmsSettings(); }
