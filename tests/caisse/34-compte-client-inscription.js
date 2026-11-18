@@ -88,7 +88,7 @@ const E = (n) => `zt-client-${n}@example.com`;
         <input id="li-email" value="a@b.fr"><input id="li-pass" value="secret1"><div id="login-err"></div><button id="resend-btn" style="display:none"></button>`, { runScripts: 'outside-only', url: 'http://localhost/' });
       const w = dom.window; w.__calls = []; w.__shown = []; w.SALON_SLUG = 'le-salon';
       w.composePhone = (c, p) => c + p; w.contactProblem = () => ''; w.show = (id) => w.__shown.push(id); w.baseUrl = () => 'http://x/compte.html?salon=le-salon'; w.loadProfile = () => {};
-      w.eval(fn('api') + fn('doSignup') + fn('doLogin') + fn('doResendVerification'));
+      w.eval(fn('ctKey') + fn('getClientToken') + fn('setClientToken') + fn('api') + fn('doSignup') + fn('doLogin') + fn('doResendVerification'));
       return w;
     };
     const respond = (w, status, data) => { w.fetch = (p, o) => { w.__calls.push({ p, body: o.body && JSON.parse(o.body) }); return Promise.resolve({ ok: status < 400, status, json: () => Promise.resolve(data) }); }; };

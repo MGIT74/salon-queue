@@ -21,12 +21,17 @@
 <script>
   (function () {
     try {
-      if (localStorage.getItem('client_token')) document.documentElement.classList.add('auth-checking');
+      // Un jeton par salon (client_token:<salon>) ; l'ancien jeton commun (client_token) est repris une fois.
+      var sl = new URLSearchParams(location.search).get('salon') || '';
+      if (localStorage.getItem('client_token:' + sl) || (localStorage.getItem('client_token') && localStorage.getItem('client_token_skip:' + sl) !== '1')) document.documentElement.classList.add('auth-checking');
     } catch (e) {}
   })();
 </script>
 <style>
   html.auth-checking #p-login { display: none !important; }
+  .salon-switch-wrap { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+  .salon-switch-wrap label { font-size: 13px; color: var(--grey); font-weight: 600; }
+  .salon-switch-wrap select { font-family: inherit; font-size: 14px; font-weight: 600; color: var(--ink); background: var(--fill); border: none; border-radius: 10px; padding: 8px 12px; max-width: 100%; }
   html.auth-checking #auth-layout { display: none !important; }
 </style>
 <link rel="stylesheet" href="/app.css?v=59">
@@ -571,6 +576,11 @@ button.gt-opt:active .gt-cta{transform:scale(.96)}
   <div class="rdv-header">
     <div class="mark" id="salon-mark-app">&nbsp;</div>
     <h1>Mon compte</h1>
+    <!-- Client qui a aussi un compte dans un autre salon de l'enseigne : changer de salon (comme l'admin). -->
+    <div id="salon-switch-wrap" class="salon-switch-wrap" style="display:none">
+      <label for="salon-switch">Salon</label>
+      <select id="salon-switch" onchange="switchClientSalon(this.value)"></select>
+    </div>
   </div>
 
   <!-- Accueil (connecté) : fidélité + dernière prestation -->
@@ -883,6 +893,37 @@ var SALON_SLUG = (function () {
   catch (e) { return ''; }
 })();
 
+/* Jeton du compte client : UN par salon. Un compte appartient à un seul salon ; le serveur refuse le jeton d'un
+   autre salon (wrong_salon). L'ancien jeton commun « client_token » est repris au 1er passage dans SON salon. */
+function ctKey() { return 'client_token:' + (SALON_SLUG || ''); }
+function getClientToken() {
+  try {
+    var t = localStorage.getItem(ctKey());
+    if (t) return t;
+    var legacy = localStorage.getItem('client_token');
+    if (legacy && localStorage.getItem('client_token_skip:' + (SALON_SLUG || '')) !== '1') return legacy;
+  } catch (e) {}
+  return null;
+}
+function setClientToken(t, slug) {
+  try { localStorage.setItem('client_token:' + (slug == null ? (SALON_SLUG || '') : slug), t); } catch (e) {}
+}
+function clearClientToken() {
+  try {
+    // L'ancien jeton commun n'est effacé que s'il appartenait à ce salon (sinon : il sert encore dans l'autre salon).
+    if (!localStorage.getItem(ctKey()) && localStorage.getItem('client_token')) localStorage.setItem('client_token_skip:' + (SALON_SLUG || ''), '1');
+    localStorage.removeItem(ctKey());
+  } catch (e) {}
+}
+/** Après un /me réussi avec l'ancien jeton commun : il appartient à ce salon, on le range sous la clé du salon. */
+function adoptLegacyToken() {
+  try {
+    if (localStorage.getItem(ctKey())) return;
+    var legacy = localStorage.getItem('client_token');
+    if (legacy) { localStorage.setItem(ctKey(), legacy); localStorage.removeItem('client_token'); }
+  } catch (e) {}
+}
+
 function baseUrl() {
   return window.location.origin + window.location.pathname + (SALON_SLUG ? '?salon=' + SALON_SLUG : '');
 }
@@ -891,7 +932,7 @@ function api(path, opts) {
   opts = opts || {};
   var headers = { 'Content-Type': 'application/json' };
   if (SALON_SLUG) headers['X-Salon-Slug'] = SALON_SLUG;
-  var token = localStorage.getItem('client_token');
+  var token = getClientToken();
   if (token) headers['X-Client-Token'] = token;
   return fetch(path, {
     method: opts.method || 'GET',
@@ -1014,7 +1055,7 @@ function doLogin() {
   document.getElementById('resend-btn').style.display = 'none';
   api('/api/client-auth/login', { method: 'POST', body: { email: email, password: password } })
     .then(function (d) {
-      localStorage.setItem('client_token', d.token);
+      setClientToken(d.token);
       loadProfile();
     })
     .catch(function (e) {
@@ -1037,7 +1078,7 @@ function doResendVerification() {
 
 function doLogout() {
   api('/api/client-auth/logout', { method: 'POST' }).catch(function () {});
-  localStorage.removeItem('client_token');
+  clearClientToken();
   hideFooter();
   document.documentElement.classList.remove('auth-checking');
   show('p-login');
@@ -1166,7 +1207,7 @@ function refreshHomeInBackground() {
   api('/api/client-auth/me').then(function (d) {
     populateHome(d);
   }).catch(function () {
-    localStorage.removeItem('client_token');
+    clearClientToken();
     hideFooter();
     document.documentElement.classList.remove('auth-checking');
     show('p-login');
@@ -1176,7 +1217,7 @@ function refreshHomeInBackground() {
 // Accueil client : actualisation discrète toutes les 15 s d'inactivité (fidélité, RDV à venir).
 AutoRefresh.start(function () {
   var home = document.getElementById('p-home');
-  if (!home || !home.classList.contains('on') || !localStorage.getItem('client_token')) return;
+  if (!home || !home.classList.contains('on') || !getClientToken()) return;
   return api('/api/client-auth/me').then(populateHome);
 }, { idleMs: 15000 });
 
@@ -1545,13 +1586,41 @@ function clearAuthIntentParams() {
     history.replaceState({}, '', u.pathname + u.search);
   } catch (e) {}
 }
+/** Sélecteur de salon : seulement si ce client a un compte confirmé (même email) dans un autre salon de l'enseigne. */
+function loadSalonSwitch() {
+  api('/api/client-auth/salons').then(function (r) {
+    var wrap = document.getElementById('salon-switch-wrap'), sel = document.getElementById('salon-switch');
+    if (!wrap || !sel) return;
+    if (!r.items || r.items.length < 2) { wrap.style.display = 'none'; return; }
+    sel.innerHTML = r.items.map(function (it) {
+      return '<option value="' + esc(it.slug) + '"' + (it.slug === r.current ? ' selected' : '') + '>' + esc(it.name) + '</option>';
+    }).join('');
+    wrap.style.display = '';
+  }).catch(function () {});
+}
+function switchClientSalon(slug) {
+  if (!slug || slug === SALON_SLUG) return;
+  var sel = document.getElementById('salon-switch'); if (sel) sel.disabled = true;
+  api('/api/client-auth/switch', { method: 'POST', body: { slug: slug } }).then(function (d) {
+    setClientToken(d.token, d.slug);
+    var url = new URL(window.location.href);
+    url.search = '?salon=' + encodeURIComponent(d.slug);
+    window.location.href = url.toString();
+  }).catch(function (e) {
+    if (sel) { sel.disabled = false; sel.value = SALON_SLUG; }
+    toast(e.message, true);
+  });
+}
+
 function loadProfile() {
   api('/api/client-auth/me').then(function (d) {
+    adoptLegacyToken();
     populateHome(d);
+    loadSalonSwitch();
     if (WANT_BOOK) { WANT_BOOK = false; clearAuthIntentParams(); document.documentElement.classList.remove('auth-checking'); goBook(); return; }
     showHomePanel();
   }).catch(function () {
-    localStorage.removeItem('client_token');
+    clearClientToken();
     hideFooter();
     document.documentElement.classList.remove('auth-checking');
     show('p-login');
@@ -1606,7 +1675,8 @@ function apiForBooking(path, opts) {
   var headers = { 'Content-Type': 'application/json' };
   if (bookSalonSlug) headers['X-Salon-Slug'] = bookSalonSlug;
   // Compte connecté (email déjà vérifié) : pas de code à 6 chiffres à la réservation.
-  var tok = null; try { tok = localStorage.getItem('client_token'); } catch (e) {}
+  // Le jeton du salon ouvert (le serveur l'accepte pour un RDV dans un salon de la même enseigne).
+  var tok = getClientToken();
   if (tok) headers['X-Client-Token'] = tok;
   return fetch(path, {
     method: opts.method || 'GET', headers: headers,
@@ -2409,7 +2479,7 @@ function guardMissingSalon() {
 
   if (resetToken) { show('p-reset'); return; }
 
-  if (localStorage.getItem('client_token')) { loadProfile(); return; }
+  if (getClientToken()) { loadProfile(); return; }
 
   // Visiteur non connecté, sans jeton ni lien de vérif/reset : le seul
   // chemin qui n'appelait jamais show() explicitement - .wrap (l'appli
