@@ -211,4 +211,5 @@ node tests/caisse/174-caisse-cloture-apres-heure-fermeture.js  # Caisse : clotur
 node tests/caisse/175-agenda-mois-plus-de-500-rdv.js  # Agenda : plus de 500 RDV dans le mois -> la fin du mois (le 26) s'affiche quand meme
 node tests/caisse/176-compte-client-isole-par-salon.js  # Compte client : un jeton par salon, changement de salon seulement si compte confirme (meme email) dans l'autre salon
 node tests/caisse/177-consentement-inscription.js  # Inscription client : case CGU + politique de confidentialite obligatoire, date et version enregistrees
+node tests/caisse/178-calendrier-conges-sans-saut.js  # Conges : fermer la bulle ne fait plus remonter la page (pastilles seules mises a jour)
 ```

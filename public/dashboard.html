@@ -6527,7 +6527,28 @@ function lvClose(id) {
   var box = document.getElementById('leaves-list-' + id);
   if (box) lvPaintSel(id, box);
   // Le badge « En congé » et le compteur du tableau de bord ne se rafraîchissent qu'à la fermeture (la bulle reste stable).
-  if (st.dirty) { st.dirty = false; if (id !== 'salon') loadBarbers(); }
+  if (st.dirty) { st.dirty = false; if (id !== 'salon') refreshBarberChipsQuiet(); }
+}
+
+/* Après un changement de congés / jours sans RDV : relit les coiffeurs et met à jour SEULEMENT les pastilles
+   (« En congé », RDV / Sans RDV), le compteur du tableau de bord et les bulles de la file. Avant, toute la fiche du
+   coiffeur était redessinée (statistiques et historique rechargés) : la page raccourcissait le temps du chargement
+   et remontait tout en haut, même avec le calendrier ouvert en bas (gênant surtout sur tablette). */
+function refreshBarberChipsQuiet() {
+  return api('/api/barbers?all=1').then(function (r) {
+    barbers = r.items; onDuty = r.on_duty;
+    if (calBooted) { rerenderAllTimelines(); renderCalendarLegend(neededMonthKeys()); }
+    var duty = document.getElementById('s-duty'); if (duty) duty.textContent = onDuty;
+    renderSeg(); updateLeaveKpi();
+    var list = document.getElementById('barbers-list');
+    if (!list) return;
+    barbers.forEach(function (b) {
+      [].forEach.call(list.querySelectorAll('.bc[data-barber="' + b.id + '"] .bc-chips'), function (el) { el.innerHTML = leaveBadgeHtml(b) + barberStatusChips(b); });
+      if (b.id === expandedBarberId) {
+        var pc = list.querySelector('.bp-chips'); if (pc) pc.innerHTML = leaveBadgeHtml(b) + barberStatusChips(b, true);
+      }
+    });
+  }).catch(function (err) { toast(err.message, true); });
 }
 
 // Redimensionne l'image côté navigateur avant envoi (évite de stocker des
