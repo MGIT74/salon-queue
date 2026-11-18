@@ -16,6 +16,9 @@ const { wrap } = require('../lib/wrap');
 const { guardPasswordAttempt, failPasswordAttempt, clearPasswordAttempt } = require('../middleware/rateLimiter');
 const router = express.Router();
 
+// Version des CGU / de la politique de confidentialité acceptées à l'inscription (enregistrée avec la date).
+const TERMS_VERSION = '2026-11';
+
 // base_url contient déjà ?salon=xxx si l'espace client est ouvert pour
 // un salon précis - ne jamais recoller un second '?' par-dessus (même
 // bug déjà rencontré et corrigé sur le lien d'annulation de RDV).
@@ -67,6 +70,10 @@ router.post('/signup', signupRateLimiter('client-signup'), wrap(async (req, res)
   if (password.length < 6) return res.status(400).json({ error: 'Le mot de passe doit contenir au moins 6 caractères' });
   const contactErr = contactError({ name, email, phone }, { emailRequired: true, phoneRequired: true });
   if (contactErr) return res.status(400).json({ error: contactErr });
+  // Consentement : la case « J'accepte les CGU et la politique de confidentialité » doit être cochée.
+  if (req.body.accept_terms !== true) {
+    return res.status(400).json({ error: 'Merci d\'accepter les conditions d\'utilisation et la politique de confidentialité', needs_terms: true });
+  }
 
   const salonId = req.salon.id;
   const [[existing]] = await pool.query(
@@ -84,9 +91,9 @@ router.post('/signup', signupRateLimiter('client-signup'), wrap(async (req, res)
   // repondait 500 "Erreur interne du serveur" (Field 'owner_id' doesn't have a default value). Le client appartient
   // au proprietaire de SON salon.
   await pool.query(
-    `INSERT INTO clients (id, owner_id, salon_id, name, email, phone, password_hash, verify_token, verify_token_expires)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [id, req.salon.owner_id, salonId, name, email, phone, passwordHash, verifyToken, verifyExpires]
+    `INSERT INTO clients (id, owner_id, salon_id, name, email, phone, password_hash, verify_token, verify_token_expires, terms_accepted_at, terms_version)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)`,
+    [id, req.salon.owner_id, salonId, name, email, phone, passwordHash, verifyToken, verifyExpires, TERMS_VERSION]
   );
 
   // Le compte est cree dans tous les cas ; mais le client doit confirmer son email pour pouvoir se connecter. Si

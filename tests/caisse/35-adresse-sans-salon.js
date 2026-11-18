@@ -28,12 +28,12 @@ const call = async (method, p, body, slug) => { const h = { 'Content-Type': 'app
     sql("INSERT INTO salons (id, owner_id, name, slug, admin_password) VALUES ('s2','o1','Salon Deux','salon-deux','')");
     let r = await call('GET', '/api/signup/status');
     check('la plateforme se declare multi-salons (/api/signup/status)', r.s === 200 && r.b.multi_salon === true, JSON.stringify(r.b));
-    r = await call('POST', '/api/client-auth/signup', { name: 'X', email: 'zt-salon-1@example.com', phone: '+33600000021', password: 'motdepasse1' });
+    r = await call('POST', '/api/client-auth/signup', { name: 'X', email: 'zt-salon-1@example.com', phone: '+33600000021', password: 'motdepasse1', accept_terms: true });
     check('inscription client SANS salon : refusee (400, "Salon non precise"), pas de 500', r.s === 400 && r.b.needs_salon === true && /Salon non précisé/.test(r.b.error), r.s + ' ' + JSON.stringify(r.b));
     check('...et AUCUN compte n\'a ete cree dans le salon par defaut', sql("SELECT COUNT(*) FROM clients WHERE email='zt-salon-1@example.com'") === '0');
     check('connexion client SANS salon : refusee (400)', (await call('POST', '/api/client-auth/login', { email: 'a@b.fr', password: 'x' })).s === 400);
     check('mot de passe oublie client SANS salon : refuse (400)', (await call('POST', '/api/client-auth/forgot-password', { email: 'a@b.fr' })).s === 400);
-    r = await call('POST', '/api/client-auth/signup', { name: 'Client', email: 'zt-salon-2@example.com', phone: '+33600000022', password: 'motdepasse1' }, 'salon-deux');
+    r = await call('POST', '/api/client-auth/signup', { name: 'Client', email: 'zt-salon-2@example.com', phone: '+33600000022', password: 'motdepasse1', accept_terms: true }, 'salon-deux');
     check('MEME inscription AVEC le nom du salon : acceptee, rattachee a CE salon', r.s === 200 && sql("SELECT COUNT(*) FROM clients c JOIN salons s ON s.id=c.salon_id WHERE c.email='zt-salon-2@example.com' AND s.slug='salon-deux'") === '1', r.s + ' ' + JSON.stringify(r.b));
     r = await call('GET', '/api/queue');
     check('la FILE (borne, affichage, poste, caisse) SANS salon : refusee (400) - plus de file du salon par defaut', r.s === 400 && r.b.needs_salon === true, r.s + ' ' + JSON.stringify(r.b));
@@ -46,7 +46,7 @@ const call = async (method, p, body, slug) => { const h = { 'Content-Type': 'app
     console.log('\n[B] Aucun moyen de CREER un salon depuis ces pages (inscriptions fermees)');
     r = await call('GET', '/api/signup/status');
     check('inscriptions fermees (enabled=false)', r.b.enabled === false, JSON.stringify(r.b));
-    r = await call('POST', '/api/signup', { name: 'Mon salon', email: 'pirate@example.com', password: 'motdepasse1', salon_name: 'Mon salon', slug: 'mon-salon' });
+    r = await call('POST', '/api/signup', { name: 'Mon salon', email: 'pirate@example.com', password: 'motdepasse1', accept_terms: true, salon_name: 'Mon salon', slug: 'mon-salon' });
     check('creer une enseigne : refuse (403, "inscriptions fermees")', r.s === 403 && r.b.signup_closed === true, r.s + ' ' + JSON.stringify(r.b));
     check('verifier la disponibilite d\'un identifiant de salon : refuse aussi (403)', (await call('GET', '/api/signup/check-slug?slug=mon-salon')).s === 403);
     check('aucune enseigne ni salon cree', sql("SELECT COUNT(*) FROM owners WHERE email='pirate@example.com'") === '0' && sql("SELECT COUNT(*) FROM salons WHERE slug='mon-salon'") === '0');
@@ -56,7 +56,7 @@ const call = async (method, p, body, slug) => { const h = { 'Content-Type': 'app
     sql("UPDATE salons SET active=0 WHERE slug <> 'test'");   // un seul salon actif : 'test'
     r = await call('GET', '/api/signup/status');
     check('la plateforme n\'est plus multi-salons', r.b.multi_salon === false, JSON.stringify(r.b));
-    r = await call('POST', '/api/client-auth/signup', { name: 'Client', email: 'zt-salon-3@example.com', phone: '+33600000023', password: 'motdepasse1' });
+    r = await call('POST', '/api/client-auth/signup', { name: 'Client', email: 'zt-salon-3@example.com', phone: '+33600000023', password: 'motdepasse1', accept_terms: true });
     check('un seul salon : la file sans nom de salon reste accessible comme avant (200)', (await call('GET', '/api/queue')).s === 200);
     check('inscription sans nom de salon : acceptee comme avant (salon par defaut)', r.s === 200 && sql("SELECT s.slug FROM clients c JOIN salons s ON s.id=c.salon_id WHERE c.email='zt-salon-3@example.com'") === 'test', r.s + ' ' + JSON.stringify(r.b));
   } finally {
