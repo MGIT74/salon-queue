@@ -213,4 +213,5 @@ node tests/caisse/176-compte-client-isole-par-salon.js  # Compte client : un jet
 node tests/caisse/177-consentement-inscription.js  # Inscription client : case CGU + politique de confidentialite obligatoire, date et version enregistrees
 node tests/caisse/178-calendrier-conges-sans-saut.js  # Conges : fermer la bulle ne fait plus remonter la page (pastilles seules mises a jour)
 node tests/caisse/179-carte-fidelite-articles.js  # Fidelite : une seule carte, paliers au choix, articles qui rapportent des points (tous ou coches)
+node tests/caisse/180-credit-produits-coiffeurs.js  # Credit produits des coiffeurs : recharge en caisse, produit pris au poste (stock et credit), annulation, admin
 ```
