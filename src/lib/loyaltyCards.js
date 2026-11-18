@@ -144,9 +144,12 @@ async function clientCards(salonId, key, opts) {
   // Espace client : dès que le client a (ou a eu) une carte, TOUTES les cartes publiées apparaissent ;
   // il active / désactive lui-même celles qu'il veut (sauf une carte désactivée par le salon).
   const member = opts.forClient && accounts.length > 0;
+  // Détails pour le client (bouton « i ») : noms des articles qui rapportent des points.
+  const names = member ? await itemNames([].concat(...cards.filter((c) => !c.scope_all).map((c) => c.items))) : {};
   cards.forEach((card) => {
     const acc = accounts.find((a) => a.card_id === card.id);
     const extra = { published: card.published, scope_all: card.scope_all, uses_salon_image: card.uses_salon_image, has_image: card.has_image, rule: ruleText(card) };
+    if (member) extra.earn_items = card.scope_all ? [] : card.items.map((i) => ({ kind: i.kind, name: names[i.kind + ':' + i.id] })).filter((i) => i.name);
     if (acc && (acc.activated_at || opts.includeInactive || member)) {
       out.push(Object.assign(accountView(card, acc), extra, { locked: acc.disabled_by === 'admin' }));
     } else if (!acc && member && card.published) {

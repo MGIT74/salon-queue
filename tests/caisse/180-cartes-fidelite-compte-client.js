@@ -51,6 +51,7 @@ const EMAIL = 'cartes180@exemple.fr';
   r = await call('POST', '/api/client-auth/loyalty-cards/all/toggle', { on: true }, cli(token));
   cards = r.body.loyalty_cards;
   check('« Activer toutes mes cartes »', r.status === 200 && cards.every((c) => c.activated), cards);
+  check('details : articles qui rapportent des points de la carte Barbe (noms)', (cards.find((c) => c.card_id === barbe).earn_items || []).length === 1 && cards.find((c) => c.card_id === barbe).earn_items[0].kind === 'service', cards.find((c) => c.card_id === barbe));
 
   // Un passage « Coupe » (sv1) : seule la carte « tous les articles » gagne un point ; la carte Barbe non.
   const visit = async (id, svc) => {
@@ -90,6 +91,8 @@ const EMAIL = 'cartes180@exemple.fr';
 
   const h = fs.readFileSync(path.join(__dirname, '../../public/compte.html'), 'utf8');
   check('compte : boutons Activer / Désactiver / Activer toutes mes cartes', h.includes('function toggleLoyaltyCard(cardId, on, btn)') && h.includes('Activer toutes mes cartes') && h.includes('Désactivée par le salon'));
+  check('compte : carrousel (scroll snap) + points de navigation', h.includes('scroll-snap-type: x mandatory') && h.includes('function scrollLoyaltyTo(i)') && h.includes('class="lc-dots"'));
+  check('compte : bouton « i » -> pop-up details (articles qui rapportent, recompenses)', h.includes('function openLoyaltyDetail(i)') && h.includes('id="lc-detail-backdrop"') && h.includes('Comment gagner des points'));
 
   clean();
   console.log('\n' + pass + ' OK, ' + fail + ' ECHEC');

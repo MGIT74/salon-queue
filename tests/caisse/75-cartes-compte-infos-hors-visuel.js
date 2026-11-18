@@ -4,7 +4,7 @@ const h = fs.readFileSync(path.join(__dirname, '../../public/compte.html'), 'utf
 let pass = 0, fail = 0;
 const check = (n, ok) => { (ok ? pass++ : fail++); console.log((ok ? '  OK   ' : '  ECHEC') + ' ' + n); };
 check('visuel .card-art (ratio 9/4) sans texte dedans', /\.card-art\s*\{[^}]*aspect-ratio:\s*9 \/ 4/.test(h));
-check('fidelite : points + logo dans .card-info, sous le visuel', /'<div class="card"><div class="card-art"><div class="card-shine"><\/div><\/div>' \+\s*'<div class="card-info">[\s\S]*?' \+ c\.points \+ '<\/div><div class="lbl">points de fidélité/.test(h));
+check('fidelite : image entiere puis bande logo / nom / points (rien sur le visuel)', /'<div class="lc-card"><div class="lc-art">'[\s\S]*?'<div class="lc-band"><div class="lc-logo"><\/div>[\s\S]*?'<div class="lc-pts"><b>' \+ c\.points/.test(h));
 check('cadeau : montant, puces, code et bouton dans .card-info apres .card-art', /class="card-art"><div class="card-shine"><\/div><\/div>' \+\s*'<div class="card-info">'[\s\S]*?gift-use-btn/.test(h));
 check('aucun filtre noir sur les cartes fidelite / cadeau', !/#loyalty-section \.card\.has-bg::before/.test(h) && !/\.gift-card\.has-bg::before/.test(h));
 check('image perso appliquee sur le visuel (fidelite)', /loyaltyArt\.style\.backgroundImage/.test(h));

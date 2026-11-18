@@ -4,6 +4,6 @@ const h = fs.readFileSync(path.join(__dirname, '../../public/compte.html'), 'utf
 let pass = 0, fail = 0;
 const check = (n, ok) => { (ok ? pass++ : fail++); console.log((ok ? '  OK   ' : '  ECHEC') + ' ' + n); };
 check('plus de badge cadeau dans la fidelite', !/loyalty-gift/.test(h) && !/gift-badge/.test(h) && !/cadeau disponible/.test(h));
-check('les points restent affiches', /'<div class="card-points-block"><div class="big">' \+ c\.points \+ '<\/div>/.test(h));
+check('les points restent affiches', /'<div class="lc-pts"><b>' \+ c\.points \+ '<\/b>/.test(h));
 check('section « Mes cadeaux » conservee', /id="gift-cards-section"/.test(h));
 console.log('\n' + pass + ' OK, ' + fail + ' ECHEC'); process.exit(fail ? 1 : 0);
