@@ -589,7 +589,7 @@ router.delete('/loyalty-cards/:id', requireAdmin, wrap(async (req, res) => {
 router.post('/loyalty-accounts/:id/deactivate', requireAdmin, wrap(async (req, res) => {
   const [[account]] = await pool.query('SELECT * FROM loyalty_accounts WHERE id = ? AND salon_id = ?', [req.params.id, req.salon.id]);
   if (!account) return res.status(404).json({ error: 'Compte fidélité introuvable' });
-  await pool.query('UPDATE loyalty_accounts SET activated_at = NULL WHERE id = ?', [account.id]);
+  await pool.query("UPDATE loyalty_accounts SET activated_at = NULL, disabled_by = 'admin' WHERE id = ?", [account.id]);
   logActivity(req.salon.id, 'loyalty_deactivate', 'Carte de fidélité désactivée pour ' + account.client_name + ' (points conservés)');
   res.json({ ok: true });
 }));
@@ -639,7 +639,7 @@ router.post('/loyalty-accounts/activate', requireAdminOrBarber, wrap(async (req,
     );
     if (existing && existing.activated_at) continue;
     if (existing) {
-      await pool.query('UPDATE loyalty_accounts SET activated_at = NOW(), recipient_email = ?, client_name = ? WHERE id = ?', [email, clientName, existing.id]);
+      await pool.query('UPDATE loyalty_accounts SET activated_at = NOW(), disabled_by = NULL, recipient_email = ?, client_name = ? WHERE id = ?', [email, clientName, existing.id]);
     } else {
       try {
         await pool.query(

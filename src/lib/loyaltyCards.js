@@ -135,17 +135,53 @@ async function clientCards(salonId, key, opts) {
   opts = opts || {};
   if (!key) return [];
   const cards = await cardsForSalon(salonId);
-  let [accounts] = await pool.query('SELECT id, card_id, points, activated_at FROM loyalty_accounts WHERE salon_id = ? AND client_key = ?', [salonId, key]);
+  let [accounts] = await pool.query('SELECT id, card_id, points, activated_at, disabled_by FROM loyalty_accounts WHERE salon_id = ? AND client_key = ?', [salonId, key]);
   if (accounts.some((a) => !a.card_id)) {
     await ensureDefaultCards();
-    [accounts] = await pool.query('SELECT id, card_id, points, activated_at FROM loyalty_accounts WHERE salon_id = ? AND client_key = ?', [salonId, key]);
+    [accounts] = await pool.query('SELECT id, card_id, points, activated_at, disabled_by FROM loyalty_accounts WHERE salon_id = ? AND client_key = ?', [salonId, key]);
   }
   const out = [];
+  // Espace client : dès que le client a (ou a eu) une carte, TOUTES les cartes publiées apparaissent ;
+  // il active / désactive lui-même celles qu'il veut (sauf une carte désactivée par le salon).
+  const member = opts.forClient && accounts.length > 0;
   cards.forEach((card) => {
     const acc = accounts.find((a) => a.card_id === card.id);
-    if (acc && (acc.activated_at || opts.includeInactive)) out.push(Object.assign(accountView(card, acc), { published: card.published, scope_all: card.scope_all, uses_salon_image: card.uses_salon_image, has_image: card.has_image }));
+    const extra = { published: card.published, scope_all: card.scope_all, uses_salon_image: card.uses_salon_image, has_image: card.has_image, rule: ruleText(card) };
+    if (acc && (acc.activated_at || opts.includeInactive || member)) {
+      out.push(Object.assign(accountView(card, acc), extra, { locked: acc.disabled_by === 'admin' }));
+    } else if (!acc && member && card.published) {
+      out.push(Object.assign({ card_id: card.id, name: card.name, points: 0, activated: false, account_id: null, tiers: card.tiers, available: [] }, extra, { locked: false }));
+    }
   });
   return out;
+}
+
+/**
+ * Le client active ou désactive une carte depuis son compte. Les points sont gardés quand il désactive.
+ * Une carte désactivée par le salon (admin) ne peut pas être réactivée par le client.
+ */
+async function clientSetCard(salonId, key, client, cardId, on) {
+  const ownerId = await ownerOfSalon(salonId);
+  const cards = ownerId ? await cardsForOwner(ownerId, { publishedOnly: true }) : [];
+  const card = cards.find((c) => c.id === cardId);
+  if (!card) throw Object.assign(new Error('Carte introuvable'), { status: 404 });
+  const [accounts] = await pool.query('SELECT id, card_id, activated_at, disabled_by FROM loyalty_accounts WHERE salon_id = ? AND client_key = ?', [salonId, key]);
+  if (!accounts.length) throw Object.assign(new Error('Votre fidélité n\'est pas encore activée : demandez à votre coiffeur lors de votre prochain passage'), { status: 403 });
+  const acc = accounts.find((a) => a.card_id === card.id);
+  if (acc && acc.disabled_by === 'admin') throw Object.assign(new Error('Cette carte a été désactivée par le salon'), { status: 403 });
+  if (on) {
+    if (acc) await pool.query('UPDATE loyalty_accounts SET activated_at = COALESCE(activated_at, NOW()), disabled_by = NULL WHERE id = ?', [acc.id]);
+    else {
+      try {
+        await pool.query(
+          `INSERT INTO loyalty_accounts (id, owner_id, salon_id, card_id, client_key, client_name, recipient_email, activated_at)
+           VALUES (UUID(), ?, ?, ?, ?, ?, ?, NOW())`, [ownerId, salonId, card.id, key, client.name || '', client.email || null]);
+      } catch (err) { if (!(err && err.code === 'ER_DUP_ENTRY')) throw err; }
+    }
+  } else if (acc && acc.activated_at) {
+    await pool.query("UPDATE loyalty_accounts SET activated_at = NULL, disabled_by = 'client' WHERE id = ?", [acc.id]);
+  }
+  return card;
 }
 
 /**
@@ -280,5 +316,5 @@ async function saveCard(ownerId, body, cardId) {
 
 module.exports = {
   REWARDS, ensureDefaultCards, cardsForOwner, cardsForSalon, cardMatches, availableTiers, accountView,
-  clientCards, earnPoints, redeem, ruleText, saveCard, tierLabel
+  clientCards, clientSetCard, earnPoints, redeem, ruleText, saveCard, tierLabel
 };

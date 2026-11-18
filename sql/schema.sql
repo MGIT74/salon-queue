@@ -1548,3 +1548,8 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 SET @n := (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'loyalty_accounts' AND index_name = 'uniq_salon_client');
 SET @sql := IF(@n = 2, 'ALTER TABLE loyalty_accounts DROP INDEX uniq_salon_client, ADD UNIQUE KEY uniq_salon_client (salon_id, client_key, card_id)', 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Qui a désactivé une carte : 'admin' (le client ne peut pas la réactiver lui-même) ou 'client' (depuis son compte).
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'loyalty_accounts' AND column_name = 'disabled_by');
+SET @sql := IF(@c = 0, 'ALTER TABLE loyalty_accounts ADD COLUMN disabled_by VARCHAR(10) NULL', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
