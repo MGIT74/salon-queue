@@ -111,6 +111,7 @@ const L = {
   const k = fs.readFileSync(path.join(__dirname, '../../public/compte.html'), 'utf8');
   check('Marketing : liste des cartes, publier / dépublier, éditeur (paliers, articles cochés, visuel)', d.includes('id="lc-list"') && d.includes('function openLoyaltyCardEditor(') &&
     d.includes('Remise % sur une prestation') && d.includes('Article offert') && d.includes('Seulement les articles cochés') && d.includes('function toggleLoyaltyCardPublished('));
+  check('Marketing : « tout cocher » par groupe (prestations / suppléments / produits)', d.includes('function lcToggleGroup(kind, on)') && d.includes('class="lc-grp"') && d.includes('— tout cocher'));
   check('caisse : un bouton par palier atteint, palier envoyé au serveur, activation carte par carte', c.includes('id="loyalty-btns"') && c.includes('function loyaltyOffers()') &&
     c.includes('usedLoyalty = loyaltyDiscount ? { card_id: loyaltyDiscount.card_id, tier_id: loyaltyDiscount.tier_id } : false') && c.includes('card_ids: cardIds'));
   check('compte client : une carte par carte activée', k.includes('id="loyalty-cards-list"') && k.includes('function renderLoyaltyCards(') && k.includes('renderLoyaltyCards(lcards)'));
