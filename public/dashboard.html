@@ -2230,10 +2230,9 @@
   <div class="tab-panel" id="t-marketing">
     <div class="card-box">
       <div class="admin-head" style="margin-bottom:4px">
-        <h3 style="margin:0">Cartes de fidélité</h3>
-        <button class="btn btn-primary" onclick="openLoyaltyCardEditor(null)">+ Nouvelle carte</button>
+        <h3 style="margin:0">Carte de fidélité</h3>
       </div>
-      <p class="hint">Seules les cartes publiées sont proposées aux clients. Le client gagne 1 point par passage payé, sur chaque carte activée dont un article qui rapporte des points est sur le ticket. Chaque palier débloque sa récompense ; l'utiliser retire ses points.</p>
+      <p class="hint">Le client gagne 1 point par passage payé, si un article qui rapporte des points est sur le ticket (tous les articles, ou seulement ceux que vous cochez). Chaque palier débloque sa récompense ; l'utiliser retire ses points.</p>
       <div id="lc-list"><div class="empty">Chargement…</div></div>
     </div>
 
@@ -2283,10 +2282,10 @@
           </select>
         </div>
       </div>
-      <p class="hint">Points et récompenses atteintes, carte par carte, pour les clients de ce salon.</p>
+      <p class="hint">Points et récompenses atteintes, pour les clients de ce salon.</p>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
         <div class="fld" style="margin:0;flex:1 1 220px"><input id="loyalty-search" type="text" placeholder="Rechercher (nom, email)…" oninput="filterLoyaltyAccounts(this.value)"></div>
-        <div class="fld" style="margin:0;flex:0 1 220px"><select id="loyalty-card-filter" onchange="filterLoyaltyAccounts(document.getElementById('loyalty-search').value)"><option value="">Toutes les cartes</option></select></div>
+        <div class="fld" style="margin:0;flex:0 1 220px;display:none"><select id="loyalty-card-filter" onchange="filterLoyaltyAccounts(document.getElementById('loyalty-search').value)"><option value="">Toutes les cartes</option></select></div>
       </div>
       <div class="item" id="loyalty-list-head" style="background:none;box-shadow:none;border-radius:0;margin-bottom:0;padding:0 4px">
         <div class="item-main">
@@ -6978,13 +6977,12 @@ function lcScopeText(c) {
 function renderLoyaltyCardsAdmin() {
   var box = document.getElementById('lc-list');
   if (!box) return;
-  box.innerHTML = !lcCards.length ? '<div class="empty">Aucune carte. Créez-en une avec « + Nouvelle carte ».</div>' : lcCards.map(function (c) {
+  box.innerHTML = !lcCards.length ? '<div class="empty">Chargement…</div>' : lcCards.map(function (c) {
     return '<div class="item"><div class="item-main"><div class="item-name">' + esc(c.name) +
-      ' <span class="chip ' + (c.published ? 'main' : '') + '" style="font-size:11.5px;margin-left:6px">' + (c.published ? 'Publiée' : 'Non publiée') + '</span></div>' +
+      '</div>' +
       '<div class="item-meta">' + esc(lcScopeText(c)) + ' · ' + esc(c.tiers.map(function (t) { return t.points + ' pts → ' + t.label; }).join(' · ')) +
       ' · ' + c.members + ' client' + (c.members > 1 ? 's' : '') + '</div></div>' +
       '<div class="item-actions">' +
-        '<button class="btn btn-soft" style="font-size:13px;padding:6px 12px" onclick="toggleLoyaltyCardPublished(\'' + c.id + '\')">' + (c.published ? 'Dépublier' : 'Publier') + '</button>' +
         '<button class="btn btn-primary" style="font-size:13px;padding:6px 12px" onclick="openLoyaltyCardEditor(\'' + c.id + '\')">Modifier</button>' +
       '</div></div>';
   }).join('');
@@ -7079,7 +7077,6 @@ function renderLoyaltyCardEditor() {
       '<div onclick="document.getElementById(\'lc-img\').click()" style="width:180px;height:80px;border-radius:14px;cursor:pointer;background:var(--fill)' + (preview ? ' url(&quot;' + esc(preview) + '&quot;) center/cover' : '') + ';display:flex;align-items:center;justify-content:center;color:var(--grey);font-size:12px;flex-shrink:0">' + (preview ? '' : 'Aucune image') + '</div>' +
       '<input type="file" id="lc-img" accept="image/*" style="display:none" onchange="lcPickImage(this)">' +
       '<div class="hint" style="margin:0">720 × 320 px conseillé, recadrée automatiquement.' + (preview ? '<br><button type="button" class="btn btn-ghost" style="font-size:12.5px;padding:4px 8px;margin-top:4px" onclick="lcEdit.image_url=\'\';lcEdit._preview=\'\';lcEdit.uses_salon_image=false;renderLoyaltyCardEditor()">Retirer l\'image</button>' : '') + '</div></div></div>' +
-    '<label style="display:flex;gap:10px;align-items:center;margin:6px 0"><input type="checkbox" style="width:auto;flex:none;margin:0"' + (e.published ? ' checked' : '') + ' onchange="lcEdit.published=this.checked"> Publiée (proposée aux clients)</label>' +
     '<label style="display:flex;gap:10px;align-items:center;margin:6px 0"><input type="checkbox" style="width:auto;flex:none;margin:0"' + (e.auto_on_signup ? ' checked' : '') + ' onchange="lcEdit.auto_on_signup=this.checked"> Activée automatiquement quand un client crée son compte en ligne</label>';
 }
 function lcSetReward(i, v) {

@@ -515,10 +515,11 @@ router.get('/loyalty-accounts', requireAdmin, wrap(async (req, res) => {
     ok: true,
     thresholds: loyaltyT,
     cards: cards.map((c) => ({ id: c.id, name: c.name, published: c.published })),
-    items: rows.map((r) => {
+    // Une seule carte : les comptes d'une ancienne carte d'essai (supprimée de l'affichage) ne sont pas listés.
+    items: rows.filter((r) => !r.card_id || cards.some((c) => c.id === r.card_id)).map((r) => {
       const card = cards.find((c) => c.id === r.card_id);
       return Object.assign({}, r, {
-        card_name: card ? card.name : '',
+        card_name: '',
         available: card ? LC.availableTiers(card, r.points).map((t) => t.label) : [],
         rewards: rewardsFor(r.points, loyaltyT),
         activated_at: utcIso(r.activated_at),
@@ -539,6 +540,9 @@ router.get('/loyalty-cards', requireAdminOrBarber, wrap(async (req, res) => {
 }));
 
 router.post('/loyalty-cards', requireAdmin, wrap(async (req, res) => {
+  // Une seule carte de fidélité : on modifie la carte existante, on n'en crée pas d'autre.
+  const [[exists]] = await pool.query('SELECT id FROM loyalty_cards WHERE owner_id = ? LIMIT 1', [req.ownerId]);
+  if (exists) return res.status(409).json({ error: 'Il y a une seule carte de fidélité : modifiez-la.' });
   try {
     const id = await require('../lib/loyaltyCards').saveCard(req.ownerId, req.body || {}, null);
     logActivity(req.salon.id, 'loyalty_card', 'Carte de fidélité créée : ' + String(req.body.name || '').slice(0, 120));
@@ -562,6 +566,7 @@ router.put('/loyalty-cards/:id', requireAdmin, wrap(async (req, res) => {
 
 // Publier / dépublier sans tout renvoyer (liste de Marketing).
 router.post('/loyalty-cards/:id/publish', requireAdmin, wrap(async (req, res) => {
+  return res.status(400).json({ error: 'La carte de fidélité est toujours active.' });
   const [r] = await pool.query('UPDATE loyalty_cards SET published = ? WHERE id = ? AND owner_id = ?', [req.body.published ? 1 : 0, req.params.id, req.ownerId]);
   if (!r.affectedRows) return res.status(404).json({ error: 'Carte introuvable' });
   res.json({ ok: true });
@@ -569,6 +574,7 @@ router.post('/loyalty-cards/:id/publish', requireAdmin, wrap(async (req, res) =>
 
 // Supprimer une carte : seulement si aucun client n'a de points dessus (sinon : la dépublier).
 router.delete('/loyalty-cards/:id', requireAdmin, wrap(async (req, res) => {
+  return res.status(400).json({ error: 'La carte de fidélité ne peut pas être supprimée.' });
   const [[c]] = await pool.query('SELECT id, name FROM loyalty_cards WHERE id = ? AND owner_id = ?', [req.params.id, req.ownerId]);
   if (!c) return res.status(404).json({ error: 'Carte introuvable' });
   const [[n]] = await pool.query('SELECT COUNT(*) AS n FROM loyalty_accounts WHERE card_id = ?', [c.id]);
