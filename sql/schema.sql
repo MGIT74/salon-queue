@@ -1499,3 +1499,52 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'clients' AND column_name = 'terms_accepted_at');
 SET @sql := IF(@c = 0, 'ALTER TABLE clients ADD COLUMN terms_accepted_at DATETIME NULL, ADD COLUMN terms_version VARCHAR(20) NULL', 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Fidélité : PLUSIEURS cartes par enseigne, créées et publiées par l'admin (Marketing). Chaque carte a ses paliers
+-- (points -> remise % prestation, remise % produit ou article offert) et ses articles qui rapportent des points
+-- (tous, ou seulement ceux cochés). Un client peut avoir plusieurs cartes activées, chacune avec ses points.
+-- La carte qui existait avant devient la première carte (créée au démarrage par loyaltyCards.ensureDefaultCards).
+CREATE TABLE IF NOT EXISTS loyalty_cards (
+  id CHAR(36) PRIMARY KEY,
+  owner_id CHAR(36) NOT NULL,
+  name VARCHAR(120) NOT NULL,
+  published TINYINT(1) NOT NULL DEFAULT 1,
+  auto_on_signup TINYINT(1) NOT NULL DEFAULT 0,
+  scope_all TINYINT(1) NOT NULL DEFAULT 1,
+  uses_salon_image TINYINT(1) NOT NULL DEFAULT 0,
+  image_url MEDIUMTEXT NULL,
+  position INT NOT NULL DEFAULT 0,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_loyalty_cards_owner (owner_id),
+  FOREIGN KEY (owner_id) REFERENCES owners(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS loyalty_card_tiers (
+  id CHAR(36) PRIMARY KEY,
+  card_id CHAR(36) NOT NULL,
+  position INT NOT NULL DEFAULT 0,
+  points INT NOT NULL,
+  reward VARCHAR(20) NOT NULL,
+  pct INT NULL,
+  free_item_kind VARCHAR(20) NULL,
+  free_item_id VARCHAR(60) NULL,
+  INDEX idx_loyalty_tiers_card (card_id),
+  FOREIGN KEY (card_id) REFERENCES loyalty_cards(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS loyalty_card_items (
+  card_id CHAR(36) NOT NULL,
+  kind VARCHAR(20) NOT NULL,
+  item_id VARCHAR(60) NOT NULL,
+  PRIMARY KEY (card_id, kind, item_id),
+  FOREIGN KEY (card_id) REFERENCES loyalty_cards(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'loyalty_accounts' AND column_name = 'card_id');
+SET @sql := IF(@c = 0, 'ALTER TABLE loyalty_accounts ADD COLUMN card_id CHAR(36) NULL', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Une carte de chaque type par client et par salon : l'index unique passe de (salon, client) à (salon, client, carte).
+SET @n := (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'loyalty_accounts' AND index_name = 'uniq_salon_client');
+SET @sql := IF(@n = 2, 'ALTER TABLE loyalty_accounts DROP INDEX uniq_salon_client, ADD UNIQUE KEY uniq_salon_client (salon_id, client_key, card_id)', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;

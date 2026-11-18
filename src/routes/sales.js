@@ -1,5 +1,4 @@
 const express = require('express');
-const { thresholdsForSalon } = require('../lib/loyaltyRules');
 const crypto = require('crypto');
 const { pool, utcIso, getSettings, getCaisseLock, caisseDayStartUtc } = require('../db');
 const { getVatRates, rateForItem, TABLES: VAT_TABLES } = require('../lib/vat');
@@ -372,23 +371,22 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
   // Le reste à payer d'un client déjà réglé d'avance ne redonne pas de point (un passage = un point).
   if (outcome.queueRow && !outcome.balanceSale) {
     // Ce passage vient d'être réellement payé : +1 point de fidélité.
-    await earnLoyaltyPoint(req.salon.id, outcome.queueRow);
+    // Cartes de fidélité : chaque carte compte seulement si un de SES articles est sur les lignes de ce client.
+    const linesOf = (qid) => cleanItems.filter((l) => (l.queue_id || outcome.queueRow.id) === qid);
+    await earnLoyaltyPoint(req.salon.id, outcome.queueRow, linesOf(outcome.queueRow.id));
     // Ticket groupé : chaque personne réglée garde son point de passage.
-    for (const g of outcome.groupRows || []) await earnLoyaltyPoint(req.salon.id, g);
+    for (const g of outcome.groupRows || []) await earnLoyaltyPoint(req.salon.id, g, linesOf(g.id));
     // Une récompense de fidélité était appliquée à ce ticket (gagnée à
     // un passage précédent) — on la consomme maintenant.
     // Remise prestation OU produit : retire les points du palier correspondant (s'il est bien atteint).
+    // Palier d'une carte (remise prestation / produit, article offert) : retire les points de CE palier.
+    // Format { card_id, tier_id } ; l'ancien 'service' / 'product' reste accepté (caisse pas encore rechargée).
     if (loyalty_redeem) {
       const key = clientKey(outcome.queueRow);
-      if (key) {
-        const type = loyalty_redeem === 'product' ? 'product' : 'service';
-        const t = await thresholdsForSalon(req.salon.id);
-        await pool.query(
-          `UPDATE loyalty_accounts SET points = points - ?, updated_at = NOW()
-           WHERE salon_id = ? AND client_key = ? AND points >= ?`,
-          [t[type], req.salon.id, key, t[type]]
-        );
-      }
+      const reqRedeem = typeof loyalty_redeem === 'string' ? loyalty_redeem
+        : (loyalty_redeem && typeof loyalty_redeem.card_id === 'string' && typeof loyalty_redeem.tier_id === 'string'
+          ? { card_id: loyalty_redeem.card_id.slice(0, 36), tier_id: loyalty_redeem.tier_id.slice(0, 36) } : null);
+      if (key && reqRedeem) await require('../lib/loyaltyCards').redeem(req.salon.id, key, reqRedeem);
     }
   }
 

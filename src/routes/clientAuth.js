@@ -255,12 +255,20 @@ router.post('/reset-password', wrap(async (req, res) => {
  *   (jamais un RDV encore en cours - déjà couvert ci-dessus) -> pour
  *   re-réserver, plusieurs affichés, pas juste le dernier.
  */
+// Visuel d'une carte de fidélité du client (à part de /me, qui est relu souvent).
+router.get('/loyalty-cards/:id/image', requireClient, wrap(async (req, res) => {
+  const [[card]] = await pool.query(
+    `SELECT lc.image_url FROM loyalty_cards lc JOIN salons s ON s.owner_id = lc.owner_id
+     WHERE lc.id = ? AND s.id = ? AND lc.published = 1`, [req.params.id, req.clientAccount.salon_id]);
+  res.json({ ok: true, image_url: card ? card.image_url || null : null });
+}));
+
 router.get('/me', requireClient, wrap(async (req, res) => {
   const c = req.clientAccount;
   const key = clientKey({ email: c.email });
 
   const [[loyalty]] = await pool.query(
-    'SELECT points, rewards_available, activated_at FROM loyalty_accounts WHERE salon_id = ? AND client_key = ?',
+    'SELECT points, rewards_available, activated_at FROM loyalty_accounts WHERE salon_id = ? AND client_key = ? ORDER BY activated_at IS NULL, updated_at DESC LIMIT 1',
     [c.salon_id, key]
   );
   const loyaltyActivated = Boolean(loyalty && loyalty.activated_at);
@@ -348,6 +356,8 @@ router.get('/me', requireClient, wrap(async (req, res) => {
     loyalty_activated: loyaltyActivated,
     loyalty: loyaltyActivated ? Object.assign({ points: loyalty.points, rewards_available: loyalty.rewards_available },
       await (async () => { const t = await thresholdsForSalon(c.salon_id); return { thresholds: t, rewards: rewardsFor(loyalty.points, t) }; })()) : null,
+    // Plusieurs cartes : seulement les cartes publiées que le client a activées (chacune avec ses points et ses paliers).
+    loyalty_cards: (await require('../lib/loyaltyCards').clientCards(c.salon_id, key)).filter((x) => x.published),
     upcoming_appointments: upcomingAppointments,
     recent_visits: recentVisits,
     gift_cards: giftCards.map((g) => {

@@ -1255,10 +1255,7 @@
 
         <div id="loyalty-section" style="display:none;margin-bottom:14px">
           <div style="font-size:13px;color:var(--green);font-weight:600;margin-bottom:8px">⭐ Fidélité disponible</div>
-          <div style="display:flex;gap:8px">
-            <button class="btn btn-soft" id="loyalty-btn-service" onclick="toggleLoyaltyDiscount('service')" style="flex:1;font-size:12.5px">-50% prestation</button>
-            <button class="btn btn-soft" id="loyalty-btn-product" onclick="toggleLoyaltyDiscount('product')" style="flex:1;font-size:12.5px">-20% produit</button>
-          </div>
+          <div id="loyalty-btns" style="display:flex;flex-wrap:wrap;gap:8px"></div>
         </div>
 
         <div id="gift-section" style="display:none;margin-bottom:14px">
@@ -1450,7 +1447,7 @@
   </div>
 </div>
 
-<script src="/app.js?v=67"></script>
+<script src="/app.js?v=68"></script>
 <script src="/queue-sim.js?v=1"></script>
 <script src="/staff-group.js?v=7"></script>
 <script src="/autorefresh.js?v=3"></script>
@@ -1480,6 +1477,7 @@ var ticketDrafts = {}; // { [barberId]: { ticket, ticketQueueId, loyaltyDiscount
 var loyaltyRewardsAvailable = null; // remises fidélité débloquées pour le client du ticket : { service: bool, product: bool } (chacune a son propre palier de points)
 var loyaltyDiscount = null; // { index, originalPrice, type } si une réduction fidélité est appliquée
 var marketingSettings = { loyalty_service_discount_pct: 50, loyalty_product_discount_pct: 20 };
+var loyaltyCardDefs = [];   // cartes de fidélité publiées (paliers : remise prestation / produit, article offert)
 var pendingPayments = [];
 var currentCat = 'services';
 
@@ -4046,7 +4044,9 @@ var AD_STATUS_COLOR = { waiting: 'var(--grey)', in_progress: 'var(--blue)', done
 
 function adRenderMarketing(r) {
   var parts = [];
-  if (r.loyalty && r.loyalty.activated) {
+  if (r.loyalty_cards && r.loyalty_cards.some(function (c) { return c.activated; })) {
+    parts.push(loyaltyCardsRowsHtml(r.loyalty_cards));
+  } else if (r.loyalty && r.loyalty.activated) {
     parts.push('<div class="detail-row"><span class="detail-label">⭐ Fidélité</span><span class="detail-value">' +
       r.loyalty.points + ' point' + (r.loyalty.points > 1 ? 's' : '') + '</span></div>' + loyaltyTiersHtml(r.loyalty));
   } else {
@@ -4741,6 +4741,10 @@ function loadMarketingSettings() {
   barberApi('/api/owner/marketing-settings').then(function (r) {
     marketingSettings = r.settings;
   }).catch(function () {});
+  barberApi('/api/owner/loyalty-cards').then(function (r) {
+    loyaltyCardDefs = (r.items || []).filter(function (c) { return c.published; });
+    if (typeof updateLoyaltyVisibility === 'function' && document.getElementById('loyalty-section')) updateLoyaltyVisibility();
+  }).catch(function () {});
 }
 
 function startCaisseClosing() {
@@ -5326,10 +5330,13 @@ function renderPendingList() {
           (giftItemsList ? '<div class="meta" style="color:var(--grey)">' + esc(giftItemsList) + '</div>' : '');
     }
     var lr = q.loyalty_rewards;
-    var loyaltyNote = lr && (lr.service || lr.product)
-      ? '<div class="lock-note" style="color:var(--blue)">⭐ Fidélité : remise ' +
-        (lr.service && lr.product ? 'prestation ou produit' : (lr.service ? 'prestation' : 'produit')) + ' disponible</div>'
-      : '';
+    var lcAvail = (q.loyalty_cards || []).filter(function (c) { return (c.available || []).length; });
+    var loyaltyNote = lcAvail.length
+      ? '<div class="lock-note" style="color:var(--blue)">⭐ Fidélité : récompense disponible (' + lcAvail.map(function (c) { return esc(c.name); }).join(', ') + ')</div>'
+      : (lr && (lr.service || lr.product)
+        ? '<div class="lock-note" style="color:var(--blue)">⭐ Fidélité : remise ' +
+          (lr.service && lr.product ? 'prestation ou produit' : (lr.service ? 'prestation' : 'produit')) + ' disponible</div>'
+        : '');
     var explicitGift = Boolean(q.gift_card && q.gift_card.explicit);
     var displayAmount = explicitGift ? q.gift_card.amount_cents : q.total_price_cents;
     var mates = explicitGift ? [] : groupMatesOf(q);
@@ -5352,8 +5359,8 @@ function renderPendingList() {
           : '') +
         unstartedAbsentBtn(q) +
         (!q.prepaid ? '<button class="btn btn-soft" onclick="event.stopPropagation();editFinishedService(\'' + q.id + '\')">Modifier la prestation</button>' : '') +
-        (isActive && !q.loyalty_member
-          ? '<button class="btn btn-ghost" onclick="event.stopPropagation();proposeLoyaltyActivation(\'' + q.id + '\')">Activer carte de fidélité</button>'
+        (isActive && q.loyalty_missing && q.loyalty_missing.length
+          ? '<button class="btn btn-ghost" onclick="event.stopPropagation();proposeLoyaltyActivation(\'' + q.id + '\')">' + (q.loyalty_member ? 'Ajouter une carte de fidélité' : 'Activer carte de fidélité') + '</button>'
           : '') +
         (isActive ? '<button class="btn btn-ghost" onclick="event.stopPropagation();toggleDeferPayment(\'' + q.id + '\')">Mettre de côté</button>' : '') +
         pendingDelBtn(q) +
@@ -5370,24 +5377,45 @@ function renderPendingList() {
 function proposeLoyaltyActivation(queueId) {
   var q = pendingPayments.find(function (x) { return x.id === queueId; });
   if (!q) return;
+  var missing = q.loyalty_missing || [];
+  if (!missing.length) return;
 
-  var proceed = function (email) {
-    if (!email) return;
+  var proceed = function (email, cardIds) {
+    if (!email || !cardIds.length) return;
     barberApi('/api/owner/loyalty-accounts/activate', {
       method: 'POST',
-      body: { client_name: q.client_name, client_email: email, client_phone: q.phone || '' }
-    }).then(function () {
-      toast('Carte de fidélité activée pour ' + q.client_name);
+      body: { client_name: q.client_name, client_email: email, client_phone: q.phone || '', card_ids: cardIds }
+    }).then(function (r) {
+      var n = (r && r.activated && r.activated.length) || cardIds.length;
+      toast((n > 1 ? n + ' cartes de fidélité activées' : 'Carte de fidélité activée') + ' pour ' + q.client_name);
       loadPendingPayments();
     }).catch(function (e) { toast(e.message, true); });
   };
+  // Plusieurs cartes publiées : le coiffeur coche celles que le client accepte.
+  var pickCards = function (email) {
+    if (missing.length === 1) {
+      showConfirm('Activer « ' + missing[0].name + ' » pour ' + q.client_name + ' (' + email + ') ?', { title: 'Fidélité' })
+        .then(function (ok) { if (ok) proceed(email, [missing[0].card_id]); });
+      return;
+    }
+    var overlay = _buildModal('<div class="modal-title">Fidélité</div>' +
+      '<div class="modal-message">Cartes à activer pour ' + esc(q.client_name) + ' (' + esc(email) + ') :</div>' +
+      '<div style="display:flex;flex-direction:column;gap:10px;margin:0 0 16px;text-align:left">' + missing.map(function (c) {
+        return '<label style="display:flex;gap:10px;align-items:center;font-size:15px;cursor:pointer"><input type="checkbox" class="lc-pick" value="' + c.card_id + '" checked style="width:20px;height:20px"> ' + esc(c.name) + '</label>';
+      }).join('') + '</div>' +
+      '<div class="modal-actions"><button class="btn btn-soft" id="lc-cancel">Annuler</button><button class="btn btn-primary" id="lc-ok">Activer</button></div>');
+    overlay.querySelector('#lc-cancel').onclick = function () { _closeModal(overlay); };
+    overlay.querySelector('#lc-ok').onclick = function () {
+      var ids = [].map.call(overlay.querySelectorAll('.lc-pick:checked'), function (x) { return x.value; });
+      if (!ids.length) { toast('Cochez au moins une carte', true); return; }
+      _closeModal(overlay); proceed(email, ids);
+    };
+  };
 
-  if (q.email) {
-    showConfirm('Activer la carte de fidélité pour ' + q.client_name + ' (' + q.email + ') ?', { title: 'Fidélité' })
-      .then(function (ok) { if (ok) proceed(q.email); });
-  } else {
+  if (q.email) pickCards(q.email);
+  else {
     showPrompt('Quel est l\'email de ' + q.client_name + ' pour activer sa carte de fidélité ?', { title: 'Fidélité', placeholder: 'email@exemple.com' })
-      .then(function (email) { if (email) proceed(email.trim()); });
+      .then(function (email) { if (email) pickCards(email.trim()); });
   }
 }
 
@@ -5684,7 +5712,7 @@ function usePendingForTicket(queueId, quiet) {
   ticketQueueId = queueId;
   ticketGroup = [];
   ticketMode = null;
-  loyaltyRewardsAvailable = q.loyalty_rewards || null;
+  loyaltyRewardsAvailable = q.loyalty_cards && q.loyalty_cards.length ? q.loyalty_cards : null;
   loyaltyDiscount = null;
   renderTicket();
   if (!quiet) toast('Ticket de ' + q.client_name + ' chargé — choisissez le paiement');
@@ -5794,7 +5822,7 @@ function useAdvanceForTicket(queueId) {
   ticketGroup = [];
   ticketMode = 'advance';
   ticketModeName = q.client_name;
-  loyaltyRewardsAvailable = q.loyalty_rewards || null;
+  loyaltyRewardsAvailable = q.loyalty_cards && q.loyalty_cards.length ? q.loyalty_cards : null;
   loyaltyDiscount = null;
   renderTicket();
   toast('Ticket de ' + q.client_name + ' chargé (paiement d\'avance) — choisissez le paiement');
@@ -6070,47 +6098,86 @@ function setLineSeller(index, barberId) {
 // attente d'encaissement" (client identifié) — jamais sur un ticket
 // construit à la main sans identité de client connue.
 function updateLoyaltyVisibility() {
-  var section = document.getElementById('loyalty-section');
-  var lr = loyaltyRewardsAvailable || {};
-  var show = ticket.length > 0 && ticketQueueId && ticketMode !== 'balance' && Boolean(lr.service || lr.product);
+  var section = document.getElementById('loyalty-section'), box = document.getElementById('loyalty-btns');
+  var offers = loyaltyOffers();
+  var show = ticket.length > 0 && ticketQueueId && ticketMode !== 'balance' && offers.length > 0;
   section.style.display = show ? 'block' : 'none';
-  if (show) {
-    // Ticket groupé : la remise fidélité ne porte que sur les lignes du client qui paie.
-    var hasService = ticket.some(function (l) { return l.item_type === 'service' && !l.person; });
-    var hasProduct = ticket.some(function (l) { return l.item_type === 'product' && !l.person; });
-    // Chaque remise n'apparaît que si son propre palier de points est atteint.
-    document.getElementById('loyalty-btn-service').style.display = lr.service ? '' : 'none';
-    document.getElementById('loyalty-btn-product').style.display = lr.product ? '' : 'none';
-    document.getElementById('loyalty-btn-service').disabled = !hasService && !(loyaltyDiscount && loyaltyDiscount.type === 'service');
-    document.getElementById('loyalty-btn-product').disabled = !hasProduct && !(loyaltyDiscount && loyaltyDiscount.type === 'product');
-    document.getElementById('loyalty-btn-service').classList.toggle('btn-primary', loyaltyDiscount && loyaltyDiscount.type === 'service');
-    document.getElementById('loyalty-btn-product').classList.toggle('btn-primary', loyaltyDiscount && loyaltyDiscount.type === 'product');
-    document.getElementById('loyalty-btn-service').textContent = '-' + marketingSettings.loyalty_service_discount_pct + '% prestation';
-    document.getElementById('loyalty-btn-product').textContent = '-' + marketingSettings.loyalty_product_discount_pct + '% produit';
-  }
+  if (!show || !box) return;
+  // Un bouton par palier atteint, sur chaque carte du client ; le nom de la carte s'il y en a plusieurs.
+  var several = offers.some(function (o) { return o.card.id !== offers[0].card.id; });
+  box.innerHTML = offers.map(function (o) {
+    var on = loyaltyDiscount && loyaltyDiscount.tier_id === o.tier.id;
+    var usable = on || o.tier.reward === 'free_item' || loyaltyLineFor(o.tier) !== -1;
+    return '<button class="btn ' + (on ? 'btn-primary' : 'btn-soft') + '"' + (usable ? '' : ' disabled') +
+      ' onclick="toggleLoyaltyDiscount(\'' + o.card.id + '\',\'' + o.tier.id + '\')" style="flex:1 1 140px;font-size:12.5px">' +
+      (several ? esc(o.card.name) + ' · ' : '') + esc(loyaltyTierShort(o.tier)) + '</button>';
+  }).join('');
 }
 
-function toggleLoyaltyDiscount(type) {
-  // Retire d'abord une réduction déjà appliquée (même type = on annule,
-  // autre type = on change d'avis).
+/** Paliers atteints par le client du ticket, sur ses cartes publiées. */
+function loyaltyOffers() {
+  var out = [];
+  (Array.isArray(loyaltyRewardsAvailable) ? loyaltyRewardsAvailable : []).forEach(function (c) {
+    var def = loyaltyCardDefs.find(function (d) { return d.id === c.card_id; });
+    if (!def) return;
+    def.tiers.forEach(function (t) { if ((c.available || []).indexOf(t.id) !== -1) out.push({ card: def, tier: t }); });
+  });
+  return out;
+}
+function loyaltyTierShort(t) {
+  if (t.reward === 'service_pct') return '-' + t.pct + '% prestation';
+  if (t.reward === 'product_pct') return '-' + t.pct + '% produit';
+  return (t.free_item_name || 'Article') + ' offert';
+}
+/** Ligne du ticket (du client qui paie) sur laquelle s'applique ce palier, ou -1. */
+function loyaltyLineFor(t) {
+  return ticket.findIndex(function (l) {
+    if (l.person) return false;   // ticket groupé : seulement les lignes du client qui paie
+    if (t.reward === 'service_pct') return l.item_type === 'service';
+    if (t.reward === 'product_pct') return l.item_type === 'product';
+    return l.item_type === t.free_item_kind && l.item_id === t.free_item_id;
+  });
+}
+
+function toggleLoyaltyDiscount(cardId, tierId) {
+  // Retire d'abord une remise déjà appliquée (même palier = on annule, autre palier = on change d'avis).
   if (loyaltyDiscount) {
-    ticket[loyaltyDiscount.index].unit_price_cents = loyaltyDiscount.originalPrice;
-    ticket[loyaltyDiscount.index].item_name = loyaltyDiscount.originalName;
-    var wasType = loyaltyDiscount.type;
+    var was = loyaltyDiscount.tier_id;
+    if (loyaltyDiscount.added) ticket.splice(loyaltyDiscount.index, 1);
+    else if (ticket[loyaltyDiscount.index]) {
+      ticket[loyaltyDiscount.index].unit_price_cents = loyaltyDiscount.originalPrice;
+      ticket[loyaltyDiscount.index].item_name = loyaltyDiscount.originalName;
+    }
     loyaltyDiscount = null;
-    if (wasType === type) { renderTicket(); return; }
+    if (was === tierId) { renderTicket(); return; }
   }
-
-  var idx = ticket.findIndex(function (l) { return l.item_type === type && !l.person; });
-  if (idx === -1) { toast('Aucune ligne ' + (type === 'service' ? 'prestation' : 'produit') + ' dans ce ticket', true); renderTicket(); return; }
-
-  var pct = type === 'service' ? marketingSettings.loyalty_service_discount_pct : marketingSettings.loyalty_product_discount_pct;
-  var factor = 1 - (pct / 100);
-  var originalPrice = ticket[idx].unit_price_cents;
-  var originalName = ticket[idx].item_name;
-  loyaltyDiscount = { index: idx, originalPrice: originalPrice, originalName: originalName, type: type };
-  ticket[idx].unit_price_cents = Math.round(originalPrice * factor);
-  ticket[idx].item_name = originalName + ' (fidélité -' + pct + '%)';
+  var card = loyaltyCardDefs.find(function (d) { return d.id === cardId; });
+  var t = card && card.tiers.find(function (x) { return x.id === tierId; });
+  if (!t) { renderTicket(); return; }
+  var idx = loyaltyLineFor(t);
+  if (t.reward === 'free_item') {
+    if (idx === -1) {
+      // Article offert absent du ticket : ajouté à 0 €.
+      var list = t.free_item_kind === 'service' ? catalog.services : (t.free_item_kind === 'extra' ? catalog.extras : catalog.products);
+      var it = (list || []).find(function (x) { return x.id === t.free_item_id; });
+      var first = ticket.find(function (l) { return !l.person; });
+      ticket.push({ item_type: t.free_item_kind, item_id: t.free_item_id, item_name: (it ? it.name : (t.free_item_name || 'Article')) + ' (fidélité offert)',
+        unit_price_cents: 0, quantity: 1, barber_id: first ? first.barber_id : null });
+      loyaltyDiscount = { index: ticket.length - 1, added: true, card_id: cardId, tier_id: tierId, type: t.free_item_kind };
+      renderTicket();
+      return;
+    }
+    loyaltyDiscount = { index: idx, originalPrice: ticket[idx].unit_price_cents, originalName: ticket[idx].item_name, card_id: cardId, tier_id: tierId, type: t.free_item_kind };
+    ticket[idx].unit_price_cents = 0;
+    ticket[idx].item_name = loyaltyDiscount.originalName + ' (fidélité offert)';
+    renderTicket();
+    return;
+  }
+  if (idx === -1) { toast('Aucune ligne ' + (t.reward === 'service_pct' ? 'prestation' : 'produit') + ' dans ce ticket', true); renderTicket(); return; }
+  var originalPrice = ticket[idx].unit_price_cents, originalName = ticket[idx].item_name;
+  loyaltyDiscount = { index: idx, originalPrice: originalPrice, originalName: originalName, card_id: cardId, tier_id: tierId, type: t.reward === 'service_pct' ? 'service' : 'product' };
+  ticket[idx].unit_price_cents = Math.round(originalPrice * (1 - t.pct / 100));
+  ticket[idx].item_name = originalName + ' (fidélité -' + t.pct + '%)';
   renderTicket();
 }
 
@@ -6185,7 +6252,7 @@ function pay(method, cashCents) {
   var soldTicket = !groupIds.length ? ticket.slice() : ticket.map(function (l) {
     return Object.assign({}, l, l.person ? { queue_id: l.person } : { queue_id: ticketQueueId, person_name: payerEntry ? payerEntry.client_name : '' });
   });
-  var usedLoyalty = loyaltyDiscount ? loyaltyDiscount.type : false; // 'service' ou 'product' : le serveur retire les points de CE palier
+  var usedLoyalty = loyaltyDiscount ? { card_id: loyaltyDiscount.card_id, tier_id: loyaltyDiscount.tier_id } : false; // le serveur retire les points de CE palier
   var saleCtx = { method: method, cashCents: method === 'partage' ? cashCents : null, chargeCents: method === 'partage' ? total - cashCents : total, total: total, soldTicket: soldTicket, linkedQueueId: linkedQueueId, gift: gift, usedLoyalty: usedLoyalty, requestId: newRequestId(), ticketMode: ticketMode, ticketModeName: ticketModeName, groupIds: groupIds };
 
   if (method === 'cb') {

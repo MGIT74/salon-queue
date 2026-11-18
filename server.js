@@ -147,6 +147,9 @@ applySchema({ attempts: 3, delayMs: 2000 })
   .then(() => require('./src/lib/loyaltyRules').convertLegacyRewards()
     .then((n) => { if (n) console.log('[fidelite] ' + n + ' ancienne(s) recompense(s) reconvertie(s) en points'); })
     .catch((e) => console.error('[fidelite] reconversion des anciennes recompenses echouee : ' + e.message)))
+  .then(() => require('./src/lib/loyaltyCards').ensureDefaultCards()
+    .then((r) => { if (r.created || r.attached) console.log('[fidelite] cartes : ' + r.created + ' carte(s) creee(s), ' + r.attached + ' compte(s) rattache(s)'); })
+    .catch((e) => console.error('[fidelite] creation de la premiere carte echouee : ' + e.message)))
   .then(startServer);
 
 function startServer() {

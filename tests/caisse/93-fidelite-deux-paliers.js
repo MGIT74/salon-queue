@@ -28,13 +28,21 @@ async function visit(extra) {
 (async () => {
   sql("DELETE FROM sales; DELETE FROM queue; DELETE FROM loyalty_accounts; DELETE FROM owner_settings WHERE owner_id='o1' AND \\`key\\` LIKE 'loyalty%'");
 
-  console.log('\n[A] Reglages : deux paliers separes');
-  let r = await api('PUT', '/api/owner/marketing-settings', { loyalty_service_threshold: 3, loyalty_product_threshold: 5, loyalty_service_discount_pct: 50, loyalty_product_discount_pct: 20 }, ADMIN);
+  console.log('\n[A] Deux paliers separes sur la carte de fidelite (editable dans Marketing)');
+  let r = await api('GET', '/api/owner/loyalty-cards', null, ADMIN);
+  const card = (r.body.items || [])[0];
+  check('la carte de fidelite existante est listee', r.status === 200 && card && card.name, r.body);
+  const body = { name: card.name, published: true, auto_on_signup: true, scope_all: true,
+    tiers: [{ points: 3, reward: 'service_pct', pct: 50 }, { points: 5, reward: 'product_pct', pct: 20 }] };
+  r = await api('PUT', '/api/owner/loyalty-cards/' + card.id, body, ADMIN);
   check('enregistrement des deux paliers', r.status === 200, r.body);
-  r = await api('GET', '/api/owner/marketing-settings');
-  check('relus : prestation 3, produit 5', r.body.settings.loyalty_service_threshold === 3 && r.body.settings.loyalty_product_threshold === 5, r.body);
-  r = await api('PUT', '/api/owner/marketing-settings', { loyalty_product_threshold: 0 }, ADMIN);
+  r = await api('GET', '/api/owner/loyalty-cards', null, ADMIN);
+  const c2 = r.body.items.find((c) => c.id === card.id);
+  check('relus : prestation 3, produit 5', c2.tiers.length === 2 && c2.tiers[0].points === 3 && c2.tiers[1].points === 5, c2.tiers);
+  r = await api('PUT', '/api/owner/loyalty-cards/' + card.id, Object.assign({}, body, { tiers: [{ points: 0, reward: 'product_pct', pct: 20 }] }), ADMIN);
   check('palier a 0 refuse', r.status === 400);
+  // Les autres cartes eventuelles (autres tests) ne doivent pas interferer.
+  sql("DELETE FROM loyalty_cards WHERE owner_id='o1' AND id<>'" + card.id + "'");
 
   console.log('\n[B] Les points s\'accumulent, chaque remise a son palier');
   sql("INSERT INTO loyalty_accounts (id,owner_id,salon_id,client_key,client_name,recipient_email,points,rewards_available,activated_at) VALUES (UUID(),'o1','s1','leo@x.fr','Leo','leo@x.fr',0,0,NOW())");
@@ -72,9 +80,9 @@ async function visit(extra) {
   console.log('\n[E] Ecrans');
   const dash = fs.readFileSync(__dirname + '/../../public/dashboard.html', 'utf8');
   const caisse = fs.readFileSync(__dirname + '/../../public/caisse.html', 'utf8');
-  check('dashboard : deux champs de points (prestation / produit)', /Points à atteindre — remise prestation/.test(dash) && /id="mk-product-threshold"/.test(dash) && /loyalty_product_threshold: productThreshold/.test(dash));
-  check('caisse : chaque bouton de remise n\'apparait que si son palier est atteint, type envoye au serveur', /loyalty-btn-product'\)\.style\.display = lr\.product/.test(caisse) && /usedLoyalty = loyaltyDiscount \? loyaltyDiscount\.type : false/.test(caisse));
-  check('compte client : progression des deux paliers', /function renderLoyaltyTiers/.test(fs.readFileSync(__dirname + '/../../public/compte.html', 'utf8')));
+  check('dashboard : paliers de la carte avec choix de la recompense', /function renderLoyaltyCardEditor/.test(dash) && /service_pct/.test(dash) && /product_pct/.test(dash) && /free_item/.test(dash));
+  check('caisse : un bouton par palier atteint, carte + palier envoyes au serveur', /function loyaltyOffers/.test(caisse) && /usedLoyalty = loyaltyDiscount \? \{ card_id:/.test(caisse));
+  check('compte client : progression des paliers de chaque carte', /function renderLoyaltyCards/.test(fs.readFileSync(__dirname + '/../../public/compte.html', 'utf8')));
 
   sql("DELETE FROM loyalty_accounts; DELETE FROM owner_settings WHERE owner_id='o1' AND \\`key\\` LIKE 'loyalty%'");
   console.log('\nRESULTAT : ' + pass + ' verifications reussies, ' + fail + ' echec(s)');

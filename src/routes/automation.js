@@ -725,7 +725,17 @@ router.get('/salons/:id/client-gifts-loyalty', requireAutomationKey, wrap(async 
       rewards_available: loyalty.rewards_available,
       rewards_unlocked: rewardsFor(loyalty.points, await thresholdsForSalon(salonId)),
       card_activated: Boolean(loyalty.activated_at)
-    } : null
+    } : null,
+    // Plusieurs cartes : chaque carte de ce client avec ses points et les récompenses atteintes.
+    loyalty_cards: loyalty ? await (async () => {
+      const LC = require('../lib/loyaltyCards');
+      const [[acc]] = await pool.query(
+        'SELECT client_key FROM loyalty_accounts WHERE salon_id = ? AND (client_key = ? OR client_name LIKE ?) LIMIT 1',
+        [salonId, clientKeyLower, '%' + client + '%']);
+      const cards = acc ? await LC.clientCards(salonId, acc.client_key, { includeInactive: true }) : [];
+      return cards.map((c) => ({ name: c.name, points: c.points, activated: c.activated,
+        rewards_unlocked: c.tiers.filter((t) => c.available.indexOf(t.id) !== -1).map((t) => t.label) }));
+    })() : []
   });
 }));
 

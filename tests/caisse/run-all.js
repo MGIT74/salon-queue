@@ -199,6 +199,7 @@ const suite = [
   ['176-compte-client-isole-par-salon.js', true, ['exit']],
   ['177-consentement-inscription.js', true, ['exit']],
   ['178-calendrier-conges-sans-saut.js', false, ['exit']],
+  ['179-cartes-fidelite-multiples.js', true, ['exit']],
 ];
 
 let bad = 0;

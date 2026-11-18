@@ -173,7 +173,7 @@ router.put('/barbers/:id/salon', requireAdmin, wrap(async (req, res) => {
 router.get('/client-stats', requireAdmin, wrap(async (req, res) => {
   const sid = req.salon.id;
   const [[acc]] = await pool.query('SELECT COUNT(*) AS n FROM clients WHERE salon_id = ? AND email_verified = 1', [sid]);
-  const [[loy]] = await pool.query('SELECT COUNT(*) AS n FROM loyalty_accounts WHERE salon_id = ? AND activated_at IS NOT NULL', [sid]);
+  const [[loy]] = await pool.query('SELECT COUNT(DISTINCT client_key) AS n FROM loyalty_accounts WHERE salon_id = ? AND activated_at IS NOT NULL', [sid]);
   const [[gif]] = await pool.query('SELECT COUNT(*) AS n FROM gift_cards WHERE salon_id = ? AND used_at IS NULL AND voided_at IS NULL', [sid]);
   const [accEmails] = await pool.query('SELECT LOWER(TRIM(email)) AS e FROM clients WHERE salon_id = ?', [sid]);
   const withAccount = new Set(accEmails.map((r) => r.e).filter(Boolean));
@@ -503,21 +503,79 @@ router.post('/gift-cards/:id/resend', requireAdmin, wrap(async (req, res) => {
  * admin, pour voir qui a combien de points/récompenses en attente.
  */
 router.get('/loyalty-accounts', requireAdmin, wrap(async (req, res) => {
+  const LC = require('../lib/loyaltyCards');
   const [rows] = await pool.query(
-    'SELECT id, client_name, client_key, recipient_email, points, rewards_available, activated_at, updated_at FROM loyalty_accounts ' +
-    'WHERE salon_id = ? AND activated_at IS NOT NULL ORDER BY updated_at DESC LIMIT 300',
+    'SELECT id, card_id, client_name, client_key, recipient_email, points, rewards_available, activated_at, updated_at FROM loyalty_accounts ' +
+    'WHERE salon_id = ? AND activated_at IS NOT NULL ORDER BY updated_at DESC LIMIT 1000',
     [req.salon.id]
   );
+  const cards = await LC.cardsForOwner(req.ownerId);
   const loyaltyT = await thresholdsForOwner(req.ownerId);
   res.json({
     ok: true,
     thresholds: loyaltyT,
-    items: rows.map((r) => Object.assign({}, r, {
-      rewards: rewardsFor(r.points, loyaltyT),
-      activated_at: utcIso(r.activated_at),
-      updated_at: utcIso(r.updated_at)
-    }))
+    cards: cards.map((c) => ({ id: c.id, name: c.name, published: c.published })),
+    items: rows.map((r) => {
+      const card = cards.find((c) => c.id === r.card_id);
+      return Object.assign({}, r, {
+        card_name: card ? card.name : '',
+        available: card ? LC.availableTiers(card, r.points).map((t) => t.label) : [],
+        rewards: rewardsFor(r.points, loyaltyT),
+        activated_at: utcIso(r.activated_at),
+        updated_at: utcIso(r.updated_at)
+      });
+    })
   });
+}));
+
+/* ---------- Cartes de fidélité (Marketing) : plusieurs cartes, publiées ou non ---------- */
+router.get('/loyalty-cards', requireAdminOrBarber, wrap(async (req, res) => {
+  const LC = require('../lib/loyaltyCards');
+  const cards = await LC.cardsForOwner(req.ownerId, { withImage: req.query.images === '1' });
+  const [counts] = await pool.query(
+    'SELECT card_id, COUNT(*) AS n FROM loyalty_accounts WHERE owner_id = ? AND activated_at IS NOT NULL GROUP BY card_id', [req.ownerId]);
+  cards.forEach((c) => { const r = counts.find((x) => x.card_id === c.id); c.members = r ? Number(r.n) : 0; });
+  res.json({ ok: true, items: cards });
+}));
+
+router.post('/loyalty-cards', requireAdmin, wrap(async (req, res) => {
+  try {
+    const id = await require('../lib/loyaltyCards').saveCard(req.ownerId, req.body || {}, null);
+    logActivity(req.salon.id, 'loyalty_card', 'Carte de fidélité créée : ' + String(req.body.name || '').slice(0, 120));
+    res.json({ ok: true, id });
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    throw err;
+  }
+}));
+
+router.put('/loyalty-cards/:id', requireAdmin, wrap(async (req, res) => {
+  try {
+    await require('../lib/loyaltyCards').saveCard(req.ownerId, req.body || {}, req.params.id);
+    logActivity(req.salon.id, 'loyalty_card', 'Carte de fidélité modifiée : ' + String(req.body.name || '').slice(0, 120));
+    res.json({ ok: true });
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    throw err;
+  }
+}));
+
+// Publier / dépublier sans tout renvoyer (liste de Marketing).
+router.post('/loyalty-cards/:id/publish', requireAdmin, wrap(async (req, res) => {
+  const [r] = await pool.query('UPDATE loyalty_cards SET published = ? WHERE id = ? AND owner_id = ?', [req.body.published ? 1 : 0, req.params.id, req.ownerId]);
+  if (!r.affectedRows) return res.status(404).json({ error: 'Carte introuvable' });
+  res.json({ ok: true });
+}));
+
+// Supprimer une carte : seulement si aucun client n'a de points dessus (sinon : la dépublier).
+router.delete('/loyalty-cards/:id', requireAdmin, wrap(async (req, res) => {
+  const [[c]] = await pool.query('SELECT id, name FROM loyalty_cards WHERE id = ? AND owner_id = ?', [req.params.id, req.ownerId]);
+  if (!c) return res.status(404).json({ error: 'Carte introuvable' });
+  const [[n]] = await pool.query('SELECT COUNT(*) AS n FROM loyalty_accounts WHERE card_id = ?', [c.id]);
+  if (Number(n.n)) return res.status(409).json({ error: Number(n.n) + ' client(s) ont cette carte : dépubliez-la plutôt (leurs points sont conservés).' });
+  await pool.query('DELETE FROM loyalty_cards WHERE id = ?', [c.id]);
+  logActivity(req.salon.id, 'loyalty_card', 'Carte de fidélité supprimée : ' + c.name);
+  res.json({ ok: true });
 }));
 
 /**
@@ -565,48 +623,50 @@ router.post('/loyalty-accounts/activate', requireAdminOrBarber, wrap(async (req,
   const key = clientKey({ email, phone, client_name: clientName });
   if (!key) return res.status(400).json({ error: 'Impossible d\'identifier ce client' });
 
-  const [[existing]] = await pool.query(
-    'SELECT id, activated_at FROM loyalty_accounts WHERE salon_id = ? AND client_key = ?',
-    [req.salon.id, key]
-  );
-  if (existing && existing.activated_at) {
-    return res.status(409).json({ error: 'Ce client a déjà une carte de fidélité active' });
-  }
+  // Cartes à activer : celles cochées en caisse (card_ids) ; sans précision (ancienne caisse) : la 1re carte publiée.
+  const LC = require('../lib/loyaltyCards');
+  const published = await LC.cardsForOwner(req.ownerId, { publishedOnly: true });
+  if (!published.length) return res.status(400).json({ error: 'Aucune carte de fidélité publiée (Marketing > Cartes de fidélité)' });
+  const wanted = Array.isArray(req.body.card_ids) && req.body.card_ids.length
+    ? published.filter((c) => req.body.card_ids.indexOf(c.id) !== -1) : published.slice(0, 1);
+  if (!wanted.length) return res.status(400).json({ error: 'Carte de fidélité introuvable' });
 
-  if (existing) {
-    await pool.query(
-      'UPDATE loyalty_accounts SET activated_at = NOW(), recipient_email = ?, client_name = ? WHERE id = ?',
-      [email, clientName, existing.id]
+  const activated = [];
+  for (const card of wanted) {
+    const [[existing]] = await pool.query(
+      'SELECT id, activated_at FROM loyalty_accounts WHERE salon_id = ? AND client_key = ? AND card_id = ?',
+      [req.salon.id, key, card.id]
     );
-  } else {
-    try {
-      await pool.query(
-        `INSERT INTO loyalty_accounts (id, owner_id, salon_id, client_key, client_name, recipient_email, activated_at)
-         VALUES (UUID(), ?, ?, ?, ?, ?, NOW())`,
-        [req.ownerId, req.salon.id, key, clientName, email]
-      );
-    } catch (err) {
-      // Deux activations envoyées au même instant (double clic) peuvent
-      // toutes les deux passer la vérification ci-dessus avant qu'aucune
-      // n'ait encore inséré sa ligne — la contrainte d'unicité sur
-      // (owner_id, client_key) fait échouer la seconde avec ce code
-      // d'erreur précis, qu'on transforme en refus propre plutôt qu'une
-      // erreur serveur générique.
-      if (err && err.code === 'ER_DUP_ENTRY') {
-        return res.status(409).json({ error: 'Ce client a déjà une carte de fidélité active' });
+    if (existing && existing.activated_at) continue;
+    if (existing) {
+      await pool.query('UPDATE loyalty_accounts SET activated_at = NOW(), recipient_email = ?, client_name = ? WHERE id = ?', [email, clientName, existing.id]);
+    } else {
+      try {
+        await pool.query(
+          `INSERT INTO loyalty_accounts (id, owner_id, salon_id, card_id, client_key, client_name, recipient_email, activated_at)
+           VALUES (UUID(), ?, ?, ?, ?, ?, ?, NOW())`,
+          [req.ownerId, req.salon.id, card.id, key, clientName, email]
+        );
+      } catch (err) {
+        // Double clic : la seconde activation de la même carte trouve la première déjà enregistrée.
+        if (err && err.code === 'ER_DUP_ENTRY') continue;
+        throw err;
       }
-      throw err;
     }
+    activated.push(card);
   }
+  if (!activated.length) {
+    return res.status(409).json({ error: wanted.length > 1 ? 'Ce client a déjà ces cartes de fidélité' : 'Ce client a déjà cette carte de fidélité' });
+  }
+  logActivity(req.salon.id, 'loyalty_activate', 'Carte(s) de fidélité activée(s) pour ' + clientName + ' : ' + activated.map((c) => c.name).join(', '));
 
   try {
-    const t = await thresholdsForOwner(req.ownerId);
-    await sendLoyaltyActivation(req.salon.id, email, { clientName, serviceThreshold: t.service, productThreshold: t.product });
+    await sendLoyaltyActivation(req.salon.id, email, { clientName, cards: activated.map((c) => ({ name: c.name, rule: LC.ruleText(c) })) });
   } catch (err) {
     console.error('[fidélité] envoi email d\'activation échoué:', err.message);
   }
 
-  res.json({ ok: true });
+  res.json({ ok: true, activated: activated.map((c) => c.id) });
 }));
 
 /**
@@ -621,10 +681,14 @@ router.get('/client-marketing', requireAdminOrBarber, wrap(async (req, res) => {
   const key = clientKey({ email, phone, client_name: name });
   if (!key) return res.json({ ok: true, loyalty: null, gifts: [] });
 
+  const LC = require('../lib/loyaltyCards');
+  const cards = await LC.clientCards(req.salon.id, key, { includeInactive: true });
+  // Ancien format : la 1re carte (tiroir client tant que la page n'est pas rechargée).
   const [[loyalty]] = await pool.query(
-    'SELECT points, rewards_available, activated_at FROM loyalty_accounts WHERE salon_id = ? AND client_key = ?',
+    'SELECT points, rewards_available, activated_at FROM loyalty_accounts WHERE salon_id = ? AND client_key = ? ORDER BY activated_at IS NULL, updated_at DESC LIMIT 1',
     [req.salon.id, key]
   );
+  const publishedCards = await LC.cardsForOwner(req.ownerId, { publishedOnly: true });
 
   const [allGifts] = await pool.query(
     'SELECT id, recipient_name, recipient_phone, recipient_email, amount_cents, items_json, used_at, created_at ' +
@@ -656,6 +720,8 @@ router.get('/client-marketing', requireAdminOrBarber, wrap(async (req, res) => {
       thresholds: loyaltyT,
       activated: Boolean(loyalty.activated_at)
     } : null,
+    loyalty_cards: cards,
+    loyalty_missing: publishedCards.filter((c) => !cards.some((x) => x.card_id === c.id && x.activated)).map((c) => ({ card_id: c.id, name: c.name })),
     gifts: relevantGifts
   });
 }));

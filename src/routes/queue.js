@@ -209,23 +209,38 @@ router.get('/pending-payment', requireAdminOrBarber, wrap(async (req, res) => {
   // Un client sans compte ACTIVÉ n'est pas encore membre : la caisse
   // doit proposer d'activer sa carte (avec son accord), pas afficher
   // une récompense qui n'existe pas.
-  const [loyaltyRows] = await pool.query(
-    'SELECT client_key, points, activated_at FROM loyalty_accounts WHERE salon_id = ? AND activated_at IS NOT NULL',
-    [req.salon.id]
-  );
+  // Plusieurs cartes : pour chaque client, ses cartes activées (publiées) avec leurs points et les paliers atteints,
+  // et les cartes publiées pas encore activées (la caisse propose de les activer, avec son accord).
+  const LC = require('../lib/loyaltyCards');
+  const loyaltyQ = 'SELECT client_key, card_id, points FROM loyalty_accounts WHERE salon_id = ? AND activated_at IS NOT NULL';
+  let [loyaltyRows] = await pool.query(loyaltyQ, [req.salon.id]);
+  if (loyaltyRows.some((l) => !l.card_id)) {   // compte sans carte (ancien code) : rattaché à la 1re carte
+    await LC.ensureDefaultCards();
+    [loyaltyRows] = await pool.query(loyaltyQ, [req.salon.id]);
+  }
+  const loyaltyCards = await LC.cardsForSalon(req.salon.id, { publishedOnly: true });
   const loyaltyByKey = {};
-  loyaltyRows.forEach((l) => { loyaltyByKey[l.client_key] = l.points; });
-  const loyaltyT = await thresholdsForSalon(req.salon.id);
+  loyaltyRows.forEach((l) => { (loyaltyByKey[l.client_key] = loyaltyByKey[l.client_key] || []).push(l); });
 
   rows = rows.map((r) => {
     const key = clientKey(r);
-    const activated = key ? Object.prototype.hasOwnProperty.call(loyaltyByKey, key) : false;
-    const extra = { loyalty_member: activated };
-    if (activated) {
-      // Remises débloquées, chacune par son propre palier de points.
-      const r = rewardsFor(loyaltyByKey[key], loyaltyT);
-      extra.loyalty_points = loyaltyByKey[key];
-      if (r.service || r.product) extra.loyalty_rewards = r;
+    const mine = (key && loyaltyByKey[key]) || [];
+    const cards = [];
+    loyaltyCards.forEach((card) => {
+      const acc = mine.find((a) => a.card_id === card.id);
+      if (acc) cards.push({ card_id: card.id, name: card.name, points: acc.points, available: LC.availableTiers(card, acc.points).map((t) => t.id) });
+    });
+    const extra = { loyalty_member: cards.length > 0, loyalty_cards: cards,
+      loyalty_missing: key ? loyaltyCards.filter((c) => !cards.some((x) => x.card_id === c.id)).map((c) => ({ card_id: c.id, name: c.name })) : [] };
+    if (cards.length) {
+      extra.loyalty_points = cards[0].points;
+      // Ancien format (notes de la file, Mon poste) : une remise prestation / produit atteinte sur l'une des cartes.
+      const lr = { service: false, product: false };
+      cards.forEach((c) => {
+        const card = loyaltyCards.find((x) => x.id === c.card_id);
+        card.tiers.forEach((t) => { if (c.available.indexOf(t.id) !== -1) { if (t.reward === 'product_pct') lr.product = true; else lr.service = true; } });
+      });
+      if (lr.service || lr.product) extra.loyalty_rewards = lr;
     }
     return Object.assign({}, r, extra);
   });

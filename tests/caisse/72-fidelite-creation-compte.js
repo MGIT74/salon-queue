@@ -14,18 +14,23 @@ check('reservation en ligne : plus d\'activation (c\'est a la creation du compte
 // Comportement reel du module, avec une base simulee.
 const state = { accounts: [], mails: [], dupNext: false };
 const fakePool = { query: async (sql, p) => {
-  if (/FROM loyalty_accounts/.test(sql)) return [state.accounts.filter((a) => a.salon_id === p[0] && a.client_key === p[1])];
+  if (/FROM loyalty_accounts/.test(sql)) return [state.accounts.filter((a) => a.salon_id === p[0] && a.client_key === p[1] && (!p[2] || a.card_id === p[2]))];
   if (/FROM salons/.test(sql)) return [[{ owner_id: 'o1' }]];
   if (/INSERT INTO loyalty_accounts/.test(sql)) {
     if (state.dupNext) { const e = new Error('dup'); e.code = 'ER_DUP_ENTRY'; throw e; }
-    state.accounts.push({ salon_id: p[1], client_key: p[2], client_name: p[3], email: p[4], activated: true }); return [{}];
+    state.accounts.push({ salon_id: p[1], card_id: p[2], client_key: p[3], client_name: p[4], email: p[5], activated: true }); return [{}];
   }
   return [[]];
 } };
 const fakes = {
   '../db': { pool: fakePool, getOwnerSettings: async () => ({ loyalty_threshold: 8 }) },
   './queueMath': { clientKey: (r) => (r.email || r.phone || r.client_name || '').toLowerCase() || null },
-  './mailer': { sendLoyaltyActivation: async (salon, to, info) => { state.mails.push({ to, threshold: info.serviceThreshold, productThreshold: info.productThreshold }); } },
+  './mailer': { sendLoyaltyActivation: async (salon, to, info) => { state.mails.push({ to, cards: info.cards }); } },
+  // Plusieurs cartes : la carte d'avant (« activée à la création du compte ») et une carte qui ne l'est pas.
+  './loyaltyCards': {
+    cardsForOwner: async () => [{ id: 'c1', name: 'Carte de fidélité', auto_on_signup: true, published: true, tiers: [] }, { id: 'c2', name: 'Carte Barbe', auto_on_signup: false, published: true, tiers: [] }],
+    ruleText: () => 'Dès 8 points, une remise.'
+  },
   './activityLog': { logActivity: () => {} }
 };
 const origLoad = Module._load;
@@ -35,10 +40,10 @@ Module._load = origLoad;
 
 (async () => {
   const c = { client_name: 'Karim', email: 'karim@ex.fr', phone: '0600000000' };
-  check('creation du compte : carte creee et activee', (await activateOnAccountCreation('s1', c)) === true && state.accounts.length === 1 && state.accounts[0].activated);
-  check('email d\'activation envoye avec le seuil du salon', state.mails.length === 1 && state.mails[0].to === 'karim@ex.fr' && state.mails[0].threshold === 8 && state.mails[0].productThreshold === 8);
+  check('creation du compte : seule la carte « activee a la creation du compte » est creee', (await activateOnAccountCreation('s1', c)) === true && state.accounts.length === 1 && state.accounts[0].activated && state.accounts[0].card_id === 'c1');
+  check('email d\'activation envoye avec les regles de la carte', state.mails.length === 1 && state.mails[0].to === 'karim@ex.fr' && state.mails[0].cards.length === 1 && state.mails[0].cards[0].rule === 'Dès 8 points, une remise.');
   check('meme client deja avec carte : rien de nouveau (pas de doublon, pas de 2e email)', (await activateOnAccountCreation('s1', c)) === false && state.accounts.length === 1 && state.mails.length === 1);
-  check('carte deja desactivee par l\'admin : pas reactivee de force', (await (async () => { state.accounts.push({ salon_id: 's1', client_key: 'old@ex.fr', activated: false }); return activateOnAccountCreation('s1', { client_name: 'Old', email: 'old@ex.fr' }); })()) === false);
+  check('carte deja desactivee par l\'admin : pas reactivee de force', (await (async () => { state.accounts.push({ salon_id: 's1', client_key: 'old@ex.fr', card_id: 'c1', activated: false }); return activateOnAccountCreation('s1', { client_name: 'Old', email: 'old@ex.fr' }); })()) === false);
   check('sans email : rien', (await activateOnAccountCreation('s1', { client_name: 'X', email: '' })) === false);
   state.dupNext = true;
   check('deux inscriptions simultanees : la seconde est ignoree proprement', (await activateOnAccountCreation('s1', { client_name: 'Zed', email: 'z@ex.fr' })) === false);

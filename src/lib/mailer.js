@@ -142,16 +142,23 @@ function loyaltyRuleText(info) {
 
 async function sendLoyaltyActivation(salonId, to, info) {
   const { tx, from, salon } = await getTransport(salonId, { force: true });
+  // Plusieurs cartes : info.cards = [{ name, rule }] (une ligne par carte activée) ; sinon l'ancienne règle à deux paliers.
+  const cards = Array.isArray(info.cards) && info.cards.length ? info.cards : null;
+  const title = cards && cards.length > 1 ? 'Vos cartes de fidélité sont activées' : 'Votre carte de fidélité est activée';
+  const intro = cards
+    ? (cards.length > 1 ? `Vos cartes de fidélité chez ${salon} viennent d'être activées !` : `Votre ${cards[0].name} chez ${salon} vient d'être activée !`)
+    : `Votre carte de fidélité chez ${salon} vient d'être activée !`;
+  const rules = cards ? cards.map((c) => `${c.name} : ${c.rule}`) : [loyaltyRuleText(info)];
   await tx.sendMail({
     from,
     to,
-    subject: 'Votre carte de fidélité est activée — ' + salon,
-    text: `Bonjour ${info.clientName},\n\n` +
-          `Votre carte de fidélité chez ${salon} vient d'être activée !\n\n` +
-          `À chaque passage réglé, vous gagnez 1 point. ${loyaltyRuleText(info)}\n\n${salon}`,
+    subject: title + ' — ' + salon,
+    text: `Bonjour ${info.clientName},\n\n${intro}\n\n` +
+          `À chaque passage réglé, vous gagnez 1 point.\n${rules.join('\n')}\n\n${salon}`,
     html: `<p>Bonjour ${h(info.clientName)},</p>` +
-          `<p>Votre carte de fidélité chez ${h(salon)} vient d'être activée !</p>` +
-          `<p>À chaque passage réglé, vous gagnez 1 point. ${h(loyaltyRuleText(info))}</p>` +
+          `<p>${h(intro)}</p>` +
+          `<p>À chaque passage réglé, vous gagnez 1 point.</p>` +
+          (rules.length > 1 ? '<ul>' + rules.map((r) => `<li>${h(r)}</li>`).join('') + '</ul>' : `<p>${h(rules[0])}</p>`) +
           `<p>${h(salon)}</p>`
   });
 }
