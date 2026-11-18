@@ -196,6 +196,7 @@ const suite = [
   ['173-caisse-z-impression-apres-cloture.js', false, ['exit']],
   ['174-caisse-cloture-apres-heure-fermeture.js', false, ['exit']],
   ['175-agenda-mois-plus-de-500-rdv.js', true, ['exit']],
+  ['176-compte-client-isole-par-salon.js', true, ['exit']],
 ];
 
 let bad = 0;

@@ -38,8 +38,26 @@ async function requireClient(req, res, next) {
     [token]
   );
   if (!row) return res.status(401).json({ error: 'Session expirée, reconnectez-vous' });
+  // Un compte client appartient à UN salon : son jeton n'ouvre jamais un autre salon de l'enseigne (avant, le
+  // jeton d'Oyonnax ouvrait la page « Mon compte » de Valleiry et y montrait le compte d'Oyonnax). Pour passer
+  // d'un salon à l'autre : POST /switch, seulement si le client a aussi un compte confirmé dans l'autre salon.
+  if (req.salon && row.salon_id && row.salon_id !== req.salon.id) {
+    return res.status(401).json({ error: 'Vous n\'êtes pas connecté à ce salon', wrong_salon: true });
+  }
   req.clientAccount = row;
   next();
+}
+
+/** Salons de la même enseigne où ce client a aussi un compte confirmé (même email) - le salon actuel compris. */
+async function linkedSalons(client) {
+  const [rows] = await pool.query(
+    `SELECT s.slug, s.name, c.id AS client_id FROM clients c JOIN salons s ON s.id = c.salon_id
+     WHERE LOWER(TRIM(c.email)) = LOWER(TRIM(?)) AND c.email_verified = 1 AND s.active = 1
+       AND s.owner_id = (SELECT owner_id FROM salons WHERE id = ?)
+     ORDER BY s.name`,
+    [client.email, client.salon_id]
+  );
+  return rows;
 }
 
 router.post('/signup', signupRateLimiter('client-signup'), wrap(async (req, res) => {
@@ -160,6 +178,24 @@ router.post('/login', loginRateLimiter('client-login'), wrap(async (req, res) =>
     [token, client.id, expiresAt]
   );
   res.json({ ok: true, token });
+}));
+
+// Sélecteur de salon de « Mon compte » : affiché seulement s'il y a au moins 2 salons.
+router.get('/salons', requireClient, wrap(async (req, res) => {
+  const rows = await linkedSalons(req.clientAccount);
+  res.json({ ok: true, current: req.salon.slug, items: rows.map((r) => ({ slug: r.slug, name: r.name })) });
+}));
+
+// Passer à un autre salon de l'enseigne sans retaper de mot de passe : seulement vers un salon où ce client a
+// déjà un compte confirmé avec le même email. Chaque salon garde son propre compte (RDV, fidélité, profil).
+router.post('/switch', requireClient, wrap(async (req, res) => {
+  const slug = String((req.body && req.body.slug) || '').trim();
+  const target = (await linkedSalons(req.clientAccount)).find((r) => r.slug === slug);
+  if (!target) return res.status(403).json({ error: 'Aucun compte à votre nom dans ce salon' });
+  const token = crypto.randomBytes(32).toString('hex');
+  const expiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
+  await pool.query('INSERT INTO client_sessions (token, client_id, expires_at) VALUES (?, ?, ?)', [token, target.client_id, expiresAt]);
+  res.json({ ok: true, token, slug: target.slug });
 }));
 
 router.post('/logout', requireClient, wrap(async (req, res) => {

@@ -209,4 +209,5 @@ node tests/caisse/172-fiche-coiffeur-historique.js  # Fiche coiffeur : profil en
 node tests/caisse/173-caisse-z-impression-apres-cloture.js  # Caisse : le ticket Z s'imprime apres la cloture (session gardee tant que le Z est affiche)
 node tests/caisse/174-caisse-cloture-apres-heure-fermeture.js  # Caisse : cloture validee juste apres l'heure de fermeture auto -> le Z est quand meme propose
 node tests/caisse/175-agenda-mois-plus-de-500-rdv.js  # Agenda : plus de 500 RDV dans le mois -> la fin du mois (le 26) s'affiche quand meme
+node tests/caisse/176-compte-client-isole-par-salon.js  # Compte client : un jeton par salon, changement de salon seulement si compte confirme (meme email) dans l'autre salon
 ```

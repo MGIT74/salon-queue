@@ -283,7 +283,7 @@ button.gt-opt:active .gt-cta{transform:scale(.96)}
     // Lien d'annulation ou « Réserver à nouveau » : un autre écran va s'ouvrir, on n'affiche pas les 2 cartes entre-temps.
     try { if (/[?&](cancel|service)=/.test(location.search)) document.getElementById('p-start').classList.remove('on'); } catch (e) {}
     // Client deja connecte (meme navigateur) : une seule carte « Réserver avec mon compte ».
-    try { if (localStorage.getItem('client_token')) { document.getElementById('start-signup').style.display = 'none'; document.getElementById('start-login-title').textContent = 'Réserver avec mon compte'; document.getElementById('start-login-sub').textContent = 'Vous êtes déjà connecté'; } } catch (e) {}
+    try { var _sl = new URLSearchParams(location.search).get('salon') || ''; if (localStorage.getItem('client_token:' + _sl) || (localStorage.getItem('client_token') && localStorage.getItem('client_token_skip:' + _sl) !== '1')) { document.getElementById('start-signup').style.display = 'none'; document.getElementById('start-login-title').textContent = 'Réserver avec mon compte'; document.getElementById('start-login-sub').textContent = 'Vous êtes déjà connecté'; } } catch (e) {}
     try { if (/[?&]staff=1(&|$)/.test(location.search)) { document.documentElement.classList.add('staff-mode'); document.body.classList.add('staff-mode'); document.getElementById('p-start').classList.remove('on'); var gp = document.getElementById('p-group'); gp.classList.add('on'); gp.classList.remove('gb-pick'); document.getElementById('gb-top').innerHTML = ''; document.getElementById('gb-body').innerHTML = ''; } } catch (e) {}
   </script>
 
