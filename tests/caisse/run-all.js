@@ -198,6 +198,7 @@ const suite = [
   ['175-agenda-mois-plus-de-500-rdv.js', true, ['exit']],
   ['176-compte-client-isole-par-salon.js', true, ['exit']],
   ['177-consentement-inscription.js', true, ['exit']],
+  ['178-calendrier-conges-sans-saut.js', false, ['exit']],
 ];
 
 let bad = 0;
