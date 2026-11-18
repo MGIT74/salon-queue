@@ -3678,22 +3678,26 @@ function creditWhen(iso) {
 }
 function renderCredit() {
   if (!crData) return;
-  var bal = crData.balance_cents;
-  document.getElementById('cr-bal').textContent = eur(bal);
-  document.getElementById('cr-balance').classList.toggle('low', bal <= crData.alert_cents);
-  document.getElementById('cr-bal-hint').textContent = bal <= 0 ? 'Crédit vide : rechargez à la caisse.' : bal <= crData.alert_cents ? 'Bientôt vide : pensez à recharger à la caisse.' : 'Rechargez votre crédit à la caisse.';
+  var bal = crData.balance_cents, free = crData.free;
+  // Coiffeur « gratuit » : pas de solde, ses produits sont offerts par le salon (seul le stock baisse).
+  document.querySelector('#cr-balance .lbl').textContent = free ? 'Vos produits' : 'Solde disponible';
+  document.getElementById('cr-bal').textContent = free ? 'Offerts' : eur(bal);
+  document.getElementById('cr-balance').classList.toggle('low', !free && bal <= crData.alert_cents);
+  document.getElementById('cr-bal-hint').textContent = free ? 'Le salon vous offre vos produits : prenez-les ici pour que le stock reste juste.'
+    : bal <= 0 ? 'Crédit vide : rechargez à la caisse.' : bal <= crData.alert_cents ? 'Bientôt vide : pensez à recharger à la caisse.' : 'Rechargez votre crédit à la caisse.';
   var prods = crData.products || [];
   document.getElementById('cr-count').textContent = prods.length + ' produit' + (prods.length > 1 ? 's' : '');
   document.getElementById('cr-grid').innerHTML = prods.length ? prods.map(function (p) {
-    var out = p.stock_enabled && p.stock_quantity < 1, poor = p.price_cents > bal;
+    var out = p.stock_enabled && p.stock_quantity < 1, poor = !free && p.price_cents > bal;
     return '<button class="cr-tile" ' + (out ? 'disabled' : '') + ' onclick="pickCreditProduct(\'' + esc(p.id) + '\')"><b>' + esc(p.name) + '</b><span>' + eur(p.price_cents) +
       (p.stock_enabled ? ' · ' + (out ? 'épuisé' : 'stock ' + p.stock_quantity) : '') + '</span>' + (poor && !out ? '<span style="color:var(--orange)">crédit insuffisant</span>' : '') + '</button>';
   }).join('') : '<div class="empty" style="grid-column:1/-1">Aucun produit disponible avec le crédit.</div>';
   var moves = crData.moves || [];
   document.getElementById('cr-hist').innerHTML = moves.length ? moves.map(function (m) {
-    var label = m.kind === 'take' ? esc(m.product_name || 'Produit') : m.kind === 'recharge' ? 'Recharge à la caisse' : 'Ajustement · ' + esc(m.note || '');
+    var label = (m.kind === 'take' || m.kind === 'free') ? esc(m.product_name || 'Produit') : m.kind === 'recharge' ? 'Recharge à la caisse' : 'Ajustement · ' + esc(m.note || '');
     return '<div class="cr-row' + (m.undone ? ' undone' : '') + '"><div>' + label + '<small>' + creditWhen(m.created_at) + (m.undone ? ' · annulé' : '') + '</small></div>' +
-      '<div style="display:flex;align-items:center"><span class="amt ' + (m.amount_cents < 0 ? 'minus' : 'plus') + '">' + (m.amount_cents > 0 ? '+' : '−') + eur(Math.abs(m.amount_cents)) + '</span>' +
+      '<div style="display:flex;align-items:center">' + (m.kind === 'free' ? '<span class="amt" style="color:var(--grey)">Offert</span>'
+        : '<span class="amt ' + (m.amount_cents < 0 ? 'minus' : 'plus') + '">' + (m.amount_cents > 0 ? '+' : '−') + eur(Math.abs(m.amount_cents)) + '</span>') +
       (m.can_undo ? '<button class="cr-undo" onclick="undoCreditMove(\'' + esc(m.id) + '\')">Annuler</button>' : '') + '</div></div>';
   }).join('') : '<div class="cr-row" style="color:var(--grey)">Aucun mouvement pour le moment.</div>';
 }
@@ -3704,9 +3708,11 @@ function pickCreditProduct(id) {
   var bal = crData.balance_cents;
   document.getElementById('cr-sheet-name').textContent = p.name;
   document.getElementById('cr-sheet-price').textContent = eur(p.price_cents);
-  document.getElementById('cr-sheet-stock').textContent = p.stock_enabled ? 'Stock : ' + p.stock_quantity + ' → ' + (p.stock_quantity - 1) : 'Nouveau solde';
-  var ok = bal >= p.price_cents && !(p.stock_enabled && p.stock_quantity < 1);
-  document.getElementById('cr-sheet-after').textContent = ok ? eur(bal) + ' → ' + eur(bal - p.price_cents) : (bal < p.price_cents ? 'Crédit insuffisant (' + eur(bal) + ')' : 'Épuisé');
+  var free = crData.free;
+  document.getElementById('cr-sheet-stock').textContent = p.stock_enabled ? 'Stock : ' + p.stock_quantity + ' → ' + (p.stock_quantity - 1) : (free ? 'Produit' : 'Nouveau solde');
+  var ok = (free || bal >= p.price_cents) && !(p.stock_enabled && p.stock_quantity < 1);
+  document.getElementById('cr-sheet-after').textContent = !ok ? (p.stock_enabled && p.stock_quantity < 1 ? 'Épuisé' : 'Crédit insuffisant (' + eur(bal) + ')')
+    : free ? 'Offert par le salon' : eur(bal) + ' → ' + eur(bal - p.price_cents);
   document.getElementById('cr-sheet-after').style.color = ok ? '' : 'var(--red)';
   var btn = document.getElementById('cr-sheet-ok');
   btn.disabled = !ok; btn.style.opacity = ok ? '1' : '.5';
@@ -3719,14 +3725,14 @@ function confirmCreditTake() {
   var p = crPick;
   barberApi('/api/barber-credit/take', { method: 'POST', body: { product_id: p.id } }).then(function (r) {
     closeCreditSheet();
-    toast('✓ ' + p.name + ' — nouveau solde ' + eur(r.balance_cents));
+    toast('✓ ' + p.name + (r.free ? ' — offert' : ' — nouveau solde ' + eur(r.balance_cents)));
     return loadCredit();
   }).catch(function (e) { toast(e.message, true); loadCredit(); })
     .then(function () { crBusy = false; });
 }
 function undoCreditMove(id) {
   barberApi('/api/barber-credit/moves/' + encodeURIComponent(id) + '/undo', { method: 'POST' })
-    .then(function (r) { toast('Annulé — solde ' + eur(r.balance_cents)); loadCredit(); })
+    .then(function (r) { toast(crData && crData.free ? 'Annulé — produit remis en stock' : 'Annulé — solde ' + eur(r.balance_cents)); loadCredit(); })
     .catch(function (e) { toast(e.message, true); });
 }
 /** Code lu (code-barres du produit, ou QR qui contient son code-barres ou son identifiant). */

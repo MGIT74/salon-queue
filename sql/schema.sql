@@ -1565,9 +1565,15 @@ CREATE TABLE IF NOT EXISTS barber_credit_moves (
   amount_cents INT NOT NULL,
   product_id CHAR(36) NULL,
   product_name VARCHAR(255) NULL,
+  value_cents INT NULL,
   sale_id CHAR(36) NULL,
   note VARCHAR(255) NULL,
   undone_at DATETIME NULL,
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   KEY idx_bcm_barber (salon_id, barber_id, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Prix du produit au moment où il est pris (aussi pour un coiffeur « gratuit », dont le crédit ne bouge pas).
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'barber_credit_moves' AND column_name = 'value_cents');
+SET @sql := IF(@c = 0, 'ALTER TABLE barber_credit_moves ADD COLUMN value_cents INT NULL', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
