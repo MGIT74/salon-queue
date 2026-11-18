@@ -785,6 +785,12 @@
     font-size: 14px; font-weight: 500; padding: 10px 16px; border-radius: 999px; cursor: pointer; white-space: nowrap;
     transition: background .2s ease, box-shadow .2s ease, transform .1s ease;
   }
+  /* Crédit coiffeurs : une seule rangée de coiffeurs qui défile à l'horizontale (calée carte par carte),
+     pour que les montants restent toujours visibles dessous. */
+  #credit-barbers.item-grid { display: grid; grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 168px;
+    overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; scroll-padding-left: 3px; overscroll-behavior-x: contain;
+    padding: 3px 3px 10px; margin-bottom: 0; scrollbar-width: thin; -webkit-overflow-scrolling: touch; }
+  #credit-barbers.item-grid > .item-card { scroll-snap-align: start; }
   .cat-tabs button.on { background: var(--card); font-weight: 600; box-shadow: var(--shadow); }
   .cat-tabs button:active { transform: scale(.95); }
   /* 4e onglet « À encaisser » : nombre de clients en attente d'encaissement */
@@ -1111,6 +1117,7 @@
     #panel-caisse #item-grid { flex: 1 1 auto; min-height: 0; overflow-y: auto; align-content: start; grid-auto-rows: max-content; padding: 3px 6px 16px 3px; margin-bottom: 0; overscroll-behavior: contain; }
     #panel-caisse .pending-section { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 6px 16px 0; }
     #panel-caisse .pending-list { max-height: none; overflow: visible; margin-bottom: 8px; }
+    #panel-caisse #credit-section { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 6px 16px 0; }
     #panel-caisse .ticket-panel { position: static; max-height: none; min-height: 0; margin-bottom: 10px; }
     /* Ticket : les lignes s'etirent avec le contenu (plus de mini-zone de 2 lignes) ; Espèces/CB plus compacts pour laisser la place ;
        seul le panneau defile si le ticket depasse vraiment la hauteur de l'ecran. */
