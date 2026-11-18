@@ -1229,10 +1229,19 @@
           <button class="on" data-cat="services">Prestations</button>
           <button data-cat="extras">Suppléments</button>
           <button data-cat="products">Produits</button>
+          <button data-cat="credit">Crédit coiffeurs</button>
           <button data-cat="pending" id="cat-tab-pending">À encaisser <span class="cat-badge" id="pending-tab-count" style="display:none"></span></button>
         </div>
         <div id="item-cats" style="display:none;gap:8px;flex-wrap:wrap;margin:0 0 10px"></div>
         <div class="item-grid" id="item-grid"></div>
+        <!-- Recharge du crédit produits d'un coiffeur : une ligne « Crédit produits · Prénom » sur le ticket. -->
+        <div id="credit-section" style="display:none">
+          <div style="font-size:13px;font-weight:600;color:var(--grey);margin:4px 2px 10px">Coiffeur</div>
+          <div id="credit-barbers" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px"></div>
+          <div style="font-size:13px;font-weight:600;color:var(--grey);margin:18px 2px 10px">Montant à recharger</div>
+          <div id="credit-amounts" style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px"></div>
+          <div class="hint" style="margin:14px 2px 0;font-size:13px;color:var(--grey);line-height:1.5">Ensuite, le coiffeur prend ses produits depuis son poste (bouton « Crédit ») : le stock baisse et son crédit aussi. Rien à faire à la caisse.</div>
+        </div>
         <div class="pending-section" id="pending-section" style="display:none">
           <div class="section-label" id="pending-label" style="display:none;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--grey);margin:22px 0 10px 2px">En attente d'encaissement</div>
           <div class="pending-list" id="pending-list"></div>
@@ -5178,15 +5187,57 @@ document.getElementById('cat-tabs').addEventListener('click', function (e) {
   currentCat = btn.dataset.cat;
   document.querySelectorAll('#cat-tabs button').forEach(function (b) { b.classList.toggle('on', b === btn); });
   applyCatView();
-  if (currentCat === 'pending') loadPendingPayments(); else renderItemGrid();
+  if (currentCat === 'pending') loadPendingPayments(); else if (currentCat === 'credit') loadCreditBalances(); else renderItemGrid();
 });
 
 /** Onglet « À encaisser » : la liste des encaissements en attente remplace la grille d'articles. */
 function applyCatView() {
-  var pending = currentCat === 'pending';
-  document.getElementById('item-grid').style.display = pending ? 'none' : '';
+  var pending = currentCat === 'pending', credit = currentCat === 'credit';
+  document.getElementById('item-grid').style.display = pending || credit ? 'none' : '';
   document.getElementById('pending-section').style.display = pending ? 'block' : 'none';
-  if (pending) document.getElementById('item-cats').style.display = 'none';
+  document.getElementById('credit-section').style.display = credit ? 'block' : 'none';
+  if (pending || credit) document.getElementById('item-cats').style.display = 'none';
+}
+
+/* ---------- Crédit produits des coiffeurs : recharge (vente normale) ---------- */
+var creditBalances = [], creditBarberId = null;
+function loadCreditBalances() {
+  barberApi('/api/barber-credit/balances').then(function (r) {
+    creditBalances = (r.items || []).filter(function (b) { return b.active; });
+    creditAlertCents = r.alert_cents;
+    renderCreditSection();
+  }).catch(function (e) { toast(e.message, true); });
+}
+var creditAlertCents = 300;
+function renderCreditSection() {
+  if (!creditBarberId && activeBarberId && creditBalances.some(function (b) { return b.id === activeBarberId; })) creditBarberId = activeBarberId;
+  document.getElementById('credit-barbers').innerHTML = creditBalances.map(function (b) {
+    var on = b.id === creditBarberId;
+    return '<button type="button" onclick="pickCreditBarber(\'' + b.id + '\')" style="min-height:72px;border-radius:16px;cursor:pointer;font-family:inherit;color:var(--ink);' +
+      'background:' + (on ? 'var(--blue-soft)' : 'var(--card)') + ';border:' + (on ? '2px solid var(--blue)' : '1px solid var(--sep)') + ';display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px">' +
+      '<b style="font-size:15px">' + esc(b.name) + '</b><span style="font-size:12.5px;color:' + (b.balance_cents <= creditAlertCents ? 'var(--red)' : 'var(--grey)') + '">Solde ' + eur(b.balance_cents) + '</span></button>';
+  }).join('') || '<div class="empty">Aucun coiffeur</div>';
+  document.getElementById('credit-amounts').innerHTML = [1000, 2000, 3000].map(function (c) {
+    return '<button type="button" class="btn btn-soft" style="height:60px;font-size:19px;font-weight:600" onclick="addCreditLine(' + c + ')">' + eur(c) + '</button>';
+  }).join('') + '<button type="button" class="btn btn-soft" style="height:60px;font-size:15px" onclick="addCreditLineOther()">Autre</button>';
+}
+function pickCreditBarber(id) { creditBarberId = id; renderCreditSection(); }
+function addCreditLine(cents) {
+  var b = creditBalances.find(function (x) { return x.id === creditBarberId; });
+  if (!b) { toast('Choisissez d\'abord le coiffeur', true); return; }
+  if (!(cents > 0)) return;
+  ticket.push({ item_type: 'product', item_id: null, item_name: 'Crédit produits · ' + b.name, unit_price_cents: cents, quantity: 1, barber_id: b.id, credit_barber_id: b.id });
+  renderTicket(ticket.length - 1);
+  toast('Recharge de ' + eur(cents) + ' pour ' + b.name + ' ajoutée au ticket');
+}
+function addCreditLineOther() {
+  if (!creditBarberId) { toast('Choisissez d\'abord le coiffeur', true); return; }
+  showPrompt('Montant à recharger (€)', { title: 'Crédit produits', placeholder: '25' }).then(function (v) {
+    if (v == null) return;
+    var cents = Math.round(parseFloat(String(v).replace(',', '.')) * 100);
+    if (!(cents > 0) || cents > 100000) { toast('Montant invalide', true); return; }
+    addCreditLine(cents);
+  });
 }
 
 /**
@@ -6413,6 +6464,7 @@ function finalizeSale(saleCtx) {
       toast('✓ ' + (saleCtx.ticketModeName || 'Client') + ' a payé d\'avance — il garde sa place dans la file');
       if (typeof refreshTimer === 'function') refreshTimer();
     }
+    if (saleCtx.soldTicket.some(function (l) { return l.credit_barber_id; })) loadCreditBalances();   // nouveau solde du coiffeur rechargé
     ticket = [];
     ticketQueueId = null;
     ticketGroup = [];

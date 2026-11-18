@@ -2614,6 +2614,24 @@
       </div>
     </div>
     <div id="barbers-list"></div>
+
+    <!-- Crédit produits : les coiffeurs rechargent à la caisse, puis prennent leurs produits depuis leur poste. -->
+    <div class="card-box" id="credit-box" style="margin-top:22px">
+      <div class="admin-head" style="margin-bottom:4px"><h3 style="margin:0">Crédit produits des coiffeurs</h3></div>
+      <p class="hint">Le coiffeur recharge son crédit à la caisse (onglet « Crédit coiffeurs », vente normale), puis prend ses produits depuis son poste (bouton « Crédit ») : le stock baisse et son crédit aussi. Bloqué à 0 €.</p>
+      <div id="credit-summary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:6px 0 14px"></div>
+      <div id="credit-rows"><div class="empty">Chargement…</div></div>
+      <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--sep)">
+        <div style="font-weight:600;margin-bottom:8px">Produits utilisables avec le crédit</div>
+        <div id="credit-cats" style="display:flex;flex-wrap:wrap;gap:8px 16px;margin-bottom:12px"></div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <label for="credit-alert" style="font-size:14px">Alerter le coiffeur sous</label>
+          <input id="credit-alert" type="text" inputmode="decimal" style="width:90px;text-align:right" value="3,00">
+          <span>€</span>
+          <button class="btn btn-primary" style="margin-left:auto" onclick="saveBarberCreditSettings()">Enregistrer</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- ===== Onglet clients ===== -->
@@ -3779,6 +3797,7 @@ function setActiveTab(tabName, how) {
   if (tabName === 'clients') loadClients();
   if (tabName === 'salons') loadChainTab();
   if (tabName === 'marketing') loadMarketingTab();
+  if (tabName === 'barbers') loadBarberCredit();
   if (tabName === 'caisse') loadCaisseTab();
   if (tabName === 'rdv') loadRdvTab();
   if (tabName === 'account') loadOwnerProfile();
@@ -12747,6 +12766,85 @@ function sendAiChatMessage() {
       aiChatSending = false;
       document.getElementById('ai-chat-send-btn').disabled = false;
     });
+}
+
+/* ---------- Crédit produits des coiffeurs (onglet Coiffeurs) ---------- */
+var creditOverview = null, creditProductCats = [];
+function loadBarberCredit() {
+  Promise.all([api('/api/barber-credit/overview'), api('/api/catalog/categories').catch(function () { return { categories: { products: [] } }; })]).then(function (r) {
+    creditOverview = r[0];
+    creditProductCats = (r[1].categories && r[1].categories.products) || [];
+    renderBarberCredit();
+  }).catch(function (e) { document.getElementById('credit-rows').innerHTML = '<div class="empty">' + esc(e.message) + '</div>'; });
+}
+function creditDate(iso) {
+  if (!iso) return '—';
+  var d = new Date(iso);
+  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+function renderBarberCredit() {
+  var o = creditOverview; if (!o) return;
+  var items = o.items || [], alertC = o.settings.alert_cents;
+  var sum = function (k) { return items.reduce(function (a, x) { return a + x[k]; }, 0); };
+  var tile = function (lbl, val) { return '<div style="background:var(--fill);border-radius:14px;padding:12px 14px"><div style="font-size:12.5px;color:var(--grey)">' + lbl + '</div><div style="font-size:22px;font-weight:700;margin-top:2px">' + val + '</div></div>'; };
+  document.getElementById('credit-summary').innerHTML = tile('Rechargé ce mois', eur(sum('month_recharged_cents'))) + tile('Pris ce mois', eur(sum('month_taken_cents'))) +
+    tile('Produits sortis du stock', sum('month_taken_count')) + tile('Crédit restant (total)', eur(sum('balance_cents')));
+  document.getElementById('credit-rows').innerHTML = items.length ? items.map(function (b) {
+    return '<div class="item"><div class="item-main"><div class="item-name">' + esc(b.name) + (b.active ? '' : ' <span class="chip" style="font-size:11.5px">ne travaille plus ici</span>') + '</div>' +
+      '<div class="item-meta">Pris ce mois : ' + eur(b.month_taken_cents) + ' (' + b.month_taken_count + ') · Dernier produit : ' + creditDate(b.last_take_at) + '</div></div>' +
+      '<div style="font-size:18px;font-weight:700;color:' + (b.balance_cents <= alertC ? 'var(--red)' : 'var(--ink)') + ';margin-right:12px;white-space:nowrap">' + eur(b.balance_cents) + '</div>' +
+      '<div class="item-actions"><button class="btn btn-soft" style="font-size:13px;padding:6px 12px" onclick="openBarberCreditHistory(\'' + b.id + '\')">Historique</button>' +
+      '<button class="btn btn-soft" style="font-size:13px;padding:6px 12px" onclick="adjustBarberCredit(\'' + b.id + '\')">Ajuster</button></div></div>';
+  }).join('') : '<div class="empty">Aucun coiffeur</div>';
+  var chosen = o.settings.categories || [];
+  document.getElementById('credit-cats').innerHTML = creditProductCats.length ? creditProductCats.map(function (c) {
+    return '<label style="display:flex;gap:8px;align-items:center;font-weight:400;cursor:pointer"><input type="checkbox" class="credit-cat" value="' + esc(c.id) + '" style="width:auto;margin:0"' + (chosen.indexOf(c.id) !== -1 ? ' checked' : '') + '> ' + esc(c.name) + '</label>';
+  }).join('') + '<div class="hint" style="width:100%;margin:2px 0 0">Aucune case cochée = tous les produits.</div>'
+    : '<div class="hint" style="margin:0">Tous les produits (créez des catégories de produits pour en limiter certains, par ex. « Boissons »).</div>';
+  document.getElementById('credit-alert').value = (alertC / 100).toFixed(2).replace('.', ',');
+}
+function saveBarberCreditSettings() {
+  var cats = [].map.call(document.querySelectorAll('.credit-cat:checked'), function (x) { return x.value; });
+  var alertC = Math.round(parseFloat(document.getElementById('credit-alert').value.replace(',', '.')) * 100);
+  if (!(alertC >= 0)) { toast('Seuil d\'alerte invalide', true); return; }
+  api('/api/barber-credit/settings', { method: 'PUT', body: { categories: cats, alert_cents: alertC } })
+    .then(function () { toast('Réglages du crédit enregistrés'); loadBarberCredit(); })
+    .catch(function (e) { toast(e.message, true); });
+}
+function openBarberCreditHistory(id) {
+  var b = (creditOverview.items || []).find(function (x) { return x.id === id; });
+  api('/api/barber-credit/moves?barber_id=' + encodeURIComponent(id)).then(function (r) {
+    var rows = (r.items || []).map(function (m) {
+      var label = m.kind === 'take' ? esc(m.product_name || 'Produit') : m.kind === 'recharge' ? 'Recharge caisse · ' + esc(m.note || '') : 'Ajustement · ' + esc(m.note || '');
+      return '<div style="display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--sep);font-size:14px;' + (m.undone ? 'opacity:.5;text-decoration:line-through' : '') + '">' +
+        '<div>' + label + '<div style="font-size:12px;color:var(--grey)">' + creditDate(m.created_at) + (m.undone ? ' · annulé par le coiffeur' : '') + '</div></div>' +
+        '<b style="white-space:nowrap;color:' + (m.amount_cents < 0 ? 'var(--red)' : 'var(--green)') + '">' + (m.amount_cents > 0 ? '+' : '−') + eur(Math.abs(m.amount_cents)) + '</b></div>';
+    }).join('') || '<div class="empty">Aucun mouvement</div>';
+    var overlay = _buildModal('<div class="modal-title">Crédit produits · ' + esc(b ? b.name : '') + '</div>' +
+      '<div style="max-height:60vh;overflow-y:auto;margin-bottom:14px;text-align:left">' + rows + '</div>' +
+      '<div class="modal-actions"><button class="btn btn-primary" id="bc-close">Fermer</button></div>');
+    overlay.querySelector('#bc-close').onclick = function () { _closeModal(overlay); };
+  }).catch(function (e) { toast(e.message, true); });
+}
+function adjustBarberCredit(id) {
+  var b = (creditOverview.items || []).find(function (x) { return x.id === id; });
+  if (!b) return;
+  var overlay = _buildModal('<div class="modal-title">Ajuster le crédit · ' + esc(b.name) + '</div>' +
+    '<div class="modal-message">Solde actuel : <b>' + eur(b.balance_cents) + '</b>. Montant positif pour ajouter, négatif pour retirer (ex. −7,50 si vous lui rendez son crédit en espèces).</div>' +
+    '<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;text-align:left">' +
+      '<label style="font-size:13px">Montant (€)<input id="bc-amount" type="text" inputmode="decimal" placeholder="-7,50" style="margin-top:4px"></label>' +
+      '<label style="font-size:13px">Raison<input id="bc-note" type="text" placeholder="Remboursé en espèces (départ)" style="margin-top:4px"></label></div>' +
+    '<div class="modal-actions"><button class="btn btn-soft" id="bc-cancel">Annuler</button><button class="btn btn-primary" id="bc-ok">Enregistrer</button></div>');
+  overlay.querySelector('#bc-cancel').onclick = function () { _closeModal(overlay); };
+  overlay.querySelector('#bc-ok').onclick = function () {
+    var cents = Math.round(parseFloat(overlay.querySelector('#bc-amount').value.replace(',', '.').replace('−', '-')) * 100);
+    var note = overlay.querySelector('#bc-note').value.trim();
+    if (!cents) { toast('Montant invalide', true); return; }
+    if (!note) { toast('Indiquez la raison', true); return; }
+    api('/api/barber-credit/adjust', { method: 'POST', body: { barber_id: id, amount_cents: cents, note: note } }).then(function (r) {
+      _closeModal(overlay); toast('Nouveau solde de ' + b.name + ' : ' + eur(r.balance_cents)); loadBarberCredit();
+    }).catch(function (e) { toast(e.message, true); });
+  };
 }
 </script>
 

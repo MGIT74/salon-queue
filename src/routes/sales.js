@@ -123,8 +123,16 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
       quantity: qty,
       barber_id: typeof it.barber_id === 'string' ? it.barber_id : null,
       // Ticket groupé : la personne (passage) de cette ligne - seulement l'un des passages réglés par ce ticket.
-      queue_id: groupIds.length && typeof it.queue_id === 'string' && linePassages.has(it.queue_id) ? it.queue_id : null
+      queue_id: groupIds.length && typeof it.queue_id === 'string' && linePassages.has(it.queue_id) ? it.queue_id : null,
+      // Recharge du crédit produits d'un coiffeur (ligne sans article : rien ne sort du stock).
+      credit_barber_id: typeof it.credit_barber_id === 'string' && it.credit_barber_id ? it.credit_barber_id.slice(0, 36) : null
     });
+  }
+  const creditLines = cleanItems.filter((it) => it.credit_barber_id);
+  if (creditLines.length) {
+    if (gift || req.body.balance) return res.status(400).json({ error: 'Une recharge de crédit coiffeur ne peut pas être un cadeau ni un reste à payer.' });
+    creditLines.forEach((it) => { it.item_type = 'product'; it.item_id = null; });
+    if (creditLines.some((it) => it.unit_price_cents < 1)) return res.status(400).json({ error: 'Montant de recharge invalide' });
   }
 
   let outcome;
@@ -318,6 +326,18 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
         'INSERT INTO sale_items (id, sale_id, item_type, item_id, item_name, unit_price_cents, quantity, barber_id, vat_rate, queue_id) VALUES ?',
         [itemRows]
       );
+
+      // 6 bis. Recharges de crédit produits : +montant sur le crédit du coiffeur, lié à cette vente.
+      if (creditLines.length) {
+        const ids = [...new Set(creditLines.map((it) => it.credit_barber_id))];
+        const [okBarbers] = await db.query('SELECT id FROM barbers WHERE salon_id = ? AND id IN (?)', [req.salon.id, ids]);
+        if (okBarbers.length !== ids.length) throw new HttpError(400, 'Recharge : coiffeur introuvable');
+        for (const it of creditLines) {
+          await db.query(
+            "INSERT INTO barber_credit_moves (id, salon_id, barber_id, kind, amount_cents, sale_id, note) VALUES (?, ?, ?, 'recharge', ?, ?, ?)",
+            [crypto.randomUUID(), req.salon.id, it.credit_barber_id, it.unit_price_cents * it.quantity, saleId, 'Ticket n° ' + ticketNumber + ' (' + payment_method + ')']);
+        }
+      }
 
       // 7. Décompte du stock (uniquement les produits à stock géré).
       for (const [productId, qty] of wantedByProduct) {

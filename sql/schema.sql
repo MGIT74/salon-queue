@@ -1553,3 +1553,21 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'loyalty_accounts' AND column_name = 'disabled_by');
 SET @sql := IF(@c = 0, 'ALTER TABLE loyalty_accounts ADD COLUMN disabled_by VARCHAR(10) NULL', 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Crédit produits des coiffeurs : le coiffeur recharge son crédit à la caisse (vente normale),
+-- puis prend ses produits (boissons, soins...) depuis son poste : le stock baisse et son crédit aussi.
+-- Solde = somme des mouvements (+ recharge / ajustement, − produit pris).
+CREATE TABLE IF NOT EXISTS barber_credit_moves (
+  id CHAR(36) PRIMARY KEY,
+  salon_id CHAR(36) NOT NULL,
+  barber_id CHAR(36) NOT NULL,
+  kind VARCHAR(10) NOT NULL,
+  amount_cents INT NOT NULL,
+  product_id CHAR(36) NULL,
+  product_name VARCHAR(255) NULL,
+  sale_id CHAR(36) NULL,
+  note VARCHAR(255) NULL,
+  undone_at DATETIME NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  KEY idx_bcm_barber (salon_id, barber_id, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

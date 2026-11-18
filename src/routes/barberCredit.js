@@ -1,0 +1,200 @@
+/**
+ * Crédit produits des coiffeurs.
+ *
+ * - Recharge : à la caisse, comme une vente normale (ligne « Crédit produits · Prénom » qui porte
+ *   credit_barber_id, voir sales.js) -> mouvement +montant lié à la vente.
+ * - Prise d'un produit : depuis « Mon poste », par le coiffeur connecté avec SON code PIN (jamais
+ *   « pour » un collègue) : le stock baisse de 1 et son crédit du prix du produit. Bloqué à 0 €.
+ *   Annulable par lui pendant 10 minutes (erreur de touche).
+ * - Admin : soldes, historique, réglages (catégories de produits autorisées, seuil d'alerte),
+ *   ajustement manuel (correction, remboursement d'un coiffeur qui part).
+ */
+const express = require('express');
+const crypto = require('crypto');
+const { pool, utcIso, getSettings, setSettings } = require('../db');
+const requireAdmin = require('../middleware/auth');
+const requireAdminOrBarber = require('../middleware/barberAuth');
+const { logActivity } = require('../lib/activityLog');
+const { wrap } = require('../lib/wrap');
+
+const router = express.Router();
+const UNDO_MINUTES = 10;
+
+async function creditSettings(salonId) {
+  const s = await getSettings(salonId);
+  let cats = [];
+  try { cats = JSON.parse(s.barber_credit_categories || '[]'); } catch (e) { cats = []; }
+  if (!Array.isArray(cats)) cats = [];
+  const alert = Number(s.barber_credit_alert_cents);
+  return { categories: cats.filter((c) => typeof c === 'string'), alert_cents: Number.isInteger(alert) && alert >= 0 ? alert : 300 };
+}
+
+async function balanceOf(db, salonId, barberId) {
+  const [[r]] = await db.query(
+    'SELECT COALESCE(SUM(amount_cents), 0) AS bal FROM barber_credit_moves WHERE salon_id = ? AND barber_id = ? AND undone_at IS NULL',
+    [salonId, barberId]);
+  return Number(r.bal);
+}
+
+/** Produits qu'un coiffeur peut prendre avec son crédit (actifs, dans les catégories choisies ; aucune = tous). */
+async function allowedProducts(salonId, cats) {
+  const [rows] = await pool.query(
+    'SELECT id, name, price_cents, category, stock_enabled, stock_quantity, barcode FROM products WHERE salon_id = ? AND active = 1 ORDER BY sort_order, name',
+    [salonId]);
+  return rows.filter((p) => !cats.length || cats.indexOf(p.category) !== -1).map((p) => ({
+    id: p.id, name: p.name, price_cents: p.price_cents, category: p.category,
+    stock_enabled: Boolean(p.stock_enabled), stock_quantity: p.stock_quantity, barcode: p.barcode || null
+  }));
+}
+
+function moveView(m) {
+  return {
+    id: m.id, kind: m.kind, amount_cents: m.amount_cents, product_id: m.product_id, product_name: m.product_name,
+    note: m.note, undone: Boolean(m.undone_at), created_at: utcIso(m.created_at),
+    can_undo: m.kind === 'take' && !m.undone_at && (Date.now() - new Date(utcIso(m.created_at)).getTime()) < UNDO_MINUTES * 60000
+  };
+}
+
+function needBarber(req, res) {
+  if (!req.barberId) { res.status(403).json({ error: 'Connectez-vous à votre poste avec votre code.' }); return false; }
+  return true;
+}
+
+// ---- Mon poste ----
+router.get('/me', requireAdminOrBarber, wrap(async (req, res) => {
+  if (!needBarber(req, res)) return;
+  const st = await creditSettings(req.salon.id);
+  const [moves] = await pool.query(
+    'SELECT * FROM barber_credit_moves WHERE salon_id = ? AND barber_id = ? ORDER BY created_at DESC LIMIT 15', [req.salon.id, req.barberId]);
+  res.json({
+    ok: true,
+    balance_cents: await balanceOf(pool, req.salon.id, req.barberId),
+    alert_cents: st.alert_cents,
+    products: await allowedProducts(req.salon.id, st.categories),
+    moves: moves.map(moveView)
+  });
+}));
+
+router.post('/take', requireAdminOrBarber, wrap(async (req, res) => {
+  if (!needBarber(req, res)) return;
+  const productId = typeof req.body.product_id === 'string' ? req.body.product_id.slice(0, 36) : '';
+  const st = await creditSettings(req.salon.id);
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    // Verrou sur le coiffeur : deux prises en même temps ne peuvent pas passer sous 0 €.
+    await conn.query('SELECT id FROM barbers WHERE id = ? AND salon_id = ? FOR UPDATE', [req.barberId, req.salon.id]);
+    const [[p]] = await conn.query(
+      'SELECT id, name, price_cents, category, stock_enabled, stock_quantity FROM products WHERE id = ? AND salon_id = ? AND active = 1 FOR UPDATE',
+      [productId, req.salon.id]);
+    if (!p || (st.categories.length && st.categories.indexOf(p.category) === -1)) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Ce produit ne se prend pas avec le crédit.' });
+    }
+    if (p.stock_enabled && p.stock_quantity < 1) {
+      await conn.rollback();
+      return res.status(409).json({ error: 'Plus de « ' + p.name + ' » en stock.' });
+    }
+    const bal = await balanceOf(conn, req.salon.id, req.barberId);
+    if (bal < p.price_cents) {
+      await conn.rollback();
+      return res.status(409).json({ error: 'Crédit insuffisant (' + (bal / 100).toFixed(2).replace('.', ',') + ' €) : rechargez à la caisse.', code: 'no_credit' });
+    }
+    if (p.stock_enabled) await conn.query('UPDATE products SET stock_quantity = stock_quantity - 1 WHERE id = ?', [p.id]);
+    const id = crypto.randomUUID();
+    await conn.query(
+      "INSERT INTO barber_credit_moves (id, salon_id, barber_id, kind, amount_cents, product_id, product_name) VALUES (?, ?, ?, 'take', ?, ?, ?)",
+      [id, req.salon.id, req.barberId, -p.price_cents, p.id, p.name]);
+    await conn.commit();
+    res.json({ ok: true, move_id: id, product: { id: p.id, name: p.name, price_cents: p.price_cents }, balance_cents: bal - p.price_cents });
+  } catch (err) {
+    try { await conn.rollback(); } catch (e) {}
+    throw err;
+  } finally { conn.release(); }
+}));
+
+// Annuler une prise (erreur de touche) : par le coiffeur lui-même, dans les 10 minutes. Stock et crédit rendus.
+router.post('/moves/:id/undo', requireAdminOrBarber, wrap(async (req, res) => {
+  if (!needBarber(req, res)) return;
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [[m]] = await conn.query(
+      "SELECT * FROM barber_credit_moves WHERE id = ? AND salon_id = ? AND barber_id = ? AND kind = 'take' FOR UPDATE",
+      [req.params.id, req.salon.id, req.barberId]);
+    if (!m || m.undone_at) { await conn.rollback(); return res.status(404).json({ error: 'Rien à annuler.' }); }
+    if (!moveView(m).can_undo) { await conn.rollback(); return res.status(409).json({ error: 'Trop tard pour annuler (' + UNDO_MINUTES + ' min) : voyez avec le responsable.' }); }
+    await conn.query('UPDATE barber_credit_moves SET undone_at = NOW() WHERE id = ?', [m.id]);
+    if (m.product_id) await conn.query('UPDATE products SET stock_quantity = stock_quantity + 1 WHERE id = ? AND salon_id = ? AND stock_enabled = 1', [m.product_id, req.salon.id]);
+    await conn.commit();
+    res.json({ ok: true, balance_cents: await balanceOf(pool, req.salon.id, req.barberId) });
+  } catch (err) {
+    try { await conn.rollback(); } catch (e) {}
+    throw err;
+  } finally { conn.release(); }
+}));
+
+// ---- Caisse (soldes pour choisir qui recharger) et dashboard ----
+router.get('/balances', requireAdminOrBarber, wrap(async (req, res) => {
+  const [rows] = await pool.query(
+    `SELECT b.id, b.name, b.active,
+       COALESCE((SELECT SUM(m.amount_cents) FROM barber_credit_moves m WHERE m.salon_id = b.salon_id AND m.barber_id = b.id AND m.undone_at IS NULL), 0) AS balance_cents
+     FROM barbers b WHERE b.salon_id = ? ORDER BY b.sort_order, b.name`, [req.salon.id]);
+  const st = await creditSettings(req.salon.id);
+  res.json({ ok: true, alert_cents: st.alert_cents, items: rows.filter((r) => r.active || Number(r.balance_cents) !== 0).map((r) => ({ id: r.id, name: r.name, active: Boolean(r.active), balance_cents: Number(r.balance_cents) })) });
+}));
+
+router.get('/overview', requireAdmin, wrap(async (req, res) => {
+  const [rows] = await pool.query(
+    `SELECT b.id, b.name, b.active,
+       COALESCE(SUM(CASE WHEN m.undone_at IS NULL THEN m.amount_cents END), 0) AS balance_cents,
+       COALESCE(SUM(CASE WHEN m.undone_at IS NULL AND m.kind = 'take' AND m.created_at >= DATE_FORMAT(UTC_TIMESTAMP(), '%Y-%m-01') THEN -m.amount_cents END), 0) AS month_taken_cents,
+       COALESCE(SUM(CASE WHEN m.undone_at IS NULL AND m.kind = 'take' AND m.created_at >= DATE_FORMAT(UTC_TIMESTAMP(), '%Y-%m-01') THEN 1 END), 0) AS month_taken_count,
+       COALESCE(SUM(CASE WHEN m.undone_at IS NULL AND m.kind = 'recharge' AND m.created_at >= DATE_FORMAT(UTC_TIMESTAMP(), '%Y-%m-01') THEN m.amount_cents END), 0) AS month_recharged_cents,
+       MAX(CASE WHEN m.kind = 'take' AND m.undone_at IS NULL THEN m.created_at END) AS last_take_at
+     FROM barbers b LEFT JOIN barber_credit_moves m ON m.salon_id = b.salon_id AND m.barber_id = b.id
+     WHERE b.salon_id = ? GROUP BY b.id, b.name, b.active ORDER BY b.name`, [req.salon.id]);
+  const st = await creditSettings(req.salon.id);
+  res.json({
+    ok: true, settings: st,
+    items: rows.filter((r) => r.active || Number(r.balance_cents) !== 0).map((r) => ({
+      id: r.id, name: r.name, active: Boolean(r.active), balance_cents: Number(r.balance_cents),
+      month_taken_cents: Number(r.month_taken_cents), month_taken_count: Number(r.month_taken_count),
+      month_recharged_cents: Number(r.month_recharged_cents), last_take_at: r.last_take_at ? utcIso(r.last_take_at) : null
+    }))
+  });
+}));
+
+router.get('/moves', requireAdmin, wrap(async (req, res) => {
+  const [rows] = await pool.query(
+    'SELECT * FROM barber_credit_moves WHERE salon_id = ? AND barber_id = ? ORDER BY created_at DESC LIMIT 100',
+    [req.salon.id, String(req.query.barber_id || '')]);
+  res.json({ ok: true, items: rows.map(moveView) });
+}));
+
+router.put('/settings', requireAdmin, wrap(async (req, res) => {
+  const cats = Array.isArray(req.body.categories) ? req.body.categories.filter((c) => typeof c === 'string').slice(0, 50) : [];
+  const alert = Math.round(Number(req.body.alert_cents));
+  if (!Number.isInteger(alert) || alert < 0 || alert > 100000) return res.status(400).json({ error: 'Seuil d\'alerte invalide' });
+  await setSettings(req.salon.id, { barber_credit_categories: JSON.stringify(cats), barber_credit_alert_cents: alert });
+  res.json({ ok: true });
+}));
+
+// Ajustement manuel par l'admin : correction, ou remboursement du crédit restant d'un coiffeur qui part.
+router.post('/adjust', requireAdmin, wrap(async (req, res) => {
+  const barberId = String(req.body.barber_id || '');
+  const amount = Math.round(Number(req.body.amount_cents));
+  const note = String(req.body.note || '').trim().slice(0, 255);
+  if (!Number.isInteger(amount) || !amount || Math.abs(amount) > 1000000) return res.status(400).json({ error: 'Montant invalide' });
+  if (!note) return res.status(400).json({ error: 'Indiquez la raison de l\'ajustement' });
+  const [[b]] = await pool.query('SELECT id, name FROM barbers WHERE id = ? AND salon_id = ?', [barberId, req.salon.id]);
+  if (!b) return res.status(404).json({ error: 'Coiffeur introuvable' });
+  await pool.query(
+    "INSERT INTO barber_credit_moves (id, salon_id, barber_id, kind, amount_cents, note) VALUES (?, ?, ?, 'adjust', ?, ?)",
+    [crypto.randomUUID(), req.salon.id, b.id, amount, note]);
+  logActivity(req.salon.id, 'barber_credit_adjust', 'Crédit produits de ' + b.name + ' ajusté de ' + (amount / 100).toFixed(2).replace('.', ',') + ' € : ' + note);
+  res.json({ ok: true, balance_cents: await balanceOf(pool, req.salon.id, b.id) });
+}));
+
+module.exports = router;
+module.exports.balanceOf = balanceOf;

@@ -34,6 +34,7 @@ const { signupEnabled } = require('./src/lib/config');
 const clientAuthRoutes = require('./src/routes/clientAuth');
 const { requireExplicitSalon } = require('./src/middleware/requireSalon');
 const tpeRoutes = require('./src/routes/tpe');
+const barberCreditRoutes = require('./src/routes/barberCredit');
 const requireAdmin = require('./src/middleware/auth');
 const resolveSalon = require('./src/middleware/resolveSalon');
 const { startNotifyJob } = require('./src/cron/notify');
@@ -125,6 +126,7 @@ app.use('/api/ai-chat', aiChatRoutes);
 app.use('/api/owner', ownerRoutes);
 app.use('/api/client-auth', requireExplicitSalon, clientAuthRoutes);
 app.use('/api/tpe', tpeRoutes);
+app.use('/api/barber-credit', requireExplicitSalon, barberCreditRoutes);
 
 // Vérification du mot de passe depuis l'écran de connexion du dashboard
 app.post('/api/login', loginRateLimiter('admin-login'), requireAdmin, (req, res) => res.json({ ok: true }));
