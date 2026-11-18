@@ -2229,41 +2229,12 @@
   <!-- ===== Onglet marketing (fidélité + cadeaux) ===== -->
   <div class="tab-panel" id="t-marketing">
     <div class="card-box">
-      <h3>Programme de fidélité</h3>
-      <p class="hint">Cumulé au niveau de l'enseigne — un client gagne 1 point par passage payé, sur n'importe lequel de vos salons. La remise prestation et la remise produit ont chacune leur propre nombre de points à atteindre ; utiliser une remise retire ses points.</p>
-      <div class="grid2">
-        <div class="fld"><label for="mk-threshold">Points à atteindre — remise prestation</label>
-          <input id="mk-threshold" type="number" min="1" step="1" value="10"></div>
-        <div class="fld"><label for="mk-product-threshold">Points à atteindre — remise produit</label>
-          <input id="mk-product-threshold" type="number" min="1" step="1" value="10"></div>
+      <div class="admin-head" style="margin-bottom:4px">
+        <h3 style="margin:0">Cartes de fidélité</h3>
+        <button class="btn btn-primary" onclick="openLoyaltyCardEditor(null)">+ Nouvelle carte</button>
       </div>
-      <div class="grid2">
-        <div class="fld"><label for="mk-service-pct">Remise sur une prestation (%)</label>
-          <input id="mk-service-pct" type="number" min="0" max="100" value="50"></div>
-        <div class="fld"><label for="mk-product-pct">Remise sur un produit (%)</label>
-          <input id="mk-product-pct" type="number" min="0" max="100" value="20"></div>
-      </div>
-      <button class="btn btn-primary" onclick="saveMarketingSettings()">Enregistrer</button>
-    </div>
-
-    <div class="card-box">
-      <h3>Design de la carte fidélité (compte client)</h3>
-      <p class="hint">
-        Image de fond affichée derrière les points de fidélité, sur le compte client. Format recommandé :
-        <strong>720 × 320 px</strong> (rectangle horizontal) — l'image est automatiquement recadrée et compressée
-        à cette taille, elle restera toujours légère peu importe la photo d'origine.
-      </p>
-      <div style="display:flex;align-items:center;gap:16px">
-        <div id="loyalty-card-preview" onclick="document.getElementById('loyalty-card-input').click()"
-             style="width:180px;height:80px;border-radius:14px;cursor:pointer;background:var(--fill);
-             display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;
-             color:var(--grey);font-size:12px;text-align:center;background-size:cover;background-position:center">Aucune image</div>
-        <input type="file" id="loyalty-card-input" accept="image/*" style="display:none" onchange="uploadLoyaltyCardImage(this)">
-        <div>
-          <div class="hint" style="margin:0 0 6px">Cliquez sur le cadre pour choisir une image.</div>
-          <button class="btn btn-ghost" onclick="removeLoyaltyCardImage()" style="font-size:13px;padding:6px 12px">Retirer l'image (fond uni par défaut)</button>
-        </div>
-      </div>
+      <p class="hint">Seules les cartes publiées sont proposées aux clients. Le client gagne 1 point par passage payé, sur chaque carte activée dont un article qui rapporte des points est sur le ticket. Chaque palier débloque sa récompense ; l'utiliser retire ses points.</p>
+      <div id="lc-list"><div class="empty">Chargement…</div></div>
     </div>
 
     <div class="card-box">
@@ -2312,12 +2283,15 @@
           </select>
         </div>
       </div>
-      <p class="hint">Points et récompenses en attente, tous salons de l'enseigne confondus.</p>
-      <div class="fld" style="margin-bottom:12px"><input id="loyalty-search" type="text" placeholder="Rechercher (nom, email)…" oninput="filterLoyaltyAccounts(this.value)"></div>
+      <p class="hint">Points et récompenses atteintes, carte par carte, pour les clients de ce salon.</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+        <div class="fld" style="margin:0;flex:1 1 220px"><input id="loyalty-search" type="text" placeholder="Rechercher (nom, email)…" oninput="filterLoyaltyAccounts(this.value)"></div>
+        <div class="fld" style="margin:0;flex:0 1 220px"><select id="loyalty-card-filter" onchange="filterLoyaltyAccounts(document.getElementById('loyalty-search').value)"><option value="">Toutes les cartes</option></select></div>
+      </div>
       <div class="item" id="loyalty-list-head" style="background:none;box-shadow:none;border-radius:0;margin-bottom:0;padding:0 4px">
         <div class="item-main">
           <div class="loyalty-info-grid loyalty-info-head">
-            <div class="f">Email</div><div class="f">Points</div><div class="f">Remises disponibles</div>
+            <div class="f">Email</div><div class="f">Points</div><div class="f">Récompenses disponibles</div>
             <div class="f">Activé le</div><div class="f">Dernière activité</div>
           </div>
         </div>
@@ -3288,7 +3262,7 @@
   </div>
 </div>
 
-<script src="/app.js?v=67"></script>
+<script src="/app.js?v=68"></script>
 <script src="/autorefresh.js?v=3"></script>
 <script src="/staff-group.js?v=7"></script>
 <script src="/daterange.js?v=4"></script>
@@ -4555,7 +4529,9 @@ function loyaltyTiersHtml(l) {
 function renderDrawerMarketing(r) {
   var parts = [];
 
-  if (r.loyalty && r.loyalty.activated) {
+  if (r.loyalty_cards && r.loyalty_cards.some(function (c) { return c.activated; })) {
+    parts.push(loyaltyCardsRowsHtml(r.loyalty_cards));
+  } else if (r.loyalty && r.loyalty.activated) {
     parts.push(
       '<div class="detail-row"><span class="detail-label">⭐ Fidélité</span><span class="detail-value">' +
       r.loyalty.points + ' point' + (r.loyalty.points > 1 ? 's' : '') +
@@ -6775,18 +6751,15 @@ var giftCardsData = [];
 var giftsPage = 1, giftsPerPage = 10;
 
 function loadMarketingTab() {
-  api('/api/owner/marketing-settings').then(function (r) {
-    document.getElementById('mk-threshold').value = r.settings.loyalty_service_threshold || r.settings.loyalty_threshold;
-    document.getElementById('mk-product-threshold').value = r.settings.loyalty_product_threshold || r.settings.loyalty_threshold;
-    document.getElementById('mk-service-pct').value = r.settings.loyalty_service_discount_pct;
-    document.getElementById('mk-product-pct').value = r.settings.loyalty_product_discount_pct;
-  }).catch(function (e) { toast(e.message, true); });
+  loadLoyaltyCards();
 
   api('/api/owner/loyalty-accounts').then(function (r) {
     loyaltyAccountsDataAll = r.items;
     loyaltyAccountsData = r.items;
     loyaltyPage = 1;
     document.getElementById('loyalty-search').value = '';
+    var f = document.getElementById('loyalty-card-filter');
+    if (f) f.innerHTML = '<option value="">Toutes les cartes</option>' + (r.cards || []).map(function (c) { return '<option value="' + c.id + '">' + esc(c.name) + '</option>'; }).join('');
     renderLoyaltyAccountsList();
   }).catch(function (e) { toast(e.message, true); });
 
@@ -6806,7 +6779,10 @@ function loadMarketingTab() {
  */
 function filterLoyaltyAccounts(query) {
   query = query.trim().toLowerCase();
-  loyaltyAccountsData = !query ? loyaltyAccountsDataAll : loyaltyAccountsDataAll.filter(function (a) {
+  var cf = document.getElementById('loyalty-card-filter'), cardId = cf ? cf.value : '';
+  loyaltyAccountsData = loyaltyAccountsDataAll.filter(function (a) {
+    if (cardId && a.card_id !== cardId) return false;
+    if (!query) return true;
     return (a.client_name || '').toLowerCase().indexOf(query) !== -1 ||
       (a.recipient_email || '').toLowerCase().indexOf(query) !== -1 ||
       (a.client_key || '').toLowerCase().indexOf(query) !== -1;
@@ -6861,13 +6837,13 @@ function renderLoyaltyAccountsList() {
         var infoGrid = [
           '<div class="f"><b>' + esc(a.recipient_email || a.client_key || '—') + '</b></div>',
           '<div class="f"><b>' + a.points + '</b></div>',
-          '<div class="f">' + (a.rewards && (a.rewards.service || a.rewards.product)
-            ? '<b>' + [a.rewards.service ? 'Prestation' : '', a.rewards.product ? 'Produit' : ''].filter(Boolean).join(' + ') + '</b>' : '') + '</div>',
+          '<div class="f">' + (a.available && a.available.length ? '<b>' + esc(a.available.join(' · ')) + '</b>' : '') + '</div>',
           '<div class="f"><b>' + fmtDate(a.activated_at) + '</b></div>',
           '<div class="f"><b>' + fmtDate(a.updated_at) + '</b></div>'
         ].join('');
         return '<div class="item">' +
-          '<div class="item-main"><div class="item-name">' + esc(a.client_name) + '</div>' +
+          '<div class="item-main"><div class="item-name">' + esc(a.client_name) +
+            (a.card_name ? ' <span class="chip" style="font-size:11.5px;margin-left:6px">' + esc(a.card_name) + '</span>' : '') + '</div>' +
           '<div class="loyalty-info-grid">' + infoGrid + '</div></div>' +
           '<div class="item-actions">' +
             '<button class="btn btn-soft" style="font-size:13px;padding:6px 12px" onclick="deactivateLoyaltyAccount(\'' + a.id + '\', \'' + esc(a.client_name).replace(/'/g, "\\'") + '\')">Désactiver</button>' +
@@ -6986,6 +6962,159 @@ function resendGiftCode(giftId) {
   api('/api/owner/gift-cards/' + giftId + '/resend', { method: 'POST', body: { base_url: window.location.origin } })
     .then(function () { toast('Email renvoyé'); })
     .catch(function (e) { toast(e.message, true); });
+}
+
+/* ---------- Cartes de fidélité (Marketing) : liste, publier / dépublier, éditeur ---------- */
+var lcCards = [], lcEdit = null;
+function loadLoyaltyCards() {
+  return api('/api/owner/loyalty-cards').then(function (r) { lcCards = r.items || []; renderLoyaltyCardsAdmin(); })
+    .catch(function (e) { toast(e.message, true); });
+}
+function lcScopeText(c) {
+  if (c.scope_all) return 'Tous les articles';
+  var n = (c.items || []).length;
+  return n + ' article' + (n > 1 ? 's' : '') + ' coché' + (n > 1 ? 's' : '');
+}
+function renderLoyaltyCardsAdmin() {
+  var box = document.getElementById('lc-list');
+  if (!box) return;
+  box.innerHTML = !lcCards.length ? '<div class="empty">Aucune carte. Créez-en une avec « + Nouvelle carte ».</div>' : lcCards.map(function (c) {
+    return '<div class="item"><div class="item-main"><div class="item-name">' + esc(c.name) +
+      ' <span class="chip ' + (c.published ? 'main' : '') + '" style="font-size:11.5px;margin-left:6px">' + (c.published ? 'Publiée' : 'Non publiée') + '</span></div>' +
+      '<div class="item-meta">' + esc(lcScopeText(c)) + ' · ' + esc(c.tiers.map(function (t) { return t.points + ' pts → ' + t.label; }).join(' · ')) +
+      ' · ' + c.members + ' client' + (c.members > 1 ? 's' : '') + '</div></div>' +
+      '<div class="item-actions">' +
+        '<button class="btn btn-soft" style="font-size:13px;padding:6px 12px" onclick="toggleLoyaltyCardPublished(\'' + c.id + '\')">' + (c.published ? 'Dépublier' : 'Publier') + '</button>' +
+        '<button class="btn btn-primary" style="font-size:13px;padding:6px 12px" onclick="openLoyaltyCardEditor(\'' + c.id + '\')">Modifier</button>' +
+      '</div></div>';
+  }).join('');
+}
+function toggleLoyaltyCardPublished(id) {
+  var c = lcCards.find(function (x) { return x.id === id; });
+  if (!c) return;
+  var go = function () {
+    api('/api/owner/loyalty-cards/' + id + '/publish', { method: 'POST', body: { published: !c.published } })
+      .then(function () { toast(c.published ? 'Carte dépubliée' : 'Carte publiée'); loadLoyaltyCards(); })
+      .catch(function (e) { toast(e.message, true); });
+  };
+  if (c.published) showConfirm('Dépublier « ' + c.name + ' » ? Elle ne sera plus proposée et ne rapportera plus de points. Les points déjà gagnés sont conservés.', { title: 'Dépublier la carte', confirmLabel: 'Dépublier' }).then(function (ok) { if (ok) go(); });
+  else go();
+}
+
+function openLoyaltyCardEditor(id) {
+  var c = id ? lcCards.find(function (x) { return x.id === id; }) : null;
+  lcEdit = c ? JSON.parse(JSON.stringify(c)) : { id: null, name: '', published: true, auto_on_signup: false, scope_all: true, items: [], has_image: false, uses_salon_image: false,
+    tiers: [{ points: 10, reward: 'service_pct', pct: 50 }] };
+  lcEdit.image_url = undefined;   // undefined = image inchangée
+  var overlay = _buildModal('<div class="modal-title">' + (c ? 'Modifier la carte' : 'Nouvelle carte de fidélité') + '</div><div id="lc-editor"></div>' +
+    '<div class="modal-actions" style="margin-top:16px">' +
+      (c && !c.members ? '<button class="btn btn-ghost" style="color:var(--red);margin-right:auto" id="lc-del">Supprimer</button>' : '') +
+      '<button class="btn btn-soft" id="lc-cancel">Annuler</button><button class="btn btn-primary" id="lc-save">Enregistrer</button></div>');
+  overlay.querySelector('.modal-box').style.maxWidth = '640px';
+  overlay.querySelector('#lc-cancel').onclick = function () { _closeModal(overlay); };
+  overlay.querySelector('#lc-save').onclick = function () { saveLoyaltyCard(overlay); };
+  var del = overlay.querySelector('#lc-del');
+  if (del) del.onclick = function () {
+    showConfirm('Supprimer définitivement « ' + c.name + ' » ?', { title: 'Supprimer la carte', danger: true, confirmLabel: 'Supprimer' }).then(function (ok) {
+      if (!ok) return;
+      api('/api/owner/loyalty-cards/' + c.id, { method: 'DELETE' }).then(function () { _closeModal(overlay); toast('Carte supprimée'); loadLoyaltyCards(); })
+        .catch(function (e) { toast(e.message, true); });
+    });
+  };
+  renderLoyaltyCardEditor();
+  // Visuel actuel (l'image de la carte, ou celle du salon pour la carte d'avant).
+  if (c && c.has_image) api('/api/owner/loyalty-cards?images=1').then(function (r) {
+    var full = (r.items || []).find(function (x) { return x.id === c.id; });
+    if (full && lcEdit && lcEdit.id === c.id && lcEdit.image_url === undefined) { lcEdit._preview = full.image_url; renderLoyaltyCardEditor(); }
+  }).catch(function () {});
+}
+
+function lcItemsOf(kind) { return (kind === 'service' ? services : (kind === 'extra' ? extras : products)) || []; }
+function renderLoyaltyCardEditor() {
+  var box = document.getElementById('lc-editor');
+  if (!box || !lcEdit) return;
+  var e = lcEdit;
+  var kinds = [['service', 'Prestations'], ['extra', 'Suppléments'], ['product', 'Produits']];
+  var checked = {}; (e.items || []).forEach(function (i) { checked[i.kind + ':' + i.id] = 1; });
+  var preview = e.image_url !== undefined ? e.image_url : (e._preview || (e.uses_salon_image ? currentLoyaltyCardImage : ''));
+  var tierRow = function (t, i) {
+    var itemOpts = kinds.map(function (k) {
+      return '<optgroup label="' + k[1] + '">' + lcItemsOf(k[0]).filter(function (x) { return x.active !== 0 && x.active !== false; }).map(function (x) {
+        var v = k[0] + ':' + x.id;
+        return '<option value="' + esc(v) + '"' + (t.free_item_kind + ':' + t.free_item_id === v ? ' selected' : '') + '>' + esc(x.name) + '</option>';
+      }).join('') + '</optgroup>';
+    }).join('');
+    return '<div class="lc-tier" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">' +
+      '<input type="number" min="1" step="1" value="' + (t.points || '') + '" oninput="lcEdit.tiers[' + i + '].points=Number(this.value)" style="width:76px" aria-label="Points"> <span style="color:var(--grey)">pts →</span>' +
+      '<select onchange="lcSetReward(' + i + ', this.value)" style="flex:1 1 170px">' +
+        '<option value="service_pct"' + (t.reward === 'service_pct' ? ' selected' : '') + '>Remise % sur une prestation</option>' +
+        '<option value="product_pct"' + (t.reward === 'product_pct' ? ' selected' : '') + '>Remise % sur un produit</option>' +
+        '<option value="free_item"' + (t.reward === 'free_item' ? ' selected' : '') + '>Article offert</option></select>' +
+      (t.reward === 'free_item'
+        ? '<select onchange="var p=this.value.split(\':\');lcEdit.tiers[' + i + '].free_item_kind=p[0];lcEdit.tiers[' + i + '].free_item_id=p.slice(1).join(\':\')" style="flex:1 1 170px"><option value="">Choisir l\'article…</option>' + itemOpts + '</select>'
+        : '<input type="number" min="1" max="100" step="1" value="' + (t.pct || '') + '" oninput="lcEdit.tiers[' + i + '].pct=Number(this.value)" style="width:70px" aria-label="Remise en %"> <span style="color:var(--grey)">%</span>') +
+      '<button type="button" class="btn btn-ghost" style="padding:4px 10px" onclick="lcEdit.tiers.splice(' + i + ',1);renderLoyaltyCardEditor()" aria-label="Retirer ce palier">✕</button></div>';
+  };
+  box.innerHTML =
+    '<div class="fld"><label for="lc-name">Nom de la carte</label><input id="lc-name" type="text" maxlength="120" value="' + esc(e.name) + '" placeholder="Ex. Carte Barbe" oninput="lcEdit.name=this.value"></div>' +
+    '<div class="fld"><label>Paliers</label>' + e.tiers.map(tierRow).join('') +
+      '<button type="button" class="btn btn-ghost" style="font-size:13px;padding:6px 10px" onclick="lcEdit.tiers.push({points:10,reward:\'service_pct\',pct:20});renderLoyaltyCardEditor()">+ Ajouter un palier</button></div>' +
+    '<div class="fld"><label>Articles qui rapportent des points</label>' +
+      '<label style="display:flex;gap:8px;align-items:center;font-weight:400;margin:4px 0"><input type="radio" style="width:auto;flex:none;margin:0" name="lc-scope"' + (e.scope_all ? ' checked' : '') + ' onchange="lcEdit.scope_all=true;renderLoyaltyCardEditor()"> Tous les articles</label>' +
+      '<label style="display:flex;gap:8px;align-items:center;font-weight:400;margin:4px 0"><input type="radio" style="width:auto;flex:none;margin:0" name="lc-scope"' + (e.scope_all ? '' : ' checked') + ' onchange="lcEdit.scope_all=false;renderLoyaltyCardEditor()"> Seulement les articles cochés</label>' +
+      (e.scope_all ? '' : '<div style="border:1px solid var(--sep);border-radius:12px;padding:8px 12px;max-height:260px;overflow-y:auto">' + kinds.map(function (k) {
+        var list = lcItemsOf(k[0]).filter(function (x) { return x.active !== 0 && x.active !== false; });
+        if (!list.length) return '';
+        return '<div style="font-size:12px;color:var(--grey);margin:8px 0 4px;text-transform:uppercase;letter-spacing:.04em">' + k[1] + '</div>' + list.map(function (x) {
+          var key = k[0] + ':' + x.id;
+          return '<label style="display:flex;gap:8px;align-items:center;font-weight:400;padding:3px 0"><input type="checkbox" style="width:auto;flex:none;margin:0"' + (checked[key] ? ' checked' : '') +
+            ' onchange="lcToggleItem(\'' + k[0] + '\',\'' + x.id + '\',this.checked)"> ' + esc(x.name) + '</label>';
+        }).join('');
+      }).join('') + '</div>') + '</div>' +
+    '<div class="fld"><label>Visuel de la carte (compte client)</label><div style="display:flex;align-items:center;gap:14px">' +
+      '<div onclick="document.getElementById(\'lc-img\').click()" style="width:180px;height:80px;border-radius:14px;cursor:pointer;background:var(--fill)' + (preview ? ' url(&quot;' + esc(preview) + '&quot;) center/cover' : '') + ';display:flex;align-items:center;justify-content:center;color:var(--grey);font-size:12px;flex-shrink:0">' + (preview ? '' : 'Aucune image') + '</div>' +
+      '<input type="file" id="lc-img" accept="image/*" style="display:none" onchange="lcPickImage(this)">' +
+      '<div class="hint" style="margin:0">720 × 320 px conseillé, recadrée automatiquement.' + (preview ? '<br><button type="button" class="btn btn-ghost" style="font-size:12.5px;padding:4px 8px;margin-top:4px" onclick="lcEdit.image_url=\'\';lcEdit._preview=\'\';lcEdit.uses_salon_image=false;renderLoyaltyCardEditor()">Retirer l\'image</button>' : '') + '</div></div></div>' +
+    '<label style="display:flex;gap:10px;align-items:center;margin:6px 0"><input type="checkbox" style="width:auto;flex:none;margin:0"' + (e.published ? ' checked' : '') + ' onchange="lcEdit.published=this.checked"> Publiée (proposée aux clients)</label>' +
+    '<label style="display:flex;gap:10px;align-items:center;margin:6px 0"><input type="checkbox" style="width:auto;flex:none;margin:0"' + (e.auto_on_signup ? ' checked' : '') + ' onchange="lcEdit.auto_on_signup=this.checked"> Activée automatiquement quand un client crée son compte en ligne</label>';
+}
+function lcSetReward(i, v) {
+  var t = lcEdit.tiers[i];
+  t.reward = v;
+  if (v === 'free_item') { t.pct = null; } else { if (!t.pct) t.pct = 20; t.free_item_kind = null; t.free_item_id = null; }
+  renderLoyaltyCardEditor();
+}
+function lcToggleItem(kind, id, on) {
+  lcEdit.items = (lcEdit.items || []).filter(function (i) { return !(i.kind === kind && i.id === id); });
+  if (on) lcEdit.items.push({ kind: kind, id: id });
+}
+function lcPickImage(input) {
+  var file = input.files && input.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function (ev) {
+    var img = new Image();
+    img.onload = function () {
+      var W = 720, H = 320, canvas = document.createElement('canvas');
+      canvas.width = W; canvas.height = H;
+      var r = W / H, sr = img.width / img.height, sx, sy, sw, sh;
+      if (sr > r) { sh = img.height; sw = sh * r; sx = (img.width - sw) / 2; sy = 0; } else { sw = img.width; sh = sw / r; sx = 0; sy = (img.height - sh) / 2; }
+      canvas.getContext('2d').drawImage(img, sx, sy, sw, sh, 0, 0, W, H);
+      lcEdit.image_url = canvas.toDataURL('image/jpeg', 0.85);
+      renderLoyaltyCardEditor();
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+function saveLoyaltyCard(overlay) {
+  var e = lcEdit;
+  var body = { name: (e.name || '').trim(), published: e.published, auto_on_signup: e.auto_on_signup, scope_all: e.scope_all,
+    items: e.scope_all ? [] : e.items, tiers: e.tiers.map(function (t) { return { id: t.id, points: t.points, reward: t.reward, pct: t.pct, free_item_kind: t.free_item_kind, free_item_id: t.free_item_id }; }) };
+  if (e.image_url !== undefined) body.image_url = e.image_url;
+  api(e.id ? '/api/owner/loyalty-cards/' + e.id : '/api/owner/loyalty-cards', { method: e.id ? 'PUT' : 'POST', body: body })
+    .then(function () { _closeModal(overlay); toast(e.id ? 'Carte enregistrée' : 'Carte créée'); loadLoyaltyCards(); })
+    .catch(function (err) { toast(err.message, true); });
 }
 
 function saveMarketingSettings() {

@@ -118,6 +118,8 @@
   .card-info .big { font-size: 24px; font-weight: 700; letter-spacing: -.02em; }
   .card-info .lbl { font-size: 12.5px; color: var(--grey); margin-top: 2px; }
   #loyalty-section .card { background: none; padding: 0; border-radius: 0; margin-bottom: 12px; }
+  .lc-one + .lc-one { margin-top: 18px; }
+  .lc-name { font-size: 14px; font-weight: 600; margin: 0 0 8px; color: var(--ink); }
   .loyalty-tiers { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0 0 16px; }
   .loyalty-tiers .tier { background: var(--card); border-radius: 14px; padding: 10px 12px; }
   .loyalty-tiers .tier-top { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--grey); }
@@ -600,19 +602,8 @@ button.gt-opt:active .gt-cta{transform:scale(.96)}
     <div class="home-col home-side">
     <div id="loyalty-section">
       <div class="eyebrow">Fidélité</div>
-      <div class="card">
-        <div class="card-art" id="loyalty-card-art"><div class="card-shine"></div></div>
-        <div class="card-info">
-          <div class="card-top-row">
-            <div class="card-logo" id="loyalty-card-logo"></div>
-            <div class="card-points-block">
-              <div class="big" id="loyalty-points">0</div>
-              <div class="lbl">points de fidélité</div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="loyalty-tiers" id="loyalty-tiers"></div>
+      <!-- Une carte par carte de fidélité activée (publiée par le salon) : visuel, points, paliers. -->
+      <div id="loyalty-cards-list"></div>
     </div>
     <div id="loyalty-inactive-msg" class="msg" style="display:none">
       Votre carte de fidélité n'est pas encore activée — demandez à votre coiffeur de l'activer lors de votre prochain passage.
@@ -872,7 +863,7 @@ button.gt-opt:active .gt-cta{transform:scale(.96)}
 
 </div>
 
-<script src="/app.js?v=67"></script>
+<script src="/app.js?v=68"></script>
 <script src="/autorefresh.js?v=3"></script>
 <script src="/group-booking.js?v=29"></script>
 <style>
@@ -1230,20 +1221,47 @@ AutoRefresh.start(function () {
   return api('/api/client-auth/me').then(populateHome);
 }, { idleMs: 15000 });
 
-/** Remise prestation / remise produit : chacune a son propre nombre de points à atteindre. */
-function renderLoyaltyTiers(l) {
-  var box = document.getElementById('loyalty-tiers');
+/* Cartes de fidélité du client (plusieurs possibles) : chacune avec son visuel, ses points et ses paliers. */
+var lcImageCache = {}, salonLoyaltyImg = '', salonLogoImg = '', lcLastCards = [];
+function loyaltyTierHtml(c, t) {
+  var ok = (c.available || []).indexOf(t.id) !== -1;
+  var pct = Math.min(100, Math.round((c.points / t.points) * 100));
+  return '<div class="tier"><div class="tier-top"><span>' + esc(t.label) + '</span><b>' +
+    (ok ? 'Disponible' : c.points + ' / ' + t.points) + '</b></div>' +
+    '<div class="tier-bar"><i style="width:' + pct + '%"></i></div></div>';
+}
+function renderLoyaltyCards(cards) {
+  var box = document.getElementById('loyalty-cards-list');
   if (!box) return;
-  var t = l && l.thresholds;
-  if (!t) { box.innerHTML = ''; return; }
-  var rw = l.rewards || {};
-  var tier = function (label, ok, need) {
-    var pct = Math.min(100, Math.round((l.points / need) * 100));
-    return '<div class="tier"><div class="tier-top"><span>' + label + '</span><b>' +
-      (ok ? 'Disponible' : l.points + ' / ' + need) + '</b></div>' +
-      '<div class="tier-bar"><i style="width:' + pct + '%"></i></div></div>';
-  };
-  box.innerHTML = tier('Remise prestation', rw.service, t.service) + tier('Remise produit', rw.product, t.product);
+  lcLastCards = cards || [];
+  box.innerHTML = lcLastCards.map(function (c) {
+    return '<div class="lc-one" data-card="' + esc(c.card_id) + '">' +
+      (lcLastCards.length > 1 || c.name !== 'Carte de fidélité' ? '<div class="lc-name">' + esc(c.name) + '</div>' : '') +
+      '<div class="card"><div class="card-art"><div class="card-shine"></div></div>' +
+      '<div class="card-info"><div class="card-top-row"><div class="card-logo"></div>' +
+      '<div class="card-points-block"><div class="big">' + c.points + '</div><div class="lbl">points de fidélité</div></div></div></div></div>' +
+      '<div class="loyalty-tiers">' + (c.tiers || []).map(function (t) { return loyaltyTierHtml(c, t); }).join('') + '</div></div>';
+  }).join('');
+  applyLoyaltyArt();
+}
+/** Visuel de chaque carte : son image à elle, sinon l'image « carte de fidélité » du salon (carte d'avant). */
+function applyLoyaltyArt() {
+  lcLastCards.forEach(function (c) {
+    var el = document.querySelector('#loyalty-cards-list .lc-one[data-card="' + c.card_id + '"]');
+    if (!el) return;
+    var loyaltyArt = el.querySelector('.card-art'), logo = el.querySelector('.card-logo');
+    if (logo && salonLogoImg) logo.style.backgroundImage = 'url("' + salonLogoImg + '")';
+    if (c.has_image) {
+      if (lcImageCache[c.card_id]) loyaltyArt.style.backgroundImage = 'url("' + lcImageCache[c.card_id] + '")';
+      else if (lcImageCache[c.card_id] === undefined) {
+        lcImageCache[c.card_id] = null;
+        api('/api/client-auth/loyalty-cards/' + encodeURIComponent(c.card_id) + '/image').then(function (r) {
+          lcImageCache[c.card_id] = r.image_url || '';
+          applyLoyaltyArt();
+        }).catch(function () { delete lcImageCache[c.card_id]; });
+      }
+    } else if (c.uses_salon_image && salonLoyaltyImg) loyaltyArt.style.backgroundImage = 'url("' + salonLoyaltyImg + '")';
+  });
 }
 
 function populateHome(d) {
@@ -1254,12 +1272,10 @@ function populateHome(d) {
   setPhoneCCDisplay('pf', phoneParts.code);
   document.getElementById('pf-phone').value = phoneParts.local;
 
-  document.getElementById('loyalty-section').style.display = d.loyalty_activated ? 'block' : 'none';
-  document.getElementById('loyalty-inactive-msg').style.display = d.loyalty_activated ? 'none' : 'block';
-  if (d.loyalty_activated) {
-    document.getElementById('loyalty-points').textContent = d.loyalty.points;
-    renderLoyaltyTiers(d.loyalty);
-  }
+  var lcards = d.loyalty_cards || [];
+  document.getElementById('loyalty-section').style.display = lcards.length ? 'block' : 'none';
+  document.getElementById('loyalty-inactive-msg').style.display = lcards.length ? 'none' : 'block';
+  renderLoyaltyCards(lcards);
 
   renderVisitCard(d.upcoming_appointments || [], d.recent_visits || []);
   renderGiftCards(d.gift_cards || []);
@@ -2434,14 +2450,10 @@ function guardMissingSalon() {
             glowIcon.innerHTML = '';
           }
         }
-        var loyaltyArt = document.getElementById('loyalty-card-art');
-        if (loyaltyArt && d.loyalty_card_image_url) {
-          loyaltyArt.style.backgroundImage = 'url("' + d.loyalty_card_image_url + '")';
-        }
-        var loyaltyLogo = document.getElementById('loyalty-card-logo');
-        if (loyaltyLogo && d.logo_url) {
-          loyaltyLogo.style.backgroundImage = 'url("' + d.logo_url + '")';
-        }
+        // Cartes de fidélité : image « carte de fidélité » du salon (carte d'avant) et logo, appliqués à chaque carte.
+        salonLoyaltyImg = d.loyalty_card_image_url || '';
+        salonLogoImg = d.logo_url || '';
+        applyLoyaltyArt();
         // Les cartes cadeaux (rendues séparément via /me, qui peut
         // répondre avant ou après ce fetch-ci) réutilisent le même logo -
         // on le mémorise, et on rafraîchit celles déjà affichées le cas

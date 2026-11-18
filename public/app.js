@@ -2375,3 +2375,18 @@ function forcedInfoHtml(a) {
   var when = d && !isNaN(d) ? ' le ' + d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }) + ' à ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
   return '<div class="forced-info"><span class="fi-ic" aria-hidden="true">!</span><div><b>RDV forcé par ' + esc(a.forced_by) + '</b>' + when + '<br>Il chevauche un autre RDV : le coiffeur gère le retard.</div></div>';
 }
+
+/* Fidélité à plusieurs cartes (fiche client : caisse, Mon poste, dashboard) : chaque carte activée avec ses points,
+   puis chacun de ses paliers (« Disponible », ou combien de points il manque). */
+function loyaltyCardsRowsHtml(cards) {
+  return (cards || []).filter(function (c) { return c.activated; }).map(function (c) {
+    var rows = '<div class="detail-row"><span class="detail-label">⭐ ' + esc(c.name) + '</span><span class="detail-value">' +
+      c.points + ' point' + (c.points > 1 ? 's' : '') + '</span></div>';
+    (c.tiers || []).forEach(function (t) {
+      var ok = (c.available || []).indexOf(t.id) !== -1, need = t.points - c.points;
+      rows += '<div class="detail-row"><span class="detail-label" style="padding-left:18px">' + esc(t.label) + '</span><span class="detail-value" style="color:' + (ok ? 'var(--green)' : 'var(--grey)') + '">' +
+        (ok ? 'Disponible' : need + ' point' + (need > 1 ? 's' : '') + ' avant (' + t.points + ')') + '</span></div>';
+    });
+    return rows;
+  }).join('');
+}

@@ -85,7 +85,7 @@ const seed = () => {
   check('caisse : membres pas encore termines du meme groupe ajoutables (payes d\'avance), bouton du groupe compte aussi', c.includes('function groupEarlyMatesOf(q)') && c.includes('(mates.length + earlyN + 1)') && c.includes("ticketGroup.push({ id: q.id, client_name: q.client_name, early: early })") && c.includes("· payé d\\'avance</span>"));
   check('caisse : « + Payer aussi » propose les membres de son groupe encore en file', c.includes('groupEarlyMatesOf(payer).forEach'));
   check('caisse : « + Payer aussi pour un autre client » (tout le salon)', c.includes('id="ticket-group-add"') && c.includes("barberApi('/api/queue/pending-payment?all=1')"));
-  check('caisse : la remise fidelite ne porte que sur les lignes du payeur', c.includes("ticket.findIndex(function (l) { return l.item_type === type && !l.person; })"));
+  check('caisse : la remise fidelite ne porte que sur les lignes du payeur', /function loyaltyLineFor\(t\) \{\s*return ticket\.findIndex\(function \(l\) \{\s*if \(l\.person\) return false;/.test(c));
   check('caisse : envoi des personnes du ticket', c.includes('group_queue_ids: saleCtx.groupIds && saleCtx.groupIds.length ? saleCtx.groupIds : undefined'));
   check('recu : le nom de la personne sur chaque ligne', c.includes("esc(receiptItemName(l))") && c.includes("' x ' + receiptItemName(l)"));
   sql("DELETE FROM sales WHERE salon_id='s1'; DELETE FROM appointments WHERE id LIKE 'g140%'; DELETE FROM queue WHERE id LIKE 'g140%'");

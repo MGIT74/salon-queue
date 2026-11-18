@@ -815,7 +815,7 @@
   </button>
 </div>
 
-<script src="/app.js?v=67"></script>
+<script src="/app.js?v=68"></script>
 <script src="/queue-sim.js?v=1"></script>
 <script src="/autorefresh.js?v=3"></script>
 <script src="/staff-group.js?v=7"></script>
@@ -3279,7 +3279,9 @@ var AD_STATUS_COLOR = { waiting: 'var(--grey)', in_progress: 'var(--blue)', done
 
 function adRenderMarketing(r) {
   var parts = [];
-  if (r.loyalty && r.loyalty.activated) {
+  if (r.loyalty_cards && r.loyalty_cards.some(function (c) { return c.activated; })) {
+    parts.push(loyaltyCardsRowsHtml(r.loyalty_cards));
+  } else if (r.loyalty && r.loyalty.activated) {
     parts.push('<div class="detail-row"><span class="detail-label">⭐ Fidélité</span><span class="detail-value">' +
       r.loyalty.points + ' point' + (r.loyalty.points > 1 ? 's' : '') + '</span></div>' + loyaltyTiersHtml(r.loyalty));
   } else {

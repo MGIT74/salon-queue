@@ -24,7 +24,7 @@ function clientKey(row) {
  * son accord au préalable. Un client jamais activé n'accumule jamais
  * le moindre point, même s'il revient plusieurs fois.
  */
-async function earnLoyaltyPoint(salonId, row) {
+async function earnLoyaltyPoint(salonId, row, items) {
   const key = clientKey(row);
   if (!key) return;
 
@@ -34,12 +34,9 @@ async function earnLoyaltyPoint(salonId, row) {
   );
   if (!existing || !existing.activated_at) return;
 
-  // Les points s'accumulent : chaque palier (prestation / produit) se débloque en atteignant son propre
-  // nombre de points, et ne retire ses points qu'au moment où la remise est utilisée (voir loyaltyRules.js).
-  await pool.query(
-    'UPDATE loyalty_accounts SET points = points + 1, client_name = ?, updated_at = NOW() WHERE id = ?',
-    [row.client_name, existing.id]
-  );
+  // Plusieurs cartes : +1 point sur chaque carte activée et publiée dont un article coché est sur le ticket
+  // (items = lignes du ticket de CE client ; voir loyaltyCards.js).
+  await require('./loyaltyCards').earnPoints(salonId, row, items);
 }
 
 /**
