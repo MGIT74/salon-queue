@@ -91,7 +91,8 @@ const EMAIL = 'cartes180@exemple.fr';
 
   const h = fs.readFileSync(path.join(__dirname, '../../public/compte.html'), 'utf8');
   check('compte : boutons Activer / Désactiver / Activer toutes mes cartes', h.includes('function toggleLoyaltyCard(cardId, on, btn)') && h.includes('Activer toutes mes cartes') && h.includes('Désactivée par le salon'));
-  check('compte : carrousel (scroll snap) + points de navigation', h.includes('scroll-snap-type: x mandatory') && h.includes('function scrollLoyaltyTo(i)') && h.includes('class="lc-dots"'));
+  check('compte : portefeuille (cartes empilees, la carte choisie s\'ouvre en grand, anime)', h.includes('function layoutLoyaltyStack(animate)') && h.includes('function openLoyaltyCard(cardId)') && h.includes('.lc-stack {') && h.includes('prefers-reduced-motion'));
+  check('compte : « Mes cadeaux » bien separe des cartes de fidelite', h.includes('class="gift-sep"') && h.includes('~ .gift-sep { margin-top: 34px'));
   check('compte : bouton « i » -> pop-up details (articles qui rapportent, recompenses)', h.includes('function openLoyaltyDetail(i)') && h.includes('id="lc-detail-backdrop"') && h.includes('Comment gagner des points'));
 
   clean();
