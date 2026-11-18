@@ -84,6 +84,8 @@
 
   .panel { display: none; }
   .panel.on { display: block; }
+  /* « Mes cadeaux » bien séparé des cartes de fidélité (colonne verticale). */
+  #loyalty-section[style*="block"] ~ .gift-sep { margin-top: 34px; padding-top: 6px; border-top: 1px solid var(--sep); }
   .eyebrow { font-size: 15px; font-weight: 600; color: var(--grey); margin: 22px 0 12px; }
   .eyebrow:first-child { margin-top: 0; }
 
@@ -121,13 +123,32 @@
   /* Cartes de fidélité : une vraie carte (image entière + bande logo / nom / points), en carrousel horizontal. */
   .lc-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: -2px 0 10px; }
   .lc-head .lc-count { font-size: 13px; color: var(--grey); }
-  .lc-rail { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; }
-  .lc-rail::-webkit-scrollbar { display: none; }
-  .lc-one { flex: 0 0 100%; min-width: 0; scroll-snap-align: start; }
-  .lc-rail.several .lc-one { flex-basis: 86%; }
-  .lc-card { border-radius: 18px; overflow: hidden; background: var(--card); border: 1px solid var(--sep); box-shadow: 0 2px 12px rgba(0,0,0,.06); }
+  /* Portefeuille : cartes fermées empilées (on voit le haut de leur illustration + nom + points),
+     la carte choisie s'ouvre en grand en dessous ; clic sur une carte fermée = elle glisse et s'ouvre. */
+  .lc-stack { position: relative; transition: height .45s cubic-bezier(.2,.8,.2,1); }
+  .lc-one { position: absolute; left: 0; right: 0; top: 0; }
+  .lc-stack.single .lc-one { position: relative; }
+  .lc-card { border-radius: 18px; overflow: hidden; background: var(--card); border: 1px solid var(--sep); box-shadow: 0 2px 12px rgba(0,0,0,.08);
+             transition: top .45s cubic-bezier(.2,.8,.2,1), height .45s cubic-bezier(.2,.8,.2,1), transform .2s; }
+  .lc-one { transition: top .45s cubic-bezier(.2,.8,.2,1), transform .2s; }
+  .lc-one:not(.big) { cursor: pointer; }
+  .lc-one:not(.big) .lc-card { height: 58px; }
+  @media (hover: hover) { .lc-one:not(.big):hover { transform: translateY(-4px); } }
   .lc-art { position: relative; aspect-ratio: 9 / 4; background: linear-gradient(135deg, #0a84ff, #5e5ce6) center / cover no-repeat; }
-  .lc-pill { position: absolute; top: 10px; left: 10px; font-size: 11.5px; font-weight: 600; padding: 4px 9px; border-radius: 99px; background: rgba(0,0,0,.55); color: #fff; }
+  .lc-strip { position: absolute; left: 0; right: 0; top: 0; height: 48px; display: flex; align-items: center; justify-content: space-between; gap: 10px;
+              padding: 0 16px; color: #fff; background: linear-gradient(rgba(0,0,0,.5), rgba(0,0,0,.15)); transition: opacity .3s; pointer-events: none; }
+  .lc-strip b { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lc-strip span { font-size: 13px; font-weight: 600; flex-shrink: 0; }
+  .lc-one.big .lc-strip { opacity: 0; }
+  .lc-one:not(.big) .lc-info, .lc-one:not(.big) .lc-pill { opacity: 0; pointer-events: none; }
+  .lc-info, .lc-pill, .lc-band { transition: opacity .3s .15s; }
+  .lc-one:not(.big) .lc-band { opacity: 0; }
+  .lc-off .lc-art { filter: grayscale(.75); }
+  .lc-detail { transition: opacity .25s, transform .25s; }
+  .lc-detail.out { opacity: 0; transform: translateY(-6px); }
+  .lc-detail .tier-bar i { transition: width .7s cubic-bezier(.2,.8,.2,1) .15s; }
+  @media (prefers-reduced-motion: reduce) { .lc-stack, .lc-one, .lc-card, .lc-strip, .lc-info, .lc-pill, .lc-band, .lc-detail, .lc-detail .tier-bar i { transition: none !important; } }
+  .lc-pill { position: absolute; bottom: 10px; left: 10px; font-size: 11.5px; font-weight: 600; padding: 4px 9px; border-radius: 99px; background: rgba(0,0,0,.55); color: #fff; }
   .lc-info { position: absolute; top: 8px; right: 8px; width: 30px; height: 30px; border-radius: 50%; border: 0; padding: 0; cursor: pointer;
              background: rgba(0,0,0,.45); color: #fff; font: 600 15px/30px Georgia, serif; font-style: italic; }
   .lc-band { display: flex; align-items: center; gap: 12px; padding: 12px 14px; }
@@ -138,16 +159,11 @@
   .lc-pts { text-align: right; }
   .lc-pts b { display: block; font-size: 22px; font-weight: 700; line-height: 1; letter-spacing: -.02em; color: var(--ink); }
   .lc-pts span { font-size: 11.5px; color: var(--grey); }
-  .lc-one.lc-off .lc-art, .lc-one.lc-off .lc-band, .lc-one.lc-off .loyalty-tiers { filter: grayscale(.7); opacity: .55; }
-  .lc-one.lc-off .lc-info, .lc-one.lc-off .lc-pill { opacity: 1; }
   .lc-foot { display: flex; justify-content: flex-end; align-items: center; min-height: 28px; margin-top: 4px; }
   .lc-state { font-size: 12.5px; font-weight: 500; color: var(--grey); }
   .lc-btn { border: 0; border-radius: 999px; padding: 6px 14px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; background: var(--accent, #0a84ff); color: #fff; }
   .lc-btn.lc-btn-ghost { background: transparent; color: var(--grey); padding: 6px 2px; font-weight: 500; text-decoration: underline; }
   .lc-btn[disabled] { opacity: .5; cursor: default; }
-  .lc-dots { display: flex; justify-content: center; gap: 6px; margin: 4px 0 16px; }
-  .lc-dots button { width: 7px; height: 7px; padding: 0; border: 0; border-radius: 9px; background: var(--sep); cursor: pointer; transition: width .2s; }
-  .lc-dots button.on { width: 18px; background: var(--ink); }
   #lc-detail-body h3 { font-size: 13px; color: var(--grey); font-weight: 600; margin: 14px 0 6px; }
   #lc-detail-body ul { margin: 0; padding-left: 18px; font-size: 14.5px; line-height: 1.6; color: var(--ink); }
   #loyalty-section .loyalty-tiers { margin: 10px 0 0; grid-template-columns: 1fr; gap: 6px; }
@@ -641,7 +657,7 @@ button.gt-opt:active .gt-cta{transform:scale(.96)}
       Votre carte de fidélité n'est pas encore activée — demandez à votre coiffeur de l'activer lors de votre prochain passage.
     </div>
 
-    <div id="gift-cards-section" style="display:none">
+    <div id="gift-cards-section" class="gift-sep" style="display:none">
       <div class="eyebrow">Mes cadeaux</div>
       <div id="gift-cards-list"></div>
     </div>
@@ -1270,56 +1286,87 @@ function loyaltyTierHtml(c, t) {
     (ok ? 'Disponible' : c.points + ' / ' + t.points) + '</b></div>' +
     '<div class="tier-bar"><i style="width:' + pct + '%"></i></div></div>';
 }
+var lcActive = null;   // carte ouverte dans le portefeuille
 function renderLoyaltyCards(cards) {
   var box = document.getElementById('loyalty-cards-list');
   if (!box) return;
   lcLastCards = cards || [];
-  // Plusieurs cartes : carrousel (une carte à la fois, la suivante dépasse) ; le client active / désactive
-  // celles qu'il veut (sauf une carte désactivée par le salon). Bouton « i » : ce que la carte apporte.
+  // Portefeuille : cartes empilées, la carte choisie ouverte en grand (image entière + bande logo / nom / points),
+  // ses paliers et son bouton Activer / Désactiver juste dessous. Bouton « i » : ce que la carte apporte.
   var several = lcLastCards.length > 1;
+  if (!lcLastCards.some(function (c) { return c.card_id === lcActive; })) {
+    var firstOn = lcLastCards.filter(function (c) { return c.activated; })[0];
+    lcActive = (firstOn || lcLastCards[0] || {}).card_id || null;
+  }
   var canOn = lcLastCards.filter(function (c) { return !c.activated && !c.locked; }).length;
   var head = several ? '<div class="lc-head"><span class="lc-count">' + lcLastCards.length + ' cartes</span>' +
     (canOn ? '<button class="lc-btn" onclick="toggleLoyaltyCard(\'all\', true, this)">' + (window.innerWidth < 520 ? 'Tout activer' : 'Activer toutes mes cartes') + '</button>' : '') + '</div>' : '';
-  var slides = lcLastCards.map(function (c, i) {
+  var cardsHtml = lcLastCards.map(function (c, i) {
     var id = esc(c.card_id);
+    var scope = (c.scope_all === false || c.scope_all === 0) ? 'Certains articles' : 'Tous les articles';
+    var pts = c.points + ' point' + (c.points > 1 ? 's' : '');
+    return '<div class="lc-one' + (c.activated ? '' : ' lc-off') + '" data-card="' + id + '" onclick="openLoyaltyCard(\'' + id + '\')">' +
+      '<div class="lc-card"><div class="lc-art">' +
+        '<div class="lc-strip"><b>' + esc(c.name) + (c.activated ? '' : ' · ' + (c.locked ? 'désactivée' : 'pas activée')) + '</b><span>' + pts + '</span></div>' +
+        (c.locked ? '<span class="lc-pill">Désactivée par le salon</span>' : c.activated ? '' : '<span class="lc-pill">Pas activée</span>') +
+        '<button class="lc-info" aria-label="Détails de la carte" onclick="event.stopPropagation();openLoyaltyDetail(' + i + ')">i</button></div>' +
+      '<div class="lc-band"><div class="lc-logo"></div><div class="lc-title"><b>' + esc(c.name) + '</b><span>' + scope + '</span></div>' +
+        '<div class="lc-pts"><b>' + c.points + '</b><span>point' + (c.points > 1 ? 's' : '') + '</span></div></div></div></div>';
+  }).join('');
+  box.innerHTML = head + '<div class="lc-stack' + (several ? '' : ' single') + '">' + cardsHtml + '</div><div class="lc-detail"></div>';
+  layoutLoyaltyStack(false);
+  applyLoyaltyArt();
+}
+function openLoyaltyCard(cardId) {
+  if (cardId === lcActive) return;
+  lcActive = cardId;
+  layoutLoyaltyStack(true);
+}
+/** Place les cartes : fermées en haut (décalées de 46 px), la carte ouverte en dessous ; puis ses paliers. */
+function layoutLoyaltyStack(animate) {
+  var box = document.getElementById('loyalty-cards-list');
+  var stack = box && box.querySelector('.lc-stack');
+  if (!stack) return;
+  var els = Array.prototype.slice.call(stack.querySelectorAll('.lc-one'));
+  var step = 46, k = 0;
+  var bigH = stack.offsetWidth * 4 / 9 + 64;
+  els.forEach(function (el) {
+    var on = el.dataset.card === lcActive;
+    el.classList.toggle('big', on);
+    var card = el.querySelector('.lc-card');
+    if (on) return;
+    el.style.top = (k * step) + 'px'; el.style.zIndex = k + 1; card.style.height = '';
+    k++;
+  });
+  var big = els.filter(function (el) { return el.dataset.card === lcActive; })[0];
+  if (big && els.length > 1) {
+    big.style.top = (k * step) + 'px'; big.style.zIndex = 50;
+    var card = big.querySelector('.lc-card');
+    card.style.height = bigH + 'px';
+    stack.style.height = (k * step + bigH) + 'px';
+    // Fin d'animation : hauteur libre (le texte de la bande peut passer sur 2 lignes).
+    setTimeout(function () { if (big.classList.contains('big')) { card.style.height = 'auto'; stack.style.height = (k * step + card.offsetHeight) + 'px'; } }, animate ? 470 : 0);
+  }
+  var det = box.querySelector('.lc-detail');
+  var c = lcLastCards.filter(function (x) { return x.card_id === lcActive; })[0];
+  var fill = function () {
+    if (!c) { det.innerHTML = ''; return; }
+    var several = lcLastCards.length > 1, id = esc(c.card_id);
     var foot = c.locked ? '<span class="lc-state">Désactivée par le salon</span>'
       : c.activated ? (several ? '<button class="lc-btn lc-btn-ghost" onclick="toggleLoyaltyCard(\'' + id + '\', false, this)">Désactiver</button>' : '')
       : '<button class="lc-btn" onclick="toggleLoyaltyCard(\'' + id + '\', true, this)">Activer cette carte</button>';
-    var scope = (c.scope_all === false || c.scope_all === 0) ? 'Certains articles' : 'Tous les articles';
-    return '<div class="lc-one' + (c.activated ? '' : ' lc-off') + '" data-card="' + id + '">' +
-      '<div class="lc-card"><div class="lc-art">' +
-        (c.locked ? '<span class="lc-pill">Désactivée</span>' : c.activated ? '' : '<span class="lc-pill">Pas activée</span>') +
-        '<button class="lc-info" aria-label="Détails de la carte" onclick="openLoyaltyDetail(' + i + ')">i</button></div>' +
-      '<div class="lc-band"><div class="lc-logo"></div><div class="lc-title"><b>' + esc(c.name) + '</b><span>' + scope + '</span></div>' +
-        '<div class="lc-pts"><b>' + c.points + '</b><span>point' + (c.points > 1 ? 's' : '') + '</span></div></div></div>' +
-      '<div class="loyalty-tiers">' + (c.tiers || []).map(function (t) { return loyaltyTierHtml(c, t); }).join('') + '</div>' +
-      '<div class="lc-foot">' + foot + '</div></div>';
-  }).join('');
-  var dots = several ? '<div class="lc-dots">' + lcLastCards.map(function (c, i) {
-    return '<button aria-label="Carte ' + (i + 1) + '"' + (i === 0 ? ' class="on"' : '') + ' onclick="scrollLoyaltyTo(' + i + ')"></button>';
-  }).join('') + '</div>' : '';
-  var prev = box.querySelector('.lc-rail'), keep = prev ? prev.scrollLeft : 0;
-  box.innerHTML = head + '<div class="lc-rail' + (several ? ' several' : '') + '">' + slides + '</div>' + dots;
-  var rail = box.querySelector('.lc-rail');
-  rail.scrollLeft = keep;
-  rail.addEventListener('scroll', syncLoyaltyDots, { passive: true });
-  syncLoyaltyDots();
-  applyLoyaltyArt();
+    det.innerHTML = '<div class="loyalty-tiers">' + (c.tiers || []).map(function (t) { return loyaltyTierHtml(c, t); }).join('') + '</div>' +
+      (foot ? '<div class="lc-foot">' + foot + '</div>' : '');
+    det.classList.remove('out');
+    if (animate) {
+      var bars = det.querySelectorAll('.tier-bar i');
+      bars.forEach(function (b) { b.dataset.w = b.style.width; b.style.width = '0'; });
+      requestAnimationFrame(function () { requestAnimationFrame(function () { bars.forEach(function (b) { b.style.width = b.dataset.w; }); }); });
+    }
+  };
+  if (animate) { det.classList.add('out'); setTimeout(fill, 220); } else fill();
 }
-function loyaltySlideStep(rail) {
-  var first = rail.querySelector('.lc-one');
-  return first ? first.offsetWidth + 12 : 1;
-}
-function syncLoyaltyDots() {
-  var rail = document.querySelector('#loyalty-cards-list .lc-rail');
-  if (!rail) return;
-  var i = Math.round(rail.scrollLeft / loyaltySlideStep(rail));
-  document.querySelectorAll('#loyalty-cards-list .lc-dots button').forEach(function (b, k) { b.classList.toggle('on', k === i); });
-}
-function scrollLoyaltyTo(i) {
-  var rail = document.querySelector('#loyalty-cards-list .lc-rail');
-  if (rail) rail.scrollTo({ left: i * loyaltySlideStep(rail), behavior: 'smooth' });
-}
+window.addEventListener('resize', function () { if (lcLastCards.length > 1) layoutLoyaltyStack(false); });
 /** Pop-up « i » : ce que rapporte la carte, ses récompenses, et ce qui la distingue des autres. */
 function openLoyaltyDetail(i) {
   var c = lcLastCards[i];
