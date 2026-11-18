@@ -119,7 +119,14 @@
   .card-info .lbl { font-size: 12.5px; color: var(--grey); margin-top: 2px; }
   #loyalty-section .card { background: none; padding: 0; border-radius: 0; margin-bottom: 12px; }
   .lc-one + .lc-one { margin-top: 18px; }
-  .lc-name { font-size: 14px; font-weight: 600; margin: 0 0 8px; color: var(--ink); }
+  .lc-name { font-size: 14px; font-weight: 600; margin: 0 0 8px; color: var(--ink); display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .lc-one.lc-off .card, .lc-one.lc-off .loyalty-tiers { opacity: .45; filter: grayscale(.6); }
+  .lc-state { font-size: 12.5px; font-weight: 500; color: var(--grey); }
+  .lc-btn { border: 0; border-radius: 999px; padding: 6px 14px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; background: var(--blue, #0a66c2); color: #fff; }
+  .lc-btn.lc-btn-ghost { background: transparent; color: var(--grey); padding: 6px 4px; font-weight: 500; text-decoration: underline; }
+  .lc-btn[disabled] { opacity: .5; cursor: default; }
+  .lc-all { display: flex; justify-content: flex-end; margin: -4px 0 12px; }
+  .lc-rule { font-size: 12.5px; color: var(--grey); margin: 6px 2px 0; }
   .loyalty-tiers { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0 0 16px; }
   .loyalty-tiers .tier { background: var(--card); border-radius: 14px; padding: 10px 12px; }
   .loyalty-tiers .tier-top { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--grey); }
@@ -1234,15 +1241,33 @@ function renderLoyaltyCards(cards) {
   var box = document.getElementById('loyalty-cards-list');
   if (!box) return;
   lcLastCards = cards || [];
-  box.innerHTML = lcLastCards.map(function (c) {
-    return '<div class="lc-one" data-card="' + esc(c.card_id) + '">' +
-      (lcLastCards.length > 1 || c.name !== 'Carte de fidélité' ? '<div class="lc-name">' + esc(c.name) + '</div>' : '') +
+  // Plusieurs cartes : le client active / désactive celles qu'il veut (sauf une carte désactivée par le salon).
+  var several = lcLastCards.length > 1;
+  var canOn = lcLastCards.filter(function (c) { return !c.activated && !c.locked; }).length;
+  box.innerHTML = (several && canOn ? '<div class="lc-all"><button class="lc-btn" onclick="toggleLoyaltyCard(\'all\', true, this)">Activer toutes mes cartes</button></div>' : '') +
+    lcLastCards.map(function (c) {
+    var head = '';
+    if (several || c.name !== 'Carte de fidélité' || !c.activated) {
+      var action = c.locked ? '<span class="lc-state">Désactivée par le salon</span>'
+        : c.activated ? (several ? '<button class="lc-btn lc-btn-ghost" onclick="toggleLoyaltyCard(\'' + esc(c.card_id) + '\', false, this)">Désactiver</button>' : '')
+        : '<button class="lc-btn" onclick="toggleLoyaltyCard(\'' + esc(c.card_id) + '\', true, this)">Activer</button>';
+      head = '<div class="lc-name"><span>' + esc(c.name) + (c.activated ? '' : ' <span class="lc-state">· pas activée</span>') + '</span>' + action + '</div>';
+    }
+    return '<div class="lc-one' + (c.activated ? '' : ' lc-off') + '" data-card="' + esc(c.card_id) + '">' + head +
       '<div class="card"><div class="card-art"><div class="card-shine"></div></div>' +
       '<div class="card-info"><div class="card-top-row"><div class="card-logo"></div>' +
       '<div class="card-points-block"><div class="big">' + c.points + '</div><div class="lbl">points de fidélité</div></div></div></div></div>' +
-      '<div class="loyalty-tiers">' + (c.tiers || []).map(function (t) { return loyaltyTierHtml(c, t); }).join('') + '</div></div>';
+      '<div class="loyalty-tiers">' + (c.tiers || []).map(function (t) { return loyaltyTierHtml(c, t); }).join('') + '</div>' +
+      (c.scope_all === false || c.scope_all === 0 ? '<div class="lc-rule">Points gagnés seulement sur certains articles de cette carte.</div>' : '') +
+      (c.activated ? '' : '<div class="lc-rule">Activez-la pour gagner des points à chaque passage.</div>') + '</div>';
   }).join('');
   applyLoyaltyArt();
+}
+function toggleLoyaltyCard(cardId, on, btn) {
+  if (btn) btn.disabled = true;
+  api('/api/client-auth/loyalty-cards/' + encodeURIComponent(cardId) + '/toggle', { method: 'POST', body: { on: on } })
+    .then(function (r) { renderLoyaltyCards(r.loyalty_cards || []); })
+    .catch(function (e) { if (btn) btn.disabled = false; toast(e.message, true); });
 }
 /** Visuel de chaque carte : son image à elle, sinon l'image « carte de fidélité » du salon (carte d'avant). */
 function applyLoyaltyArt() {

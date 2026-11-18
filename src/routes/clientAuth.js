@@ -9,6 +9,7 @@ const { hashPassword, verifyPassword } = require('../lib/password');
 const { sendClientVerificationEmail, sendClientPasswordReset, sendClientSecurityNotice } = require('../lib/mailer');
 const { activateOnAccountCreation } = require('../lib/loyalty');
 const { clientKey } = require('../lib/queueMath');
+const { logActivity } = require('../lib/activityLog');
 const { loginRateLimiter, signupRateLimiter } = require('../middleware/rateLimiter');
 const { nowParisDatetimeString } = require('./appointments');
 const { wrap } = require('../lib/wrap');
@@ -263,6 +264,31 @@ router.get('/loyalty-cards/:id/image', requireClient, wrap(async (req, res) => {
   res.json({ ok: true, image_url: card ? card.image_url || null : null });
 }));
 
+// Le client active / désactive ses cartes de fidélité (une, ou toutes d'un coup avec card_id = 'all').
+router.post('/loyalty-cards/:id/toggle', requireClient, wrap(async (req, res) => {
+  const c = req.clientAccount;
+  const key = clientKey({ email: c.email });
+  const LC = require('../lib/loyaltyCards');
+  const on = req.body.on === true;
+  try {
+    if (req.params.id === 'all') {
+      const cards = (await LC.clientCards(c.salon_id, key, { forClient: true })).filter((x) => x.published && !x.locked && x.activated !== on);
+      if (!cards.length && on && !(await LC.clientCards(c.salon_id, key, { forClient: true })).length) {
+        return res.status(403).json({ error: 'Votre fidélité n\'est pas encore activée : demandez à votre coiffeur lors de votre prochain passage' });
+      }
+      for (const x of cards) await LC.clientSetCard(c.salon_id, key, c, x.card_id, on);
+      logActivity(c.salon_id, on ? 'loyalty_activate' : 'loyalty_deactivate', (on ? 'Cartes de fidélité activées' : 'Cartes de fidélité désactivées') + ' par le client depuis son compte : ' + c.name + (cards.length ? ' — ' + cards.map((x) => x.name).join(', ') : ''));
+    } else {
+      const card = await LC.clientSetCard(c.salon_id, key, c, req.params.id, on);
+      logActivity(c.salon_id, on ? 'loyalty_activate' : 'loyalty_deactivate', 'Carte de fidélité ' + (on ? 'activée' : 'désactivée') + ' par le client depuis son compte : ' + c.name + ' — ' + card.name);
+    }
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    throw err;
+  }
+  res.json({ ok: true, loyalty_cards: (await LC.clientCards(c.salon_id, key, { forClient: true })).filter((x) => x.published) });
+}));
+
 router.get('/me', requireClient, wrap(async (req, res) => {
   const c = req.clientAccount;
   const key = clientKey({ email: c.email });
@@ -357,7 +383,8 @@ router.get('/me', requireClient, wrap(async (req, res) => {
     loyalty: loyaltyActivated ? Object.assign({ points: loyalty.points, rewards_available: loyalty.rewards_available },
       await (async () => { const t = await thresholdsForSalon(c.salon_id); return { thresholds: t, rewards: rewardsFor(loyalty.points, t) }; })()) : null,
     // Plusieurs cartes : seulement les cartes publiées que le client a activées (chacune avec ses points et ses paliers).
-    loyalty_cards: (await require('../lib/loyaltyCards').clientCards(c.salon_id, key)).filter((x) => x.published),
+    // Toutes les cartes publiées dès que le client a une carte : activées (avec points) ou à activer par lui-même.
+    loyalty_cards: (await require('../lib/loyaltyCards').clientCards(c.salon_id, key, { forClient: true })).filter((x) => x.published),
     upcoming_appointments: upcomingAppointments,
     recent_visits: recentVisits,
     gift_cards: giftCards.map((g) => {
