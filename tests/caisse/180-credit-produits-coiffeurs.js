@@ -84,6 +84,7 @@ const stock = (id) => Number(sql(`SELECT stock_quantity FROM products WHERE id='
   check('poste : « Crédit » dans le menu du bas, grille, scan, « Je l\'ai pris », annuler', poste.includes('id="nav-credit"') && poste.includes('function openCreditScreen(') &&
     poste.includes('function startCreditScan(') && poste.includes("Je l'ai pris") && poste.includes('function undoCreditMove('));
   check('caisse : onglet « Crédit coiffeurs », ligne avec credit_barber_id', caisse.includes('data-cat="credit"') && caisse.includes('credit_barber_id: '));
+  check('caisse : coiffeurs en cartes (comme les produits), avec leur photo', caisse.includes('<div id="credit-barbers" class="item-grid">') && /class="item-card' \+ \(photo \? ' has-photo'/.test(caisse) && caisse.includes('info.photo_url'));
   check('dashboard : Coiffeurs > Crédit produits (soldes, réglages, ajuster)', dash.includes('id="credit-box"') && dash.includes('function loadBarberCredit(') && dash.includes('function adjustBarberCredit('));
 
   sql("DELETE FROM barber_credit_moves WHERE salon_id='s1'");
