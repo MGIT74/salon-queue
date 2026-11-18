@@ -212,6 +212,5 @@ node tests/caisse/175-agenda-mois-plus-de-500-rdv.js  # Agenda : plus de 500 RDV
 node tests/caisse/176-compte-client-isole-par-salon.js  # Compte client : un jeton par salon, changement de salon seulement si compte confirme (meme email) dans l'autre salon
 node tests/caisse/177-consentement-inscription.js  # Inscription client : case CGU + politique de confidentialite obligatoire, date et version enregistrees
 node tests/caisse/178-calendrier-conges-sans-saut.js  # Conges : fermer la bulle ne fait plus remonter la page (pastilles seules mises a jour)
-node tests/caisse/179-cartes-fidelite-multiples.js  # Fidelite : plusieurs cartes (paliers, articles coches, publier), points par carte, activation et remises par carte
-node tests/caisse/180-cartes-fidelite-compte-client.js  # Fidelite : toutes les cartes publiees dans le compte client, activer / desactiver par le client, carte bloquee par le salon
+node tests/caisse/179-carte-fidelite-articles.js  # Fidelite : une seule carte, paliers au choix, articles qui rapportent des points (tous ou coches)
 ```

@@ -72,7 +72,9 @@ async function cardsForOwner(ownerId, opts) {
   opts = opts || {};
   const [cards] = await pool.query(
     `SELECT id, name, published, auto_on_signup, scope_all, uses_salon_image, position${opts.withImage ? ', image_url' : ', (image_url IS NOT NULL AND image_url <> \'\') AS has_image'}
-     FROM loyalty_cards WHERE owner_id = ?${opts.publishedOnly ? ' AND published = 1' : ''} ORDER BY position, created_at`, [ownerId]);
+     FROM loyalty_cards WHERE owner_id = ? ORDER BY position, created_at LIMIT 1`, [ownerId]);
+  // UNE seule carte de fidélité par enseigne (la carte d'avant, modifiable) : toujours active.
+  cards.forEach((c) => { c.published = 1; });
   if (!cards.length && !opts._retried) {
     // Enseigne créée après le démarrage : elle reçoit sa première carte (comme toutes les autres).
     const [[any]] = await pool.query('SELECT COUNT(*) AS n FROM loyalty_cards WHERE owner_id = ?', [ownerId]);
@@ -143,7 +145,7 @@ async function clientCards(salonId, key, opts) {
   const out = [];
   // Espace client : dès que le client a (ou a eu) une carte, TOUTES les cartes publiées apparaissent ;
   // il active / désactive lui-même celles qu'il veut (sauf une carte désactivée par le salon).
-  const member = opts.forClient && accounts.length > 0;
+  const member = opts.forClient && accounts.some((a) => cards.some((c) => c.id === a.card_id));
   // Détails pour le client (bouton « i ») : noms des articles qui rapportent des points.
   const names = member ? await itemNames([].concat(...cards.filter((c) => !c.scope_all).map((c) => c.items))) : {};
   cards.forEach((card) => {
@@ -280,7 +282,7 @@ async function saveCard(ownerId, body, cardId) {
       const [[c]] = await conn.query('SELECT id FROM loyalty_cards WHERE id = ? AND owner_id = ?', [id, ownerId]);
       if (!c) throw Object.assign(new Error('Carte introuvable'), { status: 404 });
       const sets = ['name = ?', 'published = ?', 'auto_on_signup = ?', 'scope_all = ?'];
-      const params = [name, body.published === false ? 0 : 1, body.auto_on_signup ? 1 : 0, scopeAll ? 1 : 0];
+      const params = [name, 1, body.auto_on_signup ? 1 : 0, scopeAll ? 1 : 0];
       if (body.image_url !== undefined) { sets.push('image_url = ?', 'uses_salon_image = 0'); params.push(body.image_url ? String(body.image_url).slice(0, 3000000) : null); }
       await conn.query('UPDATE loyalty_cards SET ' + sets.join(', ') + ' WHERE id = ?', params.concat([id]));
     } else {
