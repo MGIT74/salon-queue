@@ -6,8 +6,8 @@
  * - Prise d'un produit : depuis « Mon poste », par le coiffeur connecté avec SON code PIN (jamais
  *   « pour » un collègue) : le stock baisse de 1 et son crédit du prix du produit. Bloqué à 0 €.
  *   Annulable par lui pendant 10 minutes (erreur de touche).
- * - Admin : soldes, historique, réglages (catégories de produits autorisées, seuil d'alerte),
- *   ajustement manuel (correction, remboursement d'un coiffeur qui part).
+ * - Coiffeur « gratuit » (réglé par l'admin) : ses produits sont offerts, pas de recharge ; seul le stock baisse.
+ * - Admin : soldes, historique, réglages (catégories de produits autorisées, seuil d'alerte, coiffeurs gratuits).
  */
 const express = require('express');
 const crypto = require('crypto');
@@ -26,7 +26,11 @@ async function creditSettings(salonId) {
   try { cats = JSON.parse(s.barber_credit_categories || '[]'); } catch (e) { cats = []; }
   if (!Array.isArray(cats)) cats = [];
   const alert = Number(s.barber_credit_alert_cents);
-  return { categories: cats.filter((c) => typeof c === 'string'), alert_cents: Number.isInteger(alert) && alert >= 0 ? alert : 300 };
+  let free = [];
+  try { free = JSON.parse(s.barber_credit_free || '[]'); } catch (e) { free = []; }
+  if (!Array.isArray(free)) free = [];
+  return { categories: cats.filter((c) => typeof c === 'string'), alert_cents: Number.isInteger(alert) && alert >= 0 ? alert : 300,
+    free: free.filter((c) => typeof c === 'string') };
 }
 
 async function balanceOf(db, salonId, barberId) {
@@ -49,9 +53,9 @@ async function allowedProducts(salonId, cats) {
 
 function moveView(m) {
   return {
-    id: m.id, kind: m.kind, amount_cents: m.amount_cents, product_id: m.product_id, product_name: m.product_name,
+    id: m.id, kind: m.kind, amount_cents: m.amount_cents, value_cents: m.value_cents, product_id: m.product_id, product_name: m.product_name,
     note: m.note, undone: Boolean(m.undone_at), created_at: utcIso(m.created_at),
-    can_undo: m.kind === 'take' && !m.undone_at && (Date.now() - new Date(utcIso(m.created_at)).getTime()) < UNDO_MINUTES * 60000
+    can_undo: (m.kind === 'take' || m.kind === 'free') && !m.undone_at && (Date.now() - new Date(utcIso(m.created_at)).getTime()) < UNDO_MINUTES * 60000
   };
 }
 
@@ -70,6 +74,7 @@ router.get('/me', requireAdminOrBarber, wrap(async (req, res) => {
     ok: true,
     balance_cents: await balanceOf(pool, req.salon.id, req.barberId),
     alert_cents: st.alert_cents,
+    free: st.free.indexOf(req.barberId) !== -1,
     products: await allowedProducts(req.salon.id, st.categories),
     moves: moves.map(moveView)
   });
@@ -95,18 +100,19 @@ router.post('/take', requireAdminOrBarber, wrap(async (req, res) => {
       await conn.rollback();
       return res.status(409).json({ error: 'Plus de « ' + p.name + ' » en stock.' });
     }
+    const free = st.free.indexOf(req.barberId) !== -1;   // produits offerts : seul le stock baisse
     const bal = await balanceOf(conn, req.salon.id, req.barberId);
-    if (bal < p.price_cents) {
+    if (!free && bal < p.price_cents) {
       await conn.rollback();
       return res.status(409).json({ error: 'Crédit insuffisant (' + (bal / 100).toFixed(2).replace('.', ',') + ' €) : rechargez à la caisse.', code: 'no_credit' });
     }
     if (p.stock_enabled) await conn.query('UPDATE products SET stock_quantity = stock_quantity - 1 WHERE id = ?', [p.id]);
     const id = crypto.randomUUID();
     await conn.query(
-      "INSERT INTO barber_credit_moves (id, salon_id, barber_id, kind, amount_cents, product_id, product_name) VALUES (?, ?, ?, 'take', ?, ?, ?)",
-      [id, req.salon.id, req.barberId, -p.price_cents, p.id, p.name]);
+      'INSERT INTO barber_credit_moves (id, salon_id, barber_id, kind, amount_cents, product_id, product_name, value_cents) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [id, req.salon.id, req.barberId, free ? 'free' : 'take', free ? 0 : -p.price_cents, p.id, p.name, p.price_cents]);
     await conn.commit();
-    res.json({ ok: true, move_id: id, product: { id: p.id, name: p.name, price_cents: p.price_cents }, balance_cents: bal - p.price_cents });
+    res.json({ ok: true, move_id: id, free, product: { id: p.id, name: p.name, price_cents: p.price_cents }, balance_cents: free ? bal : bal - p.price_cents });
   } catch (err) {
     try { await conn.rollback(); } catch (e) {}
     throw err;
@@ -120,7 +126,7 @@ router.post('/moves/:id/undo', requireAdminOrBarber, wrap(async (req, res) => {
   try {
     await conn.beginTransaction();
     const [[m]] = await conn.query(
-      "SELECT * FROM barber_credit_moves WHERE id = ? AND salon_id = ? AND barber_id = ? AND kind = 'take' FOR UPDATE",
+      "SELECT * FROM barber_credit_moves WHERE id = ? AND salon_id = ? AND barber_id = ? AND kind IN ('take', 'free') FOR UPDATE",
       [req.params.id, req.salon.id, req.barberId]);
     if (!m || m.undone_at) { await conn.rollback(); return res.status(404).json({ error: 'Rien à annuler.' }); }
     if (!moveView(m).can_undo) { await conn.rollback(); return res.status(409).json({ error: 'Trop tard pour annuler (' + UNDO_MINUTES + ' min) : voyez avec le responsable.' }); }
@@ -141,7 +147,7 @@ router.get('/balances', requireAdminOrBarber, wrap(async (req, res) => {
        COALESCE((SELECT SUM(m.amount_cents) FROM barber_credit_moves m WHERE m.salon_id = b.salon_id AND m.barber_id = b.id AND m.undone_at IS NULL), 0) AS balance_cents
      FROM barbers b WHERE b.salon_id = ? ORDER BY b.sort_order, b.name`, [req.salon.id]);
   const st = await creditSettings(req.salon.id);
-  res.json({ ok: true, alert_cents: st.alert_cents, items: rows.filter((r) => r.active || Number(r.balance_cents) !== 0).map((r) => ({ id: r.id, name: r.name, active: Boolean(r.active), balance_cents: Number(r.balance_cents) })) });
+  res.json({ ok: true, alert_cents: st.alert_cents, items: rows.filter((r) => r.active || Number(r.balance_cents) !== 0).map((r) => ({ id: r.id, name: r.name, active: Boolean(r.active), free: st.free.indexOf(r.id) !== -1, balance_cents: Number(r.balance_cents) })) });
 }));
 
 router.get('/overview', requireAdmin, wrap(async (req, res) => {
@@ -149,17 +155,18 @@ router.get('/overview', requireAdmin, wrap(async (req, res) => {
     `SELECT b.id, b.name, b.active,
        COALESCE(SUM(CASE WHEN m.undone_at IS NULL THEN m.amount_cents END), 0) AS balance_cents,
        COALESCE(SUM(CASE WHEN m.undone_at IS NULL AND m.kind = 'take' AND m.created_at >= DATE_FORMAT(UTC_TIMESTAMP(), '%Y-%m-01') THEN -m.amount_cents END), 0) AS month_taken_cents,
-       COALESCE(SUM(CASE WHEN m.undone_at IS NULL AND m.kind = 'take' AND m.created_at >= DATE_FORMAT(UTC_TIMESTAMP(), '%Y-%m-01') THEN 1 END), 0) AS month_taken_count,
+       COALESCE(SUM(CASE WHEN m.undone_at IS NULL AND m.kind = 'free' AND m.created_at >= DATE_FORMAT(UTC_TIMESTAMP(), '%Y-%m-01') THEN m.value_cents END), 0) AS month_free_cents,
+       COALESCE(SUM(CASE WHEN m.undone_at IS NULL AND m.kind IN ('take', 'free') AND m.created_at >= DATE_FORMAT(UTC_TIMESTAMP(), '%Y-%m-01') THEN 1 END), 0) AS month_taken_count,
        COALESCE(SUM(CASE WHEN m.undone_at IS NULL AND m.kind = 'recharge' AND m.created_at >= DATE_FORMAT(UTC_TIMESTAMP(), '%Y-%m-01') THEN m.amount_cents END), 0) AS month_recharged_cents,
-       MAX(CASE WHEN m.kind = 'take' AND m.undone_at IS NULL THEN m.created_at END) AS last_take_at
+       MAX(CASE WHEN m.kind IN ('take', 'free') AND m.undone_at IS NULL THEN m.created_at END) AS last_take_at
      FROM barbers b LEFT JOIN barber_credit_moves m ON m.salon_id = b.salon_id AND m.barber_id = b.id
      WHERE b.salon_id = ? GROUP BY b.id, b.name, b.active ORDER BY b.name`, [req.salon.id]);
   const st = await creditSettings(req.salon.id);
   res.json({
     ok: true, settings: st,
     items: rows.filter((r) => r.active || Number(r.balance_cents) !== 0).map((r) => ({
-      id: r.id, name: r.name, active: Boolean(r.active), balance_cents: Number(r.balance_cents),
-      month_taken_cents: Number(r.month_taken_cents), month_taken_count: Number(r.month_taken_count),
+      id: r.id, name: r.name, active: Boolean(r.active), free: st.free.indexOf(r.id) !== -1, balance_cents: Number(r.balance_cents),
+      month_taken_cents: Number(r.month_taken_cents), month_free_cents: Number(r.month_free_cents), month_taken_count: Number(r.month_taken_count),
       month_recharged_cents: Number(r.month_recharged_cents), last_take_at: r.last_take_at ? utcIso(r.last_take_at) : null
     }))
   });
@@ -180,20 +187,16 @@ router.put('/settings', requireAdmin, wrap(async (req, res) => {
   res.json({ ok: true });
 }));
 
-// Ajustement manuel par l'admin : correction, ou remboursement du crédit restant d'un coiffeur qui part.
-router.post('/adjust', requireAdmin, wrap(async (req, res) => {
-  const barberId = String(req.body.barber_id || '');
-  const amount = Math.round(Number(req.body.amount_cents));
-  const note = String(req.body.note || '').trim().slice(0, 255);
-  if (!Number.isInteger(amount) || !amount || Math.abs(amount) > 1000000) return res.status(400).json({ error: 'Montant invalide' });
-  if (!note) return res.status(400).json({ error: 'Indiquez la raison de l\'ajustement' });
-  const [[b]] = await pool.query('SELECT id, name FROM barbers WHERE id = ? AND salon_id = ?', [barberId, req.salon.id]);
+// Coiffeur « gratuit » : ses produits sont offerts (pas de recharge, son crédit ne bouge pas, seul le stock baisse).
+router.put('/free/:barberId', requireAdmin, wrap(async (req, res) => {
+  const [[b]] = await pool.query('SELECT id, name FROM barbers WHERE id = ? AND salon_id = ?', [req.params.barberId, req.salon.id]);
   if (!b) return res.status(404).json({ error: 'Coiffeur introuvable' });
-  await pool.query(
-    "INSERT INTO barber_credit_moves (id, salon_id, barber_id, kind, amount_cents, note) VALUES (?, ?, ?, 'adjust', ?, ?)",
-    [crypto.randomUUID(), req.salon.id, b.id, amount, note]);
-  logActivity(req.salon.id, 'barber_credit_adjust', 'Crédit produits de ' + b.name + ' ajusté de ' + (amount / 100).toFixed(2).replace('.', ',') + ' € : ' + note);
-  res.json({ ok: true, balance_cents: await balanceOf(pool, req.salon.id, b.id) });
+  const st = await creditSettings(req.salon.id);
+  const on = req.body.free === true;
+  const free = st.free.filter((x) => x !== b.id).concat(on ? [b.id] : []);
+  await setSettings(req.salon.id, { barber_credit_free: JSON.stringify(free) });
+  logActivity(req.salon.id, 'barber_credit_free', 'Crédit produits : ' + b.name + (on ? ' prend ses produits gratuitement' : ' paie de nouveau ses produits avec son crédit'));
+  res.json({ ok: true, free: on });
 }));
 
 module.exports = router;

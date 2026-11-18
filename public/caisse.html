@@ -5210,7 +5210,7 @@ function applyCatView() {
 var creditBalances = [], creditBarberId = null;
 function loadCreditBalances() {
   barberApi('/api/barber-credit/balances').then(function (r) {
-    creditBalances = (r.items || []).filter(function (b) { return b.active; });
+    creditBalances = (r.items || []).filter(function (b) { return b.active && !b.free; });   // « gratuit » : rien à recharger
     creditAlertCents = r.alert_cents;
     renderCreditSection();
   }).catch(function (e) { toast(e.message, true); });

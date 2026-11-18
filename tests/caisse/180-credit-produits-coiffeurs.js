@@ -68,12 +68,28 @@ const stock = (id) => Number(sql(`SELECT stock_quantity FROM products WHERE id='
   r = await api('GET', '/api/barber-credit/overview', null, ADMIN);
   const k = (r.body.items || []).find((x) => x.id === 'b1');
   check('dashboard : solde, rechargé et pris ce mois', k && k.balance_cents === 2000 - price && k.month_recharged_cents === 2000 && k.month_taken_count === 1, k);
-  r = await api('POST', '/api/barber-credit/adjust', { barber_id: 'b1', amount_cents: -(2000 - price), note: 'Remboursé en espèces (départ)' }, ADMIN);
-  check('ajustement admin (remboursement) : solde 0', r.status === 200 && r.body.balance_cents === 0, r.body);
-  r = await api('POST', '/api/barber-credit/adjust', { barber_id: 'b1', amount_cents: 500, note: '' }, ADMIN);
-  check('ajustement sans raison refusé', r.status === 400);
-  r = await api('POST', '/api/barber-credit/adjust', { barber_id: 'b1', amount_cents: 500, note: 'x' });
-  check('un coiffeur ne peut pas s\'ajuster lui-même', r.status === 401 || r.status === 403, r.status);
+
+  console.log('\n[D bis] Coiffeur « gratuit » : produits offerts, seul le stock baisse');
+  r = await api('PUT', '/api/barber-credit/free/b1', { free: true });
+  check('un coiffeur ne peut pas se mettre en gratuit', r.status === 401 || r.status === 403, r.status);
+  r = await api('PUT', '/api/barber-credit/free/b1', { free: true }, ADMIN);
+  check('admin : b1 en gratuit', r.status === 200 && r.body.free === true, r.body);
+  const balBefore = 2000 - price;
+  sql("UPDATE products SET stock_quantity=5 WHERE id='p1'");
+  for (let i = 0; i < 3; i++) r = await api('POST', '/api/barber-credit/take', { product_id: 'p1' });
+  check('3 produits pris même au-delà du crédit : stock −3, crédit inchangé', r.status === 200 && r.body.free === true && stock('p1') === 2 && r.body.balance_cents === balBefore, [r.body, stock('p1')]);
+  r = await api('GET', '/api/barber-credit/me');
+  check('poste : mode gratuit, mouvements « free » avec la valeur du produit', r.body.free === true && r.body.moves[0].kind === 'free' && r.body.moves[0].value_cents === price && r.body.moves[0].amount_cents === 0, r.body.moves[0]);
+  r = await api('POST', '/api/barber-credit/moves/' + r.body.moves[0].id + '/undo');
+  check('annulation : produit remis en stock', r.status === 200 && stock('p1') === 3, r.body);
+  r = await api('GET', '/api/barber-credit/overview', null, ADMIN);
+  const k2 = r.body.items.find((x) => x.id === 'b1');
+  check('dashboard : gratuit, offert ce mois = 2 produits', k2.free === true && k2.month_free_cents === 2 * price && k2.month_taken_count === 3, k2);
+  r = await api('GET', '/api/barber-credit/balances');
+  check('caisse : b1 marqué gratuit (pas de recharge proposée)', r.body.items.find((x) => x.id === 'b1').free === true);
+  await api('PUT', '/api/barber-credit/free/b1', { free: false }, ADMIN);
+  r = await api('POST', '/api/barber-credit/adjust', { barber_id: 'b1', amount_cents: 500, note: 'x' }, ADMIN);
+  check('plus de bouton / route « Ajuster »', r.status === 404, r.status);
   r = await api('GET', '/api/barber-credit/balances');
   check('caisse : soldes de tous les coiffeurs', r.status === 200 && r.body.items.some((x) => x.id === 'b1'), r.body);
 
@@ -86,7 +102,9 @@ const stock = (id) => Number(sql(`SELECT stock_quantity FROM products WHERE id='
   check('caisse : onglet « Crédit coiffeurs », ligne avec credit_barber_id', caisse.includes('data-cat="credit"') && caisse.includes('credit_barber_id: '));
   check('caisse : coiffeurs en cartes (comme les produits), avec leur photo', caisse.includes('<div id="credit-barbers" class="item-grid">') && /class="item-card' \+ \(photo \? ' has-photo'/.test(caisse) && caisse.includes('info.photo_url'));
   check('caisse : coiffeurs sur une rangée qui défile (scroll snap), montants toujours visibles, onglet qui défile', /#credit-barbers\.item-grid \{[^}]*grid-auto-flow: column;[^}]*scroll-snap-type: x mandatory/.test(caisse) && caisse.includes('#panel-caisse #credit-section { flex: 1 1 auto; min-height: 0; overflow-y: auto;'));
-  check('dashboard : Coiffeurs > Crédit produits (soldes, réglages, ajuster)', dash.includes('id="credit-box"') && dash.includes('function loadBarberCredit(') && dash.includes('function adjustBarberCredit('));
+  check('dashboard : Coiffeurs > Crédit produits (soldes, réglages, interrupteur « Gratuit », pas d\'« Ajuster »)', dash.includes('id="credit-box"') && dash.includes('function loadBarberCredit(') &&
+    dash.includes('function toggleBarberCreditFree(') && !dash.includes('function adjustBarberCredit('));
+  check('poste : mode gratuit (« Offerts »), caisse : pas de recharge pour un gratuit', poste.includes("free ? 'Offerts' : eur(bal)") && caisse.includes('return b.active && !b.free;'));
 
   sql("DELETE FROM barber_credit_moves WHERE salon_id='s1'");
   sql("DELETE FROM settings WHERE salon_id='s1' AND \\`key\\` LIKE 'barber_credit%'");

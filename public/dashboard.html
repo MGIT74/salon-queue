@@ -2618,7 +2618,7 @@
     <!-- Crédit produits : les coiffeurs rechargent à la caisse, puis prennent leurs produits depuis leur poste. -->
     <div class="card-box" id="credit-box" style="margin-top:22px">
       <div class="admin-head" style="margin-bottom:4px"><h3 style="margin:0">Crédit produits des coiffeurs</h3></div>
-      <p class="hint">Le coiffeur recharge son crédit à la caisse (onglet « Crédit coiffeurs », vente normale), puis prend ses produits depuis son poste (bouton « Crédit ») : le stock baisse et son crédit aussi. Bloqué à 0 €.</p>
+      <p class="hint">Le coiffeur recharge son crédit à la caisse (onglet « Crédit coiffeurs », vente normale), puis prend ses produits depuis son poste (bouton « Crédit ») : le stock baisse et son crédit aussi. Bloqué à 0 €. « Gratuit » : le coiffeur ne recharge pas, ses produits sont offerts et seul le stock baisse.</p>
       <div id="credit-summary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:6px 0 14px"></div>
       <div id="credit-rows"><div class="empty">Chargement…</div></div>
       <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--sep)">
@@ -12787,14 +12787,19 @@ function renderBarberCredit() {
   var items = o.items || [], alertC = o.settings.alert_cents;
   var sum = function (k) { return items.reduce(function (a, x) { return a + x[k]; }, 0); };
   var tile = function (lbl, val) { return '<div style="background:var(--fill);border-radius:14px;padding:12px 14px"><div style="font-size:12.5px;color:var(--grey)">' + lbl + '</div><div style="font-size:22px;font-weight:700;margin-top:2px">' + val + '</div></div>'; };
-  document.getElementById('credit-summary').innerHTML = tile('Rechargé ce mois', eur(sum('month_recharged_cents'))) + tile('Pris ce mois', eur(sum('month_taken_cents'))) +
-    tile('Produits sortis du stock', sum('month_taken_count')) + tile('Crédit restant (total)', eur(sum('balance_cents')));
+  document.getElementById('credit-summary').innerHTML = tile('Rechargé ce mois', eur(sum('month_recharged_cents'))) + tile('Pris avec le crédit', eur(sum('month_taken_cents'))) +
+    tile('Offert ce mois', eur(sum('month_free_cents'))) + tile('Produits sortis du stock', sum('month_taken_count')) + tile('Crédit restant (total)', eur(sum('balance_cents')));
   document.getElementById('credit-rows').innerHTML = items.length ? items.map(function (b) {
     return '<div class="item"><div class="item-main"><div class="item-name">' + esc(b.name) + (b.active ? '' : ' <span class="chip" style="font-size:11.5px">ne travaille plus ici</span>') + '</div>' +
-      '<div class="item-meta">Pris ce mois : ' + eur(b.month_taken_cents) + ' (' + b.month_taken_count + ') · Dernier produit : ' + creditDate(b.last_take_at) + '</div></div>' +
-      '<div style="font-size:18px;font-weight:700;color:' + (b.balance_cents <= alertC ? 'var(--red)' : 'var(--ink)') + ';margin-right:12px;white-space:nowrap">' + eur(b.balance_cents) + '</div>' +
-      '<div class="item-actions"><button class="btn btn-soft" style="font-size:13px;padding:6px 12px" onclick="openBarberCreditHistory(\'' + b.id + '\')">Historique</button>' +
-      '<button class="btn btn-soft" style="font-size:13px;padding:6px 12px" onclick="adjustBarberCredit(\'' + b.id + '\')">Ajuster</button></div></div>';
+      '<div class="item-meta">' + b.month_taken_count + ' produit' + (b.month_taken_count > 1 ? 's' : '') + ' ce mois' +
+        (b.month_taken_cents ? ' · crédit : ' + eur(b.month_taken_cents) : '') + (b.month_free_cents ? ' · offert : ' + eur(b.month_free_cents) : '') +
+        ' · Dernier produit : ' + creditDate(b.last_take_at) + '</div></div>' +
+      // Gratuit : ses produits sont offerts (pas de recharge) ; seul le stock baisse.
+      '<div style="display:flex;align-items:center;gap:8px;font-size:13.5px;margin-right:14px;white-space:nowrap">' +
+        '<div class="switch' + (b.free ? ' on' : '') + '" role="switch" aria-checked="' + b.free + '" aria-label="Produits gratuits pour ' + esc(b.name) + '" tabindex="0" title="Ses produits sont offerts : pas de recharge, seul le stock baisse"' +
+        ' onclick="toggleBarberCreditFree(\'' + b.id + '\', ' + !b.free + ')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();toggleBarberCreditFree(\'' + b.id + '\', ' + !b.free + ');}"></div>Gratuit</div>' +
+      '<div style="font-size:18px;font-weight:700;color:' + (b.free ? 'var(--green)' : b.balance_cents <= alertC ? 'var(--red)' : 'var(--ink)') + ';margin-right:12px;white-space:nowrap;min-width:84px;text-align:right">' + (b.free ? 'Offert' : eur(b.balance_cents)) + '</div>' +
+      '<div class="item-actions"><button class="btn btn-soft" style="font-size:13px;padding:6px 12px" onclick="openBarberCreditHistory(\'' + b.id + '\')">Historique</button></div></div>';
   }).join('') : '<div class="empty">Aucun coiffeur</div>';
   var chosen = o.settings.categories || [];
   document.getElementById('credit-cats').innerHTML = creditProductCats.length ? creditProductCats.map(function (c) {
@@ -12815,10 +12820,11 @@ function openBarberCreditHistory(id) {
   var b = (creditOverview.items || []).find(function (x) { return x.id === id; });
   api('/api/barber-credit/moves?barber_id=' + encodeURIComponent(id)).then(function (r) {
     var rows = (r.items || []).map(function (m) {
-      var label = m.kind === 'take' ? esc(m.product_name || 'Produit') : m.kind === 'recharge' ? 'Recharge caisse · ' + esc(m.note || '') : 'Ajustement · ' + esc(m.note || '');
+      var label = m.kind === 'take' ? esc(m.product_name || 'Produit') : m.kind === 'free' ? esc(m.product_name || 'Produit') + ' · offert' : m.kind === 'recharge' ? 'Recharge caisse · ' + esc(m.note || '') : 'Ajustement · ' + esc(m.note || '');
       return '<div style="display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--sep);font-size:14px;' + (m.undone ? 'opacity:.5;text-decoration:line-through' : '') + '">' +
         '<div>' + label + '<div style="font-size:12px;color:var(--grey)">' + creditDate(m.created_at) + (m.undone ? ' · annulé par le coiffeur' : '') + '</div></div>' +
-        '<b style="white-space:nowrap;color:' + (m.amount_cents < 0 ? 'var(--red)' : 'var(--green)') + '">' + (m.amount_cents > 0 ? '+' : '−') + eur(Math.abs(m.amount_cents)) + '</b></div>';
+        (m.kind === 'free' ? '<b style="white-space:nowrap;color:var(--grey)">' + eur(m.value_cents || 0) + ' offert</b></div>'
+          : '<b style="white-space:nowrap;color:' + (m.amount_cents < 0 ? 'var(--red)' : 'var(--green)') + '">' + (m.amount_cents > 0 ? '+' : '−') + eur(Math.abs(m.amount_cents)) + '</b></div>');
     }).join('') || '<div class="empty">Aucun mouvement</div>';
     var overlay = _buildModal('<div class="modal-title">Crédit produits · ' + esc(b ? b.name : '') + '</div>' +
       '<div style="max-height:60vh;overflow-y:auto;margin-bottom:14px;text-align:left">' + rows + '</div>' +
@@ -12826,25 +12832,10 @@ function openBarberCreditHistory(id) {
     overlay.querySelector('#bc-close').onclick = function () { _closeModal(overlay); };
   }).catch(function (e) { toast(e.message, true); });
 }
-function adjustBarberCredit(id) {
-  var b = (creditOverview.items || []).find(function (x) { return x.id === id; });
-  if (!b) return;
-  var overlay = _buildModal('<div class="modal-title">Ajuster le crédit · ' + esc(b.name) + '</div>' +
-    '<div class="modal-message">Solde actuel : <b>' + eur(b.balance_cents) + '</b>. Montant positif pour ajouter, négatif pour retirer (ex. −7,50 si vous lui rendez son crédit en espèces).</div>' +
-    '<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;text-align:left">' +
-      '<label style="font-size:13px">Montant (€)<input id="bc-amount" type="text" inputmode="decimal" placeholder="-7,50" style="margin-top:4px"></label>' +
-      '<label style="font-size:13px">Raison<input id="bc-note" type="text" placeholder="Remboursé en espèces (départ)" style="margin-top:4px"></label></div>' +
-    '<div class="modal-actions"><button class="btn btn-soft" id="bc-cancel">Annuler</button><button class="btn btn-primary" id="bc-ok">Enregistrer</button></div>');
-  overlay.querySelector('#bc-cancel').onclick = function () { _closeModal(overlay); };
-  overlay.querySelector('#bc-ok').onclick = function () {
-    var cents = Math.round(parseFloat(overlay.querySelector('#bc-amount').value.replace(',', '.').replace('−', '-')) * 100);
-    var note = overlay.querySelector('#bc-note').value.trim();
-    if (!cents) { toast('Montant invalide', true); return; }
-    if (!note) { toast('Indiquez la raison', true); return; }
-    api('/api/barber-credit/adjust', { method: 'POST', body: { barber_id: id, amount_cents: cents, note: note } }).then(function (r) {
-      _closeModal(overlay); toast('Nouveau solde de ' + b.name + ' : ' + eur(r.balance_cents)); loadBarberCredit();
-    }).catch(function (e) { toast(e.message, true); });
-  };
+function toggleBarberCreditFree(id, on) {
+  api('/api/barber-credit/free/' + encodeURIComponent(id), { method: 'PUT', body: { free: on } })
+    .then(function () { toast(on ? 'Produits offerts pour ce coiffeur (seul le stock baisse)' : 'Ce coiffeur paie de nouveau avec son crédit'); loadBarberCredit(); })
+    .catch(function (e) { toast(e.message, true); loadBarberCredit(); });
 }
 </script>
 
