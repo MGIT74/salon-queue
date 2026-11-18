@@ -1494,3 +1494,8 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'appointments' AND column_name = 'forced_by');
 SET @sql := IF(@c = 0, 'ALTER TABLE appointments ADD COLUMN forced_by VARCHAR(120) NULL, ADD COLUMN forced_at DATETIME NULL', 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Création de compte client : acceptation des CGU et de la politique de confidentialité (date + version des textes).
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'clients' AND column_name = 'terms_accepted_at');
+SET @sql := IF(@c = 0, 'ALTER TABLE clients ADD COLUMN terms_accepted_at DATETIME NULL, ADD COLUMN terms_version VARCHAR(20) NULL', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;

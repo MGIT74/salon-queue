@@ -26,7 +26,7 @@ const E = (n) => `zt-client-${n}@example.com`;
     for (let i = 0; i < 60; i++) { try { if ((await fetch(BASE + '/healthz')).ok) break; } catch (e) { /* pas pret */ } await sleep(250); }
 
     console.log('\n[A] Inscription d\'un client (base STRICTE) : plus d\'erreur 500');
-    let r = await post('/api/client-auth/signup', { name: 'Client Test', email: E(1), phone: '+33600000011', password: 'motdepasse1', base_url: BASE + '/compte.html?salon=test' });
+    let r = await post('/api/client-auth/signup', { name: 'Client Test', email: E(1), phone: '+33600000011', password: 'motdepasse1', accept_terms: true, base_url: BASE + '/compte.html?salon=test' });
     check('inscription acceptee (200) - avant : 500 "Erreur interne du serveur"', r.s === 200 && r.b.ok === true, r.s + ' ' + JSON.stringify(r.b));
     check('aucune erreur "owner_id" dans le journal du serveur', !/owner_id|ER_NO_DEFAULT_FOR_FIELD/.test(log), (log.match(/Field[^\n]*/) || [''])[0]);
     const row = sql(`SELECT CONCAT(owner_id = '${ownerOfTest}', '/', salon_id = (SELECT id FROM salons WHERE slug='test'), '/', email_verified, '/', verify_token IS NOT NULL, '/', password_hash <> 'motdepasse1' AND LENGTH(password_hash) > 20) FROM clients WHERE email = '${E(1)}'`);
@@ -34,7 +34,7 @@ const E = (n) => `zt-client-${n}@example.com`;
     check('la reponse dit la verite sur l\'email : "email_sent" present (ici false : aucun SMTP configure sur ce salon)', r.b.email_sent === false && r.b.needs_email_verification === true, JSON.stringify(r.b));
 
     console.log('\n[B] Parcours complet : confirmation de l\'email puis connexion');
-    r = await post('/api/client-auth/login', { email: E(1), password: 'motdepasse1' });
+    r = await post('/api/client-auth/login', { email: E(1), password: 'motdepasse1', accept_terms: true });
     check('connexion AVANT confirmation : refusee (403) avec l\'indication "confirmez votre email"', r.s === 403 && r.b.needs_email_verification === true, r.s + ' ' + JSON.stringify(r.b));
     const t0 = sql(`SELECT verify_token FROM clients WHERE email = '${E(1)}'`);
     r = await post('/api/client-auth/resend-verification', { email: E(1), base_url: BASE + '/compte.html?salon=test' });
@@ -42,18 +42,18 @@ const E = (n) => `zt-client-${n}@example.com`;
     check('"Renvoyer le lien" : reponse neutre (ne revele pas si le compte existe) et NOUVEAU jeton genere', r.s === 200 && r.b.ok === true && t1 && t1 !== t0, r.s);
     r = await post('/api/client-auth/verify-email', { token: t1 });
     check('le lien du nouveau jeton confirme le compte', r.s === 200 && sql(`SELECT email_verified FROM clients WHERE email='${E(1)}'`) === '1');
-    r = await post('/api/client-auth/login', { email: E(1), password: 'motdepasse1' });
+    r = await post('/api/client-auth/login', { email: E(1), password: 'motdepasse1', accept_terms: true });
     check('connexion APRES confirmation : acceptee, avec un jeton de session', r.s === 200 && typeof r.b.token === 'string' && r.b.token.length > 20);
     const me = await (await fetch(BASE + '/api/client-auth/me', { headers: { 'X-Salon-Slug': 'test', 'X-Client-Token': r.b.token } })).json();
     check('"Mon compte" repond avec ce client', JSON.stringify(me).includes(E(1)), JSON.stringify(me).slice(0, 80));
     check('mauvais mot de passe : 401', (await post('/api/client-auth/login', { email: E(1), password: 'faux-mot-de-passe' })).s === 401);
 
     console.log('\n[C] Regles inchangees');
-    check('meme email, meme salon : 409 "Un compte existe deja"', (await post('/api/client-auth/signup', { name: 'Autre', email: E(1), phone: '+33600000012', password: 'motdepasse1' })).s === 409);
-    r = await post('/api/client-auth/signup', { name: 'Client Test', email: E(1), phone: '+33600000013', password: 'motdepasse1' }, 'salon-deux');
+    check('meme email, meme salon : 409 "Un compte existe deja"', (await post('/api/client-auth/signup', { name: 'Autre', email: E(1), phone: '+33600000012', password: 'motdepasse1', accept_terms: true })).s === 409);
+    r = await post('/api/client-auth/signup', { name: 'Client Test', email: E(1), phone: '+33600000013', password: 'motdepasse1', accept_terms: true }, 'salon-deux');
     check('meme email dans un AUTRE salon : accepte (un compte par salon), rattache a CE salon', r.s === 200 && sql(`SELECT COUNT(*) FROM clients c JOIN salons s ON s.id=c.salon_id WHERE c.email='${E(1)}' AND s.slug='salon-deux'`) === '1', r.s + ' ' + JSON.stringify(r.b));
-    check('email invalide : 400', (await post('/api/client-auth/signup', { name: 'X', email: 'pas-un-email', phone: '+33600000014', password: 'motdepasse1' })).s === 400);
-    check('telephone manquant : 400', (await post('/api/client-auth/signup', { name: 'X', email: E(2), password: 'motdepasse1' })).s === 400);
+    check('email invalide : 400', (await post('/api/client-auth/signup', { name: 'X', email: 'pas-un-email', phone: '+33600000014', password: 'motdepasse1', accept_terms: true })).s === 400);
+    check('telephone manquant : 400', (await post('/api/client-auth/signup', { name: 'X', email: E(2), password: 'motdepasse1', accept_terms: true })).s === 400);
   } finally { server.kill('SIGKILL'); clean(); }
 
   console.log('\n[F] AUCUNE requete d\'insertion du code n\'oublie une colonne obligatoire (le defaut ne se voit que sur une base neuve)');

@@ -31,7 +31,7 @@ check('pages qui appellent la verification : RDV en ligne (seul + a plusieurs), 
   check('RDV a plusieurs, email « x » : refuse', r.status === 400 && /email/i.test(r.body.error), r.body);
   r = await post('/api/queue/checkin', { client_name: 'Tom', email: 'x', service_id: 'sv1' });
   check('borne, email « x » : refuse', r.status === 400 && /email/i.test(r.body.error), r.body);
-  r = await post('/api/client-auth/signup', { name: 'Tom', email: 'tom@gmail.com', phone: '+33t', password: 'secret12' });
+  r = await post('/api/client-auth/signup', { name: 'Tom', email: 'tom@gmail.com', phone: '+33t', password: 'secret12', accept_terms: true });
   check('inscription compte, telephone « +33t » : refuse', r.status === 400 && /téléphone/.test(r.body.error), r.body);
   r = await post('/api/appointments/admin-create', { client_name: 'X', email: 'x', service_id: 'sv1', date: DAY, time: '10:00', barber_id: 'b1' }, { 'X-Admin-Password': 'adminpw' });
   check('equipe (admin) : email saisi « x » refuse', r.status === 400 && /email/i.test(r.body.error), r.body);

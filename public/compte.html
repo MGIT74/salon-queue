@@ -29,6 +29,9 @@
 </script>
 <style>
   html.auth-checking #p-login { display: none !important; }
+  .terms-check { display: flex; gap: 10px; align-items: flex-start; margin: 4px 0 16px; font-size: 13.5px; line-height: 1.45; color: var(--grey); cursor: pointer; text-align: left; }
+  .terms-check input { width: 18px; height: 18px; margin: 1px 0 0; flex: 0 0 auto; accent-color: var(--blue); }
+  .terms-check a { color: var(--blue); }
   .salon-switch-wrap { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
   .salon-switch-wrap label { font-size: 13px; color: var(--grey); font-weight: 600; }
   .salon-switch-wrap select { font-family: inherit; font-size: 14px; font-weight: 600; color: var(--ink); background: var(--fill); border: none; border-radius: 10px; padding: 8px 12px; max-width: 100%; }
@@ -532,6 +535,10 @@ button.gt-opt:active .gt-cta{transform:scale(.96)}
           </div>
         </div>
         <div class="fld"><label for="su-pass">Mot de passe</label><input id="su-pass" type="password" placeholder="6 caractères minimum"></div>
+        <label class="terms-check" for="su-terms">
+          <input id="su-terms" type="checkbox">
+          <span>J'accepte les <a href="https://thebarberone.com/cgu" target="_blank" rel="noopener">conditions d'utilisation</a> et j'ai lu la <a href="https://thebarberone.com/politique-de-confidentialite" target="_blank" rel="noopener">politique de confidentialité</a>.</span>
+        </label>
         <button class="go" onclick="doSignup()">Créer mon compte</button>
         <div class="err" id="signup-err"></div>
         <div style="text-align:center;margin-top:16px">
@@ -1035,7 +1042,9 @@ function doSignup() {
   if (!phoneRaw) { errEl.textContent = 'Le téléphone est requis'; return; }
   var cp = contactProblem({ name: name, email: email, phone: phone }, { emailRequired: true, phoneRequired: true });
   if (cp) { errEl.textContent = cp; return; }
-  api('/api/client-auth/signup', { method: 'POST', body: { name: name, email: email, phone: phone, password: password, base_url: baseUrl() } })
+  var terms = document.getElementById('su-terms');
+  if (terms && !terms.checked) { errEl.textContent = 'Merci d\'accepter les conditions d\'utilisation et la politique de confidentialité'; return; }
+  api('/api/client-auth/signup', { method: 'POST', body: { name: name, email: email, phone: phone, password: password, accept_terms: !!(terms && terms.checked), base_url: baseUrl() } })
     .then(function (d) {
       var sent = !(d && d.email_sent === false);
       document.getElementById('check-title').textContent = sent ? 'Vérifiez vos emails' : 'Compte créé';
