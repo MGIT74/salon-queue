@@ -7065,9 +7065,13 @@ function renderLoyaltyCardEditor() {
       (e.scope_all ? '' : '<div style="border:1px solid var(--sep);border-radius:12px;padding:8px 12px;max-height:260px;overflow-y:auto">' + kinds.map(function (k) {
         var list = lcItemsOf(k[0]).filter(function (x) { return x.active !== 0 && x.active !== false; });
         if (!list.length) return '';
-        return '<div style="font-size:12px;color:var(--grey);margin:8px 0 4px;text-transform:uppercase;letter-spacing:.04em">' + k[1] + '</div>' + list.map(function (x) {
+        var allOn = list.every(function (x) { return checked[k[0] + ':' + x.id]; });
+        // « Tout cocher » par groupe : coche / décoche toutes les prestations (ou suppléments, ou produits) d'un coup.
+        return '<label style="display:flex;gap:8px;align-items:center;font-size:12px;color:var(--grey);margin:8px 0 4px;text-transform:uppercase;letter-spacing:.04em;font-weight:600;cursor:pointer">' +
+            '<input type="checkbox" class="lc-grp" data-kind="' + k[0] + '" style="width:auto;flex:none;margin:0"' + (allOn ? ' checked' : '') +
+            ' onchange="lcToggleGroup(\'' + k[0] + '\',this.checked)"> ' + k[1] + ' <span style="text-transform:none;letter-spacing:0;font-weight:400">— tout cocher</span></label>' + list.map(function (x) {
           var key = k[0] + ':' + x.id;
-          return '<label style="display:flex;gap:8px;align-items:center;font-weight:400;padding:3px 0"><input type="checkbox" style="width:auto;flex:none;margin:0"' + (checked[key] ? ' checked' : '') +
+          return '<label style="display:flex;gap:8px;align-items:center;font-weight:400;padding:3px 0 3px 22px"><input type="checkbox" class="lc-it" data-kind="' + k[0] + '" data-id="' + esc(x.id) + '" style="width:auto;flex:none;margin:0"' + (checked[key] ? ' checked' : '') +
             ' onchange="lcToggleItem(\'' + k[0] + '\',\'' + x.id + '\',this.checked)"> ' + esc(x.name) + '</label>';
         }).join('');
       }).join('') + '</div>') + '</div>' +
@@ -7087,6 +7091,21 @@ function lcSetReward(i, v) {
 function lcToggleItem(kind, id, on) {
   lcEdit.items = (lcEdit.items || []).filter(function (i) { return !(i.kind === kind && i.id === id); });
   if (on) lcEdit.items.push({ kind: kind, id: id });
+  lcSyncGroupBox(kind);
+}
+// Sans re-rendu : la liste garde sa position de défilement.
+function lcToggleGroup(kind, on) {
+  document.querySelectorAll('.lc-it[data-kind="' + kind + '"]').forEach(function (cb) {
+    cb.checked = on;
+    lcEdit.items = (lcEdit.items || []).filter(function (i) { return !(i.kind === kind && i.id === cb.dataset.id); });
+    if (on) lcEdit.items.push({ kind: kind, id: cb.dataset.id });
+  });
+}
+function lcSyncGroupBox(kind) {
+  var grp = document.querySelector('.lc-grp[data-kind="' + kind + '"]');
+  if (!grp) return;
+  var boxes = Array.prototype.slice.call(document.querySelectorAll('.lc-it[data-kind="' + kind + '"]'));
+  grp.checked = boxes.length > 0 && boxes.every(function (cb) { return cb.checked; });
 }
 function lcPickImage(input) {
   var file = input.files && input.files[0];
