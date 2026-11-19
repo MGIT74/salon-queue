@@ -5,7 +5,7 @@
  *   credit_barber_id, voir sales.js) -> mouvement +montant lié à la vente.
  * - Prise d'un produit : depuis « Mon poste », par le coiffeur connecté avec SON code PIN (jamais
  *   « pour » un collègue) : le stock baisse de 1 et son crédit du prix du produit. Bloqué à 0 €.
- *   Annulable par lui pendant 10 minutes (erreur de touche).
+ *   Seul l'admin peut annuler une prise (stock et crédit rendus).
  * - Coiffeur « gratuit » (réglé par l'admin) : ses produits sont offerts, pas de recharge ; seul le stock baisse.
  * - Admin : soldes, historique, réglages (catégories de produits autorisées, seuil d'alerte, coiffeurs gratuits).
  */
@@ -18,7 +18,6 @@ const { logActivity } = require('../lib/activityLog');
 const { wrap } = require('../lib/wrap');
 
 const router = express.Router();
-const UNDO_MINUTES = 10;
 
 async function creditSettings(salonId) {
   const s = await getSettings(salonId);
@@ -55,7 +54,7 @@ function moveView(m) {
   return {
     id: m.id, kind: m.kind, amount_cents: m.amount_cents, value_cents: m.value_cents, product_id: m.product_id, product_name: m.product_name,
     note: m.note, undone: Boolean(m.undone_at), created_at: utcIso(m.created_at),
-    can_undo: (m.kind === 'take' || m.kind === 'free') && !m.undone_at && (Date.now() - new Date(utcIso(m.created_at)).getTime()) < UNDO_MINUTES * 60000
+    can_undo: (m.kind === 'take' || m.kind === 'free') && !m.undone_at   // par l'admin seulement
   };
 }
 
@@ -119,21 +118,22 @@ router.post('/take', requireAdminOrBarber, wrap(async (req, res) => {
   } finally { conn.release(); }
 }));
 
-// Annuler une prise (erreur de touche) : par le coiffeur lui-même, dans les 10 minutes. Stock et crédit rendus.
-router.post('/moves/:id/undo', requireAdminOrBarber, wrap(async (req, res) => {
-  if (!needBarber(req, res)) return;
+// Annuler une prise (erreur, produit rendu) : par l'ADMIN seulement, depuis Coiffeurs > Crédit produits > Historique.
+// Le stock est rendu, et le crédit aussi (rien à rendre pour un produit offert).
+router.post('/moves/:id/undo', requireAdmin, wrap(async (req, res) => {
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
     const [[m]] = await conn.query(
-      "SELECT * FROM barber_credit_moves WHERE id = ? AND salon_id = ? AND barber_id = ? AND kind IN ('take', 'free') FOR UPDATE",
-      [req.params.id, req.salon.id, req.barberId]);
+      "SELECT * FROM barber_credit_moves WHERE id = ? AND salon_id = ? AND kind IN ('take', 'free') FOR UPDATE",
+      [req.params.id, req.salon.id]);
     if (!m || m.undone_at) { await conn.rollback(); return res.status(404).json({ error: 'Rien à annuler.' }); }
-    if (!moveView(m).can_undo) { await conn.rollback(); return res.status(409).json({ error: 'Trop tard pour annuler (' + UNDO_MINUTES + ' min) : voyez avec le responsable.' }); }
     await conn.query('UPDATE barber_credit_moves SET undone_at = NOW() WHERE id = ?', [m.id]);
     if (m.product_id) await conn.query('UPDATE products SET stock_quantity = stock_quantity + 1 WHERE id = ? AND salon_id = ? AND stock_enabled = 1', [m.product_id, req.salon.id]);
     await conn.commit();
-    res.json({ ok: true, balance_cents: await balanceOf(pool, req.salon.id, req.barberId) });
+    const [[b]] = await pool.query('SELECT name FROM barbers WHERE id = ?', [m.barber_id]);
+    logActivity(req.salon.id, 'barber_credit_undo', 'Crédit produits : ' + (m.product_name || 'produit') + ' de ' + (b ? b.name : 'coiffeur') + ' annulé (remis en stock)');
+    res.json({ ok: true, balance_cents: await balanceOf(pool, req.salon.id, m.barber_id) });
   } catch (err) {
     try { await conn.rollback(); } catch (e) {}
     throw err;

@@ -1,7 +1,7 @@
 // Crédit produits des coiffeurs (base et serveur réels, voir README) :
 // - recharge à la caisse = vente normale avec une ligne « Crédit produits · Prénom » (credit_barber_id) ;
 // - le coiffeur prend un produit depuis son poste (son PIN) : stock −1, crédit −prix ; bloqué à 0 € ;
-// - annulable par lui pendant 10 min ; l'admin voit les soldes, règle les catégories, ajuste.
+// - seul l'admin annule une prise (stock et crédit rendus) ; l'admin voit les soldes, règle les catégories, met un coiffeur en gratuit.
 const { execSync } = require('child_process');
 const fs = require('fs'), path = require('path');
 const BASE = 'http://127.0.0.1:3999';
@@ -47,8 +47,10 @@ const stock = (id) => Number(sql(`SELECT stock_quantity FROM products WHERE id='
   r = await api('GET', '/api/barber-credit/me');
   check('historique : la prise est annulable', r.body.moves[0].kind === 'take' && r.body.moves[0].can_undo === true, r.body.moves[0]);
   r = await api('POST', '/api/barber-credit/moves/' + moveId + '/undo');
-  check('annulation : crédit et stock rendus', r.status === 200 && r.body.balance_cents === 2000 && stock('p1') === 5, r.body);
-  r = await api('POST', '/api/barber-credit/moves/' + moveId + '/undo');
+  check('le coiffeur ne peut PAS annuler lui-même', (r.status === 401 || r.status === 403) && stock('p1') === 4, r.status);
+  r = await api('POST', '/api/barber-credit/moves/' + moveId + '/undo', null, ADMIN);
+  check('annulation par l\'admin : crédit et stock rendus', r.status === 200 && r.body.balance_cents === 2000 && stock('p1') === 5, r.body);
+  r = await api('POST', '/api/barber-credit/moves/' + moveId + '/undo', null, ADMIN);
   check('pas deux fois', r.status === 404);
   sql("UPDATE products SET stock_quantity=0 WHERE id='p1'");
   r = await api('POST', '/api/barber-credit/take', { product_id: 'p1' });
@@ -80,8 +82,8 @@ const stock = (id) => Number(sql(`SELECT stock_quantity FROM products WHERE id='
   check('3 produits pris même au-delà du crédit : stock −3, crédit inchangé', r.status === 200 && r.body.free === true && stock('p1') === 2 && r.body.balance_cents === balBefore, [r.body, stock('p1')]);
   r = await api('GET', '/api/barber-credit/me');
   check('poste : mode gratuit, mouvements « free » avec la valeur du produit', r.body.free === true && r.body.moves[0].kind === 'free' && r.body.moves[0].value_cents === price && r.body.moves[0].amount_cents === 0, r.body.moves[0]);
-  r = await api('POST', '/api/barber-credit/moves/' + r.body.moves[0].id + '/undo');
-  check('annulation : produit remis en stock', r.status === 200 && stock('p1') === 3, r.body);
+  r = await api('POST', '/api/barber-credit/moves/' + r.body.moves[0].id + '/undo', null, ADMIN);
+  check('annulation (admin) : produit remis en stock', r.status === 200 && stock('p1') === 3, r.body);
   r = await api('GET', '/api/barber-credit/overview', null, ADMIN);
   const k2 = r.body.items.find((x) => x.id === 'b1');
   check('dashboard : gratuit, offert ce mois = 2 produits', k2.free === true && k2.month_free_cents === 2 * price && k2.month_taken_count === 3, k2);
@@ -97,8 +99,9 @@ const stock = (id) => Number(sql(`SELECT stock_quantity FROM products WHERE id='
   const poste = fs.readFileSync(path.join(__dirname, '../../public/poste.html'), 'utf8');
   const caisse = fs.readFileSync(path.join(__dirname, '../../public/caisse.html'), 'utf8');
   const dash = fs.readFileSync(path.join(__dirname, '../../public/dashboard.html'), 'utf8');
-  check('poste : « Crédit » dans le menu du bas, grille, scan, « Je l\'ai pris », annuler', poste.includes('id="nav-credit"') && poste.includes('function openCreditScreen(') &&
-    poste.includes('function startCreditScan(') && poste.includes("Je l'ai pris") && poste.includes('function undoCreditMove('));
+  check('poste : « Crédit » dans le menu du bas, grille, scan, « Je l\'ai pris », PAS de bouton annuler', poste.includes('id="nav-credit"') && poste.includes('function openCreditScreen(') &&
+    poste.includes('function startCreditScan(') && poste.includes("Je l'ai pris") && !poste.includes('function undoCreditMove(') && !poste.includes('/undo'));
+  check('dashboard : « Annuler » dans l\'historique du coiffeur (admin)', dash.includes('function undoBarberCreditMove(moveId, barberId)') && dash.includes("onclick=\"undoBarberCreditMove("));
   check('poste : onglet Crédit avec le menu du bas visible (Timer / Agenda le quittent) et recherche de produit', poste.includes('.cr-screen { position: fixed; inset: 0; z-index: 45;') &&
     poste.includes('id="cr-search"') && poste.includes('function renderCreditGrid()') && /function gotoHome\(\) \{\s*closeCreditScreen\(\);/.test(poste) && /function gotoAgenda\(\) \{\s*closeCreditScreen\(\);/.test(poste));
   check('caisse : onglet « Crédit coiffeurs », ligne avec credit_barber_id', caisse.includes('data-cat="credit"') && caisse.includes('credit_barber_id: '));
