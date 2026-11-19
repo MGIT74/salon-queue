@@ -201,6 +201,7 @@ const suite = [
   ['178-calendrier-conges-sans-saut.js', false, ['exit']],
   ['179-carte-fidelite-articles.js', true, ['exit']],
   ['180-credit-produits-coiffeurs.js', true, ['exit']],
+  ['181-tablette-agenda-coiffeurs.js', true, ['exit']],
 ];
 
 let bad = 0;
