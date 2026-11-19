@@ -1145,7 +1145,8 @@
   <div class="login" id="login-screen">
     <div class="login-card" id="login-card-normal">
       <div class="mark" id="salon-mark">&nbsp;</div>
-      <h1>Caisse</h1>
+      <h1 id="login-title">Caisse</h1>
+      <script>if (window.AGENDA_MODE) document.getElementById('login-title').textContent = 'Agenda';</script>
       <div class="pin-dots" id="pin-dots">
         <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
       </div>

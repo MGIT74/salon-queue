@@ -18,6 +18,7 @@ const check = (n, ok, extra) => { (ok ? pass++ : fail++); console.log((ok ? '  O
   check('session gardée jusqu\'à « Déconnexion » (même après fermeture du navigateur)', c.includes("var CAISSE_SESSION_KEY = AGENDA_MODE ? 'agenda-session' : 'caisse-session';") && c.includes('AGENDA_MODE ? window.localStorage : window.sessionStorage'));
   check('pas de fond de caisse ni de terminal sur la tablette', c.includes('if (!AGENDA_MODE) checkPendingRecount(') && c.includes('if (!AGENDA_MODE) { pollConnection(); setConnPollInterval(15000); }'));
   check('ouvre sur le Timer', c.includes("if (AGENDA_MODE) doSwitchCaisseTab('timer');"));
+  check('écran du code PIN : « Agenda » (et plus « Caisse »)', c.includes("if (window.AGENDA_MODE) document.getElementById('login-title').textContent = 'Agenda';"));
   check('Mes salons : lien « agenda »', d.includes("'caisse.html', 'agenda.html', 'rdv.html'"));
   console.log('\n' + pass + ' OK, ' + fail + ' ECHEC');
   process.exit(fail ? 1 : 0);
