@@ -99,6 +99,8 @@ const stock = (id) => Number(sql(`SELECT stock_quantity FROM products WHERE id='
   const dash = fs.readFileSync(path.join(__dirname, '../../public/dashboard.html'), 'utf8');
   check('poste : « Crédit » dans le menu du bas, grille, scan, « Je l\'ai pris », annuler', poste.includes('id="nav-credit"') && poste.includes('function openCreditScreen(') &&
     poste.includes('function startCreditScan(') && poste.includes("Je l'ai pris") && poste.includes('function undoCreditMove('));
+  check('poste : onglet Crédit avec le menu du bas visible (Timer / Agenda le quittent) et recherche de produit', poste.includes('.cr-screen { position: fixed; inset: 0; z-index: 45;') &&
+    poste.includes('id="cr-search"') && poste.includes('function renderCreditGrid()') && /function gotoHome\(\) \{\s*closeCreditScreen\(\);/.test(poste) && /function gotoAgenda\(\) \{\s*closeCreditScreen\(\);/.test(poste));
   check('caisse : onglet « Crédit coiffeurs », ligne avec credit_barber_id', caisse.includes('data-cat="credit"') && caisse.includes('credit_barber_id: '));
   check('caisse : seulement le coiffeur choisi en haut (bulle), sa carte + les montants ; gratuit = rien à recharger', caisse.includes('<div id="credit-card"></div>') &&
     caisse.includes('var b = creditBalances.find(function (x) { return x.id === activeBarberId; });') && caisse.includes("if (currentCat === 'credit') renderCreditSection();") &&
