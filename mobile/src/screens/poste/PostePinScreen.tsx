@@ -1,7 +1,8 @@
 // Mon poste — reproduction du login PIN web (poste.html) : pastilles +
 // pavé numérique, envoi à 4+ chiffres (PIN coiffeur 4-8).
 import React, { useState } from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { FormErrorView, LabeledField } from '../../components/AuthForm';
