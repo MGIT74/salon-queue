@@ -7,6 +7,7 @@ import { Modal, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, Vi
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../auth/AuthContext';
 import { QueueBoard } from '../../components/QueueBoard';
+import { DashboardScreen } from './DashboardScreen';
 import { ScreenPlaceholder } from '../../components/ScreenPlaceholder';
 import { useTheme } from '../../hooks/useTheme';
 import { Palette, APP_VERSION, radius, spacing } from '../../theme/theme';
@@ -35,7 +36,12 @@ export function AdminShell() {
       </View>
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content}>
-        {section === 'queue' ? (
+        {section === 'dashboard' ? (
+          <>
+            <Text style={styles.sectionTitle}>Dashboard</Text>
+            <DashboardScreen />
+          </>
+        ) : section === 'queue' ? (
           <>
             <Text style={styles.sectionTitle}>File d'attente</Text>
             <QueueBoard />

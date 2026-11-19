@@ -165,3 +165,64 @@ export type QueueEntry = {
 };
 
 export type QueueResponse = { ok: true; queue: QueueEntry[] };
+
+/* ---------- Dashboard admin ---------- */
+
+/** GET /api/owner/profile → nom/email du propriétaire (Bienvenue, …). */
+export type OwnerProfileResponse = { ok: true; name: string | null; email: string | null };
+
+/** GET /api/owner/client-stats → 4 comptes clients du dashboard. */
+export type ClientStatsResponse = {
+  ok: true;
+  accounts: number;
+  loyalty: number;
+  gifts: number;
+  without_account: number;
+};
+
+/** Série « Encaissé » (barres) — labels "HH:00" (jour) ou "YYYY-MM-DD". */
+export type SalonStatsSeries = {
+  labels: string[];
+  barber_cents: (number | null)[];
+  team_avg_cents: (number | null)[] | null;
+  previous_cents: (number | null)[];
+};
+
+export type LeaderRevenueRow = { id: string; name: string; photo_url?: string | null; revenue_cents: number; done_count: number };
+export type LeaderSpeedRow = { id: string; name: string; photo_url?: string | null; avg_minutes: number; done_count: number };
+export type LeaderProductsRow = { id: string; name: string; photo_url?: string | null; product_revenue_cents: number; product_count: number };
+
+/** GET /api/barbers/salon-stats (période ≤ 400 jours). */
+export type SalonStatsResponse = {
+  ok: true;
+  series: SalonStatsSeries;
+  revenue: { total_cents: number; previous_total_cents: number; tickets: number };
+  leaderboard: { by_revenue: LeaderRevenueRow[]; by_speed: LeaderSpeedRow[]; by_products: LeaderProductsRow[] };
+  total_cents: number;
+  previous_total_cents: number;
+  potential_revenue_cents: number;
+  free_slots: number;
+  free_revenue_cents: number;
+  missed_revenue_cents: number;
+  missed_appointments: number;
+  occupancy_pct: number;
+};
+
+/** GET /api/queue/history?per_page=1 → total de passages (KPI « Clients »). */
+export type QueueHistoryTotalResponse = { ok: true; total: number; items: unknown[] };
+
+/** Item de GET /api/appointments (admin) : RDV + durées pour le planning. */
+export type AdminAppointment = {
+  id: number;
+  client_name: string | null;
+  service_name: string | null;
+  barber_id: string | null;
+  barber_name: string | null;
+  scheduled_at: string;
+  status: string;
+  service_duration_min: number | null;
+  extras_duration_min: number | null;
+  [key: string]: unknown;
+};
+
+export type AdminAppointmentsResponse = { ok: true; items: AdminAppointment[] };

@@ -26,7 +26,9 @@ suit le réglage système, comme `[data-theme=dark]` du web.
 | Web (URL) | Mobile | État |
 |---|---|---|
 | `/admin` (connexion) | `AdminLoginScreen` : carton Email + Mot de passe, « Entrer », mot de passe oublié, « Créer mon salon » si ouvert | ✅ réel (`POST /api/signup/login-lookup` → salons) |
-| `/admin/…` (dashboard + menu latéral) | `AdminShell` : mêmes 13 sections dans l'ordre (Dashboard, File d'attente, Prestations, Suppléments, Produits, Marketing, Caisse, Rendez-vous, Coiffeurs, Clients, Mes salons, Compte, Réglages) + sélecteur d'enseigne en tête + « Plus » (toutes sections). Barre du bas mobile = Dashboard, File, Rendez-vous, Caisse, Plus | navigation ✅, contenu par section : Phase 5 |
+| `/admin/…` (**Dashboard**) | `DashboardScreen` : Bienvenue + KPI (congé/actifs/clients/RDV) + pastilles clientèle + période Jour/Semaine/Mois ‹› + Classement CA/Rapidité/Produits + CA & Manque à gagner + Prochains RDV + Catalogue + Encaissé (courbe) + journée en un coup d'œil (planning par coiffeur, heures du salon) | ✅ réel (`barbers/salon-stats`, `owner/client-stats`, `queue/history`, `appointments[?month&caisse_view]`, `owner/profile`, `settings/public`), Plage ⏳ |
+| `/admin/…` (Dashboard → File d'attente) | `QueueBoard` : En cours / À suivre + commencer/terminer/annuler | ✅ réel (polling 4 s) |
+| `/admin/…` (11 autres sections) | `ScreenPlaceholder` (menu exact du web) | ⏳ sections suivantes |
 | `/poste.html` (login PIN) | `PostePinScreen` : pastilles + pavé numérique | ✅ réel (`POST /api/barbers/login`) |
 | `/poste.html` (app) | `PosteShell` : topbar (nom du salon en capitales, prénom), zones « À suivre »/« En cours » | shell ✅, file réelle : Phase 4 |
 | `/compte.html` (login) | `ClientLoginScreen` (email + mot de passe, « Renvoyer le lien de confirmation ») | ✅ réel (`/api/client-auth/login`, `resend-verification`) |

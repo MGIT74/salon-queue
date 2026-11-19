@@ -26,3 +26,27 @@ export function formatSalonDate(value: string): string {
   const spaced = value.replace('T', ' ');
   return spaced.length >= 16 ? spaced.slice(0, 16) : spaced;
 }
+
+/** Heure courante DU SALON en minutes depuis minuit (comme le web, cf. barbers.js). */
+export function salonNowMinutes(timezone = 'Europe/Paris'): number {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(new Date());
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? 0);
+  return get('hour') * 60 + get('minute');
+}
+
+/** Date locale DU SALON au format YYYY-MM-DD (comme le web). */
+export function salonTodayStr(timezone = 'Europe/Paris'): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+}
+
+/** Minutes "12:00" → "14:05" affichables. */
+export function minutesToClock(min: number): string {
+  const h = Math.floor(min / 60) % 24;
+  const m = min % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}

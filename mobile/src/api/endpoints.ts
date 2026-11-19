@@ -3,6 +3,7 @@
 // Aucune invention : chaque type est vérifié dans la route correspondante.
 import { ApiRequest, apiBaseUrl, apiRequest } from './transport';
 import {
+  AdminAppointmentsResponse,
   ApiOkResponse,
   AvailabilityDaysResponse,
   AvailabilityResponse,
@@ -12,6 +13,10 @@ import {
   CatalogListResponse,
   ClientLoginResponse,
   ClientMeResponse,
+  ClientStatsResponse,
+  OwnerProfileResponse,
+  QueueHistoryTotalResponse,
+  SalonStatsResponse,
 } from '../types/api';
 
 /* ---------- Salon (résolution/validation X-Salon-Slug) ---------- */
@@ -22,6 +27,8 @@ export type SalonPublicResponse = {
   salon_name: string;
   logo_url: string | null;
   currency: string;
+  /** Ajouté par le serveur sans être consommé jusqu'ici (fuseau du salon). */
+  timezone?: string;
 };
 
 export async function fetchSalonPublic(salonSlug: string): Promise<SalonPublicResponse> {
@@ -188,14 +195,21 @@ export async function fetchServices(salonSlug: string): Promise<CatalogListRespo
   return apiRequest<CatalogListResponse>({ path: 'api/catalog/services', salonSlug });
 }
 
+/** GET /api/catalog/products (public) : produits de vente du salon. */
+export async function fetchProductsList(salonSlug: string): Promise<CatalogListResponse> {
+  const request: ApiRequest = { path: 'api/catalog/products', salonSlug };
+  return apiRequest<CatalogListResponse>(request);
+}
+
 /** GET /api/catalog/extras (public) : suppléments actifs du salon. */
 export async function fetchExtras(salonSlug: string): Promise<CatalogListResponse> {
   return apiRequest<CatalogListResponse>({ path: 'api/catalog/extras', salonSlug });
 }
 
 /** GET /api/barbers (public) : équipe du salon + état du jour (congés, pauses, horaires). */
-export async function fetchBarbers(salonSlug: string): Promise<BarbersListResponse> {
-  return apiRequest<BarbersListResponse>({ path: 'api/barbers', salonSlug });
+export async function fetchBarbers(salonSlug: string, opts?: { all?: boolean }): Promise<BarbersListResponse> {
+  const request: ApiRequest = { path: 'api/barbers', salonSlug, ...(opts?.all ? { query: { all: '1' } } : {}) };
+  return apiRequest<BarbersListResponse>(request);
 }
 
 /**
@@ -275,6 +289,73 @@ export async function bookAppointment(
 /** POST /api/appointments/cancel — les règles (délai, RDV honoré…) sont côté serveur. */
 export async function cancelAppointment(salonSlug: string, token: string): Promise<CancelResponse> {
   return apiRequest<CancelResponse>({ path: 'api/appointments/cancel', method: 'POST', salonSlug, body: { token } });
+}
+
+/* ---------- Dashboard admin (routes auditées sur main) ---------- */
+
+/** GET /api/owner/profile — nom de l'enseigne pour « Bienvenue, … ». */
+export async function fetchOwnerProfile(salonSlug: string, auth: ApiAuth): Promise<OwnerProfileResponse> {
+  return apiRequest<OwnerProfileResponse>({ path: 'api/owner/profile', salonSlug, auth });
+}
+
+/** GET /api/owner/client-stats — comptes, fidélité, cadeaux, sans compte. */
+export async function fetchClientStats(salonSlug: string, auth: ApiAuth): Promise<ClientStatsResponse> {
+  return apiRequest<ClientStatsResponse>({ path: 'api/owner/client-stats', salonSlug, auth });
+}
+
+/**
+ * GET /api/barbers/salon-stats — KPIs période, courbe, classement,
+ * manque à gagner. Bornes envoyées comme le web (start/end ISO +
+ * start_date/end_date locales, max 400 jours côté serveur).
+ */
+export async function fetchSalonStats(
+  salonSlug: string,
+  auth: ApiAuth,
+  params: { startIso: string; endIso: string; startDate: string; endDate: string }
+): Promise<SalonStatsResponse> {
+  const request: ApiRequest = {
+    path: 'api/barbers/salon-stats',
+    salonSlug,
+    auth,
+    query: {
+      start: params.startIso,
+      end: params.endIso,
+      start_date: params.startDate,
+      end_date: params.endDate,
+    },
+  };
+  return apiRequest<SalonStatsResponse>(request);
+}
+
+/** GET /api/queue/history?per_page=1 — total de passages (KPI Clients). */
+export async function fetchQueueHistoryCount(salonSlug: string, auth: ApiAuth): Promise<QueueHistoryTotalResponse> {
+  const request: ApiRequest = { path: 'api/queue/history', salonSlug, auth, query: { per_page: '1' } };
+  return apiRequest<QueueHistoryTotalResponse>(request);
+}
+
+/**
+ * GET /api/appointments (admin) — RDV à venir (compteur + liste
+ * « Prochains RDV »). Avec { month, caisse_view } : cache du mois pour la
+ * journée en un coup d'œil (comme le web).
+ */
+export async function fetchAdminAppointments(
+  salonSlug: string,
+  auth: ApiAuth,
+  opts?: { month?: string; caisseView?: boolean }
+): Promise<AdminAppointmentsResponse> {
+  const query: Record<string, string> = {};
+  if (opts?.month) {
+    query.month = opts.month;
+    query.all = '1';
+    if (opts.caisseView) query.caisse_view = '1';
+  }
+  const request: ApiRequest = {
+    path: 'api/appointments',
+    salonSlug,
+    auth,
+    ...(Object.keys(query).length ? { query } : {}),
+  };
+  return apiRequest<AdminAppointmentsResponse>(request);
 }
 
 /* ---------- File d'attente (opérateur : admin OU coiffeur) ---------- */
