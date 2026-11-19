@@ -16,6 +16,14 @@ export type Palette = {
   green: string;
   red: string;
   orange: string;
+  // Fonds « doux » des pastilles d'icônes / deltas (déclinaisons des couleurs d'app.css).
+  greenSoft: string;
+  orangeSoft: string;
+  redSoft: string;
+  /** Séparateur fin des listes iOS. */
+  hair: string;
+  /** Segment actif du contrôle segmenté. */
+  segOn: string;
 };
 
 export const lightPalette: Palette = {
@@ -33,6 +41,11 @@ export const lightPalette: Palette = {
   green: '#1e7e34',
   red: '#c4001b',
   orange: '#b35a00',
+  greenSoft: '#e4f3e8',
+  orangeSoft: '#fbefe3',
+  redSoft: '#fbe5e8',
+  hair: 'rgba(0,0,0,0.06)',
+  segOn: '#ffffff',
 };
 
 export const darkPalette: Palette = {
@@ -50,6 +63,11 @@ export const darkPalette: Palette = {
   green: '#30d158',
   red: '#ff453a',
   orange: '#ff9f0a',
+  greenSoft: '#0f2e19',
+  orangeSoft: '#3a2508',
+  redSoft: '#3a1210',
+  hair: 'rgba(255,255,255,0.06)',
+  segOn: '#636366',
 };
 
 export function themeFor(scheme: 'light' | 'dark' | null | undefined): Palette {
@@ -81,8 +99,10 @@ export function setSchemeForTheme(scheme: 'light' | 'dark' | null | undefined) {
 export const radius = {
   /** Boutons et champs de app.css (btn { border-radius: 10px }). */
   button: 10,
-  /** Cartes dash-card / choix (14-18 px). */
-  card: 14,
+  /** Cartes (maquette design-dashboard.html). */
+  card: 16,
+  /** Pastilles de stats. */
+  pill: 12,
   /** Carte fidélité du compte client (16-18 px). */
   loyalty: 18,
 } as const;
@@ -93,6 +113,22 @@ export const spacing = {
   md: 16,
   lg: 24,
   xl: 40,
+  /** Marge de page gauche = droite (docs/DESIGN.md §3). */
+  page: 16,
+  /** Espace entre deux blocs. */
+  block: 22,
+  /** Espace entre cartes d'une grille. */
+  grid: 10,
 } as const;
+
+/** Ombre douce des cartes : en clair seulement (docs/DESIGN.md §1). */
+export function cardShadow(t: Palette) {
+  return t.scheme === 'dark'
+    ? {}
+    : { shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 3 }, elevation: 2 };
+}
+
+/** Hauteur réservée sous le contenu pour la barre d'onglets flottante. */
+export const FLOATING_TABBAR_SPACE = 110;
 
 export const APP_VERSION = 'v0.0.1';

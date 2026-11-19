@@ -1,6 +1,7 @@
 import React from 'react';
 import { useColorScheme } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from './src/auth/AuthContext';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { setSchemeForTheme, themeFor } from './src/theme/theme';
@@ -24,9 +25,11 @@ function ConnectedApp() {
   setSchemeForTheme(palette.scheme);
 
   return (
-    <AuthProvider>
-      <StatusBar style={palette.scheme === 'dark' ? 'light' : 'dark'} />
-      <RootNavigator />
-    </AuthProvider>
+    <SafeAreaProvider>
+      <AuthProvider>
+        <StatusBar style={palette.scheme === 'dark' ? 'light' : 'dark'} />
+        <RootNavigator />
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }
