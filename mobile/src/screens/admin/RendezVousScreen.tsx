@@ -22,7 +22,7 @@ import { AddAppointmentSheet } from '../../components/AddAppointmentSheet';
 import { DayColumns, DayGlance } from '../../components/DayAgenda';
 import { WeekAgenda } from '../../components/WeekAgenda';
 import { MovedSheet, RdvSettingsSheet } from '../../components/RdvSheets';
-import { UpcomingList } from '../../components/UpcomingList';
+import { UpcomingSheet } from '../../components/UpcomingSheet';
 import { applyColumnOrder, movedBy, readColumnOrder, saveColumnOrder } from '../../utils/agendaRules';
 import { ListRow } from '../../components/ui';
 import { exportRdvCsv, exportRdvPdf } from '../../utils/exportRdv';
@@ -72,6 +72,7 @@ export function RendezVousScreen({ bottomSpace = 110 }: { bottomSpace?: number }
   const [exporting, setExporting] = useState<'' | 'csv' | 'pdf'>('');
   const [order, setOrder] = useState<string[]>([]);
   const [dragging, setDragging] = useState(false);
+  const [upOpen, setUpOpen] = useState(false);
   const [movedFor, setMovedFor] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [nudgingId, setNudgingId] = useState<number | null>(null);
@@ -243,6 +244,9 @@ export function RendezVousScreen({ bottomSpace = 110 }: { bottomSpace?: number }
           <View style={{ flex: 1 }}>
             <PageTitle t={t} title="Rendez-vous" subtitle={subtitle} />
           </View>
+          <TouchableOpacity style={styles.iconBtn} onPress={() => setUpOpen(true)} accessibilityRole="button" accessibilityLabel="Liste À venir">
+            <Ionicons name="list" size={20} color={t.blue} />
+          </TouchableOpacity>
           <TouchableOpacity style={styles.iconBtn} onPress={() => setSettingsOpen(true)} accessibilityRole="button" accessibilityLabel="Paramètres des RDV">
             <Ionicons name="settings-outline" size={19} color={t.blue} />
           </TouchableOpacity>
@@ -365,19 +369,6 @@ export function RendezVousScreen({ bottomSpace = 110 }: { bottomSpace?: number }
             onPick={(d) => { setDate(d); setView('day'); }} />
         )}
 
-        <UpcomingList
-          t={t}
-          salonSlug={salonSlug}
-          auth={auth}
-          barbers={barbers}
-          todayYmd={today}
-          nowHm={`${String(Math.floor(nowMin / 60)).padStart(2, '0')}:${String(nowMin % 60).padStart(2, '0')}`}
-          day={view === 'day' && date !== today ? date : null}
-          reloadKey={reloadKey}
-          onOpen={setOpen}
-          onChanged={() => setReloadKey((k) => k + 1)}
-        />
-
         {hasMonth ? (
           <>
             <Text style={styles.expHead}>Exporter · {shown.length} RDV affiché{shown.length > 1 ? 's' : ''}</Text>
@@ -434,6 +425,18 @@ export function RendezVousScreen({ bottomSpace = 110 }: { bottomSpace?: number }
         busyId={nudgingId}
         onClose={() => setMovedFor(null)}
         onRestore={(a, m) => void doNudge(a, m)}
+      />
+      <UpcomingSheet
+        t={t}
+        visible={upOpen}
+        salonSlug={salonSlug}
+        auth={auth}
+        barbers={barbers}
+        todayYmd={today}
+        nowHm={`${String(Math.floor(nowMin / 60)).padStart(2, '0')}:${String(nowMin % 60).padStart(2, '0')}`}
+        onClose={() => setUpOpen(false)}
+        onOpen={(a) => { setUpOpen(false); setTimeout(() => setOpen(a), 450); }}
+        onChanged={() => setReloadKey((k) => k + 1)}
       />
       <RdvSettingsSheet
         t={t}

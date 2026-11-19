@@ -6,7 +6,8 @@
 //    congés et heures non travaillées hachurés ; ligne « maintenant » ;
 //    toucher une case libre → « + HH:MM » pour ajouter un RDV à cette heure.
 // Horaires, pauses, congés : GET /api/barbers ; RDV : GET /api/appointments.
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import * as Haptics from 'expo-haptics';
 import { Animated, LayoutChangeEvent, PanResponder, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AdminAppointment, BarberPublic } from '../types/api';
@@ -265,6 +266,13 @@ export function DayColumns({ t, barbers, allBarbers, items, date, todayYmd, nowM
   const boxRef = useRef<React.ComponentRef<typeof View>>(null);
   const box = useRef({ x: 0, w: 0 });
   const autoTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Animations : colonne soulevée (lift) ; les autres glissent en douceur (shifts).
+  const lift = useRef(new Animated.Value(0)).current;
+  const shifts = useRef<Record<string, Animated.Value>>({});
+  const shiftOf = (id: string) => (shifts.current[id] ??= new Animated.Value(0));
+  const dropping = useRef(false);
+  const resetAfterReorder = useRef(false);
+  const tick = () => { void Haptics.selectionAsync().catch(() => undefined); };
 
   // Plage horaire : 8h – 20h, élargie si un RDV ou un horaire en dépasse.
   const visible = items.filter((a) => a.display_status !== 'cancelled');
@@ -281,22 +289,35 @@ export function DayColumns({ t, barbers, allBarbers, items, date, todayYmd, nowM
   for (let m = START; m <= END; m += 30) hours.push(m);
 
   const maxScroll = Math.max(0, n * colW - (width - GUTTER));
+  const SPRING = { useNativeDriver: true, damping: 22, stiffness: 260, mass: 0.9 } as const;
+  /** Les autres colonnes s'écartent pour faire la place (animé). */
+  const layoutShifts = (from: number, to: number) => {
+    barbers.forEach((b, i) => {
+      let target = 0;
+      if (from < to && i > from && i <= to) target = -colW;
+      else if (from > to && i >= to && i < from) target = colW;
+      if (i !== from) Animated.spring(shiftOf(String(b.id)), { ...SPRING, toValue: target }).start();
+    });
+  };
   const update = () => {
     const d = dragRef.current;
     if (!d) return;
     const eff = d.dx + (scrollX.current - d.startScroll);
     dragX.setValue(eff);
     const to = Math.max(0, Math.min(n - 1, Math.round(d.from + eff / colW)));
-    if (to !== d.to) { d.to = to; setDrag({ from: d.from, to }); }
+    if (to !== d.to) { d.to = to; setDrag({ from: d.from, to }); layoutShifts(d.from, to); tick(); }
   };
   const dragApi = {
-    enabled: barbers.length > 1,
+    enabled: barbers.length > 1 && !dropping.current,
     fit,
     start: (i: number, pageX: number) => {
+      if (dropping.current) return;
       dragRef.current = { from: i, to: i, dx: 0, startScroll: scrollX.current, pageX };
       dragX.setValue(0);
       setDrag({ from: i, to: i });
       onDragging?.(true);
+      Animated.spring(lift, { ...SPRING, toValue: 1 }).start();
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => undefined);
       boxRef.current?.measureInWindow((x: number, _y: number, w: number) => { box.current = { x, w }; });
       if (!fit) {
         // Près du bord : l'agenda défile tout seul pour atteindre les colonnes cachées.
@@ -304,8 +325,10 @@ export function DayColumns({ t, barbers, allBarbers, items, date, todayYmd, nowM
           const d = dragRef.current;
           if (!d || !box.current.w) return;
           let step = 0;
-          if (d.pageX > box.current.x + box.current.w - 44) step = 9;
-          else if (d.pageX < box.current.x + GUTTER + 44) step = -9;
+          const right = box.current.x + box.current.w - 50, left = box.current.x + GUTTER + 50;
+          // Plus on s'approche du bord, plus ça défile vite.
+          if (d.pageX > right) step = Math.min(16, 4 + (d.pageX - right) / 3);
+          else if (d.pageX < left) step = -Math.min(16, 4 + (left - d.pageX) / 3);
           if (!step) return;
           const next = Math.max(0, Math.min(maxScroll, scrollX.current + step));
           if (next === scrollX.current) return;
@@ -325,17 +348,40 @@ export function DayColumns({ t, barbers, allBarbers, items, date, todayYmd, nowM
       if (autoTimer.current) { clearInterval(autoTimer.current); autoTimer.current = null; }
       const d = dragRef.current;
       dragRef.current = null;
-      setDrag(null);
-      dragX.setValue(0);
-      onDragging?.(false);
-      if (commit && d && d.to !== d.from) {
-        const ids = barbers.map((b) => String(b.id));
-        const [m] = ids.splice(d.from, 1);
-        ids.splice(d.to, 0, m);
-        onReorderIds(ids);
-      }
+      if (!d) return;
+      const to = commit ? d.to : d.from;
+      if (!commit) layoutShifts(d.from, d.from);
+      dropping.current = true;
+      // La colonne se pose en douceur à sa nouvelle place, puis l'ordre est enregistré.
+      Animated.parallel([
+        Animated.spring(dragX, { ...SPRING, toValue: (to - d.from) * colW }),
+        Animated.spring(lift, { ...SPRING, toValue: 0 }),
+      ]).start(() => {
+        dropping.current = false;
+        onDragging?.(false);
+        if (to !== d.from) {
+          void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
+          const ids = barbers.map((b) => String(b.id));
+          const [m] = ids.splice(d.from, 1);
+          ids.splice(to, 0, m);
+          resetAfterReorder.current = true;
+          setDrag(null);
+          onReorderIds(ids);
+        } else {
+          setDrag(null);
+          dragX.setValue(0);
+        }
+      });
     },
   };
+  // Nouvel ordre affiché → on remet les décalages à zéro dans la même image (pas de saut).
+  const orderKey = barbers.map((b) => b.id).join(',');
+  useLayoutEffect(() => {
+    if (!resetAfterReorder.current) return;
+    resetAfterReorder.current = false;
+    dragX.setValue(0);
+    Object.values(shifts.current).forEach((v) => v.setValue(0));
+  }, [orderKey, dragX]);
   useEffect(() => () => { if (autoTimer.current) clearInterval(autoTimer.current); }, []);
 
   const tapCol = (barberId: string, locY: number) => {
@@ -344,13 +390,10 @@ export function DayColumns({ t, barbers, allBarbers, items, date, todayYmd, nowM
     setPick({ barberId, min: m });
   };
 
-  const colDragStyle = (i: number) => {
-    if (!drag) return null;
-    if (i === drag.from) return [styles.lifted, { opacity: 0.96, transform: [{ translateX: dragX }] }];
-    let shift = 0;
-    if (drag.from < drag.to && i > drag.from && i <= drag.to) shift = -colW;
-    else if (drag.from > drag.to && i >= drag.to && i < drag.from) shift = colW;
-    return shift ? { transform: [{ translateX: shift }] } : null;
+  const scale = lift.interpolate({ inputRange: [0, 1], outputRange: [1, 1.035] });
+  const colDragStyle = (i: number, id: string) => {
+    if (drag && i === drag.from) return [styles.lifted, { transform: [{ translateX: dragX }, { scale }] }];
+    return { transform: [{ translateX: shiftOf(id) }] };
   };
 
   const columns = barbers.map((b, i) => {
@@ -359,7 +402,7 @@ export function DayColumns({ t, barbers, allBarbers, items, date, todayYmd, nowM
     const mine = visible.filter((a) => String(a.barber_id) === String(b.id));
     const movedCount = mine.filter((a) => movedBy(a) !== 0).length;
     return (
-      <Animated.View key={b.id} style={[styles.col, { width: colW }, colDragStyle(i)]}>
+      <Animated.View key={b.id} style={[styles.col, { width: colW }, colDragStyle(i, String(b.id))]}>
         <DragHead index={i} api={dragApi} style={[styles.colHead, drag?.from === i && { backgroundColor: t.blueSoft }]}
           label={`${b.name} : maintenir puis glisser pour changer l'ordre`}>
           <Avatar t={t} name={b.name} color={color} size={26} />
