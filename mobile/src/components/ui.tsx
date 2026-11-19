@@ -168,7 +168,7 @@ export function PeriodNav({ t, label, onPrev, onNext, nextDisabled }: {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 10, marginBottom: 14, marginHorizontal: 2 }}>
       <Btn icon="chevron-back" onPress={onPrev} />
-      <Text style={{ color: t.ink, fontSize: 15, fontWeight: '600', flex: 1, textAlign: 'center', textTransform: 'capitalize' }} numberOfLines={1}>
+      <Text style={{ color: t.ink, fontSize: 15, fontWeight: '600', flex: 1, textAlign: 'center' }} numberOfLines={1}>
         {label}
       </Text>
       <Btn icon="chevron-forward" onPress={onNext} disabled={nextDisabled} />

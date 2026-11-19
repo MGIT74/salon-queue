@@ -1,7 +1,8 @@
-// Bornes de période du dashboard — calcul côté MOBILE comme le web
-// (dashboard.html periodRange) : le navigateur utilise SON heure locale
-// pour les bornes ; le serveur revalide. Plage personnalisée : plus tard.
-export type PeriodKey = 'day' | 'week' | 'month';
+// Bornes de période du dashboard — COPIE de periodRange() du web
+// (dashboard.html) : Jour / Semaine / Mois / Plage, avec les mêmes bornes
+// et les mêmes libellés. Le navigateur (ici le téléphone) utilise son heure
+// locale pour les bornes ; le serveur revalide.
+export type PeriodKey = 'day' | 'week' | 'month' | 'range';
 
 export type PeriodRange = {
   /** ISO d'ouverture (inclus) — envoyé en `start`. */
@@ -14,7 +15,8 @@ export type PeriodRange = {
   label: string;
 };
 
-const DAY_MS = 24 * 60 * 60 * 1000;
+/** Plage personnalisée (web : customFrom / customTo, « Du » et « Au » inclus). */
+export type CustomRange = { from: string; to: string };
 
 function localDateStr(d: Date): string {
   const y = d.getFullYear();
@@ -27,51 +29,37 @@ function withTime(y: number, m: number, d: number): Date {
   return new Date(y, m, d);
 }
 
-export function periodRange(period: PeriodKey, offset: number): PeriodRange {
-  const base = new Date();
-  startOffset(base, period, offset);
+const short = (d: Date) => d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
 
-  if (period === 'day') {
-    const start = new Date(base.getFullYear(), base.getMonth(), base.getDate());
-    const end = new Date(start.getTime() + DAY_MS);
-    return build(start, end, base.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' }));
+export function periodRange(period: PeriodKey, offset: number, custom?: CustomRange): PeriodRange {
+  const now = new Date();
+  let start: Date;
+  let end: Date;
+  let label: string;
+
+  if (period === 'range' && custom && custom.from && custom.to) {
+    start = new Date(`${custom.from}T00:00:00`);
+    end = new Date(`${custom.to}T00:00:00`);
+    end.setDate(end.getDate() + 1); // fin exclusive, le jour « au » est inclus
+    label = `${short(start)} – ${short(new Date(`${custom.to}T00:00:00`))}`;
+  } else if (period === 'day') {
+    start = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset);
+    end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 1);
+    label = offset === 0 ? "Aujourd'hui" : start.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
+  } else if (period === 'week') {
+    const day = now.getDay() === 0 ? 7 : now.getDay(); // lundi = 1 … dimanche = 7
+    const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (day - 1));
+    start = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + offset * 7);
+    end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 7);
+    const endIncl = new Date(end.getFullYear(), end.getMonth(), end.getDate() - 1);
+    label = (offset === 0 ? 'Cette semaine · ' : '') + `${short(start)} – ${short(endIncl)}`;
+  } else {
+    start = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+    end = new Date(now.getFullYear(), now.getMonth() + offset + 1, 1);
+    label = start.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+    label = label.charAt(0).toUpperCase() + label.slice(1);
   }
 
-  if (period === 'week') {
-    const dow = (base.getDay() + 6) % 7; // lundi = 0
-    const monday = new Date(base.getFullYear(), base.getMonth(), base.getDate() - dow);
-    const end = new Date(monday.getTime() + 7 * DAY_MS);
-    return build(monday, end, `du ${monday.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} au ${new Date(end.getTime() - DAY_MS).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}`);
-  }
-
-  const first = new Date(base.getFullYear(), base.getMonth(), 1);
-  const end = new Date(base.getFullYear(), base.getMonth() + 1, 1);
-  return build(first, end, base.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }));
-}
-
-function startOffset(base: Date, period: PeriodKey, offset: number): void {
-  if (!offset) {
-    moveAnchorTo(base, period);
-    return;
-  }
-  const shift: Record<PeriodKey, number> = { day: offset, week: offset * 7, month: offset * 30 };
-  const candidate = new Date(base.getTime() + shift[period] * DAY_MS);
-  // ancre re-calée au début de la période visée (day exact ; week : lundi ;
-  // month : 1er) pour coller aux bornes du web.
-  moveAnchorTo(candidate, period);
-  base.setTime(candidate.getTime());
-}
-
-function moveAnchorTo(d: Date, period: PeriodKey): void {
-  if (period === 'week') {
-    const dow = (d.getDay() + 6) % 7;
-    if (dow !== 0) d.setDate(d.getDate() - dow);
-  } else if (period === 'month') {
-    d.setDate(1);
-  }
-}
-
-function build(start: Date, end: Date, label: string): PeriodRange {
   const endIncl = new Date(end.getTime() - 1);
   return {
     startIso: start.toISOString(),

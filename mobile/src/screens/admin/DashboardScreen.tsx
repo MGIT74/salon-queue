@@ -5,7 +5,8 @@
 //   settings/public (devise + fuseau). Aucun calcul métier ici : bornes de
 //   période côté mobile (comme le navigateur web), tout le reste = serveur.
 import React, { useCallback, useMemo, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Card } from '../../components/Card';
 import {
   Avatar,
@@ -41,8 +42,9 @@ import {
 import { ApiAuth } from '../../api/transport';
 import { useAuth } from '../../auth/AuthContext';
 import { useTheme } from '../../hooks/useTheme';
-import { Palette, spacing } from '../../theme/theme';
-import { PeriodKey, periodRange } from '../../utils/period';
+import { Palette, cardShadow, spacing } from '../../theme/theme';
+import { CustomRange, PeriodKey, localDateStr, periodRange } from '../../utils/period';
+import { DateRangeSheet } from '../../components/DateRangeSheet';
 import { formatPriceCents, salonNowMinutes, salonTodayStr } from '../../utils/format';
 import { AdminAppointment, BarberPublic, SalonStatsResponse } from '../../types/api';
 
@@ -59,13 +61,19 @@ export function DashboardScreen({ bottomSpace = 110 }: { bottomSpace?: number })
   const [rank, setRank] = useState<'ca' | 'speed' | 'produits'>('ca');
   const [refreshKey, setRefreshKey] = useState(0);
   const [selectedBar, setSelectedBar] = useState<number | null>(null);
+  // Plage (web : customFrom / customTo, aujourd'hui par défaut).
+  const [custom, setCustom] = useState<CustomRange>(() => {
+    const d = localDateStr(new Date());
+    return { from: d, to: d };
+  });
+  const [rangeOpen, setRangeOpen] = useState(false);
 
   const auth: ApiAuth = admin
     ? { kind: 'admin', adminPassword: admin.adminPassword }
     : { kind: 'public' };
   const salonSlug = admin?.salonSlug ?? '';
 
-  const range = useMemo(() => periodRange(period, offset), [period, offset]);
+  const range = useMemo(() => periodRange(period, offset, custom), [period, offset, custom]);
 
   /* --- Données (une source = un petit bloc réutilisable) --- */
   const settingsRes = useApi(useCallback(() => fetchSalonPublic(salonSlug), [salonSlug]), refreshKey);
@@ -129,7 +137,10 @@ export function DashboardScreen({ bottomSpace = 110 }: { bottomSpace?: number })
   const ranking = stats?.leaderboard ? rowsFor(stats, rank) : [];
   const rankMax = stats ? Math.max(1, ...ranking.map((r) => rankAmount(stats, rank, r.id))) : 1;
   const encaisse = chartValues.reduce<number>((a, v) => a + (Number(v) || 0), 0);
-  const glanceBarbers = barbers.filter((b) => todayAppts.some((a) => a.barber_id === b.id));
+  // Tous les coiffeurs actifs qui prennent des RDV (ou en ont un aujourd'hui) : la frise reste visible même vide.
+  const glanceBarbers = barbers.filter(
+    (b) => b.active && (b.accepts_appointments !== 0 || todayAppts.some((a) => a.barber_id === b.id))
+  );
 
   return (
     <ScrollView
@@ -148,7 +159,7 @@ export function DashboardScreen({ bottomSpace = 110 }: { bottomSpace?: number })
 
       {/* Chiffres clés */}
       <Grid2>
-        <KpiTile t={t} icon="people-outline" tone="blue" value={String(barbers.length)} label="Coiffeurs actifs" loading={!barbersRes.data} />
+        <KpiTile t={t} icon="people-outline" tone="blue" value={String(barbers.filter((b) => b.active).length)} label="Coiffeurs actifs" loading={!barbersRes.data} />
         <KpiTile t={t} icon="umbrella-outline" tone="orange" value={String(barbers.filter((b) => b.active && b.on_leave_today).length)} label="En congé" loading={!barbersRes.data} />
         <KpiTile t={t} icon="person-outline" tone="green" value={String(queueCountRes.data?.total ?? 0)} label="Clients" loading={!queueCountRes.data} />
         <KpiTile t={t} icon="calendar-outline" tone="blue" value={String(apptsRes.data?.items.length ?? 0)} label="RDV à venir" loading={!apptsRes.data} />
@@ -160,7 +171,7 @@ export function DashboardScreen({ bottomSpace = 110 }: { bottomSpace?: number })
         {!monthRes.data ? (
           monthRes.error ? <ErrorText t={t} text={errText(monthRes.error)} onRetry={monthRes.reload} /> : <InlineLoading t={t} />
         ) : glanceBarbers.length === 0 ? (
-          <EmptyText t={t} text="Aucun rendez-vous aujourd'hui" />
+          <EmptyText t={t} text="Aucun coiffeur ne prend de rendez-vous" />
         ) : (
           <View>
             <View style={styles.glanceHead}>
@@ -200,6 +211,7 @@ export function DashboardScreen({ bottomSpace = 110 }: { bottomSpace?: number })
                 </View>
               </View>
             ))}
+            {todayAppts.length === 0 ? <Text style={styles.glanceEmpty}>Aucun rendez-vous aujourd'hui</Text> : null}
           </View>
         )}
       </Card>
@@ -211,16 +223,43 @@ export function DashboardScreen({ bottomSpace = 110 }: { bottomSpace?: number })
           { key: 'day' as PeriodKey, label: 'Jour' },
           { key: 'week' as PeriodKey, label: 'Semaine' },
           { key: 'month' as PeriodKey, label: 'Mois' },
+          { key: 'range' as PeriodKey, label: 'Plage' },
         ]}
         value={period}
-        onChange={(p) => { setPeriod(p); setOffset(0); setSelectedBar(null); }}
+        onChange={(p) => {
+          setPeriod(p);
+          setOffset(0);
+          setSelectedBar(null);
+          if (p === 'range') setRangeOpen(true);
+        }}
       />
-      <PeriodNav
+      {period === 'range' ? (
+        <TouchableOpacity style={styles.rangeBtn} onPress={() => setRangeOpen(true)} accessibilityRole="button">
+          <View style={{ flex: 1 }}>
+            <Text style={styles.rangeLabel}>Du</Text>
+            <Text style={styles.rangeValue}>{dayLong(custom.from)}</Text>
+          </View>
+          <Ionicons name="arrow-forward" size={16} color={t.grey} />
+          <View style={{ flex: 1, alignItems: 'flex-end' }}>
+            <Text style={styles.rangeLabel}>Au</Text>
+            <Text style={styles.rangeValue}>{dayLong(custom.to)}</Text>
+          </View>
+        </TouchableOpacity>
+      ) : (
+        <PeriodNav
+          t={t}
+          label={range.label}
+          onPrev={() => { setOffset((o) => o - 1); setSelectedBar(null); }}
+          onNext={() => { setOffset((o) => o + 1); setSelectedBar(null); }}
+          nextDisabled={offset >= 0}
+        />
+      )}
+      <DateRangeSheet
         t={t}
-        label={range.label}
-        onPrev={() => { setOffset((o) => o - 1); setSelectedBar(null); }}
-        onNext={() => { setOffset((o) => o + 1); setSelectedBar(null); }}
-        nextDisabled={offset >= 0}
+        visible={rangeOpen}
+        value={custom}
+        onClose={() => setRangeOpen(false)}
+        onApply={(r) => { setCustom(r); setSelectedBar(null); setRangeOpen(false); }}
       />
 
       {/* Chiffre d'affaires + Manque à gagner */}
@@ -502,6 +541,12 @@ function deltaLabel(pc: number | null): string {
   return `${pc >= 0 ? '+' : '−'}${Math.abs(pc)} %`;
 }
 
+/** « 2026-11-16 » → « Lun. 16 nov. ». */
+function dayLong(ymd: string): string {
+  const d = new Date(`${ymd}T12:00:00`);
+  return Number.isNaN(d.getTime()) ? ymd : capitalize(d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' }));
+}
+
 function capitalize(s: string): string {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
 }
@@ -541,4 +586,11 @@ const stylesFor = (t: Palette) =>
     timeDay: { color: t.grey, fontSize: 11, marginTop: 1 },
     val: { color: t.grey, fontSize: 16, fontVariant: ['tabular-nums'] },
     pillRow: { flexDirection: 'row', gap: 8 },
+    glanceEmpty: { color: t.grey, fontSize: 13, textAlign: 'center', marginTop: 2 },
+    rangeBtn: {
+      flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 10, marginBottom: 14,
+      backgroundColor: t.card, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 14, ...cardShadow(t),
+    },
+    rangeLabel: { color: t.grey, fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.6 },
+    rangeValue: { color: t.ink, fontSize: 15, fontWeight: '600', marginTop: 2 },
   });
