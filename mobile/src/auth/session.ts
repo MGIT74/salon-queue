@@ -8,8 +8,11 @@
 //   X-Salon-Slug avant l'authentification ;
 // - trois univers de session strictement séparés (admin / coiffeur /
 //   client), conformes à l'audit docs/API_AUDIT.md §2 — un univers ne
-//   lit jamais la session d'un autre.
+//   lit jamais la session d'un autre ;
+// - chaque session est LIÉE À SON SERVEUR (origine de l'API) : passer
+//   de prod à test (ou l'inverse) exige une reconnexion, comme sur le web.
 import * as SecureStore from 'expo-secure-store';
+import { apiBaseUrl } from '../api/transport';
 
 export type SalonRef = { slug: string; name?: string };
 
@@ -58,7 +61,7 @@ export async function readSalonRef(): Promise<SalonRef | null> {
 /* ---------- Sessions par univers ---------- */
 
 export async function saveSession<T extends TboSession>(session: T): Promise<void> {
-  await SecureStore.setItemAsync(SESSION_KEYS[session.kind], JSON.stringify(session));
+  await SecureStore.setItemAsync(SESSION_KEYS[session.kind], JSON.stringify({ origin: apiBaseUrl(), data: session }));
 }
 
 export async function readSession<K extends SessionKind>(kind: K): Promise<Extract<TboSession, { kind: K }> | null> {
@@ -66,9 +69,23 @@ export async function readSession<K extends SessionKind>(kind: K): Promise<Extra
     const raw = await SecureStore.getItemAsync(SESSION_KEYS[kind]);
     if (!raw) return null;
     const parsed: unknown = JSON.parse(raw);
-    if (parsed && typeof parsed === 'object' && (parsed as TboSession).kind === kind) {
-      return parsed as Extract<TboSession, { kind: K }>;
+    // Session d'une AUTRE origine (prod/test) : elle est vidée — comme
+    // sur le web, chaque environnement a ses connexions.
+    if (parsed && typeof parsed === 'object' && 'origin' in (parsed as Record<string, unknown>)) {
+      const boxed = parsed as { origin: unknown; data: unknown };
+      if (boxed.origin !== apiBaseUrl()) {
+        await clearSession(kind);
+        return null;
+      }
+      const data = boxed.data;
+      if (data && typeof data === 'object' && (data as TboSession).kind === kind) {
+        return data as Extract<TboSession, { kind: K }>;
+      }
+      await clearSession(kind);
+      return null;
     }
+    // Ancien format (session sans origine) : vidé, reconnexion propre.
+    await clearSession(kind);
     return null;
   } catch {
     return null;

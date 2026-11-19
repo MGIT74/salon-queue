@@ -30,11 +30,11 @@ const stylesFor = (t: Palette, warn: boolean) =>
       gap: spacing.sm + 2,
     },
     cardTitle: {
-      color: t.blue,
-      fontSize: 12,
+      // Comme les h3 des card-box du web : titre sobbre, encre du thème.
+      color: t.ink,
+      fontSize: 15.5,
       fontWeight: '700',
-      textTransform: 'uppercase',
-      letterSpacing: 1.5,
+      letterSpacing: 0,
     },
     cardBody: { gap: spacing.xs + 2 },
   });

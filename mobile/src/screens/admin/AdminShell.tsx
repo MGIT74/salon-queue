@@ -37,10 +37,8 @@ export function AdminShell() {
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content}>
         {section === 'dashboard' ? (
-          <>
-            <Text style={styles.sectionTitle}>Dashboard</Text>
-            <DashboardScreen />
-          </>
+          // Le Dashboard porte son propre titre (« Bienvenue, … ») : pas de redondance.
+          <DashboardScreen />
         ) : section === 'queue' ? (
           <>
             <Text style={styles.sectionTitle}>File d'attente</Text>
