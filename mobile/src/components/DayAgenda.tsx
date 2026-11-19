@@ -14,11 +14,14 @@ import { AdminAppointment, BarberPublic } from '../types/api';
 import { Palette, cardShadow, spacing } from '../theme/theme';
 import { barberColorFor, tint } from '../utils/barberColor';
 import { Avatar } from './ui';
+import { ZoomSlider } from './ZoomSlider';
+import { formatPriceCents } from '../utils/format';
 import { movedBy, nudgeRoom } from '../utils/agendaRules';
 
 const HEAD_H = 46;
 const GUTTER = 48;
-const ZOOMS = [0.8, 1.1, 1.5, 2.1]; // pixels par minute
+/** Zoom continu (curseur) : pixels par minute. */
+const ZMIN = 0.7, ZMAX = 3, ZDEF = 1.1;
 
 const toMin = (hm: string) => Number(hm.slice(0, 2)) * 60 + Number(hm.slice(3, 5));
 const hm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
@@ -227,6 +230,24 @@ const glanceStyles = (t: Palette) =>
 
 /* =============================== Colonnes =============================== */
 
+/** Lignes affichées DANS un bloc, selon sa hauteur (plus on zoome, plus on en voit). */
+export function details(a: AdminAppointment, h: number): { text: string; strong?: boolean; wrap?: boolean }[] {
+  const p = a.pricing;
+  const out: { text: string; strong?: boolean; wrap?: boolean }[] = [];
+  const extras = p?.extras?.map((x) => x.name) ?? [];
+  const onlyExtras = /suppl[ée]ment seul/i.test(String(a.service_name ?? ''));
+  const svc = onlyExtras ? extras.join(' + ') : [a.service_name, ...extras.map((x) => `+ ${x}`)].filter(Boolean).join('  ');
+  if (svc) out.push({ text: svc, wrap: true });
+  if (p?.products?.length) out.push({ text: `Produits : ${p.products.map((x) => (x.quantity > 1 ? `${x.quantity}× ${x.name}` : x.name)).join(', ')}`, wrap: true });
+  if (p && p.total_cents) out.push({ text: formatPriceCents(p.total_cents), strong: true });
+  if (a.phone) out.push({ text: String(a.phone) });
+  const note = a.note || a.client_note;
+  if (note) out.push({ text: `« ${String(note)} »`, wrap: true });
+  // ~15 px par ligne ; nom + heure déjà affichés.
+  const room = Math.floor((h - 8) / 15) - 2;
+  return room > 0 ? out.slice(0, room) : [];
+}
+
 export function DayColumns({ t, barbers, allBarbers, items, date, todayYmd, nowMin, isTablet, onOpen, onAdd, onNudge, onMoved, onReorderIds, onDragging, busyId }: {
   t: Palette;
   /** Coiffeurs affichés (filtre compris). */
@@ -253,10 +274,9 @@ export function DayColumns({ t, barbers, allBarbers, items, date, todayYmd, nowM
   busyId?: number | null;
 }) {
   const styles = colStyles(t);
-  const [zoom, setZoom] = useState(1);
+  const [pxm, setPxm] = useState(ZDEF);
   const [width, setWidth] = useState(0);
   const [pick, setPick] = useState<{ barberId: string; min: number } | null>(null);
-  const pxm = ZOOMS[zoom];
   // Glisser une colonne (web : glisser le nom d'un coiffeur à gauche / à droite).
   const [drag, setDrag] = useState<{ from: number; to: number } | null>(null);
   const dragX = useRef(new Animated.Value(0)).current;
@@ -282,8 +302,11 @@ export function DayColumns({ t, barbers, allBarbers, items, date, todayYmd, nowM
   const y = (m: number) => (m - START) * pxm;
 
   const n = Math.max(1, barbers.length);
-  const fit = isTablet && width > 0 && (width - GUTTER) / n >= 130;
-  const colW = fit ? (width - GUTTER) / n : 150;
+  // Le zoom élargit aussi les colonnes : plus de place pour lire le contenu des RDV.
+  const grow = Math.min(1.9, Math.max(0.85, pxm / ZDEF));
+  const minCol = (isTablet ? 130 : 150) * grow;
+  const fit = isTablet && width > 0 && (width - GUTTER) / n >= minCol;
+  const colW = fit ? (width - GUTTER) / n : Math.round(minCol);
 
   const hours: number[] = [];
   for (let m = START; m <= END; m += 30) hours.push(m);
@@ -402,7 +425,7 @@ export function DayColumns({ t, barbers, allBarbers, items, date, todayYmd, nowM
     const mine = visible.filter((a) => String(a.barber_id) === String(b.id));
     const movedCount = mine.filter((a) => movedBy(a) !== 0).length;
     return (
-      <Animated.View key={b.id} style={[styles.col, { width: colW }, colDragStyle(i, String(b.id))]}>
+      <Animated.View key={b.id} style={[styles.col, fit ? { flex: 1 } : { width: colW }, colDragStyle(i, String(b.id))]}>
         <DragHead index={i} api={dragApi} style={[styles.colHead, drag?.from === i && { backgroundColor: t.blueSoft }]}
           label={`${b.name} : maintenir puis glisser pour changer l'ordre`}>
           <Avatar t={t} name={b.name} color={color} size={26} />
@@ -451,8 +474,10 @@ export function DayColumns({ t, barbers, allBarbers, items, date, todayYmd, nowM
                   {a.client_name || 'Client'}
                   {moved ? <Text style={styles.movedTag}>{`  ⇅ ${moved > 0 ? '+' : ''}${moved}`}</Text> : null}
                 </Text>
-                <Text style={styles.evMeta} numberOfLines={1}>{hm(r.s)} – {hm(r.e)}</Text>
-                {h > 58 ? <Text style={styles.evMeta} numberOfLines={1}>{a.service_name}</Text> : null}
+                <Text style={styles.evMeta} numberOfLines={1}>{hm(r.s)} – {hm(r.e)}{h > 40 ? ` · ${r.d} min` : ''}</Text>
+                {details(a, h).map((l, k) => (
+                  <Text key={k} style={[styles.evMeta, l.strong && styles.evStrong]} numberOfLines={l.wrap ? 2 : 1}>{l.text}</Text>
+                ))}
                 {abs && !short ? <Text style={styles.evAbsTag}>Absent</Text> : null}
                 {canNudge ? (
                   <View style={styles.nudges}>
@@ -501,15 +526,7 @@ export function DayColumns({ t, barbers, allBarbers, items, date, todayYmd, nowM
     <View style={styles.card}>
       <View style={styles.head}>
         <Text style={styles.count} numberOfLines={1}>{visible.length} RDV{isTablet ? ' ce jour' : ''}</Text>
-        <View style={styles.zoom}>
-          <TouchableOpacity onPress={() => setZoom(Math.max(0, zoom - 1))} hitSlop={8} accessibilityRole="button" accessibilityLabel="Dézoomer">
-            <Ionicons name="remove" size={18} color={zoom === 0 ? t.sep : t.ink} />
-          </TouchableOpacity>
-          <View style={styles.zTrack}><View style={[styles.zFill, { width: `${((zoom + 1) / ZOOMS.length) * 100}%` }]} /></View>
-          <TouchableOpacity onPress={() => setZoom(Math.min(ZOOMS.length - 1, zoom + 1))} hitSlop={8} accessibilityRole="button" accessibilityLabel="Zoomer">
-            <Ionicons name="add" size={18} color={zoom === ZOOMS.length - 1 ? t.sep : t.ink} />
-          </TouchableOpacity>
-        </View>
+        <ZoomSlider t={t} value={pxm} min={ZMIN} max={ZMAX} step={0.4} onChange={setPxm} width={isTablet ? 130 : 78} />
         <TouchableOpacity style={styles.add} onPress={() => onAdd()} accessibilityRole="button">
           <Ionicons name="add" size={18} color="#fff" />
           <Text style={styles.addTxt}>{isTablet ? 'Ajouter un RDV' : 'Ajouter'}</Text>
@@ -565,6 +582,7 @@ const colStyles = (t: Palette) =>
     evAbs: { backgroundColor: 'transparent', borderWidth: 1.5, borderStyle: 'dashed', borderColor: t.sep },
     evName: { color: t.ink, fontSize: 13, fontWeight: '700' },
     evMeta: { color: t.grey, fontSize: 11.5, fontVariant: ['tabular-nums'] },
+    evStrong: { color: t.ink, fontWeight: '700' },
     evAbsTag: { alignSelf: 'flex-start', marginTop: 2, color: t.red, backgroundColor: t.redSoft, fontSize: 10, fontWeight: '700', paddingHorizontal: 6, borderRadius: 99, overflow: 'hidden' },
     pick: { position: 'absolute', left: 4, right: 4, borderRadius: 9, borderWidth: 1.5, borderStyle: 'dashed', borderColor: t.blue, alignItems: 'center', justifyContent: 'center', backgroundColor: t.blueSoft },
     pickTxt: { color: t.blue, fontSize: 12.5, fontWeight: '700' },

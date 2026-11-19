@@ -11,10 +11,12 @@ import { AdminAppointment, BarberPublic } from '../types/api';
 import { Palette, cardShadow, spacing } from '../theme/theme';
 import { barberColorFor, tint } from '../utils/barberColor';
 import { Avatar } from './ui';
+import { ZoomSlider } from './ZoomSlider';
+import { details } from './DayAgenda';
 
 const HEAD_H = 50;
 const GUTTER = 46;
-const ZOOMS = [0.8, 1.1, 1.5, 2.1];
+const ZMIN = 0.7, ZMAX = 3, ZDEF = 1.1;
 const toMin = (hm: string) => Number(hm.slice(0, 2)) * 60 + Number(hm.slice(3, 5));
 const hm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 const parse = (s: string) => new Date(`${s}T12:00:00`);
@@ -45,7 +47,7 @@ export function WeekAgenda({ t, days, byDay, barbers, todayYmd, nowMin, isTablet
   const c = colStyles(t);
   const [folded, setFolded] = useState(false);
   const [q, setQ] = useState('');
-  const [zoom, setZoom] = useState(1);
+  const [pxm, setPxm] = useState(ZDEF);
   const [width, setWidth] = useState(0);
   const [pick, setPick] = useState<{ date: string; min: number } | null>(null);
   const G0 = 8 * 60, G1 = 19 * 60;
@@ -66,13 +68,13 @@ export function WeekAgenda({ t, days, byDay, barbers, todayYmd, nowMin, isTablet
   }, [q, searchPool]);
 
   /* ----- Agenda 7 jours ----- */
-  const pxm = ZOOMS[zoom];
   let START = 8 * 60, END = 20 * 60;
   weekItems.forEach((a) => { const r = range(a); START = Math.min(START, Math.floor(r.s / 60) * 60); END = Math.max(END, Math.ceil(r.e / 60) * 60); });
   const H = (END - START) * pxm;
   const y = (m: number) => (m - START) * pxm;
-  const fit = isTablet && width > 0 && (width - GUTTER) / 7 >= 110;
-  const colW = fit ? (width - GUTTER) / 7 : 104;
+  const grow = Math.min(1.9, Math.max(0.85, pxm / ZDEF));
+  const fit = isTablet && width > 0 && (width - GUTTER) / 7 >= 110 * grow;
+  const colW = fit ? (width - GUTTER) / 7 : Math.round(104 * grow);
   const hours: number[] = [];
   for (let m = START; m <= END; m += 30) hours.push(m);
 
@@ -81,7 +83,7 @@ export function WeekAgenda({ t, days, byDay, barbers, todayYmd, nowMin, isTablet
     const isToday = d === todayYmd;
     const past = d < todayYmd;
     return (
-      <View key={d} style={[c.col, { width: colW }]}>
+      <View key={d} style={[c.col, fit ? { flex: 1 } : { width: colW }]}>
         <Pressable style={c.colHead} onPress={() => onDay(d)} accessibilityRole="button" accessibilityLabel={`Ouvrir le ${d}`}>
           <Text style={[c.wd, isToday && { color: t.blue }]}>{cap(parse(d).toLocaleDateString('fr-FR', { weekday: 'short' })).replace('.', '')}</Text>
           <View style={[c.dn, isToday && { backgroundColor: t.blue }]}>
@@ -111,6 +113,9 @@ export function WeekAgenda({ t, days, byDay, barbers, todayYmd, nowMin, isTablet
               >
                 <Text style={[c.evName, st === 'completed' && { color: t.grey, fontWeight: '500' }]} numberOfLines={1}>{a.client_name || 'Client'}</Text>
                 {h >= 34 ? <Text style={c.evMeta} numberOfLines={1}>{hm(r.s)}{isTablet && a.barber_name ? ` · ${a.barber_name}` : ''}</Text> : null}
+                {details(a, h).map((l, k) => (
+                  <Text key={k} style={[c.evMeta, l.strong && { color: t.ink, fontWeight: '700' }]} numberOfLines={l.wrap ? 2 : 1}>{l.text}</Text>
+                ))}
               </Pressable>
             );
           })}
@@ -209,15 +214,7 @@ export function WeekAgenda({ t, days, byDay, barbers, todayYmd, nowMin, isTablet
       <View style={c.card}>
         <View style={c.head}>
           <Text style={c.count} numberOfLines={1}>{weekItems.length} RDV cette semaine</Text>
-          <View style={c.zoom}>
-            <TouchableOpacity onPress={() => setZoom(Math.max(0, zoom - 1))} hitSlop={8} accessibilityRole="button" accessibilityLabel="Dézoomer">
-              <Ionicons name="remove" size={18} color={zoom === 0 ? t.sep : t.ink} />
-            </TouchableOpacity>
-            <View style={c.zTrack}><View style={[c.zFill, { width: `${((zoom + 1) / ZOOMS.length) * 100}%` }]} /></View>
-            <TouchableOpacity onPress={() => setZoom(Math.min(ZOOMS.length - 1, zoom + 1))} hitSlop={8} accessibilityRole="button" accessibilityLabel="Zoomer">
-              <Ionicons name="add" size={18} color={zoom === ZOOMS.length - 1 ? t.sep : t.ink} />
-            </TouchableOpacity>
-          </View>
+          <ZoomSlider t={t} value={pxm} min={ZMIN} max={ZMAX} step={0.4} onChange={setPxm} width={isTablet ? 130 : 78} />
           <TouchableOpacity style={c.add} onPress={() => onAdd(days.find((d) => d >= todayYmd) ?? todayYmd)} accessibilityRole="button" accessibilityLabel="Ajouter un RDV">
             <Ionicons name="add" size={18} color="#fff" />
             {isTablet ? <Text style={c.addTxt}>Ajouter un RDV</Text> : null}

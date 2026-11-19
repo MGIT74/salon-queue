@@ -3,7 +3,7 @@
 // en tête, Déconnexion en rouge dans « Plus », version en pied.
 // Pattern mobile du web : barre du bas + bouton « Plus » (menu complet).
 import React, { useState } from 'react';
-import { ActionSheetIOS, Alert, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActionSheetIOS, Alert, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View, LayoutAnimation } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../auth/AuthContext';
@@ -92,7 +92,16 @@ export function AdminShell() {
           active={section}
           onSelect={setSection}
           collapsed={collapsed}
-          onToggle={() => setCollapsed(!collapsed)}
+          onToggle={() => {
+            // Menu qui se replie / se déplie en douceur ; l'agenda suit la nouvelle largeur dans la même animation.
+            LayoutAnimation.configureNext({
+              duration: 320,
+              update: { type: LayoutAnimation.Types.spring, springDamping: 0.86 },
+              create: { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.opacity, duration: 220 },
+              delete: { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.opacity, duration: 120 },
+            });
+            setCollapsed(!collapsed);
+          }}
           salonName={salonName}
           canSwitchSalon={salons.length > 1}
           onPickSalon={pickSalon}
