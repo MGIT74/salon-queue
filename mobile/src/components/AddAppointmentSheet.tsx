@@ -3,10 +3,10 @@
 // « Premier disponible »), date et créneau, 3. client (nom requis, email et
 // téléphone facultatifs). Créneaux et choix du coiffeur : serveur.
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, TextInput, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { ApiAuth, ApiError } from '../api/transport';
-import { adminCreateAppointment, fetchExtras, fetchServices, fetchStaffAvailability } from '../api/endpoints';
+import { ClientSuggestion, adminCreateAppointment, fetchExtras, fetchServices, fetchStaffAvailability, searchClients } from '../api/endpoints';
 import { AvailabilitySlot, BarberPublic, CatalogItem } from '../types/api';
 import { Palette, cardShadow, radius, spacing, sheetTheme } from '../theme/theme';
 import { formatPriceCents } from '../utils/format';
@@ -25,8 +25,10 @@ const dayLong = (s: string) => {
   return v.charAt(0).toUpperCase() + v.slice(1);
 };
 
-/** « Seulement un supplément » : le serveur prend sa prestation cachée (web : EXTRAS_ONLY). */
+/** Aucune prestation + suppléments : le serveur prend sa prestation cachée « Supplément seul » (web : EXTRAS_ONLY). */
 const EXTRAS_ONLY = '__extras__';
+/** Recherche sans accents ni majuscules. */
+const norm = (v: string) => v.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
 export function AddAppointmentSheet({ t: tIn, visible, initialDate, initialTime, initialBarberId, todayYmd, barbers, salonSlug, auth, onClose, onCreated }: {
   t: Palette;
@@ -63,6 +65,20 @@ export function AddAppointmentSheet({ t: tIn, visible, initialDate, initialTime,
   const [phone, setPhone] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveErr, setSaveErr] = useState('');
+  const [find, setFind] = useState('');
+  const [sugg, setSugg] = useState<ClientSuggestion[]>([]);
+  const [picked, setPicked] = useState(false);
+
+  // Nom du client : dès 3 lettres, les clients du salon qui correspondent (web : même route).
+  useEffect(() => {
+    const q = name.trim();
+    if (!visible || step !== 3 || picked || q.length < 3) { setSugg([]); return; }
+    let alive = true;
+    const id = setTimeout(() => {
+      searchClients(salonSlug, auth, q).then((r) => alive && setSugg(r.items ?? [])).catch(() => alive && setSugg([]));
+    }, 250);
+    return () => { alive = false; clearTimeout(id); };
+  }, [name, picked, visible, step, salonSlug, auth]);
 
   // Remise à zéro à chaque ouverture.
   useEffect(() => {
@@ -77,6 +93,9 @@ export function AddAppointmentSheet({ t: tIn, visible, initialDate, initialTime,
     setEmail('');
     setPhone('');
     setSaveErr('');
+    setFind('');
+    setSugg([]);
+    setPicked(false);
     if (!services) {
       Promise.all([fetchServices(salonSlug), fetchExtras(salonSlug)])
         .then(([s, x]) => {
@@ -111,6 +130,9 @@ export function AddAppointmentSheet({ t: tIn, visible, initialDate, initialTime,
   }, [todayYmd]);
 
   const only = sid === EXTRAS_ONLY;
+  const fq = norm(find.trim());
+  const shownServices = (services ?? []).filter((x) => !fq || norm(x.name).includes(fq) || x.id === serviceId);
+  const shownExtras = extras.filter((x) => !fq || norm(x.name).includes(fq) || extraIds.includes(x.id));
   const service = services?.find((s) => s.id === serviceId) ?? null;
   const chosenExtras = extras.filter((x) => extraIds.includes(x.id));
   const total = (service?.price_cents ?? 0) + chosenExtras.reduce((a, x) => a + x.price_cents, 0);
@@ -164,43 +186,45 @@ export function AddAppointmentSheet({ t: tIn, visible, initialDate, initialTime,
           {step === 1 ? (
             <>
               <Text style={styles.title}>Prestation</Text>
+              <View style={styles.search}>
+                <Ionicons name="search" size={16} color={t.grey} />
+                <TextInput style={styles.searchInput} value={find} onChangeText={setFind} placeholder="Rechercher une prestation ou un supplément"
+                  placeholderTextColor={t.grey} autoCorrect={false} autoCapitalize="none" clearButtonMode="while-editing" returnKeyType="search" />
+              </View>
               {catErr ? <ErrorText t={t} text={catErr} /> : !services ? <InlineLoading t={t} /> : (
-                <Card t={t} flush style={styles.block}>
-                  {extras.length ? (
-                    // Web : « Seulement un supplément · Sans prestation » en tête de liste.
-                    <ListRow t={t} first inset={50} onPress={() => setServiceId(EXTRAS_ONLY)}
-                      left={<Ionicons name={only ? 'checkmark-circle' : 'ellipse-outline'} size={24} color={only ? t.blue : t.sep} />}
-                      right={<Text style={styles.amt}>Choisir ensuite</Text>}>
-                      <RowText t={t} title="Seulement un supplément" meta="Sans prestation" />
-                    </ListRow>
-                  ) : null}
-                  {services.map((s, i) => (
-                    <ListRow key={s.id} t={t} first={i === 0 && !extras.length} inset={50} onPress={() => setServiceId(s.id)}
-                      left={<Ionicons name={serviceId === s.id ? 'checkmark-circle' : 'ellipse-outline'} size={24} color={serviceId === s.id ? t.blue : t.sep} />}
-                      right={<Text style={styles.amt}>{formatPriceCents(s.price_cents)}</Text>}>
-                      <RowText t={t} title={s.name} meta={`${s.duration_min} min`} />
-                    </ListRow>
-                  ))}
-                </Card>
-              )}
-              {extras.length ? (
                 <>
-                  <Text style={[styles.sub, only && !extraIds.length && { color: t.blue }]}>{only ? 'Quel supplément ? (au moins un)' : 'Suppléments (optionnels)'}</Text>
-                  <Card t={t} flush style={styles.block}>
-                    {extras.map((x, i) => {
-                      const on = extraIds.includes(x.id);
-                      return (
-                        <ListRow key={x.id} t={t} first={i === 0} inset={50}
-                          onPress={() => setExtraIds(on ? extraIds.filter((id) => id !== x.id) : [...extraIds, x.id])}
-                          left={<Ionicons name={on ? 'checkbox' : 'square-outline'} size={22} color={on ? t.blue : t.sep} />}
-                          right={<Text style={styles.amt}>+ {formatPriceCents(x.price_cents)}</Text>}>
-                          <RowText t={t} title={x.name} meta={x.duration_min ? `+ ${x.duration_min} min` : undefined} />
+                  {shownServices.length ? (
+                    <Card t={t} flush style={styles.block}>
+                      {shownServices.map((s, i) => (
+                        <ListRow key={s.id} t={t} first={i === 0} inset={50} onPress={() => setServiceId(serviceId === s.id ? null : s.id)}
+                          left={<Ionicons name={serviceId === s.id ? 'checkmark-circle' : 'ellipse-outline'} size={24} color={serviceId === s.id ? t.blue : t.sep} />}
+                          right={<Text style={styles.amt}>{formatPriceCents(s.price_cents)}</Text>}>
+                          <RowText t={t} title={s.name} meta={`${s.duration_min} min`} />
                         </ListRow>
-                      );
-                    })}
-                  </Card>
+                      ))}
+                    </Card>
+                  ) : find ? <Text style={styles.hint}>Aucune prestation pour « {find} ».</Text> : null}
+                  {shownExtras.length ? (
+                    <>
+                      <Text style={styles.sub}>Suppléments{serviceId ? ' (optionnels)' : ''}</Text>
+                      <Card t={t} flush style={styles.block}>
+                        {shownExtras.map((x, i) => {
+                          const on = extraIds.includes(x.id);
+                          return (
+                            <ListRow key={x.id} t={t} first={i === 0} inset={50}
+                              onPress={() => setExtraIds(on ? extraIds.filter((id) => id !== x.id) : [...extraIds, x.id])}
+                              left={<Ionicons name={on ? 'checkbox' : 'square-outline'} size={22} color={on ? t.blue : t.sep} />}
+                              right={<Text style={styles.amt}>+ {formatPriceCents(x.price_cents)}</Text>}>
+                              <RowText t={t} title={x.name} meta={x.duration_min ? `+ ${x.duration_min} min` : undefined} />
+                            </ListRow>
+                          );
+                        })}
+                      </Card>
+                    </>
+                  ) : null}
+                  {!serviceId ? <Text style={styles.hint}>Sans prestation, un supplément seul suffit.</Text> : null}
                 </>
-              ) : null}
+              )}
             </>
           ) : step === 2 ? (
             <>
@@ -262,11 +286,25 @@ export function AddAppointmentSheet({ t: tIn, visible, initialDate, initialTime,
                   left={<Avatar t={t} name={slotBarber ? barbers.find((b) => String(b.id) === String(slotBarber))?.name : '?'} color={slotBarber ? barberColorFor(barbers, slotBarber) : t.grey} />}
                   right={<Text style={styles.amt}>{formatPriceCents(total)}</Text>}>
                   <RowText t={t} title={`${dayLong(date)} · ${time}`}
-                    meta={`${service?.name ?? ''}${chosenExtras.length ? ' + ' + chosenExtras.map((x) => x.name).join(', ') : ''} · ${barbers.find((b) => String(b.id) === String(slotBarber))?.name ?? 'Premier disponible'}`} />
+                    meta={`${only ? chosenExtras.map((x) => x.name).join(', ') : `${service?.name ?? ''}${chosenExtras.length ? ' + ' + chosenExtras.map((x) => x.name).join(', ') : ''}`} · ${barbers.find((b) => String(b.id) === String(slotBarber))?.name ?? 'Premier disponible'}`} />
                 </ListRow>
               </Card>
               <View style={{ gap: 12 }}>
-                <LabeledField label="Nom du client" t={t} value={name} onChangeText={setName} autoCapitalize="words" placeholder="Nom et prénom" />
+                <View>
+                  <LabeledField label="Nom du client" t={t} value={name} onChangeText={(v) => { setName(v); setPicked(false); }} autoCapitalize="words" placeholder="Nom et prénom (3 lettres → clients du salon)" />
+                  {sugg.length ? (
+                    <Card t={t} flush style={{ marginTop: 6 }}>
+                      {sugg.map((c, i) => (
+                        <ListRow key={`${c.name}-${c.email}-${c.phone}-${i}`} t={t} first={i === 0} inset={58}
+                          onPress={() => { setName(c.name); setEmail(c.email || ''); setPhone(c.phone || ''); setPicked(true); setSugg([]); }}
+                          left={<Avatar t={t} name={c.name} color={t.blue} size={32} />}
+                          right={c.account_id ? <Text style={styles.acBadge}>Compte client</Text> : undefined}>
+                          <RowText t={t} title={c.name} meta={[c.email, c.phone].filter(Boolean).join(' · ') || undefined} />
+                        </ListRow>
+                      ))}
+                    </Card>
+                  ) : null}
+                </View>
                 <LabeledField label="Email (facultatif)" t={t} value={email} onChangeText={setEmail} keyboardType="email-address" placeholder="client@exemple.fr" />
                 <LabeledField label="Téléphone (facultatif)" t={t} value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder="06 12 34 56 78" />
               </View>
@@ -298,6 +336,9 @@ export function AddAppointmentSheet({ t: tIn, visible, initialDate, initialTime,
 
 const stylesFor = (t: Palette) =>
   StyleSheet.create({
+    search: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: t.fill, borderRadius: 11, paddingHorizontal: 12, marginBottom: 12 },
+    searchInput: { flex: 1, color: t.ink, fontSize: 16, paddingVertical: 10 },
+    acBadge: { color: t.blue, backgroundColor: t.blueSoft, fontSize: 11, fontWeight: '700', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 99, overflow: 'hidden' },
     sheet: { flex: 1, backgroundColor: t.bg },
     head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.page, paddingTop: 18, paddingBottom: 10 },
     headTitle: { color: t.ink, fontSize: 17, fontWeight: '700' },

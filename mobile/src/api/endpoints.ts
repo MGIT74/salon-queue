@@ -606,3 +606,11 @@ export async function importAppointments(
 export async function fetchAllServices(salonSlug: string, auth: ApiAuth): Promise<CatalogListResponse> {
   return apiRequest<CatalogListResponse>({ path: 'api/catalog/services', salonSlug, auth, query: { all: '1' } });
 }
+
+/** Client proposé pendant la saisie du nom (web : attachClientAutocomplete). */
+export type ClientSuggestion = { name: string; email: string; phone: string; account_id: string | null; relatives: { id: string; name: string }[] };
+
+/** GET /api/queue/clients-search?q= — clients du salon (comptes, RDV, file) dès 3 lettres, 8 au plus. */
+export async function searchClients(salonSlug: string, auth: ApiAuth, q: string): Promise<{ ok: true; items: ClientSuggestion[] }> {
+  return apiRequest({ path: 'api/queue/clients-search', salonSlug, auth, query: { q } });
+}
