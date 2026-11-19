@@ -13,6 +13,7 @@ import { AdminAppointment, BarberPublic } from '../types/api';
 import { Palette, cardShadow, spacing } from '../theme/theme';
 import { barberColorFor, tint } from '../utils/barberColor';
 import { Avatar } from './ui';
+import { movedBy, nudgeRoom } from '../utils/agendaRules';
 
 const HEAD_H = 46;
 const GUTTER = 48;
@@ -225,7 +226,7 @@ const glanceStyles = (t: Palette) =>
 
 /* =============================== Colonnes =============================== */
 
-export function DayColumns({ t, barbers, allBarbers, items, date, todayYmd, nowMin, isTablet, onOpen, onAdd }: {
+export function DayColumns({ t, barbers, allBarbers, items, date, todayYmd, nowMin, isTablet, onOpen, onAdd, onNudge, onMoved, onReorder, busyId }: {
   t: Palette;
   /** Coiffeurs affichés (filtre compris). */
   barbers: BarberPublic[];
@@ -239,6 +240,14 @@ export function DayColumns({ t, barbers, allBarbers, items, date, todayYmd, nowM
   onOpen: (a: AdminAppointment) => void;
   /** Ajouter un RDV (heure et coiffeur pré-choisis si la case a été touchée). */
   onAdd: (time?: string, barberId?: string) => void;
+  /** Décaler un RDV de ±5 min (flèches ▲ ▼). */
+  onNudge: (a: AdminAppointment, minutes: number) => void;
+  /** Liste des RDV décalés d'un coiffeur (pastille ⇅ de l'en-tête). */
+  onMoved: (barberId: string) => void;
+  /** Ouvrir « Ordre des colonnes ». */
+  onReorder: () => void;
+  /** RDV en cours de décalage (flèches désactivées). */
+  busyId?: number | null;
 }) {
   const styles = colStyles(t);
   const [zoom, setZoom] = useState(1);
@@ -270,6 +279,7 @@ export function DayColumns({ t, barbers, allBarbers, items, date, todayYmd, nowM
     const color = barberColorFor(allBarbers, b.id);
     const info = dayInfo(b, date, START, END);
     const mine = visible.filter((a) => String(a.barber_id) === String(b.id));
+    const movedCount = mine.filter((a) => movedBy(a) !== 0).length;
     return (
       <View key={b.id} style={[styles.col, { width: colW }]}>
         <View style={styles.colHead}>
@@ -278,6 +288,12 @@ export function DayColumns({ t, barbers, allBarbers, items, date, todayYmd, nowM
             <Text style={styles.colName} numberOfLines={1}>{b.name}</Text>
             {info.sub ? <Text style={styles.colSub} numberOfLines={1}>{info.sub}</Text> : null}
           </View>
+          {movedCount ? (
+            <TouchableOpacity style={styles.mBadge} onPress={() => onMoved(String(b.id))} accessibilityRole="button"
+              accessibilityLabel={`${movedCount} RDV décalé${movedCount > 1 ? 's' : ''} de 5 min`} hitSlop={6}>
+              <Text style={styles.mBadgeTxt}>⇅ {movedCount}</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
         <Pressable style={{ height: H }} onPress={(e) => tapCol(String(b.id), e.nativeEvent.locationY)}>
           {hours.map((m) => <View key={m} style={[styles.hl, { top: y(m) }, m % 60 !== 0 && { opacity: 0.5 }]} />)}
@@ -297,18 +313,51 @@ export function DayColumns({ t, barbers, allBarbers, items, date, todayYmd, nowM
             const abs = st === 'no_show';
             const h = Math.max(28, r.d * pxm) - 3;
             const short = h < 44;
+            const future = date > todayYmd || (date === todayYmd && r.s > nowMin);
+            const room = nudgeRoom(a, future);
+            const canNudge = room.up || room.down;
+            const moved = movedBy(a);
             return (
               <Pressable
                 key={a.id}
                 onPress={() => onOpen(a)}
                 accessibilityRole="button"
-                style={[styles.ev, { top: y(r.s) + 1, height: h }, short && { paddingVertical: 3 },
+                style={[styles.ev, { top: y(r.s) + 1, height: h }, short && { paddingVertical: 3 }, canNudge && { paddingRight: 30 },
                   abs ? styles.evAbs : { backgroundColor: past ? t.fill : tint(color, t) }]}
               >
-                <Text style={[styles.evName, past && { color: t.grey, fontWeight: '500' }]} numberOfLines={1}>{a.client_name || 'Client'}</Text>
-                <Text style={styles.evMeta} numberOfLines={1}>{hm(r.s)} – {hm(r.e)}{short ? '' : ''}</Text>
+                <Text style={[styles.evName, past && { color: t.grey, fontWeight: '500' }]} numberOfLines={1}>
+                  {a.client_name || 'Client'}
+                  {moved ? <Text style={styles.movedTag}>{`  ⇅ ${moved > 0 ? '+' : ''}${moved}`}</Text> : null}
+                </Text>
+                <Text style={styles.evMeta} numberOfLines={1}>{hm(r.s)} – {hm(r.e)}</Text>
                 {h > 58 ? <Text style={styles.evMeta} numberOfLines={1}>{a.service_name}</Text> : null}
                 {abs && !short ? <Text style={styles.evAbsTag}>Absent</Text> : null}
+                {canNudge ? (
+                  <View style={styles.nudges}>
+                    <TouchableOpacity
+                      style={[styles.nudge, (!room.up || busyId === a.id) && { opacity: 0.3 }]}
+                      disabled={!room.up || busyId === a.id}
+                      onPress={() => onNudge(a, -5)}
+                      hitSlop={4}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Avancer ${a.client_name} de 5 minutes`}
+                    >
+                      <Ionicons name="caret-up" size={11} color={t.blue} />
+                    </TouchableOpacity>
+                    {h >= 44 ? (
+                      <TouchableOpacity
+                        style={[styles.nudge, (!room.down || busyId === a.id) && { opacity: 0.3 }]}
+                        disabled={!room.down || busyId === a.id}
+                        onPress={() => onNudge(a, 5)}
+                        hitSlop={4}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Retarder ${a.client_name} de 5 minutes`}
+                      >
+                        <Ionicons name="caret-down" size={11} color={t.blue} />
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
+                ) : null}
               </Pressable>
             );
           })}
@@ -330,6 +379,12 @@ export function DayColumns({ t, barbers, allBarbers, items, date, todayYmd, nowM
     <View style={styles.card}>
       <View style={styles.head}>
         <Text style={styles.count} numberOfLines={1}>{visible.length} RDV{isTablet ? ' ce jour' : ''}</Text>
+        {barbers.length > 1 ? (
+          <TouchableOpacity style={styles.reorder} onPress={onReorder} accessibilityRole="button" accessibilityLabel="Réorganiser les colonnes">
+            <Ionicons name="reorder-three" size={18} color={t.blue} />
+            {isTablet ? <Text style={styles.reorderTxt}>Réorganiser</Text> : null}
+          </TouchableOpacity>
+        ) : null}
         <View style={styles.zoom}>
           <TouchableOpacity onPress={() => setZoom(Math.max(0, zoom - 1))} hitSlop={8} accessibilityRole="button" accessibilityLabel="Dézoomer">
             <Ionicons name="remove" size={18} color={zoom === 0 ? t.sep : t.ink} />
@@ -397,4 +452,11 @@ const colStyles = (t: Palette) =>
     nowTag: { position: 'absolute', left: -GUTTER + 2, top: -8, backgroundColor: t.red, borderRadius: 5, paddingHorizontal: 4, paddingVertical: 1 },
     nowTxt: { color: '#fff', fontSize: 10, fontWeight: '700', fontVariant: ['tabular-nums'] },
     tip: { color: t.grey, fontSize: 12, textAlign: 'center', paddingVertical: 8 },
+    mBadge: { backgroundColor: t.orangeSoft, borderRadius: 99, paddingHorizontal: 6, paddingVertical: 2 },
+    mBadgeTxt: { color: t.orange, fontSize: 11, fontWeight: '700' },
+    movedTag: { color: t.orange, fontSize: 10.5, fontWeight: '700' },
+    nudges: { position: 'absolute', right: 4, top: 4, gap: 3 },
+    nudge: { width: 22, height: 18, borderRadius: 6, backgroundColor: t.card, alignItems: 'center', justifyContent: 'center', ...cardShadow(t) },
+    reorder: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 34, paddingHorizontal: 10, borderRadius: 17, backgroundColor: t.blueSoft },
+    reorderTxt: { color: t.blue, fontSize: 14, fontWeight: '600' },
   });

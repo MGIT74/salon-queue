@@ -8,7 +8,7 @@ import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpaci
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../auth/AuthContext';
 import { ApiAuth, ApiError } from '../../api/transport';
-import { fetchAdminAppointments, fetchBarbers, fetchSalonPublic } from '../../api/endpoints';
+import { fetchAdminAppointments, fetchBarbers, fetchSalonPublic, nudgeAppointment } from '../../api/endpoints';
 import { AdminAppointment, BarberPublic } from '../../types/api';
 import { useTheme } from '../../hooks/useTheme';
 import { useLayout } from '../../hooks/useLayout';
@@ -20,6 +20,10 @@ import { Avatar, Chip, EmptyText, ErrorText, InlineLoading, PageTitle, Segmented
 import { AppointmentSheet } from '../../components/AppointmentSheet';
 import { AddAppointmentSheet } from '../../components/AddAppointmentSheet';
 import { DayColumns, DayGlance } from '../../components/DayAgenda';
+import { WeekAgenda } from '../../components/WeekAgenda';
+import { ColumnOrderSheet, MovedSheet, RdvSettingsSheet } from '../../components/RdvSheets';
+import { UpcomingSheet } from '../../components/UpcomingSheet';
+import { applyColumnOrder, movedBy, readColumnOrder, saveColumnOrder } from '../../utils/agendaRules';
 import { ListRow } from '../../components/ui';
 import { exportRdvCsv, exportRdvPdf } from '../../utils/exportRdv';
 
@@ -66,6 +70,32 @@ export function RendezVousScreen({ bottomSpace = 110 }: { bottomSpace?: number }
   const [addFor, setAddFor] = useState<{ date: string; time?: string; barberId?: string } | null>(null);
   const [toast, setToast] = useState('');
   const [exporting, setExporting] = useState<'' | 'csv' | 'pdf'>('');
+  const [order, setOrder] = useState<string[]>([]);
+  const [reorderOpen, setReorderOpen] = useState(false);
+  const [movedFor, setMovedFor] = useState<string | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [upOpen, setUpOpen] = useState(false);
+  const [nudgingId, setNudgingId] = useState<number | null>(null);
+
+  // Ordre des colonnes choisi sur cet appareil (web : glisser le nom d'un coiffeur).
+  useEffect(() => { void readColumnOrder(salonSlug).then(setOrder); }, [salonSlug]);
+
+  // Décalage « magique » de 5 min (client non prévenu) — règles : serveur.
+  const doNudge = async (a: AdminAppointment, minutes: number) => {
+    if (nudgingId) return;
+    setNudgingId(a.id);
+    try {
+      const r = await nudgeAppointment(salonSlug, auth, a.id, minutes);
+      setToast(r.client_time
+        ? `${a.client_name ?? 'Client'} : ${r.from} → ${r.to} (client non prévenu)`
+        : `${a.client_name ?? 'Client'} : remis à son heure (${r.to})`);
+      setReloadKey((k) => k + 1);
+    } catch (e) {
+      setToast(e instanceof ApiError ? e.message : 'Décalage impossible');
+    } finally {
+      setNudgingId(null);
+    }
+  };
 
   useEffect(() => {
     if (!toast) return;
@@ -150,7 +180,7 @@ export function RendezVousScreen({ bottomSpace = 110 }: { bottomSpace?: number }
 
   const bookableBarbers = barbers.filter((b) => b.active);
   // Colonnes du jour : coiffeurs actifs qui prennent des RDV (ou qui en ont un ce jour), filtre coiffeur compris.
-  const dayBarbers = bookableBarbers
+  const dayBarbers = applyColumnOrder(bookableBarbers, order)
     .filter((b) => b.accepts_appointments !== 0 || (byDay[date] ?? []).some((a) => String(a.barber_id) === String(b.id)))
     .filter((b) => barberFilter === 'all' || String(b.id) === barberFilter);
   const nowMin = salonNowMinutes(tz);
@@ -213,15 +243,22 @@ export function RendezVousScreen({ bottomSpace = 110 }: { bottomSpace?: number }
           <View style={{ flex: 1 }}>
             <PageTitle t={t} title="Rendez-vous" subtitle={subtitle} />
           </View>
-          {date !== today ? (
-            <TouchableOpacity style={styles.todayBtn} onPress={() => setDate(today)} accessibilityRole="button">
-              <Text style={styles.todayLabel}>Aujourd'hui</Text>
-            </TouchableOpacity>
-          ) : null}
+          <TouchableOpacity style={styles.iconBtn} onPress={() => setUpOpen(true)} accessibilityRole="button" accessibilityLabel="Liste À venir">
+            <Ionicons name="list" size={20} color={t.blue} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.iconBtn} onPress={() => setSettingsOpen(true)} accessibilityRole="button" accessibilityLabel="Paramètres des RDV">
+            <Ionicons name="settings-outline" size={19} color={t.blue} />
+          </TouchableOpacity>
           <TouchableOpacity style={styles.addBtn} onPress={() => setAddFor({ date })} accessibilityRole="button" accessibilityLabel="Ajouter un RDV">
             <Ionicons name="add" size={24} color="#fff" />
           </TouchableOpacity>
         </View>
+        {date !== today ? (
+          <TouchableOpacity onPress={() => setDate(today)} accessibilityRole="button" style={styles.todayLink}>
+            <Ionicons name="return-up-back" size={15} color={t.blue} />
+            <Text style={styles.todayLabel}>Revenir à aujourd'hui</Text>
+          </TouchableOpacity>
+        ) : null}
         {toast ? <View style={styles.toast}><Text style={styles.toastText}>{toast}</Text></View> : null}
 
         <Segmented
@@ -300,34 +337,26 @@ export function RendezVousScreen({ bottomSpace = 110 }: { bottomSpace?: number }
               isTablet={isTablet}
               onOpen={setOpen}
               onAdd={(time, barberId) => setAddFor({ date, time, barberId })}
+              onNudge={(a, m) => void doNudge(a, m)}
+              onMoved={setMovedFor}
+              onReorder={() => setReorderOpen(true)}
+              busyId={nudgingId}
             />
           </>
         ) : view === 'week' ? (
-          week.map((d) => (
-            <Card key={d} t={t} style={[styles.block, { marginBottom: 12 }]}>
-              <View style={styles.dayHeadRow}>
-                <Text style={[styles.dayHead, d === today && { color: t.blue }]}>
-                  {cap(fmt(d, { weekday: 'long', day: 'numeric', month: 'long' }))}
-                  <Text style={styles.dayCount}>{(byDay[d] ?? []).length ? `  ·  ${(byDay[d] ?? []).length} RDV` : ''}</Text>
-                </Text>
-                {d >= today ? (
-                  <TouchableOpacity onPress={() => setAddFor({ date: d })} hitSlop={8} accessibilityRole="button" accessibilityLabel={`Ajouter un RDV le ${d}`}>
-                    <Ionicons name="add-circle" size={24} color={t.blue} />
-                  </TouchableOpacity>
-                ) : null}
-              </View>
-              {(byDay[d] ?? []).length ? (
-                (byDay[d] ?? []).map((a) => (
-                  <View key={a.id} style={styles.tl}>
-                    <Text style={styles.tlHour}>{String(a.scheduled_at).slice(11, 16)}</Text>
-                    <View style={{ flex: 1 }}>{slotCard(a)}</View>
-                  </View>
-                ))
-              ) : (
-                <Text style={styles.none}>Aucun rendez-vous</Text>
-              )}
-            </Card>
-          ))
+          <WeekAgenda
+            t={t}
+            days={week}
+            byDay={byDay}
+            barbers={barbers}
+            todayYmd={today}
+            nowMin={nowMin}
+            isTablet={isTablet}
+            searchPool={all}
+            onOpen={setOpen}
+            onDay={(d) => { setDate(d); setView('day'); }}
+            onAdd={(d, time) => setAddFor({ date: d, time })}
+          />
         ) : (
           <MonthGrid t={t} month={date} today={today} counts={Object.fromEntries(Object.entries(byDay).map(([k, v]) => [k, v.length]))}
             onPick={(d) => { setDate(d); setView('day'); }} />
@@ -378,6 +407,45 @@ export function RendezVousScreen({ bottomSpace = 110 }: { bottomSpace?: number }
         onClose={() => setOpen(null)}
         onChanged={() => setReloadKey((k) => k + 1)}
         asPanel={isTablet}
+        nowMin={nowMin}
+      />
+
+      <ColumnOrderSheet
+        t={t}
+        visible={reorderOpen}
+        barbers={applyColumnOrder(bookableBarbers.filter((b) => b.accepts_appointments !== 0), order)}
+        allBarbers={barbers}
+        onClose={() => setReorderOpen(false)}
+        onSave={(ids) => { setOrder(ids); void saveColumnOrder(salonSlug, ids); setReorderOpen(false); }}
+      />
+      <MovedSheet
+        t={t}
+        visible={movedFor !== null}
+        barber={barbers.find((b) => String(b.id) === movedFor) ?? null}
+        items={(byDay[date] ?? []).filter((a) => String(a.barber_id) === movedFor && movedBy(a) !== 0)}
+        busyId={nudgingId}
+        onClose={() => setMovedFor(null)}
+        onRestore={(a, m) => void doNudge(a, m)}
+      />
+      <RdvSettingsSheet
+        t={t}
+        visible={settingsOpen}
+        salonSlug={salonSlug}
+        auth={auth}
+        onClose={() => setSettingsOpen(false)}
+        onSaved={() => setToast('Paramètres des RDV enregistrés')}
+      />
+      <UpcomingSheet
+        t={t}
+        visible={upOpen}
+        salonSlug={salonSlug}
+        auth={auth}
+        barbers={barbers}
+        todayYmd={today}
+        nowHm={`${String(Math.floor(nowMin / 60)).padStart(2, '0')}:${String(nowMin % 60).padStart(2, '0')}`}
+        onClose={() => setUpOpen(false)}
+        onOpen={(a) => { setUpOpen(false); setTimeout(() => setOpen(a), 450); }}
+        onChanged={() => setReloadKey((k) => k + 1)}
       />
     </View>
   );
@@ -443,9 +511,11 @@ function MonthGrid({ t, month, today, counts, onPick }: {
 const stylesFor = (t: Palette) =>
   StyleSheet.create({
     content: { paddingHorizontal: spacing.page, paddingTop: 4 },
-    titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+    titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
     todayBtn: { marginTop: 14, backgroundColor: t.blueSoft, borderRadius: 11, paddingVertical: 8, paddingHorizontal: 12 },
     todayLabel: { color: t.blue, fontSize: 14.5, fontWeight: '600' },
+    iconBtn: { marginTop: 12, width: 38, height: 38, borderRadius: 19, backgroundColor: t.blueSoft, alignItems: 'center', justifyContent: 'center' },
+    todayLink: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: -10, marginBottom: 12, marginLeft: 2 },
     addBtn: { marginTop: 12, width: 38, height: 38, borderRadius: 19, backgroundColor: t.blue, alignItems: 'center', justifyContent: 'center' },
     toast: { backgroundColor: t.greenSoft, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 12, marginBottom: 12 },
     toastText: { color: t.green, fontSize: 14.5, fontWeight: '600' },

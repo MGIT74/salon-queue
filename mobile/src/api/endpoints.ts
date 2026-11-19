@@ -505,3 +505,104 @@ export async function adminCreateAppointment(
     body: { ...body, products: [], force: false, force_ack: false, base_url: rdvPage },
   });
 }
+
+/** PUT /api/appointments/:id/nudge — décaler de ±5 min (client NON prévenu, ±5 min max de son heure réservée). */
+export async function nudgeAppointment(salonSlug: string, auth: ApiAuth, id: number, minutes: number): Promise<{ ok: true; from: string; to: string; minutes: number; client_time: string | null }> {
+  return apiRequest({ path: `api/appointments/${id}/nudge`, method: 'PUT', salonSlug, auth, body: { minutes } });
+}
+
+/** DELETE /api/appointments/:id — suppression définitive (admin). */
+export async function deleteAppointment(salonSlug: string, auth: ApiAuth, id: number): Promise<ApiOkResponse> {
+  return apiRequest<ApiOkResponse>({ path: `api/appointments/${id}`, method: 'DELETE', salonSlug, auth });
+}
+
+/**
+ * PUT /api/appointments/:id/services — « Modifier la prestation » (heure de début gardée).
+ * 409 code « overlap_confirm » : dépassement ≤ 10 min, renvoyer avec force: true après accord ;
+ * 409 code « no_room » : il faut déplacer le RDV. Le client reçoit un email.
+ */
+export async function updateAppointmentServices(
+  salonSlug: string,
+  auth: ApiAuth,
+  id: number,
+  body: { service_id: string; extras: string[]; force?: boolean }
+): Promise<{ ok: true; duration_min: number; price_cents: number; end_time: string; over_min: number; emailed: boolean }> {
+  return apiRequest({ path: `api/appointments/${id}/services`, method: 'PUT', salonSlug, auth, body: { ...body, force: body.force === true, base_url: clientEmailBaseUrl(salonSlug) } });
+}
+
+/** Passage d'historique (GET /api/queue/client-history-by-contact ou /:id/client-history). */
+export type ClientVisit = { id: number; checkin_at: string; service_name: string | null; total_price_cents: number | null; barber_name?: string | null; status?: string };
+
+export async function fetchClientHistory(
+  salonSlug: string,
+  auth: ApiAuth,
+  appt: { promoted_queue_id?: number | null; email?: string | null; phone?: string | null; client_name?: string | null }
+): Promise<{ ok: true; items: ClientVisit[] }> {
+  if (appt.promoted_queue_id) {
+    return apiRequest({ path: `api/queue/${appt.promoted_queue_id}/client-history`, salonSlug, auth });
+  }
+  return apiRequest({
+    path: 'api/queue/client-history-by-contact',
+    salonSlug,
+    auth,
+    query: { email: String(appt.email ?? ''), phone: String(appt.phone ?? ''), name: String(appt.client_name ?? '') },
+  });
+}
+
+/** GET /api/owner/client-marketing — fidélité et cadeaux du client (tiroir du web). */
+export type ClientMarketing = {
+  ok: true;
+  loyalty: { points: number; rewards_available: number; activated: boolean } | null;
+  loyalty_cards?: { card_id: string; name: string; points: number; activated: boolean }[];
+  gifts: { id: string; amount_cents: number; items: { item_name: string; quantity: number }[]; used_at: string | null }[];
+};
+
+export async function fetchClientMarketing(
+  salonSlug: string,
+  auth: ApiAuth,
+  c: { email?: string | null; phone?: string | null; client_name?: string | null }
+): Promise<ClientMarketing> {
+  return apiRequest({
+    path: 'api/owner/client-marketing',
+    salonSlug,
+    auth,
+    query: { email: String(c.email ?? ''), phone: String(c.phone ?? ''), name: String(c.client_name ?? '') },
+  });
+}
+
+/** Réglages RDV (GET / PUT /api/settings) — mêmes 6 champs que « Paramètres des rendez-vous » du web. */
+export type RdvSettings = {
+  rdv_slot_step_min: string;
+  rdv_min_lead_min: string;
+  rdv_max_advance_days: string;
+  rdv_buffer_min: string;
+  rdv_cancel_deadline_min: string;
+  rdv_prep_alert_min: string;
+};
+
+export async function fetchSettings(salonSlug: string, auth: ApiAuth): Promise<{ ok: true; settings: Record<string, unknown> }> {
+  return apiRequest({ path: 'api/settings', salonSlug, auth });
+}
+
+export async function saveRdvSettings(salonSlug: string, auth: ApiAuth, body: RdvSettings): Promise<ApiOkResponse> {
+  return apiRequest<ApiOkResponse>({ path: 'api/settings', method: 'PUT', salonSlug, auth, body });
+}
+
+/** GET /api/appointments?all=1 — tous statuts, du plus récent au plus ancien (500 max) : liste « À venir » du web. */
+export async function fetchAllAppointments(salonSlug: string, auth: ApiAuth): Promise<AdminAppointmentsResponse> {
+  return apiRequest<AdminAppointmentsResponse>({ path: 'api/appointments', salonSlug, auth, query: { all: '1' } });
+}
+
+/** POST /api/appointments/import — lots de 100 lignes max (aucun email envoyé). */
+export async function importAppointments(
+  salonSlug: string,
+  auth: ApiAuth,
+  rows: { line: number; date: string; time: string; client_name: string; email: string; phone: string; note: string; barber_id: string; service_id: string }[]
+): Promise<{ ok: true; inserted?: number; skipped?: number; overlaps?: number; errors?: { line: number; error: string }[] }> {
+  return apiRequest({ path: 'api/appointments/import', method: 'POST', salonSlug, auth, body: { rows } });
+}
+
+/** GET /api/catalog/services?all=1 (admin) — toutes les prestations, pour l'import. */
+export async function fetchAllServices(salonSlug: string, auth: ApiAuth): Promise<CatalogListResponse> {
+  return apiRequest<CatalogListResponse>({ path: 'api/catalog/services', salonSlug, auth, query: { all: '1' } });
+}

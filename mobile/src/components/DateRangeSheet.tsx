@@ -13,8 +13,11 @@ const WEEKDAYS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
 const fmt = (ymd: string) =>
   new Date(`${ymd}T12:00:00`).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
 
-export function DateRangeSheet({ t, visible, value, onClose, onApply }: {
+export function DateRangeSheet({ t, visible, value, onClose, onApply, allowFuture, title }: {
   t: Palette;
+  /** Dates futures autorisées (filtre « À venir »). Par défaut : non (statistiques). */
+  allowFuture?: boolean;
+  title?: string;
   visible: boolean;
   value: CustomRange;
   onClose: () => void;
@@ -58,7 +61,7 @@ export function DateRangeSheet({ t, visible, value, onClose, onApply }: {
     }
   };
 
-  const nextMonthDisabled = localDateStr(new Date(month.getFullYear(), month.getMonth() + 1, 1)) > today;
+  const nextMonthDisabled = !allowFuture && localDateStr(new Date(month.getFullYear(), month.getMonth() + 1, 1)) > today;
   const styles = stylesFor(t);
   const monthLabel = month.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
 
@@ -69,7 +72,7 @@ export function DateRangeSheet({ t, visible, value, onClose, onApply }: {
           <TouchableOpacity onPress={onClose} hitSlop={8} accessibilityRole="button">
             <Text style={styles.cancel}>Annuler</Text>
           </TouchableOpacity>
-          <Text style={styles.title}>Plage</Text>
+          <Text style={styles.title}>{title ?? 'Plage'}</Text>
           <TouchableOpacity
             onPress={() => onApply({ from, to: to ?? from })}
             disabled={!from}
@@ -112,7 +115,7 @@ export function DateRangeSheet({ t, visible, value, onClose, onApply }: {
             ))}
             {cells.map((ymd, i) => {
               if (!ymd) return <View key={`e${i}`} style={styles.cell} />;
-              const future = ymd > today;
+              const future = !allowFuture && ymd > today;
               const end = to ?? from;
               const isEdge = ymd === from || ymd === to;
               const inside = !!from && !!end && ymd > from && ymd < end;

@@ -3,11 +3,27 @@
 // interne. Toutes les règles restent côté serveur (RDV confirmé seulement,
 // encaissé = pas d'annulation, créneaux recalculés, emails au client).
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { ApiAuth, ApiError } from '../api/transport';
-import { adminCancelAppointment, fetchRescheduleSlots, rescheduleAppointment, saveAppointmentContact, saveAppointmentNote } from '../api/endpoints';
-import { AdminAppointment, AvailabilitySlot, BarberPublic } from '../types/api';
+import {
+  ClientMarketing,
+  ClientVisit,
+  adminCancelAppointment,
+  deleteAppointment,
+  fetchClientHistory,
+  fetchClientMarketing,
+  fetchExtras,
+  fetchRescheduleSlots,
+  fetchServices,
+  nudgeAppointment,
+  rescheduleAppointment,
+  saveAppointmentContact,
+  saveAppointmentNote,
+  updateAppointmentServices,
+} from '../api/endpoints';
+import { AdminAppointment, AvailabilitySlot, BarberPublic, CatalogItem } from '../types/api';
+import { movedBy, nudgeRoom } from '../utils/agendaRules';
 import { Palette, cardShadow, radius, spacing } from '../theme/theme';
 import { formatPriceCents } from '../utils/format';
 import { barberColorFor } from '../utils/barberColor';
@@ -15,7 +31,7 @@ import { Card } from './Card';
 import { Avatar, Chip, EmptyText, ErrorText, InlineLoading, ListRow, RowText } from './ui';
 import { LabeledField } from './AuthForm';
 
-type Mode = 'view' | 'move' | 'cancel';
+type Mode = 'view' | 'move' | 'cancel' | 'services';
 
 const STATUS: Record<string, { label: string; tone: 'green' | 'grey' | 'red' | 'blue' }> = {
   confirmed: { label: 'Confirmé', tone: 'blue' },
@@ -40,7 +56,7 @@ function errText(e: unknown) {
   return e instanceof ApiError ? e.message : 'Une erreur est survenue.';
 }
 
-export function AppointmentSheet({ t, visible, appt, barbers, salonSlug, auth, todayYmd, onClose, onChanged, asPanel }: {
+export function AppointmentSheet({ t, visible, appt, barbers, salonSlug, auth, todayYmd, nowMin, onClose, onChanged, asPanel }: {
   t: Palette;
   /** Tablette : panneau à droite (l'agenda reste visible) au lieu d'une feuille plein écran. */
   asPanel?: boolean;
@@ -51,6 +67,8 @@ export function AppointmentSheet({ t, visible, appt, barbers, salonSlug, auth, t
   auth: ApiAuth;
   /** Date du jour DU SALON (YYYY-MM-DD). */
   todayYmd: string;
+  /** Heure actuelle du salon (minutes) : pour savoir si le RDV peut encore être décalé. */
+  nowMin?: number;
   onClose: () => void;
   /** Après une action réussie : recharger l'agenda. */
   onChanged: () => void;
@@ -63,6 +81,10 @@ export function AppointmentSheet({ t, visible, appt, barbers, salonSlug, auth, t
   const [noteSaved, setNoteSaved] = useState(false);
   const [editContact, setEditContact] = useState(false);
   const [contact, setContact] = useState({ client_name: '', email: '', phone: '' });
+  const [history, setHistory] = useState<ClientVisit[] | null>(null);
+  const [marketing, setMarketing] = useState<ClientMarketing | null>(null);
+  const [nudging, setNudging] = useState(false);
+  const [info, setInfo] = useState('');
 
   useEffect(() => {
     if (!visible || !appt) return;
@@ -72,7 +94,12 @@ export function AppointmentSheet({ t, visible, appt, barbers, salonSlug, auth, t
     setNoteSaved(false);
     setEditContact(false);
     setContact({ client_name: appt.client_name ?? '', email: String(appt.email ?? ''), phone: String(appt.phone ?? '') });
-  }, [visible, appt]);
+    setInfo('');
+    setHistory(null);
+    setMarketing(null);
+    fetchClientHistory(salonSlug, auth, appt).then((r) => setHistory(r.items)).catch(() => setHistory([]));
+    fetchClientMarketing(salonSlug, auth, appt).then(setMarketing).catch(() => setMarketing(null));
+  }, [visible, appt, salonSlug, auth]);
 
   if (!appt) return null;
 
@@ -84,6 +111,38 @@ export function AppointmentSheet({ t, visible, appt, barbers, salonSlug, auth, t
   const editable = status === 'confirmed' && day >= todayYmd;
   const contactEditable = editable && !appt.promoted_queue_id;
   const color = barberColorFor(barbers, appt.barber_id);
+  const startMin = Number(start.slice(0, 2)) * 60 + Number(start.slice(3, 5));
+  const isFuture = day > todayYmd || (day === todayYmd && startMin > (nowMin ?? 0));
+  const room = nudgeRoom(appt, isFuture);
+  const moved = movedBy(appt);
+  const clientHm = appt.client_time ? String(appt.client_time).slice(11, 16) : start;
+
+  const nudge = async (minutes: number) => {
+    if (nudging) return;
+    setNudging(true);
+    setError('');
+    try {
+      const r = await nudgeAppointment(salonSlug, auth, appt.id, minutes);
+      setInfo(`${appt.client_name ?? 'Client'} : ${r.from} → ${r.to}${r.client_time ? ' (client non prévenu)' : ' — remis à son heure'}`);
+      onChanged();
+      onClose();
+    } catch (e) {
+      setError(errText(e));
+    } finally {
+      setNudging(false);
+    }
+  };
+
+  const remove = () => {
+    Alert.alert(
+      'Supprimer définitivement ?',
+      'Le rendez-vous sera effacé de l\'agenda et de l\'historique. Le client n\'est pas prévenu (utilisez « Annuler » pour le prévenir).',
+      [
+        { text: 'Garder', style: 'cancel' },
+        { text: 'Supprimer', style: 'destructive', onPress: () => void run(() => deleteAppointment(salonSlug, auth, appt.id), () => { onChanged(); onClose(); }) },
+      ]
+    );
+  };
 
   const run = async (fn: () => Promise<unknown>, after?: () => void) => {
     if (busy) return;
@@ -107,7 +166,7 @@ export function AppointmentSheet({ t, visible, appt, barbers, salonSlug, auth, t
               <Text style={styles.headAct}>‹ Retour</Text>
             </TouchableOpacity>
           )}
-          <Text style={styles.headTitle}>{mode === 'move' ? 'Déplacer le RDV' : mode === 'cancel' ? 'Annuler le RDV' : 'Rendez-vous'}</Text>
+          <Text style={styles.headTitle}>{mode === 'move' ? 'Déplacer le RDV' : mode === 'cancel' ? 'Annuler le RDV' : mode === 'services' ? 'Modifier la prestation' : 'Rendez-vous'}</Text>
           <TouchableOpacity onPress={onClose} hitSlop={8} accessibilityRole="button" style={{ width: 70, alignItems: 'flex-end' }}>
             <Text style={[styles.headAct, { fontWeight: '700' }]}>OK</Text>
           </TouchableOpacity>
@@ -118,7 +177,10 @@ export function AppointmentSheet({ t, visible, appt, barbers, salonSlug, auth, t
             <Avatar t={t} name={appt.client_name} color={color} size={56} />
             <View style={{ flex: 1 }}>
               <Text style={styles.name} numberOfLines={2}>{appt.client_name || 'Client'}</Text>
-              <Text style={styles.when}>{dayLabel(day)} · {start}{dur ? ` – ${addMinutes(start, dur)}` : ''}</Text>
+              <Text style={styles.when}>
+                {dayLabel(day)} · {start}{dur ? ` – ${addMinutes(start, dur)}` : ''}
+                {moved ? <Text style={{ color: t.orange, fontWeight: '700' }}>{`  ⇅ ${moved > 0 ? '+' : ''}${moved}`}</Text> : null}
+              </Text>
             </View>
             <Chip t={t} label={st.label} />
           </View>
@@ -126,6 +188,8 @@ export function AppointmentSheet({ t, visible, appt, barbers, salonSlug, auth, t
           {mode === 'move' ? (
             <MovePanel t={t} appt={appt} barbers={barbers} salonSlug={salonSlug} auth={auth} todayYmd={todayYmd}
               onDone={() => { onChanged(); onClose(); }} />
+          ) : mode === 'services' ? (
+            <ServicesPanel t={t} appt={appt} salonSlug={salonSlug} auth={auth} onDone={() => { onChanged(); onClose(); }} />
           ) : mode === 'cancel' ? (
             <CancelPanel t={t} busy={busy} error={error}
               hasEmail={!!appt.email}
@@ -157,18 +221,47 @@ export function AppointmentSheet({ t, visible, appt, barbers, salonSlug, auth, t
                 </Card>
               ) : null}
 
+              {info ? <Text style={styles.info}>{info}</Text> : null}
+
+              {room.up || room.down || moved ? (
+                <Card t={t} title="Décaler de 5 min (client non prévenu)" style={styles.block}>
+                  <View style={styles.btnRow}>
+                    <TouchableOpacity style={[styles.btn, styles.btnGrey, { height: 42 }, !room.up && { opacity: 0.35 }]} disabled={!room.up || nudging} onPress={() => void nudge(-5)} accessibilityRole="button">
+                      <Ionicons name="caret-up" size={15} color={t.ink} />
+                      <Text style={[styles.btnLabel, { color: t.ink, fontSize: 15.5 }]}>{addMinutes(start, -5)}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[styles.btn, styles.btnGrey, { height: 42 }, !room.down && { opacity: 0.35 }]} disabled={!room.down || nudging} onPress={() => void nudge(5)} accessibilityRole="button">
+                      <Ionicons name="caret-down" size={15} color={t.ink} />
+                      <Text style={[styles.btnLabel, { color: t.ink, fontSize: 15.5 }]}>{addMinutes(start, 5)}</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <Text style={styles.sub}>
+                    Heure réservée par le client : {clientHm}
+                  </Text>
+                  {moved && isFuture ? (
+                    <TouchableOpacity onPress={() => void nudge(-moved)} disabled={nudging} accessibilityRole="button">
+                      <Text style={{ color: t.blue, fontSize: 15, fontWeight: '600', marginTop: 4 }}>↩ Remettre à {clientHm}</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </Card>
+              ) : null}
+
               {editable ? (
                 <>
-                  <View style={styles.btnRow}>
+                  <TouchableOpacity style={[styles.btn, styles.btnSoft, { flex: 0, marginBottom: 12 }]} onPress={() => setMode('services')} accessibilityRole="button">
+                    <Ionicons name="create-outline" size={18} color={t.blue} />
+                    <Text style={[styles.btnLabel, { color: t.blue }]}>Modifier la prestation</Text>
+                  </TouchableOpacity>
+                  <View style={[styles.btnRow, { marginBottom: spacing.block }]}>
                     <TouchableOpacity style={[styles.btn, styles.btnSoft]} onPress={() => setMode('move')} accessibilityRole="button">
                       <Ionicons name="swap-horizontal" size={18} color={t.blue} />
                       <Text style={[styles.btnLabel, { color: t.blue }]}>Déplacer</Text>
                     </TouchableOpacity>
+                    <TouchableOpacity style={[styles.btn, { backgroundColor: t.redSoft }]} onPress={() => setMode('cancel')} accessibilityRole="button">
+                      <Ionicons name="close" size={18} color={t.red} />
+                      <Text style={[styles.btnLabel, { color: t.red }]}>Annuler</Text>
+                    </TouchableOpacity>
                   </View>
-                  <TouchableOpacity style={[styles.btn, { backgroundColor: t.redSoft, marginBottom: spacing.block }]} onPress={() => setMode('cancel')} accessibilityRole="button">
-                    <Ionicons name="close" size={18} color={t.red} />
-                    <Text style={[styles.btnLabel, { color: t.red }]}>Annuler le RDV</Text>
-                  </TouchableOpacity>
                 </>
               ) : null}
 
@@ -224,7 +317,47 @@ export function AppointmentSheet({ t, visible, appt, barbers, salonSlug, auth, t
                 ) : null}
               </Card>
 
+              <Card t={t} flush title={`Historique des passages${history && history.length ? ` · ${history.length}` : ''}`} style={styles.block}>
+                {history === null ? <InlineLoading t={t} /> : history.length === 0 ? (
+                  <View style={{ padding: spacing.md }}><Text style={styles.text}>Aucun passage enregistré</Text></View>
+                ) : history.slice(0, 4).map((v, i) => (
+                  <ListRow key={v.id} t={t} first={i === 0}
+                    right={v.total_price_cents ? <Text style={styles.sub}>{formatPriceCents(v.total_price_cents)}</Text> : undefined}>
+                    <RowText t={t} title={v.service_name || 'Prestation'}
+                      meta={new Date(v.checkin_at).toLocaleString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })} />
+                  </ListRow>
+                ))}
+              </Card>
+
+              {marketing ? (
+                <Card t={t} flush title="Marketing" style={styles.block}>
+                  {(marketing.loyalty_cards ?? []).some((c) => c.activated) ? (
+                    (marketing.loyalty_cards ?? []).filter((c) => c.activated).map((c, i) => (
+                      <ListRow key={c.card_id} t={t} first={i === 0} right={<Text style={styles.amt}>{c.points} pt{c.points > 1 ? 's' : ''}</Text>}>
+                        <RowText t={t} title={`⭐ ${c.name}`} />
+                      </ListRow>
+                    ))
+                  ) : marketing.loyalty && marketing.loyalty.activated ? (
+                    <ListRow t={t} first right={<Text style={styles.amt}>{marketing.loyalty.points} pt{marketing.loyalty.points > 1 ? 's' : ''}</Text>}>
+                      <RowText t={t} title="⭐ Fidélité" />
+                    </ListRow>
+                  ) : (
+                    <View style={{ padding: spacing.md, paddingBottom: 6 }}><Text style={styles.text}>Carte de fidélité non activée</Text></View>
+                  )}
+                  {marketing.gifts.map((g) => (
+                    <ListRow key={g.id} t={t} right={<Text style={[styles.amt, { color: g.used_at ? t.grey : t.green }]}>{formatPriceCents(g.amount_cents)}</Text>}>
+                      <RowText t={t} title={g.used_at ? '🎁 Cadeau utilisé' : '🎁 Cadeau disponible'} meta={g.items.map((it) => `${it.quantity} × ${it.item_name}`).join(', ')} />
+                    </ListRow>
+                  ))}
+                </Card>
+              ) : null}
+
               {error ? <ErrorText t={t} text={error} /> : null}
+
+              <TouchableOpacity style={[styles.btn, { flex: 0, backgroundColor: 'transparent', borderWidth: 1, borderColor: t.redSoft, marginBottom: 20 }]} onPress={remove} accessibilityRole="button">
+                <Ionicons name="trash-outline" size={17} color={t.red} />
+                <Text style={[styles.btnLabel, { color: t.red, fontSize: 15.5 }]}>Supprimer définitivement</Text>
+              </TouchableOpacity>
             </>
           )}
         </ScrollView>
@@ -354,6 +487,88 @@ function MovePanel({ t, appt, barbers, salonSlug, auth, todayYmd, onDone }: {
   );
 }
 
+/* ---------- Modifier la prestation (web : PUT :id/services, heure de début gardée) ---------- */
+
+function ServicesPanel({ t, appt, salonSlug, auth, onDone }: {
+  t: Palette; appt: AdminAppointment; salonSlug: string; auth: ApiAuth; onDone: () => void;
+}) {
+  const styles = stylesFor(t);
+  const [services, setServices] = useState<CatalogItem[] | null>(null);
+  const [extras, setExtras] = useState<CatalogItem[]>([]);
+  const [serviceId, setServiceId] = useState<string>(String(appt.service_id ?? ''));
+  const [extraIds, setExtraIds] = useState<string[]>((appt.pricing?.extras ?? []).map((x) => String(x.id)));
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState('');
+
+  useEffect(() => {
+    Promise.all([fetchServices(salonSlug), fetchExtras(salonSlug)])
+      .then(([sv, x]) => { setServices(sv.items.filter((i) => i.active !== 0)); setExtras(x.items.filter((i) => i.active !== 0)); })
+      .catch((e) => setErr(errText(e)));
+  }, [salonSlug]);
+
+  const save = async (force = false) => {
+    if (!serviceId || saving) return;
+    setSaving(true);
+    setErr('');
+    try {
+      await updateAppointmentServices(salonSlug, auth, appt.id, { service_id: serviceId, extras: extraIds, force });
+      onDone();
+    } catch (e) {
+      const code = e instanceof ApiError ? (e as ApiError & { code?: string }).message : '';
+      // Dépassement de 10 min au plus : on demande l'accord (comme le web), puis on force.
+      if (e instanceof ApiError && e.status === 409 && /dépasse de \d+ min/.test(e.message) && !/Pas assez de place/.test(e.message)) {
+        Alert.alert('Ça dépasse un peu', `${e.message} Enregistrer quand même ?`, [
+          { text: 'Annuler', style: 'cancel' },
+          { text: 'Enregistrer', onPress: () => void save(true) },
+        ]);
+      } else {
+        setErr(code || errText(e));
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!services) return err ? <ErrorText t={t} text={err} /> : <InlineLoading t={t} />;
+  return (
+    <View>
+      <Text style={styles.label}>Prestation</Text>
+      <Card t={t} flush style={styles.block}>
+        {services.map((sv, i) => (
+          <ListRow key={sv.id} t={t} first={i === 0} inset={50} onPress={() => setServiceId(sv.id)}
+            left={<Ionicons name={serviceId === sv.id ? 'checkmark-circle' : 'ellipse-outline'} size={24} color={serviceId === sv.id ? t.blue : t.sep} />}
+            right={<Text style={styles.amt}>{formatPriceCents(sv.price_cents)}</Text>}>
+            <RowText t={t} title={sv.name} meta={`${sv.duration_min} min`} />
+          </ListRow>
+        ))}
+      </Card>
+      {extras.length ? (
+        <>
+          <Text style={styles.label}>Suppléments</Text>
+          <Card t={t} flush style={styles.block}>
+            {extras.map((x, i) => {
+              const on = extraIds.includes(String(x.id));
+              return (
+                <ListRow key={x.id} t={t} first={i === 0} inset={50}
+                  onPress={() => setExtraIds(on ? extraIds.filter((id) => id !== String(x.id)) : [...extraIds, String(x.id)])}
+                  left={<Ionicons name={on ? 'checkbox' : 'square-outline'} size={22} color={on ? t.blue : t.sep} />}
+                  right={<Text style={styles.amt}>+ {formatPriceCents(x.price_cents)}</Text>}>
+                  <RowText t={t} title={x.name} meta={x.duration_min ? `+ ${x.duration_min} min` : undefined} />
+                </ListRow>
+              );
+            })}
+          </Card>
+        </>
+      ) : null}
+      {err ? <ErrorText t={t} text={err} /> : null}
+      <TouchableOpacity style={[styles.btn, { flex: 0, backgroundColor: t.blue }]} disabled={saving} onPress={() => void save(false)} accessibilityRole="button">
+        {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnLabel}>Enregistrer</Text>}
+      </TouchableOpacity>
+      <Text style={styles.hint}>L'heure de début est gardée ; prix et durée du coiffeur. Le client reçoit un email.</Text>
+    </View>
+  );
+}
+
 /* ---------- Annuler : message par défaut ou personnalisé (web : admin-cancel) ---------- */
 
 function CancelPanel({ t, busy, error, hasEmail, onConfirm }: {
@@ -433,4 +648,5 @@ const stylesFor = (t: Palette) =>
     slot: { width: '23%', alignItems: 'center', paddingVertical: 11, borderRadius: radius.button, backgroundColor: t.card, ...cardShadow(t) },
     slotText: { color: t.ink, fontSize: 15, fontWeight: '600', fontVariant: ['tabular-nums'] },
     hint: { color: t.grey, fontSize: 13, textAlign: 'center', marginTop: 10 },
+    info: { color: t.green, backgroundColor: t.greenSoft, borderRadius: 12, padding: 10, fontSize: 14, fontWeight: '600', marginBottom: 12, overflow: 'hidden' },
   });
