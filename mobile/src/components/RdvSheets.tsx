@@ -1,6 +1,4 @@
 // Feuilles de l'agenda (maquette maquette-agenda.html, validée) :
-// - ColumnOrderSheet : ordre des colonnes (web : glisser le nom d'un coiffeur),
-//   gardé sur l'appareil ;
 // - MovedSheet : RDV décalés de 5 min d'un coiffeur + « Remettre à l'heure du client » ;
 // - RdvSettingsSheet : « Paramètres des rendez-vous » (6 réglages du web).
 import React, { useEffect, useState } from 'react';
@@ -31,52 +29,6 @@ function SheetHead({ t, left, title, right, onLeft, onRight, rightBusy }: {
 }
 
 /* ============================ Ordre des colonnes ============================ */
-
-export function ColumnOrderSheet({ t, visible, barbers, allBarbers, onClose, onSave }: {
-  t: Palette; visible: boolean; barbers: BarberPublic[]; allBarbers: BarberPublic[]; onClose: () => void; onSave: (ids: string[]) => void;
-}) {
-  const [list, setList] = useState<BarberPublic[]>(barbers);
-  useEffect(() => { if (visible) setList(barbers); }, [visible, barbers]);
-  const move = (i: number, dir: -1 | 1) => {
-    const j = i + dir;
-    if (j < 0 || j >= list.length) return;
-    const next = list.slice();
-    [next[i], next[j]] = [next[j], next[i]];
-    setList(next);
-  };
-  return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View style={{ flex: 1, backgroundColor: t.bg }}>
-        <SheetHead t={t} left="Annuler" onLeft={onClose} title="Ordre des colonnes" right="OK" onRight={() => onSave(list.map((b) => String(b.id)))} />
-        <ScrollView contentContainerStyle={{ paddingHorizontal: spacing.page, paddingBottom: 40 }}>
-          <Text style={{ color: t.grey, fontSize: 13.5, marginHorizontal: 4, marginBottom: 12 }}>
-            Montez ou descendez les coiffeurs : le premier est la colonne de gauche. Ordre gardé sur cet appareil, comme sur le web.
-          </Text>
-          <Card t={t} flush>
-            {list.map((b, i) => (
-              <ListRow key={b.id} t={t} first={i === 0} inset={62}
-                left={<Avatar t={t} name={b.name} color={barberColorFor(allBarbers, b.id)} />}
-                right={
-                  <View style={{ flexDirection: 'row', gap: 6 }}>
-                    <TouchableOpacity onPress={() => move(i, -1)} disabled={i === 0} style={[styles(t).arrow, i === 0 && { opacity: 0.3 }]} accessibilityRole="button" accessibilityLabel={`Monter ${b.name}`}>
-                      <Ionicons name="chevron-up" size={18} color={t.blue} />
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => move(i, 1)} disabled={i === list.length - 1} style={[styles(t).arrow, i === list.length - 1 && { opacity: 0.3 }]} accessibilityRole="button" accessibilityLabel={`Descendre ${b.name}`}>
-                      <Ionicons name="chevron-down" size={18} color={t.blue} />
-                    </TouchableOpacity>
-                  </View>
-                }>
-                <RowText t={t} title={b.name} meta={`Colonne ${i + 1}`} />
-              </ListRow>
-            ))}
-          </Card>
-        </ScrollView>
-      </View>
-    </Modal>
-  );
-}
-
-/* ============================ RDV décalés ============================ */
 
 export function MovedSheet({ t, visible, barber, items, busyId, onClose, onRestore }: {
   t: Palette; visible: boolean; barber: BarberPublic | null; items: AdminAppointment[]; busyId: number | null;

@@ -21,8 +21,8 @@ import { AppointmentSheet } from '../../components/AppointmentSheet';
 import { AddAppointmentSheet } from '../../components/AddAppointmentSheet';
 import { DayColumns, DayGlance } from '../../components/DayAgenda';
 import { WeekAgenda } from '../../components/WeekAgenda';
-import { ColumnOrderSheet, MovedSheet, RdvSettingsSheet } from '../../components/RdvSheets';
-import { UpcomingSheet } from '../../components/UpcomingSheet';
+import { MovedSheet, RdvSettingsSheet } from '../../components/RdvSheets';
+import { UpcomingList } from '../../components/UpcomingList';
 import { applyColumnOrder, movedBy, readColumnOrder, saveColumnOrder } from '../../utils/agendaRules';
 import { ListRow } from '../../components/ui';
 import { exportRdvCsv, exportRdvPdf } from '../../utils/exportRdv';
@@ -71,10 +71,9 @@ export function RendezVousScreen({ bottomSpace = 110 }: { bottomSpace?: number }
   const [toast, setToast] = useState('');
   const [exporting, setExporting] = useState<'' | 'csv' | 'pdf'>('');
   const [order, setOrder] = useState<string[]>([]);
-  const [reorderOpen, setReorderOpen] = useState(false);
+  const [dragging, setDragging] = useState(false);
   const [movedFor, setMovedFor] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [upOpen, setUpOpen] = useState(false);
   const [nudgingId, setNudgingId] = useState<number | null>(null);
 
   // Ordre des colonnes choisi sur cet appareil (web : glisser le nom d'un coiffeur).
@@ -236,6 +235,7 @@ export function RendezVousScreen({ bottomSpace = 110 }: { bottomSpace?: number }
   return (
     <View style={{ flex: 1 }}>
       <ScrollView
+        scrollEnabled={!dragging}
         contentContainerStyle={[styles.content, { paddingBottom: bottomSpace }, isTablet && { paddingHorizontal: 28, paddingTop: 16 }]}
         refreshControl={<RefreshControl refreshing={false} onRefresh={() => setReloadKey((k) => k + 1)} tintColor={t.blue} />}
       >
@@ -243,9 +243,6 @@ export function RendezVousScreen({ bottomSpace = 110 }: { bottomSpace?: number }
           <View style={{ flex: 1 }}>
             <PageTitle t={t} title="Rendez-vous" subtitle={subtitle} />
           </View>
-          <TouchableOpacity style={styles.iconBtn} onPress={() => setUpOpen(true)} accessibilityRole="button" accessibilityLabel="Liste À venir">
-            <Ionicons name="list" size={20} color={t.blue} />
-          </TouchableOpacity>
           <TouchableOpacity style={styles.iconBtn} onPress={() => setSettingsOpen(true)} accessibilityRole="button" accessibilityLabel="Paramètres des RDV">
             <Ionicons name="settings-outline" size={19} color={t.blue} />
           </TouchableOpacity>
@@ -339,7 +336,13 @@ export function RendezVousScreen({ bottomSpace = 110 }: { bottomSpace?: number }
               onAdd={(time, barberId) => setAddFor({ date, time, barberId })}
               onNudge={(a, m) => void doNudge(a, m)}
               onMoved={setMovedFor}
-              onReorder={() => setReorderOpen(true)}
+              onReorderIds={(ids) => {
+                // Colonnes affichées dans le nouvel ordre, puis les autres coiffeurs à leur place.
+                const next = [...ids, ...applyColumnOrder(barbers, order).map((b) => String(b.id)).filter((id) => !ids.includes(id))];
+                setOrder(next);
+                void saveColumnOrder(salonSlug, next);
+              }}
+              onDragging={setDragging}
               busyId={nudgingId}
             />
           </>
@@ -361,6 +364,19 @@ export function RendezVousScreen({ bottomSpace = 110 }: { bottomSpace?: number }
           <MonthGrid t={t} month={date} today={today} counts={Object.fromEntries(Object.entries(byDay).map(([k, v]) => [k, v.length]))}
             onPick={(d) => { setDate(d); setView('day'); }} />
         )}
+
+        <UpcomingList
+          t={t}
+          salonSlug={salonSlug}
+          auth={auth}
+          barbers={barbers}
+          todayYmd={today}
+          nowHm={`${String(Math.floor(nowMin / 60)).padStart(2, '0')}:${String(nowMin % 60).padStart(2, '0')}`}
+          day={view === 'day' && date !== today ? date : null}
+          reloadKey={reloadKey}
+          onOpen={setOpen}
+          onChanged={() => setReloadKey((k) => k + 1)}
+        />
 
         {hasMonth ? (
           <>
@@ -410,14 +426,6 @@ export function RendezVousScreen({ bottomSpace = 110 }: { bottomSpace?: number }
         nowMin={nowMin}
       />
 
-      <ColumnOrderSheet
-        t={t}
-        visible={reorderOpen}
-        barbers={applyColumnOrder(bookableBarbers.filter((b) => b.accepts_appointments !== 0), order)}
-        allBarbers={barbers}
-        onClose={() => setReorderOpen(false)}
-        onSave={(ids) => { setOrder(ids); void saveColumnOrder(salonSlug, ids); setReorderOpen(false); }}
-      />
       <MovedSheet
         t={t}
         visible={movedFor !== null}
@@ -434,18 +442,6 @@ export function RendezVousScreen({ bottomSpace = 110 }: { bottomSpace?: number }
         auth={auth}
         onClose={() => setSettingsOpen(false)}
         onSaved={() => setToast('Paramètres des RDV enregistrés')}
-      />
-      <UpcomingSheet
-        t={t}
-        visible={upOpen}
-        salonSlug={salonSlug}
-        auth={auth}
-        barbers={barbers}
-        todayYmd={today}
-        nowHm={`${String(Math.floor(nowMin / 60)).padStart(2, '0')}:${String(nowMin % 60).padStart(2, '0')}`}
-        onClose={() => setUpOpen(false)}
-        onOpen={(a) => { setUpOpen(false); setTimeout(() => setOpen(a), 450); }}
-        onChanged={() => setReloadKey((k) => k + 1)}
       />
     </View>
   );

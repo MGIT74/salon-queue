@@ -6,8 +6,8 @@
 //    congés et heures non travaillées hachurés ; ligne « maintenant » ;
 //    toucher une case libre → « + HH:MM » pour ajouter un RDV à cette heure.
 // Horaires, pauses, congés : GET /api/barbers ; RDV : GET /api/appointments.
-import React, { useMemo, useState } from 'react';
-import { LayoutChangeEvent, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, LayoutChangeEvent, PanResponder, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AdminAppointment, BarberPublic } from '../types/api';
 import { Palette, cardShadow, spacing } from '../theme/theme';
@@ -226,7 +226,7 @@ const glanceStyles = (t: Palette) =>
 
 /* =============================== Colonnes =============================== */
 
-export function DayColumns({ t, barbers, allBarbers, items, date, todayYmd, nowMin, isTablet, onOpen, onAdd, onNudge, onMoved, onReorder, busyId }: {
+export function DayColumns({ t, barbers, allBarbers, items, date, todayYmd, nowMin, isTablet, onOpen, onAdd, onNudge, onMoved, onReorderIds, onDragging, busyId }: {
   t: Palette;
   /** Coiffeurs affichés (filtre compris). */
   barbers: BarberPublic[];
@@ -244,8 +244,10 @@ export function DayColumns({ t, barbers, allBarbers, items, date, todayYmd, nowM
   onNudge: (a: AdminAppointment, minutes: number) => void;
   /** Liste des RDV décalés d'un coiffeur (pastille ⇅ de l'en-tête). */
   onMoved: (barberId: string) => void;
-  /** Ouvrir « Ordre des colonnes ». */
-  onReorder: () => void;
+  /** Nouvel ordre des colonnes après un glisser (ids des coiffeurs affichés). */
+  onReorderIds: (ids: string[]) => void;
+  /** Glisser en cours : l'écran bloque son défilement vertical. */
+  onDragging?: (on: boolean) => void;
   /** RDV en cours de décalage (flèches désactivées). */
   busyId?: number | null;
 }) {
@@ -254,6 +256,15 @@ export function DayColumns({ t, barbers, allBarbers, items, date, todayYmd, nowM
   const [width, setWidth] = useState(0);
   const [pick, setPick] = useState<{ barberId: string; min: number } | null>(null);
   const pxm = ZOOMS[zoom];
+  // Glisser une colonne (web : glisser le nom d'un coiffeur à gauche / à droite).
+  const [drag, setDrag] = useState<{ from: number; to: number } | null>(null);
+  const dragX = useRef(new Animated.Value(0)).current;
+  const dragRef = useRef<{ from: number; to: number; dx: number; startScroll: number; pageX: number } | null>(null);
+  const scrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
+  const scrollX = useRef(0);
+  const boxRef = useRef<React.ComponentRef<typeof View>>(null);
+  const box = useRef({ x: 0, w: 0 });
+  const autoTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Plage horaire : 8h – 20h, élargie si un RDV ou un horaire en dépasse.
   const visible = items.filter((a) => a.display_status !== 'cancelled');
@@ -269,20 +280,88 @@ export function DayColumns({ t, barbers, allBarbers, items, date, todayYmd, nowM
   const hours: number[] = [];
   for (let m = START; m <= END; m += 30) hours.push(m);
 
+  const maxScroll = Math.max(0, n * colW - (width - GUTTER));
+  const update = () => {
+    const d = dragRef.current;
+    if (!d) return;
+    const eff = d.dx + (scrollX.current - d.startScroll);
+    dragX.setValue(eff);
+    const to = Math.max(0, Math.min(n - 1, Math.round(d.from + eff / colW)));
+    if (to !== d.to) { d.to = to; setDrag({ from: d.from, to }); }
+  };
+  const dragApi = {
+    enabled: barbers.length > 1,
+    fit,
+    start: (i: number, pageX: number) => {
+      dragRef.current = { from: i, to: i, dx: 0, startScroll: scrollX.current, pageX };
+      dragX.setValue(0);
+      setDrag({ from: i, to: i });
+      onDragging?.(true);
+      boxRef.current?.measureInWindow((x: number, _y: number, w: number) => { box.current = { x, w }; });
+      if (!fit) {
+        // Près du bord : l'agenda défile tout seul pour atteindre les colonnes cachées.
+        autoTimer.current = setInterval(() => {
+          const d = dragRef.current;
+          if (!d || !box.current.w) return;
+          let step = 0;
+          if (d.pageX > box.current.x + box.current.w - 44) step = 9;
+          else if (d.pageX < box.current.x + GUTTER + 44) step = -9;
+          if (!step) return;
+          const next = Math.max(0, Math.min(maxScroll, scrollX.current + step));
+          if (next === scrollX.current) return;
+          scrollX.current = next;
+          scrollRef.current?.scrollTo({ x: next, animated: false });
+          update();
+        }, 16);
+      }
+    },
+    move: (dx: number, pageX: number) => {
+      const d = dragRef.current;
+      if (!d) return;
+      d.dx = dx; d.pageX = pageX;
+      update();
+    },
+    end: (commit: boolean) => {
+      if (autoTimer.current) { clearInterval(autoTimer.current); autoTimer.current = null; }
+      const d = dragRef.current;
+      dragRef.current = null;
+      setDrag(null);
+      dragX.setValue(0);
+      onDragging?.(false);
+      if (commit && d && d.to !== d.from) {
+        const ids = barbers.map((b) => String(b.id));
+        const [m] = ids.splice(d.from, 1);
+        ids.splice(d.to, 0, m);
+        onReorderIds(ids);
+      }
+    },
+  };
+  useEffect(() => () => { if (autoTimer.current) clearInterval(autoTimer.current); }, []);
+
   const tapCol = (barberId: string, locY: number) => {
     const m = Math.round((START + locY / pxm) / 15) * 15;
     if (m < START || m >= END) return;
     setPick({ barberId, min: m });
   };
 
-  const columns = barbers.map((b) => {
+  const colDragStyle = (i: number) => {
+    if (!drag) return null;
+    if (i === drag.from) return [styles.lifted, { opacity: 0.96, transform: [{ translateX: dragX }] }];
+    let shift = 0;
+    if (drag.from < drag.to && i > drag.from && i <= drag.to) shift = -colW;
+    else if (drag.from > drag.to && i >= drag.to && i < drag.from) shift = colW;
+    return shift ? { transform: [{ translateX: shift }] } : null;
+  };
+
+  const columns = barbers.map((b, i) => {
     const color = barberColorFor(allBarbers, b.id);
     const info = dayInfo(b, date, START, END);
     const mine = visible.filter((a) => String(a.barber_id) === String(b.id));
     const movedCount = mine.filter((a) => movedBy(a) !== 0).length;
     return (
-      <View key={b.id} style={[styles.col, { width: colW }]}>
-        <View style={styles.colHead}>
+      <Animated.View key={b.id} style={[styles.col, { width: colW }, colDragStyle(i)]}>
+        <DragHead index={i} api={dragApi} style={[styles.colHead, drag?.from === i && { backgroundColor: t.blueSoft }]}
+          label={`${b.name} : maintenir puis glisser pour changer l'ordre`}>
           <Avatar t={t} name={b.name} color={color} size={26} />
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={styles.colName} numberOfLines={1}>{b.name}</Text>
@@ -294,7 +373,7 @@ export function DayColumns({ t, barbers, allBarbers, items, date, todayYmd, nowM
               <Text style={styles.mBadgeTxt}>⇅ {movedCount}</Text>
             </TouchableOpacity>
           ) : null}
-        </View>
+        </DragHead>
         <Pressable style={{ height: H }} onPress={(e) => tapCol(String(b.id), e.nativeEvent.locationY)}>
           {hours.map((m) => <View key={m} style={[styles.hl, { top: y(m) }, m % 60 !== 0 && { opacity: 0.5 }]} />)}
           {info.fullOff ? (
@@ -371,7 +450,7 @@ export function DayColumns({ t, barbers, allBarbers, items, date, todayYmd, nowM
             </TouchableOpacity>
           ) : null}
         </Pressable>
-      </View>
+      </Animated.View>
     );
   });
 
@@ -379,12 +458,6 @@ export function DayColumns({ t, barbers, allBarbers, items, date, todayYmd, nowM
     <View style={styles.card}>
       <View style={styles.head}>
         <Text style={styles.count} numberOfLines={1}>{visible.length} RDV{isTablet ? ' ce jour' : ''}</Text>
-        {barbers.length > 1 ? (
-          <TouchableOpacity style={styles.reorder} onPress={onReorder} accessibilityRole="button" accessibilityLabel="Réorganiser les colonnes">
-            <Ionicons name="reorder-three" size={18} color={t.blue} />
-            {isTablet ? <Text style={styles.reorderTxt}>Réorganiser</Text> : null}
-          </TouchableOpacity>
-        ) : null}
         <View style={styles.zoom}>
           <TouchableOpacity onPress={() => setZoom(Math.max(0, zoom - 1))} hitSlop={8} accessibilityRole="button" accessibilityLabel="Dézoomer">
             <Ionicons name="remove" size={18} color={zoom === 0 ? t.sep : t.ink} />
@@ -400,7 +473,7 @@ export function DayColumns({ t, barbers, allBarbers, items, date, todayYmd, nowM
         </TouchableOpacity>
       </View>
 
-      <View style={{ flexDirection: 'row' }} onLayout={(e: LayoutChangeEvent) => setWidth(e.nativeEvent.layout.width)}>
+      <View ref={boxRef} style={{ flexDirection: 'row' }} onLayout={(e: LayoutChangeEvent) => setWidth(e.nativeEvent.layout.width)}>
         <View style={{ width: GUTTER, height: H + HEAD_H }}>
           {hours.map((m) => (
             <Text key={m} style={[styles.hour, { top: HEAD_H + y(m) - 7 }, m % 60 === 0 ? styles.hourStrong : null]}>{hm(m)}</Text>
@@ -409,7 +482,8 @@ export function DayColumns({ t, barbers, allBarbers, items, date, todayYmd, nowM
         {fit ? (
           <View style={{ flexDirection: 'row', flex: 1 }}>{columns}</View>
         ) : (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>{columns}</ScrollView>
+          <ScrollView ref={scrollRef} horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} scrollEnabled={!drag}
+            scrollEventThrottle={16} onScroll={(e) => { if (!dragRef.current) scrollX.current = e.nativeEvent.contentOffset.x; }}>{columns}</ScrollView>
         )}
         {date === todayYmd && nowMin >= START && nowMin <= END ? (
           <View pointerEvents="none" style={[styles.now, { top: HEAD_H + y(nowMin) }]}>
@@ -417,7 +491,10 @@ export function DayColumns({ t, barbers, allBarbers, items, date, todayYmd, nowM
           </View>
         ) : null}
       </View>
-      <Text style={styles.tip}>Touchez une case libre pour ajouter un RDV à cette heure.</Text>
+      <Text style={styles.tip}>
+        Touchez une case libre pour ajouter un RDV à cette heure.
+        {barbers.length > 1 ? (isTablet ? '\nGlissez le nom d\'un coiffeur à gauche ou à droite pour changer l\'ordre.' : '\nMaintenez le nom d\'un coiffeur puis glissez-le pour changer l\'ordre.') : ''}
+      </Text>
     </View>
   );
 }
@@ -457,6 +534,53 @@ const colStyles = (t: Palette) =>
     movedTag: { color: t.orange, fontSize: 10.5, fontWeight: '700' },
     nudges: { position: 'absolute', right: 4, top: 4, gap: 3 },
     nudge: { width: 22, height: 18, borderRadius: 6, backgroundColor: t.card, alignItems: 'center', justifyContent: 'center', ...cardShadow(t) },
-    reorder: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 34, paddingHorizontal: 10, borderRadius: 17, backgroundColor: t.blueSoft },
-    reorderTxt: { color: t.blue, fontSize: 14, fontWeight: '600' },
+    lifted: { zIndex: 10, elevation: 10, shadowColor: '#000', shadowOpacity: 0.22, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, backgroundColor: t.card },
   });
+
+/* En-tête de colonne glissable : maintenir (ou, sur tablette, glisser
+   directement à l'horizontale) puis déplacer à gauche / à droite. */
+type DragApi = { enabled: boolean; fit: boolean; start: (i: number, pageX: number) => void; move: (dx: number, pageX: number) => void; end: (commit: boolean) => void };
+function DragHead({ index, api, style, label, children }: { index: number; api: DragApi; style: object; label: string; children: React.ReactNode }) {
+  const apiRef = useRef(api);
+  apiRef.current = api;
+  const idx = useRef(index);
+  idx.current = index;
+  const armed = useRef(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stop = (commit: boolean) => {
+    if (timer.current) { clearTimeout(timer.current); timer.current = null; }
+    if (armed.current) apiRef.current.end(commit);
+    armed.current = false;
+  };
+  const pr = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => apiRef.current.enabled,
+      onPanResponderGrant: (e) => {
+        armed.current = false;
+        const px = e.nativeEvent.pageX;
+        timer.current = setTimeout(() => { armed.current = true; apiRef.current.start(idx.current, px); }, 220);
+      },
+      onPanResponderMove: (e, g) => {
+        if (!armed.current) {
+          if (apiRef.current.fit && Math.abs(g.dx) > 6 && Math.abs(g.dx) > Math.abs(g.dy)) {
+            if (timer.current) { clearTimeout(timer.current); timer.current = null; }
+            armed.current = true;
+            apiRef.current.start(idx.current, e.nativeEvent.pageX - g.dx);
+          } else {
+            if ((Math.abs(g.dx) > 8 || Math.abs(g.dy) > 8) && timer.current) { clearTimeout(timer.current); timer.current = null; }
+            return;
+          }
+        }
+        apiRef.current.move(g.dx, e.nativeEvent.pageX);
+      },
+      onPanResponderTerminationRequest: () => !armed.current,
+      onPanResponderRelease: () => stop(true),
+      onPanResponderTerminate: () => stop(false),
+    })
+  ).current;
+  return (
+    <View style={style} {...pr.panHandlers} accessibilityLabel={label}>
+      {children}
+    </View>
+  );
+}
