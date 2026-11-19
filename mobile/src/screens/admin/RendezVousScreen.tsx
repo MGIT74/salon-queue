@@ -213,7 +213,7 @@ export function RendezVousScreen({ bottomSpace = 110 }: { bottomSpace?: number }
         />
 
         {/* Bandeau semaine (Jour / Semaine) ou navigation du mois */}
-        <View style={styles.navRow}>
+        <View style={[styles.navRow, styles.navCard]}>
           <TouchableOpacity style={styles.arrow} onPress={() => shift(-1)} accessibilityRole="button" accessibilityLabel="Précédent">
             <Ionicons name="chevron-back" size={18} color={t.blue} />
           </TouchableOpacity>
@@ -258,10 +258,10 @@ export function RendezVousScreen({ bottomSpace = 110 }: { bottomSpace?: number }
         ) : !hasMonth || (loading && !all.length) ? (
           <InlineLoading t={t} />
         ) : view === 'day' ? (
-          <View>{dayList(date)}</View>
+          <Card t={t} style={styles.block}>{dayList(date)}</Card>
         ) : view === 'week' ? (
           week.map((d) => (
-            <View key={d} style={{ marginBottom: spacing.block - 6 }}>
+            <Card key={d} t={t} style={[styles.block, { marginBottom: 12 }]}>
               <Text style={[styles.dayHead, d === today && { color: t.blue }]}>
                 {cap(fmt(d, { weekday: 'long', day: 'numeric', month: 'long' }))}
                 <Text style={styles.dayCount}>{(byDay[d] ?? []).length ? `  ·  ${(byDay[d] ?? []).length} RDV` : ''}</Text>
@@ -276,7 +276,7 @@ export function RendezVousScreen({ bottomSpace = 110 }: { bottomSpace?: number }
               ) : (
                 <Text style={styles.none}>Aucun rendez-vous</Text>
               )}
-            </View>
+            </Card>
           ))
         ) : (
           <MonthGrid t={t} month={date} today={today} counts={Object.fromEntries(Object.entries(byDay).map(([k, v]) => [k, v.length]))}
@@ -326,7 +326,7 @@ function StatusPill({ t, label }: { t: Palette; label: string }) {
 function NowLine({ t, min }: { t: Palette; min: number }) {
   const hm = `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginLeft: 52, marginVertical: 4 }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginLeft: 52, marginVertical: 6 }}>
       <Text style={{ color: t.red, fontSize: 11, fontWeight: '700' }}>{hm}</Text>
       <View style={{ flex: 1, height: 2, borderRadius: 1, backgroundColor: t.red }} />
     </View>
@@ -373,7 +373,9 @@ const stylesFor = (t: Palette) =>
     todayBtn: { marginTop: 14, backgroundColor: t.blueSoft, borderRadius: 11, paddingVertical: 8, paddingHorizontal: 12 },
     todayLabel: { color: t.blue, fontSize: 14.5, fontWeight: '600' },
     navRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12, marginBottom: 14 },
-    arrow: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: t.card, ...cardShadow(t) },
+    navCard: { backgroundColor: t.card, borderRadius: 16, padding: 8, ...cardShadow(t) },
+    block: { marginBottom: spacing.block },
+    arrow: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: t.fill },
     navLabel: { flex: 1, textAlign: 'center', color: t.ink, fontSize: 16, fontWeight: '600' },
     week: { flex: 1, flexDirection: 'row', gap: 2 },
     wd: { flex: 1, alignItems: 'center', paddingVertical: 6, borderRadius: 12 },
@@ -382,12 +384,12 @@ const stylesFor = (t: Palette) =>
     dot: { width: 5, height: 5, borderRadius: 3, marginTop: 3 },
     chips: { gap: 8, paddingVertical: 2, paddingHorizontal: 2, marginBottom: 8 },
     tl: { flexDirection: 'row', gap: 10, marginBottom: 8 },
-    tlHour: { width: 42, color: t.grey, fontSize: 12.5, paddingTop: 12, fontVariant: ['tabular-nums'] },
+    tlHour: { width: 42, color: t.ink, fontSize: 13, fontWeight: '600', paddingTop: 12, fontVariant: ['tabular-nums'] },
     slot: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 12, paddingVertical: 9, paddingHorizontal: 12 },
     slotPast: { backgroundColor: 'transparent', borderWidth: 1, borderColor: t.hair },
     slotName: { color: t.ink, fontSize: 15.5, fontWeight: '600' },
     slotMeta: { color: t.grey, fontSize: 12.5, marginTop: 1 },
-    dayHead: { color: t.ink, fontSize: 17, fontWeight: '700', marginHorizontal: 4, marginBottom: 8 },
+    dayHead: { color: t.ink, fontSize: 17, fontWeight: '700', marginBottom: 6 },
     dayCount: { color: t.grey, fontSize: 14, fontWeight: '500' },
-    none: { color: t.grey, fontSize: 14, marginLeft: 4 },
+    none: { color: t.grey, fontSize: 14 },
   });

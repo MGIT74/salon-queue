@@ -46,11 +46,10 @@ import { useLayout } from '../../hooks/useLayout';
 import { Palette, cardShadow, spacing } from '../../theme/theme';
 import { CustomRange, PeriodKey, localDateStr, periodRange } from '../../utils/period';
 import { DateRangeSheet } from '../../components/DateRangeSheet';
+import { barberColorFor } from '../../utils/barberColor';
 import { formatPriceCents, salonNowMinutes, salonTodayStr } from '../../utils/format';
 import { AdminAppointment, BarberPublic, SalonStatsResponse } from '../../types/api';
 
-// Couleur d'avatar quand le serveur n'en fournit pas (purement décoratif).
-const AVATAR_COLORS = ['#5e5ce6', '#ff9f0a', '#30b0c7', '#34c759', '#ff375f', '#af52de', '#0a84ff', '#a2845e'];
 
 export function DashboardScreen({ bottomSpace = 110 }: { bottomSpace?: number }) {
   const t = useTheme();
@@ -129,12 +128,7 @@ export function DashboardScreen({ bottomSpace = 110 }: { bottomSpace?: number })
   const chartLabels = (chart?.labels ?? []).map((l) => labelShort(l, period));
   const maxChart = Math.max(1, ...chartValues.map((v) => v ?? 0));
 
-  const barberColor = (id: string | null | undefined): string => {
-    const idx = barbers.findIndex((b) => b.id === id);
-    const b = idx >= 0 ? barbers[idx] : undefined;
-    const c = b ? (b as Record<string, unknown>).color : null;
-    return typeof c === 'string' && c ? c : AVATAR_COLORS[(idx >= 0 ? idx : 0) % AVATAR_COLORS.length];
-  };
+  const barberColor = (id: string | null | undefined): string => barberColorFor(barbers, id);
 
   const ranking = stats?.leaderboard ? rowsFor(stats, rank) : [];
   const rankMax = stats ? Math.max(1, ...ranking.map((r) => rankAmount(stats, rank, r.id))) : 1;

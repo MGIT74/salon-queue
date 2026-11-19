@@ -4,13 +4,21 @@
 import { BarberPublic } from '../types/api';
 import { Palette } from '../theme/theme';
 
-const FALLBACK = ['#5e5ce6', '#ff9f0a', '#30b0c7', '#34c759', '#ff375f', '#af52de', '#0a84ff', '#a2845e'];
+// COPIE de public/app.js (DOT_COLORS, stableColorForId, barberColorOf) : même couleur que sur le web.
+const DOT_COLORS = ['#3b82f6', '#f97316', '#10b981', '#a855f7', '#ec4899', '#eab308', '#14b8a6', '#ef4444'];
 
+export function stableColorForId(id: string): string {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+  return DOT_COLORS[hash % DOT_COLORS.length];
+}
+
+/** Couleur choisie dans la fiche du coiffeur, sinon la couleur automatique du web (même id = même couleur). */
 export function barberColorFor(barbers: BarberPublic[], id: string | null | undefined): string {
-  const idx = barbers.findIndex((b) => b.id === id);
-  const b = idx >= 0 ? barbers[idx] : undefined;
+  if (id == null || id === '') return '#8e8e93';
+  const b = barbers.find((x) => String(x.id) === String(id));
   const c = b ? (b as Record<string, unknown>).color : null;
-  return typeof c === 'string' && /^#[0-9a-fA-F]{6}$/.test(c) ? c : FALLBACK[(idx >= 0 ? idx : 0) % FALLBACK.length];
+  return typeof c === 'string' && /^#[0-9a-fA-F]{6}$/.test(c) ? c : stableColorForId(String(id));
 }
 
 /** Mélange une couleur avec le fond de carte : ~15 % en clair, ~30 % en sombre. */
