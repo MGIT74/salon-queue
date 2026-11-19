@@ -21,7 +21,7 @@ import { movedBy, nudgeRoom } from '../utils/agendaRules';
 const HEAD_H = 46;
 const GUTTER = 48;
 /** Zoom continu (curseur) : pixels par minute. */
-const ZMIN = 0.7, ZMAX = 3, ZDEF = 1.1;
+const ZMIN = 0.7, ZMAX = 8, ZDEF = 1.1;
 
 const toMin = (hm: string) => Number(hm.slice(0, 2)) * 60 + Number(hm.slice(3, 5));
 const hm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
@@ -231,20 +231,6 @@ const glanceStyles = (t: Palette) =>
 /* =============================== Colonnes =============================== */
 
 /** Lignes affichées DANS un bloc, selon sa hauteur (plus on zoome, plus on en voit). */
-/**
- * Hauteur d'un bloc : sa durée, mais étirée vers le bas pour montrer tout son
- * contenu (nom, heure, prestation, suppléments…), sans déborder sur le RDV
- * suivant de la même colonne ni sous la fin de la grille.
- */
-export function blockHeight(a: AdminAppointment, startMin: number, durMin: number, pxm: number, colW: number, nextStartMin: number, minH: number): number {
-  const durH = Math.max(minH, durMin * pxm) - 3;
-  const charsPerLine = Math.max(8, (colW - 48) / 6.4);
-  const lines = 2 + details(a, 9999).reduce((n, l) => n + (l.wrap && l.text.length > charsPerLine ? 2 : 1), 0);
-  const need = 10 + lines * 15;
-  const cap = (nextStartMin - startMin) * pxm - 3;
-  return Math.max(durH, Math.min(need, cap));
-}
-
 export function details(a: AdminAppointment, h: number): { text: string; strong?: boolean; wrap?: boolean }[] {
   const p = a.pricing;
   const out: { text: string; strong?: boolean; wrap?: boolean }[] = [];
@@ -322,8 +308,14 @@ export function DayColumns({ t, barbers, allBarbers, items, date, todayYmd, nowM
   const fit = isTablet && width > 0 && (width - GUTTER) / n >= minCol;
   const colW = fit ? (width - GUTTER) / n : Math.round(minCol);
 
+  // Axe des heures selon le zoom : repères toutes les 5, 10, 15, 30 ou 60 min (jamais trop serrés),
+  // libellés là où il y a la place. Les blocs gardent leur VRAIE durée → cohérents avec l'axe.
+  const gridStep = [5, 10, 15, 30].find((st) => st * pxm >= 10) ?? 60;
+  const labelStep = [5, 10, 15, 30, 60].find((st) => st * pxm >= 26) ?? 60;
+  const snap = pxm >= 3 ? 5 : 15;
   const hours: number[] = [];
-  for (let m = START; m <= END; m += 30) hours.push(m);
+  for (let m = START; m <= END; m += gridStep) hours.push(m);
+  const lineOpacity = (m: number) => (m % 60 === 0 ? 1 : m % labelStep === 0 ? 0.6 : 0.28);
 
   const maxScroll = Math.max(0, n * colW - (width - GUTTER));
   const SPRING = { useNativeDriver: true, damping: 22, stiffness: 260, mass: 0.9 } as const;
@@ -422,7 +414,7 @@ export function DayColumns({ t, barbers, allBarbers, items, date, todayYmd, nowM
   useEffect(() => () => { if (autoTimer.current) clearInterval(autoTimer.current); }, []);
 
   const tapCol = (barberId: string, locY: number) => {
-    const m = Math.round((START + locY / pxm) / 15) * 15;
+    const m = Math.round((START + locY / pxm) / snap) * snap;
     if (m < START || m >= END) return;
     setPick({ barberId, min: m });
   };
@@ -455,7 +447,7 @@ export function DayColumns({ t, barbers, allBarbers, items, date, todayYmd, nowM
           ) : null}
         </DragHead>
         <Pressable style={{ height: H }} onPress={(e) => tapCol(String(b.id), e.nativeEvent.locationY)}>
-          {hours.map((m) => <View key={m} style={[styles.hl, { top: y(m) }, m % 60 !== 0 && { opacity: 0.5 }]} />)}
+          {hours.map((m) => <View key={m} style={[styles.hl, { top: y(m) }, { opacity: lineOpacity(m) }]} />)}
           {info.fullOff ? (
             <View style={[styles.off, { top: 0, bottom: 0 }]}><Text style={styles.offTxt}>{info.fullOff}</Text></View>
           ) : (
@@ -465,14 +457,14 @@ export function DayColumns({ t, barbers, allBarbers, items, date, todayYmd, nowM
               </View>
             ))
           )}
-          {mine.map((a, idx, arr) => {
+          {mine.map((a) => {
             const r = apptRange(a);
             const st = a.display_status ?? 'confirmed';
             const past = st === 'completed';
             const abs = st === 'no_show';
             // RDV suivant dans la colonne (le bloc s'étire jusqu'à lui au plus).
-            const nextS = arr.reduce((m, o) => { if (o.id === a.id) return m; const os = apptRange(o).s; return os > r.s && os < m ? os : m; }, END);
-            const h = blockHeight(a, r.s, r.d, pxm, colW, nextS, 28);
+            // Hauteur = vraie durée (l'axe à gauche fait foi) ; plancher minime pour rester touchable.
+            const h = Math.max(16, r.d * pxm - 2);
             const short = h < 44;
             const future = date > todayYmd || (date === todayYmd && r.s > nowMin);
             const room = nudgeRoom(a, future);
@@ -483,14 +475,15 @@ export function DayColumns({ t, barbers, allBarbers, items, date, todayYmd, nowM
                 key={a.id}
                 onPress={() => onOpen(a)}
                 accessibilityRole="button"
-                style={[styles.ev, { top: y(r.s) + 1, height: h }, short && { paddingVertical: 3 }, canNudge && { paddingRight: 30 },
+                style={[styles.ev, { top: y(r.s) + 1, height: h }, short && { paddingVertical: h < 24 ? 1 : 3 }, canNudge && { paddingRight: 30 },
                   abs ? styles.evAbs : { backgroundColor: past ? t.fill : tint(color, t) }]}
               >
-                <Text style={[styles.evName, past && { color: t.grey, fontWeight: '500' }]} numberOfLines={1}>
+                <Text style={[styles.evName, past && { color: t.grey, fontWeight: '500' }, h < 34 && { fontSize: 12 }]} numberOfLines={1}>
                   {a.client_name || 'Client'}
+                  {h < 34 ? <Text style={styles.evMeta}>{`  ${hm(r.s)}–${hm(r.e)}`}</Text> : null}
                   {moved ? <Text style={styles.movedTag}>{`  ⇅ ${moved > 0 ? '+' : ''}${moved}`}</Text> : null}
                 </Text>
-                <Text style={styles.evMeta} numberOfLines={1}>{hm(r.s)} – {hm(r.e)}{h > 40 ? ` · ${r.d} min` : ''}</Text>
+                {h >= 34 ? <Text style={styles.evMeta} numberOfLines={1}>{hm(r.s)} – {hm(r.e)}{h > 40 ? ` · ${r.d} min` : ''}</Text> : null}
                 {details(a, h).map((l, k) => (
                   <Text key={k} style={[styles.evMeta, l.strong && styles.evStrong]} numberOfLines={l.wrap ? 2 : 1}>{l.text}</Text>
                 ))}
@@ -542,7 +535,7 @@ export function DayColumns({ t, barbers, allBarbers, items, date, todayYmd, nowM
     <View style={styles.card}>
       <View style={styles.head}>
         <Text style={styles.count} numberOfLines={1}>{visible.length} RDV{isTablet ? ' ce jour' : ''}</Text>
-        <ZoomSlider t={t} value={pxm} min={ZMIN} max={ZMAX} step={0.4} onChange={setPxm} width={isTablet ? 130 : 78} />
+        <ZoomSlider t={t} value={pxm} min={ZMIN} max={ZMAX} step={0.8} onChange={setPxm} width={isTablet ? 130 : 78} />
         <TouchableOpacity style={styles.add} onPress={() => onAdd()} accessibilityRole="button">
           <Ionicons name="add" size={18} color="#fff" />
           <Text style={styles.addTxt}>{isTablet ? 'Ajouter un RDV' : 'Ajouter'}</Text>
@@ -551,8 +544,8 @@ export function DayColumns({ t, barbers, allBarbers, items, date, todayYmd, nowM
 
       <View ref={boxRef} style={{ flexDirection: 'row' }} onLayout={(e: LayoutChangeEvent) => setWidth(e.nativeEvent.layout.width)}>
         <View style={{ width: GUTTER, height: H + HEAD_H }}>
-          {hours.map((m) => (
-            <Text key={m} style={[styles.hour, { top: HEAD_H + y(m) - 7 }, m % 60 === 0 ? styles.hourStrong : null]}>{hm(m)}</Text>
+          {hours.filter((m) => m % labelStep === 0).map((m) => (
+            <Text key={m} style={[styles.hour, { top: m === START ? HEAD_H + 2 : HEAD_H + y(m) - 7 }, m % 60 === 0 ? styles.hourStrong : styles.hourMinor]}>{hm(m)}</Text>
           ))}
         </View>
         {fit ? (
@@ -586,6 +579,7 @@ const colStyles = (t: Palette) =>
     add: { flexDirection: 'row', alignItems: 'center', gap: 2, height: 34, paddingHorizontal: 12, borderRadius: 17, backgroundColor: t.blue },
     addTxt: { color: '#fff', fontSize: 14, fontWeight: '600' },
     hour: { position: 'absolute', right: 6, color: t.grey, fontSize: 10.5, fontVariant: ['tabular-nums'] },
+    hourMinor: { color: t.grey, fontSize: 10, fontWeight: '400' },
     hourStrong: { color: t.ink, fontWeight: '600', fontSize: 11.5 },
     col: { borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: t.hair },
     colHead: { height: HEAD_H, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: t.hair },

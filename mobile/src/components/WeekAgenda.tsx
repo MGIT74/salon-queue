@@ -12,11 +12,11 @@ import { Palette, cardShadow, spacing } from '../theme/theme';
 import { barberColorFor, tint } from '../utils/barberColor';
 import { Avatar } from './ui';
 import { ZoomSlider } from './ZoomSlider';
-import { blockHeight, details } from './DayAgenda';
+import { details } from './DayAgenda';
 
 const HEAD_H = 50;
 const GUTTER = 46;
-const ZMIN = 0.7, ZMAX = 3, ZDEF = 1.1;
+const ZMIN = 0.7, ZMAX = 8, ZDEF = 1.1;
 const toMin = (hm: string) => Number(hm.slice(0, 2)) * 60 + Number(hm.slice(3, 5));
 const hm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 const parse = (s: string) => new Date(`${s}T12:00:00`);
@@ -75,8 +75,14 @@ export function WeekAgenda({ t, days, byDay, barbers, todayYmd, nowMin, isTablet
   const grow = Math.min(1.9, Math.max(0.85, pxm / ZDEF));
   const fit = isTablet && width > 0 && (width - GUTTER) / 7 >= 110 * grow;
   const colW = fit ? (width - GUTTER) / 7 : Math.round(104 * grow);
+  // Axe des heures selon le zoom : repères toutes les 5, 10, 15, 30 ou 60 min (jamais trop serrés),
+  // libellés là où il y a la place. Les blocs gardent leur VRAIE durée → cohérents avec l'axe.
+  const gridStep = [5, 10, 15, 30].find((st) => st * pxm >= 10) ?? 60;
+  const labelStep = [5, 10, 15, 30, 60].find((st) => st * pxm >= 26) ?? 60;
+  const snap = pxm >= 3 ? 5 : 15;
   const hours: number[] = [];
-  for (let m = START; m <= END; m += 30) hours.push(m);
+  for (let m = START; m <= END; m += gridStep) hours.push(m);
+  const lineOpacity = (m: number) => (m % 60 === 0 ? 1 : m % labelStep === 0 ? 0.6 : 0.28);
 
   const columns = days.map((d) => {
     const list = (byDay[d] ?? []).filter((a) => a.display_status !== 'cancelled');
@@ -93,17 +99,16 @@ export function WeekAgenda({ t, days, byDay, barbers, todayYmd, nowMin, isTablet
         <Pressable
           style={[{ height: H }, past && { backgroundColor: t.scheme === 'dark' ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)' }]}
           onPress={(e) => {
-            const m = Math.round((START + e.nativeEvent.locationY / pxm) / 15) * 15;
+            const m = Math.round((START + e.nativeEvent.locationY / pxm) / snap) * snap;
             if (!past && m >= START && m < END) setPick({ date: d, min: m });
           }}
         >
-          {hours.map((m) => <View key={m} style={[c.hl, { top: y(m) }, m % 60 !== 0 && { opacity: 0.5 }]} />)}
-          {list.map((a, idx, arr) => {
+          {hours.map((m) => <View key={m} style={[c.hl, { top: y(m) }, { opacity: lineOpacity(m) }]} />)}
+          {list.map((a) => {
             const r = range(a);
             const st = a.display_status ?? 'confirmed';
             const color = barberColorFor(barbers, a.barber_id);
-            const nextS = arr.reduce((m, o) => { if (o.id === a.id) return m; const os = range(o).s; return os > r.s && os < m ? os : m; }, END);
-            const h = blockHeight(a, r.s, r.d, pxm, colW, nextS, 26);
+            const h = Math.max(14, r.d * pxm - 2);
             return (
               <Pressable
                 key={a.id}
@@ -215,7 +220,7 @@ export function WeekAgenda({ t, days, byDay, barbers, todayYmd, nowMin, isTablet
       <View style={c.card}>
         <View style={c.head}>
           <Text style={c.count} numberOfLines={1}>{weekItems.length} RDV cette semaine</Text>
-          <ZoomSlider t={t} value={pxm} min={ZMIN} max={ZMAX} step={0.4} onChange={setPxm} width={isTablet ? 130 : 78} />
+          <ZoomSlider t={t} value={pxm} min={ZMIN} max={ZMAX} step={0.8} onChange={setPxm} width={isTablet ? 130 : 78} />
           <TouchableOpacity style={c.add} onPress={() => onAdd(days.find((d) => d >= todayYmd) ?? todayYmd)} accessibilityRole="button" accessibilityLabel="Ajouter un RDV">
             <Ionicons name="add" size={18} color="#fff" />
             {isTablet ? <Text style={c.addTxt}>Ajouter un RDV</Text> : null}
@@ -223,8 +228,8 @@ export function WeekAgenda({ t, days, byDay, barbers, todayYmd, nowMin, isTablet
         </View>
         <View style={{ flexDirection: 'row' }} onLayout={(e: LayoutChangeEvent) => setWidth(e.nativeEvent.layout.width)}>
           <View style={{ width: GUTTER, height: H + HEAD_H }}>
-            {hours.filter((m) => m % 60 === 0).map((m) => (
-              <Text key={m} style={[c.hour, { top: HEAD_H + y(m) - 7 }]}>{hm(m)}</Text>
+            {hours.filter((m) => m % labelStep === 0).map((m) => (
+              <Text key={m} style={[c.hour, { top: m === START ? HEAD_H + 2 : HEAD_H + y(m) - 7 }, m % 60 !== 0 && c.hourMinor]}>{hm(m)}</Text>
             ))}
           </View>
           {fit ? <View style={{ flexDirection: 'row', flex: 1 }}>{columns}</View> : (
@@ -274,6 +279,7 @@ const colStyles = (t: Palette) =>
     zFill: { height: '100%', backgroundColor: t.blue },
     add: { flexDirection: 'row', alignItems: 'center', gap: 2, height: 34, minWidth: 34, justifyContent: 'center', paddingHorizontal: 8, borderRadius: 17, backgroundColor: t.blue },
     addTxt: { color: '#fff', fontSize: 14, fontWeight: '600', marginRight: 4 },
+    hourMinor: { color: t.grey, fontSize: 10, fontWeight: '400' },
     hour: { position: 'absolute', right: 6, color: t.ink, fontSize: 11, fontWeight: '600', fontVariant: ['tabular-nums'] },
     col: { borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: t.hair },
     colHead: { height: HEAD_H, alignItems: 'center', justifyContent: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: t.hair },
