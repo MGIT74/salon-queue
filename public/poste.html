@@ -712,7 +712,12 @@
              display: flex; align-items: center; justify-content: center; gap: 10px; cursor: pointer; }
   .cr-sub { display: flex; justify-content: space-between; align-items: baseline; margin: 18px 2px 10px; font-size: 15px; font-weight: 600; }
   .cr-sub span { font-size: 12.5px; font-weight: 400; color: var(--grey); }
-  .cr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 10px; }
+  /* Produits sur 2 lignes qui défilent à l'horizontale (calées colonne par colonne) quand il y en a beaucoup. */
+  .cr-grid { display: grid; grid-template-rows: repeat(2, auto); grid-auto-flow: column; grid-auto-columns: 132px; gap: 10px;
+             overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch;
+             padding: 2px 2px 10px; margin: 0 -2px; scrollbar-width: thin; }
+  .cr-grid > .cr-tile { scroll-snap-align: start; }
+  .cr-grid.cr-grid-empty { display: block; }
   .cr-tile { border: none; border-radius: 16px; background: var(--card); box-shadow: var(--shadow); padding: 14px 8px 12px; min-height: 96px; cursor: pointer; font-family: inherit; color: var(--ink);
              display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; text-align: center; }
   .cr-tile b { font-size: 14px; font-weight: 600; }
@@ -3711,11 +3716,14 @@ function renderCreditGrid() {
   var qEl = document.getElementById('cr-search'), q = qEl && qEl.style.display !== 'none' ? norm(qEl.value.trim()) : '';
   var all = crData.products || [];
   var prods = q ? all.filter(function (p) { return norm(p.name).indexOf(q) !== -1 || (p.barcode && p.barcode.indexOf(q) !== -1); }) : all;
+  document.getElementById('cr-grid').classList.toggle('cr-grid-empty', !prods.length);
+  // Une seule ligne s'il y a peu de produits ; sinon 2 lignes qui défilent.
+  document.getElementById('cr-grid').style.gridTemplateRows = prods.length > 4 ? 'repeat(2, auto)' : 'auto';
   document.getElementById('cr-grid').innerHTML = prods.length ? prods.map(function (p) {
     var out = p.stock_enabled && p.stock_quantity < 1, poor = !free && p.price_cents > bal;
     return '<button class="cr-tile" ' + (out ? 'disabled' : '') + ' onclick="pickCreditProduct(\'' + esc(p.id) + '\')"><b>' + esc(p.name) + '</b><span>' + eur(p.price_cents) +
       (p.stock_enabled ? ' · ' + (out ? 'épuisé' : 'stock ' + p.stock_quantity) : '') + '</span>' + (poor && !out ? '<span style="color:var(--orange)">crédit insuffisant</span>' : '') + '</button>';
-  }).join('') : '<div class="empty" style="grid-column:1/-1">' + (all.length ? 'Aucun produit ne correspond à « ' + esc(qEl.value.trim()) + ' ».' : 'Aucun produit disponible avec le crédit.') + '</div>';
+  }).join('') : '<div class="empty">' + (all.length ? 'Aucun produit ne correspond à « ' + esc(qEl.value.trim()) + ' ».' : 'Aucun produit disponible avec le crédit.') + '</div>';
 }
 
 function pickCreditProduct(id) {
