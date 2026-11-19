@@ -18,6 +18,9 @@ import { barberColorFor, tint } from '../../utils/barberColor';
 import { Card } from '../../components/Card';
 import { Avatar, Chip, EmptyText, ErrorText, InlineLoading, PageTitle, Segmented } from '../../components/ui';
 import { AppointmentSheet } from '../../components/AppointmentSheet';
+import { AddAppointmentSheet } from '../../components/AddAppointmentSheet';
+import { ListRow } from '../../components/ui';
+import { exportRdvCsv, exportRdvPdf } from '../../utils/exportRdv';
 
 type View3 = 'day' | 'week' | 'month';
 type StatusFilter = 'all' | 'confirmed' | 'completed' | 'no_show' | 'cancelled';
@@ -59,6 +62,15 @@ export function RendezVousScreen({ bottomSpace = 110 }: { bottomSpace?: number }
   const [error, setError] = useState<unknown>(null);
   const [open, setOpen] = useState<AdminAppointment | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const [addFor, setAddFor] = useState<string | null>(null);
+  const [toast, setToast] = useState('');
+  const [exporting, setExporting] = useState<'' | 'csv' | 'pdf'>('');
+
+  useEffect(() => {
+    if (!toast) return;
+    const id = setTimeout(() => setToast(''), 3500);
+    return () => clearTimeout(id);
+  }, [toast]);
 
   // Fuseau du salon (jour « aujourd'hui » du salon, pas celui du téléphone).
   useEffect(() => {
@@ -188,6 +200,26 @@ export function RendezVousScreen({ bottomSpace = 110 }: { bottomSpace?: number }
 
   const week = Array.from({ length: 7 }, (_, i) => addDays(mondayOf(date), i));
 
+  // RDV de la vue affichée (jour, semaine ou mois) avec les filtres : ce sont eux qu'on exporte.
+  const shown = useMemo(() => {
+    if (view === 'day') return byDay[date] ?? [];
+    if (view === 'week') return week.flatMap((d) => byDay[d] ?? []);
+    return filtered.filter((a) => String(a.scheduled_at).slice(0, 7) === date.slice(0, 7));
+  }, [view, byDay, date, filtered, week]);
+
+  const doExport = async (kind: 'csv' | 'pdf') => {
+    if (exporting || !shown.length) return;
+    setExporting(kind);
+    try {
+      if (kind === 'csv') await exportRdvCsv(shown, today);
+      else await exportRdvPdf(shown, `Rendez-vous — ${subtitle}`);
+    } catch (e) {
+      setToast(e instanceof Error ? e.message : 'Export impossible');
+    } finally {
+      setExporting('');
+    }
+  };
+
   return (
     <View style={{ flex: 1 }}>
       <ScrollView
@@ -203,7 +235,11 @@ export function RendezVousScreen({ bottomSpace = 110 }: { bottomSpace?: number }
               <Text style={styles.todayLabel}>Aujourd'hui</Text>
             </TouchableOpacity>
           ) : null}
+          <TouchableOpacity style={styles.addBtn} onPress={() => setAddFor(date)} accessibilityRole="button" accessibilityLabel="Ajouter un RDV">
+            <Ionicons name="add" size={24} color="#fff" />
+          </TouchableOpacity>
         </View>
+        {toast ? <View style={styles.toast}><Text style={styles.toastText}>{toast}</Text></View> : null}
 
         <Segmented
           t={t}
@@ -258,14 +294,27 @@ export function RendezVousScreen({ bottomSpace = 110 }: { bottomSpace?: number }
         ) : !hasMonth || (loading && !all.length) ? (
           <InlineLoading t={t} />
         ) : view === 'day' ? (
-          <Card t={t} style={styles.block}>{dayList(date)}</Card>
+          <Card t={t} style={styles.block}>
+            {dayList(date)}
+            <TouchableOpacity style={styles.addRow} onPress={() => setAddFor(date)} accessibilityRole="button">
+              <Ionicons name="add-circle" size={20} color={t.blue} />
+              <Text style={styles.addRowText}>Ajouter un RDV ce jour</Text>
+            </TouchableOpacity>
+          </Card>
         ) : view === 'week' ? (
           week.map((d) => (
             <Card key={d} t={t} style={[styles.block, { marginBottom: 12 }]}>
-              <Text style={[styles.dayHead, d === today && { color: t.blue }]}>
-                {cap(fmt(d, { weekday: 'long', day: 'numeric', month: 'long' }))}
-                <Text style={styles.dayCount}>{(byDay[d] ?? []).length ? `  ·  ${(byDay[d] ?? []).length} RDV` : ''}</Text>
-              </Text>
+              <View style={styles.dayHeadRow}>
+                <Text style={[styles.dayHead, d === today && { color: t.blue }]}>
+                  {cap(fmt(d, { weekday: 'long', day: 'numeric', month: 'long' }))}
+                  <Text style={styles.dayCount}>{(byDay[d] ?? []).length ? `  ·  ${(byDay[d] ?? []).length} RDV` : ''}</Text>
+                </Text>
+                {d >= today ? (
+                  <TouchableOpacity onPress={() => setAddFor(d)} hitSlop={8} accessibilityRole="button" accessibilityLabel={`Ajouter un RDV le ${d}`}>
+                    <Ionicons name="add-circle" size={24} color={t.blue} />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
               {(byDay[d] ?? []).length ? (
                 (byDay[d] ?? []).map((a) => (
                   <View key={a.id} style={styles.tl}>
@@ -282,7 +331,38 @@ export function RendezVousScreen({ bottomSpace = 110 }: { bottomSpace?: number }
           <MonthGrid t={t} month={date} today={today} counts={Object.fromEntries(Object.entries(byDay).map(([k, v]) => [k, v.length]))}
             onPick={(d) => { setDate(d); setView('day'); }} />
         )}
+
+        {hasMonth ? (
+          <>
+            <Text style={styles.expHead}>Exporter · {shown.length} RDV affiché{shown.length > 1 ? 's' : ''}</Text>
+            <Card t={t} flush style={styles.block}>
+              <ListRow t={t} first inset={58} chevron onPress={() => void doExport('csv')}
+                left={<View style={[styles.ric, { backgroundColor: '#34c759' }]}><Ionicons name="download-outline" size={17} color="#fff" /></View>}
+                right={exporting === 'csv' ? <InlineLoading t={t} /> : undefined}>
+                <Text style={[styles.rowLabel, !shown.length && { color: t.grey }]}>Télécharger CSV</Text>
+              </ListRow>
+              <ListRow t={t} inset={58} chevron onPress={() => void doExport('pdf')}
+                left={<View style={[styles.ric, { backgroundColor: '#ff9f0a' }]}><Ionicons name="document-text-outline" size={17} color="#fff" /></View>}
+                right={exporting === 'pdf' ? <InlineLoading t={t} /> : undefined}>
+                <Text style={[styles.rowLabel, !shown.length && { color: t.grey }]}>Télécharger PDF</Text>
+              </ListRow>
+            </Card>
+            <Text style={styles.expNote}>Mêmes colonnes que le web (nom, email, téléphone, prestation, coiffeur, date, statut). Le fichier s'ouvre dans la feuille de partage : Fichiers, Mail, AirDrop…</Text>
+          </>
+        ) : null}
       </ScrollView>
+
+      <AddAppointmentSheet
+        t={t}
+        visible={addFor !== null}
+        initialDate={addFor ?? date}
+        todayYmd={today}
+        barbers={barbers}
+        salonSlug={salonSlug}
+        auth={auth}
+        onClose={() => setAddFor(null)}
+        onCreated={(msg) => { setToast(msg); setReloadKey((k) => k + 1); }}
+      />
 
       <AppointmentSheet
         t={t}
@@ -372,6 +452,16 @@ const stylesFor = (t: Palette) =>
     titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
     todayBtn: { marginTop: 14, backgroundColor: t.blueSoft, borderRadius: 11, paddingVertical: 8, paddingHorizontal: 12 },
     todayLabel: { color: t.blue, fontSize: 14.5, fontWeight: '600' },
+    addBtn: { marginTop: 12, width: 38, height: 38, borderRadius: 19, backgroundColor: t.blue, alignItems: 'center', justifyContent: 'center' },
+    toast: { backgroundColor: t.greenSoft, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 12, marginBottom: 12 },
+    toastText: { color: t.green, fontSize: 14.5, fontWeight: '600' },
+    addRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 10, marginTop: 4, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: t.hair },
+    addRowText: { color: t.blue, fontSize: 15.5, fontWeight: '600' },
+    dayHeadRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+    expHead: { color: t.ink, fontSize: 20, fontWeight: '700', letterSpacing: -0.4, marginHorizontal: 4, marginBottom: 8, marginTop: 4 },
+    expNote: { color: t.grey, fontSize: 13, marginHorizontal: 4, marginTop: -14, marginBottom: spacing.block, lineHeight: 18 },
+    ric: { width: 30, height: 30, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+    rowLabel: { color: t.ink, fontSize: 16 },
     navRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12, marginBottom: 14 },
     navCard: { backgroundColor: t.card, borderRadius: 16, padding: 8, ...cardShadow(t) },
     block: { marginBottom: spacing.block },
@@ -389,7 +479,7 @@ const stylesFor = (t: Palette) =>
     slotPast: { backgroundColor: 'transparent', borderWidth: 1, borderColor: t.hair },
     slotName: { color: t.ink, fontSize: 15.5, fontWeight: '600' },
     slotMeta: { color: t.grey, fontSize: 12.5, marginTop: 1 },
-    dayHead: { color: t.ink, fontSize: 17, fontWeight: '700', marginBottom: 6 },
+    dayHead: { flex: 1, color: t.ink, fontSize: 17, fontWeight: '700', marginBottom: 6 },
     dayCount: { color: t.grey, fontSize: 14, fontWeight: '500' },
     none: { color: t.grey, fontSize: 14 },
   });

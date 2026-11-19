@@ -465,3 +465,43 @@ export async function saveAppointmentContact(
 ): Promise<ApiOkResponse> {
   return apiRequest<ApiOkResponse>({ path: `api/appointments/${id}/contact`, method: 'PUT', salonSlug, auth, body });
 }
+
+/** GET /api/appointments/availability (avec la session de l'équipe) — barber_id vide = « Premier disponible ». */
+export async function fetchStaffAvailability(
+  salonSlug: string,
+  auth: ApiAuth,
+  params: { date: string; service_id: string; extras: string[]; barber_id: string | null }
+): Promise<AvailabilityResponse> {
+  const query: Record<string, string> = { date: params.date, service_id: params.service_id };
+  if (params.extras.length) query.extras = params.extras.join(',');
+  if (params.barber_id) query.barber_id = params.barber_id;
+  return apiRequest<AvailabilityResponse>({ path: 'api/appointments/availability', salonSlug, auth, query });
+}
+
+/**
+ * POST /api/appointments/admin-create — RDV ajouté par l'équipe (web : « Ajouter un RDV »).
+ * barber_id null = « Premier disponible » (le serveur choisit). Email / téléphone facultatifs.
+ */
+export async function adminCreateAppointment(
+  salonSlug: string,
+  auth: ApiAuth,
+  body: {
+    client_name: string;
+    email: string;
+    phone: string;
+    service_id: string;
+    barber_id: string | null;
+    extras: string[];
+    date: string;
+    time: string;
+  }
+): Promise<{ ok: true; id: string; barber_name?: string | null }> {
+  const rdvPage = apiBaseUrl().replace(/\/+$/, '') + '/rdv.html' + (salonSlug ? `?salon=${encodeURIComponent(salonSlug)}` : '');
+  return apiRequest<{ ok: true; id: string; barber_name?: string | null }>({
+    path: 'api/appointments/admin-create',
+    method: 'POST',
+    salonSlug,
+    auth,
+    body: { ...body, products: [], force: false, force_ack: false, base_url: rdvPage },
+  });
+}
