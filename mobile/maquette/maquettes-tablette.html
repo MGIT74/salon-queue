@@ -149,8 +149,11 @@ main{max-width:1500px;margin:0 auto;padding:26px 24px 80px}
 .week div.on{background:var(--blue);color:rgba(255,255,255,.8)}.week div.on b{color:#fff}
 .week div i{display:block;width:5px;height:5px;border-radius:50%;background:var(--blue);margin:3px auto 0}
 .week div.on i{background:#fff}
-.slot{border-left:4px solid;border-radius:10px;padding:8px 10px;margin-bottom:8px;background:var(--card);box-shadow:var(--shadow)}
-.slot .n{font-size:15px;font-weight:600}.slot .m{font-size:12.5px;color:var(--grey);margin-top:1px}
+.slot{border-radius:12px;padding:9px 12px;margin-bottom:8px;background:var(--card);box-shadow:var(--shadow);display:flex;align-items:center;gap:10px}
+.slot .tx{flex:1;min-width:0}
+.slot .n{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.slot .m{font-size:12.5px;color:var(--grey);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.slot.past{background:transparent;box-shadow:none;border:1px solid var(--hair)}.slot.past .n{color:var(--grey);font-weight:500}
+.slot .av{width:26px;height:26px;font-size:10.5px}
 .tl{display:flex;gap:10px}.tl .h{width:40px;font-size:12px;color:var(--grey);font-variant-numeric:tabular-nums;padding-top:9px;flex:none}
 .tl .c{flex:1}
 .free{border:1.5px dashed var(--sep);border-radius:10px;padding:8px 10px;margin-bottom:8px;color:var(--grey);font-size:13px}
@@ -351,10 +354,11 @@ function phone(o){
 .ag-col{position:relative;background:var(--card);border-radius:12px;box-shadow:var(--shadow);overflow:hidden}
 .ag-col .hl{position:absolute;left:0;right:0;height:1px;background:var(--hair)}
 .ag-col .off{position:absolute;left:0;right:0;background:repeating-linear-gradient(135deg,var(--fill) 0 6px,transparent 6px 12px);opacity:.8}
-.ev{position:absolute;left:5px;right:5px;border-radius:9px;padding:6px 8px;color:#fff;font-size:13px;line-height:1.3;overflow:hidden}
+.ev{position:absolute;left:5px;right:5px;border-radius:9px;padding:6px 8px;background:var(--blueSoft)!important;color:var(--grey);font-size:13px;line-height:1.3;overflow:hidden}
+.ev b{color:var(--ink)}
 .ev b{display:block;font-size:14px}
-.ev.past{opacity:.45}
-.ev.soft{background:var(--fill)!important;color:var(--grey);border:1.5px dashed var(--sep)}
+.ev.past{background:var(--fill)!important;opacity:.7}.ev.past b{color:var(--grey);font-weight:500}
+.ev.soft{background:transparent!important;color:var(--grey);border:1.5px dashed var(--sep)}.ev.soft b{color:var(--grey)}
 .ag-now{position:absolute;left:56px;right:0;height:2px;background:var(--red);z-index:3}
 .ag-now:before{content:attr(data-t);position:absolute;left:-54px;top:-9px;background:var(--red);color:#fff;font-size:11px;font-weight:700;padding:2px 6px;border-radius:6px}
 /* Barre flottante centrée (tablette) */
@@ -410,7 +414,7 @@ function dashBody(mini){ return side(0,mini)+'<div class="content"><div class="t
   '<div class="kpis4">'+tile('users','blue','6','Coiffeurs actifs')+tile('umb','orange','1','En congé')+tile('user','green','78','Clients')+tile('cal','blue','4','RDV à venir')+'</div>'+
   sec("La journée en un coup d'œil")+
   card('<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--grey);margin:0 0 8px 46px">'+['9h','10h','11h','12h','13h','14h','15h','16h','17h','18h','19h'].map(function(h){return '<span>'+h+'</span>';}).join('')+'</div>'+
-    [['KA','Karim','#5e5ce6',[[0,5,1,'Hugo P.'],[10,7.5,1,'Yassine T.'],[55,7.5,0,'Lucas Martin'],[70,3.5,0,''],[85,5,0,'Rayan M.']]],['ML','Mehdi L.','#ff9f0a',[[15,3.5,1,''],[25,5,1,'Malik S.'],[62.5,5,0,'Sofiane B.'],[75,7.5,0,'Kevin L.']]],['YS','Yanis','#30b0c7',[]]].map(function(b){return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">'+av(b[0])+'<div style="flex:1;height:36px;background:var(--fill);border-radius:9px;position:relative;overflow:hidden">'+b[3].map(function(x){return '<span style="position:absolute;top:4px;bottom:4px;left:'+x[0]+'%;width:'+x[1]+'%;background:'+b[2]+';border-radius:6px;opacity:'+(x[2]?.35:.92)+';color:#fff;font-size:12px;font-weight:600;padding:0 7px;display:flex;align-items:center;white-space:nowrap;overflow:hidden">'+x[3]+'</span>';}).join('')+(b[3].length?'':'<span style="position:absolute;left:12px;top:9px;font-size:13px;color:var(--grey)">Sans RDV aujourd\'hui</span>')+'<span style="position:absolute;top:0;bottom:0;left:53%;width:2px;background:var(--red)"></span></div></div>';}).join(''))+
+    [['KA','Karim','#5e5ce6',[[0,5,1,'Hugo P.'],[10,7.5,1,'Yassine T.'],[55,7.5,0,'Lucas Martin'],[70,3.5,0,''],[85,5,0,'Rayan M.']]],['ML','Mehdi L.','#ff9f0a',[[15,3.5,1,''],[25,5,1,'Malik S.'],[62.5,5,0,'Sofiane B.'],[75,7.5,0,'Kevin L.']]],['YS','Yanis','#30b0c7',[]]].map(function(b){return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">'+av(b[0])+'<div style="flex:1;height:36px;background:var(--fill);border-radius:9px;position:relative;overflow:hidden">'+b[3].map(function(x){return '<span style="position:absolute;top:4px;bottom:4px;left:'+x[0]+'%;width:'+x[1]+'%;background:'+(x[2]?'var(--fill2)':'var(--blue)')+';border-radius:6px;color:'+(x[2]?'var(--grey)':'#fff')+';font-size:12px;font-weight:600;padding:0 7px;display:flex;align-items:center;white-space:nowrap;overflow:hidden">'+x[3]+'</span>';}).join('')+(b[3].length?'':'<span style="position:absolute;left:12px;top:9px;font-size:13px;color:var(--grey)">Sans RDV aujourd\'hui</span>')+'<span style="position:absolute;top:0;bottom:0;left:53%;width:2px;background:var(--red)"></span></div></div>';}).join(''))+
   '<div class="cols2"><div>'+
     card('<div class="card-h">Encaissé du salon</div><div style="display:flex;align-items:center;gap:10px"><span class="big">1 284,00 €</span><span class="chip green" style="font-size:13px">▲ 12 %</span></div><div class="note">vs période précédente · touchez une barre pour le détail</div>'+
       '<div style="display:flex;align-items:flex-end;gap:12px;height:150px;margin-top:16px">'+[38,62,48,92,8,8,4].map(function(h,i){return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;height:100%;justify-content:flex-end"><i style="display:block;width:100%;height:'+h+'%;border-radius:6px 6px 3px 3px;background:'+(i===3?'var(--blue)':'var(--blueSoft)')+'"></i><small style="font-size:11px;color:var(--grey)">'+'LMMJVSD'[i]+'</small></div>';}).join('')+'</div>')+
