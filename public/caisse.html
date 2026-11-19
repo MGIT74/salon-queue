@@ -785,12 +785,14 @@
     font-size: 14px; font-weight: 500; padding: 10px 16px; border-radius: 999px; cursor: pointer; white-space: nowrap;
     transition: background .2s ease, box-shadow .2s ease, transform .1s ease;
   }
-  /* Crédit coiffeurs : une seule rangée de coiffeurs qui défile à l'horizontale (calée carte par carte),
-     pour que les montants restent toujours visibles dessous. */
-  #credit-barbers.item-grid { display: grid; grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 168px;
-    overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; scroll-padding-left: 3px; overscroll-behavior-x: contain;
-    padding: 3px 3px 10px; margin-bottom: 0; scrollbar-width: thin; -webkit-overflow-scrolling: touch; }
-  #credit-barbers.item-grid > .item-card { scroll-snap-align: start; }
+  .credit-card { display: flex; align-items: center; gap: 18px; background: var(--card); border: 1px solid var(--sep); border-radius: 20px; padding: 16px; box-shadow: var(--shadow); }
+  .credit-card .ph { width: 96px; height: 96px; border-radius: 18px; flex: none; background: var(--fill) center / cover no-repeat; display: flex; align-items: center; justify-content: center; font-size: 40px; font-weight: 700; color: var(--grey); }
+  .credit-card .who { flex: 1; min-width: 0; }
+  .credit-card .who b { display: block; font-size: 19px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .credit-card .who span { font-size: 13px; color: var(--grey); }
+  .credit-card .bal { text-align: right; }
+  .credit-card .bal small { display: block; font-size: 12.5px; color: var(--grey); }
+  .credit-card .bal strong { font-size: 30px; font-weight: 700; letter-spacing: -.02em; white-space: nowrap; }
   .cat-tabs button.on { background: var(--card); font-weight: 600; box-shadow: var(--shadow); }
   .cat-tabs button:active { transform: scale(.95); }
   /* 4e onglet « À encaisser » : nombre de clients en attente d'encaissement */
@@ -1243,11 +1245,13 @@
         <div class="item-grid" id="item-grid"></div>
         <!-- Recharge du crédit produits d'un coiffeur : une ligne « Crédit produits · Prénom » sur le ticket. -->
         <div id="credit-section" style="display:none">
-          <div style="font-size:13px;font-weight:600;color:var(--grey);margin:4px 2px 10px">Coiffeur</div>
-          <div id="credit-barbers" class="item-grid"></div>
-          <div style="font-size:13px;font-weight:600;color:var(--grey);margin:18px 2px 10px">Montant à recharger</div>
-          <div id="credit-amounts" style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px"></div>
-          <div class="hint" style="margin:14px 2px 0;font-size:13px;color:var(--grey);line-height:1.5">Ensuite, le coiffeur prend ses produits depuis son poste (bouton « Crédit ») : le stock baisse et son crédit aussi. Rien à faire à la caisse.</div>
+          <!-- Seul le coiffeur choisi dans les bulles du haut : sa carte (photo, nom, solde), puis les montants. -->
+          <div id="credit-card"></div>
+          <div id="credit-amounts-box">
+            <div style="font-size:13px;font-weight:600;color:var(--grey);margin:18px 2px 10px">Montant à recharger</div>
+            <div id="credit-amounts" style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px"></div>
+          </div>
+          <div class="hint" id="credit-hint" style="margin:14px 2px 0;font-size:13px;color:var(--grey);line-height:1.5">Pour un autre coiffeur, touchez sa bulle en haut. Ensuite, il prend ses produits depuis son poste (bouton « Crédit ») : le stock baisse et son crédit aussi.</div>
         </div>
         <div class="pending-section" id="pending-section" style="display:none">
           <div class="section-label" id="pending-label" style="display:none;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--grey);margin:22px 0 10px 2px">En attente d'encaissement</div>
@@ -1997,6 +2001,7 @@ function selectActiveBarber(barberId) {
   renderBarberBubbles();
   updateTabLockState();
   loadPendingPayments();
+  if (currentCat === 'credit') renderCreditSection();   // Crédit coiffeurs : la carte du coiffeur choisi
   extrasPickerOpen = false;
   nextDetailOpen = {};
   renderActive(true);
@@ -5207,46 +5212,47 @@ function applyCatView() {
 }
 
 /* ---------- Crédit produits des coiffeurs : recharge (vente normale) ---------- */
-var creditBalances = [], creditBarberId = null;
+var creditBalances = [];
 function loadCreditBalances() {
   barberApi('/api/barber-credit/balances').then(function (r) {
-    creditBalances = (r.items || []).filter(function (b) { return b.active && !b.free; });   // « gratuit » : rien à recharger
+    creditBalances = (r.items || []).filter(function (b) { return b.active; });
     creditAlertCents = r.alert_cents;
     renderCreditSection();
   }).catch(function (e) { toast(e.message, true); });
 }
 var creditAlertCents = 300;
+/** Carte du coiffeur choisi dans les bulles du haut (photo, nom, solde), puis les montants à recharger. */
 function renderCreditSection() {
-  if (!creditBarberId && activeBarberId && creditBalances.some(function (b) { return b.id === activeBarberId; })) creditBarberId = activeBarberId;
-  // Mêmes cartes que Prestations / Produits : photo du coiffeur (ou son initiale), nom, solde.
-  document.getElementById('credit-barbers').innerHTML = creditBalances.map(function (b) {
-    var on = b.id === creditBarberId;
-    var info = (allBarbers || []).find(function (x) { return x.id === b.id; }) || {};
-    var photo = info.photo_url || '';
-    var low = b.balance_cents <= creditAlertCents;
-    return '<button type="button" class="item-card' + (photo ? ' has-photo' : '') + (on ? ' sel' : '') + '" aria-pressed="' + on + '" title="' + esc(b.name) + '" onclick="pickCreditBarber(\'' + b.id + '\')">' +
-      '<span class="item-media"' + (photo ? ' style="background-image:url(&quot;' + esc(photo) + '&quot;)"' : ' aria-hidden="true"') + '>' +
-        (photo ? '' : '<span style="font-size:34px;font-weight:700;color:var(--grey)">' + esc((b.name || '?').charAt(0).toUpperCase()) + '</span>') + '</span>' +
-      // « Solde » en petit au-dessus, le montant sur une seule ligne : vert s'il est chargé, rouge s'il est vide ou bas.
-      '<span class="item-body"><span class="item-name">' + esc(b.name) + '</span><span class="item-meta">Solde</span>' +
-      '<span class="item-foot"><span class="item-price" style="white-space:nowrap;color:' + (low ? 'var(--red)' : 'var(--green)') + '">' + eur(b.balance_cents) + '</span>' +
-      '<span class="item-add">' + VITRINE_PLUS_SVG + VITRINE_CHECK_SVG + '</span></span></span></button>';
-  }).join('') || '<div class="empty">Aucun coiffeur</div>';
+  var box = document.getElementById('credit-card');
+  if (!box) return;
+  var b = creditBalances.find(function (x) { return x.id === activeBarberId; });
+  var info = (allBarbers || []).find(function (x) { return x.id === activeBarberId; }) || {};
+  if (!b) {
+    box.innerHTML = '<div class="empty">Touchez la bulle d\'un coiffeur en haut.</div>';
+    document.getElementById('credit-amounts-box').style.display = 'none';
+    return;
+  }
+  var photo = info.photo_url || '';
+  var low = b.balance_cents <= creditAlertCents;
+  box.innerHTML = '<div class="credit-card"><div class="ph"' + (photo ? ' style="background-image:url(&quot;' + esc(photo) + '&quot;)"' : '') + '>' + (photo ? '' : esc((b.name || '?').charAt(0).toUpperCase())) + '</div>' +
+    '<div class="who"><b>' + esc(b.name) + '</b><span>' + (b.free ? 'Produits offerts par le salon' : 'Crédit produits') + '</span></div>' +
+    '<div class="bal"><small>' + (b.free ? '' : 'Solde') + '</small><strong style="color:' + (b.free || !low ? 'var(--green)' : 'var(--red)') + '">' + (b.free ? 'Offert' : eur(b.balance_cents)) + '</strong></div></div>' +
+    (b.free ? '<div class="empty" style="margin-top:14px">Ce coiffeur est en « Gratuit » : rien à recharger.</div>' : '');
+  document.getElementById('credit-amounts-box').style.display = b.free ? 'none' : '';
   document.getElementById('credit-amounts').innerHTML = [1000, 2000, 3000].map(function (c) {
     return '<button type="button" class="btn btn-soft" style="height:60px;font-size:19px;font-weight:600" onclick="addCreditLine(' + c + ')">' + eur(c) + '</button>';
   }).join('') + '<button type="button" class="btn btn-soft" style="height:60px;font-size:15px" onclick="addCreditLineOther()">Autre</button>';
 }
-function pickCreditBarber(id) { creditBarberId = id; renderCreditSection(); }
 function addCreditLine(cents) {
-  var b = creditBalances.find(function (x) { return x.id === creditBarberId; });
-  if (!b) { toast('Choisissez d\'abord le coiffeur', true); return; }
+  var b = creditBalances.find(function (x) { return x.id === activeBarberId; });
+  if (!b || b.free) { toast('Touchez d\'abord la bulle du coiffeur en haut', true); return; }
   if (!(cents > 0)) return;
   ticket.push({ item_type: 'product', item_id: null, item_name: 'Crédit produits · ' + b.name, unit_price_cents: cents, quantity: 1, barber_id: b.id, credit_barber_id: b.id });
   renderTicket(ticket.length - 1);
   toast('Recharge de ' + eur(cents) + ' pour ' + b.name + ' ajoutée au ticket');
 }
 function addCreditLineOther() {
-  if (!creditBarberId) { toast('Choisissez d\'abord le coiffeur', true); return; }
+  if (!activeBarberId) { toast('Touchez d\'abord la bulle du coiffeur en haut', true); return; }
   showPrompt('Montant à recharger (€)', { title: 'Crédit produits', placeholder: '25' }).then(function (v) {
     if (v == null) return;
     var cents = Math.round(parseFloat(String(v).replace(',', '.')) * 100);

@@ -100,12 +100,12 @@ const stock = (id) => Number(sql(`SELECT stock_quantity FROM products WHERE id='
   check('poste : « Crédit » dans le menu du bas, grille, scan, « Je l\'ai pris », annuler', poste.includes('id="nav-credit"') && poste.includes('function openCreditScreen(') &&
     poste.includes('function startCreditScan(') && poste.includes("Je l'ai pris") && poste.includes('function undoCreditMove('));
   check('caisse : onglet « Crédit coiffeurs », ligne avec credit_barber_id', caisse.includes('data-cat="credit"') && caisse.includes('credit_barber_id: '));
-  check('caisse : coiffeurs en cartes (comme les produits), avec leur photo', caisse.includes('<div id="credit-barbers" class="item-grid">') && /class="item-card' \+ \(photo \? ' has-photo'/.test(caisse) && caisse.includes('info.photo_url'));
-  check('caisse : solde sur une ligne, vert si chargé / rouge si vide ou bas', caisse.includes("white-space:nowrap;color:' + (low ? 'var(--red)' : 'var(--green)')"));
-  check('caisse : coiffeurs sur une rangée qui défile (scroll snap), montants toujours visibles, onglet qui défile', /#credit-barbers\.item-grid \{[^}]*grid-auto-flow: column;[^}]*scroll-snap-type: x mandatory/.test(caisse) && caisse.includes('#panel-caisse #credit-section { flex: 1 1 auto; min-height: 0; overflow-y: auto;'));
+  check('caisse : seulement le coiffeur choisi en haut (bulle), sa carte + les montants ; gratuit = rien à recharger', caisse.includes('<div id="credit-card"></div>') &&
+    caisse.includes('var b = creditBalances.find(function (x) { return x.id === activeBarberId; });') && caisse.includes("if (currentCat === 'credit') renderCreditSection();") &&
+    caisse.includes("(b.free || !low ? 'var(--green)' : 'var(--red)')") && caisse.includes('rien à recharger'));
   check('dashboard : Coiffeurs > Crédit produits (soldes, réglages, interrupteur « Gratuit », pas d\'« Ajuster »)', dash.includes('id="credit-box"') && dash.includes('function loadBarberCredit(') &&
     dash.includes('function toggleBarberCreditFree(') && !dash.includes('function adjustBarberCredit('));
-  check('poste : mode gratuit (« Offerts »), caisse : pas de recharge pour un gratuit', poste.includes("free ? 'Offerts' : eur(bal)") && caisse.includes('return b.active && !b.free;'));
+  check('poste : mode gratuit (« Offerts »), caisse : pas de recharge pour un gratuit', poste.includes("free ? 'Offerts' : eur(bal)") && caisse.includes('rien à recharger'));
 
   sql("DELETE FROM barber_credit_moves WHERE salon_id='s1'");
   sql("DELETE FROM settings WHERE salon_id='s1' AND \\`key\\` LIKE 'barber_credit%'");
