@@ -197,8 +197,8 @@ export function DashboardScreen({ bottomSpace = 110 }: { bottomSpace?: number })
                         <View
                           key={a.id}
                           style={[styles.slot, {
-                            // Pas de couleur par coiffeur : bleu = à venir, gris = passé / non confirmé (docs/DESIGN.md §5).
-                            backgroundColor: dimmed || ended ? t.fill2 : t.blue,
+                            // Couleur du coiffeur pour les RDV à venir, gris si passé / non confirmé (docs/DESIGN.md §5).
+                            backgroundColor: dimmed || ended ? t.fill2 : barberColor(b.id),
                             opacity: dimmed ? 0.5 : 1,
                             left: `${left}%`,
                             width: `${width}%`,

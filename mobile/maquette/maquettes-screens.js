@@ -29,8 +29,8 @@ phone({cap:"Rendez-vous — Jour", sub:"Paramètres, Aujourd'hui, Jour/Semaine/M
   '<div class="tl"><div class="h">09:00</div><div class="c"><div class="slot past"><div class="tx"><div class="n">Hugo P.</div><div class="m">Coupe · Karim · 30 min</div></div><span class="chip ">Terminé</span></div></div></div>'+
   '<div class="tl"><div class="h">10:30</div><div class="c"><div class="slot past"><div class="tx"><div class="n">Nathan V.</div><div class="m">Barbe · Mehdi L. · 20 min</div></div><span class="chip red">Absent</span></div></div></div>'+
   '<div class="now-line">14:20</div>'+
-  '<div class="tl"><div class="h">14:30</div><div class="c"><div class="slot"><div class="tx"><div class="n">Lucas Martin</div><div class="m">Coupe + barbe · Karim · 45 min</div></div>'+av('KA')+'</div></div></div>'+
-  '<div class="tl"><div class="h">15:15</div><div class="c"><div class="slot"><div class="tx"><div class="n">Sofiane B.</div><div class="m">Dégradé · Mehdi L. · 30 min</div></div>'+av('ML')+'</div></div></div>'+
+  '<div class="tl"><div class="h">14:30</div><div class="c"><div class="slot" style="--c:#5e5ce6"><div class="tx"><div class="n">Lucas Martin</div><div class="m">Coupe + barbe · Karim · 45 min</div></div>'+av('KA')+'</div></div></div>'+
+  '<div class="tl"><div class="h">15:15</div><div class="c"><div class="slot" style="--c:#ff9f0a"><div class="tx"><div class="n">Sofiane B.</div><div class="m">Dégradé · Mehdi L. · 30 min</div></div>'+av('ML')+'</div></div></div>'+
   '<div class="tl"><div class="h">16:00</div><div class="c"><div class="free">Libre · 16:00 – 17:30</div></div></div>'
 }),
 phone({cap:"Rendez-vous — Semaine / à venir", sub:"Liste « À venir » avec sélection multiple, import et exports (CSV / PDF).", top:ADMIN_TOP, bar:'admin', on:2, body:
@@ -339,9 +339,9 @@ phone({cap:'Mon poste — Agenda', sub:'« À suivre », agenda Jour/Semaine/Moi
   card('<div style="display:flex;gap:12px;align-items:center"><span class="time" style="font-size:20px;width:auto">14:30</span><div style="flex:1"><div style="font-weight:600">Lucas Martin</div><div class="note">Coupe + barbe · 45 min</div></div><span class="btn sm">Commencer</span></div>')+
   seg(['Jour','Semaine','Mois'],0)+
   '<div class="now-line">14:20</div>'+
-  '<div class="tl"><div class="h">14:30</div><div class="c"><div class="slot"><div class="tx"><div class="n">Lucas Martin</div><div class="m">Coupe + barbe · 45 min</div></div>'+av('KA')+'</div></div></div>'+
+  '<div class="tl"><div class="h">14:30</div><div class="c"><div class="slot" style="--c:#5e5ce6"><div class="tx"><div class="n">Lucas Martin</div><div class="m">Coupe + barbe · 45 min</div></div>'+av('KA')+'</div></div></div>'+
   '<div class="tl"><div class="h">15:15</div><div class="c"><div class="free">Libre · 15:15 – 16:00</div></div></div>'+
-  '<div class="tl"><div class="h">16:00</div><div class="c"><div class="slot"><div class="tx"><div class="n">Thomas R.</div><div class="m">Coupe enfant · 20 min</div></div>'+av('KA')+'</div></div></div>'
+  '<div class="tl"><div class="h">16:00</div><div class="c"><div class="slot" style="--c:#5e5ce6"><div class="tx"><div class="n">Thomas R.</div><div class="m">Coupe enfant · 20 min</div></div>'+av('KA')+'</div></div></div>'
 }),
 phone({cap:'Mon poste — Crédit', sub:'Solde, recherche, produits sur 2 lignes qui défilent, scan caméra, « Je l\'ai pris » (bloqué à 0 €).', bar:'poste', on:2,
   top:'<div class="topbar"><div class="salon-btn">'+av('KA')+'Karim</div><span class="chip green" style="font-size:13px;padding:6px 10px">En poste</span></div>', body:
@@ -367,9 +367,9 @@ phone({cap:'Lien « agenda » (tablette partagée)', sub:'Agenda + Timer + Déco
   title('Agenda','Jeudi 19 novembre')+
   seg(['Jour','Semaine','Mois'],0)+
   chips(['Tous','Karim','Mehdi L.','Yanis'],0)+
-  '<div class="tl"><div class="h">14:30</div><div class="c"><div class="slot"><div class="tx"><div class="n">Lucas Martin</div><div class="m">Coupe + barbe · Karim</div></div>'+av('KA')+'</div><div class="slot"><div class="tx"><div class="n">Adam K.</div><div class="m">Coupe · Yanis</div></div>'+av('YS')+'</div></div></div>'+
-  '<div class="tl"><div class="h">15:15</div><div class="c"><div class="slot"><div class="tx"><div class="n">Sofiane B.</div><div class="m">Dégradé · Mehdi L.</div></div>'+av('ML')+'</div></div></div>'+
-  '<div class="tl"><div class="h">16:00</div><div class="c"><div class="slot"><div class="tx"><div class="n">Thomas R.</div><div class="m">Coupe enfant · Karim</div></div>'+av('KA')+'</div></div></div>'
+  '<div class="tl"><div class="h">14:30</div><div class="c"><div class="slot" style="--c:#5e5ce6"><div class="tx"><div class="n">Lucas Martin</div><div class="m">Coupe + barbe · Karim</div></div>'+av('KA')+'</div><div class="slot" style="--c:#30b0c7"><div class="tx"><div class="n">Adam K.</div><div class="m">Coupe · Yanis</div></div>'+av('YS')+'</div></div></div>'+
+  '<div class="tl"><div class="h">15:15</div><div class="c"><div class="slot" style="--c:#ff9f0a"><div class="tx"><div class="n">Sofiane B.</div><div class="m">Dégradé · Mehdi L.</div></div>'+av('ML')+'</div></div></div>'+
+  '<div class="tl"><div class="h">16:00</div><div class="c"><div class="slot" style="--c:#5e5ce6"><div class="tx"><div class="n">Thomas R.</div><div class="m">Coupe enfant · Karim</div></div>'+av('KA')+'</div></div></div>'
 })
 ]);
 

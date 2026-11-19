@@ -75,9 +75,9 @@ Tous les chiffres : `fontVariant: ['tabular-nums']`.
 - Boutons flottants (⚙️ ou autre) qui chevauchent le contenu.
 - Emojis dans l'interface (🏆, 🥈…) — utiliser rang + avatar.
 - Bordures grises autour des cartes ; cartes dans des cartes.
-- **Bandes / liserés de couleur sur le côté des blocs** (créneaux, RDV, cartes) et blocs remplis de la couleur du coiffeur.
-  Un créneau = carte blanche simple (nom, prestation, durée) avec l'avatar du coiffeur ou une étiquette de statut à droite ;
-  passé / terminé = fond transparent, texte gris ; dans une frise ou un agenda en colonnes : bleu doux (à venir) / gris (passé).
-  La couleur du coiffeur ne sert QUE pour son avatar.
+- **Bandes / liserés de couleur sur le côté des blocs** (créneaux, RDV, cartes).
+  La couleur de CHAQUE coiffeur (celle déjà en place côté serveur) sert à les différencier, en **fond teinté de tout le
+  bloc** : environ 15 % de la couleur sur le fond de carte en clair, 30 % en sombre ; texte en `ink`, avatar du coiffeur à
+  droite. Frise « coup d'œil » : barre pleine à la couleur du coiffeur. RDV passé / terminé / absent : gris, sans couleur.
 - Marges différentes à gauche et à droite, texte coupé ou qui sort de l'écran.
 - Toute donnée inventée : chaque chiffre vient du serveur.
