@@ -1,7 +1,7 @@
 // Endpoints d'authentification, de salon et de réservation — formes de
 // réponses lues directement dans le code serveur (docs/API_AUDIT.md).
 // Aucune invention : chaque type est vérifié dans la route correspondante.
-import { ApiRequest, apiRequest } from './transport';
+import { ApiRequest, apiBaseUrl, apiRequest } from './transport';
 import {
   ApiOkResponse,
   AvailabilityDaysResponse,
@@ -40,13 +40,42 @@ export async function loginClient(salonSlug: string, email: string, password: st
   });
 }
 
+/**
+ * Page web vers laquelle pointent les liens envoyés par email (confirmation,
+ * réinitialisation) : compte.html du salon, comme le web (baseUrl()). Le
+ * serveur la contrôle (safeBaseUrl : domaines autorisés uniquement).
+ */
+export function clientEmailBaseUrl(salonSlug: string): string {
+  const base = apiBaseUrl().replace(/\/+$/, '') + '/compte.html';
+  return salonSlug.trim() ? `${base}?salon=${encodeURIComponent(salonSlug.trim())}` : base;
+}
+
+/** POST /api/client-auth/signup — réponse auditée (clientAuth.js). */
+export type ClientSignupResponse = { ok: true; needs_email_verification: true; email_sent: boolean };
+
+/**
+ * Inscription client : un compte appartient au salon de X-Salon-Slug.
+ * accept_terms DOIT valoir true (sinon 400 needs_terms) ; téléphone requis.
+ */
+export async function signupClient(
+  salonSlug: string,
+  input: { name: string; email: string; phone: string; password: string; accept_terms: boolean }
+): Promise<ClientSignupResponse> {
+  return apiRequest<ClientSignupResponse>({
+    path: 'api/client-auth/signup',
+    method: 'POST',
+    salonSlug,
+    body: { ...input, base_url: clientEmailBaseUrl(salonSlug) },
+  });
+}
+
 /** Renvoi du lien de vérification email (rate limité côté serveur). */
 export async function resendClientVerification(salonSlug: string, email: string): Promise<ApiOkResponse> {
   return apiRequest<ApiOkResponse>({
     path: 'api/client-auth/resend-verification',
     method: 'POST',
     salonSlug,
-    body: { email },
+    body: { email, base_url: clientEmailBaseUrl(salonSlug) },
   });
 }
 
@@ -55,6 +84,30 @@ export async function fetchClientMe(salonSlug: string, clientToken: string): Pro
     path: 'api/client-auth/me',
     salonSlug,
     auth: { kind: 'client', clientToken },
+  });
+}
+
+/** GET /api/client-auth/salons — salons de l'enseigne où ce client a un compte confirmé (même email). */
+export type ClientSalonsResponse = { ok: true; current: string; items: { slug: string; name: string }[] };
+
+export async function fetchClientSalons(salonSlug: string, clientToken: string): Promise<ClientSalonsResponse> {
+  return apiRequest<ClientSalonsResponse>({
+    path: 'api/client-auth/salons',
+    salonSlug,
+    auth: { kind: 'client', clientToken },
+  });
+}
+
+/** POST /api/client-auth/switch — nouveau jeton pour le compte du client dans l'autre salon (403 sinon). */
+export type ClientSwitchResponse = { ok: true; token: string; slug: string };
+
+export async function switchClientSalon(salonSlug: string, clientToken: string, targetSlug: string): Promise<ClientSwitchResponse> {
+  return apiRequest<ClientSwitchResponse>({
+    path: 'api/client-auth/switch',
+    method: 'POST',
+    salonSlug,
+    auth: { kind: 'client', clientToken },
+    body: { slug: targetSlug },
   });
 }
 

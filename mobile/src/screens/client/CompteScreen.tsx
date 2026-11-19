@@ -3,9 +3,10 @@
 // Une session expirée (401) déconnecte automatiquement et propose de se
 // reconnecter ; aucune donnée n'est fabriquée côté mobile.
 import React, { useCallback, useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActionSheetIOS, Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { ApiError } from '../../api/transport';
-import { fetchClientMe, logoutClient } from '../../api/endpoints';
+import { ClientSalonsResponse, fetchClientMe, fetchClientSalons, logoutClient } from '../../api/endpoints';
 import { ClientMeResponse } from '../../types/api';
 import { useAuth } from '../../auth/AuthContext';
 import { SessionBanner } from '../../components/SessionBanner';
@@ -24,6 +25,8 @@ export function CompteScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const [me, setMe] = useState<ClientMeResponse | null>(null);
+  const [salons, setSalons] = useState<ClientSalonsResponse | null>(null);
+  const [switching, setSwitching] = useState(false);
 
   const load = useCallback(async () => {
     if (!client) return;
@@ -32,11 +35,14 @@ export function CompteScreen() {
     try {
       const data = await fetchClientMe(client.salonSlug, client.clientToken);
       setMe(data);
+      // Sélecteur de salon (web : loadSalonSwitch) — silencieux en cas d'erreur.
+      fetchClientSalons(client.salonSlug, client.clientToken).then(setSalons).catch(() => setSalons(null));
     } catch (err) {
-      // Session expirée côté serveur : déconnexion propre + message.
+      // Session expirée, ou jeton d'un AUTRE salon (wrong_salon : un compte = un salon) :
+      // déconnexion propre + message du serveur.
       if (err instanceof ApiError && err.status === 401) {
         await auth.logout('client');
-        setError(new ApiError(401, 'Session expirée, reconnectez-vous'));
+        setError(err.wrongSalon ? err : new ApiError(401, 'Session expirée, reconnectez-vous'));
       } else {
         setError(err);
       }
@@ -57,6 +63,38 @@ export function CompteScreen() {
       await auth.logout('client');
     }
   }, [client, auth]);
+
+  const pickSalon = useCallback(() => {
+    if (!client || !salons || switching) return;
+    const items = salons.items;
+    const choose = async (slug: string) => {
+      if (slug === client.salonSlug) return;
+      setSwitching(true);
+      try {
+        await auth.switchClientSalon(slug);
+        setMe(null);
+        setSalons(null);
+      } catch (err) {
+        Alert.alert('Changement de salon impossible', err instanceof ApiError ? err.message : 'Une erreur est survenue.');
+      } finally {
+        setSwitching(false);
+      }
+    };
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        { title: 'Salon', options: [...items.map((i) => i.name), 'Annuler'], cancelButtonIndex: items.length },
+        (index) => {
+          const it = items[index];
+          if (it) void choose(it.slug);
+        }
+      );
+    } else {
+      Alert.alert('Salon', undefined, [
+        ...items.map((i) => ({ text: i.name, onPress: () => void choose(i.slug) })),
+        { text: 'Annuler', style: 'cancel' as const },
+      ]);
+    }
+  }, [client, salons, switching, auth]);
 
   if (!client) return null; // garou : l'écran n'est monté qu'avec session
   if (loading && !me) return <LoadingView t={t} label="Chargement de votre compte…" />;
@@ -87,6 +125,19 @@ export function CompteScreen() {
         onLogout={() => void logout()}
         t={t}
       />
+
+      {/* Compte aussi ouvert dans un autre salon de l'enseigne : changer de salon (web : salon-switch, ≥ 2 salons). */}
+      {salons && salons.items.length >= 2 ? (
+        <View style={styles.switchRow}>
+          <Text style={styles.switchLabel}>Salon</Text>
+          <TouchableOpacity style={styles.switchBtn} onPress={pickSalon} disabled={switching} accessibilityRole="button">
+            <Text style={styles.switchValue}>
+              {salons.items.find((i) => i.slug === salons.current)?.name ?? salons.current}
+            </Text>
+            <Ionicons name="chevron-down" size={14} color={t.ink} />
+          </TouchableOpacity>
+        </View>
+      ) : null}
 
       <Card title="Fidélité" t={t}>
         {me.loyalty_activated && me.loyalty ? (
@@ -169,4 +220,8 @@ const stylesFor = (t: Palette) =>
     errorBox: { padding: spacing.lg, justifyContent: 'center', gap: spacing.md },
     retry: { backgroundColor: t.blue, borderRadius: radius.button, paddingVertical: 12, alignItems: 'center', marginTop: spacing.sm },
     retryLabel: { color: '#fff', fontWeight: '700' },
+    switchRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    switchLabel: { color: t.grey, fontSize: 13, fontWeight: '600' },
+    switchBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: t.fill, borderRadius: 10, paddingVertical: 8, paddingHorizontal: 12 },
+    switchValue: { color: t.ink, fontSize: 14, fontWeight: '600' },
   });

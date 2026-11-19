@@ -29,8 +29,9 @@ suit le réglage système, comme `[data-theme=dark]` du web.
 | `/admin/…` (dashboard + menu latéral) | `AdminShell` : mêmes 13 sections dans l'ordre (Dashboard, File d'attente, Prestations, Suppléments, Produits, Marketing, Caisse, Rendez-vous, Coiffeurs, Clients, Mes salons, Compte, Réglages) + sélecteur d'enseigne en tête + « Plus » (toutes sections). Barre du bas mobile = Dashboard, File, Rendez-vous, Caisse, Plus | navigation ✅, contenu par section : Phase 5 |
 | `/poste.html` (login PIN) | `PostePinScreen` : pastilles + pavé numérique | ✅ réel (`POST /api/barbers/login`) |
 | `/poste.html` (app) | `PosteShell` : topbar (nom du salon en capitales, prénom), zones « À suivre »/« En cours » | shell ✅, file réelle : Phase 4 |
-| `/compte.html` (login) | `ClientLoginScreen` (email + mot de passe) | ✅ réel (`/api/client-auth/login`) |
-| `/compte.html` (app) | `CompteShell` : barre du bas du web **Accueil / Réserver / Compte / Déconnexion**. Accueil = fidélité + RDV + cadeaux (données réelles), Réserver = assistant réel, Compte = profil (Phase 3+) | ✅/partiel |
+| `/compte.html` (login) | `ClientLoginScreen` (email + mot de passe, « Renvoyer le lien de confirmation ») | ✅ réel (`/api/client-auth/login`, `resend-verification`) |
+| `/compte.html` (#p-signup, #p-check-email) | `ClientLoginScreen` panneau « Créer un compte » : nom, email, téléphone avec indicatif, mot de passe, case CGU + confidentialité **obligatoire** | ✅ réel (`/api/client-auth/signup`, `accept_terms: true`, 400 `needs_terms`) |
+| `/compte.html` (app) | `CompteShell` : barre du bas du web **Accueil / Réserver / Compte / Déconnexion**. Accueil = fidélité + RDV + cadeaux (données réelles), Réserver = assistant réel, Compte = profil (Phase 3+). Sélecteur « Salon » (si compte confirmé dans ≥ 2 salons de l'enseigne) ; jeton d'un autre salon refusé (`wrong_salon`) → déconnexion | ✅/partiel (`/api/client-auth/salons`, `/switch`) |
 | `/rdv.html` (réservation) | intégré dans l'onglet « Réserver » (assistant 4 étapes) | ✅ réel |
 | `display.html` / `kiosk.html` | hors périmètre mobile (TV salle, borne tactile du salon) | — |
 | `super-admin.html` | hors périmètre (web dédié) | — |

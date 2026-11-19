@@ -31,6 +31,10 @@ export type ApiErrorExtras = {
   retryAfterSeconds?: number;
   needsSalon?: boolean;
   needsEmailVerification?: boolean;
+  /** 401 wrong_salon : jeton client d'un AUTRE salon (un compte = un salon). */
+  wrongSalon?: boolean;
+  /** 400 needs_terms : CGU / politique de confidentialité non acceptées à l'inscription. */
+  needsTerms?: boolean;
 };
 
 export class ApiError extends Error {
@@ -38,6 +42,8 @@ export class ApiError extends Error {
   readonly retryAfterSeconds?: number;
   readonly needsSalon?: boolean;
   readonly needsEmailVerification?: boolean;
+  readonly wrongSalon?: boolean;
+  readonly needsTerms?: boolean;
 
   constructor(status: number, message: string, extras: ApiErrorExtras = {}) {
     super(message);
@@ -46,6 +52,8 @@ export class ApiError extends Error {
     this.retryAfterSeconds = extras.retryAfterSeconds;
     this.needsSalon = extras.needsSalon;
     this.needsEmailVerification = extras.needsEmailVerification;
+    this.wrongSalon = extras.wrongSalon;
+    this.needsTerms = extras.needsTerms;
   }
 }
 
@@ -84,7 +92,7 @@ function joinUrl(baseUrl: string, path: string): string {
   return `${left}/${right}`;
 }
 
-/** Erreur d'API normalisée : 429 (Retry-After), 400 (needs_salon), 403 (needs_email_verification). */
+/** Erreur d'API normalisée : 429 (Retry-After), 400 (needs_salon, needs_terms), 401 (wrong_salon), 403 (needs_email_verification). */
 async function toApiError(response: Response): Promise<never> {
   const retryAfterRaw = Number(response.headers.get('Retry-After'));
   let message = `Erreur HTTP ${response.status}`;
@@ -99,7 +107,9 @@ async function toApiError(response: Response): Promise<never> {
   const retryAfterSeconds = Number.isFinite(retryAfterRaw) && retryAfterRaw > 0 ? retryAfterRaw : undefined;
   const needsSalon = payload?.needs_salon === true ? true : undefined;
   const needsEmailVerification = payload?.needs_email_verification === true ? true : undefined;
-  throw new ApiError(response.status, message, { retryAfterSeconds, needsSalon, needsEmailVerification });
+  const wrongSalon = payload?.wrong_salon === true ? true : undefined;
+  const needsTerms = payload?.needs_terms === true ? true : undefined;
+  throw new ApiError(response.status, message, { retryAfterSeconds, needsSalon, needsEmailVerification, wrongSalon, needsTerms });
 }
 
 /** Appel JSON typé vers l'API TBO. Utilisé par les futurs hooks d'écrans. */

@@ -32,6 +32,8 @@ export type AuthContextValue = AuthState & {
   loginAdmin(email: string, password: string): Promise<void>;
   loginBarber(salonSlug: string, pin: string): Promise<void>;
   loginClient(salonSlug: string, email: string, password: string): Promise<void>;
+  /** « Mon compte » : changer de salon (web : salon-switch) — un compte = un salon. */
+  switchClientSalon(slug: string): Promise<void>;
   /** Sélecteur d'enseigne du menu latéral (web : salon-switcher). */
   switchAdminSalon(slug: string): Promise<void>;
   logout(kind: SessionKind): Promise<void>;
@@ -146,6 +148,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [commit]
   );
 
+  const switchClientSalonImpl = useCallback(async (slug: string) => {
+    const current = stateRef.current.client;
+    if (!current || !slug || current.salonSlug === slug) return;
+    const { switchClientSalon: apiSwitch } = await import('../api/endpoints');
+    // Le serveur ne délivre un jeton que si le client a un compte confirmé dans ce salon.
+    const { token, slug: newSlug } = await apiSwitch(current.salonSlug, current.clientToken, slug);
+    const session: ClientSession = { kind: 'client', salonSlug: newSlug, clientToken: token };
+    await commit(newSlug, [session]);
+    setState((prev) => ({ ...prev, salonRef: { slug: newSlug }, client: session }));
+  }, [commit]);
+
   const logout = useCallback(async (kind: SessionKind) => {
     await clearSession(kind);
     setState((prev) => ({ ...prev, [kind]: null }));
@@ -158,9 +171,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       switchAdminSalon,
       loginBarber: loginBarberImpl,
       loginClient: loginClientImpl,
+      switchClientSalon: switchClientSalonImpl,
       logout,
     }),
-    [state, loginAdminImpl, switchAdminSalon, loginBarberImpl, loginClientImpl, logout]
+    [state, loginAdminImpl, switchAdminSalon, loginBarberImpl, loginClientImpl, switchClientSalonImpl, logout]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
