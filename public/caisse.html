@@ -5227,8 +5227,9 @@ function renderCreditSection() {
     return '<button type="button" class="item-card' + (photo ? ' has-photo' : '') + (on ? ' sel' : '') + '" aria-pressed="' + on + '" title="' + esc(b.name) + '" onclick="pickCreditBarber(\'' + b.id + '\')">' +
       '<span class="item-media"' + (photo ? ' style="background-image:url(&quot;' + esc(photo) + '&quot;)"' : ' aria-hidden="true"') + '>' +
         (photo ? '' : '<span style="font-size:34px;font-weight:700;color:var(--grey)">' + esc((b.name || '?').charAt(0).toUpperCase()) + '</span>') + '</span>' +
-      '<span class="item-body"><span class="item-name">' + esc(b.name) + '</span>' +
-      '<span class="item-foot"><span class="item-price" style="' + (low ? 'color:var(--red)' : '') + '">Solde ' + eur(b.balance_cents) + '</span>' +
+      // « Solde » en petit au-dessus, le montant sur une seule ligne : vert s'il est chargé, rouge s'il est vide ou bas.
+      '<span class="item-body"><span class="item-name">' + esc(b.name) + '</span><span class="item-meta">Solde</span>' +
+      '<span class="item-foot"><span class="item-price" style="white-space:nowrap;color:' + (low ? 'var(--red)' : 'var(--green)') + '">' + eur(b.balance_cents) + '</span>' +
       '<span class="item-add">' + VITRINE_PLUS_SVG + VITRINE_CHECK_SVG + '</span></span></span></button>';
   }).join('') || '<div class="empty">Aucun coiffeur</div>';
   document.getElementById('credit-amounts').innerHTML = [1000, 2000, 3000].map(function (c) {
