@@ -40,7 +40,7 @@ body{font-family:var(--font);background:#d9dbe0;color:#1d1d1f;-webkit-font-smoot
 .chev{color:var(--grey)}
 .avatar{width:34px;height:34px;border-radius:50%;background:var(--blue);color:#fff;display:grid;place-items:center;font-size:13px;font-weight:700}
 
-.scroll{flex:1;overflow-y:auto;padding:4px 16px 24px;scrollbar-width:none}
+.scroll{flex:1;overflow-y:auto;padding:4px 16px 110px;scrollbar-width:none}
 .scroll::-webkit-scrollbar{display:none}
 
 /* Titre de page */
@@ -125,11 +125,16 @@ body{font-family:var(--font);background:#d9dbe0;color:#1d1d1f;-webkit-font-smoot
 .now{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--red);border-radius:1px}
 .glance{position:relative}
 
-/* Barre d'onglets (inchangée, déjà conforme) */
-.tabbar{flex:none;display:flex;background:var(--card);border-top:.5px solid var(--sep);padding:7px 4px 26px}
-.tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10.5px;font-weight:600;color:var(--grey)}
-.tab.on{color:var(--blue)}
-.tab svg{width:24px;height:24px}
+/* Barre d'onglets FLOTTANTE, effet verre (Liquid Glass iOS) */
+.tabbar{position:absolute;left:14px;right:14px;bottom:22px;height:64px;display:flex;align-items:center;padding:0 6px;border-radius:32px;
+  background:rgba(255,255,255,.55);-webkit-backdrop-filter:blur(22px) saturate(180%);backdrop-filter:blur(22px) saturate(180%);
+  border:.5px solid rgba(255,255,255,.7);box-shadow:0 8px 28px rgba(0,0,0,.14),inset 0 1px 0 rgba(255,255,255,.8);z-index:5}
+.dark .tabbar{background:rgba(44,44,46,.55);border-color:rgba(255,255,255,.12);box-shadow:0 8px 28px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.08)}
+.tab{flex:1;height:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:10px;font-weight:600;color:var(--ink);opacity:.72;border-radius:26px}
+.tab.on{color:var(--blue);opacity:1;background:rgba(0,98,196,.10)}
+.dark .tab.on{background:rgba(255,255,255,.10)}
+.tab svg{width:23px;height:23px}
+.home-ind{position:absolute;bottom:7px;left:50%;transform:translateX(-50%);width:134px;height:5px;border-radius:3px;background:var(--ink);opacity:.85;z-index:6}
 
 /* Règles (colonne de droite) */
 .rules{width:390px;background:#fff;border-radius:20px;padding:22px 22px 10px;box-shadow:0 10px 30px rgba(0,0,0,.08);font-size:14px;line-height:1.5;color:#1d1d1f}
@@ -254,6 +259,7 @@ body{font-family:var(--font);background:#d9dbe0;color:#1d1d1f;-webkit-font-smoot
       <div class="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>Caisse</div>
       <div class="tab"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>Plus</div>
     </div>
+    <div class="home-ind"></div>
   </div></div>
 </div>
 </template>
@@ -284,6 +290,7 @@ body{font-family:var(--font);background:#d9dbe0;color:#1d1d1f;-webkit-font-smoot
       <li>Choix (Jour / Semaine / Mois / Plage, CA / Rapidité / Produits) = <b>contrôle segmenté iOS</b> pleine largeur.</li>
       <li>Navigation de période sur sa propre ligne : ‹ date ›.</li>
       <li>Salon = bouton en haut à gauche (sélecteur d'enseigne), compte = avatar à droite.</li>
+      <li><b>Barre d'onglets flottante</b>, effet verre : à 14 px des bords et 22 px du bas, rayon 32, le contenu défile <b>dessous</b> (dernier bloc à 110 px du bas). Onglet actif = pastille bleue douce.</li>
     </ul>
     <h4 class="no">Interdit</h4>
     <ul>

@@ -43,6 +43,18 @@ Tous les chiffres : `fontVariant: ['tabular-nums']`.
 - Le titre d'un bloc est **au-dessus** de la carte, pas dedans (lien bleu « Tout voir » à droite si besoin).
 - En-tête fixe : à gauche le bouton salon (icône dans pastille `blueSoft` + nom + chevron = sélecteur d'enseigne), à droite l'avatar rond (initiales) du compte. Pas d'email affiché en en-tête.
 
+## 3 bis. Barre d'onglets FLOTTANTE, effet verre (Apple)
+
+- Flotte au-dessus du contenu : `position: 'absolute'`, `left: 14`, `right: 14`, `bottom: insets.bottom + 8` (≈ 22 px du bord), hauteur 64, `borderRadius: 32`, `overflow: 'hidden'`.
+- Le contenu défile **sous** la barre : `contentContainerStyle.paddingBottom = 110 + insets.bottom` sur chaque écran.
+- Effet verre :
+  - iOS 26 et + : `GlassView` de **expo-glass-effect** (Liquid Glass natif) si `isLiquidGlassAvailable()` ;
+  - sinon : `BlurView` de **expo-blur** (`intensity` 60, `tint` `systemChromeMaterialLight` / `systemChromeMaterialDark`).
+  - Installer avec `npx expo install expo-glass-effect expo-blur` (autorisé ; les deux marchent dans Expo Go).
+- Bordure fine claire (`hairlineWidth`, `rgba(255,255,255,0.7)` en clair / `0.12` en sombre) + ombre douce (clair `0.14`, sombre `0.5`, radius 14).
+- 5 onglets (Dashboard, File, Rendez-vous, Caisse, Plus) : icône 23 + libellé 10/600 ; actif = couleur `blue` + pastille ronde derrière (`rgba(0,98,196,0.10)` en clair, `rgba(255,255,255,0.10)` en sombre) ; inactifs en `ink` à 72 % d'opacité.
+- Même barre flottante pour l'espace client (Accueil / Réserver / Compte / Déconnexion en rouge) et le poste coiffeur.
+
 ## 4. Composants (à créer dans `src/components/`, réutilisés partout)
 
 - **Card** : fond `card`, rayon 16, padding 16, **aucune bordure**, ombre en clair seulement. Variante `flush` (padding vertical 4, sans padding horizontal) pour les listes.
