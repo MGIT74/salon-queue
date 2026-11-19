@@ -732,12 +732,6 @@
   .cr-sheet .after { display: flex; justify-content: space-between; padding: 12px 14px; border-radius: 14px; background: var(--fill); font-size: 14px; }
   .cr-sheet .btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .cr-sheet .btns button { height: 52px; border-radius: 14px; border: none; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; }
-  .cr-cam { position: fixed; inset: 0; z-index: 90; background: #000; display: none; flex-direction: column; }
-  .cr-cam.on { display: flex; }
-  .cr-cam video { flex: 1; width: 100%; object-fit: cover; min-height: 0; }
-  .cr-cam .bar { position: absolute; left: 0; right: 0; top: 0; padding: calc(14px + env(safe-area-inset-top, 0px)) 16px 14px; display: flex; justify-content: space-between; align-items: center; color: #fff; font-weight: 600; }
-  .cr-cam .frame { position: absolute; left: 50%; top: 45%; width: 72%; max-width: 320px; height: 150px; transform: translate(-50%, -50%); border: 3px solid #30d158; border-radius: 18px; pointer-events: none; }
-  .cr-cam .tip { position: absolute; left: 0; right: 0; bottom: calc(30px + env(safe-area-inset-bottom, 0px)); text-align: center; color: #d1d1d6; font-size: 13.5px; padding: 0 20px; }
 </style>
 </head>
 <body>
@@ -878,12 +872,6 @@
     </div>
   </div>
 </div>
-<div class="cr-cam" id="cr-cam">
-  <video id="cr-video" playsinline muted autoplay></video>
-  <div class="bar"><span>Scanner un produit</span><button class="cr-x" style="background:rgba(255,255,255,.18);color:#fff" aria-label="Fermer le scanner" onclick="stopCreditScan()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
-  <div class="frame"></div>
-  <div class="tip" id="cr-cam-tip">Visez le code-barres du produit</div>
-</div>
 
 <div class="poste-footer" id="poste-footer" style="display:none">
   <button id="nav-home" onclick="gotoHome()">
@@ -908,6 +896,7 @@
 <script src="/queue-sim.js?v=1"></script>
 <script src="/autorefresh.js?v=3"></script>
 <script src="/staff-group.js?v=7"></script>
+<script src="/scanner.js?v=1"></script>
 <script>requireSalonInUrl("Pour utiliser votre poste, ouvrez le lien de votre salon.");</script>
 <script>
 mountThemeButton();
@@ -3658,7 +3647,7 @@ function adReschedule() {
 }
 
 /* ---------- Crédit produits : prendre un produit (boisson, soin...) avec son crédit ---------- */
-var crData = null, crPick = null, crBusy = false, crStream = null, crTimer = null, crZx = null;
+var crData = null, crPick = null, crBusy = false;
 function openCreditScreen() {
   document.getElementById('cr-screen').classList.add('on');
   loadCredit();
@@ -3743,55 +3732,11 @@ function onCreditCode(code) {
   if (!p) { toast('Produit non reconnu (' + code + ') : choisissez-le dans la grille', true); return; }
   pickCreditProduct(p.id);
 }
-/** Caméra : lecteur intégré du navigateur s'il existe, sinon la petite bibliothèque ZXing (chargée seulement ici). */
+/** Caméra : scanner partagé (scanner.js) — lecteur intégré du navigateur, sinon ZXing chargé à la demande. */
 function startCreditScan() {
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { toast('Caméra indisponible sur cet appareil : touchez le produit', true); return; }
-  var cam = document.getElementById('cr-cam'), video = document.getElementById('cr-video');
-  document.getElementById('cr-cam-tip').textContent = 'Visez le code-barres du produit';
-  cam.classList.add('on');
-  var useNative = 'BarcodeDetector' in window;
-  if (!useNative) {
-    loadZxing().then(function () {
-      crZx = new ZXing.BrowserMultiFormatReader();
-      crZx.decodeFromConstraints({ video: { facingMode: 'environment' } }, video, function (result) {
-        if (result) onCreditCode(result.getText());
-      }).catch(function (e) { stopCreditScan(); toast('Caméra refusée ou indisponible : touchez le produit', true); });
-    }).catch(function () { stopCreditScan(); toast('Scanner indisponible : touchez le produit', true); });
-    return;
-  }
-  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false }).then(function (stream) {
-    crStream = stream; video.srcObject = stream; video.play();
-    var det = new BarcodeDetector();
-    var tick = function () {
-      if (!crStream) return;
-      det.detect(video).then(function (codes) {
-        if (codes && codes.length) onCreditCode(codes[0].rawValue);
-        else crTimer = setTimeout(tick, 250);
-      }).catch(function () { crTimer = setTimeout(tick, 400); });
-    };
-    tick();
-  }).catch(function () { stopCreditScan(); toast('Caméra refusée ou indisponible : touchez le produit', true); });
+  BarcodeScanner.open({ title: 'Scanner un produit', tip: 'Visez le code-barres du produit', onCode: onCreditCode });
 }
-function stopCreditScan() {
-  clearTimeout(crTimer); crTimer = null;
-  if (crZx) { try { crZx.reset(); } catch (e) {} crZx = null; }
-  if (crStream) { crStream.getTracks().forEach(function (t) { t.stop(); }); crStream = null; }
-  var v = document.getElementById('cr-video'); if (v) v.srcObject = null;
-  var cam = document.getElementById('cr-cam'); if (cam) cam.classList.remove('on');
-}
-var zxingLoading = null;
-function loadZxing() {
-  if (window.ZXing) return Promise.resolve();
-  if (zxingLoading) return zxingLoading;
-  zxingLoading = new Promise(function (resolve, reject) {
-    var s = document.createElement('script');
-    s.src = '/vendor/zxing-0.21.3.min.js';
-    s.onload = function () { resolve(); };
-    s.onerror = function () { zxingLoading = null; reject(); };
-    document.head.appendChild(s);
-  });
-  return zxingLoading;
-}
+function stopCreditScan() { if (window.BarcodeScanner) BarcodeScanner.close(); }
 </script>
 </body>
 </html>
