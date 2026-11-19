@@ -251,36 +251,72 @@ export function Delta({ t, pc }: { t: Palette; pc: number | null }) {
 
 /* ---------- Graphique ---------- */
 
-/** Barres : blueSoft, la plus haute ou la sélectionnée en blue. */
+/**
+ * Barres : blueSoft, la plus haute ou la sélectionnée en blue.
+ * `null` = période pas encore arrivée (le serveur n'envoie pas de point) : pas de barre.
+ * Les libellés sont posés SOUS les barres, centrés, sans être coupés par la largeur
+ * d'une barre (mois = ~30 barres très fines) ; un libellé tous les N selon la densité.
+ */
 export function BarChart({ t, values, labels, selected, onSelect, height = 110 }: {
-  t: Palette; values: number[]; labels: string[]; selected: number | null; onSelect: (i: number | null) => void; height?: number;
+  t: Palette; values: (number | null)[]; labels: string[]; selected: number | null; onSelect: (i: number | null) => void; height?: number;
 }) {
-  const max = Math.max(1, ...values);
-  const dense = values.length > 12;
-  const every = values.length > 20 ? 5 : values.length > 12 ? 3 : 1;
+  const n = values.length;
+  const nums = values.map((v) => (v == null ? 0 : Number(v) || 0));
+  const max = Math.max(1, ...nums);
+  const dense = n > 12;
+  const every = n > 24 ? 5 : n > 12 ? 3 : 1;
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: dense ? 2 : 8, height: height + 18, marginTop: 14 }}>
-      {values.map((v, i) => {
-        const hi = selected === i || (selected === null && v === max && v > 0);
-        return (
-          <Pressable key={i} onPress={() => onSelect(selected === i ? null : i)} style={{ flex: 1, alignItems: 'center', justifyContent: 'flex-end', height: '100%', gap: 6 }}>
-            <View
+    <View style={{ marginTop: 14 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: dense ? 2 : 8, height }}>
+        {values.map((v, i) => {
+          const hi = selected === i || (selected === null && nums[i] === max && nums[i] > 0);
+          return (
+            <Pressable
+              key={i}
+              disabled={v == null}
+              onPress={() => onSelect(selected === i ? null : i)}
+              style={{ flex: 1, height: '100%', justifyContent: 'flex-end' }}
+            >
+              {v == null ? null : (
+                <View
+                  style={{
+                    width: '100%',
+                    height: Math.max(3, (nums[i] / max) * height),
+                    borderTopLeftRadius: dense ? 2 : 6,
+                    borderTopRightRadius: dense ? 2 : 6,
+                    borderBottomLeftRadius: dense ? 1 : 3,
+                    borderBottomRightRadius: dense ? 1 : 3,
+                    backgroundColor: hi ? t.blue : t.blueSoft,
+                  }}
+                />
+              )}
+            </Pressable>
+          );
+        })}
+      </View>
+      <View style={{ height: 18, marginTop: 6 }}>
+        {labels.map((l, i) =>
+          i % every === 0 || i === selected ? (
+            <Text
+              key={i}
+              numberOfLines={1}
               style={{
-                width: '100%',
-                height: Math.max(3, (v / max) * height),
-                borderTopLeftRadius: dense ? 2 : 6,
-                borderTopRightRadius: dense ? 2 : 6,
-                borderBottomLeftRadius: dense ? 1 : 3,
-                borderBottomRightRadius: dense ? 1 : 3,
-                backgroundColor: hi ? t.blue : t.blueSoft,
+                position: 'absolute',
+                width: 36,
+                marginLeft: -18,
+                left: `${((i + 0.5) / Math.max(1, n)) * 100}%`,
+                textAlign: 'center',
+                color: i === selected ? t.blue : t.grey,
+                fontSize: 11,
+                fontWeight: i === selected ? '700' : '500',
+                fontVariant: ['tabular-nums'],
               }}
-            />
-            <Text style={{ color: t.grey, fontSize: 11, fontWeight: '500' }} numberOfLines={1}>
-              {i % every === 0 ? labels[i] ?? '' : ' '}
+            >
+              {l}
             </Text>
-          </Pressable>
-        );
-      })}
+          ) : null
+        )}
+      </View>
     </View>
   );
 }

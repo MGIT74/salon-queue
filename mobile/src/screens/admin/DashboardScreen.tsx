@@ -302,10 +302,10 @@ export function DashboardScreen({ bottomSpace = 110 }: { bottomSpace?: number })
               {selectedBar === null ? <DeltaInline t={t} pc={deltaPct(stats.previous_total_cents, stats.total_cents)} /> : null}
             </View>
             <Text style={styles.sub}>
-              {selectedBar !== null ? chartLabels[selectedBar] : 'vs période précédente · touchez une barre pour le détail'}
+              {selectedBar !== null ? barDetailLabel(chart?.labels?.[selectedBar] ?? '') : 'vs période précédente · touchez une barre pour le détail'}
             </Text>
             {chart ? (
-              <BarChart t={t} values={chartValues.map((v) => Number(v) || 0)} labels={chartLabels} selected={selectedBar} onSelect={setSelectedBar} />
+              <BarChart t={t} values={chartValues.map((v) => (v == null ? null : Number(v) || 0))} labels={chartLabels} selected={selectedBar} onSelect={setSelectedBar} />
             ) : null}
           </>
         )}
@@ -597,6 +597,12 @@ function errText(error: unknown): string {
 function deltaLabel(pc: number | null): string {
   if (pc === null) return '—';
   return `${pc >= 0 ? '+' : '−'}${Math.abs(pc)} %`;
+}
+
+/** Libellé complet d'une barre touchée : « Lun. 16 nov. » ou « Lun. 16 nov. · 14h ». */
+function barDetailLabel(raw: string): string {
+  const [day, time] = raw.split('T');
+  return time ? `${dayLong(day)} · ${Number(time.slice(0, 2))}h` : dayLong(day);
 }
 
 /** « 2026-11-16 » → « Lun. 16 nov. ». */
