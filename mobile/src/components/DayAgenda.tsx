@@ -231,6 +231,20 @@ const glanceStyles = (t: Palette) =>
 /* =============================== Colonnes =============================== */
 
 /** Lignes affichées DANS un bloc, selon sa hauteur (plus on zoome, plus on en voit). */
+/**
+ * Hauteur d'un bloc : sa durée, mais étirée vers le bas pour montrer tout son
+ * contenu (nom, heure, prestation, suppléments…), sans déborder sur le RDV
+ * suivant de la même colonne ni sous la fin de la grille.
+ */
+export function blockHeight(a: AdminAppointment, startMin: number, durMin: number, pxm: number, colW: number, nextStartMin: number, minH: number): number {
+  const durH = Math.max(minH, durMin * pxm) - 3;
+  const charsPerLine = Math.max(8, (colW - 48) / 6.4);
+  const lines = 2 + details(a, 9999).reduce((n, l) => n + (l.wrap && l.text.length > charsPerLine ? 2 : 1), 0);
+  const need = 10 + lines * 15;
+  const cap = (nextStartMin - startMin) * pxm - 3;
+  return Math.max(durH, Math.min(need, cap));
+}
+
 export function details(a: AdminAppointment, h: number): { text: string; strong?: boolean; wrap?: boolean }[] {
   const p = a.pricing;
   const out: { text: string; strong?: boolean; wrap?: boolean }[] = [];
@@ -451,12 +465,14 @@ export function DayColumns({ t, barbers, allBarbers, items, date, todayYmd, nowM
               </View>
             ))
           )}
-          {mine.map((a) => {
+          {mine.map((a, idx, arr) => {
             const r = apptRange(a);
             const st = a.display_status ?? 'confirmed';
             const past = st === 'completed';
             const abs = st === 'no_show';
-            const h = Math.max(28, r.d * pxm) - 3;
+            // RDV suivant dans la colonne (le bloc s'étire jusqu'à lui au plus).
+            const nextS = arr.reduce((m, o) => { if (o.id === a.id) return m; const os = apptRange(o).s; return os > r.s && os < m ? os : m; }, END);
+            const h = blockHeight(a, r.s, r.d, pxm, colW, nextS, 28);
             const short = h < 44;
             const future = date > todayYmd || (date === todayYmd && r.s > nowMin);
             const room = nudgeRoom(a, future);

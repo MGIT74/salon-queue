@@ -12,7 +12,7 @@ import { Palette, cardShadow, spacing } from '../theme/theme';
 import { barberColorFor, tint } from '../utils/barberColor';
 import { Avatar } from './ui';
 import { ZoomSlider } from './ZoomSlider';
-import { details } from './DayAgenda';
+import { blockHeight, details } from './DayAgenda';
 
 const HEAD_H = 50;
 const GUTTER = 46;
@@ -98,11 +98,12 @@ export function WeekAgenda({ t, days, byDay, barbers, todayYmd, nowMin, isTablet
           }}
         >
           {hours.map((m) => <View key={m} style={[c.hl, { top: y(m) }, m % 60 !== 0 && { opacity: 0.5 }]} />)}
-          {list.map((a) => {
+          {list.map((a, idx, arr) => {
             const r = range(a);
             const st = a.display_status ?? 'confirmed';
             const color = barberColorFor(barbers, a.barber_id);
-            const h = Math.max(26, r.d * pxm) - 3;
+            const nextS = arr.reduce((m, o) => { if (o.id === a.id) return m; const os = range(o).s; return os > r.s && os < m ? os : m; }, END);
+            const h = blockHeight(a, r.s, r.d, pxm, colW, nextS, 26);
             return (
               <Pressable
                 key={a.id}
