@@ -6264,7 +6264,8 @@ function toggleGiftFields() {
 // cadeau à l'avance pour quelqu'un d'autre).
 function updateGiftVisibility() {
   var section = document.getElementById('gift-section');
-  var show = ticket.length > 0 && !ticketQueueId;
+  // Ni pour une recharge de crédit coiffeur (le crédit est pour le coiffeur lui-même).
+  var show = ticket.length > 0 && !ticketQueueId && !ticket.some(function (l) { return l.credit_barber_id; });
   section.style.display = show ? 'block' : 'none';
   if (!show) {
     document.getElementById('gift-checkbox').checked = false;
