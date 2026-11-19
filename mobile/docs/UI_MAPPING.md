@@ -54,3 +54,5 @@ suit le réglage système, comme `[data-theme=dark]` du web.
 - **Nepting** : toujours NON branché (aucun appel `/api/tpe`, aucune clé) — intégration
   spécifique à valider avant activation.
 - **Impression** : réservée au pont du salon, hors périmètre mobile en Phase 1-5.
+
+| `dashboard.html #t-rdv` (Rendez-vous) | `RendezVousScreen` : Jour / Semaine / Mois, bandeau semaine, filtres Statut et Coiffeur, créneaux teintés à la couleur du coiffeur ; `AppointmentSheet` : prestation + prix, Déplacer (coiffeur, date, créneau), Annuler (message par défaut / personnalisé), coordonnées, note interne | ✅ réel (`GET /api/appointments?month&all`, `availability?exclude_appointment_id`, `PUT :id/reschedule`, `POST :id/admin-cancel`, `PUT :id/contact`, `PUT :id/note`) — à venir : Modifier la prestation, Ajouter un RDV, Paramètres, import / exports, sélection multiple, historique et marketing dans la fiche |

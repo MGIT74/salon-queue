@@ -9,6 +9,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAuth } from '../../auth/AuthContext';
 import { QueueBoard } from '../../components/QueueBoard';
 import { DashboardScreen } from './DashboardScreen';
+import { RendezVousScreen } from './RendezVousScreen';
 import { ScreenPlaceholder } from '../../components/ScreenPlaceholder';
 import { GlassTab, GlassTabBar } from '../../components/GlassTabBar';
 import { Avatar, PageTitle } from '../../components/ui';
@@ -68,6 +69,8 @@ export function AdminShell() {
   const sectionContent =
     section === 'dashboard' ? (
       <DashboardScreen bottomSpace={bottomSpace} />
+    ) : section === 'rdv' ? (
+      <RendezVousScreen bottomSpace={bottomSpace} />
     ) : (
       <ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.content, { paddingBottom: bottomSpace }]}>
         {current ? <PageTitle t={t} title={current.label} /> : null}

@@ -402,3 +402,66 @@ export async function queueCancel(salonSlug: string, id: number, auth: ApiAuth, 
     ...(reason ? { body: { reason } } : {}),
   });
 }
+
+/* ---------- Rendez-vous : actions de l'équipe (appointments.js) ---------- */
+
+/** GET /api/appointments/availability?exclude_appointment_id= : créneaux pour DÉPLACER un RDV. */
+export async function fetchRescheduleSlots(
+  salonSlug: string,
+  auth: ApiAuth,
+  params: { date: string; service_id: string; barber_id: string; appointment_id: number }
+): Promise<AvailabilityResponse> {
+  return apiRequest<AvailabilityResponse>({
+    path: 'api/appointments/availability',
+    salonSlug,
+    auth,
+    query: {
+      date: params.date,
+      service_id: params.service_id,
+      barber_id: params.barber_id,
+      exclude_appointment_id: String(params.appointment_id),
+    },
+  });
+}
+
+/** PUT /api/appointments/:id/reschedule — le client reçoit un email avec le nouvel horaire. */
+export async function rescheduleAppointment(
+  salonSlug: string,
+  auth: ApiAuth,
+  id: number,
+  body: { date: string; time: string; barber_id: string }
+): Promise<ApiOkResponse> {
+  return apiRequest<ApiOkResponse>({
+    path: `api/appointments/${id}/reschedule`,
+    method: 'PUT',
+    salonSlug,
+    auth,
+    body: { ...body, base_url: clientEmailBaseUrl(salonSlug) },
+  });
+}
+
+/** POST /api/appointments/:id/admin-cancel — email au client (message par défaut ou personnalisé). */
+export async function adminCancelAppointment(salonSlug: string, auth: ApiAuth, id: number, customMessage: string): Promise<ApiOkResponse> {
+  return apiRequest<ApiOkResponse>({
+    path: `api/appointments/${id}/admin-cancel`,
+    method: 'POST',
+    salonSlug,
+    auth,
+    body: { custom_message: customMessage },
+  });
+}
+
+/** PUT /api/appointments/:id/note — note interne rattachée au CLIENT (vide = supprimée). */
+export async function saveAppointmentNote(salonSlug: string, auth: ApiAuth, id: number, note: string): Promise<ApiOkResponse> {
+  return apiRequest<ApiOkResponse>({ path: `api/appointments/${id}/note`, method: 'PUT', salonSlug, auth, body: { note } });
+}
+
+/** PUT /api/appointments/:id/contact — nom, email, téléphone (RDV confirmé, pas encore en file). */
+export async function saveAppointmentContact(
+  salonSlug: string,
+  auth: ApiAuth,
+  id: number,
+  body: { client_name: string; email: string; phone: string }
+): Promise<ApiOkResponse> {
+  return apiRequest<ApiOkResponse>({ path: `api/appointments/${id}/contact`, method: 'PUT', salonSlug, auth, body });
+}

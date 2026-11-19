@@ -212,14 +212,40 @@ export type SalonStatsResponse = {
 export type QueueHistoryTotalResponse = { ok: true; total: number; items: unknown[] };
 
 /** Item de GET /api/appointments (admin) : RDV + durées pour le planning. */
+/** Détail du prix d'un RDV (appointments.js apptPricing). */
+export type AppointmentPricing = {
+  service_price_cents: number;
+  service_duration_min: number;
+  custom: boolean;
+  extras: { id: string; name: string; price_cents: number; duration_min: number }[];
+  products: { id: string; name: string; unit_price_cents: number; quantity: number }[];
+  charged_cents: number | null;
+  services_total_cents: number;
+  products_total_cents: number;
+  total_cents: number;
+  total_duration_min: number;
+};
+
+/** Élément de GET /api/appointments (appointments.js buildApptItems). */
 export type AdminAppointment = {
   id: number;
   client_name: string | null;
+  email?: string | null;
+  phone?: string | null;
+  service_id?: string | null;
   service_name: string | null;
   barber_id: string | null;
   barber_name: string | null;
+  /** Heure locale DU SALON « YYYY-MM-DD HH:MM:SS » (jamais UTC). */
   scheduled_at: string;
   status: string;
+  /** confirmed | completed | no_show | cancelled (calculé par le serveur). */
+  display_status?: 'confirmed' | 'completed' | 'no_show' | 'cancelled';
+  note?: string;
+  duration_min?: number;
+  client_note?: string | null;
+  promoted_queue_id?: number | null;
+  pricing?: AppointmentPricing | null;
   service_duration_min: number | null;
   extras_duration_min: number | null;
   [key: string]: unknown;
