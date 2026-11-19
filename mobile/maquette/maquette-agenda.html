@@ -207,9 +207,15 @@ main{max-width:1500px;margin:0 auto;padding:26px 24px 80px}
 <main id="main">
 <p class="group-intro ag-intro">Reprend l'agenda du web (frise « La journée en un coup d'œil » avec recherche et légende, puis une colonne par coiffeur), en mieux pour le tactile : couleurs des coiffeurs en fond teinté, pauses et congés hachurés, ligne « maintenant », colonnes qui défilent sur téléphone. Données fictives.</p>
 <div class="ag-row" id="phones"></div>
-<div class="tcap">Tablette (paysage, menu replié)</div>
+<div class="tcap" style="margin-top:6px">Toutes les fonctions du menu Rendez-vous du web</div>
+<div class="tcap-sub">Vue Semaine (coup d'œil + agenda), décalage de 5 min, réorganisation des colonnes, RDV décalés, fiche complète, paramètres, liste « À venir » avec sélection, import.</div>
+<div class="ag-row" id="phones2"></div>
+<div class="tcap">Tablette (paysage, menu replié) — Jour</div>
 <div class="tcap-sub">Toutes les colonnes visibles d'un coup. Toucher une case libre affiche « + 12:00 » pour ajouter un RDV à cette heure (comme le web) ; toucher un RDV ouvre sa fiche dans un panneau à droite.</div>
 <div class="ipad-wrap" id="tab"></div>
+<div class="tcap" style="margin-top:40px">Tablette — Semaine</div>
+<div class="tcap-sub">Coup d'œil de la semaine avec le nom des clients, puis les 7 jours côte à côte. ⚙ = Paramètres des RDV.</div>
+<div class="ipad-wrap" id="tab2"></div>
 </main>
 <script>
 /* =================== Kit (mêmes composants que src/components/ui.tsx) =================== */
@@ -458,11 +464,157 @@ var AGENDA = {
 };
 </script>
 
+<style>
+.nudges{position:absolute;right:4px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:3px}
+.nudges b{width:22px;height:20px;border-radius:6px;background:var(--card);color:var(--blue);display:grid;place-items:center;font-size:10px;box-shadow:var(--shadow)}
+.moved{display:inline-block;font-size:10px;font-weight:700;color:var(--orange);background:var(--orangeSoft);border-radius:99px;padding:0 5px;margin-left:4px;font-style:normal}
+.mbadge{font-size:11px;font-weight:700;color:var(--orange);background:var(--orangeSoft);border-radius:99px;padding:2px 7px;margin-left:auto;flex:none}
+.grip{color:var(--grey);margin-left:auto;flex:none}
+.week-glance .wrow{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.week-glance .wd{width:54px;font-size:13px;font-weight:700;flex:none;white-space:nowrap}
+.week-glance .wd.today{color:var(--blue)}
+.week-glance .lane{height:30px}
+.wcols .colh{justify-content:center;flex-direction:column;gap:0;font-size:12px;color:var(--grey);font-weight:600}
+.wcols .colh b{font-size:17px;color:var(--ink)}
+.wcols .colh.today b{color:#fff;background:var(--blue);border-radius:50%;width:28px;height:28px;display:grid;place-items:center;font-size:15px}
+.bchips{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--grey);margin-bottom:8px}
+.bchips i{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:4px;vertical-align:-1px}
+.selbar{position:absolute;left:12px;right:12px;bottom:96px;background:var(--ink);color:var(--bg);border-radius:18px;padding:10px 12px;z-index:5;display:flex;align-items:center;gap:8px;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+.selbar b{flex:1;font-size:14px}
+.selbar span{font-size:12.5px;font-weight:600;padding:7px 8px;border-radius:10px;background:rgba(127,127,127,.25);white-space:nowrap}
+.selbar span.r{color:#ff6b61}
+</style>
+<script>
+/* ---------- Semaine : coup d'œil (une ligne par jour, blocs à la couleur du coiffeur) + agenda 7 jours ---------- */
+var WDAYS=[['Lun',16],['Mar',17],['Mer',18],['Jeu',19],['Ven',20],['Sam',21],['Dim',22]];
+var WEV=[ // [jour, barbier, début, durée, nom, état]
+ [0,0,'10:00',30,'Hugo P.','past'],[0,1,'14:00',45,'Malik S.','past'],[1,2,'11:00',30,'Adam K.','past'],[2,0,'9:30',45,'Rayan M.','past'],[2,4,'16:00',30,'Paul G.','past'],
+ [3,0,'14:30',45,'Lucas Martin',''],[3,1,'15:15',30,'Sofiane B.',''],[3,2,'15:00',60,'Noé D.',''],[3,0,'16:00',20,'Thomas R.',''],
+ [4,1,'10:00',30,'Kevin L.',''],[4,0,'11:30',45,'Yanis D.',''],[4,4,'17:00',30,'Liam C.',''],
+ [5,0,'9:00',30,'Ilyes B.',''],[5,2,'10:00',45,'Enzo F.',''],[5,1,'11:00',30,'Mathis R.',''],[5,4,'14:00',30,'Nathan V.','']
+];
+function weekGlance(names){
+  var rows=WDAYS.map(function(d,di){
+    var evs=WEV.filter(function(e){return e[0]===di;});
+    return '<div class="wrow"><span class="wd'+(di===3?' today':'')+'">'+d[0]+' '+d[1]+'</span><div class="lane">'+(evs.length?evs.map(function(e){var b=B[e[1]],w=e[3]/(DAYN-DAY0)*100;return '<span class="'+e[5]+'" style="left:'+pct(e[2])+'%;width:'+w+'%;background:'+b.c+'">'+(names&&w>6?e[4]:'')+'</span>';}).join(''):'<div class="empty">'+(di===6?'Salon fermé':'Aucun RDV')+'</div>')+(di===3?'<i class="nw" style="left:'+pct(NOW)+'%"></i>':'')+'</div><span class="calb">'+ic('cal',15)+'</span></div>';
+  }).join('');
+  return '<div class="glance week-glance"><div class="gl-head"><b>La semaine en un coup d\'œil</b><span style="flex:1"></span><span class="fold">Replier ⌃</span></div>'+
+    '<div class="gsearch" style="margin-bottom:8px">'+ic('search',15)+'Rechercher un client…</div>'+
+    '<div class="bchips">'+B.slice(0,5).map(function(b){return '<span><i style="background:'+b.c+'"></i>'+b.n+'</span>';}).join('')+'</div>'+
+    rows+'<div class="axis" style="margin:0 36px 0 62px">'+['8h','10h','12h','14h','16h','18h'].map(function(t){return '<span>'+t+'</span>';}).join('')+'</div></div>';
+}
+function weekCols(o){
+  var H=o.h, start=o.start, end=o.end, pxm=H/((end-start)*60);
+  function y(hm){return (mm(hm)-start*60)*pxm;}
+  var gut=''; for(var h=start;h<=end;h++){ gut+='<span class="h" style="top:'+(44+y(h+':00'))+'px">'+(h<10?'0':'')+h+':00</span>'; }
+  var lines=''; for(var h2=start;h2<end;h2++){ lines+='<div class="hl" style="top:'+y(h2+':00')+'px"></div><div class="hl half" style="top:'+y(h2+':30')+'px"></div>'; }
+  var cols=WDAYS.map(function(d,di){
+    var evs=WEV.filter(function(e){return e[0]===di&&mm(e[2])>=start*60;}).map(function(e){
+      var b=B[e[1]], h=Math.max(28,e[3]*pxm)-3;
+      return '<div class="ev '+e[5]+'" style="top:'+y(e[2])+'px;height:'+h+'px;background:color-mix(in srgb,'+b.c+' var(--mixk),var(--card));padding:3px 6px;line-height:1.2"><b>'+e[4]+'</b><span class="tm">'+e[2]+'</span></div>';
+    }).join('');
+    var closed=di===6?'<div class="off" style="top:0;bottom:0"><em>Salon fermé</em></div>':'';
+    return '<div class="col" style="'+(o.colW?'flex:none;width:'+o.colW+'px':'')+'"><div class="colh'+(di===3?' today':'')+'">'+d[0]+'<b>'+d[1]+'</b></div><div class="grid">'+lines+closed+evs+'</div></div>';
+  }).join('');
+  return '<div class="cal wcols"><div class="cal-head"><span class="cnt">16 RDV cette semaine</span><div class="zoom"><b style="font-size:15px;line-height:1">−</b><span class="tr"><b></b></span><b style="font-size:15px;line-height:1">+</b></div><span class="add">'+(o.colW?'+':'+ Ajouter'+(o.long?' un RDV':''))+'</span></div>'+
+    '<div class="cols" style="height:'+(H+44)+'px;flex:none"><div class="gut">'+gut+'</div>'+cols+'<div class="nowl" data-t="'+NOW+'" style="top:'+(44+y(NOW))+'px;left:calc(46px + '+(o.colW? (3*o.colW)+'px':'3/7*(100% - 46px)')+')'+(o.colW?';width:'+o.colW+'px;right:auto':';width:calc((100% - 46px)/7);right:auto')+'"></div>'+(o.colW?'<div class="scroll-x-hint"></div>':'')+'</div></div>';
+}
+
+/* ---------- Jour : décalage 5 min + réorganiser les colonnes ---------- */
+function dayNudge(){
+  var col=function(b,inner,badge){return '<div class="col" style="flex:none;width:150px"><div class="colh">'+av(b.i).replace('class="av"','class="av" style="background:'+b.c+'"')+'<div style="min-width:0;overflow:hidden">'+b.n+'<small>'+b.s+'</small></div>'+(badge||'<span class="grip">⠿</span>')+'</div><div class="grid">'+inner+'</div></div>';};
+  var pxm=1.6, y=function(hm){return (mm(hm)-14*60)*pxm;};
+  var lines=''; for(var h=14;h<18;h++){ lines+='<div class="hl" style="top:'+y(h+':00')+'px"></div><div class="hl half" style="top:'+y(h+':30')+'px"></div>'; }
+  var gut=''; for(var h2=14;h2<=17;h2++){ gut+='<span class="h" style="top:'+(44+y(h2+':00'))+'px">'+h2+':00</span><span style="top:'+(44+y(h2+':30'))+'px">'+h2+':30</span>'; }
+  var ev=function(c,s,d,n,extra,nudge,moved){return '<div class="ev" style="top:'+y(s)+'px;height:'+(d*pxm-3)+'px;background:color-mix(in srgb,'+c+' var(--mixk),var(--card));padding-right:30px"><b>'+n+(moved?'<i class="moved">⇅ '+moved+'</i>':'')+'</b><span class="tm">'+extra+'</span>'+(nudge?'<div class="nudges"><b>▲</b><b>▼</b></div>':'')+'</div>';};
+  var c1=col(B[0],lines+ev(B[0].c,'14:35',45,'Lucas Martin','14:35 – 15:20',1,'+5')+ev(B[0].c,'16:00',20,'Thomas R.','16:00 – 16:20',1),'<span class="mbadge">⇅ 1</span>');
+  var c2=col(B[1],lines+'<div class="off" style="top:'+y('14:00')+'px;height:'+(45*pxm)+'px"><em>Pause</em></div>'+ev(B[1].c,'15:15',30,'Sofiane B.','15:15 – 15:45',1)+ev(B[1].c,'16:30',45,'Kevin L.','16:30 – 17:15',1));
+  return '<div class="cal"><div class="cal-head"><span class="cnt">12 RDV</span><span class="pill-btn" style="height:30px;font-size:13px">⠿ Réorganiser</span><span class="add">+ Ajouter</span></div>'+
+    '<div class="cols" style="height:'+(4*60*pxm+44)+'px;flex:none"><div class="gut">'+gut+'</div>'+c1+c2+'<div class="nowl" data-t="'+NOW+'" style="top:'+(44+y(NOW))+'px"></div><div class="scroll-x-hint"></div></div></div>';
+}
+function reorderSheet(){
+  return '<div class="sheet-dim"></div><div class="sheet" style="top:330px"><div class="grab"></div>'+navbar('Annuler','Ordre des colonnes','OK')+'<div class="scroll nobar">'+
+    '<div class="note" style="margin:0 6px 12px">Glissez ⠿ pour changer l\'ordre. Gardé sur cet appareil, comme sur le web.</div>'+
+    card(B.map(function(b,i){return row({l:av(b.i).replace('class="av"','class="av" style="background:'+b.c+'"'),t:b.n,m:b.s,r:'<span style="color:var(--grey);font-size:20px">⠿</span>'});}).join(''),{flush:1,inset:62})+'</div></div>';
+}
+function movedSheet(){
+  return '<div class="sheet-dim"></div><div class="sheet" style="top:420px"><div class="grab"></div>'+navbar('','RDV décalés — Karim','Fermer')+'<div class="scroll nobar">'+
+    '<div class="note" style="margin:0 6px 12px">Décalés de 5 min dans l\'agenda (clients non prévenus). « Remettre » les replace à l\'heure réservée par le client.</div>'+
+    card(row({t:'Lucas Martin',m:'Heure du client 14:30 → maintenant 14:35 · +5 min',r:'<span class="btn sm sec2">↩ 14:30</span>'}),{flush:1})+'</div></div>';
+}
+
+/* ---------- Fiche complète ---------- */
+function ficheFull(){
+  return '<div class="sheet-dim"></div><div class="sheet"><div class="grab"></div>'+navbar('','Rendez-vous','OK')+'<div class="scroll nobar">'+
+    '<div style="display:flex;gap:14px;align-items:center;margin:6px 0 16px">'+av('LM',1).replace('#0a84ff','#3b82f6')+'<div style="flex:1"><div class="title" style="font-size:23px">Lucas Martin</div><div class="subtitle">Jeudi 19 nov. · 14:35 – 15:20 <i class="moved">⇅ +5</i></div></div></div>'+
+    card(row({l:rowIc('cut','#3b82f6'),t:'Coupe + barbe',m:'Karim · 45 min',r:'<span class="a">35,00 €</span>'})+row({l:'<span style="width:30px"></span>',t:'+ Cire',m:'5 min',r:'<span class="v">3,00 €</span>'}),{flush:1,inset:58})+
+    '<div class="card" style="padding:12px 14px"><div class="card-h" style="margin-bottom:8px">Décaler de 5 min (client non prévenu)</div><div class="btns"><div class="btn sm grey" style="flex:1">▲ 14:30</div><div class="btn sm grey" style="flex:1;opacity:.4">▼ 14:40</div></div><div class="note" style="margin-top:8px">Heure réservée par le client : 14:30 · « Remettre à 14:30 »</div></div>'+
+    '<div class="btns" style="margin-bottom:12px">'+btn('Modifier la prestation','sec2','edit')+'</div>'+
+    '<div class="btns" style="margin-bottom:12px">'+btn('Déplacer','sec2','move')+btn('Annuler','red','x')+'</div>'+
+    card(row({t:'Nom',m:'Lucas Martin',reg:1})+row({t:'Email',m:'lucas.martin@mail.fr',reg:1})+row({t:'Téléphone',m:'06 12 34 56 78',reg:1})+row({t:'Modifier les coordonnées',nc:'var(--blue)'}),{flush:1,h:'Coordonnées'})+
+    card('<div class="input ph" style="box-shadow:none;background:var(--fill)">Note interne (visible par l\'équipe)</div>',{h:'Note interne'})+
+    card(row({t:'Coupe',m:'12 oct. · Karim',r:'<span class="v">20,00 €</span>'})+row({t:'Coupe + barbe',m:'14 sept. · Karim',r:'<span class="v">35,00 €</span>'}),{flush:1,h:'Historique des passages'})+
+    card(frow('Accepte les messages marketing','',{tog:true}),{flush:1,h:'Marketing'})+
+    btn('Supprimer définitivement','red')+
+  '</div></div>';
+}
+
+/* ---------- Paramètres ---------- */
+function settingsSheet(){
+  return '<div class="sheet-dim"></div><div class="sheet"><div class="grab"></div>'+navbar('Annuler','Paramètres des RDV','Enregistrer')+'<div class="scroll nobar">'+
+    card(frow('Pas des créneaux proposés','15 min',{chev:1})+frow('Délai minimum avant réservation','1 h',{chev:1})+frow('Réservable jusqu\'à','60 jours',{chev:1}),{flush:1,h:'Réservation en ligne'})+
+    card(frow('Marge tampon entre 2 RDV','5 min',{chev:1})+frow('Délai limite pour annuler en ligne','24 h',{chev:1}),{flush:1,h:'Règles'})+
+    card(frow('Alerte de préparation avant un RDV','10 min',{chev:1}),{flush:1,h:'Équipe'})+
+    '<div class="note" style="margin:0 6px">Le pas des créneaux règle aussi la graduation de l\'agenda (Jour et Semaine).</div>'+
+  '</div></div>';
+}
+
+/* ---------- Liste « À venir » : filtres, sélection, actions ---------- */
+function upcomingList(){
+  return '<div class="ag-top"><div class="t">À venir<small>48 RDV · page 1 / 5</small></div><span class="pill-btn">Sélectionner</span></div>'+
+    '<div class="search">'+ic('search',17)+'Rechercher un client</div>'+
+    '<div class="chips"><span class="chip on">Tous</span><span class="chip">Confirmés</span><span class="chip">Terminés</span><span class="chip">Absents</span><span class="chip">Annulés</span></div>'+
+    '<div class="chips"><span class="chip on">Tous les coiffeurs</span><span class="chip">Karim</span><span class="chip">Mehdi L.</span><span class="chip">Yanis</span></div>'+
+    '<div style="display:flex;gap:8px;margin-bottom:14px"><div class="input" style="flex:1;font-size:14px;min-height:40px">Du 19/11 <span style="color:var(--grey)">⌄</span></div><div class="input" style="flex:1;font-size:14px;min-height:40px">Au 31/12 <span style="color:var(--grey)">⌄</span></div></div>'+
+    card(
+      row({l:'<span class="check on"></span>',t:'Lucas Martin',m:'Jeu. 19 nov. 14:35 · Coupe + barbe',r:chip('Karim')})+
+      row({l:'<span class="check on"></span>',t:'Sofiane B.',m:'Jeu. 19 nov. 15:15 · Dégradé',r:chip('Mehdi L.')})+
+      row({l:'<span class="check"></span>',t:'Adam K.',m:'Ven. 20 nov. 10:00 · Coupe',r:chip('Yanis')})+
+      row({l:'<span class="check"></span>',t:'Thomas R.',m:'Sam. 21 nov. 11:30 · Coupe enfant',r:chip('Karim')}),
+    {flush:1,inset:50})+
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin:-8px 4px 16px;font-size:14px;color:var(--grey)"><span>10 par page ⌄</span><span><span style="color:var(--blue)">‹</span> 1 / 5 <span style="color:var(--blue)">›</span></span></div>'+
+    card(row({l:rowIc('ul','#0a84ff'),t:'Importer des RDV (CSV)',reg:1,chev:1}),{flush:1,inset:58});
+}
+var SELBAR='<div class="selbar"><b>2 sél.</b><span>CSV</span><span>PDF</span><span class="r">Annuler</span><span class="r">Suppr.</span></div>';
+
+var AGENDA2 = {
+  phone: [
+    phone({cap:'Semaine — coup d\'œil + agenda', sub:'« La semaine en un coup d\'œil » : une ligne par jour, RDV à la couleur du coiffeur (légende des coiffeurs) ; puis l\'agenda en 7 colonnes (une par jour), aujourd\'hui en bleu. Toucher un jour ouvre la vue Jour.', top:ADMIN_TOP, bar:'admin', on:2,
+      body:'<div class="ag-top"><span class="rbtn">‹</span><div class="t">16 – 22 nov.<small>16 RDV cette semaine</small></div><span class="pill-btn">Auj.</span><span class="rbtn">›</span></div><div class="seg" style="margin-bottom:12px"><span>Jour</span><span class="on">Semaine</span><span>Mois</span></div>'+weekGlance(false)+weekCols({h:300,start:9,end:13,colW:96})}),
+    phone({cap:'Jour — décaler de 5 min, réorganiser', sub:'Flèches ▲ ▼ sur chaque RDV : décale de 5 min (client non prévenu, ±5 min max de son heure). « ⇅ +5 » sur le RDV, « ⇅ 1 » sur la colonne = liste des RDV décalés. ⠿ / « Réorganiser » : ordre des colonnes.', top:ADMIN_TOP, bar:'admin', on:2,
+      body:PH_TOP+dayNudge()}),
+    phone({cap:'Réorganiser les colonnes', sub:'Glisser ⠿ (comme glisser le nom sur le web). Ordre gardé sur l\'appareil.', top:ADMIN_TOP, bar:'admin', on:2, body:PH_TOP+dayNudge(), over:reorderSheet()}),
+    phone({cap:'RDV décalés (pastille ⇅)', sub:'Liste des RDV décalés du coiffeur, bouton « Remettre à l\'heure du client ».', top:ADMIN_TOP, bar:'admin', on:2, body:PH_TOP+dayNudge(), over:movedSheet()}),
+    phone({cap:'Fiche complète d\'un RDV', sub:'Décaler ±5 min, Modifier la prestation, Déplacer, Annuler, coordonnées, note interne, historique, marketing, Supprimer.', top:ADMIN_TOP, bar:'admin', on:2, body:PH_TOP, over:ficheFull()}),
+    phone({cap:'Paramètres des RDV (⚙)', sub:'Les 6 réglages du web.', top:ADMIN_TOP, bar:'admin', on:2, body:PH_TOP, over:settingsSheet()}),
+    phone({cap:'Liste « À venir » + sélection', sub:'Recherche, statut, coiffeur, Du / Au, pagination, sélection multiple → CSV, PDF, Annuler, Supprimer ; Importer (CSV).', top:ADMIN_TOP, bar:'admin', on:2, body:upcomingList(), over:SELBAR})
+  ],
+  tablet: '<div class="ipad"><div class="screen">'+'<div class="tstatus"><span>9:41  Jeu. 19 nov.</span><span>87 %</span></div>'+
+    '<div class="side">'+['grid','list','cut','plus','box','mail','card','cal','user','users','shop','id','gear'].map(function(n,i){return '<div class="it'+(i===7?' on':'')+'">'+ic(n,20)+'</div>';}).join('')+'</div>'+
+    '<div class="content"><div class="tscroll">'+
+      '<div class="ag-top"><span class="rbtn">‹</span><div class="t" style="font-size:24px;text-align:center">16 – 22 novembre 2026<small>16 RDV cette semaine</small></div><span class="pill-btn">Aujourd\'hui</span>'+seg(['Jour','Semaine','Mois'],1).replace('class="seg"','class="seg sm"')+'<span class="rbtn">⚙</span><span class="rbtn">›</span></div>'+
+      weekGlance(true)+weekCols({h:260,start:9,end:13,long:true})+
+    '</div></div></div></div>'
+};
+</script>
+
 <script>
 (function(){
   document.getElementById('phones').innerHTML = AGENDA.phone.join('');
   document.getElementById('tab').innerHTML = AGENDA.tablet;
-  function fit(){ var w=document.getElementById('main').clientWidth, k=Math.min(1,w/1218), el=document.getElementById('tab'); el.style.transform='scale('+k+')'; el.style.height=(858*k)+'px'; }
+  document.getElementById('phones2').innerHTML = AGENDA2.phone.join('');
+  document.getElementById('tab2').innerHTML = AGENDA2.tablet;
+  function fit(){ var w=document.getElementById('main').clientWidth, k=Math.min(1,w/1218); ['tab','tab2'].forEach(function(id){ var el=document.getElementById(id); el.style.transform='scale('+k+')'; el.style.height=(858*k)+'px'; }); }
   window.addEventListener('resize',fit); fit();
   var dark=false, btn=document.getElementById('themeBtn');
   function apply(){ [].forEach.call(document.querySelectorAll('.screen'),function(s){s.classList.toggle('dark',dark);s.classList.toggle('light',!dark);}); document.body.classList.toggle('dk',dark); btn.textContent=dark?'Mode clair':'Mode sombre'; }
