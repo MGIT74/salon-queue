@@ -2219,6 +2219,7 @@
       <h2>Produits</h2>
       <div class="admin-head-btns">
         <button class="cat-color-btn" onclick="openCatColorsDialog('product')" title="Couleur dans l'agenda du poste" aria-label="Couleur dans l'agenda du poste"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+        <button class="btn btn-soft" onclick="openProductScan()" title="Scanner un produit (douchette ou caméra du téléphone)" style="display:flex;align-items:center;gap:6px"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M7 12h10"/></svg>Scanner</button>
         <button class="btn btn-primary" onclick="openCatalogForm('products')">+ Ajouter</button>
       </div>
     </div>
@@ -3192,8 +3193,11 @@
       <div class="fld" id="sc-stock-qty-fld" style="display:none"><label for="sc-stock-qty">Quantité en stock</label><input id="sc-stock-qty" type="number" min="0" value="0"></div>
       <div class="fld" id="sc-barcode-fld" style="display:none">
         <label for="sc-barcode">Code-barres</label>
-        <input id="sc-barcode" type="text" placeholder="Cliquez ici puis scannez le produit">
-        <p class="hint" style="margin-top:4px">Cliquez dans ce champ puis scannez l'emballage du produit avec la douchette USB - le code s'y écrit tout seul. Vous pouvez aussi le taper à la main.</p>
+        <div style="display:flex;gap:8px">
+          <input id="sc-barcode" type="text" placeholder="Cliquez ici puis scannez le produit" style="flex:1;min-width:0">
+          <button type="button" class="btn btn-soft" style="flex:none;display:flex;align-items:center;gap:6px;white-space:nowrap" onclick="scanBarcodeIntoField()" aria-label="Scanner avec la caméra du téléphone"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M7 12h10"/></svg>Caméra</button>
+        </div>
+        <p class="hint" style="margin-top:4px">Cliquez dans ce champ puis scannez l'emballage avec la douchette USB (le code s'y écrit tout seul), ou touchez « Caméra » pour le scanner avec le téléphone. Vous pouvez aussi le taper à la main.</p>
       </div>
     </div>
     <div class="sheet-foot"><button class="btn btn-primary" onclick="saveCatalog()">Enregistrer</button></div>
@@ -3283,6 +3287,7 @@
 <script src="/autorefresh.js?v=3"></script>
 <script src="/staff-group.js?v=7"></script>
 <script src="/daterange.js?v=4"></script>
+<script src="/scanner.js?v=1"></script>
 <script>
   // Le lien "Creer mon salon" n'a de sens que si l'inscription est ouverte sur
   // cette installation (fermee chez un client unique). Masque par defaut : s'il
@@ -12836,6 +12841,42 @@ function toggleBarberCreditFree(id, on) {
   api('/api/barber-credit/free/' + encodeURIComponent(id), { method: 'PUT', body: { free: on } })
     .then(function () { toast(on ? 'Produits offerts pour ce coiffeur (seul le stock baisse)' : 'Ce coiffeur paie de nouveau avec son crédit'); loadBarberCredit(); })
     .catch(function (e) { toast(e.message, true); loadBarberCredit(); });
+}
+
+/* ---------- Produits : scanner (douchette USB ou caméra du téléphone) ---------- */
+function scanBarcodeIntoField() {
+  BarcodeScanner.open({ title: 'Scanner le code-barres', tip: "Visez le code-barres sur l'emballage", onCode: function (code) {
+    document.getElementById('sc-barcode').value = code;
+    toast('Code-barres : ' + code);
+  } });
+}
+/** Code scanné : produit connu -> sa fiche ; inconnu -> nouveau produit avec ce code-barres déjà rempli. */
+function handleAdminProductCode(code) {
+  code = String(code || '').trim();
+  if (!code) return;
+  var p = (products || []).find(function (x) { return x.barcode && x.barcode === code; });
+  if (p) { openCatalogForm('products', p.id); toast('Produit trouvé : ' + p.name); return; }
+  openCatalogForm('products');
+  document.getElementById('sc-barcode').value = code;
+  toast('Nouveau produit : code-barres ' + code + ' rempli, complétez le nom et le prix');
+  setTimeout(function () { var n = document.getElementById('sc-name'); if (n) n.focus(); }, 150);
+}
+function openProductScan() {
+  var overlay = _buildModal('<div class="modal-title">Scanner un produit</div>' +
+    '<div class="modal-message">Scannez avec la douchette (le code s\'écrit ci-dessous), ou utilisez la caméra du téléphone.</div>' +
+    '<input id="ps-code" class="modal-input" type="text" autocomplete="off" placeholder="En attente de la douchette…" style="margin-bottom:12px">' +
+    '<div class="modal-actions"><button class="btn btn-soft" id="ps-cancel">Fermer</button><button class="btn btn-primary" id="ps-cam">Caméra du téléphone</button></div>');
+  var input = overlay.querySelector('#ps-code');
+  setTimeout(function () { input.focus(); }, 80);
+  // La douchette « tape » le code puis Entrée.
+  input.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); var v = input.value; _closeModal(overlay); handleAdminProductCode(v); }
+  });
+  overlay.querySelector('#ps-cancel').onclick = function () { _closeModal(overlay); };
+  overlay.querySelector('#ps-cam').onclick = function () {
+    _closeModal(overlay);
+    BarcodeScanner.open({ title: 'Scanner un produit', tip: "Visez le code-barres sur l'emballage", onCode: handleAdminProductCode });
+  };
 }
 </script>
 

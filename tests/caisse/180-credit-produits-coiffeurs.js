@@ -104,6 +104,11 @@ const stock = (id) => Number(sql(`SELECT stock_quantity FROM products WHERE id='
     caisse.includes('var b = creditBalances.find(function (x) { return x.id === activeBarberId; });') && caisse.includes("if (currentCat === 'credit') renderCreditSection();") &&
     caisse.includes("(b.free || !low ? 'var(--green)' : 'var(--red)')") && caisse.includes('rien à recharger'));
   check('caisse : pas de « C\'est un cadeau » pour une recharge de crédit coiffeur', caisse.includes('!ticketQueueId && !ticket.some(function (l) { return l.credit_barber_id; })'));
+  const scan = fs.readFileSync(path.join(__dirname, '../../public/scanner.js'), 'utf8');
+  check('scanner caméra partagé (poste + dashboard) : BarcodeDetector sinon ZXing local', scan.includes("'BarcodeDetector' in window") && scan.includes("/vendor/zxing-0.21.3.min.js") &&
+    poste.includes('<script src="/scanner.js?v=1"></script>') && dash.includes('<script src="/scanner.js?v=1"></script>') && fs.existsSync(path.join(__dirname, '../../public/vendor/zxing-0.21.3.min.js')));
+  check('Produits (admin) : bouton « Scanner » (douchette ou caméra) et « Caméra » sur le code-barres ; produit inconnu = nouveau produit pré-rempli', dash.includes('onclick="openProductScan()"') &&
+    dash.includes('onclick="scanBarcodeIntoField()"') && dash.includes("document.getElementById('sc-barcode').value = code;") && dash.includes("openCatalogForm('products', p.id)"));
   check('dashboard : Coiffeurs > Crédit produits (soldes, réglages, interrupteur « Gratuit », pas d\'« Ajuster »)', dash.includes('id="credit-box"') && dash.includes('function loadBarberCredit(') &&
     dash.includes('function toggleBarberCreditFree(') && !dash.includes('function adjustBarberCredit('));
   check('poste : mode gratuit (« Offerts »), caisse : pas de recharge pour un gratuit', poste.includes("free ? 'Offerts' : eur(bal)") && caisse.includes('rien à recharger'));
