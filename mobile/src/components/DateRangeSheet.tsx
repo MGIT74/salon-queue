@@ -5,7 +5,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Palette, cardShadow, radius, spacing } from '../theme/theme';
+import { Palette, cardShadow, radius, spacing, sheetTheme } from '../theme/theme';
 import { CustomRange, localDateStr } from '../utils/period';
 
 const WEEKDAYS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
@@ -13,7 +13,7 @@ const WEEKDAYS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
 const fmt = (ymd: string) =>
   new Date(`${ymd}T12:00:00`).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
 
-export function DateRangeSheet({ t, visible, value, onClose, onApply, allowFuture, title }: {
+export function DateRangeSheet({ t: tIn, visible, value, onClose, onApply, allowFuture, title }: {
   t: Palette;
   /** Dates futures autorisées (filtre « À venir »). Par défaut : non (statistiques). */
   allowFuture?: boolean;
@@ -23,6 +23,7 @@ export function DateRangeSheet({ t, visible, value, onClose, onApply, allowFutur
   onClose: () => void;
   onApply: (r: CustomRange) => void;
 }) {
+  const t = sheetTheme(tIn);
   const today = localDateStr(new Date());
   const [from, setFrom] = useState(value.from);
   const [to, setTo] = useState<string | null>(value.to);

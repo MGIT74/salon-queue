@@ -132,3 +132,13 @@ export function cardShadow(t: Palette) {
 export const FLOATING_TABBAR_SPACE = 110;
 
 export const APP_VERSION = 'v0.0.1';
+
+/**
+ * Fenêtres (feuilles / pop-up) : comme le web (.modal-box = var(--card)), le
+ * fond d'une fenêtre n'est jamais le noir de la page. En sombre : fond « surélevé »
+ * #1c1c1e et cartes un cran plus claires (couleurs iOS). En clair : inchangé.
+ */
+export function sheetTheme(t: Palette): Palette {
+  if (t.scheme !== 'dark') return t;
+  return { ...t, bg: '#1c1c1e', card: '#2c2c2e', fill: '#3a3a3c', fill2: '#48484a', sep: '#545458', segOn: '#636366', hair: 'rgba(255,255,255,0.08)' };
+}

@@ -8,7 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { ApiAuth, ApiError } from '../api/transport';
 import { adminCreateAppointment, fetchExtras, fetchServices, fetchStaffAvailability } from '../api/endpoints';
 import { AvailabilitySlot, BarberPublic, CatalogItem } from '../types/api';
-import { Palette, cardShadow, radius, spacing } from '../theme/theme';
+import { Palette, cardShadow, radius, spacing, sheetTheme } from '../theme/theme';
 import { formatPriceCents } from '../utils/format';
 import { barberColorFor } from '../utils/barberColor';
 import { contactProblem } from '../utils/phone';
@@ -25,7 +25,10 @@ const dayLong = (s: string) => {
   return v.charAt(0).toUpperCase() + v.slice(1);
 };
 
-export function AddAppointmentSheet({ t, visible, initialDate, initialTime, initialBarberId, todayYmd, barbers, salonSlug, auth, onClose, onCreated }: {
+/** « Seulement un supplément » : le serveur prend sa prestation cachée (web : EXTRAS_ONLY). */
+const EXTRAS_ONLY = '__extras__';
+
+export function AddAppointmentSheet({ t: tIn, visible, initialDate, initialTime, initialBarberId, todayYmd, barbers, salonSlug, auth, onClose, onCreated }: {
   t: Palette;
   visible: boolean;
   initialDate: string;
@@ -40,6 +43,7 @@ export function AddAppointmentSheet({ t, visible, initialDate, initialTime, init
   onClose: () => void;
   onCreated: (message: string) => void;
 }) {
+  const t = sheetTheme(tIn);
   const styles = stylesFor(t);
   const [step, setStep] = useState<Step>(1);
   const [services, setServices] = useState<CatalogItem[] | null>(null);
@@ -74,7 +78,8 @@ export function AddAppointmentSheet({ t, visible, initialDate, initialTime, init
     if (!services) {
       Promise.all([fetchServices(salonSlug), fetchExtras(salonSlug)])
         .then(([s, x]) => {
-          setServices(s.items.filter((i) => i.active !== 0));
+          // La prestation cachée « Supplément seul » n'est jamais listée (web : lib/extrasOnly).
+          setServices(s.items.filter((i) => i.active !== 0 && !(i as { system_kind?: string | null }).system_kind));
           setExtras(x.items.filter((i) => i.active !== 0));
         })
         .catch((e) => setCatErr(errText(e)));
@@ -103,6 +108,7 @@ export function AddAppointmentSheet({ t, visible, initialDate, initialTime, init
     return Array.from({ length: 42 }, (_, i) => ymd(new Date(base.getTime() + i * 86400000)));
   }, [todayYmd]);
 
+  const only = serviceId === EXTRAS_ONLY;
   const service = services?.find((s) => s.id === serviceId) ?? null;
   const chosenExtras = extras.filter((x) => extraIds.includes(x.id));
   const total = (service?.price_cents ?? 0) + chosenExtras.reduce((a, x) => a + x.price_cents, 0);
@@ -112,7 +118,7 @@ export function AddAppointmentSheet({ t, visible, initialDate, initialTime, init
   const bookable = barbers.filter((b) => b.active && b.accepts_appointments !== 0);
 
   const save = async () => {
-    if (saving || !serviceId || !time) return;
+    if (saving || !serviceId || !time || (only && !extraIds.length)) return;
     const problem = contactProblem({ name, email, phone }, { nameRequired: true });
     if (!name.trim()) return setSaveErr('Le nom est requis');
     if (problem) return setSaveErr(problem);
@@ -158,8 +164,16 @@ export function AddAppointmentSheet({ t, visible, initialDate, initialTime, init
               <Text style={styles.title}>Prestation</Text>
               {catErr ? <ErrorText t={t} text={catErr} /> : !services ? <InlineLoading t={t} /> : (
                 <Card t={t} flush style={styles.block}>
+                  {extras.length ? (
+                    // Web : « Seulement un supplément · Sans prestation » en tête de liste.
+                    <ListRow t={t} first inset={50} onPress={() => setServiceId(EXTRAS_ONLY)}
+                      left={<Ionicons name={only ? 'checkmark-circle' : 'ellipse-outline'} size={24} color={only ? t.blue : t.sep} />}
+                      right={<Text style={styles.amt}>Choisir ensuite</Text>}>
+                      <RowText t={t} title="Seulement un supplément" meta="Sans prestation" />
+                    </ListRow>
+                  ) : null}
                   {services.map((s, i) => (
-                    <ListRow key={s.id} t={t} first={i === 0} inset={50} onPress={() => setServiceId(s.id)}
+                    <ListRow key={s.id} t={t} first={i === 0 && !extras.length} inset={50} onPress={() => setServiceId(s.id)}
                       left={<Ionicons name={serviceId === s.id ? 'checkmark-circle' : 'ellipse-outline'} size={24} color={serviceId === s.id ? t.blue : t.sep} />}
                       right={<Text style={styles.amt}>{formatPriceCents(s.price_cents)}</Text>}>
                       <RowText t={t} title={s.name} meta={`${s.duration_min} min`} />
@@ -169,7 +183,7 @@ export function AddAppointmentSheet({ t, visible, initialDate, initialTime, init
               )}
               {extras.length ? (
                 <>
-                  <Text style={styles.sub}>Suppléments (optionnels)</Text>
+                  <Text style={[styles.sub, only && !extraIds.length && { color: t.blue }]}>{only ? 'Quel supplément ? (au moins un)' : 'Suppléments (optionnels)'}</Text>
                   <Card t={t} flush style={styles.block}>
                     {extras.map((x, i) => {
                       const on = extraIds.includes(x.id);
@@ -189,7 +203,7 @@ export function AddAppointmentSheet({ t, visible, initialDate, initialTime, init
           ) : step === 2 ? (
             <>
               <Text style={styles.title}>Créneau</Text>
-              <Text style={styles.recap}>{service?.name}{chosenExtras.length ? ` + ${chosenExtras.map((x) => x.name).join(', ')}` : ''} · {duration} min</Text>
+              <Text style={styles.recap}>{only ? chosenExtras.map((x) => x.name).join(', ') : `${service?.name ?? ''}${chosenExtras.length ? ` + ${chosenExtras.map((x) => x.name).join(', ')}` : ''}`} · {duration} min</Text>
 
               <Text style={styles.label}>Coiffeur</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hList}>
@@ -262,8 +276,8 @@ export function AddAppointmentSheet({ t, visible, initialDate, initialTime, init
 
         <View style={styles.footer}>
           {step === 1 ? (
-            <TouchableOpacity style={[styles.btn, !serviceId && { opacity: 0.45 }]} disabled={!serviceId} onPress={() => setStep(2)} accessibilityRole="button">
-              <Text style={styles.btnLabel}>{serviceId ? `Continuer · ${formatPriceCents(total)} · ${duration} min` : 'Choisissez une prestation'}</Text>
+            <TouchableOpacity style={[styles.btn, (!serviceId || (only && !extraIds.length)) && { opacity: 0.45 }]} disabled={!serviceId || (only && !extraIds.length)} onPress={() => setStep(2)} accessibilityRole="button">
+              <Text style={styles.btnLabel}>{!serviceId ? 'Choisissez une prestation' : only && !extraIds.length ? 'Choisissez au moins un supplément' : `Continuer · ${formatPriceCents(total)} · ${duration} min`}</Text>
             </TouchableOpacity>
           ) : step === 2 ? (
             <TouchableOpacity style={[styles.btn, !time && { opacity: 0.45 }]} disabled={!time} onPress={() => setStep(3)} accessibilityRole="button">

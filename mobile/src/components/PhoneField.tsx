@@ -6,7 +6,7 @@ import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, TouchableOpaci
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { PHONE_COUNTRIES, PhoneCountry } from '../utils/phone';
-import { Palette, radius, spacing } from '../theme/theme';
+import { Palette, radius, spacing, sheetTheme } from '../theme/theme';
 
 export function PhoneField({ label, t, country, onCountryChange, value, onChangeText }: {
   label: string;
@@ -17,6 +17,7 @@ export function PhoneField({ label, t, country, onCountryChange, value, onChange
   onChangeText: (v: string) => void;
 }) {
   const styles = stylesFor(t);
+  const ms = stylesFor(sheetTheme(t));
   const [open, setOpen] = useState(false);
 
   return (
@@ -41,11 +42,11 @@ export function PhoneField({ label, t, country, onCountryChange, value, onChange
       </View>
 
       <Modal visible={open} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setOpen(false)}>
-        <SafeAreaView style={styles.sheet} edges={['top', 'bottom']}>
-          <View style={styles.sheetHead}>
-            <Text style={styles.sheetTitle}>Indicatif</Text>
+        <SafeAreaView style={ms.sheet} edges={['top', 'bottom']}>
+          <View style={ms.sheetHead}>
+            <Text style={ms.sheetTitle}>Indicatif</Text>
             <Pressable onPress={() => setOpen(false)} accessibilityRole="button">
-              <Text style={styles.close}>Fermer</Text>
+              <Text style={ms.close}>Fermer</Text>
             </Pressable>
           </View>
           <FlatList
@@ -55,15 +56,15 @@ export function PhoneField({ label, t, country, onCountryChange, value, onChange
               const on = item[3] === country[3];
               return (
                 <TouchableOpacity
-                  style={[styles.opt, on && { backgroundColor: t.blueSoft }]}
+                  style={[ms.opt, on && { backgroundColor: sheetTheme(t).blueSoft }]}
                   onPress={() => {
                     onCountryChange(item);
                     setOpen(false);
                   }}
                 >
-                  <Text style={styles.flag}>{item[1]}</Text>
-                  <Text style={styles.optCode}>{item[0]}</Text>
-                  <Text style={styles.optName}>{item[2]}</Text>
+                  <Text style={ms.flag}>{item[1]}</Text>
+                  <Text style={ms.optCode}>{item[0]}</Text>
+                  <Text style={ms.optName}>{item[2]}</Text>
                 </TouchableOpacity>
               );
             }}

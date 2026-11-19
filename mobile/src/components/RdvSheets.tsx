@@ -7,7 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { ApiAuth, ApiError } from '../api/transport';
 import { RdvSettings, fetchSettings, saveRdvSettings } from '../api/endpoints';
 import { AdminAppointment, BarberPublic } from '../types/api';
-import { Palette, cardShadow, spacing } from '../theme/theme';
+import { Palette, cardShadow, spacing, sheetTheme } from '../theme/theme';
 import { barberColorFor } from '../utils/barberColor';
 import { Card } from './Card';
 import { Avatar, ErrorText, InlineLoading, ListRow, RowText } from './ui';
@@ -30,10 +30,11 @@ function SheetHead({ t, left, title, right, onLeft, onRight, rightBusy }: {
 
 /* ============================ Ordre des colonnes ============================ */
 
-export function MovedSheet({ t, visible, barber, items, busyId, onClose, onRestore }: {
+export function MovedSheet({ t: tIn, visible, barber, items, busyId, onClose, onRestore }: {
   t: Palette; visible: boolean; barber: BarberPublic | null; items: AdminAppointment[]; busyId: number | null;
   onClose: () => void; onRestore: (a: AdminAppointment, minutes: number) => void;
 }) {
+  const t = sheetTheme(tIn);
   const toMin = (hm: string) => Number(hm.slice(0, 2)) * 60 + Number(hm.slice(3, 5));
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -83,9 +84,10 @@ const SETTINGS: { key: keyof RdvSettings; label: string; hint?: string; options:
     options: [['0', 'Désactivée'], ['5', '5 min'], ['10', '10 min'], ['15', '15 min']] },
 ];
 
-export function RdvSettingsSheet({ t, visible, salonSlug, auth, onClose, onSaved }: {
+export function RdvSettingsSheet({ t: tIn, visible, salonSlug, auth, onClose, onSaved }: {
   t: Palette; visible: boolean; salonSlug: string; auth: ApiAuth; onClose: () => void; onSaved: () => void;
 }) {
+  const t = sheetTheme(tIn);
   const st = styles(t);
   const [vals, setVals] = useState<RdvSettings | null>(null);
   const [err, setErr] = useState('');

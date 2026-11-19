@@ -81,3 +81,9 @@ Tous les chiffres : `fontVariant: ['tabular-nums']`.
   droite. Frise « coup d'œil » : barre pleine à la couleur du coiffeur. RDV passé / terminé / absent : gris, sans couleur.
 - Marges différentes à gauche et à droite, texte coupé ou qui sort de l'écran.
 - Toute donnée inventée : chaque chiffre vient du serveur.
+
+## Fenêtres (feuilles / pop-up)
+
+Comme le web (`.modal-box` = `var(--card)`), une fenêtre n'a jamais le fond noir de la page.
+Toute feuille passe par `sheetTheme(t)` : en sombre fond `#1c1c1e`, cartes `#2c2c2e`,
+champs `#3a3a3c` ; en clair rien ne change.

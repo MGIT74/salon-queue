@@ -16,12 +16,13 @@ import { Avatar, PageTitle } from '../../components/ui';
 import { AdminSidebar, useSidebarCollapsed } from '../../components/AdminSidebar';
 import { useLayout } from '../../hooks/useLayout';
 import { useTheme } from '../../hooks/useTheme';
-import { Palette, APP_VERSION, FLOATING_TABBAR_SPACE, cardShadow, radius, spacing } from '../../theme/theme';
+import { Palette, APP_VERSION, FLOATING_TABBAR_SPACE, cardShadow, radius, spacing, sheetTheme } from '../../theme/theme';
 import { ADMIN_BOTTOM_BAR, ADMIN_SECTIONS, AdminSectionDef, AdminSectionKey } from '../../navigation/menu.config';
 
 export function AdminShell() {
   const t = useTheme();
   const styles = stylesFor(t);
+  const ps = stylesFor(sheetTheme(t));
   const insets = useSafeAreaInsets();
   const { admin, logout, switchAdminSalon } = useAuth();
   const [section, setSection] = useState<AdminSectionKey>('dashboard');
@@ -130,40 +131,40 @@ export function AdminShell() {
       />
 
       <Modal animationType="slide" presentationStyle="pageSheet" visible={plusOpen} onRequestClose={() => setPlusOpen(false)}>
-        <View style={{ flex: 1, backgroundColor: t.bg }}>
-          <View style={styles.plusHead}>
+        <View style={{ flex: 1, backgroundColor: sheetTheme(t).bg }}>
+          <View style={ps.plusHead}>
             <View style={{ flexShrink: 1 }}>
-              <Text style={styles.plusTitle}>Plus</Text>
-              <Text style={styles.plusSub} numberOfLines={1}>{admin.email}</Text>
+              <Text style={ps.plusTitle}>Plus</Text>
+              <Text style={ps.plusSub} numberOfLines={1}>{admin.email}</Text>
             </View>
             <TouchableOpacity onPress={() => setPlusOpen(false)} accessibilityRole="button" hitSlop={8}>
               <Text style={{ color: t.blue, fontSize: 16, fontWeight: '600' }}>Fermer</Text>
             </TouchableOpacity>
           </View>
-          <ScrollView contentContainerStyle={styles.plusList}>
-            <View style={styles.plusCard}>
+          <ScrollView contentContainerStyle={ps.plusList}>
+            <View style={ps.plusCard}>
               {ADMIN_SECTIONS.map((s, i) => (
                 <TouchableOpacity
                   key={s.key}
-                  style={styles.plusItem}
+                  style={ps.plusItem}
                   onPress={() => {
                     setSection(s.key);
                     setPlusOpen(false);
                   }}
                   accessibilityRole="button"
                 >
-                  {i > 0 ? <View style={styles.plusSep} /> : null}
+                  {i > 0 ? <View style={ps.plusSep} /> : null}
                   <Ionicons name={s.icon} size={20} color={section === s.key ? t.blue : t.ink} />
-                  <Text style={[styles.plusItemLabel, section === s.key && { color: t.blue, fontWeight: '600' }]}>{s.label}</Text>
+                  <Text style={[ps.plusItemLabel, section === s.key && { color: t.blue, fontWeight: '600' }]}>{s.label}</Text>
                   <Ionicons name="chevron-forward" size={16} color={t.sep} />
                 </TouchableOpacity>
               ))}
             </View>
-            <TouchableOpacity style={[styles.plusCard, styles.plusItem]} onPress={() => void logout('admin')} accessibilityRole="button">
+            <TouchableOpacity style={[ps.plusCard, ps.plusItem]} onPress={() => void logout('admin')} accessibilityRole="button">
               <Ionicons name="log-out-outline" size={20} color={t.red} />
-              <Text style={[styles.plusItemLabel, { color: t.red, fontWeight: '600' }]}>Déconnexion</Text>
+              <Text style={[ps.plusItemLabel, { color: t.red, fontWeight: '600' }]}>Déconnexion</Text>
             </TouchableOpacity>
-            <Text style={styles.version}>{APP_VERSION}</Text>
+            <Text style={ps.version}>{APP_VERSION}</Text>
           </ScrollView>
         </View>
       </Modal>

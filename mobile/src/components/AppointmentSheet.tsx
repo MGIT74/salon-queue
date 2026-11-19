@@ -24,7 +24,7 @@ import {
 } from '../api/endpoints';
 import { AdminAppointment, AvailabilitySlot, BarberPublic, CatalogItem } from '../types/api';
 import { movedBy, nudgeRoom } from '../utils/agendaRules';
-import { Palette, cardShadow, radius, spacing } from '../theme/theme';
+import { Palette, cardShadow, radius, spacing, sheetTheme } from '../theme/theme';
 import { formatPriceCents } from '../utils/format';
 import { barberColorFor } from '../utils/barberColor';
 import { Card } from './Card';
@@ -56,7 +56,7 @@ function errText(e: unknown) {
   return e instanceof ApiError ? e.message : 'Une erreur est survenue.';
 }
 
-export function AppointmentSheet({ t, visible, appt, barbers, salonSlug, auth, todayYmd, nowMin, onClose, onChanged, asPanel }: {
+export function AppointmentSheet({ t: tIn, visible, appt, barbers, salonSlug, auth, todayYmd, nowMin, onClose, onChanged, asPanel }: {
   t: Palette;
   /** Tablette : panneau à droite (l'agenda reste visible) au lieu d'une feuille plein écran. */
   asPanel?: boolean;
@@ -73,6 +73,7 @@ export function AppointmentSheet({ t, visible, appt, barbers, salonSlug, auth, t
   /** Après une action réussie : recharger l'agenda. */
   onChanged: () => void;
 }) {
+  const t = sheetTheme(tIn);
   const styles = stylesFor(t);
   const [mode, setMode] = useState<Mode>('view');
   const [busy, setBusy] = useState(false);

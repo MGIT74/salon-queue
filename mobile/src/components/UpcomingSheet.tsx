@@ -10,7 +10,7 @@ import { File } from 'expo-file-system';
 import { ApiAuth, ApiError } from '../api/transport';
 import { adminCancelAppointment, deleteAppointment, fetchAllAppointments, fetchAllServices, importAppointments } from '../api/endpoints';
 import { AdminAppointment, BarberPublic, CatalogItem } from '../types/api';
-import { Palette, cardShadow, spacing } from '../theme/theme';
+import { Palette, cardShadow, spacing, sheetTheme } from '../theme/theme';
 import { barberColorFor } from '../utils/barberColor';
 import { exportRdvCsv, exportRdvPdf } from '../utils/exportRdv';
 import { ImportGroup, ParsedCsv, ParsedRow, barberKey, groupRows, parseRdvCsv, plainKey } from '../utils/rdvImport';
@@ -28,12 +28,13 @@ const PER_PAGE = [10, 20, 50];
 const errText = (e: unknown) => (e instanceof ApiError ? e.message : e instanceof Error ? e.message : 'Une erreur est survenue.');
 const fmtDay = (s: string) => new Date(`${s}T12:00:00`).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
 
-export function UpcomingSheet({ t, visible, salonSlug, auth, barbers, todayYmd, nowHm, onClose, onOpen, onChanged }: {
+export function UpcomingSheet({ t: tIn, visible, salonSlug, auth, barbers, todayYmd, nowHm, onClose, onOpen, onChanged }: {
   t: Palette; visible: boolean; salonSlug: string; auth: ApiAuth; barbers: BarberPublic[]; todayYmd: string;
   /** Heure actuelle du salon « HH:MM » (RDV passés non annulables). */
   nowHm: string;
   onClose: () => void; onOpen: (a: AdminAppointment) => void; onChanged: () => void;
 }) {
+  const t = sheetTheme(tIn);
   const st = stylesFor(t);
   const [items, setItems] = useState<AdminAppointment[] | null>(null);
   const [err, setErr] = useState('');
@@ -261,10 +262,11 @@ function SelBtn({ t, label, red, disabled, busy, onPress }: { t: Palette; label:
 
 /* ============================ Import CSV ============================ */
 
-function ImportSheet({ t, visible, salonSlug, auth, barbers, todayYmd, nowHm, onClose, onDone }: {
+function ImportSheet({ t: tIn, visible, salonSlug, auth, barbers, todayYmd, nowHm, onClose, onDone }: {
   t: Palette; visible: boolean; salonSlug: string; auth: ApiAuth; barbers: BarberPublic[]; todayYmd: string; nowHm: string;
   onClose: () => void; onDone: (msg: string) => void;
 }) {
+  const t = sheetTheme(tIn);
   const st = stylesFor(t);
   const [parsed, setParsed] = useState<ParsedCsv | null>(null);
   const [services, setServices] = useState<CatalogItem[]>([]);
