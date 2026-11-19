@@ -103,6 +103,7 @@ const stock = (id) => Number(sql(`SELECT stock_quantity FROM products WHERE id='
   check('caisse : seulement le coiffeur choisi en haut (bulle), sa carte + les montants ; gratuit = rien à recharger', caisse.includes('<div id="credit-card"></div>') &&
     caisse.includes('var b = creditBalances.find(function (x) { return x.id === activeBarberId; });') && caisse.includes("if (currentCat === 'credit') renderCreditSection();") &&
     caisse.includes("(b.free || !low ? 'var(--green)' : 'var(--red)')") && caisse.includes('rien à recharger'));
+  check('caisse : pas de « C\'est un cadeau » pour une recharge de crédit coiffeur', caisse.includes('!ticketQueueId && !ticket.some(function (l) { return l.credit_barber_id; })'));
   check('dashboard : Coiffeurs > Crédit produits (soldes, réglages, interrupteur « Gratuit », pas d\'« Ajuster »)', dash.includes('id="credit-box"') && dash.includes('function loadBarberCredit(') &&
     dash.includes('function toggleBarberCreditFree(') && !dash.includes('function adjustBarberCredit('));
   check('poste : mode gratuit (« Offerts »), caisse : pas de recharge pour un gratuit', poste.includes("free ? 'Offerts' : eur(bal)") && caisse.includes('rien à recharger'));
