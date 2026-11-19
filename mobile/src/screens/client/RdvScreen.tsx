@@ -33,7 +33,7 @@ import { Card } from '../../components/Card';
 import { FormErrorView, LoadingView } from '../../components/AuthForm';
 import { useTheme } from '../../hooks/useTheme';
 import { usePolling } from '../../hooks/usePolling';
-import { Palette, radius, spacing } from '../../theme/theme';
+import { Palette, radius, spacing, FLOATING_TABBAR_SPACE } from '../../theme/theme';
 import { formatPriceCents, formatSalonDate } from '../../utils/format';
 import { AvailabilitySlot, BarberPublic, CatalogItem } from '../../types/api';
 
@@ -513,7 +513,7 @@ function ConfirmStep({ t, error, date, slot, service, extraNames, barberName, no
 const stylesFor = (t: Palette) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: t.bg },
-    content: { padding: spacing.lg, paddingBottom: spacing.xl + spacing.md, gap: spacing.md },
+    content: { padding: spacing.lg, paddingBottom: FLOATING_TABBAR_SPACE + 34, gap: spacing.md },
     text: { color: t.grey, fontSize: 15, lineHeight: 21 },
     big: { color: t.ink, fontSize: 22, fontWeight: '700' },
     note: { color: t.grey, fontSize: 13, fontStyle: 'italic', lineHeight: 19 },

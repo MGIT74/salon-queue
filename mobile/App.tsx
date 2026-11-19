@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useColorScheme } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -6,6 +6,7 @@ import { AuthProvider } from './src/auth/AuthContext';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { setSchemeForTheme, themeFor } from './src/theme/theme';
 import Maquette from './maquette/Maquette';
+import { applyOrientationPolicy } from './src/utils/orientation';
 
 // Maquette de design (données fictives, aucun appel serveur) : modèle visuel des vrais écrans.
 // Par défaut l'app s'ouvre sur l'app branchée. Pour ouvrir la maquette :
@@ -21,6 +22,9 @@ export default function App() {
 
 function ConnectedApp() {
   const scheme = useColorScheme();
+  useEffect(() => {
+    void applyOrientationPolicy();
+  }, []);
   const palette = themeFor(scheme);
   setSchemeForTheme(palette.scheme);
 

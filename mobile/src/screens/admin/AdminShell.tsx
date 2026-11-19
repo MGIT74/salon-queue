@@ -12,6 +12,8 @@ import { DashboardScreen } from './DashboardScreen';
 import { ScreenPlaceholder } from '../../components/ScreenPlaceholder';
 import { GlassTab, GlassTabBar } from '../../components/GlassTabBar';
 import { Avatar, PageTitle } from '../../components/ui';
+import { AdminSidebar, useSidebarCollapsed } from '../../components/AdminSidebar';
+import { useLayout } from '../../hooks/useLayout';
 import { useTheme } from '../../hooks/useTheme';
 import { Palette, APP_VERSION, FLOATING_TABBAR_SPACE, cardShadow, radius, spacing } from '../../theme/theme';
 import { ADMIN_BOTTOM_BAR, ADMIN_SECTIONS, AdminSectionDef, AdminSectionKey } from '../../navigation/menu.config';
@@ -23,6 +25,8 @@ export function AdminShell() {
   const { admin, logout, switchAdminSalon } = useAuth();
   const [section, setSection] = useState<AdminSectionKey>('dashboard');
   const [plusOpen, setPlusOpen] = useState(false);
+  const { isTablet } = useLayout();
+  const [collapsed, setCollapsed] = useSidebarCollapsed();
 
   if (!admin) return null; // garou : rendu uniquement avec session admin
 
@@ -30,7 +34,7 @@ export function AdminShell() {
   const current = def(section);
   const salons = admin.salons ?? [];
   const salonName = salons.find((s) => s.slug === admin.salonSlug)?.name ?? admin.salonSlug ?? 'Salon';
-  const bottomSpace = FLOATING_TABBAR_SPACE + insets.bottom;
+  const bottomSpace = isTablet ? 40 + insets.bottom : FLOATING_TABBAR_SPACE + insets.bottom;
 
   // Sélecteur d'enseigne du web (salon-switcher) : seulement s'il y a plusieurs salons.
   const pickSalon = () => {
@@ -61,6 +65,43 @@ export function AdminShell() {
   ];
   const activeTab = plusOpen ? 'plus' : (ADMIN_BOTTOM_BAR as string[]).includes(section) ? section : 'plus';
 
+  const sectionContent =
+    section === 'dashboard' ? (
+      <DashboardScreen bottomSpace={bottomSpace} />
+    ) : (
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.content, { paddingBottom: bottomSpace }]}>
+        {current ? <PageTitle t={t} title={current.label} /> : null}
+        {section === 'queue' ? (
+          <QueueBoard />
+        ) : current ? (
+          <ScreenPlaceholder phase={current.phase} description={current.desc} checklist={listFor(current)} />
+        ) : null}
+        <Text style={styles.version}>{APP_VERSION}</Text>
+      </ScrollView>
+    );
+
+  if (isTablet) {
+    return (
+      <View style={[styles.safe, { flexDirection: 'row' }]}>
+        <AdminSidebar
+          t={t}
+          active={section}
+          onSelect={setSection}
+          collapsed={collapsed}
+          onToggle={() => setCollapsed(!collapsed)}
+          salonName={salonName}
+          canSwitchSalon={salons.length > 1}
+          onPickSalon={pickSalon}
+          email={admin.email}
+          onLogout={() => void logout('admin')}
+        />
+        <SafeAreaView style={{ flex: 1 }} edges={['top', 'right']}>
+          {sectionContent}
+        </SafeAreaView>
+      </View>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <View style={styles.topbar}>
@@ -76,19 +117,7 @@ export function AdminShell() {
         </TouchableOpacity>
       </View>
 
-      {section === 'dashboard' ? (
-        <DashboardScreen bottomSpace={bottomSpace} />
-      ) : (
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.content, { paddingBottom: bottomSpace }]}>
-          {current ? <PageTitle t={t} title={current.label} /> : null}
-          {section === 'queue' ? (
-            <QueueBoard />
-          ) : current ? (
-            <ScreenPlaceholder phase={current.phase} description={current.desc} checklist={listFor(current)} />
-          ) : null}
-          <Text style={styles.version}>{APP_VERSION}</Text>
-        </ScrollView>
-      )}
+      {sectionContent}
 
       <GlassTabBar
         t={t}

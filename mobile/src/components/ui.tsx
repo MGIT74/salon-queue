@@ -92,17 +92,17 @@ export function MiniStat({ t, label, value, valueColor, detail, loading }: {
   );
 }
 
-/** Grille 2 colonnes, 10 px d'écart. */
-export function Grid2({ children }: { children: React.ReactNode }) {
+/** Grille de N colonnes (2 par défaut), 10 px d'écart. */
+export function Grid2({ children, columns = 2 }: { children: React.ReactNode; columns?: number }) {
   const items = React.Children.toArray(children);
   const rows: React.ReactNode[][] = [];
-  for (let i = 0; i < items.length; i += 2) rows.push(items.slice(i, i + 2));
+  for (let i = 0; i < items.length; i += columns) rows.push(items.slice(i, i + columns));
   return (
     <View style={{ gap: spacing.grid, marginBottom: spacing.block }}>
       {rows.map((row, i) => (
         <View key={i} style={{ flexDirection: 'row', gap: spacing.grid }}>
           {row.map((child, j) => <View key={j} style={{ flex: 1 }}>{child}</View>)}
-          {row.length === 1 ? <View style={{ flex: 1 }} /> : null}
+          {Array.from({ length: columns - row.length }, (_, k) => <View key={`f${k}`} style={{ flex: 1 }} />)}
         </View>
       ))}
     </View>

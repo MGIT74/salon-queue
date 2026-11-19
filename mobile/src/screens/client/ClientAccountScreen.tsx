@@ -5,7 +5,7 @@ import React from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { ScreenPlaceholder } from '../../components/ScreenPlaceholder';
 import { useTheme } from '../../hooks/useTheme';
-import { spacing } from '../../theme/theme';
+import { spacing, FLOATING_TABBAR_SPACE } from '../../theme/theme';
 
 export function ClientAccountScreen() {
   const t = useTheme();
@@ -25,5 +25,5 @@ export function ClientAccountScreen() {
 const stylesFor = (t: ReturnType<typeof useTheme>) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: t.bg },
-    content: { padding: spacing.lg, paddingBottom: spacing.xl },
+    content: { padding: spacing.lg, paddingBottom: FLOATING_TABBAR_SPACE + 34},
   });

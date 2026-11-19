@@ -13,7 +13,7 @@ import { SessionBanner } from '../../components/SessionBanner';
 import { Card } from '../../components/Card';
 import { LoadingView } from '../../components/AuthForm';
 import { useTheme } from '../../hooks/useTheme';
-import { Palette, radius, spacing } from '../../theme/theme';
+import { Palette, radius, spacing, FLOATING_TABBAR_SPACE } from '../../theme/theme';
 import { formatPriceCents, formatSalonDate } from '../../utils/format';
 
 export function CompteScreen() {
@@ -202,7 +202,7 @@ export function CompteScreen() {
 const stylesFor = (t: Palette) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: t.bg },
-    content: { padding: spacing.lg, paddingBottom: spacing.xl, gap: spacing.md },
+    content: { padding: spacing.lg, paddingBottom: FLOATING_TABBAR_SPACE + 34, gap: spacing.md },
     card: {
       backgroundColor: t.card,
       borderColor: t.sep,

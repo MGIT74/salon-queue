@@ -1,43 +1,70 @@
-// Mon poste (coiffeur connecté) — reproduction du topbar de poste.html :
-// nom du salon en petites capitales, nom du coiffeur en titre, déconnexion.
-// Zones du web reproduites : « En cours » puis « À suivre » (file RÉELLE,
-// 4 s, actions commencer/terminer/annuler avec la session PIN du coiffeur).
-import React from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { StatusBar } from 'expo-status-bar';
+// Mon poste (coiffeur connecté) — poste.html : barre FLOTTANTE effet verre
+// Agenda · Timer · Crédit · Déconnexion (docs/DESIGN.md §3 bis).
+// « Agenda » affiche pour l'instant la file RÉELLE (en cours / à suivre,
+// actions avec la session PIN). Timer et Crédit : écrans à venir (maquettes
+// maquettes-app.html, groupe « Poste & Agenda »).
+import React, { useState } from 'react';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../auth/AuthContext';
 import { QueueBoard } from '../../components/QueueBoard';
+import { GlassTabBar } from '../../components/GlassTabBar';
+import { Card } from '../../components/Card';
+import { Avatar, PageTitle } from '../../components/ui';
 import { useTheme } from '../../hooks/useTheme';
-import { Palette, spacing } from '../../theme/theme';
+import { FLOATING_TABBAR_SPACE, Palette, cardShadow, spacing } from '../../theme/theme';
+
+type Tab = 'agenda' | 'timer' | 'credit';
 
 export function PosteShell() {
   const t = useTheme();
   const styles = stylesFor(t);
-  const { barber, salonRef, logout } = useAuth();
+  const insets = useSafeAreaInsets();
+  const { barber, logout } = useAuth();
+  const [tab, setTab] = useState<Tab>('agenda');
 
   if (!barber) return null; // garou : rendu uniquement avec session coiffeur
 
-  return (
-    <SafeAreaView style={styles.safe}>
-      <StatusBar style={t.scheme === 'dark' ? 'light' : 'dark'} />
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.topbar}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.salonTag}>{salonRef?.slug ? salonRef.slug : 'Salon'}</Text>
-            <Text style={styles.myName}>{barber.barberName}</Text>
-          </View>
-          <TouchableOpacity style={styles.logout} onPress={() => void logout('barber')} accessibilityRole="button">
-            <Ionicons name="log-out-outline" size={18} color={t.grey} />
-            <Text style={styles.logoutLabel}>Déconnexion</Text>
-          </TouchableOpacity>
-        </View>
+  const today = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
 
-        <QueueBoard heading={false} />
-        <Text style={styles.agendaNote}>
-          Mon agenda (calendrier, RDV) : à suivre — API déjà auditées.
-        </Text>
+  return (
+    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
+      <View style={styles.topbar}>
+        <View style={styles.who}>
+          <Avatar t={t} name={barber.barberName} />
+          <Text style={styles.whoName} numberOfLines={1}>{barber.barberName}</Text>
+        </View>
+      </View>
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: FLOATING_TABBAR_SPACE + insets.bottom }]}>
+        {tab === 'agenda' ? (
+          <>
+            <PageTitle t={t} title="Mon poste" subtitle={today.charAt(0).toUpperCase() + today.slice(1)} />
+            <QueueBoard heading={false} />
+          </>
+        ) : (
+          <>
+            <PageTitle t={t} title={tab === 'timer' ? 'Timer' : 'Mon crédit produits'} />
+            <Card t={t}>
+              <Text style={styles.soon}>
+                {tab === 'timer'
+                  ? 'Écran en préparation : minuteur de la coupe en cours, démarrage avant l\'heure du RDV selon les réglages.'
+                  : 'Écran en préparation : solde, scan d\'un produit et « Je l\'ai pris ». Rechargez votre crédit à la caisse.'}
+              </Text>
+            </Card>
+          </>
+        )}
       </ScrollView>
+      <GlassTabBar
+        t={t}
+        active={tab}
+        tabs={[
+          { key: 'agenda', label: 'Agenda', icon: 'calendar-outline' },
+          { key: 'timer', label: 'Timer', icon: 'timer-outline' },
+          { key: 'credit', label: 'Crédit', icon: 'wallet-outline' },
+          { key: 'logout', label: 'Déconnexion', icon: 'log-out-outline', danger: true },
+        ]}
+        onPress={(k) => (k === 'logout' ? void logout('barber') : setTab(k as Tab))}
+      />
     </SafeAreaView>
   );
 }
@@ -45,11 +72,9 @@ export function PosteShell() {
 const stylesFor = (t: Palette) =>
   StyleSheet.create({
     safe: { flex: 1, backgroundColor: t.bg },
-    content: { padding: spacing.lg * 0.6, paddingBottom: spacing.xl, gap: spacing.md },
-    topbar: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: spacing.md, paddingHorizontal: spacing.lg - 4, paddingTop: spacing.lg - 4 },
-    salonTag: { fontSize: 12, fontWeight: '600', color: t.grey, letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 2 },
-    myName: { color: t.ink, fontSize: 24, fontWeight: '600', letterSpacing: -0.4 },
-    logout: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 6 },
-    logoutLabel: { color: t.grey, fontSize: 14 },
-    agendaNote: { color: t.grey, fontSize: 12.5, fontStyle: 'italic', textAlign: 'center', marginTop: 8 },
+    topbar: { paddingHorizontal: spacing.page, paddingTop: 6, paddingBottom: 10, flexDirection: 'row' },
+    who: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: t.card, borderRadius: 12, paddingVertical: 6, paddingLeft: 6, paddingRight: 12, ...cardShadow(t) },
+    whoName: { color: t.ink, fontSize: 15, fontWeight: '600' },
+    content: { paddingHorizontal: spacing.page, paddingTop: 4 },
+    soon: { color: t.grey, fontSize: 15, lineHeight: 21 },
   });

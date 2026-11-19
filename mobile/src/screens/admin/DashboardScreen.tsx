@@ -42,6 +42,7 @@ import {
 import { ApiAuth } from '../../api/transport';
 import { useAuth } from '../../auth/AuthContext';
 import { useTheme } from '../../hooks/useTheme';
+import { useLayout } from '../../hooks/useLayout';
 import { Palette, cardShadow, spacing } from '../../theme/theme';
 import { CustomRange, PeriodKey, localDateStr, periodRange } from '../../utils/period';
 import { DateRangeSheet } from '../../components/DateRangeSheet';
@@ -55,6 +56,7 @@ export function DashboardScreen({ bottomSpace = 110 }: { bottomSpace?: number })
   const t = useTheme();
   const styles = stylesFor(t);
   const { admin } = useAuth();
+  const { isTablet } = useLayout();
 
   const [period, setPeriod] = useState<PeriodKey>('week');
   const [offset, setOffset] = useState(0);
@@ -142,29 +144,19 @@ export function DashboardScreen({ bottomSpace = 110 }: { bottomSpace?: number })
     (b) => b.active && (b.accepts_appointments !== 0 || todayAppts.some((a) => a.barber_id === b.id))
   );
 
-  return (
-    <ScrollView
-      style={{ flex: 1 }}
-      contentContainerStyle={[styles.content, { paddingBottom: bottomSpace }]}
-      refreshControl={
-        <RefreshControl refreshing={false} onRefresh={reloadAll} tintColor={t.blue} />
-      }
-    >
-      <PageTitle
-        t={t}
-        title={welcome ? 'Bienvenue, ' : 'Bienvenue'}
-        accent={welcome || undefined}
-        subtitle={capitalize(new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }))}
-      />
-
+  const kpisBlock = (
+    <>
       {/* Chiffres clés */}
-      <Grid2>
+      <Grid2 columns={isTablet ? 4 : 2}>
         <KpiTile t={t} icon="people-outline" tone="blue" value={String(barbers.filter((b) => b.active).length)} label="Coiffeurs actifs" loading={!barbersRes.data} />
         <KpiTile t={t} icon="umbrella-outline" tone="orange" value={String(barbers.filter((b) => b.active && b.on_leave_today).length)} label="En congé" loading={!barbersRes.data} />
         <KpiTile t={t} icon="person-outline" tone="green" value={String(queueCountRes.data?.total ?? 0)} label="Clients" loading={!queueCountRes.data} />
         <KpiTile t={t} icon="calendar-outline" tone="blue" value={String(apptsRes.data?.items.length ?? 0)} label="RDV à venir" loading={!apptsRes.data} />
       </Grid2>
-
+    </>
+  );
+  const glanceBlock = (
+    <>
       {/* La journée en un coup d'œil (09:00 – 19:00) */}
       <SectionHeader t={t} title="La journée en un coup d'œil" />
       <Card t={t} style={styles.block}>
@@ -216,7 +208,10 @@ export function DashboardScreen({ bottomSpace = 110 }: { bottomSpace?: number })
           </View>
         )}
       </Card>
-
+    </>
+  );
+  const periodBlock = (
+    <>
       {/* Période (Plage personnalisée : à venir) */}
       <Segmented
         t={t}
@@ -262,7 +257,10 @@ export function DashboardScreen({ bottomSpace = 110 }: { bottomSpace?: number })
         onClose={() => setRangeOpen(false)}
         onApply={(r) => { setCustom(r); setSelectedBar(null); setRangeOpen(false); }}
       />
-
+    </>
+  );
+  const caBlock = (
+    <>
       {/* Chiffre d'affaires + Manque à gagner */}
       <Grid2>
         <MiniStat
@@ -285,7 +283,10 @@ export function DashboardScreen({ bottomSpace = 110 }: { bottomSpace?: number })
           }
         />
       </Grid2>
-
+    </>
+  );
+  const encBlock = (
+    <>
       {/* Encaissé du salon + courbe */}
       <Card t={t} title="Encaissé du salon" style={styles.block}>
         {statsRes.error && !stats ? (
@@ -309,7 +310,10 @@ export function DashboardScreen({ bottomSpace = 110 }: { bottomSpace?: number })
           </>
         )}
       </Card>
-
+    </>
+  );
+  const rankBlock = (
+    <>
       {/* Classement */}
       <SectionHeader t={t} title="Classement" />
       <Card t={t} flush style={styles.block}>
@@ -354,7 +358,10 @@ export function DashboardScreen({ bottomSpace = 110 }: { bottomSpace?: number })
           ))
         )}
       </Card>
-
+    </>
+  );
+  const rdvBlock = (
+    <>
       {/* Prochains RDV */}
       <SectionHeader t={t} title="Prochains RDV" />
       <Card t={t} flush style={styles.block}>
@@ -387,7 +394,10 @@ export function DashboardScreen({ bottomSpace = 110 }: { bottomSpace?: number })
           })
         )}
       </Card>
-
+    </>
+  );
+  const clientsBlock = (
+    <>
       {/* Clientèle */}
       <SectionHeader t={t} title="Clientèle" />
       <Card t={t} style={styles.block}>
@@ -408,7 +418,10 @@ export function DashboardScreen({ bottomSpace = 110 }: { bottomSpace?: number })
           <InlineLoading t={t} />
         )}
       </Card>
-
+    </>
+  );
+  const catalogBlock = (
+    <>
       {/* Catalogue */}
       <SectionHeader t={t} title="Catalogue" />
       <Card t={t} flush style={styles.block}>
@@ -440,6 +453,50 @@ export function DashboardScreen({ bottomSpace = 110 }: { bottomSpace?: number })
           <InlineLoading t={t} />
         )}
       </Card>
+    </>
+  );
+
+  return (
+    <ScrollView
+      style={{ flex: 1 }}
+      contentContainerStyle={[styles.content, { paddingBottom: bottomSpace }, isTablet && { paddingHorizontal: 28, paddingTop: 16 }]}
+      refreshControl={
+        <RefreshControl refreshing={false} onRefresh={reloadAll} tintColor={t.blue} />
+      }
+    >
+      <PageTitle
+        t={t}
+        title={welcome ? 'Bienvenue, ' : 'Bienvenue'}
+        accent={welcome || undefined}
+        subtitle={capitalize(new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }))}
+      />
+
+      {kpisBlock}
+      {glanceBlock}
+      {periodBlock}
+      {isTablet ? (
+        <View style={{ flexDirection: 'row', gap: 22, alignItems: 'flex-start' }}>
+          <View style={{ flex: 1.35 }}>
+            {caBlock}
+            {encBlock}
+            {rdvBlock}
+          </View>
+          <View style={{ flex: 1 }}>
+            {rankBlock}
+            {clientsBlock}
+            {catalogBlock}
+          </View>
+        </View>
+      ) : (
+        <>
+          {caBlock}
+          {encBlock}
+          {rankBlock}
+          {rdvBlock}
+          {clientsBlock}
+          {catalogBlock}
+        </>
+      )}
     </ScrollView>
   );
 }
