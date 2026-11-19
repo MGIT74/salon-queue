@@ -40,8 +40,10 @@ function errText(e: unknown) {
   return e instanceof ApiError ? e.message : 'Une erreur est survenue.';
 }
 
-export function AppointmentSheet({ t, visible, appt, barbers, salonSlug, auth, todayYmd, onClose, onChanged }: {
+export function AppointmentSheet({ t, visible, appt, barbers, salonSlug, auth, todayYmd, onClose, onChanged, asPanel }: {
   t: Palette;
+  /** Tablette : panneau à droite (l'agenda reste visible) au lieu d'une feuille plein écran. */
+  asPanel?: boolean;
   visible: boolean;
   appt: AdminAppointment | null;
   barbers: BarberPublic[];
@@ -97,8 +99,7 @@ export function AppointmentSheet({ t, visible, appt, barbers, salonSlug, auth, t
     }
   };
 
-  return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+  const body = (
       <KeyboardAvoidingView style={styles.sheet} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={styles.head}>
           {mode === 'view' ? <View style={{ width: 70 }} /> : (
@@ -228,6 +229,15 @@ export function AppointmentSheet({ t, visible, appt, barbers, salonSlug, auth, t
           )}
         </ScrollView>
       </KeyboardAvoidingView>
+  );
+
+  if (asPanel) {
+    if (!visible) return null;
+    return <View style={styles.panel}>{body}</View>;
+  }
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      {body}
     </Modal>
   );
 }
@@ -388,6 +398,11 @@ function CancelPanel({ t, busy, error, hasEmail, onConfirm }: {
 const stylesFor = (t: Palette) =>
   StyleSheet.create({
     sheet: { flex: 1, backgroundColor: t.bg },
+    panel: {
+      position: 'absolute', top: 0, right: 0, bottom: 0, width: 420, backgroundColor: t.bg,
+      borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: t.sep,
+      shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 24, shadowOffset: { width: -8, height: 0 }, elevation: 12,
+    },
     head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.page, paddingTop: 18, paddingBottom: 8 },
     headTitle: { color: t.ink, fontSize: 17, fontWeight: '700' },
     headAct: { color: t.blue, fontSize: 16 },

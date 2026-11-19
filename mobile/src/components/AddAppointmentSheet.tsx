@@ -25,10 +25,14 @@ const dayLong = (s: string) => {
   return v.charAt(0).toUpperCase() + v.slice(1);
 };
 
-export function AddAppointmentSheet({ t, visible, initialDate, todayYmd, barbers, salonSlug, auth, onClose, onCreated }: {
+export function AddAppointmentSheet({ t, visible, initialDate, initialTime, initialBarberId, todayYmd, barbers, salonSlug, auth, onClose, onCreated }: {
   t: Palette;
   visible: boolean;
   initialDate: string;
+  /** Heure touchée dans l'agenda : présélectionnée si elle est libre (comme le web). */
+  initialTime?: string;
+  /** Colonne touchée dans l'agenda : coiffeur présélectionné. */
+  initialBarberId?: string;
   todayYmd: string;
   barbers: BarberPublic[];
   salonSlug: string;
@@ -60,7 +64,7 @@ export function AddAppointmentSheet({ t, visible, initialDate, todayYmd, barbers
     setStep(1);
     setServiceId(null);
     setExtraIds([]);
-    setBarberId('');
+    setBarberId(initialBarberId ?? '');
     setDate(initialDate < todayYmd ? todayYmd : initialDate);
     setTime(null);
     setName('');
@@ -85,10 +89,14 @@ export function AddAppointmentSheet({ t, visible, initialDate, todayYmd, barbers
     setSlotErr('');
     setTime(null);
     fetchStaffAvailability(salonSlug, auth, { date, service_id: serviceId, extras: extraIds, barber_id: barberId || null })
-      .then((r) => alive && setSlots(r.slots))
+      .then((r) => {
+        if (!alive) return;
+        setSlots(r.slots);
+        if (initialTime && date === initialDate && r.slots.some((x) => x.time === initialTime)) setTime(initialTime);
+      })
       .catch((e) => alive && setSlotErr(errText(e)));
     return () => { alive = false; };
-  }, [visible, step, serviceId, extraIds, barberId, date, salonSlug, auth]);
+  }, [visible, step, serviceId, extraIds, barberId, date, salonSlug, auth, initialTime, initialDate]);
 
   const days = useMemo(() => {
     const base = new Date(`${todayYmd}T12:00:00`);

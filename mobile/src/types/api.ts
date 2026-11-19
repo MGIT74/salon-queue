@@ -108,6 +108,12 @@ export type BarberPublic = {
   on_break_now?: number | boolean;
   outside_hours_now?: number | boolean;
   leaves?: { start_date: string; end_date: string }[];
+  /** Jours « sans RDV » (file d'attente seulement). */
+  walkin_days?: { start_date: string; end_date: string }[];
+  /** Pauses hebdomadaires (weekday : 0 = dimanche, comme Date.getDay()). */
+  breaks?: { weekday: number; start_time: string; end_time: string; active: number }[];
+  /** Couleur choisie dans la fiche (#rrggbb) ou null. */
+  color?: string | null;
   schedules?: BarberSchedule[];
   disabled_service_ids?: string[];
   disabled_extra_ids?: string[];

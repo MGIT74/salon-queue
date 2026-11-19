@@ -19,6 +19,7 @@ import { Card } from '../../components/Card';
 import { Avatar, Chip, EmptyText, ErrorText, InlineLoading, PageTitle, Segmented } from '../../components/ui';
 import { AppointmentSheet } from '../../components/AppointmentSheet';
 import { AddAppointmentSheet } from '../../components/AddAppointmentSheet';
+import { DayColumns, DayGlance } from '../../components/DayAgenda';
 import { ListRow } from '../../components/ui';
 import { exportRdvCsv, exportRdvPdf } from '../../utils/exportRdv';
 
@@ -62,7 +63,7 @@ export function RendezVousScreen({ bottomSpace = 110 }: { bottomSpace?: number }
   const [error, setError] = useState<unknown>(null);
   const [open, setOpen] = useState<AdminAppointment | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
-  const [addFor, setAddFor] = useState<string | null>(null);
+  const [addFor, setAddFor] = useState<{ date: string; time?: string; barberId?: string } | null>(null);
   const [toast, setToast] = useState('');
   const [exporting, setExporting] = useState<'' | 'csv' | 'pdf'>('');
 
@@ -148,6 +149,10 @@ export function RendezVousScreen({ bottomSpace = 110 }: { bottomSpace?: number }
         : cap(fmt(date, { month: 'long', year: 'numeric' }));
 
   const bookableBarbers = barbers.filter((b) => b.active);
+  // Colonnes du jour : coiffeurs actifs qui prennent des RDV (ou qui en ont un ce jour), filtre coiffeur compris.
+  const dayBarbers = bookableBarbers
+    .filter((b) => b.accepts_appointments !== 0 || (byDay[date] ?? []).some((a) => String(a.barber_id) === String(b.id)))
+    .filter((b) => barberFilter === 'all' || String(b.id) === barberFilter);
   const nowMin = salonNowMinutes(tz);
 
   /* ---------- rendu d'un créneau (fond teinté à la couleur du coiffeur, sans liseré) ---------- */
@@ -174,28 +179,6 @@ export function RendezVousScreen({ bottomSpace = 110 }: { bottomSpace?: number }
         )}
       </Pressable>
     );
-  };
-
-  const dayList = (d: string) => {
-    const list = byDay[d] ?? [];
-    if (!list.length) return <EmptyText t={t} text="Aucun rendez-vous" />;
-    const rows: React.ReactNode[] = [];
-    let nowShown = d !== today;
-    list.forEach((a) => {
-      const hm = String(a.scheduled_at).slice(11, 16);
-      if (!nowShown && toMin(hm) > nowMin) {
-        rows.push(<NowLine key="now" t={t} min={nowMin} />);
-        nowShown = true;
-      }
-      rows.push(
-        <View key={a.id} style={styles.tl}>
-          <Text style={styles.tlHour}>{hm}</Text>
-          <View style={{ flex: 1 }}>{slotCard(a)}</View>
-        </View>
-      );
-    });
-    if (!nowShown) rows.push(<NowLine key="now" t={t} min={nowMin} />);
-    return rows;
   };
 
   const week = Array.from({ length: 7 }, (_, i) => addDays(mondayOf(date), i));
@@ -235,7 +218,7 @@ export function RendezVousScreen({ bottomSpace = 110 }: { bottomSpace?: number }
               <Text style={styles.todayLabel}>Aujourd'hui</Text>
             </TouchableOpacity>
           ) : null}
-          <TouchableOpacity style={styles.addBtn} onPress={() => setAddFor(date)} accessibilityRole="button" accessibilityLabel="Ajouter un RDV">
+          <TouchableOpacity style={styles.addBtn} onPress={() => setAddFor({ date })} accessibilityRole="button" accessibilityLabel="Ajouter un RDV">
             <Ionicons name="add" size={24} color="#fff" />
           </TouchableOpacity>
         </View>
@@ -294,13 +277,31 @@ export function RendezVousScreen({ bottomSpace = 110 }: { bottomSpace?: number }
         ) : !hasMonth || (loading && !all.length) ? (
           <InlineLoading t={t} />
         ) : view === 'day' ? (
-          <Card t={t} style={styles.block}>
-            {dayList(date)}
-            <TouchableOpacity style={styles.addRow} onPress={() => setAddFor(date)} accessibilityRole="button">
-              <Ionicons name="add-circle" size={20} color={t.blue} />
-              <Text style={styles.addRowText}>Ajouter un RDV ce jour</Text>
-            </TouchableOpacity>
-          </Card>
+          <>
+            <DayGlance
+              t={t}
+              barbers={dayBarbers}
+              items={byDay[date] ?? []}
+              date={date}
+              todayYmd={today}
+              nowMin={nowMin}
+              searchPool={all}
+              onOpen={setOpen}
+              onBarber={(id) => setBarberFilter(barberFilter === id ? 'all' : id)}
+            />
+            <DayColumns
+              t={t}
+              barbers={dayBarbers}
+              allBarbers={barbers}
+              items={byDay[date] ?? []}
+              date={date}
+              todayYmd={today}
+              nowMin={nowMin}
+              isTablet={isTablet}
+              onOpen={setOpen}
+              onAdd={(time, barberId) => setAddFor({ date, time, barberId })}
+            />
+          </>
         ) : view === 'week' ? (
           week.map((d) => (
             <Card key={d} t={t} style={[styles.block, { marginBottom: 12 }]}>
@@ -310,7 +311,7 @@ export function RendezVousScreen({ bottomSpace = 110 }: { bottomSpace?: number }
                   <Text style={styles.dayCount}>{(byDay[d] ?? []).length ? `  ·  ${(byDay[d] ?? []).length} RDV` : ''}</Text>
                 </Text>
                 {d >= today ? (
-                  <TouchableOpacity onPress={() => setAddFor(d)} hitSlop={8} accessibilityRole="button" accessibilityLabel={`Ajouter un RDV le ${d}`}>
+                  <TouchableOpacity onPress={() => setAddFor({ date: d })} hitSlop={8} accessibilityRole="button" accessibilityLabel={`Ajouter un RDV le ${d}`}>
                     <Ionicons name="add-circle" size={24} color={t.blue} />
                   </TouchableOpacity>
                 ) : null}
@@ -355,7 +356,9 @@ export function RendezVousScreen({ bottomSpace = 110 }: { bottomSpace?: number }
       <AddAppointmentSheet
         t={t}
         visible={addFor !== null}
-        initialDate={addFor ?? date}
+        initialDate={addFor?.date ?? date}
+        initialTime={addFor?.time}
+        initialBarberId={addFor?.barberId}
         todayYmd={today}
         barbers={barbers}
         salonSlug={salonSlug}
@@ -374,6 +377,7 @@ export function RendezVousScreen({ bottomSpace = 110 }: { bottomSpace?: number }
         todayYmd={today}
         onClose={() => setOpen(null)}
         onChanged={() => setReloadKey((k) => k + 1)}
+        asPanel={isTablet}
       />
     </View>
   );
@@ -399,16 +403,6 @@ function StatusPill({ t, label }: { t: Palette; label: string }) {
   return (
     <View style={{ backgroundColor: t.redSoft, borderRadius: 99, paddingVertical: 3, paddingHorizontal: 9 }}>
       <Text style={{ color: t.red, fontSize: 12, fontWeight: '600' }}>{label}</Text>
-    </View>
-  );
-}
-
-function NowLine({ t, min }: { t: Palette; min: number }) {
-  const hm = `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginLeft: 52, marginVertical: 6 }}>
-      <Text style={{ color: t.red, fontSize: 11, fontWeight: '700' }}>{hm}</Text>
-      <View style={{ flex: 1, height: 2, borderRadius: 1, backgroundColor: t.red }} />
     </View>
   );
 }
