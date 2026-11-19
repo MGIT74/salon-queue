@@ -51,6 +51,8 @@ export function AddAppointmentSheet({ t: tIn, visible, initialDate, initialTime,
   const [catErr, setCatErr] = useState('');
   const [serviceId, setServiceId] = useState<string | null>(null);
   const [extraIds, setExtraIds] = useState<string[]>([]);
+  // Aucune prestation mais des suppléments cochés = « Seulement un supplément » (comme le serveur).
+  const sid = serviceId ?? (extraIds.length ? EXTRAS_ONLY : null);
   const [barberId, setBarberId] = useState<string>(''); // '' = Premier disponible
   const [date, setDate] = useState(initialDate);
   const [slots, setSlots] = useState<AvailabilitySlot[] | null>(null);
@@ -88,12 +90,12 @@ export function AddAppointmentSheet({ t: tIn, visible, initialDate, initialTime,
 
   // Créneaux (étape 2).
   useEffect(() => {
-    if (!visible || step !== 2 || !serviceId) return;
+    if (!visible || step !== 2 || !sid) return;
     let alive = true;
     setSlots(null);
     setSlotErr('');
     setTime(null);
-    fetchStaffAvailability(salonSlug, auth, { date, service_id: serviceId, extras: extraIds, barber_id: barberId || null })
+    fetchStaffAvailability(salonSlug, auth, { date, service_id: sid, extras: extraIds, barber_id: barberId || null })
       .then((r) => {
         if (!alive) return;
         setSlots(r.slots);
@@ -101,14 +103,14 @@ export function AddAppointmentSheet({ t: tIn, visible, initialDate, initialTime,
       })
       .catch((e) => alive && setSlotErr(errText(e)));
     return () => { alive = false; };
-  }, [visible, step, serviceId, extraIds, barberId, date, salonSlug, auth, initialTime, initialDate]);
+  }, [visible, step, sid, extraIds, barberId, date, salonSlug, auth, initialTime, initialDate]);
 
   const days = useMemo(() => {
     const base = new Date(`${todayYmd}T12:00:00`);
     return Array.from({ length: 42 }, (_, i) => ymd(new Date(base.getTime() + i * 86400000)));
   }, [todayYmd]);
 
-  const only = serviceId === EXTRAS_ONLY;
+  const only = sid === EXTRAS_ONLY;
   const service = services?.find((s) => s.id === serviceId) ?? null;
   const chosenExtras = extras.filter((x) => extraIds.includes(x.id));
   const total = (service?.price_cents ?? 0) + chosenExtras.reduce((a, x) => a + x.price_cents, 0);
@@ -118,7 +120,7 @@ export function AddAppointmentSheet({ t: tIn, visible, initialDate, initialTime,
   const bookable = barbers.filter((b) => b.active && b.accepts_appointments !== 0);
 
   const save = async () => {
-    if (saving || !serviceId || !time || (only && !extraIds.length)) return;
+    if (saving || !sid || !time || (only && !extraIds.length)) return;
     const problem = contactProblem({ name, email, phone }, { nameRequired: true });
     if (!name.trim()) return setSaveErr('Le nom est requis');
     if (problem) return setSaveErr(problem);
@@ -129,7 +131,7 @@ export function AddAppointmentSheet({ t: tIn, visible, initialDate, initialTime,
         client_name: name.trim(),
         email: email.trim(),
         phone: phone.trim(),
-        service_id: serviceId,
+        service_id: sid,
         barber_id: barberId || null,
         extras: extraIds,
         date,
@@ -276,8 +278,8 @@ export function AddAppointmentSheet({ t: tIn, visible, initialDate, initialTime,
 
         <View style={styles.footer}>
           {step === 1 ? (
-            <TouchableOpacity style={[styles.btn, (!serviceId || (only && !extraIds.length)) && { opacity: 0.45 }]} disabled={!serviceId || (only && !extraIds.length)} onPress={() => setStep(2)} accessibilityRole="button">
-              <Text style={styles.btnLabel}>{!serviceId ? 'Choisissez une prestation' : only && !extraIds.length ? 'Choisissez au moins un supplément' : `Continuer · ${formatPriceCents(total)} · ${duration} min`}</Text>
+            <TouchableOpacity style={[styles.btn, (!sid || (only && !extraIds.length)) && { opacity: 0.45 }]} disabled={!sid || (only && !extraIds.length)} onPress={() => setStep(2)} accessibilityRole="button">
+              <Text style={styles.btnLabel}>{!sid ? 'Choisissez une prestation' : only && !extraIds.length ? 'Choisissez au moins un supplément' : `Continuer · ${formatPriceCents(total)} · ${duration} min`}</Text>
             </TouchableOpacity>
           ) : step === 2 ? (
             <TouchableOpacity style={[styles.btn, !time && { opacity: 0.45 }]} disabled={!time} onPress={() => setStep(3)} accessibilityRole="button">
