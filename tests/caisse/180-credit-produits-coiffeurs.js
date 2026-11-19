@@ -104,6 +104,7 @@ const stock = (id) => Number(sql(`SELECT stock_quantity FROM products WHERE id='
   check('dashboard : « Annuler » dans l\'historique du coiffeur (admin)', dash.includes('function undoBarberCreditMove(moveId, barberId)') && dash.includes("onclick=\"undoBarberCreditMove("));
   check('poste : onglet Crédit avec le menu du bas visible (Timer / Agenda le quittent) et recherche de produit', poste.includes('.cr-screen { position: fixed; inset: 0; z-index: 45;') &&
     poste.includes('id="cr-search"') && poste.includes('function renderCreditGrid()') && /function gotoHome\(\) \{\s*closeCreditScreen\(\);/.test(poste) && /function gotoAgenda\(\) \{\s*closeCreditScreen\(\);/.test(poste));
+  check('poste : produits sur 2 lignes qui défilent (scroll snap)', /\.cr-grid \{[^}]*grid-template-rows: repeat\(2, auto\);[^}]*grid-auto-flow: column;[^}]*scroll-snap-type: x mandatory/.test(poste));
   check('caisse : onglet « Crédit coiffeurs », ligne avec credit_barber_id', caisse.includes('data-cat="credit"') && caisse.includes('credit_barber_id: '));
   check('caisse : seulement le coiffeur choisi en haut (bulle), sa carte + les montants ; gratuit = rien à recharger', caisse.includes('<div id="credit-card"></div>') &&
     caisse.includes('var b = creditBalances.find(function (x) { return x.id === activeBarberId; });') && caisse.includes("if (currentCat === 'credit') renderCreditSection();") &&
