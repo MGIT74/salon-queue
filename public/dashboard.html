@@ -12827,15 +12827,30 @@ function openBarberCreditHistory(id) {
     var rows = (r.items || []).map(function (m) {
       var label = m.kind === 'take' ? esc(m.product_name || 'Produit') : m.kind === 'free' ? esc(m.product_name || 'Produit') + ' · offert' : m.kind === 'recharge' ? 'Recharge caisse · ' + esc(m.note || '') : 'Ajustement · ' + esc(m.note || '');
       return '<div style="display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--sep);font-size:14px;' + (m.undone ? 'opacity:.5;text-decoration:line-through' : '') + '">' +
-        '<div>' + label + '<div style="font-size:12px;color:var(--grey)">' + creditDate(m.created_at) + (m.undone ? ' · annulé par le coiffeur' : '') + '</div></div>' +
-        (m.kind === 'free' ? '<b style="white-space:nowrap;color:var(--grey)">' + eur(m.value_cents || 0) + ' offert</b></div>'
-          : '<b style="white-space:nowrap;color:' + (m.amount_cents < 0 ? 'var(--red)' : 'var(--green)') + '">' + (m.amount_cents > 0 ? '+' : '−') + eur(Math.abs(m.amount_cents)) + '</b></div>');
+        '<div>' + label + '<div style="font-size:12px;color:var(--grey)">' + creditDate(m.created_at) + (m.undone ? ' · annulé' : '') + '</div></div>' +
+        '<div style="display:flex;align-items:center;gap:8px">' +
+        (m.kind === 'free' ? '<b style="white-space:nowrap;color:var(--grey)">' + eur(m.value_cents || 0) + ' offert</b>'
+          : '<b style="white-space:nowrap;color:' + (m.amount_cents < 0 ? 'var(--red)' : 'var(--green)') + '">' + (m.amount_cents > 0 ? '+' : '−') + eur(Math.abs(m.amount_cents)) + '</b>') +
+        (m.can_undo ? '<button class="btn btn-soft" style="font-size:12.5px;padding:5px 10px" onclick="undoBarberCreditMove(\'' + m.id + '\', \'' + id + '\')">Annuler</button>' : '') +
+        '</div></div>';
     }).join('') || '<div class="empty">Aucun mouvement</div>';
     var overlay = _buildModal('<div class="modal-title">Crédit produits · ' + esc(b ? b.name : '') + '</div>' +
       '<div style="max-height:60vh;overflow-y:auto;margin-bottom:14px;text-align:left">' + rows + '</div>' +
       '<div class="modal-actions"><button class="btn btn-primary" id="bc-close">Fermer</button></div>');
     overlay.querySelector('#bc-close').onclick = function () { _closeModal(overlay); };
   }).catch(function (e) { toast(e.message, true); });
+}
+/** Admin : annule un produit pris par erreur (remis en stock, crédit rendu). */
+function undoBarberCreditMove(moveId, barberId) {
+  showConfirm('Annuler ce produit ? Il est remis en stock et le crédit du coiffeur est rendu.', { title: 'Annuler le produit', confirmLabel: 'Oui, annuler' }).then(function (ok) {
+    if (!ok) return;
+    api('/api/barber-credit/moves/' + encodeURIComponent(moveId) + '/undo', { method: 'POST' }).then(function () {
+      toast('Produit annulé et remis en stock');
+      document.querySelectorAll('.modal-overlay').forEach(function (o) { _closeModal(o); });
+      loadBarberCredit();
+      openBarberCreditHistory(barberId);
+    }).catch(function (e) { toast(e.message, true); });
+  });
 }
 function toggleBarberCreditFree(id, on) {
   api('/api/barber-credit/free/' + encodeURIComponent(id), { method: 'PUT', body: { free: on } })
