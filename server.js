@@ -88,6 +88,12 @@ app.use(express.json({ limit: '5mb' })); // limite relevée pour les photos de c
 // version potentiellement obsolète. app.css/app.js gardent un cache normal,
 // mais portent un paramètre ?v= mis à jour à chaque changement notable pour
 // forcer un rechargement même sans purge manuelle.
+// Tablette des coiffeurs (« agenda ») : la page caisse en mode Agenda + Timer seulement (ni caisse ni clôture).
+app.get('/agenda.html', (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+  res.sendFile(path.join(__dirname, 'public', 'caisse.html'));
+});
+
 app.use(express.static(path.join(__dirname, 'public'), {
   setHeaders: (res, filePath) => {
     if (filePath.endsWith('.html')) {

@@ -19,9 +19,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Caisse</title>
 <script>
+  // Lien « agenda » (tablette partagée des coiffeurs) : même page, mais seulement Agenda + Timer + Déconnexion ;
+  // la session reste ouverte (même après la clôture de la caisse) jusqu'à « Déconnexion ».
+  var AGENDA_MODE = /\/agenda(\.html)?$/i.test(location.pathname);
+  var CAISSE_SESSION_KEY = AGENDA_MODE ? 'agenda-session' : 'caisse-session';
+  var CAISSE_STORE = (function () { try { return AGENDA_MODE ? window.localStorage : window.sessionStorage; } catch (e) { return null; } })();
+  if (AGENDA_MODE) { document.documentElement.classList.add('agenda-mode'); document.title = 'Agenda'; }
   (function () {
     try {
-      var saved = JSON.parse(sessionStorage.getItem('caisse-session') || 'null');
+      var saved = JSON.parse(CAISSE_STORE.getItem(CAISSE_SESSION_KEY) || 'null');
       if (saved && saved.id && saved.pin) document.documentElement.classList.add('auth-checking');
     } catch (e) {}
   })();
@@ -33,6 +39,8 @@
 </script>
 <style>
   html.auth-checking #login-screen { display: none; }
+  html.agenda-mode #nav-caisse, html.agenda-mode #nav-cloture, html.agenda-mode #conn-btn { display: none !important; }
+  html:not(.agenda-mode) #nav-logout { display: none !important; }
 </style>
 <link rel="stylesheet" href="/app.css?v=59">
 <style>
@@ -1384,6 +1392,10 @@
     <svg class="ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2.5"/><path d="M2 10h20"/><path d="M6 15h4"/></svg>
     Caisse
   </button>
+  <button id="nav-logout" onclick="agendaLogout()">
+    <svg class="ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4H6.5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2H9"/><path d="M16 15.5 20.5 12 16 8.5"/><path d="M20 12H9"/></svg>
+    Déconnexion
+  </button>
   <button id="nav-cloture" onclick="switchCaisseTab('cloture')">
     <svg class="ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
     Clôture
@@ -1521,7 +1533,7 @@ function loadSalonName() {
       tpeBridgeUrl = d.tpe_bridge_url || null;
       tpePrintMode = d.tpe_print_mode === 'text' ? 'text' : 'escpos';
       applyAccentColor(d.accent_color); applyCatColors(d.cat_colors);   // couleurs des étiquettes de l'agenda (comme Mon poste)
-      document.title = name + ' — Caisse';
+      document.title = name + (AGENDA_MODE ? ' — Agenda' : ' — Caisse');
       var mark = document.getElementById('salon-mark');
       if (mark) mark.textContent = name.toUpperCase();
       var tag = document.getElementById('salon-name-tag');
@@ -1598,7 +1610,7 @@ function attemptLogin() {
   fetch('/api/barbers/login', {
     method: 'POST',
     headers: headers,
-    body: JSON.stringify({ pin: pinBuffer, source: 'caisse' })
+    body: JSON.stringify({ pin: pinBuffer, source: AGENDA_MODE ? 'agenda' : 'caisse' })
   }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
     .then(function (res) {
       if (!res.ok) {
@@ -1608,9 +1620,9 @@ function attemptLogin() {
         return;
       }
       me = { id: res.data.barber.id, name: res.data.barber.name, pin: pinBuffer };
-      try { sessionStorage.setItem('caisse-session', JSON.stringify(me)); } catch (e) {}
+      try { CAISSE_STORE.setItem(CAISSE_SESSION_KEY, JSON.stringify(me)); } catch (e) {}
       showApp();
-      checkPendingRecount(res.data.pending_recount);
+      if (!AGENDA_MODE) checkPendingRecount(res.data.pending_recount);   // fond de caisse : seulement la vraie caisse
     })
     .catch(function () {
       document.getElementById('login-error').textContent = 'Connexion impossible';
@@ -1734,7 +1746,7 @@ function logout() {
   allBarbers = [];
   // Plus de session : on arrête d'interroger les encaissements en attente (sinon refus en boucle toutes les 5 s).
   clearInterval(pendingPaymentsInterval); pendingPaymentsInterval = null;
-  try { sessionStorage.removeItem('caisse-session'); } catch (e) {}
+  try { CAISSE_STORE.removeItem(CAISSE_SESSION_KEY); } catch (e) {}
   pinBuffer = '';
   clearTimeout(inactivityTimer);
   document.getElementById('app-screen').style.display = 'none';
@@ -1782,16 +1794,21 @@ function showApp() {
   loadPendingPayments();
   restoreChargedSale();
   updateConnBtnVisibility();
-  pollConnection();
-  setConnPollInterval(15000);
+  if (!AGENDA_MODE) { pollConnection(); setConnPollInterval(15000); }   // terminal / imprimante : seulement la vraie caisse
   loadMarketingSettings();
-  focusScanCatcher();
+  if (AGENDA_MODE) doSwitchCaisseTab('timer'); else focusScanCatcher();
   clearInterval(pendingPaymentsInterval);
   pendingPaymentsInterval = setInterval(loadPendingPayments, 5000);
   resetInactivityTimer();
 }
 
 var CAISSE_TABS = ['timer', 'agenda', 'caisse', 'cloture'];
+
+/** Tablette « agenda » : déconnexion volontaire (le soir) ; le lendemain, le premier coiffeur retape son code PIN. */
+function agendaLogout() {
+  showConfirm('Se déconnecter de la tablette ? Le premier coiffeur demain retapera son code PIN.', { title: 'Déconnexion', confirmLabel: 'Se déconnecter' })
+    .then(function (ok) { if (ok) logout(); });
+}
 
 // Coiffeur verifie par PIN specifiquement pour cloturer - distinct de
 // `me` (celui qui a ouvert la tablette ce matin) et de `activeBarberId`
@@ -1803,6 +1820,7 @@ var clotureVerifiedBarber = null;
 
 function switchCaisseTab(tab) {
   if (CAISSE_TABS.indexOf(tab) === -1) tab = 'caisse';
+  if (AGENDA_MODE && (tab === 'caisse' || tab === 'cloture')) tab = 'timer';   // tablette : ni caisse ni clôture
   if (tab === 'cloture' && !clotureVerifiedBarber) { verifyClotureAccess(); return; }
   doSwitchCaisseTab(tab);
 }
@@ -2033,6 +2051,7 @@ function caisseLockText(d) {
 }
 
 function refreshCaisseLockState() {
+  if (AGENDA_MODE) return;   // tablette « agenda » : reste ouverte même caisse clôturée
   var headers = {};
   if (SALON_SLUG) headers['X-Salon-Slug'] = SALON_SLUG;
   fetch('/api/settings/public', { headers: headers })
@@ -4958,7 +4977,7 @@ function showLoginOrLocked() {
   fetch('/api/settings/public', { headers: headers })
     .then(function (r) { return r.json(); })
     .then(function (d) {
-      var locked = Boolean(d.caisse_locked_until);
+      var locked = Boolean(d.caisse_locked_until) && !AGENDA_MODE;   // la tablette « agenda » ne se ferme jamais
       if (locked) document.getElementById('locked-reopen-text').textContent = caisseLockText(d);
       document.getElementById('login-card-normal').style.display = locked ? 'none' : '';
       document.getElementById('login-card-locked').style.display = locked ? 'block' : 'none';
@@ -5054,9 +5073,9 @@ function forceOpenCaisse() {
   fetch('/api/settings/public', { headers: headers })
     .then(function (r) { return r.json(); })
     .then(function (d) {
-      if (d.caisse_locked_until) {
+      if (d.caisse_locked_until && !AGENDA_MODE) {
         // Session gardée d'avant la fermeture : effacée, le code PIN sera redemandé à l'ouverture.
-        try { sessionStorage.removeItem('caisse-session'); } catch (e) {}
+        try { CAISSE_STORE.removeItem(CAISSE_SESSION_KEY); } catch (e) {}
         document.documentElement.classList.remove('auth-checking');
         document.getElementById('locked-reopen-text').textContent = caisseLockText(d);
         document.getElementById('login-card-normal').style.display = 'none';
@@ -5065,10 +5084,11 @@ function forceOpenCaisse() {
       }
 
       var saved = null;
-      try { saved = JSON.parse(sessionStorage.getItem('caisse-session') || 'null'); } catch (e) {}
+      try { saved = JSON.parse(CAISSE_STORE.getItem(CAISSE_SESSION_KEY) || 'null'); } catch (e) {}
       if (saved && saved.id && saved.pin) {
         me = saved;
         showApp();
+        if (AGENDA_MODE) return;
         // Rafraîchissement de la page : la session est restaurée sans repasser
         // par le code PIN (donc sans passer par attemptLogin, qui est le
         // chemin normal d'affichage de la popup de recomptage). On vérifie
