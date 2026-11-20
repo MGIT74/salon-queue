@@ -204,6 +204,7 @@ const suite = [
   ['181-tablette-agenda-coiffeurs.js', true, ['exit']],
   ['182-borne-anciennes-webview.js', false, ['exit']],
   ['183-borne-nom-puis-prestation.js', false, ['exit']],
+  ['184-cadeau-coiffeur-libre.js', false, ['exit']],
 ];
 
 let bad = 0;
