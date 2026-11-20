@@ -18,7 +18,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>File d'attente</title>
-<link rel="stylesheet" href="/app.css?v=59">
+<link rel="stylesheet" href="/app.css?v=60">
 <script>
   // Adresse SANS ?salon=... : on masque la page le temps de savoir si la plateforme heberge plusieurs salons
   // (voir requireSalonInUrl dans app.js) - pour ne jamais montrer, meme une fraction de seconde, un ecran sans salon.
@@ -105,7 +105,7 @@
   .kiosk-closed { grid-column: 1 / -1; text-align: center; padding: 48px 20px; font-size: clamp(20px, 2.4vw, 28px); font-weight: 800; color: var(--ink); }
   .kiosk-closed small { display: block; margin-top: 8px; font-size: 15px; font-weight: 600; color: var(--grey); }
   .barber-fallback {
-    position: absolute; inset: 0;
+    position: absolute; top: 0; right: 0; bottom: 0; left: 0;
     display: flex; align-items: center; justify-content: center;
     font-size: clamp(32px,5vw,56px); font-weight: 600; color: var(--grey);
     background: linear-gradient(160deg, var(--fill), var(--fill-2));
@@ -244,7 +244,7 @@
   .gb-pick .gb-choices { max-width: 720px; }
 
   /* --- Avertissement avant remise a zero --- */
-  .idle-warn { position: fixed; inset: 0; z-index: 190; background: rgba(0,0,0,.55); display: flex; align-items: center; justify-content: center; padding: 24px; }
+  .idle-warn { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 190; background: rgba(0,0,0,.55); display: flex; align-items: center; justify-content: center; padding: 24px; }
   .idle-warn[hidden] { display: none; }
   .idle-warn-box { background: var(--card); color: var(--ink); border-radius: 24px; padding: clamp(26px,4vh,40px) clamp(24px,3vw,44px); max-width: 460px; width: 100%; text-align: center; box-shadow: var(--shadow); }
   .idle-warn-n { width: 84px; height: 84px; border-radius: 50%; margin: 0 auto 18px; background: var(--fill); display: flex; align-items: center; justify-content: center;
@@ -254,7 +254,7 @@
 
   /* --- Écran de veille --- */
   .idle-screen {
-    position: fixed; inset: 0; z-index: 200; background: var(--bg);
+    position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 200; background: var(--bg);
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     cursor: pointer; transition: opacity .35s ease;
   }
@@ -472,7 +472,7 @@
   </main>
 </div>
 
-<script src="/app.js?v=68"></script>
+<script src="/app.js?v=69"></script>
 <script src="/group-booking.js?v=29"></script>
 <script src="/queue-sim.js?v=1"></script>
 <script>requireSalonInUrl("Pour utiliser cette borne, ouvrez le lien de votre salon.");</script>

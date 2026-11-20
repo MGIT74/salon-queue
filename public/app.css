@@ -206,7 +206,7 @@ input[type="date"] { -webkit-appearance: none; appearance: none; }
   display: flex; align-items: flex-end; padding: 44px;
 }
 .auth-visual::before {
-  content: ''; position: absolute; inset: 0;
+  content: ''; position: absolute; top: 0; right: 0; bottom: 0; left: 0;
   background: linear-gradient(180deg, rgba(0,0,0,.05) 0%, rgba(0,0,0,.6) 100%);
 }
 .auth-visual-overlay { position: relative; z-index: 1; color: #fff; }
@@ -217,7 +217,7 @@ input[type="date"] { -webkit-appearance: none; appearance: none; }
   padding: 40px 24px; position: relative; overflow: hidden; background: var(--bg);
 }
 .auth-form-side::before {
-  content: ''; position: absolute; inset: 0; pointer-events: none;
+  content: ''; position: absolute; top: 0; right: 0; bottom: 0; left: 0; pointer-events: none;
   background:
     radial-gradient(circle at 50% -10%, rgba(var(--accent-rgb), .30) 0%, rgba(var(--accent-rgb), 0) 55%),
     radial-gradient(circle at 50% 15%, rgba(var(--accent-rgb), .16) 0%, rgba(var(--accent-rgb), 0) 45%);
@@ -300,7 +300,7 @@ input[type="date"] { -webkit-appearance: none; appearance: none; }
    recomptage 400) : une confirmation demandée depuis l'un d'eux doit rester
    visible - sinon le bouton qui l'ouvre semble ne rien faire. Sous les toasts. */
 .modal-overlay {
-  position: fixed; inset: 0; z-index: 9000;
+  position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 9000;
   background: rgba(0,0,0,0.42);
   backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
   display: flex; align-items: center; justify-content: center;
@@ -351,7 +351,7 @@ input[type="date"] { -webkit-appearance: none; appearance: none; }
 }
 .cam-choice.sel .cam-dot { border-color: #fff; }
 .cam-choice.sel .cam-dot::after {
-  content: ''; position: absolute; inset: 2px; border-radius: 50%; background: #fff;
+  content: ''; position: absolute; top: 2px; right: 2px; bottom: 2px; left: 2px; border-radius: 50%; background: #fff;
 }
 
 .autocomplete-dropdown {
@@ -449,7 +449,7 @@ input[type="date"] { -webkit-appearance: none; appearance: none; }
 .item-add svg { width: 17px; height: 17px; }
 .item-add .ic-check { display: none; }
 .item-card.sel { background: rgba(var(--accent-rgb), .13); }
-.item-card.sel::after { content: ''; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 2.5px var(--accent); pointer-events: none; z-index: 2; }
+.item-card.sel::after { content: ''; position: absolute; top: 0; right: 0; bottom: 0; left: 0; border-radius: inherit; box-shadow: inset 0 0 0 2.5px var(--accent); pointer-events: none; z-index: 2; }
 .item-card.sel .item-add { background: var(--accent); color: #fff; box-shadow: none; }
 .item-card.sel .ic-plus { display: none; }
 .item-card.sel .ic-check { display: block; }
@@ -632,7 +632,7 @@ body .tfx > button { transition: color .25s ease, transform .1s ease; }
 .dr-btn span { overflow: hidden; text-overflow: ellipsis; }
 :root:not([data-theme="dark"]) .dr-btn { box-shadow: inset 0 0 0 1px var(--sep); }
 :root:not([data-theme="dark"]) .dr-btn[aria-expanded="true"] { box-shadow: inset 0 0 0 2px var(--accent); }
-.dr-backdrop { position: fixed; inset: 0; z-index: 99998; background: transparent; }
+.dr-backdrop { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 99998; background: transparent; }
 .dr-pop { position: fixed; z-index: 99999; box-sizing: border-box; background: var(--card); color: var(--ink); border-radius: 18px;
   box-shadow: 0 0 0 1px var(--sep), 0 22px 60px rgba(0,0,0,.30); font-size: 14px; user-select: none; overflow: hidden; max-width: calc(100vw - 16px); }
 .dr-pop button, .dr-pop select { font-family: inherit; color: inherit; }
