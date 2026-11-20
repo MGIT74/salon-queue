@@ -28,8 +28,21 @@ async function creditSettings(salonId) {
   let free = [];
   try { free = JSON.parse(s.barber_credit_free || '[]'); } catch (e) { free = []; }
   if (!Array.isArray(free)) free = [];
+  let discounts = {};
+  try { discounts = JSON.parse(s.barber_credit_discounts || '{}'); } catch (e) { discounts = {}; }
+  if (!discounts || typeof discounts !== 'object' || Array.isArray(discounts)) discounts = {};
   return { categories: cats.filter((c) => typeof c === 'string'), alert_cents: Number.isInteger(alert) && alert >= 0 ? alert : 300,
-    free: free.filter((c) => typeof c === 'string') };
+    free: free.filter((c) => typeof c === 'string'), discounts };
+}
+
+/** Remise du coiffeur (0 à 100 %) sur les produits pris avec son crédit. */
+function discountOf(st, barberId) {
+  const d = Number(st.discounts[barberId]);
+  return Number.isInteger(d) && d > 0 && d <= 100 ? d : 0;
+}
+/** Prix payé par le coiffeur avec sa remise (arrondi au centime). */
+function priceFor(priceCents, pct) {
+  return pct ? Math.round(priceCents * (100 - pct) / 100) : priceCents;
 }
 
 async function balanceOf(db, salonId, barberId) {
@@ -74,7 +87,9 @@ router.get('/me', requireAdminOrBarber, wrap(async (req, res) => {
     balance_cents: await balanceOf(pool, req.salon.id, req.barberId),
     alert_cents: st.alert_cents,
     free: st.free.indexOf(req.barberId) !== -1,
-    products: await allowedProducts(req.salon.id, st.categories),
+    discount_pct: discountOf(st, req.barberId),
+    // Prix pour CE coiffeur (avec sa remise) ; price_cents reste le prix normal du produit.
+    products: (await allowedProducts(req.salon.id, st.categories)).map((p) => Object.assign(p, { my_price_cents: priceFor(p.price_cents, discountOf(st, req.barberId)) })),
     moves: moves.map(moveView)
   });
 }));
@@ -100,18 +115,20 @@ router.post('/take', requireAdminOrBarber, wrap(async (req, res) => {
       return res.status(409).json({ error: 'Plus de « ' + p.name + ' » en stock.' });
     }
     const free = st.free.indexOf(req.barberId) !== -1;   // produits offerts : seul le stock baisse
+    const pct = discountOf(st, req.barberId);
+    const pay = priceFor(p.price_cents, pct);   // prix réduit du coiffeur
     const bal = await balanceOf(conn, req.salon.id, req.barberId);
-    if (!free && bal < p.price_cents) {
+    if (!free && bal < pay) {
       await conn.rollback();
       return res.status(409).json({ error: 'Crédit insuffisant (' + (bal / 100).toFixed(2).replace('.', ',') + ' €) : rechargez à la caisse.', code: 'no_credit' });
     }
     if (p.stock_enabled) await conn.query('UPDATE products SET stock_quantity = stock_quantity - 1 WHERE id = ?', [p.id]);
     const id = crypto.randomUUID();
     await conn.query(
-      'INSERT INTO barber_credit_moves (id, salon_id, barber_id, kind, amount_cents, product_id, product_name, value_cents) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [id, req.salon.id, req.barberId, free ? 'free' : 'take', free ? 0 : -p.price_cents, p.id, p.name, p.price_cents]);
+      'INSERT INTO barber_credit_moves (id, salon_id, barber_id, kind, amount_cents, product_id, product_name, value_cents, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [id, req.salon.id, req.barberId, free ? 'free' : 'take', free ? 0 : -pay, p.id, p.name, p.price_cents, !free && pct ? 'Remise ' + pct + ' %' : null]);
     await conn.commit();
-    res.json({ ok: true, move_id: id, free, product: { id: p.id, name: p.name, price_cents: p.price_cents }, balance_cents: free ? bal : bal - p.price_cents });
+    res.json({ ok: true, move_id: id, free, discount_pct: free ? 0 : pct, product: { id: p.id, name: p.name, price_cents: p.price_cents, paid_cents: free ? 0 : pay }, balance_cents: free ? bal : bal - pay });
   } catch (err) {
     try { await conn.rollback(); } catch (e) {}
     throw err;
@@ -165,7 +182,7 @@ router.get('/overview', requireAdmin, wrap(async (req, res) => {
   res.json({
     ok: true, settings: st,
     items: rows.filter((r) => r.active || Number(r.balance_cents) !== 0).map((r) => ({
-      id: r.id, name: r.name, active: Boolean(r.active), free: st.free.indexOf(r.id) !== -1, balance_cents: Number(r.balance_cents),
+      id: r.id, name: r.name, active: Boolean(r.active), free: st.free.indexOf(r.id) !== -1, discount_pct: discountOf(st, r.id), balance_cents: Number(r.balance_cents),
       month_taken_cents: Number(r.month_taken_cents), month_free_cents: Number(r.month_free_cents), month_taken_count: Number(r.month_taken_count),
       month_recharged_cents: Number(r.month_recharged_cents), last_take_at: r.last_take_at ? utcIso(r.last_take_at) : null
     }))
@@ -197,6 +214,20 @@ router.put('/free/:barberId', requireAdmin, wrap(async (req, res) => {
   await setSettings(req.salon.id, { barber_credit_free: JSON.stringify(free) });
   logActivity(req.salon.id, 'barber_credit_free', 'Crédit produits : ' + b.name + (on ? ' prend ses produits gratuitement' : ' paie de nouveau ses produits avec son crédit'));
   res.json({ ok: true, free: on });
+}));
+
+// Remise du coiffeur sur les produits pris avec son crédit (prix réduit pour le personnel), 0 = prix normal.
+router.put('/discount/:barberId', requireAdmin, wrap(async (req, res) => {
+  const [[b]] = await pool.query('SELECT id, name FROM barbers WHERE id = ? AND salon_id = ?', [req.params.barberId, req.salon.id]);
+  if (!b) return res.status(404).json({ error: 'Coiffeur introuvable' });
+  const pct = Math.round(Number(req.body.pct));
+  if (!Number.isInteger(pct) || pct < 0 || pct > 100) return res.status(400).json({ error: 'Remise entre 0 et 100 %' });
+  const st = await creditSettings(req.salon.id);
+  const discounts = Object.assign({}, st.discounts);
+  if (pct) discounts[b.id] = pct; else delete discounts[b.id];
+  await setSettings(req.salon.id, { barber_credit_discounts: JSON.stringify(discounts) });
+  logActivity(req.salon.id, 'barber_credit_discount', 'Crédit produits : remise de ' + b.name + ' = ' + pct + ' %');
+  res.json({ ok: true, pct });
 }));
 
 module.exports = router;

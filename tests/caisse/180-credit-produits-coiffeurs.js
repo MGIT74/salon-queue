@@ -71,6 +71,28 @@ const stock = (id) => Number(sql(`SELECT stock_quantity FROM products WHERE id='
   const k = (r.body.items || []).find((x) => x.id === 'b1');
   check('dashboard : solde, rechargé et pris ce mois', k && k.balance_cents === 2000 - price && k.month_recharged_cents === 2000 && k.month_taken_count === 1, k);
 
+  console.log('\n[D ter] Remise de personnel sur les produits');
+  r = await api('PUT', '/api/barber-credit/discount/b1', { pct: 25 });
+  check('un coiffeur ne peut pas se mettre une remise', r.status === 401 || r.status === 403, r.status);
+  r = await api('PUT', '/api/barber-credit/discount/b1', { pct: 150 }, ADMIN);
+  check('remise > 100 % refusée', r.status === 400);
+  r = await api('PUT', '/api/barber-credit/discount/b1', { pct: 25 }, ADMIN);
+  check('admin : remise de 25 % pour b1', r.status === 200 && r.body.pct === 25, r.body);
+  const pay25 = Math.round(price * 75 / 100);
+  r = await api('GET', '/api/barber-credit/me');
+  check('poste : prix réduit affiché (my_price_cents)', r.body.discount_pct === 25 && r.body.products.find((p) => p.id === 'p1').my_price_cents === pay25, r.body.products.find((p) => p.id === 'p1'));
+  const balD = r.body.balance_cents;
+  sql("UPDATE products SET stock_quantity=5 WHERE id='p1'");
+  r = await api('POST', '/api/barber-credit/take', { product_id: 'p1' });
+  check('prise : crédit −prix réduit, stock −1, « Remise 25 % » noté', r.status === 200 && r.body.balance_cents === balD - pay25 && stock('p1') === 4 &&
+    sql(`SELECT CONCAT(amount_cents,'|',value_cents,'|',note) FROM barber_credit_moves WHERE id='${r.body.move_id}'`) === `${-pay25}|${price}|Remise 25 %`, r.body);
+  await api('POST', '/api/barber-credit/moves/' + r.body.move_id + '/undo', null, ADMIN);
+  r = await api('GET', '/api/barber-credit/overview', null, ADMIN);
+  check('dashboard : remise affichée', r.body.items.find((x) => x.id === 'b1').discount_pct === 25);
+  await api('PUT', '/api/barber-credit/discount/b1', { pct: 0 }, ADMIN);
+  r = await api('GET', '/api/barber-credit/me');
+  check('remise à 0 : prix normal', r.body.discount_pct === 0 && r.body.products.find((p) => p.id === 'p1').my_price_cents === price);
+
   console.log('\n[D bis] Coiffeur « gratuit » : produits offerts, seul le stock baisse');
   r = await api('PUT', '/api/barber-credit/free/b1', { free: true });
   check('un coiffeur ne peut pas se mettre en gratuit', r.status === 401 || r.status === 403, r.status);
@@ -101,6 +123,8 @@ const stock = (id) => Number(sql(`SELECT stock_quantity FROM products WHERE id='
   const dash = fs.readFileSync(path.join(__dirname, '../../public/dashboard.html'), 'utf8');
   check('poste : « Crédit » dans le menu du bas, grille, scan, « Je l\'ai pris », PAS de bouton annuler', poste.includes('id="nav-credit"') && poste.includes('function openCreditScreen(') &&
     poste.includes('function startCreditScan(') && poste.includes("Je l'ai pris") && !poste.includes('function undoCreditMove(') && !poste.includes('/undo'));
+  check('dashboard : champ « Remise » % par coiffeur ; poste : prix barré + prix réduit', dash.includes('function saveBarberCreditDiscount(id, input)') && dash.includes("onchange=\"saveBarberCreditDiscount(") &&
+    poste.includes('function creditPriceOf(p)') && poste.includes("'<s style=\"opacity:.6\">' + eur(p.price_cents) + '</s>"));
   check('dashboard : « Annuler » dans l\'historique du coiffeur (admin)', dash.includes('function undoBarberCreditMove(moveId, barberId)') && dash.includes("onclick=\"undoBarberCreditMove("));
   check('poste : onglet Crédit avec le menu du bas visible (Timer / Agenda le quittent) et recherche de produit', poste.includes('.cr-screen { position: fixed; inset: 0; z-index: 45;') &&
     poste.includes('id="cr-search"') && poste.includes('function renderCreditGrid()') && /function gotoHome\(\) \{\s*closeCreditScreen\(\);/.test(poste) && /function gotoAgenda\(\) \{\s*closeCreditScreen\(\);/.test(poste));

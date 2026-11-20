@@ -2619,7 +2619,7 @@
     <!-- Crédit produits : les coiffeurs rechargent à la caisse, puis prennent leurs produits depuis leur poste. -->
     <div class="card-box" id="credit-box" style="margin-top:22px">
       <div class="admin-head" style="margin-bottom:4px"><h3 style="margin:0">Crédit produits des coiffeurs</h3></div>
-      <p class="hint">Le coiffeur recharge son crédit à la caisse (onglet « Crédit coiffeurs », vente normale), puis prend ses produits depuis son poste (bouton « Crédit ») : le stock baisse et son crédit aussi. Bloqué à 0 €. « Gratuit » : le coiffeur ne recharge pas, ses produits sont offerts et seul le stock baisse.</p>
+      <p class="hint">Le coiffeur recharge son crédit à la caisse (onglet « Crédit coiffeurs », vente normale), puis prend ses produits depuis son poste (bouton « Crédit ») : le stock baisse et son crédit aussi. Bloqué à 0 €. « Remise » : prix réduit pour le coiffeur (ex. 25 %). « Gratuit » : il ne recharge pas, ses produits sont offerts et seul le stock baisse.</p>
       <div id="credit-summary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:6px 0 14px"></div>
       <div id="credit-rows"><div class="empty">Chargement…</div></div>
       <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--sep)">
@@ -2627,7 +2627,7 @@
         <div id="credit-cats" style="display:flex;flex-wrap:wrap;gap:8px 16px;margin-bottom:12px"></div>
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
           <label for="credit-alert" style="font-size:14px">Alerter le coiffeur sous</label>
-          <input id="credit-alert" type="text" inputmode="decimal" style="width:90px;text-align:right" value="3,00">
+          <input id="credit-alert" type="text" inputmode="decimal" style="width:90px;height:34px;padding:0 8px;text-align:right;background:var(--fill);color:var(--ink);border:1px solid var(--sep);border-radius:10px;font:inherit" value="3,00">
           <span>€</span>
           <button class="btn btn-primary" style="margin-left:auto" onclick="saveBarberCreditSettings()">Enregistrer</button>
         </div>
@@ -12800,6 +12800,10 @@ function renderBarberCredit() {
       '<div class="item-meta">' + b.month_taken_count + ' produit' + (b.month_taken_count > 1 ? 's' : '') + ' ce mois' +
         (b.month_taken_cents ? ' · crédit : ' + eur(b.month_taken_cents) : '') + (b.month_free_cents ? ' · offert : ' + eur(b.month_free_cents) : '') +
         ' · Dernier produit : ' + creditDate(b.last_take_at) + '</div></div>' +
+      // Remise de personnel (%) sur ses produits ; inutile quand il est en « Gratuit ».
+      (b.free ? '' : '<label style="display:flex;align-items:center;gap:6px;font-size:13.5px;margin-right:16px;white-space:nowrap">Remise' +
+        '<input type="number" min="0" max="100" step="1" inputmode="numeric" value="' + (b.discount_pct || 0) + '" aria-label="Remise de ' + esc(b.name) + ' en %"' +
+        ' style="width:64px;height:34px;padding:0 8px;text-align:right;background:var(--fill);color:var(--ink);border:1px solid var(--sep);border-radius:10px;font:inherit" onchange="saveBarberCreditDiscount(\'' + b.id + '\', this)"> %</label>') +
       // Gratuit : ses produits sont offerts (pas de recharge) ; seul le stock baisse.
       '<div style="display:flex;align-items:center;gap:8px;font-size:13.5px;margin-right:14px;white-space:nowrap">' +
         '<div class="switch' + (b.free ? ' on' : '') + '" role="switch" aria-checked="' + b.free + '" aria-label="Produits gratuits pour ' + esc(b.name) + '" tabindex="0" title="Ses produits sont offerts : pas de recharge, seul le stock baisse"' +
@@ -12826,7 +12830,7 @@ function openBarberCreditHistory(id) {
   var b = (creditOverview.items || []).find(function (x) { return x.id === id; });
   api('/api/barber-credit/moves?barber_id=' + encodeURIComponent(id)).then(function (r) {
     var rows = (r.items || []).map(function (m) {
-      var label = m.kind === 'take' ? esc(m.product_name || 'Produit') : m.kind === 'free' ? esc(m.product_name || 'Produit') + ' · offert' : m.kind === 'recharge' ? 'Recharge caisse · ' + esc(m.note || '') : 'Ajustement · ' + esc(m.note || '');
+      var label = m.kind === 'take' ? esc(m.product_name || 'Produit') + (m.note ? ' · ' + esc(m.note) : '') : m.kind === 'free' ? esc(m.product_name || 'Produit') + ' · offert' : m.kind === 'recharge' ? 'Recharge caisse · ' + esc(m.note || '') : 'Ajustement · ' + esc(m.note || '');
       return '<div style="display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--sep);font-size:14px;' + (m.undone ? 'opacity:.5;text-decoration:line-through' : '') + '">' +
         '<div>' + label + '<div style="font-size:12px;color:var(--grey)">' + creditDate(m.created_at) + (m.undone ? ' · annulé' : '') + '</div></div>' +
         '<div style="display:flex;align-items:center;gap:8px">' +
@@ -12852,6 +12856,13 @@ function undoBarberCreditMove(moveId, barberId) {
       openBarberCreditHistory(barberId);
     }).catch(function (e) { toast(e.message, true); });
   });
+}
+function saveBarberCreditDiscount(id, input) {
+  var pct = Math.round(Number(String(input.value).replace(',', '.')));
+  if (!(pct >= 0 && pct <= 100)) { toast('Remise entre 0 et 100 %', true); loadBarberCredit(); return; }
+  api('/api/barber-credit/discount/' + encodeURIComponent(id), { method: 'PUT', body: { pct: pct } })
+    .then(function () { toast(pct ? 'Remise de ' + pct + ' % enregistrée' : 'Plus de remise : prix normal'); loadBarberCredit(); })
+    .catch(function (e) { toast(e.message, true); loadBarberCredit(); });
 }
 function toggleBarberCreditFree(id, on) {
   api('/api/barber-credit/free/' + encodeURIComponent(id), { method: 'PUT', body: { free: on } })
