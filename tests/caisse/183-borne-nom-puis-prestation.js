@@ -1,4 +1,4 @@
-// Borne : nouveau parcours « super kiosk ». Seul : coiffeur > « À quel nom ? » (prénom + email, clavier intégré)
+// Borne : nouveau parcours « super kiosk ». Seul : coiffeur > « À quel nom ? » (prénom + email, clavier de la tablette)
 // > prestation (« Bonjour X, on vous fait quoi ? ») > un petit plus > ticket (retour accueil auto 15 s).
 // À plusieurs : le prénom est déjà connu -> directement la prestation. Étapes affichées en haut.
 const fs = require('fs'), path = require('path');
@@ -9,7 +9,7 @@ const form = k.slice(k.indexOf('id="p-form"'), k.indexOf('id="p-form-extras"'));
 const infos = k.slice(k.indexOf('id="p-infos"'), k.indexOf('id="p-form"'));
 check('écran « À quel nom ? » avant la prestation', k.indexOf('id="p-infos"') > 0 && k.indexOf('id="p-infos"') < k.indexOf('id="p-form"'));
 check('prénom et email sur cet écran (plus dans la prestation)', /id="f-name"/.test(infos) && /id="f-mail"/.test(infos) && !/id="f-name"|id="f-mail"/.test(form));
-check('clavier intégré (AZERTY) + raccourcis @gmail.com…', /id="k-kbd"/.test(infos) && /\['a','z','e','r','t','y','u','i','o','p'\]/.test(k) && /@gmail\.com/.test(k) && /inputmode="none"/.test(infos));
+check('clavier de la tablette (plus de clavier à l\'écran) + raccourcis @gmail.com…', !/id="k-kbd"/.test(k) && !/inputmode="none"/.test(k) && /@gmail\.com/.test(k) && /id="k-domains"/.test(infos) && /enterkeyhint="next"/.test(infos));
 check('Continuer : prénom obligatoire, email vérifié', /function infosNext\(\) \{[\s\S]{0,400}contactProblem\([\s\S]{0,300}show\('p-form'\)/.test(k));
 check('seul : coiffeur -> « À quel nom ? » ; à plusieurs : directement la prestation', /if \(grp\) \{ setFormTitle\(\); show\('p-form'\); return; \}[\s\S]{0,300}show\('p-infos'\);/.test(k));
 check('titre « Bonjour X, on vous fait quoi ? »', /'Bonjour ' \+ n \+ ', on vous fait quoi \?'/.test(k));

@@ -281,8 +281,7 @@
   .kstep .ks.cur i { background: var(--card); color: var(--ink); }
 
   .k-infos { display: flex; gap: clamp(16px,2.4vw,32px); align-items: flex-start; }
-  .k-infos .k-fields { flex: 1 1 0; min-width: 0; }
-  .k-infos .k-kbd { flex: 1.15 1 0; min-width: 0; }
+  .k-infos .k-fields { flex: 1 1 0; min-width: 0; max-width: 760px; }
   .fld input.k-big { font-size: clamp(20px,2.2vw,28px); font-weight: 600; padding: clamp(14px,2vh,20px) clamp(16px,1.6vw,22px);
            border-radius: 18px; border: 2px solid transparent; background: var(--fill); color: var(--ink); }
   .fld input.k-big.k-focus { border-color: var(--accent); background: var(--card); }
@@ -290,24 +289,12 @@
   .k-chip { border: none; background: var(--fill); color: var(--ink); border-radius: 14px; padding: 12px 16px;
             font-family: inherit; font-size: clamp(14px,1.3vw,16px); font-weight: 600; cursor: pointer; }
   .k-chip:active { background: var(--accent); color: #fff; }
-  .k-kbd { background: var(--fill); border-radius: 22px; padding: 10px; }
-  .kb-row { display: flex; gap: 6px; margin-bottom: 6px; }
-  .kb-row:last-child { margin-bottom: 0; }
-  .kb-k { flex: 1 1 0; min-width: 0; height: clamp(44px,6.4vh,62px); border: none; border-radius: 12px;
-          background: var(--card); color: var(--ink); font-family: inherit; font-size: clamp(16px,1.7vw,22px);
-          font-weight: 600; cursor: pointer; box-shadow: 0 1px 0 rgba(0,0,0,.08); padding: 0; }
-  .kb-k:active { background: var(--accent); color: #fff; }
-  .kb-k.kb-fn { background: var(--sep); }
-  .kb-k.kb-on { background: var(--ink); color: var(--card); }
-  .kb-k.kb-space { flex-grow: 3.4; font-size: clamp(13px,1.2vw,16px); color: var(--grey); }
-  .kb-k.kb-ok { flex-grow: 1.6; background: var(--accent); color: #fff; }
   .k-foot-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
   .k-foot-row .k-foot-hint { font-size: clamp(13px,1.2vw,16px); color: var(--grey); }
   .k-foot-row .go.k-go { width: auto; padding-left: clamp(30px,3.4vw,48px); padding-right: clamp(30px,3.4vw,48px); }
   @media (max-width: 820px) {
     .k-infos { flex-direction: column; align-items: stretch; }
-    .k-infos .k-fields, .k-infos .k-kbd { flex: none; }
-    .kb-k { height: clamp(40px,4.2vh,54px); }
+    .k-infos .k-fields { flex: none; }
     .k-infos .fld { margin-bottom: 10px; }
   }
 
@@ -413,12 +400,11 @@
       <div class="kbody k-infos">
         <div class="k-fields">
           <div class="fld"><label for="f-name">Prénom</label>
-            <input id="f-name" class="k-big" type="text" placeholder="Votre prénom" autocomplete="given-name" inputmode="none" onfocus="kbTarget=this.id;kbRender()"></div>
+            <input id="f-name" class="k-big" type="text" placeholder="Votre prénom" autocomplete="given-name" autocapitalize="words" enterkeyhint="next" onfocus="kbTarget=this.id;kbRender()"></div>
           <div class="fld"><label for="f-mail">Email — on vous prévient avant votre tour (facultatif)</label>
-            <input id="f-mail" class="k-big" type="email" placeholder="vous@exemple.com" autocomplete="email" inputmode="none" onfocus="kbTarget=this.id;kbRender()"></div>
+            <input id="f-mail" class="k-big" type="email" placeholder="vous@exemple.com" autocomplete="email" autocapitalize="off" enterkeyhint="go" onfocus="kbTarget=this.id;kbRender()"></div>
           <div class="k-domains" id="k-domains"></div>
         </div>
-        <div class="k-kbd" id="k-kbd" aria-label="Clavier"></div>
       </div>
       <div class="kfoot k-foot-row">
         <span class="k-foot-hint">Ensuite : votre prestation</span>
@@ -610,75 +596,50 @@ function kTicketAutoReturn(id) {
   }, 1000);
 }
 
-/* ---------- Clavier intégré (écran « À quel nom ? ») ---------- */
-var kbTarget = 'f-name', kbShift = true;
-var KB_ROWS = [
-  ['1','2','3','4','5','6','7','8','9','0'],
-  ['a','z','e','r','t','y','u','i','o','p'],
-  ['q','s','d','f','g','h','j','k','l','m'],
-  ['⇧','w','x','c','v','b','n','é','è','⌫'],
-  ['@','.','-','_','espace','ç','OK']
-];
+/* ---------- Écran « À quel nom ? » : clavier de la tablette (Android) + raccourcis @gmail.com… ---------- */
+var kbTarget = 'f-name';
 function kbRender() {
-  var box = document.getElementById('k-kbd');
-  if (!box) return;
-  var mail = kbTarget === 'f-mail';
-  box.innerHTML = KB_ROWS.map(function (row) {
-    return '<div class="kb-row">' + row.map(function (k) {
-      var lab = k === 'espace' ? 'espace' : (k.length === 1 && kbShift && !mail ? k.toUpperCase() : k);
-      var cls = 'kb-k' + (k === 'espace' ? ' kb-space' : '') + (k === 'OK' ? ' kb-ok' : '') + (k === '⇧' || k === '⌫' ? ' kb-fn' : '') + (k === '⇧' && kbShift && !mail ? ' kb-on' : '');
-      return '<button type="button" class="' + cls + '" data-k="' + esc(k) + '">' + esc(lab) + '</button>';
-    }).join('') + '</div>';
-  }).join('');
   document.querySelectorAll('#f-name, #f-mail').forEach(function (inp) { inp.classList.toggle('k-focus', inp.id === kbTarget); });
   var dom = document.getElementById('k-domains');
-  if (dom) {
-    dom.style.display = mail ? '' : 'none';
+  if (dom && !dom.innerHTML) {
     dom.innerHTML = ['@gmail.com', '@hotmail.fr', '@outlook.fr', '@icloud.com'].map(function (d) {
       return '<button type="button" class="k-chip" data-dom="' + d + '">' + d + '</button>';
     }).join('');
   }
 }
-function kbPress(k) {
-  var inp = document.getElementById(kbTarget);
-  if (!inp) return;
-  var mail = kbTarget === 'f-mail';
-  if (k === '⌫') inp.value = inp.value.slice(0, -1);
-  else if (k === '⇧') { kbShift = !kbShift; kbRender(); return; }
-  else if (k === 'OK') {
-    if (kbTarget === 'f-name') { kbTarget = 'f-mail'; kbRender(); }
-    else infosNext();
-    return;
-  }
-  else {
-    var c = k === 'espace' ? ' ' : k;
-    if (!mail && kbShift && c.length === 1) c = c.toUpperCase();
-    if (mail && c === ' ') return;
-    inp.value += c;
-    if (!mail && kbShift && c !== ' ') { kbShift = false; kbRender(); }
-    if (!mail && c === ' ') { kbShift = true; kbRender(); }
-  }
-  if (!mail && !inp.value) { kbShift = true; kbRender(); }
-  inp.dispatchEvent(new Event('input'));
+function kbFocus(id) {
+  kbTarget = id; kbRender();
+  var el = document.getElementById(id);
+  if (el) el.focus();
 }
 function kbDomain(d) {
   var inp = document.getElementById('f-mail');
   inp.value = inp.value.replace(/@.*$/, '') + d;
   inp.dispatchEvent(new Event('input'));
+  kbFocus('f-mail');
 }
+document.addEventListener('mousedown', function (ev) {
+  // garde le clavier ouvert : l'appui sur un raccourci ne retire pas le focus du champ email
+  if (ev.target.closest && ev.target.closest('#k-domains .k-chip')) ev.preventDefault();
+});
 document.addEventListener('click', function (ev) {
-  var t = ev.target.closest ? ev.target.closest('#k-kbd .kb-k, #k-domains .k-chip') : null;
-  if (!t) return;
-  if (t.dataset.dom) kbDomain(t.dataset.dom); else kbPress(t.dataset.k);
+  var t = ev.target.closest ? ev.target.closest('#k-domains .k-chip') : null;
+  if (t) kbDomain(t.dataset.dom);
+});
+// Touche « Entrée » du clavier : prénom -> email -> Continuer
+document.addEventListener('keydown', function (ev) {
+  if (ev.key !== 'Enter') return;
+  if (ev.target.id === 'f-name') { ev.preventDefault(); kbFocus('f-mail'); }
+  else if (ev.target.id === 'f-mail' && document.getElementById('p-infos').classList.contains('on')) { ev.preventDefault(); infosNext(); }
 });
 
 // « Continuer » de l'écran « À quel nom ? » : prénom obligatoire, email facultatif mais valide.
 function infosNext() {
   var name = document.getElementById('f-name').value.replace(/\s+/g, ' ').trim();
   var mail = document.getElementById('f-mail').value.trim();
-  if (!name) { toast('Entrez votre prénom', true); kbTarget = 'f-name'; kbRender(); return; }
+  if (!name) { toast('Entrez votre prénom', true); kbFocus('f-name'); return; }
   var cp = contactProblem({ name: name, email: mail });
-  if (cp) { toast(cp, true); kbTarget = 'f-mail'; kbRender(); return; }
+  if (cp) { toast(cp, true); kbFocus('f-mail'); return; }
   document.getElementById('f-name').value = name;
   setFormTitle();
   updateStep1NextState();
@@ -1057,11 +1018,9 @@ function pickBarberAndGo(id) {
   renderFormOptions();
   // A plusieurs : le prenom est deja connu (et l'email est demande une seule fois, a la fin) -> directement la prestation.
   if (grp) { setFormTitle(); show('p-form'); return; }
-  // Seul : d'abord le prenom et l'email (clavier integre), la prestation vient ensuite.
-  kbTarget = document.getElementById('f-name').value.trim() ? 'f-mail' : 'f-name';
-  kbShift = !document.getElementById('f-name').value;
-  kbRender();
+  // Seul : d'abord le prenom et l'email (clavier de la tablette), la prestation vient ensuite.
   show('p-infos');
+  kbFocus(document.getElementById('f-name').value.trim() ? 'f-mail' : 'f-name');
 }
 
 function submitGiftCheckin(b) {
@@ -1207,7 +1166,7 @@ function resetForm() {
   document.getElementById('kcart-mail').value = '';
   document.getElementById('eyebrow-home').textContent = 'Choisissez votre coiffeur';
   document.getElementById('form-title').textContent = 'On vous fait quoi ?';
-  kbTarget = 'f-name'; kbShift = true;
+  kbTarget = 'f-name';
   renderTotals(); renderBarberGrid();
   show('p-who');
 }
