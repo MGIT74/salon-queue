@@ -281,7 +281,9 @@
   .kstep .ks.cur i { background: var(--card); color: var(--ink); }
 
   .k-infos { display: flex; gap: clamp(16px,2.4vw,32px); align-items: flex-start; }
-  .k-infos .k-fields { flex: 1 1 0; min-width: 0; max-width: 760px; }
+  .k-infos .k-fields { flex: 1 1 0; min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+                      column-gap: clamp(14px,1.8vw,24px); align-items: end; }
+  .k-infos .k-fields .k-domains { grid-column: 2; }
   .fld input.k-big { font-size: clamp(20px,2.2vw,28px); font-weight: 600; padding: clamp(14px,2vh,20px) clamp(16px,1.6vw,22px);
            border-radius: 18px; border: 2px solid transparent; background: var(--fill); color: var(--ink); }
   .fld input.k-big.k-focus { border-color: var(--accent); background: var(--card); }
@@ -294,7 +296,8 @@
   .k-foot-row .go.k-go { width: auto; padding-left: clamp(30px,3.4vw,48px); padding-right: clamp(30px,3.4vw,48px); }
   @media (max-width: 820px) {
     .k-infos { flex-direction: column; align-items: stretch; }
-    .k-infos .k-fields { flex: none; }
+    .k-infos .k-fields { flex: none; grid-template-columns: minmax(0, 1fr); }
+    .k-infos .k-fields .k-domains { grid-column: 1; }
     .k-infos .fld { margin-bottom: 10px; }
   }
 
