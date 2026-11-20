@@ -3694,14 +3694,15 @@ function renderCredit() {
   document.getElementById('cr-bal').textContent = free ? 'Offerts' : eur(bal);
   document.getElementById('cr-balance').classList.toggle('low', !free && bal <= crData.alert_cents);
   document.getElementById('cr-bal-hint').textContent = free ? 'Le salon vous offre vos produits : prenez-les ici pour que le stock reste juste.'
-    : bal <= 0 ? 'Crédit vide : rechargez à la caisse.' : bal <= crData.alert_cents ? 'Bientôt vide : pensez à recharger à la caisse.' : 'Rechargez votre crédit à la caisse.';
+    : (bal <= 0 ? 'Crédit vide : rechargez à la caisse.' : bal <= crData.alert_cents ? 'Bientôt vide : pensez à recharger à la caisse.' : 'Rechargez votre crédit à la caisse.') +
+      (crData.discount_pct ? ' Remise de ' + crData.discount_pct + ' % sur vos produits.' : '');
   var prods = crData.products || [];
   document.getElementById('cr-count').textContent = prods.length + ' produit' + (prods.length > 1 ? 's' : '');
   document.getElementById('cr-search').style.display = prods.length ? '' : 'none';
   renderCreditGrid();
   var moves = crData.moves || [];
   document.getElementById('cr-hist').innerHTML = moves.length ? moves.map(function (m) {
-    var label = (m.kind === 'take' || m.kind === 'free') ? esc(m.product_name || 'Produit') : m.kind === 'recharge' ? 'Recharge à la caisse' : 'Ajustement · ' + esc(m.note || '');
+    var label = (m.kind === 'take' || m.kind === 'free') ? esc(m.product_name || 'Produit') + (m.kind === 'take' && m.note ? ' <small style="display:inline;color:var(--green)">' + esc(m.note) + '</small>' : '') : m.kind === 'recharge' ? 'Recharge à la caisse' : 'Ajustement · ' + esc(m.note || '');
     return '<div class="cr-row' + (m.undone ? ' undone' : '') + '"><div>' + label + '<small>' + creditWhen(m.created_at) + (m.undone ? ' · annulé' : '') + '</small></div>' +
       '<div style="display:flex;align-items:center">' + (m.kind === 'free' ? '<span class="amt" style="color:var(--grey)">Offert</span>'
         : '<span class="amt ' + (m.amount_cents < 0 ? 'minus' : 'plus') + '">' + (m.amount_cents > 0 ? '+' : '−') + eur(Math.abs(m.amount_cents)) + '</span>') +
@@ -3709,6 +3710,8 @@ function renderCredit() {
   }).join('') : '<div class="cr-row" style="color:var(--grey)">Aucun mouvement pour le moment.</div>';
 }
 /** Grille des produits, filtrée par la recherche (nom ou code-barres, sans tenir compte des accents). */
+/** Prix du produit pour ce coiffeur (avec sa remise de personnel). */
+function creditPriceOf(p) { return p.my_price_cents != null ? p.my_price_cents : p.price_cents; }
 function renderCreditGrid() {
   if (!crData) return;
   var bal = crData.balance_cents, free = crData.free;
@@ -3720,8 +3723,10 @@ function renderCreditGrid() {
   // Une seule ligne s'il y a peu de produits ; sinon 2 lignes qui défilent.
   document.getElementById('cr-grid').style.gridTemplateRows = prods.length > 4 ? 'repeat(2, auto)' : 'auto';
   document.getElementById('cr-grid').innerHTML = prods.length ? prods.map(function (p) {
-    var out = p.stock_enabled && p.stock_quantity < 1, poor = !free && p.price_cents > bal;
-    return '<button class="cr-tile" ' + (out ? 'disabled' : '') + ' onclick="pickCreditProduct(\'' + esc(p.id) + '\')"><b>' + esc(p.name) + '</b><span>' + eur(p.price_cents) +
+    var mine = creditPriceOf(p);   // prix avec la remise du coiffeur
+    var out = p.stock_enabled && p.stock_quantity < 1, poor = !free && mine > bal;
+    var priceHtml = (!free && mine < p.price_cents) ? '<s style="opacity:.6">' + eur(p.price_cents) + '</s> <b style="font-size:12.5px;color:var(--green)">' + eur(mine) + '</b>' : eur(p.price_cents);
+    return '<button class="cr-tile" ' + (out ? 'disabled' : '') + ' onclick="pickCreditProduct(\'' + esc(p.id) + '\')"><b>' + esc(p.name) + '</b><span>' + priceHtml +
       (p.stock_enabled ? ' · ' + (out ? 'épuisé' : 'stock ' + p.stock_quantity) : '') + '</span>' + (poor && !out ? '<span style="color:var(--orange)">crédit insuffisant</span>' : '') + '</button>';
   }).join('') : '<div class="empty">' + (all.length ? 'Aucun produit ne correspond à « ' + esc(qEl.value.trim()) + ' ».' : 'Aucun produit disponible avec le crédit.') + '</div>';
 }
@@ -3732,12 +3737,14 @@ function pickCreditProduct(id) {
   crPick = p;
   var bal = crData.balance_cents;
   document.getElementById('cr-sheet-name').textContent = p.name;
-  document.getElementById('cr-sheet-price').textContent = eur(p.price_cents);
+  var mine = creditPriceOf(p);
+  document.getElementById('cr-sheet-price').innerHTML = (!crData.free && mine < p.price_cents)
+    ? '<s style="opacity:.55;font-size:15px;font-weight:500">' + eur(p.price_cents) + '</s> ' + eur(mine) : eur(p.price_cents);
   var free = crData.free;
   document.getElementById('cr-sheet-stock').textContent = p.stock_enabled ? 'Stock : ' + p.stock_quantity + ' → ' + (p.stock_quantity - 1) : (free ? 'Produit' : 'Nouveau solde');
-  var ok = (free || bal >= p.price_cents) && !(p.stock_enabled && p.stock_quantity < 1);
+  var ok = (free || bal >= mine) && !(p.stock_enabled && p.stock_quantity < 1);
   document.getElementById('cr-sheet-after').textContent = !ok ? (p.stock_enabled && p.stock_quantity < 1 ? 'Épuisé' : 'Crédit insuffisant (' + eur(bal) + ')')
-    : free ? 'Offert par le salon' : eur(bal) + ' → ' + eur(bal - p.price_cents);
+    : free ? 'Offert par le salon' : eur(bal) + ' → ' + eur(bal - mine);
   document.getElementById('cr-sheet-after').style.color = ok ? '' : 'var(--red)';
   var btn = document.getElementById('cr-sheet-ok');
   btn.disabled = !ok; btn.style.opacity = ok ? '1' : '.5';
