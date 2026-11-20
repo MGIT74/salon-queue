@@ -2415,7 +2415,8 @@ function selectBookSlot(btn) {
 function renderBookDtBarbers() {
   var box = document.getElementById('bk-dt-barbers');
   if (!box) return;
-  if (activeBookGift || !selBookService) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  // Carte cadeau : même choix du coiffeur qu'une prise de RDV normale (le cadeau ne bloque plus le coiffeur).
+  if (!selBookService) { box.style.display = 'none'; box.innerHTML = ''; return; }
   var day = document.getElementById('bk-date').value;
   var offOn = function (b) { return Boolean(day && typeof barberBookableOn === 'function' && !barberBookableOn(b, day)); };
   var list = bookBarbers.filter(function (b) {
@@ -2448,8 +2449,9 @@ function renderBookDtBarbers() {
 function pickBookDtBarber(id) {
   if (String(selBookBarber) === String(id)) return;
   selBookBarber = id;
-  applyBookBarberOffer();
+  if (!activeBookGift) applyBookBarberOffer();   // cadeau : prestation et suppléments fixés par le cadeau
   renderBookBarberGrid();
+  if (activeBookGift) renderGiftSummaryBox();     // « Rendez-vous avec » suit le coiffeur choisi
   lastBookDateBarber = selBookBarber;
   if (window.bkPickOpenDay) window.bkPickOpenDay(!(bkGrp && bkGrp.date), true);   // premier jour disponible de ce coiffeur
   loadBookSlots();
