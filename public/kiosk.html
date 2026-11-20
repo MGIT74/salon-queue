@@ -270,7 +270,9 @@
   .idle-hint { position: absolute; bottom: clamp(30px,5vh,60px); font-size: clamp(14px,1.4vw,18px); color: var(--grey); }
 
   /* ---------- Nouveau parcours borne : étapes, « À quel nom ? » + clavier ---------- */
-  .kstep { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 clamp(14px,2vh,22px); flex: none; }
+  .kstep { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin: 0 0 clamp(14px,2vh,22px); flex: none; }
+  /* Étapes toujours en haut, au milieu (l'écran du coiffeur n'est plus centré verticalement). */
+  .stage.kstep-on { justify-content: flex-start; }
   .kstep .ks { display: flex; align-items: center; gap: 8px; padding: 7px 13px 7px 8px; border-radius: 999px;
                font-size: clamp(12px,1.1vw,14px); font-weight: 600; color: var(--grey); }
   .kstep .ks i { font-style: normal; width: 22px; height: 22px; border-radius: 50%; background: var(--fill);
@@ -573,7 +575,10 @@ function renderKStep(id) {
   var el = document.getElementById('kstep');
   if (!el) return;
   var cur = KSTEP_OF[id];
-  if (cur === undefined || grp || activeGift) { el.style.display = 'none'; return; }
+  var st = document.querySelector('.stage');
+  var on = !(cur === undefined || grp || activeGift);
+  if (st) st.classList.toggle('kstep-on', on);
+  if (!on) { el.style.display = 'none'; return; }
   el.style.display = '';
   el.innerHTML = KSTEP_LABELS.map(function (l, i) {
     var cls = i === cur ? 'cur' : (i < cur ? 'done' : '');
