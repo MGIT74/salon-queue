@@ -203,6 +203,7 @@ const suite = [
   ['180-credit-produits-coiffeurs.js', true, ['exit']],
   ['181-tablette-agenda-coiffeurs.js', true, ['exit']],
   ['182-borne-anciennes-webview.js', false, ['exit']],
+  ['183-borne-nom-puis-prestation.js', false, ['exit']],
 ];
 
 let bad = 0;

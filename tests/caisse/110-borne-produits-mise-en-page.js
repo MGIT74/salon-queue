@@ -41,7 +41,7 @@ const PUB = { 'Content-Type': 'application/json', 'X-Salon-Slug': 'test' };
   check('etape produits presente', /id="p-form-products"/.test(html) && /Un produit avec ça \?/.test(html) && /id="products-grid"/.test(html));
   check('produits « caisse seulement » filtres', /online_bookable !== 0/.test(html));
   check('produits envoyes a la confirmation', /products: selProducts\.map/.test(html));
-  check('etapes en colonne : en-tete / liste qui defile / barre du bas', (html.match(/class="panel kflow"/g) || []).length === 3 && /\.kflow \.kbody \{[^}]*overflow-y: auto/.test(html) && /\.kflow \.kfoot \{[^}]*flex: none/.test(html));
+  check('etapes en colonne : en-tete / liste qui defile / barre du bas', (html.match(/class="panel kflow"/g) || []).length === 4 && /\.kflow \.kbody \{[^}]*overflow-y: auto/.test(html) && /\.kflow \.kfoot \{[^}]*flex: none/.test(html));
   check('accueil centre sans couper le haut', /\.stage \{ justify-content: safe center; \}/.test(html));
   check('recherche des supplements et produits', /id="extras-q"/.test(html) && /id="products-q"/.test(html));
   check('tarif du coiffeur applique a la borne', /barberItems\(b, 'services', services\)/.test(html));

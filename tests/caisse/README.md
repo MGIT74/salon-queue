@@ -216,4 +216,5 @@ node tests/caisse/179-carte-fidelite-articles.js  # Fidelite : une seule carte, 
 node tests/caisse/180-credit-produits-coiffeurs.js  # Credit produits des coiffeurs : recharge en caisse, produit pris au poste (stock et credit), annulation, admin
 node tests/caisse/181-tablette-agenda-coiffeurs.js  # Lien agenda : tablette partagee des coiffeurs (Agenda + Timer + Deconnexion, ouverte meme caisse cloturee)
 node tests/caisse/182-borne-anciennes-webview.js  # Borne dans une WebView ancienne : plus de « inset » (ecran de veille plein ecran)
+node tests/caisse/183-borne-nom-puis-prestation.js  # Borne : nom + email (clavier intégré) avant la prestation, étapes en haut, ticket -> accueil en 15 s
 ```
