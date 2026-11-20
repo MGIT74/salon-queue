@@ -640,7 +640,9 @@ router.get('/gift-cards/lookup', wrap(async (req, res) => {
   // faut bloquer toute réservation en ligne plutôt que de laisser le
   // client choisir un autre coiffeur à sa place (le cadeau a été pensé
   // pour être honoré précisément par ce coiffeur-là, en salon).
-  const walkInOnly = Boolean(gift.barber_id) && !gift.accepts_appointments;
+  // Depuis que le client choisit librement son coiffeur (il n'est plus bloqué sur celui qui a encaissé
+  // le cadeau), un coiffeur « sans rendez-vous » ne bloque plus la réservation en ligne : le client en prend un autre.
+  const walkInOnly = false;
 
   res.json({
     ok: true,

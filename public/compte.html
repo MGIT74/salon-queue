@@ -2007,15 +2007,8 @@ function lookupBookGiftCode() {
     selBookService = serviceItem.item_id;
     selBookExtras = extraItems.map(function (it) { return it.item_id; });
 
-    // Le coiffeur désigné (celui dont la bulle était sélectionnée à la
-    // vente en caisse) permet de sauter entièrement l'étape "choisissez
-    // le coiffeur" - directement au choix du créneau, comme sur la page
-    // de réservation publique (rdv.html).
-    if (g.designated_barber) {
-      selectBookBarber(null, g.designated_barber.id);
-      return;
-    }
-
+    // Le client choisit librement son coiffeur : il n'est plus bloqué sur
+    // celui qui a encaissé le cadeau en caisse.
     document.querySelectorAll('#bk-barber-grid .svc-card').forEach(function (c) { c.classList.remove('sel'); });
     document.getElementById('bk-barber-eyebrow').textContent = 'Cadeau de ' + g.recipient_name + ' — choisissez le coiffeur';
     show('p-book-barber');
@@ -2052,7 +2045,7 @@ function renderGiftSummaryBox() {
     box.style.backgroundImage = '';
   }
 
-  var barber = activeBookGift.designated_barber || bookBarbers.find(function (b) { return b.id === selBookBarber; });
+  var barber = bookBarbers.find(function (b) { return b.id === selBookBarber; });
   var barberRow = document.getElementById('gift-summary-barber-row');
   if (barber) {
     var avatarEl = document.getElementById('gift-summary-avatar');

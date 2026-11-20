@@ -775,7 +775,7 @@ function renderGiftSummaryBox() {
     box.style.backgroundImage = '';
   }
 
-  var barber = activeGift.designated_barber || barbers.find(function (b) { return b.id === selBarber; });
+  var barber = barbers.find(function (b) { return b.id === selBarber; });
   var barberRow = document.getElementById('gift-summary-barber-row');
   if (barber) {
     var avatarEl = document.getElementById('gift-summary-avatar');
@@ -832,15 +832,8 @@ function lookupGiftCode() {
     selService = serviceItem.item_id;
     selExtras = extraItems.map(function (it) { return it.item_id; });
 
-    // Le coiffeur désigné (celui dont la bulle était sélectionnée à la
-    // vente en caisse) permet de sauter entièrement l'étape "choisissez
-    // le coiffeur" - le client passe directement au choix de la date,
-    // le cadeau étant déjà lié au bon coiffeur depuis l'achat.
-    if (g.designated_barber) {
-      selectBarber(null, g.designated_barber.id);
-      return;
-    }
-
+    // Le client choisit librement son coiffeur : il n'est plus bloqué sur
+    // celui qui a encaissé le cadeau en caisse.
     document.querySelectorAll('#barber-grid .svc-card').forEach(function (c) { c.classList.remove('sel'); });
     document.getElementById('barber-eyebrow').textContent = 'Cadeau de ' + g.recipient_name + ' — choisissez le coiffeur';
     show('p-barber');
