@@ -315,6 +315,9 @@
   .k-soft-btn { display: flex; align-items: center; gap: 10px; border: none; background: var(--fill); color: var(--ink);
                 border-radius: 999px; padding: 14px 24px; font-family: inherit; font-size: clamp(15px,1.4vw,18px);
                 font-weight: 600; cursor: pointer; }
+  /* Le tableau « En cours » ne s'affiche que sur le 1er écran ; ensuite la borne prend toute la largeur. */
+  .kiosk.no-board { grid-template-columns: 1fr; grid-template-rows: 1fr; }
+  .kiosk.no-board .board { display: none; }
   .t-auto { margin-top: 10px; font-size: 13px; color: var(--grey); text-align: center; }
 </style>
 </head>
@@ -566,6 +569,9 @@ function show(id) {
   // Classe posee en JS (les vieilles WebView Android ne connaissent pas :has).
   var st = document.querySelector('.stage');
   if (st) st.classList.toggle('flow-on', document.getElementById(id).classList.contains('kflow'));
+  // Tableau « En cours » : seulement sur « Qui vient ? » (masqué dès qu'on a choisi seul / plusieurs / cadeau).
+  var kw = document.querySelector('.kiosk');
+  if (kw) kw.classList.toggle('no-board', id !== 'p-who');
   renderGrpBanner(id);
   renderKStep(id);
   kTicketAutoReturn(id);
