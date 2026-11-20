@@ -19,5 +19,6 @@ check('plus de :has (vieilles WebView) : classe flow-on posée en JS', !/:has\(/
 check('ticket : retour à l\'accueil automatique après 15 s', /id="t-auto"/.test(k) && /var left = 15/.test(k) && /on\.id === 'p-ticket'\) resetForm\(\)/.test(k));
 check('« J\'ai un code cadeau » sur le 1er écran (tuile cadeau gardée)', /J'ai un code cadeau<\/button>/.test(k) && /Utiliser un cadeau<\/div>/.test(k));
 check('tableau « En cours » seulement sur le 1er écran', /classList\.toggle\('no-board', id !== 'p-who'\)/.test(k) && /\.kiosk\.no-board \.board \{ display: none; \}/.test(k));
+check('logo du salon en haut de chaque page (étapes au milieu)', /id="ktop"/.test(k) && /id="ktop-logo-img"/.test(k) && /ti\.src = salonLogoUrl/.test(k));
 console.log('\n' + pass + ' OK, ' + fail + ' ECHEC');
 process.exit(fail ? 1 : 0);
