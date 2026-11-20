@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TBO mobile — Maquette Accueil (ouverture + salons)</title>
+<style>
+/* Maquette de l'ACCUEIL de l'app : animation d'ouverture → liste des salons →
+   salon choisi. Couleurs = tokens de public/app.css. Données = exemples. */
+:root{--font:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Helvetica Neue",Arial,sans-serif}
+.light{--bg:#eef0f2;--card:#fff;--ink:#1d1d1f;--grey:#66666b;--sep:#bcbdc6;--fill:#e4e5eb;--blue:#0062c4;--blueSoft:#e3eefb;--green:#1e7e34;--greenSoft:#e4f3e8;
+  --shadow:0 1px 2px rgba(0,0,0,.04),0 4px 14px rgba(0,0,0,.06);--glass:rgba(255,255,255,.62);--glassB:rgba(255,255,255,.75);--splash:#eef0f2;--splashInk:#1d1d1f}
+.dark{--bg:#000;--card:#1c1c1e;--ink:#f5f5f7;--grey:#98989d;--sep:#38383a;--fill:#2c2c2e;--blue:#0a84ff;--blueSoft:#0a2540;--green:#30d158;--greenSoft:#0f2e19;
+  --shadow:none;--glass:rgba(44,44,46,.6);--glassB:rgba(255,255,255,.12);--splash:#000;--splashInk:#f5f5f7}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:#121214;color:#f5f5f7;-webkit-font-smoothing:antialiased}
+body.lt{background:#d9dbe0;color:#1d1d1f}
+.head{position:sticky;top:0;z-index:50;background:rgba(18,18,20,.85);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid rgba(255,255,255,.08);padding:14px 24px}
+body.lt .head{background:rgba(217,219,224,.85);border-color:rgba(0,0,0,.08)}
+.head-in{max-width:1500px;margin:0 auto;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.head h1{font-size:19px;font-weight:700;letter-spacing:-.3px;margin-right:auto}
+.btn{font:600 14px var(--font);border:none;border-radius:10px;padding:9px 14px;background:#f5f5f7;color:#1d1d1f;cursor:pointer}
+body.lt .btn{background:#1d1d1f;color:#fff}
+.btn.blue{background:#0a84ff;color:#fff}
+main{max-width:1500px;margin:0 auto;padding:26px 24px 80px}
+.intro{font-size:15px;opacity:.78;margin:0 0 24px;max-width:960px;line-height:1.55}
+.screens{display:flex;flex-wrap:wrap;gap:34px 30px}
+.shot{width:390px}
+.cap{font-size:14px;font-weight:700;margin:0 0 4px}
+.cap-sub{font-size:12.5px;opacity:.72;margin:0 0 10px;line-height:1.45;min-height:54px}
+.phone{width:390px;height:844px;border-radius:54px;background:#0d0d0d;padding:12px;box-shadow:0 26px 50px rgba(0,0,0,.3)}
+.screen{width:100%;height:100%;border-radius:44px;overflow:hidden;background:var(--bg);color:var(--ink);position:relative;display:flex;flex-direction:column;font-size:16px}
+.status{height:50px;flex:none;display:flex;justify-content:space-between;align-items:flex-end;padding:0 32px 6px;font-size:15px;font-weight:600;position:relative;z-index:5}
+.status .r{display:flex;gap:6px;align-items:center}
+.bat{width:24px;height:12px;border:1.5px solid currentColor;border-radius:4px;position:relative;opacity:.9}
+.bat:after{content:"";position:absolute;inset:1.5px;right:5px;background:currentColor;border-radius:1.5px}
+.home-ind{position:absolute;bottom:7px;left:50%;transform:translateX(-50%);width:134px;height:5px;border-radius:3px;background:var(--ink);opacity:.85;z-index:9}
+svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.scroll{flex:1;overflow-y:auto;padding:0 16px 40px;scrollbar-width:none}
+.scroll::-webkit-scrollbar{display:none}
+
+/* ---------- Logo TBO (marque) ---------- */
+.mark{width:112px;height:112px;position:relative;display:grid;place-items:center}
+.mark svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.ring{fill:none;stroke:var(--blue);stroke-width:3.2;stroke-linecap:round}
+.ring2{fill:none;stroke:var(--blue);stroke-width:1.2;opacity:.35}
+.sci{fill:none;stroke:var(--splashInk);stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+.word{font-size:31px;font-weight:800;letter-spacing:-.9px;color:var(--splashInk);display:flex;gap:0;white-space:pre}
+.word span{display:inline-block}
+.tag{font-size:13.5px;letter-spacing:2.6px;text-transform:uppercase;color:var(--grey);font-weight:600}
+
+/* ---------- 1. Animation d'ouverture ---------- */
+.splash{position:absolute;inset:0;background:var(--splash);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;z-index:3}
+.glow{position:absolute;width:300px;height:300px;border-radius:50%;background:radial-gradient(circle,rgba(10,132,255,.38),rgba(10,132,255,0) 66%);filter:blur(6px)}
+.light .glow{background:radial-gradient(circle,rgba(0,98,196,.20),rgba(0,98,196,0) 66%)}
+.play .glow{animation:glow 3.4s cubic-bezier(.2,.8,.2,1) both}
+.play .ring{stroke-dasharray:330;animation:draw 1.1s .25s cubic-bezier(.65,0,.35,1) both}
+.play .ring2{animation:pop .9s .9s cubic-bezier(.2,.9,.3,1.3) both}
+.play .sci{stroke-dasharray:120;animation:draw2 .8s .7s cubic-bezier(.65,0,.35,1) both}
+.play .mark{animation:markOut 3.4s cubic-bezier(.7,0,.2,1) both}
+.play .word span{animation:rise .55s cubic-bezier(.2,.9,.3,1.2) both}
+.play .tag{animation:fade .6s 1.65s ease both}
+.play .splash{animation:splashOut .7s 2.55s cubic-bezier(.7,0,.3,1) both}
+@keyframes glow{0%{transform:scale(.2);opacity:0}35%{opacity:1}70%{transform:scale(1.15);opacity:.9}100%{transform:scale(1.3);opacity:0}}
+@keyframes draw{from{stroke-dashoffset:330}to{stroke-dashoffset:0}}
+@keyframes draw2{from{stroke-dashoffset:120}to{stroke-dashoffset:0}}
+@keyframes pop{from{transform:scale(.6);opacity:0}to{transform:scale(1);opacity:.35}}
+@keyframes rise{from{transform:translateY(18px);opacity:0;filter:blur(4px)}to{transform:none;opacity:1;filter:none}}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@keyframes markOut{0%,70%{transform:none}100%{transform:translateY(-6px) scale(.96)}}
+@keyframes splashOut{to{opacity:0;transform:scale(1.06);visibility:hidden}}
+/* la liste apparaît en dessous */
+.play .list-in .hero-t,.play .list-in .search,.play .list-in .sec,.play .list-in .sc{animation:up .6s cubic-bezier(.2,.9,.3,1.1) both}
+@keyframes up{from{opacity:0;transform:translateY(26px)}to{opacity:1;transform:none}}
+
+/* ---------- 2. Liste des salons ---------- */
+.top-hero{position:relative;height:210px;flex:none;margin-top:-50px;padding:62px 20px 0;overflow:hidden}
+.top-hero .bgimg{position:absolute;inset:0;background:
+  radial-gradient(120% 90% at 85% 0%,rgba(10,132,255,.55),transparent 60%),
+  radial-gradient(90% 80% at 0% 30%,rgba(255,159,10,.28),transparent 60%),
+  linear-gradient(180deg,#1b1d22,#000);}
+.light .top-hero .bgimg{background:
+  radial-gradient(120% 90% at 85% 0%,rgba(0,98,196,.28),transparent 60%),
+  radial-gradient(90% 80% at 0% 30%,rgba(255,159,10,.18),transparent 60%),
+  linear-gradient(180deg,#f7f8fa,#eef0f2);}
+.top-hero .fadebot{position:absolute;left:0;right:0;bottom:0;height:70px;background:linear-gradient(180deg,transparent,var(--bg))}
+.hero-row{position:relative;display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.mini-mark{width:34px;height:34px;border-radius:10px;background:var(--blue);display:grid;place-items:center;color:#fff}
+.mini-mark svg.i{width:20px;height:20px}
+.brand{font-size:15px;font-weight:700;letter-spacing:-.2px}
+.hero-t{position:relative;font-size:32px;font-weight:800;letter-spacing:-.8px;line-height:1.08}
+.hero-s{position:relative;color:var(--grey);font-size:15px;margin-top:6px}
+.search{display:flex;align-items:center;gap:8px;background:var(--glass);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid var(--glassB);border-radius:14px;padding:11px 12px;color:var(--grey);font-size:16px;margin:2px 0 18px}
+.search svg.i{width:18px;height:18px}
+.chip{margin-left:auto;display:flex;align-items:center;gap:5px;background:var(--blueSoft);color:var(--blue);border-radius:99px;padding:5px 10px;font-size:13px;font-weight:600}
+.chip svg.i{width:15px;height:15px}
+.sec{font-size:13px;font-weight:600;color:var(--grey);text-transform:uppercase;letter-spacing:.6px;margin:4px 6px 8px}
+.sc{display:flex;align-items:center;gap:13px;background:var(--card);border-radius:18px;padding:12px;margin-bottom:10px;box-shadow:var(--shadow)}
+.logo{width:56px;height:56px;border-radius:15px;flex:none;display:grid;place-items:center;font-weight:800;font-size:19px;color:#fff;letter-spacing:-.5px}
+.sc .nm{font-size:17px;font-weight:700;letter-spacing:-.2px}
+.sc .ad{font-size:13.5px;color:var(--grey);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sc .bd{display:inline-flex;margin-top:6px;gap:6px}
+.pill{font-size:11.5px;font-weight:700;border-radius:99px;padding:3px 8px;background:var(--fill);color:var(--grey)}
+.pill.g{background:var(--greenSoft);color:var(--green)}
+.chev{margin-left:auto;color:var(--sep)}
+.recent{background:linear-gradient(135deg,rgba(10,132,255,.22),rgba(10,132,255,.06));border:1px solid rgba(10,132,255,.35)}
+.light .recent{background:linear-gradient(135deg,rgba(0,98,196,.12),rgba(0,98,196,.03));border-color:rgba(0,98,196,.25)}
+.foot-link{display:flex;align-items:center;justify-content:center;gap:8px;color:var(--blue);font-weight:600;font-size:15px;padding:16px 0 6px}
+.foot-note{text-align:center;color:var(--grey);font-size:12.5px}
+
+/* ---------- 3. Salon choisi ---------- */
+.cover{position:relative;height:300px;flex:none;margin-top:-50px;overflow:hidden}
+.cover .img{position:absolute;inset:0;background:
+  linear-gradient(180deg,rgba(0,0,0,.15),rgba(0,0,0,.55)),
+  repeating-linear-gradient(115deg,#2a2d33 0 18px,#24272c 18px 36px);}
+.cover .img:after{content:"Photo du salon (image de connexion du salon, réglée sur le web)";position:absolute;left:0;right:0;top:120px;text-align:center;color:rgba(255,255,255,.45);font-size:12px}
+.cover .fadebot{position:absolute;left:0;right:0;bottom:0;height:120px;background:linear-gradient(180deg,transparent,var(--bg))}
+.back{position:absolute;top:58px;left:16px;width:38px;height:38px;border-radius:50%;background:rgba(0,0,0,.35);backdrop-filter:blur(12px);display:grid;place-items:center;color:#fff;z-index:2}
+.back svg.i{width:20px;height:20px}
+.idn{position:relative;margin:-92px 20px 0;display:flex;align-items:flex-end;gap:14px;z-index:2}
+.idn .logo{width:78px;height:78px;border-radius:22px;font-size:26px;box-shadow:0 10px 30px rgba(0,0,0,.35);border:3px solid var(--bg)}
+.idn .nm{font-size:26px;font-weight:800;letter-spacing:-.6px;line-height:1.1}
+.idn .ad{font-size:14px;color:var(--grey);margin-top:3px}
+.acts{display:flex;gap:8px;margin:16px 20px 18px}
+.act{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;background:var(--card);border-radius:14px;padding:10px 4px;color:var(--blue);font-size:12.5px;font-weight:600;box-shadow:var(--shadow)}
+.big{display:flex;align-items:center;gap:14px;border-radius:20px;padding:18px 16px;margin:0 16px 12px;box-shadow:var(--shadow)}
+.big.pri{background:var(--blue);color:#fff}
+.big.pri .s{color:rgba(255,255,255,.82)}
+.big.sec2{background:var(--card)}
+.big .ic{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;flex:none}
+.big.pri .ic{background:rgba(255,255,255,.18)}
+.big.sec2 .ic{background:var(--blueSoft);color:var(--blue)}
+.big .t{font-size:18px;font-weight:700;letter-spacing:-.2px}
+.big .s{font-size:13.5px;color:var(--grey);margin-top:2px}
+.team{margin:6px 16px 0;background:var(--card);border-radius:18px;overflow:hidden;box-shadow:var(--shadow)}
+.row{display:flex;align-items:center;gap:12px;padding:13px 14px}
+.row+.row{border-top:1px solid var(--sep)}
+.row .ic2{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;color:#fff;flex:none}
+.row .ic2 svg.i{width:18px;height:18px}
+.row .t{font-size:16px}
+.row .s{font-size:12.5px;color:var(--grey)}
+
+/* ---------- Note à décider ---------- */
+.note{margin-top:34px;background:rgba(255,159,10,.12);border:1px solid rgba(255,159,10,.4);border-radius:16px;padding:18px 20px;max-width:960px;line-height:1.55;font-size:14.5px}
+.note h3{font-size:16px;margin-bottom:8px}
+.note ol{margin:8px 0 0 20px}
+.flow{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 22px;font-size:14px;font-weight:600}
+.flow span{background:rgba(127,127,127,.18);border-radius:99px;padding:6px 12px}
+</style>
+</head>
+<body>
+<div class="head"><div class="head-in">
+  <h1>Accueil de l'app — ouverture, salons, salon choisi</h1>
+  <button class="btn blue" onclick="replay()">▶ Rejouer l'animation</button>
+  <button class="btn" onclick="toggleTheme()">Mode clair / sombre</button>
+</div></div>
+<main>
+  <p class="intro">Proposition pour ce qu'on voit en ouvrant l'app. L'animation dure environ 3 secondes : un halo bleu, le cercle du logo qui se dessine, les ciseaux, puis « The Barber One » lettre par lettre. Ensuite l'écran se fond dans la liste des salons, dont les cartes montent une à une. Au <b>2ᵉ lancement</b>, l'animation est raccourcie (~1 s) et l'app ouvre directement le dernier salon utilisé.</p>
+  <div class="flow"><span>① Ouverture animée</span>→<span>② Choisir un salon</span>→<span>③ Le salon : Client ou Équipe</span>→<span>connexion existante</span></div>
+
+  <div class="screens">
+    <div class="shot">
+      <p class="cap">① Ouverture (animée — bouton « Rejouer » en haut)</p>
+      <p class="cap-sub">Halo bleu, le cercle se dessine, les ciseaux se tracent, le nom apparaît lettre par lettre avec un léger flou. Puis fondu vers la liste des salons, dont les cartes montent en cascade.</p>
+      <div class="phone"><div class="screen dark th play" id="anim">
+        <div class="status" style="color:var(--splashInk)"><span>9:41</span><span class="r">●●●● <span class="bat"></span></span></div>
+        <!-- liste en dessous -->
+        <div class="list-in" style="display:flex;flex-direction:column;flex:1;min-height:0" data-list></div>
+        <div class="splash">
+          <div class="glow"></div>
+          <div class="mark">
+            <svg viewBox="0 0 112 112"><circle class="ring2" cx="56" cy="56" r="54"/><circle class="ring" cx="56" cy="56" r="46" transform="rotate(-90 56 56)"/>
+              <g class="sci" transform="translate(32 32) scale(2)"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></g>
+            </svg>
+          </div>
+          <div class="word" data-word="The Barber One"></div>
+          <div class="tag">Rendez-vous · File · Caisse</div>
+        </div>
+        <div class="home-ind"></div>
+      </div></div>
+    </div>
+
+    <div class="shot">
+      <p class="cap">② Choisir un salon</p>
+      <p class="cap-sub">Fond dégradé discret avec le logo. Recherche par nom ou par ville, bouton « Près de moi ». En haut, le dernier salon utilisé sur cet iPhone. En bas, le lien « Gérant ? » mène au Dashboard.</p>
+      <div class="phone"><div class="screen dark th" data-list-static>
+        <div class="status"><span>9:41</span><span class="r">●●●● <span class="bat"></span></span></div>
+      </div></div>
+    </div>
+
+    <div class="shot">
+      <p class="cap">③ Le salon choisi</p>
+      <p class="cap-sub">Grande photo, logo et adresse du salon. Raccourcis Appeler, Itinéraire et Site. Puis deux entrées : <b>Client</b> (réserver, mon compte, fidélité) et <b>Équipe</b> (Mon poste par code PIN, Dashboard).</p>
+      <div class="phone"><div class="screen dark th">
+        <div class="status" style="color:#fff"><span>9:41</span><span class="r">●●●● <span class="bat"></span></span></div>
+        <div class="cover"><div class="img"></div><div class="fadebot"></div><div class="back"><svg class="i" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></div></div>
+        <div class="idn"><div class="logo" style="background:linear-gradient(135deg,#0a84ff,#5e5ce6)">TBO</div>
+          <div><div class="nm">TBO Oyonnax</div><div class="ad">Adresse du salon (réglée sur le web)</div></div></div>
+        <div class="acts">
+          <div class="act"><svg class="i" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>Appeler</div>
+          <div class="act"><svg class="i" viewBox="0 0 24 24"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>Itinéraire</div>
+          <div class="act"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>Site</div>
+        </div>
+        <div class="big pri"><div class="ic"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/></svg></div>
+          <div><div class="t">Prendre rendez-vous</div><div class="s">Client · mon compte, fidélité, cartes cadeaux</div></div><svg class="i" viewBox="0 0 24 24" style="margin-left:auto;opacity:.8"><polyline points="9 18 15 12 9 6"/></svg></div>
+        <div class="sec" style="margin:14px 22px 8px">Équipe du salon</div>
+        <div class="team">
+          <div class="row"><div class="ic2" style="background:#ff9f0a"><svg class="i" viewBox="0 0 24 24"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg></div>
+            <div><div class="t">Mon poste</div><div class="s">Coiffeur · code PIN</div></div><svg class="i chev" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
+          <div class="row"><div class="ic2" style="background:#0a84ff"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></div>
+            <div><div class="t">Dashboard</div><div class="s">Gérant · email et mot de passe</div></div><svg class="i chev" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
+        </div>
+        <div class="home-ind"></div>
+      </div></div>
+    </div>
+  </div>
+
+  <div class="note">
+    <h3>⚠️ À décider avant de coder : d'où vient « la liste de tous les salons » ?</h3>
+    Aujourd'hui, le serveur <b>n'a aucune route publique</b> qui liste les salons. Seul le super-admin les voit. Le serveur donne seulement, pour un salon déjà connu, son nom, son logo, son adresse, son site et son image de connexion.
+    <ol>
+      <li><b>Ajouter une route publique au serveur</b> (ex. <code>GET /api/salons/directory</code> : nom, logo, ville, adresse des salons actifs). Il faut toucher au serveur, donc ton accord, puis une mise en ligne sur <code>test</code> et <code>main</code>.</li>
+      <li><b>Sans toucher au serveur</b> : la liste montre seulement les salons déjà utilisés sur cet iPhone. Les autres s'ajoutent avec un lien ou un QR code du salon (ex. <code>rdv.html?salon=…</code>).</li>
+    </ol>
+    « Près de moi » et la ville n'existent que si le serveur les fournit (choix 1).
+  </div>
+</main>
+
+<script>
+var SALONS=[
+  {n:'TBO Oyonnax',a:'Oyonnax · adresse du salon',l:'TBO',c:'linear-gradient(135deg,#0a84ff,#5e5ce6)',recent:true},
+  {n:'Salon exemple 2',a:'Ville · adresse',l:'S2',c:'linear-gradient(135deg,#ff9f0a,#ff375f)'},
+  {n:'Salon exemple 3',a:'Ville · adresse',l:'S3',c:'linear-gradient(135deg,#30d158,#0a84ff)'},
+  {n:'Salon exemple 4',a:'Ville · adresse',l:'S4',c:'linear-gradient(135deg,#bf5af2,#5e5ce6)'},
+  {n:'Salon exemple 5',a:'Ville · adresse',l:'S5',c:'linear-gradient(135deg,#64d2ff,#30d158)'}
+];
+var CHEV='<svg class="i chev" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>';
+function card(s,i,cls){return '<div class="sc '+(cls||'')+'" style="animation-delay:'+(2.75+i*0.09).toFixed(2)+'s"><div class="logo" style="background:'+s.c+'">'+s.l+'</div><div style="min-width:0"><div class="nm">'+s.n+'</div><div class="ad">'+s.a+'</div>'+(s.recent?'<div class="bd"><span class="pill g">Dernier utilisé</span></div>':'')+'</div>'+CHEV+'</div>';}
+function listHtml(){
+  return '<div class="top-hero"><div class="bgimg"></div><div class="fadebot"></div>'+
+    '<div class="hero-row"><div class="mini-mark"><svg class="i" viewBox="0 0 24 24"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg></div><div class="brand">The Barber One</div></div>'+
+    '<div class="hero-t" style="animation-delay:2.6s">Choisissez<br>votre salon</div></div>'+
+    '<div class="scroll">'+
+    '<div class="search" style="animation-delay:2.68s"><svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><span style="white-space:nowrap">Nom du salon, ville…</span><span class="chip" style="white-space:nowrap"><svg class="i" viewBox="0 0 24 24"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>Près de moi</span></div>'+
+    '<div class="sec" style="animation-delay:2.72s">Sur cet iPhone</div>'+card(SALONS[0],0,'recent')+
+    '<div class="sec" style="animation-delay:2.8s;margin-top:14px">Tous les salons</div>'+SALONS.slice(1).map(function(s,i){return card(s,i+1);}).join('')+
+    '<div class="foot-link"><svg class="i" viewBox="0 0 24 24" style="width:18px;height:18px"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Gérant d\'un salon ? Dashboard</div>'+
+    '<div class="foot-note">The Barber One</div></div><div class="home-ind"></div>';
+}
+document.querySelectorAll('[data-list]').forEach(function(el){el.innerHTML=listHtml();});
+document.querySelectorAll('[data-list-static]').forEach(function(el){el.insertAdjacentHTML('beforeend',listHtml());});
+var w=document.querySelector('[data-word]');
+w.innerHTML=w.dataset.word.split('').map(function(ch,i){return '<span style="animation-delay:'+(1.0+i*0.045).toFixed(3)+'s">'+(ch===' '?'&nbsp;':ch)+'</span>';}).join('');
+function replay(){var a=document.getElementById('anim');a.classList.remove('play');void a.offsetWidth;a.classList.add('play');}
+setInterval(replay,6500);
+function toggleTheme(){
+  var dark=document.querySelector('.th').classList.contains('dark');
+  document.querySelectorAll('.th').forEach(function(s){s.classList.toggle('dark',!dark);s.classList.toggle('light',dark);});
+  document.body.classList.toggle('lt',dark);
+  replay();
+}
+</script>
+</body>
+</html>
