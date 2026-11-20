@@ -18,5 +18,6 @@ check('étapes en haut (Coiffeur · Vous · Prestation · Un petit plus · C\'es
 check('plus de :has (vieilles WebView) : classe flow-on posée en JS', !/:has\(/.test(k) && /classList\.toggle\('flow-on'/.test(k) && /\.stage\.flow-on \{/.test(k));
 check('ticket : retour à l\'accueil automatique après 15 s', /id="t-auto"/.test(k) && /var left = 15/.test(k) && /on\.id === 'p-ticket'\) resetForm\(\)/.test(k));
 check('« J\'ai un code cadeau » sur le 1er écran (tuile cadeau gardée)', /J'ai un code cadeau<\/button>/.test(k) && /Utiliser un cadeau<\/div>/.test(k));
+check('tableau « En cours » seulement sur le 1er écran', /classList\.toggle\('no-board', id !== 'p-who'\)/.test(k) && /\.kiosk\.no-board \.board \{ display: none; \}/.test(k));
 console.log('\n' + pass + ' OK, ' + fail + ' ECHEC');
 process.exit(fail ? 1 : 0);
