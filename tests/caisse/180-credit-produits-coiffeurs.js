@@ -74,6 +74,8 @@ const stock = (id) => Number(sql(`SELECT stock_quantity FROM products WHERE id='
   check('…et ceux des autres catégories n\'y sont pas', !r.body.products.some((x) => x.id === 'p2'), r.body.products);
   r = await api('POST', '/api/barber-credit/take', { product_id: 'p1' });
   check('…et « Je l\'ai pris » passe', r.status === 200, r.body);
+  const posteSrc = require('fs').readFileSync(require('path').join(__dirname, '../../public/poste.html'), 'utf8');
+  check('poste : photo du produit sur la tuile et dans la confirmation', /class="cr-img" style="background-image:url/.test(posteSrc) && /id="cr-sheet-img"/.test(posteSrc));
   if (r.status === 200) await api('POST', '/api/barber-credit/moves/' + r.body.move_id + '/undo', null, ADMIN);   // annulé : les totaux plus bas restent ceux d'avant
   await api('PUT', '/api/barber-credit/settings', { categories: [], alert_cents: 300 }, ADMIN);
   r = await api('GET', '/api/barber-credit/overview', null, ADMIN);

@@ -61,11 +61,12 @@ function inCreditCats(cats, p) {
 
 async function allowedProducts(salonId, cats) {
   const [rows] = await pool.query(
-    'SELECT id, name, price_cents, category, category_id, stock_enabled, stock_quantity, barcode FROM products WHERE salon_id = ? AND active = 1 ORDER BY sort_order, name',
+    'SELECT id, name, price_cents, category, category_id, stock_enabled, stock_quantity, barcode, image_url FROM products WHERE salon_id = ? AND active = 1 ORDER BY sort_order, name',
     [salonId]);
   return rows.filter((p) => inCreditCats(cats, p)).map((p) => ({
     id: p.id, name: p.name, price_cents: p.price_cents, category: p.category,
-    stock_enabled: Boolean(p.stock_enabled), stock_quantity: p.stock_quantity, barcode: p.barcode || null
+    stock_enabled: Boolean(p.stock_enabled), stock_quantity: p.stock_quantity, barcode: p.barcode || null,
+    image_url: p.image_url || null   // photo du produit, affichée sur la tuile du poste
   }));
 }
 
