@@ -9374,7 +9374,7 @@ function openAdminAddAppointment(dateStr, preselectedBarberId, prefTime) {
           aaShowHalf('morning');
         }
         // Heure touchée dans l'agenda (ou déjà choisie) : libre -> déjà sélectionnée, bouton « Continuer à HH:MM » ;
-        // pas libre -> le créneau suivant est seulement entouré (et « Forcer le RDV à HH:MM » est proposé).
+        // pas libre -> le créneau libre le plus proche (avant ou après) est seulement entouré (et « Forcer le RDV à HH:MM » est proposé).
         var want = state.time || prefTime;
         var hit = want ? r.slots.filter(function (x) { return x.time === want; })[0] : null;
         var nx = overlay.querySelector('#aa-dt-next');
@@ -9386,7 +9386,11 @@ function openAdminAddAppointment(dateStr, preselectedBarberId, prefTime) {
         } else {
           state.time = null; nx.style.display = 'none';
           if (prefTime) {
-            var near = [].slice.call(slotsEl.querySelectorAll('.aa-slot[data-time]')).filter(function (c) { return c.dataset.time >= prefTime; })[0];
+            // Créneau libre le PLUS PROCHE de l'heure touchée, avant ou après (à égalité : le plus tôt).
+            var toM = function (t) { return Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5)); };
+            var near = [].slice.call(slotsEl.querySelectorAll('.aa-slot[data-time]')).reduce(function (best, c) {
+              return !best || Math.abs(toM(c.dataset.time) - toM(prefTime)) < Math.abs(toM(best.dataset.time) - toM(prefTime)) ? c : best;
+            }, null);
             if (near) { near.classList.add('pref'); try { near.scrollIntoView({ block: 'nearest' }); } catch (e) {} }
           }
         }
