@@ -372,12 +372,18 @@ async function computeSlotsForBarber(barberId, dateStr, durationMin, rdvSettings
     if (t < startMin || t + durationMin > endMin || (isToday && t <= nowMin)) return [];
     return busyRanges.some(([bStart, bEnd]) => t < bEnd && t + durationMin > bStart) ? [] : [opts.atTime];
   }
+  // Heures testées : la grille (pas des créneaux depuis l'ouverture) + l'heure où finit chaque plage occupée
+  // (RDV + marge, pause...). Un trou qui commence hors de la grille - typiquement libéré par le « déplacement
+  // magique » de 5 min (RDV passé de 10:00 à 09:55 -> libre dès 10:25) - est ainsi proposé quand le RDV y tient pile.
+  const candidates = new Set();
+  for (let t = startMin; t + durationMin <= endMin; t += stepMin) candidates.add(t);
+  busyRanges.forEach(([, bEnd]) => { if (bEnd > startMin && bEnd + durationMin <= endMin) candidates.add(bEnd); });
   const slots = [];
-  for (let t = startMin; t + durationMin <= endMin; t += stepMin) {
-    if (isToday && t <= nowMin) continue;
+  Array.from(candidates).sort((a, b) => a - b).forEach((t) => {
+    if (isToday && t <= nowMin) return;
     const overlaps = busyRanges.some(([bStart, bEnd]) => t < bEnd && t + durationMin > bStart);
     if (!overlaps) slots.push(minutesToTime(t));
-  }
+  });
   return slots;
 }
 
@@ -1404,7 +1410,11 @@ router.post('/admin-create', requireAdminOrBarber, wrap(withBookingLock(async (r
     // idé par le staff. Le pas des créneaux et la marge tampon restent
     // appliqués (évite un vrai conflit d'agenda).
     const slots = await computeSlotsForBarber(barber_id, date, durationMin, rdvSettings, { skipLead: true });
-    if (!slots.includes(time)) {
+    // Équipe : n'importe quelle heure précise où le RDV tient (pas seulement les heures de la grille) passe sans
+    // « Forcer » - « Forcer » reste pour un vrai chevauchement.
+    const fitsExactly = !slots.includes(time) &&
+      (await computeSlotsForBarber(barber_id, date, durationMin, rdvSettings, { skipLead: true, atTime: time })).length > 0;
+    if (!slots.includes(time) && !fitsExactly) {
       // « Forcer » (équipe seulement, case « Je prends la responsabilité » cochée) : chevauchement accepté.
       if (req.body.force === true && req.body.force_ack === true) {
         const fc = await forceCheck(barber_id, date, time, durationMin, rdvSettings);
@@ -1797,7 +1807,8 @@ router.put('/:id/reschedule', requireAdminOrBarber, wrap(withBookingLock(async (
   const productSelections = productLinks.map((p) => ({ id: p.product_id, quantity: p.quantity }));
 
   const slots = await computeSlotsForBarber(finalBarberId, date, durationMin, rdvSettings, { skipLead: true, excludeAppointmentId: appt.id });
-  if (!slots.includes(time)) return res.status(409).json({ error: (await walkinRefusal(finalBarberId, date)) || "Ce créneau n'est plus disponible" });
+  // Équipe : heure précise libre acceptée même hors de la grille (comme l'ajout depuis l'agenda).
+  if (!slots.includes(time) && !(await computeSlotsForBarber(finalBarberId, date, durationMin, rdvSettings, { skipLead: true, excludeAppointmentId: appt.id, atTime: time })).length) return res.status(409).json({ error: (await walkinRefusal(finalBarberId, date)) || "Ce créneau n'est plus disponible" });
 
   const newScheduledAt = date + ' ' + time + ':00';
   await applyMove(appt, date, time, finalBarberId, rdvSettings, extraIds, productSelections);
@@ -1970,7 +1981,7 @@ router.put('/:id/services', requireAdminOrBarber, wrap(withBookingLock(async (re
     if (await isSalonClosedOnDate(req.salon.id, date)) return res.status(409).json({ error: 'Salon fermé ce jour : déplacement impossible.' });
     if (`${date} ${time}:00` < nowParisDatetimeString(rdvSettings.timezone)) return res.status(400).json({ error: 'Ce créneau est déjà passé.' });
     const slots = await computeSlotsForBarber(finalBarberId, date, durationMin, rdvSettings, { skipLead: true, excludeAppointmentId: appt.id });
-    if (!slots.includes(time)) return res.status(409).json({ error: (await walkinRefusal(finalBarberId, date)) || "Ce créneau n'est plus disponible pour la nouvelle durée" });
+    if (!slots.includes(time) && !(await computeSlotsForBarber(finalBarberId, date, durationMin, rdvSettings, { skipLead: true, excludeAppointmentId: appt.id, atTime: time })).length) return res.status(409).json({ error: (await walkinRefusal(finalBarberId, date)) || "Ce créneau n'est plus disponible pour la nouvelle durée" });
   } else {
     // Durée actuelle chez ce coiffeur : si la nouvelle n'est pas plus longue, rien à vérifier.
     const [oldExtras] = await pool.query('SELECT extra_id FROM appointment_extras WHERE appointment_id = ?', [appt.id]);

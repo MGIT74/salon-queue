@@ -218,4 +218,5 @@ node tests/caisse/181-tablette-agenda-coiffeurs.js  # Lien agenda : tablette par
 node tests/caisse/182-borne-anciennes-webview.js  # Borne dans une WebView ancienne : plus de « inset » (ecran de veille plein ecran)
 node tests/caisse/183-borne-nom-puis-prestation.js  # Borne : nom + email (clavier de la tablette) avant la prestation, étapes en haut, ticket -> accueil en 15 s
 node tests/caisse/184-cadeau-coiffeur-libre.js  # Carte cadeau : le client choisit librement son coiffeur (plus bloqué sur celui qui a encaissé)
+node tests/caisse/185-creneau-libere-deplacement-magique.js  # Déplacement magique : le trou libéré (hors grille) est proposé en ligne et accepté sans « Forcer »
 ```
