@@ -44,6 +44,12 @@ const call = async (method, p, body, h) => { const r = await fetch(BASE + p, { m
     check('agenda : un vrai chevauchement demande toujours « Forcer »', r.status === 409, JSON.stringify(r.data));
     r = await call('POST', '/api/appointments/admin-create', { client_name: 'T185 E', service_id: 'sv3', barber_id: 'b2', date: D, time: '11:43' }, BOB);
     check('agenda : heure précise libre hors grille (11:43) acceptée', r.status === 200 && r.data.forced === false, JSON.stringify(r.data));
+    // Heure touchée pas libre : le créneau entouré est le plus proche, avant OU après (09:55 plutôt que 11:00 pour 10:05).
+    const fs = require('fs');
+    ['poste.html', 'caisse.html', 'dashboard.html'].forEach((f) => {
+      const h = fs.readFileSync(path.join(__dirname, '../../public', f), 'utf8');
+      check(f + ' : créneau libre le plus proche entouré (avant ou après)', !h.includes('return c.dataset.time >= prefTime; })[0]') && /Math\.abs\(toM\(c\.dataset\.time\) - toM\(prefTime\)\) < Math\.abs\(toM\(best\.dataset\.time\) - toM\(prefTime\)\)/.test(h));
+    });
   } finally {
     await clean();
     await pool.query("DELETE FROM barber_schedules WHERE barber_id = 'b2'");
