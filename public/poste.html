@@ -721,6 +721,11 @@
   .cr-tile { border: none; border-radius: 16px; background: var(--card); box-shadow: var(--shadow); padding: 14px 8px 12px; min-height: 96px; cursor: pointer; font-family: inherit; color: var(--ink);
              display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; text-align: center; }
   .cr-tile b { font-size: 14px; font-weight: 600; }
+  /* Photo du produit en haut de la tuile (sinon un petit pictogramme). */
+  .cr-tile .cr-img { width: 100%; height: 88px; border-radius: 12px; background: var(--fill) center / contain no-repeat; flex-shrink: 0; margin-bottom: 4px;
+                     display: flex; align-items: center; justify-content: center; color: var(--grey); }
+  .cr-tile.has-img { padding-top: 8px; justify-content: flex-start; }
+  .cr-sheet .cr-sheet-img { width: 84px; height: 84px; border-radius: 16px; background: var(--fill) center / contain no-repeat; margin: 0 auto 12px; }
   .cr-tile span { font-size: 12px; color: var(--grey); }
   .cr-tile[disabled] { opacity: .45; cursor: default; }
   .cr-hist { background: var(--card); border-radius: 16px; box-shadow: var(--shadow); overflow: hidden; }
@@ -873,6 +878,7 @@
 <div class="cr-sheet-bg" id="cr-sheet-bg" onclick="if(event.target===this)closeCreditSheet()">
   <div class="cr-sheet" role="dialog" aria-modal="true" aria-labelledby="cr-sheet-name">
     <div class="grab"></div>
+    <div class="cr-sheet-img" id="cr-sheet-img" style="display:none"></div>
     <div class="prod"><b id="cr-sheet-name"></b><strong id="cr-sheet-price"></strong></div>
     <div class="after"><span style="color:var(--grey)" id="cr-sheet-stock"></span><span style="font-weight:600" id="cr-sheet-after"></span></div>
     <div class="btns">
@@ -3730,7 +3736,9 @@ function renderCreditGrid() {
     var mine = creditPriceOf(p);   // prix avec la remise du coiffeur
     var out = p.stock_enabled && p.stock_quantity < 1, poor = !free && mine > bal;
     var priceHtml = (!free && mine < p.price_cents) ? '<s style="opacity:.6">' + eur(p.price_cents) + '</s> <b style="font-size:12.5px;color:var(--green)">' + eur(mine) + '</b>' : eur(p.price_cents);
-    return '<button class="cr-tile" ' + (out ? 'disabled' : '') + ' onclick="pickCreditProduct(\'' + esc(p.id) + '\')"><b>' + esc(p.name) + '</b><span>' + priceHtml +
+    var img = p.image_url ? '<span class="cr-img" style="background-image:url(\'' + esc(p.image_url.replace(/'/g, '%27')) + '\')" aria-hidden="true"></span>'
+      : '<span class="cr-img" aria-hidden="true"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg></span>';
+    return '<button class="cr-tile has-img" ' + (out ? 'disabled' : '') + ' onclick="pickCreditProduct(\'' + esc(p.id) + '\')">' + img + '<b>' + esc(p.name) + '</b><span>' + priceHtml +
       (p.stock_enabled ? ' · ' + (out ? 'épuisé' : 'stock ' + p.stock_quantity) : '') + '</span>' + (poor && !out ? '<span style="color:var(--orange)">crédit insuffisant</span>' : '') + '</button>';
   }).join('') : '<div class="empty">' + (all.length ? 'Aucun produit ne correspond à « ' + esc(qEl.value.trim()) + ' ».' : 'Aucun produit disponible avec le crédit.') + '</div>';
 }
@@ -3741,6 +3749,8 @@ function pickCreditProduct(id) {
   crPick = p;
   var bal = crData.balance_cents;
   document.getElementById('cr-sheet-name').textContent = p.name;
+  var shImg = document.getElementById('cr-sheet-img');
+  if (shImg) { shImg.style.display = p.image_url ? '' : 'none'; shImg.style.backgroundImage = p.image_url ? 'url(\'' + p.image_url.replace(/'/g, '%27') + '\')' : ''; }
   var mine = creditPriceOf(p);
   document.getElementById('cr-sheet-price').innerHTML = (!crData.free && mine < p.price_cents)
     ? '<s style="opacity:.55;font-size:15px;font-weight:500">' + eur(p.price_cents) + '</s> ' + eur(mine) : eur(p.price_cents);
