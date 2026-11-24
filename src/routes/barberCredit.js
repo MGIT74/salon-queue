@@ -53,11 +53,17 @@ async function balanceOf(db, salonId, barberId) {
 }
 
 /** Produits qu'un coiffeur peut prendre avec son crédit (actifs, dans les catégories choisies ; aucune = tous). */
+// Catégorie autorisée ? Les cases de l'admin enregistrent l'identifiant de la catégorie (catalog_categories) ;
+// l'ancien texte « category » du produit reste accepté (anciens réglages).
+function inCreditCats(cats, p) {
+  return !cats.length || (p.category_id && cats.indexOf(p.category_id) !== -1) || (p.category && cats.indexOf(p.category) !== -1);
+}
+
 async function allowedProducts(salonId, cats) {
   const [rows] = await pool.query(
-    'SELECT id, name, price_cents, category, stock_enabled, stock_quantity, barcode FROM products WHERE salon_id = ? AND active = 1 ORDER BY sort_order, name',
+    'SELECT id, name, price_cents, category, category_id, stock_enabled, stock_quantity, barcode FROM products WHERE salon_id = ? AND active = 1 ORDER BY sort_order, name',
     [salonId]);
-  return rows.filter((p) => !cats.length || cats.indexOf(p.category) !== -1).map((p) => ({
+  return rows.filter((p) => inCreditCats(cats, p)).map((p) => ({
     id: p.id, name: p.name, price_cents: p.price_cents, category: p.category,
     stock_enabled: Boolean(p.stock_enabled), stock_quantity: p.stock_quantity, barcode: p.barcode || null
   }));
@@ -104,9 +110,9 @@ router.post('/take', requireAdminOrBarber, wrap(async (req, res) => {
     // Verrou sur le coiffeur : deux prises en même temps ne peuvent pas passer sous 0 €.
     await conn.query('SELECT id FROM barbers WHERE id = ? AND salon_id = ? FOR UPDATE', [req.barberId, req.salon.id]);
     const [[p]] = await conn.query(
-      'SELECT id, name, price_cents, category, stock_enabled, stock_quantity FROM products WHERE id = ? AND salon_id = ? AND active = 1 FOR UPDATE',
+      'SELECT id, name, price_cents, category, category_id, stock_enabled, stock_quantity FROM products WHERE id = ? AND salon_id = ? AND active = 1 FOR UPDATE',
       [productId, req.salon.id]);
-    if (!p || (st.categories.length && st.categories.indexOf(p.category) === -1)) {
+    if (!p || !inCreditCats(st.categories, p)) {
       await conn.rollback();
       return res.status(404).json({ error: 'Ce produit ne se prend pas avec le crédit.' });
     }
