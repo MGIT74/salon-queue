@@ -3283,7 +3283,7 @@
   </div>
 </div>
 
-<script src="/app.js?v=70"></script>
+<script src="/app.js?v=69"></script>
 <script src="/autorefresh.js?v=3"></script>
 <script src="/staff-group.js?v=7"></script>
 <script src="/daterange.js?v=4"></script>
@@ -9351,7 +9351,7 @@ function openAdminAddAppointment(dateStr, preselectedBarberId, prefTime) {
     state.force = false; aaForce.reset();
     if (!state.barberId) aaForce.hide();   // « Premier disponible » : on force seulement pour un coiffeur précis
     var offB = state.barberId && rdvBarbers.find(function (x) { return String(x.id) === String(state.barberId); });
-    if (offB && barberOffOn(offB, dateStr)) { slotsEl.innerHTML = barberOffSlotsHtml(offB, dateStr, false); return; }
+    if (offB && barberOffOn(offB, dateStr)) { aaForce.hide(); slotsEl.innerHTML = barberOffSlotsHtml(offB, dateStr, false); return; }
     slotsEl.innerHTML = '<span class="hint" style="margin:0">Chargement…</span>';
     api('/api/appointments/availability?date=' + dateStr + '&service_id=' + state.serviceId + '&barber_id=' + state.barberId + '&extras=' + state.extraIds.join(',') + (aaAllHours ? '&all=1' : ''))
       .then(function (r) {
