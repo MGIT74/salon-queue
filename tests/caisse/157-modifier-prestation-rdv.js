@@ -1,6 +1,6 @@
 // « Modifier la prestation » d'un RDV à venir (Mon poste, Caisse, admin) : PUT /api/appointments/:id/services.
 // Même heure de début, nouvelle durée (tarif du coiffeur) : ça tient -> enregistré ; déborde sur le RDV suivant ->
-// confirmation demandée (force), SANS LIMITE de minutes ; atteint une pause / la fin de journée -> refusé (déplacer).
+// confirmation demandée (force), SANS LIMITE de minutes, même sur une pause ; dépasse la fin de journée -> refusé.
 // Vraie base + vrai serveur (port 3999).
 process.env.DB_HOST = process.env.DB_HOST || '127.0.0.1';
 process.env.DB_USER = process.env.DB_USER || 'sq';
@@ -54,12 +54,15 @@ const DAY = d.toISOString().slice(0, 10);
   check('produits absents de la requête -> gardés', (await pool.query("SELECT COUNT(*) AS n FROM appointment_products WHERE appointment_id = 't157a'"))[0][0].n === 1);
   r = await call('PUT', '/api/appointments/t157b/services', { service_id: 'sv1', extras: ['t157-e40'] });
   check('dernier RDV avant la fin de journée : place libre derrière -> enregistré', r.status === 200 && r.data.end_time === '11:40', JSON.stringify(r.data));
-  // La pause reste respectée, même en confirmant.
+  // Déborder sur une pause : permis en confirmant.
   const wdP = new Date(DAY + 'T00:00:00Z').getUTCDay();
   await pool.query("INSERT INTO barber_breaks (id, barber_id, weekday, start_time, end_time, active) VALUES ('t157-pause','b1',?,'11:00:00','12:00:00',1)", [wdP]);
   try {
+    r = await call('PUT', '/api/appointments/t157a/services', { service_id: 'sv1', extras: ['t157-e40'] });
+    check('déborde jusque dans la pause : confirmation demandée (pas refusé)', r.status === 409 && r.data.code === 'overlap_confirm', JSON.stringify(r.data));
     r = await call('PUT', '/api/appointments/t157a/services', { service_id: 'sv1', extras: ['t157-e40'], force: true });
-    check('déborderait jusque dans la pause (11:00) -> refusé « no_room », même avec « force »', r.status === 409 && r.data.code === 'no_room' && /pause/.test(r.data.conflict), JSON.stringify(r.data));
+    check('confirmé -> enregistré même sur la pause', r.status === 200 && r.data.end_time === '11:10', JSON.stringify(r.data));
+    await call('PUT', '/api/appointments/t157a/services', { service_id: 'sv1', extras: [] });
   } finally { await pool.query("DELETE FROM barber_breaks WHERE id = 't157-pause'"); }
 
   console.log('\n[B] Déplacer avec la nouvelle prestation (un seul enregistrement)');
