@@ -1480,7 +1480,7 @@
   </div>
 </div>
 
-<script src="/app.js?v=69"></script>
+<script src="/app.js?v=70"></script>
 <script src="/queue-sim.js?v=1"></script>
 <script src="/staff-group.js?v=7"></script>
 <script src="/autorefresh.js?v=3"></script>
@@ -4662,7 +4662,7 @@ function openCaisseAddAppointment(dateStr, barberId, prefTime) {
     toggleEl.style.display = 'none';
     paRenderDtBarbers();
     state.force = false; paForce.reset();
-    if (barber && barberOffOn(barber, dateStr)) { paForce.hide(); slotsEl.innerHTML = barberOffSlotsHtml(barber, dateStr, false); return; }
+    if (barber && barberOffOn(barber, dateStr)) { slotsEl.innerHTML = barberOffSlotsHtml(barber, dateStr, false); return; }
     slotsEl.innerHTML = '<span class="hint" style="margin:0">Chargement…</span>';
     barberApi('/api/appointments/availability?date=' + dateStr + '&service_id=' + state.serviceId + '&barber_id=' + barberId + '&extras=' + state.extraIds.join(',') + (paAllHours ? '&all=1' : ''), { actingAs: barberId })
       .then(function (r) {

@@ -2306,42 +2306,36 @@ function staffForceInit(o) {
       .then(function (r) {
         if (my !== seq) return;
         if (!r.ok) { res.innerHTML = '<div class="force-err">' + esc(r.error) + '</div>'; return; }
-        var ov = r.overlaps || [];
+        var ov = r.overlaps || [], wn = r.warnings || [];
         res.innerHTML = '<div class="force-warn"><b class="force-wt">⚠ Attention : RDV forcé</b>' + t + ' – ' + esc(r.end) +
           (ov.length ? ' <b>déborde</b> sur ' + ov.map(function (x) { return 'le RDV de <b>' + esc(x.client_name) + ' (' + esc(x.time) + ')</b> de <b>' + x.minutes + ' min</b>'; }).join(', ') +
             '.<br>Le coiffeur devra rattraper le retard. Les clients ne sont pas prévenus du chevauchement.'
-            : ' : pas de chevauchement (heure en dehors des créneaux proposés).') + '</div>';
+            : (wn.length ? '.' : ' : pas de chevauchement (heure en dehors des créneaux proposés).')) +
+          wn.map(function (x) { return '<br>• ' + esc(x); }).join('') + '</div>';
         ack.style.display = ''; go.style.display = ''; go.textContent = 'Forcer le RDV à ' + t; cur = t;
       })
       .catch(function (e) { if (my === seq) res.innerHTML = '<div class="force-err">' + esc(e.message) + '</div>'; });
   }
   var row = w.querySelector('.force-row'), other = w.querySelector('.force-other');
-  // « Forcer » n'apparaît QUE dans un cas : l'heure touchée dans l'agenda tombe dans un espace LIBRE, mais trop court
-  // pour la durée de la prestation (elle déborderait sur le RDV suivant). Jamais sinon :
-  //  - heure libre et assez longue -> elle est simplement sélectionnée (pas besoin de forcer) ;
-  //  - heure déjà occupée par un RDV, hors horaires, pause... -> rien à forcer ;
-  //  - « + Ajouter un RDV » sans heure touchée -> pas de « Forcer ».
+  // « Forcer » SANS LIMITE pour l'équipe (poste, caisse, agenda, admin) : toujours proposé pour un coiffeur précis.
+  //  - heure touchée dans l'agenda et pas libre pour cette prestation (occupée, trop courte, hors horaires, pause,
+  //    congé...) -> « Forcer le RDV à HH:MM » ;
+  //  - sinon -> « Forcer un RDV à une autre heure… » (on tape l'heure). Seule une heure déjà passée est refusée.
   var forceAt = '', freeSeq = 0;
   function loadFree() {
-    forceAt = ''; w.style.display = 'none';
+    forceAt = '';
     var dt = (o.defaultTime && o.defaultTime()) || '', p = o.params();
-    if (!dt || !p.barber_id) return;
+    if (!p.barber_id) { w.style.display = 'none'; return; }
+    w.style.display = ''; paintLink();
+    if (!dt) return;
     var my = ++freeSeq;
     o.api('/api/appointments/availability?all=1&date=' + p.date + '&service_id=' + encodeURIComponent(p.service_id || '') +
       '&barber_id=' + encodeURIComponent(p.barber_id) + '&extras=' + (p.extras || []).join(','), { actingAs: p.barber_id })
       .then(function (r) {
-        if (my !== freeSeq || (r.slots || []).some(function (x) { return x.time === dt; })) return;   // libre : pas de « Forcer »
-        return o.api('/api/appointments/force-check?barber_id=' + encodeURIComponent(p.barber_id) + '&date=' + p.date + '&time=' + dt +
-          '&service_id=' + encodeURIComponent(p.service_id || '') + '&extras=' + (p.extras || []).join(','), { actingAs: p.barber_id })
-          .then(function (c) {
-            if (my !== freeSeq || !c || !c.ok) return;
-            var ov = c.overlaps || [];
-            // Espace libre trop court : ça déborde sur un RDV qui commence APRÈS l'heure touchée (aucun RDV en cours à cette heure).
-            if (!ov.length || ov.some(function (x) { return x.time <= dt; })) return;
-            forceAt = dt; paintLink(); w.style.display = '';
-          });
+        if (my !== freeSeq || (r.slots || []).some(function (x) { return x.time === dt; })) return;   // libre : rien à forcer à cette heure
+        forceAt = dt; paintLink();
       })
-      .catch(function () {});
+      .catch(function () { if (my === freeSeq) { forceAt = dt; paintLink(); } });
   }
   function paintLink() {
     var dt = forceAt;   // seulement l'heure touchée dans un espace libre trop court (voir loadFree)
@@ -2373,7 +2367,7 @@ function forcedInfoHtml(a) {
   if (!a || !a.forced_by) return '';
   var d = a.forced_at ? new Date(a.forced_at) : null;
   var when = d && !isNaN(d) ? ' le ' + d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }) + ' à ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
-  return '<div class="forced-info"><span class="fi-ic" aria-hidden="true">!</span><div><b>RDV forcé par ' + esc(a.forced_by) + '</b>' + when + '<br>Il chevauche un autre RDV : le coiffeur gère le retard.</div></div>';
+  return '<div class="forced-info"><span class="fi-ic" aria-hidden="true">!</span><div><b>RDV forcé par ' + esc(a.forced_by) + '</b>' + when + '<br>Ajouté en dehors des créneaux libres : le coiffeur gère le retard.</div></div>';
 }
 
 /* Fidélité à plusieurs cartes (fiche client : caisse, Mon poste, dashboard) : chaque carte activée avec ses points,

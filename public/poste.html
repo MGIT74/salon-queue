@@ -907,7 +907,7 @@
   </button>
 </div>
 
-<script src="/app.js?v=69"></script>
+<script src="/app.js?v=70"></script>
 <script src="/queue-sim.js?v=1"></script>
 <script src="/autorefresh.js?v=3"></script>
 <script src="/staff-group.js?v=7"></script>
@@ -3258,7 +3258,7 @@ function openPosteAddAppointment(dateStr, barberId) {
     toggleEl.style.display = 'none';
     paRenderDtBarbers();
     state.force = false; paForce.reset();
-    if (target && barberOffOn(target, dateStr)) { paForce.hide(); slotsEl.innerHTML = barberOffSlotsHtml(target, dateStr, false); return; }
+    if (target && barberOffOn(target, dateStr)) { slotsEl.innerHTML = barberOffSlotsHtml(target, dateStr, false); return; }
     slotsEl.innerHTML = '<span class="hint" style="margin:0">Chargement…</span>';
     barberApi('/api/appointments/availability?date=' + dateStr + '&service_id=' + state.serviceId + '&barber_id=' + targetId + '&extras=' + state.extraIds.join(',') + (paAllHours ? '&all=1' : ''), { actingAs: targetId })
       .then(function (r) {

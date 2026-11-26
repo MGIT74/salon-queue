@@ -1301,15 +1301,32 @@ async function isSalonClosedOnDate(salonId, dateStr) {
 }
 
 /**
- * « Forcer » un RDV (équipe : admin, Mon poste, caisse) dans un créneau trop court : il peut chevaucher d'autres
- * RDV du coiffeur, mais jamais une pause, un congé, une fermeture, les horaires du coiffeur ni une heure passée.
- * Renvoie { ok, end, overlaps: [{ client_name, time, minutes }] } ou { ok: false, error }.
+ * « Forcer » un RDV (équipe : admin, Mon poste, caisse, agenda) : SANS LIMITE, à n'importe quelle heure à venir -
+ * par-dessus d'autres RDV, hors horaires, pendant une pause, un congé, un jour « sans RDV » ou de fermeture.
+ * Seule une heure déjà passée est refusée. Ce qui sort de l'ordinaire est signalé (warnings) dans l'aperçu.
+ * Renvoie { ok, end, overlaps: [{ client_name, time, minutes }], warnings: [texte] } ou { ok: false, error }.
  */
 async function forceCheck(barberId, date, time, durationMin, rdvSettings) {
-  const ok = await computeSlotsForBarber(barberId, date, durationMin, rdvSettings,
-    { skipLead: true, atTime: time, ignoreBusyNow: true, ignoreAppointments: true });
-  if (!ok.length) {
-    return { ok: false, error: (await walkinRefusal(barberId, date)) || 'Impossible de forcer à ' + time + ' : en dehors des horaires du coiffeur, pendant une pause, un congé, ou heure déjà passée.' };
+  if (`${date} ${time}:00` < nowParisDatetimeString(rdvSettings.timezone)) {
+    return { ok: false, error: 'Impossible de forcer à ' + time + ' : heure déjà passée.' };
+  }
+  const warnings = [];
+  {
+    const s0 = timeToMinutes(time), e0 = s0 + durationMin;
+    const weekday = new Date(date + 'T00:00:00Z').getUTCDay();
+    const [[sch]] = await pool.query('SELECT start_time, end_time FROM barber_schedules WHERE barber_id = ? AND weekday = ? AND active = 1', [barberId, weekday]);
+    if (!sch) warnings.push('Le coiffeur ne travaille pas ce jour-là.');
+    else if (s0 < timeToMinutes(sch.start_time) || e0 > timeToMinutes(sch.end_time)) warnings.push('En dehors des horaires du coiffeur (' + String(sch.start_time).slice(0, 5) + ' – ' + String(sch.end_time).slice(0, 5) + ').');
+    const [[closed]] = await pool.query(
+      'SELECT id FROM salon_closures WHERE salon_id = (SELECT salon_id FROM barbers WHERE id = ?) AND start_date <= ? AND end_date >= ? LIMIT 1', [barberId, date, date]);
+    if (closed) warnings.push('Le salon est fermé ce jour-là.');
+    const [[leave]] = await pool.query('SELECT id FROM barber_leaves WHERE barber_id = ? AND ? BETWEEN start_date AND end_date LIMIT 1', [barberId, date]);
+    if (leave) warnings.push('Le coiffeur est en congé ce jour-là.');
+    const walkin = await walkinRefusal(barberId, date);
+    if (walkin) warnings.push(walkin.replace(' : pas de rendez-vous possible.', '.'));
+    const [brs] = await pool.query('SELECT start_time, end_time FROM barber_breaks WHERE barber_id = ? AND weekday = ? AND active = 1', [barberId, weekday]);
+    brs.filter((b) => s0 < timeToMinutes(b.end_time) && e0 > timeToMinutes(b.start_time))
+      .forEach((b) => warnings.push('Pendant une pause (' + String(b.start_time).slice(0, 5) + ' – ' + String(b.end_time).slice(0, 5) + ').'));
   }
   const start = timeToMinutes(time), end = start + durationMin;
   const [rows] = await pool.query(
@@ -1325,7 +1342,7 @@ async function forceCheck(barberId, date, time, durationMin, rdvSettings) {
     const hm = String(r.scheduled_at).split(' ')[1].slice(0, 5), s0 = timeToMinutes(hm), e0 = s0 + Number(r.svc) + Number(r.ext);
     return { client_name: r.client_name, time: hm, minutes: Math.min(end, e0) - Math.max(start, s0) };
   }).filter((o) => o.minutes > 0).sort((x, y) => (x.time < y.time ? -1 : 1));
-  return { ok: true, end: minutesToTime(end), overlaps };
+  return { ok: true, end: minutesToTime(end), overlaps, warnings };
 }
 
 // Aperçu avant de forcer (fenêtre orange) : de combien le RDV déborde, et sur qui.
@@ -1359,7 +1376,9 @@ router.post('/admin-create', requireAdminOrBarber, wrap(withBookingLock(async (r
   const contactErr = contactError({ name: client_name, email, phone }, { nameRequired: false });
   if (contactErr) return res.status(400).json({ error: contactErr });
 
-  if (await isSalonClosedOnDate(req.salon.id, date)) return res.status(409).json({ error: 'Salon fermé ce jour : prise de rendez-vous impossible.' });
+  // « Forcer » (case cochée) passe même un jour de fermeture : sans limite pour l'équipe (voir forceCheck).
+  const forcing = req.body.force === true && req.body.force_ack === true;
+  if (!forcing && await isSalonClosedOnDate(req.salon.id, date)) return res.status(409).json({ error: 'Salon fermé ce jour : prise de rendez-vous impossible.' });
 
   const rawProducts = Array.isArray(req.body.products) ? req.body.products : [];
   let productSelections = [];
@@ -1416,7 +1435,7 @@ router.post('/admin-create', requireAdminOrBarber, wrap(withBookingLock(async (r
       (await computeSlotsForBarber(barber_id, date, durationMin, rdvSettings, { skipLead: true, atTime: time })).length > 0;
     if (!slots.includes(time) && !fitsExactly) {
       // « Forcer » (équipe seulement, case « Je prends la responsabilité » cochée) : chevauchement accepté.
-      if (req.body.force === true && req.body.force_ack === true) {
+      if (forcing) {
         const fc = await forceCheck(barber_id, date, time, durationMin, rdvSettings);
         if (!fc.ok) return res.status(409).json({ error: fc.error });
         forced = true;

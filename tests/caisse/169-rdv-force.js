@@ -1,5 +1,6 @@
 // « Forcer » un RDV dans un créneau trop court (équipe : admin, Mon poste, caisse ; jamais les pages clients).
-// Chevauchement d'autres RDV accepté avec la case « Je prends la responsabilité » ; jamais pause / hors horaires / passé.
+// Sans limite pour l'équipe (case « Je prends la responsabilité ») : chevauchement, pause, hors horaires, congé, fermeture
+// acceptés (signalés dans l'aperçu) ; seule une heure déjà passée est refusée.
 // Trace : forced_by / forced_at, affichés dans le tiroir et dans l'agenda du poste. Vraie base + vrai serveur (port 3999).
 process.env.DB_HOST = process.env.DB_HOST || '127.0.0.1';
 process.env.DB_USER = process.env.DB_USER || 'sq';
@@ -44,9 +45,16 @@ const call = async (method, p, body, h) => { const r = await fetch(BASE + p, { m
     const [[row2]] = await pool.query("SELECT forced_by FROM appointments WHERE client_name = 'T169 Admin'");
     check('admin : « forcé par l\'admin »', r.status === 200 && row2 && row2.forced_by === "l'admin", JSON.stringify(r.data));
     r = await call('POST', '/api/appointments/admin-create', Object.assign({}, body, { client_name: 'T169 Pause', time: '11:45', force: true, force_ack: true }), BOB);
-    check('jamais pendant une pause', r.status === 409, JSON.stringify(r.data));
+    check('sans limite : pendant une pause, accepté (forcé)', r.status === 200 && r.data.forced === true, JSON.stringify(r.data));
     r = await call('POST', '/api/appointments/admin-create', Object.assign({}, body, { client_name: 'T169 Tard', time: '18:45', force: true, force_ack: true }), BOB);
-    check('jamais après la fin des horaires', r.status === 409, JSON.stringify(r.data));
+    check('sans limite : après la fin des horaires, accepté (forcé)', r.status === 200 && r.data.forced === true, JSON.stringify(r.data));
+    r = await call('GET', '/api/appointments/force-check?barber_id=b2&date=' + D + '&time=11:45&service_id=sv1', null, BOB);
+    check('aperçu : la pause est signalée', r.data.ok && (r.data.warnings || []).some((w) => /pause/.test(w)), JSON.stringify(r.data));
+    r = await call('GET', '/api/appointments/force-check?barber_id=b2&date=' + D + '&time=18:45&service_id=sv1', null, BOB);
+    check('aperçu : hors horaires signalé', r.data.ok && (r.data.warnings || []).some((w) => /horaires/.test(w)), JSON.stringify(r.data));
+    const past = new Date(Date.now() - 2 * 864e5).toISOString().slice(0, 10);
+    r = await call('POST', '/api/appointments/admin-create', Object.assign({}, body, { client_name: 'T169 Passe', date: past, time: '10:00', force: true, force_ack: true }), BOB);
+    check('heure déjà passée : toujours refusée', r.status === 400 || r.status === 409, JSON.stringify(r.data));
     const list = await call('GET', '/api/appointments?month=' + D.slice(0, 7) + '&all=1&caisse_view=1', null, BOB);
     const it = (list.data.items || []).find((x) => x.client_name === 'T169 Client');
     check('agenda : forced_by / forced_at envoyés aux écrans', it && it.forced_by === 'Bob' && it.forced_at, JSON.stringify(it && { f: it.forced_by, at: it.forced_at }));
@@ -64,7 +72,8 @@ const call = async (method, p, body, h) => { const r = await fetch(BASE + p, { m
   check('fenêtre commune (lien, aperçu, case obligatoire, bouton orange)', /function staffForceHtml\(p\)/.test(app) && /function staffForceInit\(o\)/.test(app) && app.includes('Je prends la responsabilité de ce débordement') && app.includes("go.disabled = !box.checked"));
   check('poste, caisse, admin : « Forcer » dans l\'étape Créneau + force / force_ack envoyés', [[p, 'pa'], [c, 'pa'], [d, 'aa']].every(([h, x]) => h.includes("staffForceHtml('" + x + "')") && h.includes('force: !!state.force, force_ack: !!state.force')));
   check('heure touchée dans l\'agenda : « Forcer le RDV à 16:40 », un toucher -> avertissement, « Changer l\'heure… »', app.includes("'⚠ Forcer le RDV à <span class=\"force-tm\">'") && app.includes("row.style.display = dt ? 'none' : ''") && app.includes('Changer l\\\'heure…'));
-  check('« Forcer » SEULEMENT si l\'heure touchée tombe dans un espace libre trop court (pas libre en entier, pas déjà prise, jamais sans heure touchée)', /function loadFree\(\) \{\s*forceAt = ''; w\.style\.display = 'none';/.test(app) && /availability\?all=1/.test(app) && app.includes("if (!ov.length || ov.some(function (x) { return x.time <= dt; })) return;") && app.includes("forceAt = dt; paintLink(); w.style.display = '';"));
+  check('« Forcer » toujours proposé pour un coiffeur précis (heure touchée pas libre -> « Forcer le RDV à HH:MM », sinon « autre heure… »)', /function loadFree\(\) \{\s*forceAt = '';/.test(app) && /availability\?all=1/.test(app) && app.includes("w.style.display = ''; paintLink();") && app.includes("forceAt = dt; paintLink();") && !app.includes("if (!ov.length || ov.some(function (x) { return x.time <= dt; })) return;"));
+  check('congé : « Forcer » reste proposé (plus de .hide() sur un jour d\'absence)', [p, c, d].every((h) => !/Force\.hide\(\); slotsEl\.innerHTML = barberOffSlotsHtml/.test(h)));
   check('admin et caisse : heure touchée libre déjà sélectionnée, « Continuer à HH:MM » (comme Mon poste)', [d, c].every((h) => /AllHours = !!prefTime;/.test(h) && h.includes("nx.textContent = 'Continuer à ' + want;") && /-dt-next/.test(h) && h.includes('.aa-slot.pref:not(.sel)')));
   check('« Aucun créneau » : toute la largeur + durée', fs.readFileSync(path.join(__dirname, '../../public/app.css'), 'utf8').includes('.aa-slots > .hint') && p.includes("(r.duration_min ? ' pour ' + formatMinutes(r.duration_min) : '')"));
   check('pages clients : pas de « Forcer »', ['rdv.html', 'compte.html', 'kiosk.html'].every((f) => !read(f).includes('staffForce')));
