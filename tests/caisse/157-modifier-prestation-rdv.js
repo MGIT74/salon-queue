@@ -1,6 +1,6 @@
 // « Modifier la prestation » d'un RDV à venir (Mon poste, Caisse, admin) : PUT /api/appointments/:id/services.
-// Même heure de début, nouvelle durée (tarif du coiffeur) : ça tient -> enregistré ; dépasse de 10 min au plus sur ce
-// qui suit -> confirmation demandée (force) ; plus de 10 min -> refusé, il faut déplacer (date/time dans le même appel).
+// Même heure de début, nouvelle durée (tarif du coiffeur) : ça tient -> enregistré ; déborde sur le RDV suivant ->
+// confirmation demandée (force), SANS LIMITE de minutes ; atteint une pause / la fin de journée -> refusé (déplacer).
 // Vraie base + vrai serveur (port 3999).
 process.env.DB_HOST = process.env.DB_HOST || '127.0.0.1';
 process.env.DB_USER = process.env.DB_USER || 'sq';
@@ -46,14 +46,21 @@ const DAY = d.toISOString().slice(0, 10);
   check('confirmé (force) -> enregistré, fin 10:35, chevauchement 5 min signalé', r.status === 200 && r.data.end_time === '10:35' && r.data.over_min === 5 && r.data.duration_min === 35, JSON.stringify(r.data));
   check('suppléments et produits du RDV mis à jour', JSON.stringify(await extrasOf('t157a')) === '["t157-e5"]' && (await pool.query("SELECT COUNT(*) AS n FROM appointment_products WHERE appointment_id = 't157a' AND product_id = 't157-gel'"))[0][0].n === 1);
   r = await call('PUT', '/api/appointments/t157a/services', { service_id: 'sv1', extras: ['t157-e20'] });
-  check('Coupe + 20 min (dépasse de 20 min > 10) -> refusé « no_room », il faut déplacer', r.status === 409 && r.data.code === 'no_room' && r.data.over_min === 20 && /Déplacez/.test(r.data.error), JSON.stringify(r.data));
+  check('Coupe + 20 min (déborde de 20 min sur Karim) -> confirmation demandée, plus de limite à 10 min', r.status === 409 && r.data.code === 'overlap_confirm' && r.data.over_min === 20, JSON.stringify(r.data));
   r = await call('PUT', '/api/appointments/t157a/services', { service_id: 'sv1', extras: ['t157-e20'], force: true });
-  check('même avec « force », plus de 10 min reste refusé', r.status === 409 && r.data.code === 'no_room');
+  check('confirmé (force) -> enregistré même si ça déborde de 20 min', r.status === 200 && r.data.end_time === '10:50' && r.data.over_min === 20, JSON.stringify(r.data));
   r = await call('PUT', '/api/appointments/t157a/services', { service_id: 'sv1', extras: [] });
   check('plus court (Coupe seule) -> enregistré sans question', r.status === 200 && r.data.end_time === '10:30' && r.data.over_min === 0 && (await extrasOf('t157a')).length === 0, JSON.stringify(r.data));
   check('produits absents de la requête -> gardés', (await pool.query("SELECT COUNT(*) AS n FROM appointment_products WHERE appointment_id = 't157a'"))[0][0].n === 1);
   r = await call('PUT', '/api/appointments/t157b/services', { service_id: 'sv1', extras: ['t157-e40'] });
   check('dernier RDV avant la fin de journée : place libre derrière -> enregistré', r.status === 200 && r.data.end_time === '11:40', JSON.stringify(r.data));
+  // La pause reste respectée, même en confirmant.
+  const wdP = new Date(DAY + 'T00:00:00Z').getUTCDay();
+  await pool.query("INSERT INTO barber_breaks (id, barber_id, weekday, start_time, end_time, active) VALUES ('t157-pause','b1',?,'11:00:00','12:00:00',1)", [wdP]);
+  try {
+    r = await call('PUT', '/api/appointments/t157a/services', { service_id: 'sv1', extras: ['t157-e40'], force: true });
+    check('déborderait jusque dans la pause (11:00) -> refusé « no_room », même avec « force »', r.status === 409 && r.data.code === 'no_room' && /pause/.test(r.data.conflict), JSON.stringify(r.data));
+  } finally { await pool.query("DELETE FROM barber_breaks WHERE id = 't157-pause'"); }
 
   console.log('\n[B] Déplacer avec la nouvelle prestation (un seul enregistrement)');
   r = await call('PUT', '/api/appointments/t157a/services', { service_id: 'sv1', extras: ['t157-e20'], date: DAY, time: '15:00', base_url: 'http://x/rdv.html' });
