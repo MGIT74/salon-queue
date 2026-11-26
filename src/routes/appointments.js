@@ -1889,13 +1889,27 @@ router.put('/:id/nudge', requireAdminOrBarber, wrap(withBookingLock(async (req, 
  * La nouvelle durée est celle du coiffeur (tarif personnalisé). On garde l'heure de début et on regarde ce qui suit
  * ce RDV chez ce coiffeur (RDV suivant + marge tampon, pause, fin de journée) :
  *  - ça tient (ou la durée ne s'allonge pas) -> enregistré ;
- *  - ça dépasse de 10 min au plus -> refusé avec code « overlap_confirm » tant que l'équipe n'a pas confirmé (force) ;
- *  - ça dépasse de plus de 10 min -> refusé (« no_room ») : il faut déplacer le RDV ou choisir autre chose.
+ *  - ça déborde sur le(s) RDV suivant(s) -> refusé avec code « overlap_confirm » tant que l'équipe n'a pas confirmé
+ *    (force) : SANS LIMITE de minutes (même un trou de 5 min peut recevoir une prestation plus longue) ;
+ *  - ça atteint une pause ou la fin de journée du coiffeur -> refusé (« no_room ») : la pause est respectée.
  * Avec date + time (+ barber_id) : prestation ET nouvel horaire enregistrés ensemble, créneau vérifié libre (strict).
  * Interdit si le RDV est encaissé (sauf payé d'avance, la différence se règle en caisse), commencé ou terminé.
  * Le client reçoit un email avec la nouvelle prestation, l'horaire et le prix.
  */
-const SERVICE_EDIT_OVERLAP_MAX_MIN = 10;
+/** Ce qu'une prestation allongée ne doit JAMAIS dépasser : la prochaine pause du coiffeur ou sa fin de journée. */
+async function hardLimitAfter(barberId, dateStr, startMin) {
+  const weekday = new Date(dateStr + 'T00:00:00Z').getUTCDay();
+  const [[schedule]] = await pool.query(
+    'SELECT end_time FROM barber_schedules WHERE barber_id = ? AND weekday = ? AND active = 1', [barberId, weekday]);
+  let best = schedule ? { limit: timeToMinutes(schedule.end_time), label: 'la fin de journée (' + String(schedule.end_time).slice(0, 5) + ')' } : null;
+  const [breaks] = await pool.query(
+    'SELECT start_time FROM barber_breaks WHERE barber_id = ? AND weekday = ? AND active = 1', [barberId, weekday]);
+  breaks.forEach((b) => {
+    const st = timeToMinutes(b.start_time);
+    if (st > startMin && (!best || st < best.limit)) best = { limit: st, label: 'la pause (' + String(b.start_time).slice(0, 5) + ')' };
+  });
+  return best;
+}
 
 /** Ce qui vient juste après `startMin` chez ce coiffeur ce jour-là : { limit, label } (fin de journée par défaut). */
 async function nextBusyAfter(barberId, dateStr, startMin, rdvSettings, excludeId) {
@@ -1992,10 +2006,13 @@ router.put('/:id/services', requireAdminOrBarber, wrap(withBookingLock(async (re
       const startMin = timeToMinutes(oldTime);
       const next = await nextBusyAfter(finalBarberId, oldDate, startMin, rdvSettings, appt.id);
       overMin = next ? startMin + durationMin - next.limit : 0;
-      if (overMin > SERVICE_EDIT_OVERLAP_MAX_MIN) {
+      // Pause et fin de journée : toujours respectées. Les RDV suivants : on peut déborder sans limite (en confirmant).
+      const hard = await hardLimitAfter(finalBarberId, oldDate, startMin);
+      const hardOver = hard ? startMin + durationMin - hard.limit : 0;
+      if (hardOver > 0) {
         return res.status(409).json({
-          code: 'no_room', over_min: overMin, duration_min: durationMin, conflict: next.label,
-          error: 'Pas assez de place : la nouvelle prestation dépasse de ' + overMin + ' min sur ' + next.label + '. Déplacez le RDV ou choisissez une autre prestation.'
+          code: 'no_room', over_min: hardOver, duration_min: durationMin, conflict: hard.label,
+          error: 'Pas assez de place : la nouvelle prestation dépasse de ' + hardOver + ' min sur ' + hard.label + '. Déplacez le RDV ou choisissez une autre prestation.'
         });
       }
       if (overMin > 0 && !force) {

@@ -1899,8 +1899,8 @@ function barberOffReason(b, dateStr) {
    Mêmes cartes que la prise de RDV (prestation, suppléments, produits), le choix actuel déjà coché, avec le nouveau
    prix et la nouvelle heure de fin. Le serveur garde l'heure de début et vérifie la place derrière :
    - ça tient -> enregistré (le client reçoit un email) ;
-   - ça dépasse de 10 min au plus -> on demande « Enregistrer quand même ? » ;
-   - plus de 10 min -> « Déplacer ce RDV » (créneaux libres pour la nouvelle durée) ou changer la prestation.
+   - ça déborde sur le RDV suivant (sans limite de minutes) -> on demande « Enregistrer quand même ? » ;
+   - ça atteint une pause ou la fin de journée -> « Déplacer ce RDV » (créneaux libres pour la nouvelle durée) ou changer la prestation.
    cfg : { call(path, opts) -> Promise (api / barberApi), actingAs, services, extras, products, barbers, onSaved() } */
 function openApptServicesEditor(a, cfg) {
   if (!a) return;
@@ -2019,7 +2019,7 @@ function openApptServicesEditor(a, cfg) {
         btn.disabled = false;
         var d = e.data || {};
         if (d.code === 'overlap_confirm') {
-          showConfirm(d.error + ' C’est toléré jusqu’à 10 min. Enregistrer quand même ?', { title: 'Ça déborde un peu', confirmLabel: 'Enregistrer quand même' })
+          showConfirm(d.error + ' Le coiffeur devra rattraper le retard. Enregistrer quand même ?', { title: 'Ça déborde sur le RDV suivant', confirmLabel: 'Enregistrer quand même' })
             .then(function (ok) { if (ok) save(true); });
         } else if (d.code === 'no_room') {
           showErr(esc(d.error), true);
