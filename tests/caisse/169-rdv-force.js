@@ -1,5 +1,6 @@
 // « Forcer » un RDV dans un créneau trop court (équipe : admin, Mon poste, caisse ; jamais les pages clients).
-// Chevauchement d'autres RDV accepté avec la case « Je prends la responsabilité » ; jamais pause / hors horaires / passé.
+// Chevauchement d'autres RDV et débordement sur une pause acceptés (case « Je prends la responsabilité ») ;
+// jamais commencer pendant une pause, hors horaires, congé ou heure passée.
 // Trace : forced_by / forced_at, affichés dans le tiroir et dans l'agenda du poste. Vraie base + vrai serveur (port 3999).
 process.env.DB_HOST = process.env.DB_HOST || '127.0.0.1';
 process.env.DB_USER = process.env.DB_USER || 'sq';
@@ -44,7 +45,11 @@ const call = async (method, p, body, h) => { const r = await fetch(BASE + p, { m
     const [[row2]] = await pool.query("SELECT forced_by FROM appointments WHERE client_name = 'T169 Admin'");
     check('admin : « forcé par l\'admin »', r.status === 200 && row2 && row2.forced_by === "l'admin", JSON.stringify(r.data));
     r = await call('POST', '/api/appointments/admin-create', Object.assign({}, body, { client_name: 'T169 Pause', time: '11:45', force: true, force_ack: true }), BOB);
-    check('jamais pendant une pause', r.status === 409, JSON.stringify(r.data));
+    check('déborde sur la pause (11:45 – 12:15) : accepté en forçant', r.status === 200 && r.data.forced === true, JSON.stringify(r.data));
+    r = await call('GET', '/api/appointments/force-check?barber_id=b2&date=' + D + '&time=11:45&service_id=sv1', null, BOB);
+    check('aperçu : la pause apparaît dans le débordement', r.data.ok && (r.data.overlaps || []).some((o) => o.kind === 'pause' && o.minutes === 15), JSON.stringify(r.data));
+    r = await call('POST', '/api/appointments/admin-create', Object.assign({}, body, { client_name: 'T169 DansPause', time: '12:10', force: true, force_ack: true }), BOB);
+    check('jamais COMMENCER pendant la pause', r.status === 409 && /pause/.test(r.data.error), JSON.stringify(r.data));
     r = await call('POST', '/api/appointments/admin-create', Object.assign({}, body, { client_name: 'T169 Tard', time: '18:45', force: true, force_ack: true }), BOB);
     check('jamais après la fin des horaires', r.status === 409, JSON.stringify(r.data));
     const list = await call('GET', '/api/appointments?month=' + D.slice(0, 7) + '&all=1&caisse_view=1', null, BOB);

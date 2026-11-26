@@ -2308,7 +2308,7 @@ function staffForceInit(o) {
         if (!r.ok) { res.innerHTML = '<div class="force-err">' + esc(r.error) + '</div>'; return; }
         var ov = r.overlaps || [];
         res.innerHTML = '<div class="force-warn"><b class="force-wt">⚠ Attention : RDV forcé</b>' + t + ' – ' + esc(r.end) +
-          (ov.length ? ' <b>déborde</b> sur ' + ov.map(function (x) { return 'le RDV de <b>' + esc(x.client_name) + ' (' + esc(x.time) + ')</b> de <b>' + x.minutes + ' min</b>'; }).join(', ') +
+          (ov.length ? ' <b>déborde</b> sur ' + ov.map(function (x) { return (x.kind === 'pause' ? '<b>la pause (' + esc(x.time) + ')</b>' : 'le RDV de <b>' + esc(x.client_name) + ' (' + esc(x.time) + ')</b>') + ' de <b>' + x.minutes + ' min</b>'; }).join(', ') +
             '.<br>Le coiffeur devra rattraper le retard. Les clients ne sont pas prévenus du chevauchement.'
             : ' : pas de chevauchement (heure en dehors des créneaux proposés).') + '</div>';
         ack.style.display = ''; go.style.display = ''; go.textContent = 'Forcer le RDV à ' + t; cur = t;

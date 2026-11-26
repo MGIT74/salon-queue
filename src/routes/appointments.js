@@ -334,7 +334,8 @@ async function computeSlotsForBarber(barberId, dateStr, durationMin, rdvSettings
     'SELECT start_time, end_time FROM barber_breaks WHERE barber_id = ? AND weekday = ? AND active = 1',
     [barberId, weekday]
   );
-  breaks.forEach((b) => busyRanges.push([timeToMinutes(b.start_time), timeToMinutes(b.end_time)]));
+  // « Forcer » : le RDV peut déborder sur une pause (il ne peut pas y COMMENCER, voir forceCheck).
+  if (!opts.ignoreBreaks) breaks.forEach((b) => busyRanges.push([timeToMinutes(b.start_time), timeToMinutes(b.end_time)]));
   // Creneaux deja choisis (pas encore enregistres) par les autres personnes d'une reservation de groupe.
   (opts.extraBusy || []).forEach((r) => busyRanges.push(r));
   // Créneaux gardés pendant qu'un client vérifie son email par code (60 s par code), sauf le sien.
@@ -1301,17 +1302,22 @@ async function isSalonClosedOnDate(salonId, dateStr) {
 }
 
 /**
- * « Forcer » un RDV (équipe : admin, Mon poste, caisse) dans un créneau trop court : il peut chevaucher d'autres
- * RDV du coiffeur, mais jamais une pause, un congé, une fermeture, les horaires du coiffeur ni une heure passée.
- * Renvoie { ok, end, overlaps: [{ client_name, time, minutes }] } ou { ok: false, error }.
+ * « Forcer » un RDV (équipe : admin, Mon poste, caisse) dans un créneau trop court : il peut déborder SANS LIMITE sur
+ * les RDV suivants et sur une pause (mais pas COMMENCER pendant une pause) ; jamais un congé, une fermeture, les
+ * horaires du coiffeur ni une heure passée.
+ * Renvoie { ok, end, overlaps: [{ client_name, time, minutes, kind? }] } ou { ok: false, error }.
  */
 async function forceCheck(barberId, date, time, durationMin, rdvSettings) {
-  const ok = await computeSlotsForBarber(barberId, date, durationMin, rdvSettings,
-    { skipLead: true, atTime: time, ignoreBusyNow: true, ignoreAppointments: true });
-  if (!ok.length) {
-    return { ok: false, error: (await walkinRefusal(barberId, date)) || 'Impossible de forcer à ' + time + ' : en dehors des horaires du coiffeur, pendant une pause, un congé, ou heure déjà passée.' };
-  }
   const start = timeToMinutes(time), end = start + durationMin;
+  const weekday = new Date(date + 'T00:00:00Z').getUTCDay();
+  const [breaks] = await pool.query('SELECT start_time, end_time FROM barber_breaks WHERE barber_id = ? AND weekday = ? AND active = 1', [barberId, weekday]);
+  const inBreak = breaks.find((b) => start >= timeToMinutes(b.start_time) && start < timeToMinutes(b.end_time));
+  if (inBreak) return { ok: false, error: 'Impossible de forcer à ' + time + ' : c\'est pendant la pause (' + String(inBreak.start_time).slice(0, 5) + ' – ' + String(inBreak.end_time).slice(0, 5) + ').' };
+  const ok = await computeSlotsForBarber(barberId, date, durationMin, rdvSettings,
+    { skipLead: true, atTime: time, ignoreBusyNow: true, ignoreAppointments: true, ignoreBreaks: true });
+  if (!ok.length) {
+    return { ok: false, error: (await walkinRefusal(barberId, date)) || 'Impossible de forcer à ' + time + ' : en dehors des horaires du coiffeur, un congé, ou heure déjà passée.' };
+  }
   const [rows] = await pool.query(
     `SELECT a.client_name, a.scheduled_at, COALESCE(MAX(bsp.duration_min), MAX(s.duration_min)) AS svc,
             COALESCE(SUM(COALESCE(bep.duration_min, e.duration_min)), 0) AS ext, q.status AS queue_status, MAX(q.start_at) AS queue_start_at
@@ -1324,7 +1330,13 @@ async function forceCheck(barberId, date, time, durationMin, rdvSettings) {
   const overlaps = rows.filter((r) => r.queue_status !== 'cancelled' && !(r.queue_status === 'done' && r.queue_start_at)).map((r) => {
     const hm = String(r.scheduled_at).split(' ')[1].slice(0, 5), s0 = timeToMinutes(hm), e0 = s0 + Number(r.svc) + Number(r.ext);
     return { client_name: r.client_name, time: hm, minutes: Math.min(end, e0) - Math.max(start, s0) };
-  }).filter((o) => o.minutes > 0).sort((x, y) => (x.time < y.time ? -1 : 1));
+  }).filter((o) => o.minutes > 0);
+  // Débordement sur une pause : signalé comme un chevauchement (kind « pause »).
+  breaks.forEach((b) => {
+    const s0 = timeToMinutes(b.start_time), e0 = timeToMinutes(b.end_time), m = Math.min(end, e0) - Math.max(start, s0);
+    if (m > 0) overlaps.push({ kind: 'pause', client_name: 'Pause', time: String(b.start_time).slice(0, 5), minutes: m });
+  });
+  overlaps.sort((x, y) => (x.time < y.time ? -1 : 1));
   return { ok: true, end: minutesToTime(end), overlaps };
 }
 
@@ -1889,26 +1901,19 @@ router.put('/:id/nudge', requireAdminOrBarber, wrap(withBookingLock(async (req, 
  * La nouvelle durée est celle du coiffeur (tarif personnalisé). On garde l'heure de début et on regarde ce qui suit
  * ce RDV chez ce coiffeur (RDV suivant + marge tampon, pause, fin de journée) :
  *  - ça tient (ou la durée ne s'allonge pas) -> enregistré ;
- *  - ça déborde sur le(s) RDV suivant(s) -> refusé avec code « overlap_confirm » tant que l'équipe n'a pas confirmé
- *    (force) : SANS LIMITE de minutes (même un trou de 5 min peut recevoir une prestation plus longue) ;
- *  - ça atteint une pause ou la fin de journée du coiffeur -> refusé (« no_room ») : la pause est respectée.
+ *  - ça déborde sur le(s) RDV suivant(s) ou sur une pause -> refusé avec code « overlap_confirm » tant que l'équipe
+ *    n'a pas confirmé (force) : SANS LIMITE de minutes (même un trou de 5 min peut recevoir une prestation plus longue) ;
+ *  - ça dépasse la fin de journée du coiffeur -> refusé (« no_room »).
  * Avec date + time (+ barber_id) : prestation ET nouvel horaire enregistrés ensemble, créneau vérifié libre (strict).
  * Interdit si le RDV est encaissé (sauf payé d'avance, la différence se règle en caisse), commencé ou terminé.
  * Le client reçoit un email avec la nouvelle prestation, l'horaire et le prix.
  */
-/** Ce qu'une prestation allongée ne doit JAMAIS dépasser : la prochaine pause du coiffeur ou sa fin de journée. */
-async function hardLimitAfter(barberId, dateStr, startMin) {
+/** Ce qu'une prestation allongée ne doit JAMAIS dépasser : la fin de journée du coiffeur (pause et RDV : en confirmant). */
+async function hardLimitAfter(barberId, dateStr) {
   const weekday = new Date(dateStr + 'T00:00:00Z').getUTCDay();
   const [[schedule]] = await pool.query(
     'SELECT end_time FROM barber_schedules WHERE barber_id = ? AND weekday = ? AND active = 1', [barberId, weekday]);
-  let best = schedule ? { limit: timeToMinutes(schedule.end_time), label: 'la fin de journée (' + String(schedule.end_time).slice(0, 5) + ')' } : null;
-  const [breaks] = await pool.query(
-    'SELECT start_time FROM barber_breaks WHERE barber_id = ? AND weekday = ? AND active = 1', [barberId, weekday]);
-  breaks.forEach((b) => {
-    const st = timeToMinutes(b.start_time);
-    if (st > startMin && (!best || st < best.limit)) best = { limit: st, label: 'la pause (' + String(b.start_time).slice(0, 5) + ')' };
-  });
-  return best;
+  return schedule ? { limit: timeToMinutes(schedule.end_time), label: 'la fin de journée (' + String(schedule.end_time).slice(0, 5) + ')' } : null;
 }
 
 /** Ce qui vient juste après `startMin` chez ce coiffeur ce jour-là : { limit, label } (fin de journée par défaut). */
@@ -2006,8 +2011,8 @@ router.put('/:id/services', requireAdminOrBarber, wrap(withBookingLock(async (re
       const startMin = timeToMinutes(oldTime);
       const next = await nextBusyAfter(finalBarberId, oldDate, startMin, rdvSettings, appt.id);
       overMin = next ? startMin + durationMin - next.limit : 0;
-      // Pause et fin de journée : toujours respectées. Les RDV suivants : on peut déborder sans limite (en confirmant).
-      const hard = await hardLimitAfter(finalBarberId, oldDate, startMin);
+      // Fin de journée : toujours respectée. RDV suivants et pause : on peut déborder sans limite (en confirmant).
+      const hard = await hardLimitAfter(finalBarberId, oldDate);
       const hardOver = hard ? startMin + durationMin - hard.limit : 0;
       if (hardOver > 0) {
         return res.status(409).json({
