@@ -1316,10 +1316,44 @@ router.get('/history', requireAdmin, wrap(async (req, res) => {
   else if (st === 'cancelled:unknown') conditions.push("q.status = 'cancelled' AND " + cancelledAppt + " AND (ax.cancelled_by IS NULL OR ax.cancelled_by NOT IN ('client','salon')))");
   const whereClause = conditions.join(' AND ');
 
-  const [[{ total }]] = await pool.query(
+  // Annulés : les RDV annulés AVANT d'arriver (jamais passés dans la file) sont ajoutés à la liste, pour voir TOUS les
+  // RDV annulés comme dans le Manque à gagner (dont le lien « 10 RDV » ouvre ce filtre, avec past_only=1 : heure passée).
+  const withAppts = st === 'cancelled' || st.indexOf('cancelled:') === 0;
+  let apptItems = [];
+  if (withAppts) {
+    const settings = await getSettings(req.salon.id);
+    const ac = ["a.salon_id = ?", "a.status = 'cancelled'", 'a.promoted_queue_id IS NULL'], ap = [req.salon.id];
+    if (req.query.date_from) { ac.push('a.scheduled_at >= ?'); ap.push(req.query.date_from + ' 00:00:00'); }
+    if (req.query.date_to) { ac.push('a.scheduled_at <= ?'); ap.push(req.query.date_to + ' 23:59:59'); }
+    if (req.query.past_only === '1') { ac.push('a.scheduled_at <= ?'); ap.push(nowParisDatetimeString(settings.timezone)); }
+    if (req.query.barber_id) { ac.push('a.barber_id = ?'); ap.push(req.query.barber_id); }
+    if (st === 'cancelled:client' || st === 'cancelled:salon') { ac.push('a.cancelled_by = ?'); ap.push(st.slice(10)); }
+    else if (st === 'cancelled:unknown') ac.push("(a.cancelled_by IS NULL OR a.cancelled_by NOT IN ('client','salon'))");
+    const [ar] = await pool.query(
+      `SELECT a.id, a.client_name, a.email, a.phone, a.barber_id, a.scheduled_at, a.cancelled_by, a.cancelled_by_name, s.name AS service_name,
+              COALESCE(bsp.price_cents, s.price_cents) + COALESCE((SELECT SUM(COALESCE(bep.price_cents, e.price_cents)) FROM appointment_extras ae JOIN extras e ON e.id = ae.extra_id
+                 LEFT JOIN barber_extra_prices bep ON bep.extra_id = e.id AND bep.barber_id = a.barber_id WHERE ae.appointment_id = a.id), 0) AS price_cents,
+              (SELECT GROUP_CONCAT(e.name ORDER BY e.name SEPARATOR '\u0001') FROM appointment_extras ae JOIN extras e ON e.id = ae.extra_id WHERE ae.appointment_id = a.id) AS extras
+       FROM appointments a JOIN services s ON s.id = a.service_id
+       LEFT JOIN barber_service_prices bsp ON bsp.service_id = s.id AND bsp.barber_id = a.barber_id
+       WHERE ${ac.join(' AND ')} ORDER BY a.scheduled_at DESC LIMIT 5000`, ap);
+    apptItems = ar.map((a) => {
+      const sch = String(a.scheduled_at).replace('T', ' ').slice(0, 19);
+      return {
+        id: a.id, from_appointment: true, client_name: a.client_name, email: a.email, phone: a.phone, barber_id: a.barber_id,
+        service_name: a.service_name, extra_names: a.extras ? String(a.extras).split('\u0001') : [],
+        status: 'cancelled', checkin_at: parisLocalToUtcDate(sch.slice(0, 10), sch.slice(11), settings.timezone).toISOString(),
+        start_at: null, end_at: null, total_price_cents: Number(a.price_cents) || 0, note: '',
+        cancel_kind: ['client', 'salon'].includes(a.cancelled_by) ? a.cancelled_by : 'unknown', cancelled_by_name: a.cancelled_by_name || null
+      };
+    });
+  }
+
+  const [[{ total: queueTotal }]] = await pool.query(
     `SELECT COUNT(*) AS total FROM queue q WHERE ${whereClause}`,
     params
   );
+  const total = queueTotal + apptItems.length;
 
   const [rows] = await pool.query(
     `SELECT q.*, s.name AS service_name,
@@ -1329,7 +1363,7 @@ router.get('/history', requireAdmin, wrap(async (req, res) => {
      FROM queue q LEFT JOIN services s ON s.id = q.service_id
      WHERE ${whereClause}
      ORDER BY q.checkin_at DESC, q.id DESC LIMIT ? OFFSET ?`,
-    [...params, perPage, offset]
+    withAppts ? [...params, 5000, 0] : [...params, perPage, offset]
   );
 
   const ids = rows.map((r) => r.id);
@@ -1348,7 +1382,7 @@ router.get('/history', requireAdmin, wrap(async (req, res) => {
   const [notes] = await pool.query('SELECT client_key, note FROM client_notes WHERE salon_id = ?', [req.salon.id]);
   const noteByKey = Object.fromEntries(notes.map((n) => [n.client_key, n.note]));
 
-  const items = rows.map((r) => Object.assign({}, r, {
+  let items = rows.map((r) => Object.assign({}, r, {
     position: r.queue_position,
     checkin_at: utcIso(r.checkin_at),
     start_at: utcIso(r.start_at),
@@ -1359,6 +1393,11 @@ router.get('/history', requireAdmin, wrap(async (req, res) => {
     cancel_kind: r.status !== 'cancelled' ? null : (Number(r.appt_cancelled) ? (['client', 'salon'].includes(r.appt_cancelled_by) ? r.appt_cancelled_by : 'unknown') : 'absent'),
     cancelled_by_name: r.appt_cancelled_by_name || null
   }));
+  if (withAppts) {
+    // Passages + RDV annulés avant d'arriver, du plus récent au plus ancien, puis la page demandée.
+    items = items.concat(apptItems).sort((x, y) => String(y.checkin_at || '').localeCompare(String(x.checkin_at || '')))
+      .slice(offset, offset + perPage);
+  }
   res.json({
     ok: true,
     items,

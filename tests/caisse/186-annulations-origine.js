@@ -64,13 +64,23 @@ const call = async (method, p, body, h) => { const r = await fetch(BASE + p, { m
     let h = await hist('&status=no_show');
     check('Statut « Absents » : seulement le client pas venu', h.length === 1 && h[0].id === 't186q' && h[0].cancel_kind === 'absent', JSON.stringify(h.map((x) => [x.id, x.cancel_kind])));
     h = await hist('&status=cancelled:client');
-    check('Statut « Annulés par le client » : le client qui a prévenu', h.length === 1 && h[0].id === 't186q2' && h[0].cancel_kind === 'client', JSON.stringify(h.map((x) => [x.id, x.cancel_kind])));
+    check('Statut « Annulés par le client » : le client qui a prévenu (passage) + le RDV annulé par le lien', h.length === 2 && h.some((x) => x.id === 't186q2' && !x.from_appointment) && h.some((x) => x.id === 'pc' && x.from_appointment), JSON.stringify(h.map((x) => [x.id, x.cancel_kind])));
     h = await hist('&status=cancelled:salon');
-    check('Statut « Annulés par le salon » : aucun ici', h.length === 0, JSON.stringify(h.map((x) => x.id)));
+    check('Statut « Annulés par le salon » : le RDV annulé par Bob', h.length === 1 && h[0].id === 'ps', JSON.stringify(h.map((x) => x.id)));
     h = await hist('&barber_id=b1');
     check('Coiffeur : Alice n\'a aucun de ces passages', h.length === 0, JSON.stringify(h.map((x) => x.id)));
     h = await hist('&barber_id=b2');
     check('Coiffeur : Bob les a tous les deux', h.length === 2, JSON.stringify(h.map((x) => x.id)));
+
+    // RDV annulés AVANT d'arriver (jamais dans la file) : aussi dans le menu Clients, comme dans le Manque à gagner.
+    h = await hist('&status=cancelled:unknown&past_only=1');
+    check('Clients « origine inconnue » : le RDV annulé avant d\'arriver est listé (fiche de RDV)', h.some((x) => x.id === 'pu' && x.from_appointment && x.cancel_kind === 'unknown'), JSON.stringify(h.map((x) => [x.id, x.cancel_kind])));
+    h = await hist('&status=cancelled:salon&past_only=1');
+    check('Clients « annulés par le salon » : celui de Bob (nom gardé)', h.some((x) => x.id === 'ps' && x.cancelled_by_name === 'Bob'), JSON.stringify(h.map((x) => [x.id, x.cancelled_by_name])));
+    h = await hist('&status=cancelled:client&past_only=1');
+    check('Clients « annulés par le client » : celui qui a prévenu + celui qui a annulé par le lien', h.length === 2 && h.some((x) => x.id === 'pc') && h.some((x) => x.id === 't186q2'), JSON.stringify(h.map((x) => x.id)));
+    const dashSrc = fs.readFileSync(path.join(__dirname, '../../public/dashboard.html'), 'utf8');
+    check('dashboard : « 10 RDV » cliquable -> Clients filtré (même période, heure passée)', /onclick="openMissedInClients\(/.test(dashSrc) && /function openMissedInClients\(kind\)/.test(dashSrc) && /past_only=1/.test(dashSrc));
 
     console.log('\n[D] Écrans');
     const app = fs.readFileSync(path.join(__dirname, '../../public/app.js'), 'utf8');
