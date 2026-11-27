@@ -208,6 +208,7 @@ const suite = [
   ['185-creneau-libere-deplacement-magique.js', false, ['exit']],
   ['186-annulations-origine.js', false, ['exit']],
   ['187-creneaux-libres-valeur-reelle.js', false, ['exit']],
+  ['188-tiroir-compte-client.js', false, ['exit']],
 ];
 
 let bad = 0;

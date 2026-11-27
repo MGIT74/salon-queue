@@ -221,4 +221,5 @@ node tests/caisse/184-cadeau-coiffeur-libre.js  # Carte cadeau : le client chois
 node tests/caisse/185-creneau-libere-deplacement-magique.js  # Déplacement magique : le trou libéré (hors grille) est proposé en ligne et accepté sans « Forcer »
 node tests/caisse/186-annulations-origine.js  # RDV annulés : par le client / par le salon / origine inconnue ; absents ; Manque à gagner en 4 lignes
 node tests/caisse/187-creneaux-libres-valeur-reelle.js  # Créneaux libres : chaque trou valorisé par ce qui y rentre (+ supplément seul, + déplacement magique)
+node tests/caisse/188-tiroir-compte-client.js  # Tiroirs : compte client / proche / sans compte / pas de coordonnées ; filtre « Compte » des Clients
 ```
