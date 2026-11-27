@@ -3315,7 +3315,7 @@
   </div>
 </div>
 
-<script src="/app.js?v=72"></script>
+<script src="/app.js?v=73"></script>
 <script src="/autorefresh.js?v=3"></script>
 <script src="/staff-group.js?v=7"></script>
 <script src="/daterange.js?v=4"></script>
@@ -4669,7 +4669,7 @@ function renderDrawerVisits(items) {
           '<div class="visit-date">' + sourceBadge(v, true) + when + '</div>' +
           '<div class="visit-meta">' + esc(v.service_name || 'Prestation') +
           (v.total_price_cents ? ' · ' + eur(v.total_price_cents) : '') +
-          ' · <span style="color:' + (STATUS_COLOR[v.status] || 'var(--grey)') + '">' + esc(STATUS_LABEL[v.status] || v.status) + '</span>' +
+          ' · <span style="color:' + ((passageCancelLabel(v) || {}).color || STATUS_COLOR[v.status] || 'var(--grey)') + '">' + esc((passageCancelLabel(v) || {}).label || STATUS_LABEL[v.status] || v.status) + '</span>' +
           durationBadge(v.start_at, v.end_at) + '</div>' +
         '</div>';
       }).join('');
