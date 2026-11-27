@@ -1478,6 +1478,13 @@ router.put('/:id/note', requireAdminOrBarber, wrap(async (req, res) => {
   res.json({ ok: true });
 }));
 
+/** Passage annulé : « absent » (pas venu, sans prévenir ni annuler) ou annulé par le client / le salon (avec le nom) / inconnu. */
+function passageCancelInfo(r) {
+  if (r.status !== 'cancelled') return { cancel_kind: null, cancelled_by_name: null };
+  if (r.appt_status !== 'cancelled') return { cancel_kind: 'absent', cancelled_by_name: null };
+  return { cancel_kind: ['client', 'salon'].includes(r.appt_cancelled_by) ? r.appt_cancelled_by : 'unknown', cancelled_by_name: r.appt_cancelled_by_name || null };
+}
+
 /**
  * Tous les passages d'un même client (peu importe le statut), retrouvé
  * par sa clé de rapprochement — combien de fois il est venu, quand,
@@ -1501,7 +1508,8 @@ router.get('/:id/client-history', requireAdminOrBarber, wrap(async (req, res) =>
   // qu'il s'agisse d'un vrai RDV ou d'un check-in kiosk).
   const [allRows] = await pool.query(
     `SELECT q.id, q.client_name, q.email, q.phone, q.status, q.checkin_at, q.start_at, q.end_at,
-            q.total_price_cents, s.name AS service_name, a.source AS source
+            q.total_price_cents, s.name AS service_name, a.source AS source,
+            a.status AS appt_status, a.cancelled_by AS appt_cancelled_by, a.cancelled_by_name AS appt_cancelled_by_name
      FROM queue q
      LEFT JOIN services s ON s.id = q.service_id
      LEFT JOIN appointments a ON a.promoted_queue_id = q.id
@@ -1515,7 +1523,8 @@ router.get('/:id/client-history', requireAdminOrBarber, wrap(async (req, res) =>
     .map((r) => Object.assign({}, r, {
       checkin_at: utcIso(r.checkin_at),
       start_at: utcIso(r.start_at),
-      end_at: utcIso(r.end_at)
+      end_at: utcIso(r.end_at),
+      ...passageCancelInfo(r)
     }));
 
   res.json({ ok: true, items });
@@ -1532,7 +1541,8 @@ router.get('/client-history-by-contact', requireAdminOrBarber, wrap(async (req, 
 
   const [allRows] = await pool.query(
     `SELECT q.id, q.client_name, q.email, q.phone, q.status, q.checkin_at, q.start_at, q.end_at,
-            q.total_price_cents, s.name AS service_name, a.source AS source
+            q.total_price_cents, s.name AS service_name, a.source AS source,
+            a.status AS appt_status, a.cancelled_by AS appt_cancelled_by, a.cancelled_by_name AS appt_cancelled_by_name
      FROM queue q
      LEFT JOIN services s ON s.id = q.service_id
      LEFT JOIN appointments a ON a.promoted_queue_id = q.id
@@ -1546,7 +1556,8 @@ router.get('/client-history-by-contact', requireAdminOrBarber, wrap(async (req, 
     .map((r) => Object.assign({}, r, {
       checkin_at: utcIso(r.checkin_at),
       start_at: utcIso(r.start_at),
-      end_at: utcIso(r.end_at)
+      end_at: utcIso(r.end_at),
+      ...passageCancelInfo(r)
     }));
 
   res.json({ ok: true, items });

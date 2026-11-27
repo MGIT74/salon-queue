@@ -875,6 +875,15 @@ function apptCancelDetail(a) {
   if (k === 'salon') return 'Annulé par ' + (a.cancelled_by_name || 'le salon') + when + '. Le client a reçu l\'email d\'annulation s\'il a une adresse.';
   return 'Annulé avant le suivi des annulations : on ne sait pas qui a annulé.';
 }
+/** Passage annulé (historique des passages, liste Clients) : libellé précis + couleur, sinon null. */
+function passageCancelLabel(v) {
+  var k = v && v.cancel_kind;
+  if (!k) return null;
+  if (k === 'absent') return { label: 'Absent (pas venu, sans prévenir)', color: 'var(--red)' };
+  if (k === 'client') return { label: 'Annulé par le client', color: 'var(--orange, #f97316)' };
+  if (k === 'salon') return { label: 'Annulé par le salon' + (v.cancelled_by_name ? ' · ' + v.cancelled_by_name : ''), color: 'var(--blue)' };
+  return { label: 'Annulé · origine inconnue', color: 'var(--grey)' };
+}
 /** Etiquette de statut d'un RDV (tiroir) : Annulé par le client / par le salon / origine inconnue, Terminé, Absent, Confirmé. */
 function apptBadgeHtml(a) {
   var k = apptCancelKind(a);

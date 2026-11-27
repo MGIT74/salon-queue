@@ -72,6 +72,13 @@ const call = async (method, p, body, h) => { const r = await fetch(BASE + p, { m
     h = await hist('&barber_id=b2');
     check('Coiffeur : Bob les a tous les deux', h.length === 2, JSON.stringify(h.map((x) => x.id)));
 
+    // Tiroir -> historique des passages : statut précis de chaque passage.
+    let ch = await call('GET', '/api/queue/t186q/client-history', null, ADMIN);
+    check('tiroir : passage « absent » (pas venu, sans prévenir)', (ch.data.items || []).some((x) => x.id === 't186q' && x.cancel_kind === 'absent'), JSON.stringify(ch.data).slice(0, 200));
+    ch = await call('GET', '/api/queue/t186q2/client-history', null, ADMIN);
+    check('tiroir : passage « annulé par le client »', (ch.data.items || []).some((x) => x.id === 't186q2' && x.cancel_kind === 'client'), JSON.stringify(ch.data).slice(0, 200));
+    const appSrc2 = fs.readFileSync(path.join(__dirname, '../../public/app.js'), 'utf8');
+    check('admin, caisse, poste : libellé précis dans l\'historique des passages', /function passageCancelLabel\(v\)/.test(appSrc2) && ['dashboard.html', 'caisse.html', 'poste.html'].every((f) => /passageCancelLabel\(v\)/.test(fs.readFileSync(path.join(__dirname, '../../public', f), 'utf8'))));
     // RDV annulés AVANT d'arriver (jamais dans la file) : aussi dans le menu Clients, comme dans le Manque à gagner.
     h = await hist('&status=cancelled:unknown&past_only=1');
     check('Clients « origine inconnue » : le RDV annulé avant d\'arriver est listé (fiche de RDV)', h.some((x) => x.id === 'pu' && x.from_appointment && x.cancel_kind === 'unknown'), JSON.stringify(h.map((x) => [x.id, x.cancel_kind])));

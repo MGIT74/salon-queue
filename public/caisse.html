@@ -1480,7 +1480,7 @@
   </div>
 </div>
 
-<script src="/app.js?v=72"></script>
+<script src="/app.js?v=73"></script>
 <script src="/queue-sim.js?v=1"></script>
 <script src="/staff-group.js?v=7"></script>
 <script src="/autorefresh.js?v=3"></script>
@@ -4129,7 +4129,7 @@ function adRenderVisits(items) {
         return '<div class="ad-visit-row"><div class="ad-visit-date">' + adSourceIcon(v) + when + '</div>' +
           '<div class="ad-visit-meta">' + esc(v.service_name || 'Prestation') +
           (v.total_price_cents ? ' · ' + eur(v.total_price_cents) : '') +
-          ' · <span style="color:' + (AD_STATUS_COLOR[v.status] || 'var(--grey)') + '">' + esc(AD_STATUS_LABEL[v.status] || v.status) + '</span>' +
+          ' · <span style="color:' + ((passageCancelLabel(v) || {}).color || AD_STATUS_COLOR[v.status] || 'var(--grey)') + '">' + esc((passageCancelLabel(v) || {}).label || AD_STATUS_LABEL[v.status] || v.status) + '</span>' +
           (mins > 0 ? ' · ' + formatMinutes(mins) : '') + '</div></div>';
       }).join('');
 }
