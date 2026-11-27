@@ -56,7 +56,23 @@ const call = async (method, p, body, h) => { const r = await fetch(BASE + p, { m
     check('absent 1 · client 1 · salon 1 · origine inconnue 1', bd.absent && bd.absent.count === 1 && bd.client.count === 1 && bd.salon.count === 1 && bd.unknown.count === 1, JSON.stringify(bd));
     check('les 4 montants font le total des RDV ratés', bd.absent && (bd.absent.cents + bd.client.cents + bd.salon.cents + bd.unknown.cents) === r.data.missed_revenue_cents && r.data.missed_appointments === 4, JSON.stringify([bd, r.data.missed_revenue_cents]));
 
-    console.log('\n[C] Écrans');
+    console.log('\n[C] Menu Clients : filtres Statut et Coiffeur');
+    await pool.query("INSERT INTO queue (id, salon_id, client_name, barber_id, service_id, status, checkin_at) VALUES ('t186q2','s1','T186 prevenu','b2','sv1','cancelled', ?)", [P + ' 09:00:00']);
+    await pool.query("UPDATE queue SET checkin_at = ? WHERE id = 't186q'", [P + ' 13:00:00']);
+    await ins('pq', '15:00', P, { cols: 'promoted_queue_id, cancelled_by, cancelled_via', vals: "'t186q2', 'client', 'phone'", status: 'cancelled' });
+    const hist = async (q) => ((await call('GET', '/api/queue/history?per_page=100&date_from=' + P + '&date_to=' + P + q, null, ADMIN)).data.items || []).filter((x) => /^T186/.test(x.client_name));
+    let h = await hist('&status=no_show');
+    check('Statut « Absents » : seulement le client pas venu', h.length === 1 && h[0].id === 't186q' && h[0].cancel_kind === 'absent', JSON.stringify(h.map((x) => [x.id, x.cancel_kind])));
+    h = await hist('&status=cancelled:client');
+    check('Statut « Annulés par le client » : le client qui a prévenu', h.length === 1 && h[0].id === 't186q2' && h[0].cancel_kind === 'client', JSON.stringify(h.map((x) => [x.id, x.cancel_kind])));
+    h = await hist('&status=cancelled:salon');
+    check('Statut « Annulés par le salon » : aucun ici', h.length === 0, JSON.stringify(h.map((x) => x.id)));
+    h = await hist('&barber_id=b1');
+    check('Coiffeur : Alice n\'a aucun de ces passages', h.length === 0, JSON.stringify(h.map((x) => x.id)));
+    h = await hist('&barber_id=b2');
+    check('Coiffeur : Bob les a tous les deux', h.length === 2, JSON.stringify(h.map((x) => x.id)));
+
+    console.log('\n[D] Écrans');
     const app = fs.readFileSync(path.join(__dirname, '../../public/app.js'), 'utf8');
     const dash = fs.readFileSync(path.join(__dirname, '../../public/dashboard.html'), 'utf8');
     const queueSrc = fs.readFileSync(path.join(__dirname, '../../src/routes/queue.js'), 'utf8');

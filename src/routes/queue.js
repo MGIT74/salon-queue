@@ -1305,6 +1305,15 @@ router.get('/history', requireAdmin, wrap(async (req, res) => {
     conditions.push('q.barber_id = ?');
     params.push(req.query.barber_id);
   }
+  // Statut (menu Clients, même filtre que Rendez-vous) : en attente, en cours, terminé, absent (pas venu, sans
+  // prévenir), annulé (RDV lié annulé) et l'origine de l'annulation : client / salon / inconnue.
+  const cancelledAppt = "EXISTS (SELECT 1 FROM appointments ax WHERE ax.promoted_queue_id = q.id AND ax.status = 'cancelled'";
+  const st = String(req.query.status || '');
+  if (['waiting', 'in_progress', 'done'].includes(st)) { conditions.push('q.status = ?'); params.push(st); }
+  else if (st === 'no_show') conditions.push("q.status = 'cancelled' AND NOT " + cancelledAppt + ')');
+  else if (st === 'cancelled') conditions.push("q.status = 'cancelled' AND " + cancelledAppt + ')');
+  else if (st === 'cancelled:client' || st === 'cancelled:salon') { conditions.push("q.status = 'cancelled' AND " + cancelledAppt + ' AND ax.cancelled_by = ?)'); params.push(st.slice(10)); }
+  else if (st === 'cancelled:unknown') conditions.push("q.status = 'cancelled' AND " + cancelledAppt + " AND (ax.cancelled_by IS NULL OR ax.cancelled_by NOT IN ('client','salon')))");
   const whereClause = conditions.join(' AND ');
 
   const [[{ total }]] = await pool.query(
@@ -1313,7 +1322,10 @@ router.get('/history', requireAdmin, wrap(async (req, res) => {
   );
 
   const [rows] = await pool.query(
-    `SELECT q.*, s.name AS service_name
+    `SELECT q.*, s.name AS service_name,
+            (SELECT a.cancelled_by FROM appointments a WHERE a.promoted_queue_id = q.id AND a.status = 'cancelled' LIMIT 1) AS appt_cancelled_by,
+            (SELECT a.cancelled_by_name FROM appointments a WHERE a.promoted_queue_id = q.id AND a.status = 'cancelled' LIMIT 1) AS appt_cancelled_by_name,
+            (SELECT COUNT(*) FROM appointments a WHERE a.promoted_queue_id = q.id AND a.status = 'cancelled') AS appt_cancelled
      FROM queue q LEFT JOIN services s ON s.id = q.service_id
      WHERE ${whereClause}
      ORDER BY q.checkin_at DESC, q.id DESC LIMIT ? OFFSET ?`,
@@ -1342,7 +1354,10 @@ router.get('/history', requireAdmin, wrap(async (req, res) => {
     start_at: utcIso(r.start_at),
     end_at: utcIso(r.end_at),
     extra_names: extrasByQueue[r.id] || [],
-    note: noteByKey[clientKey(r)] || ''
+    note: noteByKey[clientKey(r)] || '',
+    // Passage annulé : « absent » (pas venu, sans prévenir) ou annulé (RDV lié annulé) par le client / le salon / inconnu.
+    cancel_kind: r.status !== 'cancelled' ? null : (Number(r.appt_cancelled) ? (['client', 'salon'].includes(r.appt_cancelled_by) ? r.appt_cancelled_by : 'unknown') : 'absent'),
+    cancelled_by_name: r.appt_cancelled_by_name || null
   }));
   res.json({
     ok: true,
