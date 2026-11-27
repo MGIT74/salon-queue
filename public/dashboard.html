@@ -2658,6 +2658,22 @@
     </div>
 
     <div class="clients-toolbar">
+      <div class="fld" style="margin:0"><label for="client-filter-status">Statut</label>
+        <select id="client-filter-status" onchange="applyClientFilters()">
+          <option value="">Tous</option>
+          <option value="waiting">En attente</option>
+          <option value="in_progress">En cours</option>
+          <option value="done">Terminés</option>
+          <option value="no_show">Absents</option>
+          <option value="cancelled">Annulés (tous)</option>
+          <option value="cancelled:client">Annulés par le client</option>
+          <option value="cancelled:salon">Annulés par le salon</option>
+          <option value="cancelled:unknown">Annulés · origine inconnue</option>
+        </select>
+      </div>
+      <div class="fld" style="margin:0"><label for="client-filter-barber">Coiffeur</label>
+        <select id="client-filter-barber" onchange="applyClientFilters()" style="min-width:180px"><option value="">Tous</option></select>
+      </div>
       <div class="fld" style="margin:0"><label for="client-date-from">Du</label><input id="client-date-from" type="date" data-range-to="client-date-to" onchange="applyClientDateFilter()"></div>
       <div class="fld" style="margin:0"><label for="client-date-to">Au</label><input id="client-date-to" type="date" onchange="applyClientDateFilter()"></div>
       <button class="btn btn-ghost" onclick="clearClientDateFilter()">Réinitialiser</button>
@@ -10202,6 +10218,11 @@ function loadClients() {
   var params = 'page=' + clientsPage + '&per_page=' + clientsPerPage;
   if (clientsDateFrom) params += '&date_from=' + clientsDateFrom;
   if (clientsDateTo) params += '&date_to=' + clientsDateTo;
+  // Filtres Statut et Coiffeur (comme dans Rendez-vous).
+  var stEl = document.getElementById('client-filter-status'), bEl = document.getElementById('client-filter-barber');
+  if (stEl && stEl.value) params += '&status=' + encodeURIComponent(stEl.value);
+  if (bEl && bEl.value) params += '&barber_id=' + encodeURIComponent(bEl.value);
+  fillClientBarberFilter();
   return api('/api/queue/history?' + params).then(function (r) {
     clientHistory = r.items;
     clientsPage = r.page;
@@ -10210,6 +10231,21 @@ function loadClients() {
     renderClientsPagination();
   }).catch(function (e) { toast(e.message, true); });
 }
+
+var clientBarberFilterFilled = false;
+function fillClientBarberFilter() {
+  if (clientBarberFilterFilled) return;
+  clientBarberFilterFilled = true;
+  api('/api/barbers?all=1').then(function (r) {
+    var sel = document.getElementById('client-filter-barber');
+    if (!sel) return;
+    var cur = sel.value;
+    sel.innerHTML = '<option value="">Tous</option>' + r.items.slice().sort(function (a, b) { return a.name.localeCompare(b.name); })
+      .map(function (b) { return '<option value="' + esc(b.id) + '">' + esc(b.name) + '</option>'; }).join('');
+    sel.value = cur;
+  }).catch(function () { clientBarberFilterFilled = false; });
+}
+function applyClientFilters() { clientsPage = 1; loadClients(); }
 
 function applyClientDateFilter() {
   clientsDateFrom = document.getElementById('client-date-from').value;
@@ -10225,6 +10261,8 @@ function changeClientsPerPage(value) {
 }
 
 function clearClientDateFilter() {
+  document.getElementById('client-filter-status').value = '';
+  document.getElementById('client-filter-barber').value = '';
   document.getElementById('client-date-from').value = '';
   document.getElementById('client-date-to').value = '';
   clientsDateFrom = '';
@@ -10428,10 +10466,15 @@ function renderClients() {
         }
         actions += '<button class="btn btn-ghost" onclick="deleteClient(\'' + c.id + '\')">Supprimer</button>';
 
+        // Annulé : absent (pas venu, sans prévenir) ou annulé par le client / par le salon / origine inconnue.
+        var ck = c.cancel_kind;
+        var stLabel = ck === 'absent' ? 'Absent' : ck === 'client' ? 'Annulé par le client' : ck === 'salon' ? 'Annulé par le salon' + (c.cancelled_by_name && c.cancelled_by_name !== "l'admin" ? ' · ' + c.cancelled_by_name : '')
+          : ck === 'unknown' ? 'Annulé · origine inconnue' : (STATUS_LABEL[c.status] || c.status);
+        var stColor = ck === 'client' ? 'var(--orange, #f97316)' : ck === 'salon' ? 'var(--blue)' : ck === 'unknown' ? 'var(--grey)' : (STATUS_COLOR[c.status] || 'var(--grey)');
         var nameCell = '<b>' + esc(c.client_name) + '</b>' +
-          ' <span style="margin-left:6px;font-size:12.5px;font-weight:500;color:' + (STATUS_COLOR[c.status] || 'var(--grey)') + '">' +
-          '<span class="status-dot" style="background:' + (STATUS_COLOR[c.status] || 'var(--grey)') + '"></span>' +
-          esc(STATUS_LABEL[c.status] || c.status) + '</span>' +
+          ' <span style="margin-left:6px;font-size:12.5px;font-weight:500;color:' + stColor + '">' +
+          '<span class="status-dot" style="background:' + stColor + '"></span>' +
+          esc(stLabel) + '</span>' +
           (stuck ? ' <span class="chip" style="background:var(--orange);color:#fff;font-size:10.5px">bloqué</span>' : '');
 
         var infoGrid = [
