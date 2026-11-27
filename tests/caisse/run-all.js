@@ -206,6 +206,7 @@ const suite = [
   ['183-borne-nom-puis-prestation.js', false, ['exit']],
   ['184-cadeau-coiffeur-libre.js', false, ['exit']],
   ['185-creneau-libere-deplacement-magique.js', false, ['exit']],
+  ['186-annulations-origine.js', false, ['exit']],
 ];
 
 let bad = 0;

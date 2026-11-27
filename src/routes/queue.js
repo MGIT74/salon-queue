@@ -998,8 +998,9 @@ router.post('/:id/cancel', requireAdminOrBarber, wrap(async (req, res) => {
   );
   if (notified) {
     await pool.query(
-      "UPDATE appointments SET status = 'cancelled' WHERE promoted_queue_id = ? AND salon_id = ? AND status = 'confirmed'",
-      [req.params.id, req.salon.id]
+      // Le client a prévenu le salon (téléphone...) : annulé par le client, noté par la personne de l'équipe.
+      "UPDATE appointments SET status = 'cancelled', cancelled_by = 'client', cancelled_via = 'phone', cancelled_by_name = ?, cancelled_at = UTC_TIMESTAMP() WHERE promoted_queue_id = ? AND salon_id = ? AND status = 'confirmed'",
+      [req.barberId ? ((await pool.query('SELECT name FROM barbers WHERE id = ?', [req.barberId]))[0][0] || {}).name || 'un coiffeur' : "l'admin", req.params.id, req.salon.id]
     );
   }
   await recompute(req.salon.id);

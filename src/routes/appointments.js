@@ -636,6 +636,12 @@ async function buildApptItems(salonId, rows) {
         // RDV forcé dans un créneau trop court : par qui, quand (UTC).
         forced_by: r.forced_by || null,
         forced_at: r.forced_at ? utcIso(r.forced_at) : null,
+        // Annulé : par qui (« client » : lien de l'email / compte, ou a prévenu le salon ; « salon » : coiffeur ou admin ;
+        // null = annulé avant ce suivi, origine inconnue), comment, noté par qui, et quand (UTC).
+        cancelled_by: displayStatus === 'cancelled' ? (r.cancelled_by || null) : null,
+        cancelled_via: displayStatus === 'cancelled' ? (r.cancelled_via || null) : null,
+        cancelled_by_name: displayStatus === 'cancelled' ? (r.cancelled_by_name || null) : null,
+        cancelled_at: displayStatus === 'cancelled' && r.cancelled_at ? utcIso(r.cancelled_at) : null,
         created_at: utcIso(r.created_at),
         // Coupe faite avec le Timer : vraie heure de début / fin (UTC). Sans Timer (« Je prends ») : début vide.
         queue_start_at: r.queue_start_at ? utcIso(r.queue_start_at) : null,
@@ -1275,7 +1281,7 @@ router.post('/cancel-group', resolveCancellationSalon, wrap(withBookingLock(asyn
       if (paid) { kept++; continue; }
     }
     if (deadlineMin > 0 && minutesUntil < deadlineMin) { kept++; continue; }
-    await pool.query('UPDATE appointments SET status = ? WHERE id = ?', ['cancelled', m.id]);
+    await pool.query("UPDATE appointments SET status = 'cancelled', cancelled_by = 'client', cancelled_via = 'link', cancelled_at = UTC_TIMESTAMP() WHERE id = ?", [m.id]);
     if (m.promoted_queue_id) {
       await pool.query("UPDATE queue SET status = 'cancelled' WHERE id = ? AND status IN ('waiting','in_progress')", [m.promoted_queue_id]);
     }
@@ -1293,6 +1299,12 @@ router.post('/cancel-group', resolveCancellationSalon, wrap(withBookingLock(asyn
  * est TOUJOURS requis explicitement (pas de "premier disponible"
  * automatique comme pour le grand public).
  */
+// Nom de la personne de l'équipe qui agit : le coiffeur connecté par son code (jamais « au nom de »), sinon l'admin.
+async function staffActorName(req) {
+  if (req.barberId) { const [[b]] = await pool.query('SELECT name FROM barbers WHERE id = ?', [req.barberId]); return b ? b.name : 'un coiffeur'; }
+  return "l'admin";
+}
+
 async function isSalonClosedOnDate(salonId, dateStr) {
   const [[closed]] = await pool.query(
     'SELECT id FROM salon_closures WHERE salon_id = ? AND start_date <= ? AND end_date >= ? LIMIT 1',
@@ -1605,7 +1617,8 @@ router.post('/cancel', resolveCancellationSalon, wrap(withBookingLock(async (req
     }
   }
 
-  await pool.query('UPDATE appointments SET status = ? WHERE id = ?', ['cancelled', appt.id]);
+  // Annulé par le client lui-même (lien de l'email de confirmation / son compte client).
+  await pool.query("UPDATE appointments SET status = 'cancelled', cancelled_by = 'client', cancelled_via = 'link', cancelled_at = UTC_TIMESTAMP() WHERE id = ?", [appt.id]);
   if (appt.promoted_queue_id) {
     await pool.query(
       "UPDATE queue SET status = 'cancelled' WHERE id = ? AND status IN ('waiting','in_progress')",
@@ -1640,7 +1653,9 @@ router.post('/:id/admin-cancel', requireAdminOrBarber, wrap(withBookingLock(asyn
     if (paid) return res.status(409).json({ error: 'Rendez-vous encaissé : une annulation nécessite une procédure de remboursement.' });
   }
 
-  await pool.query('UPDATE appointments SET status = ? WHERE id = ?', ['cancelled', appt.id]);
+  // Annulé par le salon : coiffeur (code PIN) ou admin.
+  await pool.query("UPDATE appointments SET status = 'cancelled', cancelled_by = 'salon', cancelled_via = 'staff', cancelled_by_name = ?, cancelled_at = UTC_TIMESTAMP() WHERE id = ?",
+    [await staffActorName(req), appt.id]);
   if (appt.promoted_queue_id) {
     await pool.query(
       "UPDATE queue SET status = 'cancelled' WHERE id = ? AND status IN ('waiting','in_progress')",

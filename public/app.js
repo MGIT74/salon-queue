@@ -847,11 +847,41 @@ function apptWhenLabel(a) {
   return d.charAt(0).toUpperCase() + d.slice(1) + ' à ' + String(a.scheduled_at).slice(11, 16);
 }
 
-/** Etiquette de statut d'un RDV (tiroir) : Annulé / Terminé / Absent / Confirmé. */
+/** Origine d'une annulation : « client », « salon » ou « unknown » (annulé avant le suivi). Absent / autre : null. */
+function apptCancelKind(a) {
+  if (!a || a.status !== 'cancelled') return null;
+  return a.cancelled_by === 'client' || a.cancelled_by === 'salon' ? a.cancelled_by : 'unknown';
+}
+/** Libellé court du statut : Absent, Annulé par le client, Annulé par le salon · Emin, Annulé · origine inconnue... */
+function apptStatusLabel(a) {
+  var k = apptCancelKind(a);
+  if (k === 'client') return 'Annulé par le client';
+  if (k === 'salon') return 'Annulé par le salon' + (a.cancelled_by_name && a.cancelled_by_name !== "l'admin" ? ' · ' + a.cancelled_by_name : '');
+  if (k === 'unknown') return 'Annulé · origine inconnue';
+  return { confirmed: 'Confirmé', completed: 'Terminé', no_show: 'Absent' }[a && a.display_status] || (a && a.display_status) || '';
+}
+/** Détail d'une annulation pour le tiroir : comment, par qui, quand. */
+function apptCancelDetail(a) {
+  var k = apptCancelKind(a);
+  if (!k) return '';
+  var when = '';
+  if (a.cancelled_at) {
+    var d = new Date(a.cancelled_at);
+    if (!isNaN(d)) when = ' le ' + d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }) + ' à ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  }
+  if (k === 'client') return a.cancelled_via === 'phone'
+    ? 'Le client a prévenu le salon' + (a.cancelled_by_name ? ' (noté par ' + a.cancelled_by_name + ')' : '') + when + '.'
+    : 'Annulé par le client avec le lien de l\'email ou son compte' + when + '.';
+  if (k === 'salon') return 'Annulé par ' + (a.cancelled_by_name || 'le salon') + when + '. Le client a reçu l\'email d\'annulation s\'il a une adresse.';
+  return 'Annulé avant le suivi des annulations : on ne sait pas qui a annulé.';
+}
+/** Etiquette de statut d'un RDV (tiroir) : Annulé par le client / par le salon / origine inconnue, Terminé, Absent, Confirmé. */
 function apptBadgeHtml(a) {
-  return a.status === 'cancelled' ? '<span class="ad-badge cancelled">Annulé</span>'
-    : (a.display_status === 'completed' ? '<span class="ad-badge done">Terminé</span>'
-      : (a.display_status === 'no_show' ? '<span class="ad-badge cancelled">Absent</span>' : '<span class="ad-badge">Confirmé</span>'));
+  var k = apptCancelKind(a);
+  if (k) return '<span class="ad-badge cancelled ad-cancel-' + k + '">' + esc(apptStatusLabel(a)) + '</span>' +
+    '<div class="ad-cancel-detail">' + esc(apptCancelDetail(a)) + '</div>';
+  return a.display_status === 'completed' ? '<span class="ad-badge done">Terminé</span>'
+    : (a.display_status === 'no_show' ? '<span class="ad-badge cancelled">Absent</span><div class="ad-cancel-detail">Le client n\'est pas venu, sans prévenir ni annuler.</div>' : '<span class="ad-badge">Confirmé</span>');
 }
 
 /**

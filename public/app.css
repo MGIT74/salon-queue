@@ -939,3 +939,12 @@ body .tfx > button { transition: color .25s ease, transform .1s ease; }
 
 /* Menus du bas (Mon poste, caisse, espace client) : voir syncBottomBars dans app.js (iPhone, appli sur l'écran d'accueil). */
 .poste-footer, .caisse-footer, .client-footer { translate: 0 var(--vv-shift, 0px); }
+
+/* Origine d'une annulation de RDV (tiroirs) : client (orange), salon (bleu), inconnue (gris). */
+.ad-badge.ad-cancel-client { background: rgba(255,159,10,.18); color: #c76a00; }
+.ad-badge.ad-cancel-salon { background: rgba(10,132,255,.16); color: #0062c4; }
+.ad-badge.ad-cancel-unknown { background: var(--fill); color: var(--grey); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .ad-badge.ad-cancel-client { color: #ffb340; } :root:not([data-theme="light"]) .ad-badge.ad-cancel-salon { color: #64aaff; } }
+:root[data-theme="dark"] .ad-badge.ad-cancel-client { color: #ffb340; }
+:root[data-theme="dark"] .ad-badge.ad-cancel-salon { color: #64aaff; }
+.ad-cancel-detail { margin-top: 6px; font-size: 12.5px; line-height: 1.45; color: var(--grey); white-space: normal; }
