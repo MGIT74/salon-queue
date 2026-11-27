@@ -205,6 +205,8 @@
   .dash-missed-detail .mb-val { align-items: flex-end; }
   .dash-missed-detail .mb-txt b { font-weight: 600; }
   .dash-missed-detail em { font-style: normal; font-size: 11.5px; color: var(--grey); }
+  .dash-missed-detail .mb-link { border: none; background: none; padding: 2px 0; margin: 0; font: inherit; font-size: 12px; font-weight: 600; color: var(--accent, #0a84ff); cursor: pointer; white-space: nowrap; }
+  .dash-missed-detail .mb-link:hover { text-decoration: underline; }
   .dash-card-ca .st-delta { margin: 2px 0 10px; }
   .dash-ca-rows { display: flex; flex-direction: column; gap: 6px; }
   .dash-ca-row { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; }
@@ -4072,6 +4074,7 @@ function loadDashSalon() {
   var endIncl = new Date(range.end); endIncl.setDate(endIncl.getDate() - 1);
   var qs = 'start=' + range.start.toISOString() + '&end=' + range.end.toISOString() +
     '&start_date=' + localDateStr(range.start) + '&end_date=' + localDateStr(endIncl);
+  dashMissedRange = { from: localDateStr(range.start), to: localDateStr(endIncl) };   // pour les liens « 10 RDV » -> Clients
   var per = document.getElementById('dash-rev-period'); if (per) per.textContent = range.label;
   api('/api/barbers/salon-stats?' + qs).then(function (r) {
     document.getElementById('dash-rev-total').textContent = eur(r.total_cents);
@@ -4117,6 +4120,22 @@ var MISSED_KINDS = [
   { k: 'salon', label: 'Annulés par le salon', sub: 'Coiffeur ou admin', color: '#0a84ff' },
   { k: 'unknown', label: 'Annulés · origine inconnue', sub: 'Avant le suivi des annulations', color: '#8e8e93' }
 ];
+var dashMissedRange = null;
+/** « 10 RDV » du Manque à gagner -> menu Clients, filtré sur ce statut et la même période (heure déjà passée). */
+function openMissedInClients(kind) {
+  var map = { absent: 'no_show', client: 'cancelled:client', salon: 'cancelled:salon', unknown: 'cancelled:unknown' };
+  var stEl = document.getElementById('client-filter-status'), bEl = document.getElementById('client-filter-barber');
+  if (stEl) stEl.value = map[kind] || '';
+  if (bEl) bEl.value = '';
+  var r = dashMissedRange || {};
+  document.getElementById('client-date-from').value = r.from || '';
+  document.getElementById('client-date-to').value = r.to || '';
+  clientsDateFrom = r.from || ''; clientsDateTo = r.to || '';
+  clientsPastOnly = true; clientsPage = 1;
+  document.getElementById('client-search').value = '';
+  setActiveTab('clients');
+}
+
 function missedBreakdownHtml(bd, nMiss, totalCents) {
   if (!bd) return '<div><span>RDV annulés / absents' + (nMiss ? ' (' + nMiss + ' RDV)' : '') + '</span><b>' + eur(totalCents || 0) + '</b></div>';
   var kinds = MISSED_KINDS.filter(function (x) { return bd[x.k] && bd[x.k].count; });
@@ -4126,7 +4145,7 @@ function missedBreakdownHtml(bd, nMiss, totalCents) {
   return head + bar + kinds.map(function (x) {
     var v = bd[x.k];
     return '<div class="mb-row"><span class="mb-dot" style="background:' + x.color + '"></span><span class="mb-txt"><b>' + x.label + '</b><em>' + x.sub + '</em></span>' +
-      '<span class="mb-val"><b>' + eur(v.cents) + '</b><em>' + v.count + ' RDV</em></span></div>';
+      '<span class="mb-val"><b>' + eur(v.cents) + '</b><button type="button" class="mb-link" onclick="openMissedInClients(\'' + x.k + '\')" title="Voir ces RDV dans Clients">' + v.count + ' RDV ›</button></span></div>';
   }).join('');
 }
 
@@ -6804,6 +6823,7 @@ var clientsPerPage = 25;
 var clientsTotalPages = 1;
 var clientsDateFrom = '';
 var clientsDateTo = '';
+var clientsPastOnly = false;   // ouvert depuis le Manque à gagner : seulement les RDV dont l'heure est passée (mêmes chiffres)
 var selectedClientIds = {};
 
 var STATUS_LABEL = {
@@ -10222,6 +10242,7 @@ function loadClients() {
   var stEl = document.getElementById('client-filter-status'), bEl = document.getElementById('client-filter-barber');
   if (stEl && stEl.value) params += '&status=' + encodeURIComponent(stEl.value);
   if (bEl && bEl.value) params += '&barber_id=' + encodeURIComponent(bEl.value);
+  if (clientsPastOnly) params += '&past_only=1';
   fillClientBarberFilter();
   return api('/api/queue/history?' + params).then(function (r) {
     clientHistory = r.items;
@@ -10245,9 +10266,10 @@ function fillClientBarberFilter() {
     sel.value = cur;
   }).catch(function () { clientBarberFilterFilled = false; });
 }
-function applyClientFilters() { clientsPage = 1; loadClients(); }
+function applyClientFilters() { clientsPastOnly = false; clientsPage = 1; loadClients(); }
 
 function applyClientDateFilter() {
+  clientsPastOnly = false;
   clientsDateFrom = document.getElementById('client-date-from').value;
   clientsDateTo = document.getElementById('client-date-to').value;
   clientsPage = 1;
@@ -10261,6 +10283,7 @@ function changeClientsPerPage(value) {
 }
 
 function clearClientDateFilter() {
+  clientsPastOnly = false;
   document.getElementById('client-filter-status').value = '';
   document.getElementById('client-filter-barber').value = '';
   document.getElementById('client-date-from').value = '';
@@ -10346,7 +10369,7 @@ function toggleSelectAllClients(checked) {
 function selectAllClients() {
   var q = (document.getElementById('client-search').value || '').trim().toLowerCase();
   clientHistory.forEach(function (c) {
-    if (!q || c.client_name.toLowerCase().indexOf(q) !== -1) selectedClientIds[c.id] = true;
+    if (!c.from_appointment && (!q || c.client_name.toLowerCase().indexOf(q) !== -1)) selectedClientIds[c.id] = true;
   });
   document.querySelectorAll('.client-check').forEach(function (cb) { cb.checked = true; });
   updateClientsExportBar();
@@ -10464,7 +10487,7 @@ function renderClients() {
           actions += '<button class="btn btn-soft" onclick="forceCloseClient(\'' + c.id + '\')">' +
             (stuck ? 'Forcer la clôture' : 'Terminer') + '</button>';
         }
-        actions += '<button class="btn btn-ghost" onclick="deleteClient(\'' + c.id + '\')">Supprimer</button>';
+        if (!c.from_appointment) actions += '<button class="btn btn-ghost" onclick="deleteClient(\'' + c.id + '\')">Supprimer</button>';
 
         // Annulé : absent (pas venu, sans prévenir) ou annulé par le client / par le salon / origine inconnue.
         var ck = c.cancel_kind;
@@ -10487,15 +10510,29 @@ function renderClients() {
           '<div class="f">' + (dur ? '<b>' + dur + '</b>' : '') + '</div>'
         ].join('');
 
-        return '<div class="item">' +
-          '<input type="checkbox" class="client-check"' + (selectedClientIds[c.id] ? ' checked' : '') +
-          ' onclick="event.stopPropagation()" onchange="toggleClientSelect(\'' + c.id + '\', this.checked)">' +
-          '<div class="item-main" onclick="openClientDrawer(\'' + c.id + '\', \'history\')" style="cursor:pointer">' +
+        // RDV annulé avant d'arriver (pas un passage) : sa fiche de RDV, pas de case à cocher ni de suppression.
+        var check = c.from_appointment
+          ? '<input type="checkbox" class="client-check" style="visibility:hidden" tabindex="-1" disabled>'
+          : '<input type="checkbox" class="client-check"' + (selectedClientIds[c.id] ? ' checked' : '') +
+            ' onclick="event.stopPropagation()" onchange="toggleClientSelect(\'' + c.id + '\', this.checked)">';
+        var open = c.from_appointment ? 'openClientApptFromHistory(\'' + c.id + '\')' : 'openClientDrawer(\'' + c.id + '\', \'history\')';
+        return '<div class="item">' + check +
+          '<div class="item-main" onclick="' + open + '" style="cursor:pointer">' +
             '<div class="client-info-grid">' + infoGrid + '</div>' +
           '</div>' +
           '<div class="item-actions" onclick="event.stopPropagation()">' + actions + '</div>' +
         '</div>';
       }).join('');
+}
+
+/** Ligne « RDV annulé avant d'arriver » du menu Clients : ouvre la fiche du RDV (qui a annulé, quand). */
+function openClientApptFromHistory(id) {
+  api('/api/appointments/lookup?id=' + encodeURIComponent(id)).then(function (r) {
+    var a = r.item || (r.items && r.items[0]);
+    if (!a) return toast('Rendez-vous introuvable', true);
+    if (typeof calAppointmentById === 'object' && calAppointmentById) calAppointmentById[a.id] = a;
+    openClientDrawer(a.id, 'appointment', a);
+  }).catch(function (e) { toast(e.message, true); });
 }
 
 /**
