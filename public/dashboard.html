@@ -194,6 +194,13 @@
   .dash-missed-detail div { display: flex; justify-content: space-between; gap: 12px; }
   .dash-missed-detail b { color: var(--ink); font-weight: 600; white-space: nowrap; }
   .dash-missed-detail small { display: block; font-size: 12px; opacity: .8; }
+  .dash-missed-head { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .dash-info-btn { flex: none; width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid var(--sep); background: none; color: var(--grey);
+                   font: 700 13px/1 Georgia, 'Times New Roman', serif; font-style: italic; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
+  .dash-info-btn:hover, .dash-info-btn.on { border-color: var(--accent, #0a84ff); color: var(--accent, #0a84ff); }
+  .dash-missed-help { position: absolute; top: 34px; left: 0; right: 0; z-index: 20; box-sizing: border-box; padding: 12px 14px; border-radius: 14px;
+                      background: var(--card); border: 1px solid var(--sep); box-shadow: 0 10px 30px rgba(0,0,0,.35); font-size: 12.5px; line-height: 1.5; color: var(--ink); }
+  .dash-missed-help[hidden] { display: none; }
   .dash-missed-detail .mb-head { margin-top: 4px; padding-top: 10px; border-top: 1px solid var(--sep); font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
   .dash-missed-detail .mb-head b { font-size: 13.5px; letter-spacing: 0; }
   .dash-missed-detail .mb-bar { display: flex; height: 8px; gap: 2px; border-radius: 99px; overflow: hidden; }
@@ -2150,7 +2157,10 @@
       </div>
 
       <div class="dash-card dash-card-missed">
-        <div class="dash-card-head"><h3>Manque à gagner</h3></div>
+        <div class="dash-card-head dash-missed-head"><h3>Manque à gagner</h3>
+          <button type="button" class="dash-info-btn" aria-label="Comment c'est calculé" aria-expanded="false" aria-controls="dash-missed-help" onclick="toggleMissedHelp(this)">i</button>
+          <div class="dash-missed-help" id="dash-missed-help" role="note" hidden></div>
+        </div>
         <div class="dash-big-num dash-missed-num" id="dash-missed-total">—</div>
         <div class="dash-missed-detail" id="dash-missed-detail"></div>
       </div>
@@ -4114,8 +4124,10 @@ function loadDashSalon() {
     document.getElementById('dash-missed-detail').innerHTML =
       '<div><span>Créneaux libres</span><b>' + eur(r.free_revenue_cents || 0) + '</b></div>' +
       missedBreakdownHtml(r.missed_breakdown, nMiss, r.missed_revenue_cents) +
-      '<small>Temps déjà passé seulement. Chaque trou compte pour ce qui pouvait vraiment y entrer (prestations, un supplément seul), déplacement magique de 5 min compris.' +
-      (r.missed_breakdown && r.missed_breakdown.unknown && r.missed_breakdown.unknown.count ? ' « Origine inconnue » : RDV annulés avant le suivi, la ligne disparaît d\'elle-même avec le temps.' : '') + '</small>';
+      '';
+    // Explication du calcul : derrière le bouton « i » de la carte (plus de long texte sous les chiffres).
+    document.getElementById('dash-missed-help').textContent = 'Temps déjà passé seulement. Chaque trou compte pour ce qui pouvait vraiment y entrer (prestations, un supplément seul), déplacement magique de 5 min compris.' +
+      (r.missed_breakdown && r.missed_breakdown.unknown && r.missed_breakdown.unknown.count ? ' « Origine inconnue » : RDV annulés avant le suivi, la ligne disparaît d\'elle-même avec le temps.' : '');
   }).catch(function (e) { toast(e.message, true); });
 }
 
@@ -4129,6 +4141,19 @@ var MISSED_KINDS = [
   { k: 'unknown', label: 'Annulés · origine inconnue', sub: 'Avant le suivi des annulations', color: '#8e8e93' }
 ];
 var dashMissedRange = null;
+function toggleMissedHelp(btn) {
+  var box = document.getElementById('dash-missed-help');
+  var open = box.hasAttribute('hidden');
+  if (open) box.removeAttribute('hidden'); else box.setAttribute('hidden', '');
+  btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  btn.classList.toggle('on', open);
+}
+document.addEventListener('click', function (e) {   // un clic ailleurs referme l'explication
+  var box = document.getElementById('dash-missed-help');
+  if (!box || box.hasAttribute('hidden') || (e.target.closest && e.target.closest('.dash-missed-head'))) return;
+  box.setAttribute('hidden', '');
+  var b = document.querySelector('.dash-info-btn'); if (b) { b.classList.remove('on'); b.setAttribute('aria-expanded', 'false'); }
+});
 /** « 10 RDV » du Manque à gagner -> menu Clients, filtré sur ce statut et la même période (heure déjà passée). */
 function openMissedInClients(kind) {
   var map = { absent: 'no_show', client: 'cancelled:client', salon: 'cancelled:salon', unknown: 'cancelled:unknown' };
