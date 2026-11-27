@@ -220,4 +220,5 @@ node tests/caisse/183-borne-nom-puis-prestation.js  # Borne : nom + email (clavi
 node tests/caisse/184-cadeau-coiffeur-libre.js  # Carte cadeau : le client choisit librement son coiffeur (plus bloqué sur celui qui a encaissé)
 node tests/caisse/185-creneau-libere-deplacement-magique.js  # Déplacement magique : le trou libéré (hors grille) est proposé en ligne et accepté sans « Forcer »
 node tests/caisse/186-annulations-origine.js  # RDV annulés : par le client / par le salon / origine inconnue ; absents ; Manque à gagner en 4 lignes
+node tests/caisse/187-creneaux-libres-valeur-reelle.js  # Créneaux libres : chaque trou valorisé par ce qui y rentre (+ supplément seul, + déplacement magique)
 ```

@@ -207,6 +207,7 @@ const suite = [
   ['184-cadeau-coiffeur-libre.js', false, ['exit']],
   ['185-creneau-libere-deplacement-magique.js', false, ['exit']],
   ['186-annulations-origine.js', false, ['exit']],
+  ['187-creneaux-libres-valeur-reelle.js', false, ['exit']],
 ];
 
 let bad = 0;
