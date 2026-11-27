@@ -1686,6 +1686,8 @@
   .bp-badge.green { background: rgba(52,199,89,.16); color: var(--green); }
   .bp-badge.blue { background: rgba(var(--accent-rgb), .16); color: var(--blue); }
   .bp-badge.red { background: rgba(255,59,48,.14); color: var(--red); }
+  .bp-badge.orange { background: rgba(255,149,0,.16); color: var(--orange, #f97316); }
+  .bp-badge.grey { background: var(--fill); color: var(--grey); }
   .bp-main { min-width: 0; }
   .bp-tabbody.fade { animation: bpTabIn .32s cubic-bezier(.22,.8,.3,1) both; }
   @keyframes bpTabIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
@@ -6108,7 +6110,10 @@ function bpHistRender(id) {
     d.done.forEach(function (x) { days[multiDay(x.start_at || x.checkin_at)] = 1; });
     var many = Object.keys(days).length > 1;
     list.innerHTML = d.done.length ? d.done.map(function (x) {
-      var at = x.start_at || x.checkin_at, st = x.status === 'cancelled' ? '<span class="bp-badge red">Absent / annulé</span>' : x.status === 'in_progress' ? '<span class="bp-badge blue">En cours</span>' : '';
+      // Annulé : précis (absent sans prévenir / annulé par le client / par le salon · nom / origine inconnue).
+      var pc = x.status === 'cancelled' ? passageCancelLabel(x) : null;
+      var pcCls = { absent: 'red', client: 'orange', salon: 'blue', unknown: 'grey' }[x.cancel_kind] || 'red';
+      var at = x.start_at || x.checkin_at, st = x.status === 'cancelled' ? '<span class="bp-badge ' + pcCls + '">' + esc(pc ? pc.label.replace(' (pas venu, sans prévenir)', '') : 'Absent / annulé') + '</span>' : x.status === 'in_progress' ? '<span class="bp-badge blue">En cours</span>' : '';
       var what = [x.service_name || ''].concat(x.extra_names || []).filter(Boolean).join(' + ') || 'Prestation';
       var mins = x.start_at && x.end_at ? Math.round((new Date(x.end_at) - new Date(x.start_at)) / 60000) : 0;
       return '<div class="bp-hist-it"><span class="bp-hist-tm">' + (many ? '<small>' + multiDay(at) + '</small>' : '') + hm(at) + '</span>' +
@@ -6172,7 +6177,8 @@ function loadBarberStats(id) {
         return '<div class="st-delta ' + (pc > 0 ? 'up' : 'down') + '">' + (pc > 0 ? '▲ +' : '▼ −') + Math.abs(pc) + ' % vs période préc.</div>';
       };
       var tile = function (v, label, extra, cls) { return '<div class="stat-tile' + (cls ? ' ' + cls : '') + '"><div class="v">' + v + '</div><div class="l">' + label + '</div>' + (extra || '') + '</div>'; };
-      var missed = (r.no_show_count || 0) + (r.cancelled_count || 0);
+      // Même compte que le Manque à gagner (RDV dont l'heure est passée), détaillé par origine en dessous.
+      var missed = a && a.missed_breakdown ? (a.missed_appointments || 0) : (r.no_show_count || 0) + (r.cancelled_count || 0);
       grid.innerHTML =
         tile(r.done_count, 'coupes terminées', delta(r.done_count, pv && pv.done_count)) +
         tile(eur(r.revenue_cents), 'encaissé', delta(r.revenue_cents, pv && pv.revenue_cents)) +
@@ -6185,7 +6191,11 @@ function loadBarberStats(id) {
           tile(r.avg_ticket_cents == null ? '—' : eur(r.avg_ticket_cents), 'panier moyen <span class="st-help">par client</span>', delta(r.avg_ticket_cents, pv && pv.avg_ticket_cents)) +
           tile(r.addon_rate_pct == null ? '—' : r.addon_rate_pct + ' %', 'ventes en plus <span class="st-help">clients avec produit ou supplément</span>', delta(r.addon_rate_pct, pv && pv.addon_rate_pct, 'pt')) +
           tile(r.revenue_per_hour_cents == null ? '—' : eur(r.revenue_per_hour_cents), 'encaissé par heure travaillée', delta(r.revenue_per_hour_cents, pv && pv.revenue_per_hour_cents)) +
-          tile(missed, 'RDV ratés', '<div class="st-delta flat">' + (r.no_show_count || 0) + ' absent' + ((r.no_show_count || 0) > 1 ? 's' : '') + ' · ' + (r.cancelled_count || 0) + ' annulé' + ((r.cancelled_count || 0) > 1 ? 's' : '') + (r.appointments_total ? ' sur ' + r.appointments_total + ' RDV' : '') + '</div>') +
+          tile(missed, 'RDV ratés', '<div class="st-delta flat">' + (a && a.missed_breakdown
+            ? (MISSED_KINDS.filter(function (x) { return a.missed_breakdown[x.k] && a.missed_breakdown[x.k].count; })
+                .map(function (x) { return a.missed_breakdown[x.k].count + ' ' + ({ absent: 'absent', client: 'annulé par le client', salon: 'annulé par le salon', unknown: 'origine inconnue' })[x.k]; }).join(' · ') || 'aucun')
+            : (r.no_show_count || 0) + ' absent · ' + (r.cancelled_count || 0) + ' annulé') +
+            (r.appointments_total ? ' sur ' + r.appointments_total + ' RDV' : '') + '</div>') +
           tile(a.free_slots, 'créneaux libres (≈)') +
           tile(eur(a.potential_revenue_cents), 'manque à gagner' +
             '<br><span style="opacity:.7;font-size:.9em">créneaux libres ' + eur(a.free_revenue_cents || 0) + ' · RDV ratés ' + eur(a.missed_revenue_cents || 0) + '</span>' +
