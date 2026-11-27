@@ -470,12 +470,14 @@ router.get('/salon-stats', requireAdmin, wrap(async (req, res) => {
   const startSql = toSqlUtc(new Date(start)), endSql = toSqlUtc(new Date(end));
   let potential = 0, freeSlots = 0, available = 0, booked = 0, catalogBased = false, freeCents = 0, missedCents = 0, missedCount = 0;
   const perBarber = [];
+  const missedBreakdown = { absent: { count: 0, cents: 0 }, client: { count: 0, cents: 0 }, salon: { count: 0, cents: 0 }, unknown: { count: 0, cents: 0 } };
   for (const b of active) {
     const c = await barberPeriodCore(req.salon.id, b.id, startSql, endSql, start_date, end_date);
     const a = c.availability;
     if (!a || !a.available_minutes) continue;
     potential += a.potential_revenue_cents; freeSlots += a.free_slots; available += a.available_minutes; booked += c.booked_minutes;
     freeCents += a.free_revenue_cents; missedCents += a.missed_revenue_cents; missedCount += a.missed_appointments;
+    Object.keys(missedBreakdown).forEach((k) => { const v = (a.missed_breakdown || {})[k]; if (v) { missedBreakdown[k].count += v.count; missedBreakdown[k].cents += v.cents; } });
     if (a.potential_basis === 'catalog') catalogBased = true;
     perBarber.push({ id: b.id, name: b.name, potential_revenue_cents: a.potential_revenue_cents, occupancy_pct: a.occupancy_pct });
   }
@@ -543,7 +545,7 @@ router.get('/salon-stats', requireAdmin, wrap(async (req, res) => {
     ok: true, series,
     total_cents: sum(series.barber_cents), previous_total_cents: sum(series.previous_cents),
     potential_revenue_cents: potential, free_slots: freeSlots,
-    free_revenue_cents: freeCents, missed_revenue_cents: missedCents, missed_appointments: missedCount,
+    free_revenue_cents: freeCents, missed_revenue_cents: missedCents, missed_appointments: missedCount, missed_breakdown: missedBreakdown,
     occupancy_pct: available > 0 ? Math.round((100 * booked) / available) : 0,
     potential_catalog_based: catalogBased,
     per_barber: perBarber
@@ -723,7 +725,8 @@ async function barberPeriodCore(salonId, barberId, startSql, endSql, start_date,
             (SELECT COALESCE(SUM(COALESCE(bep.price_cents, e.price_cents)), 0) FROM appointment_extras ae JOIN extras e ON e.id = ae.extra_id
                LEFT JOIN barber_extra_prices bep ON bep.extra_id = e.id AND bep.barber_id = a.barber_id WHERE ae.appointment_id = a.id) AS ext_price,
             (SELECT COALESCE(SUM(COALESCE(bep.duration_min, e.duration_min)), 0) FROM appointment_extras ae JOIN extras e ON e.id = ae.extra_id
-               LEFT JOIN barber_extra_prices bep ON bep.extra_id = e.id AND bep.barber_id = a.barber_id WHERE ae.appointment_id = a.id) AS ext_dur
+               LEFT JOIN barber_extra_prices bep ON bep.extra_id = e.id AND bep.barber_id = a.barber_id WHERE ae.appointment_id = a.id) AS ext_dur,
+            a.status AS appt_status, a.cancelled_by
      FROM appointments a JOIN services s ON s.id = a.service_id
      LEFT JOIN barber_service_prices bsp ON bsp.service_id = s.id AND bsp.barber_id = a.barber_id
      LEFT JOIN queue q ON q.id = a.promoted_queue_id
@@ -732,6 +735,14 @@ async function barberPeriodCore(salonId, barberId, startSql, endSql, start_date,
     [salonId, barberId, start_date + ' 00:00:00', end_date + ' 23:59:59', nowLocal]
   );
   const missedCents = lost.reduce((t, x) => t + Number(x.svc_price || 0) + Number(x.ext_price || 0), 0);
+  // Détail des RDV ratés : absent (pas venu, sans prévenir ni annuler), annulé par le client, annulé par le salon,
+  // ou annulé avant le suivi de l'origine (« inconnue » : disparaît avec le temps).
+  const missedBreakdown = { absent: { count: 0, cents: 0 }, client: { count: 0, cents: 0 }, salon: { count: 0, cents: 0 }, unknown: { count: 0, cents: 0 } };
+  lost.forEach((x) => {
+    const k = x.appt_status !== 'cancelled' ? 'absent' : (x.cancelled_by === 'client' || x.cancelled_by === 'salon' ? x.cancelled_by : 'unknown');
+    missedBreakdown[k].count += 1;
+    missedBreakdown[k].cents += Number(x.svc_price || 0) + Number(x.ext_price || 0);
+  });
   const missedMinutes = lost.reduce((t, x) => t + Number(x.svc_dur || 0) + Number(x.ext_dur || 0), 0);
   const freeMinutes = Math.max(0, elapsedMinutes - occupiedMinutes - missedMinutes);
 
@@ -757,6 +768,7 @@ async function barberPeriodCore(salonId, barberId, startSql, endSql, start_date,
     free_revenue_cents: freeCents,          // créneaux libres déjà passés, au prix moyen de ses prestations
     missed_revenue_cents: missedCents,      // RDV annulés / absents, à leur prix réservé
     missed_appointments: lost.length,
+    missed_breakdown: missedBreakdown,      // { absent, client, salon, unknown } : { count, cents }
     potential_revenue_cents: freeCents + missedCents,
     potential_basis: rates.length ? 'catalog' : 'none'
   };

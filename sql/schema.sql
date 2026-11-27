@@ -1577,3 +1577,9 @@ CREATE TABLE IF NOT EXISTS barber_credit_moves (
 SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'barber_credit_moves' AND column_name = 'value_cents');
 SET @sql := IF(@c = 0, 'ALTER TABLE barber_credit_moves ADD COLUMN value_cents INT NULL', 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Origine d'une annulation de RDV : 'client' (lien de l'email / compte client, ou client qui a prévenu le salon)
+-- ou 'salon' (coiffeur / admin). NULL = annulé avant ce suivi (« origine inconnue » dans les statistiques).
+SET @c := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'appointments' AND column_name = 'cancelled_by');
+SET @sql := IF(@c = 0, 'ALTER TABLE appointments ADD COLUMN cancelled_by VARCHAR(10) NULL, ADD COLUMN cancelled_via VARCHAR(10) NULL, ADD COLUMN cancelled_by_name VARCHAR(120) NULL, ADD COLUMN cancelled_at DATETIME NULL', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;

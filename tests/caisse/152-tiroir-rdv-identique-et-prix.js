@@ -6,9 +6,9 @@ const app = rd('public/app.js'), dash = rd('public/dashboard.html'), caisse = rd
 let pass = 0, fail = 0;
 const check = (n, ok, x = '') => { (ok ? pass++ : fail++); console.log((ok ? '  OK   ' : '  ECHEC') + ' ' + n + (x ? '  [' + x + ']' : '')); };
 const fnSrc = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i === -1) throw new Error('introuvable: ' + name); const j = src.indexOf('\nfunction ', i + 10); const k = src.indexOf('\n/**', i + 10); const ends = [j, k].filter((x) => x > -1); return src.slice(i, ends.length ? Math.min.apply(null, ends) : undefined); };
-const ctx = vm.createContext({ CURRENCY: 'EUR' });
+const ctx = vm.createContext({ CURRENCY: 'EUR', esc: (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]) });
 ctx.esc = (v) => String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;');
-vm.runInContext(['eur', 'formatMinutes', 'apptWhenLabel', 'apptBadgeHtml', 'apptPricingHtml', 'apptInfoRowsHtml'].map((n) => fnSrc(app, n)).join('\n'), ctx);
+vm.runInContext(['eur', 'formatMinutes', 'apptWhenLabel', 'apptCancelKind', 'apptStatusLabel', 'apptCancelDetail', 'apptBadgeHtml', 'apptPricingHtml', 'apptInfoRowsHtml'].map((n) => fnSrc(app, n)).join('\n'), ctx);
 const txt = (h) => h.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
 
 console.log('\n[A] Detail du prix');
