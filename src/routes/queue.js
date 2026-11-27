@@ -13,6 +13,7 @@ const { wrap } = require('../lib/wrap');
 const { resolveServiceId } = require('../lib/extrasOnly');
 const { PASSAGE_OF_LINE, saleForPassage, passageCountOfSale } = require('../lib/salePassage');
 const { contactError, isValidEmail, isValidPhone } = require('../lib/contact');
+const clientAccount = require('../lib/clientAccount');
 const { isBlocked, recordFailure, recordSuccess, signupRateLimiter } = require('../middleware/rateLimiter');
 
 const router = express.Router();
@@ -1319,6 +1320,10 @@ router.get('/history', requireAdmin, wrap(async (req, res) => {
   // Annulés : les RDV annulés AVANT d'arriver (jamais passés dans la file) sont ajoutés à la liste, pour voir TOUS les
   // RDV annulés comme dans le Manque à gagner (dont le lien « 10 RDV » ouvre ce filtre, avec past_only=1 : heure passée).
   const withAppts = st === 'cancelled' || st.indexOf('cancelled:') === 0;
+  // Filtre « Compte » : avec / sans compte client (rapprochement par email, sinon téléphone - lib/clientAccount).
+  const accountFilter = ['with', 'without'].includes(req.query.account) ? req.query.account : '';
+  const postFilter = withAppts || !!accountFilter;
+  const accIdx = await clientAccount.loadSalonAccounts(req.salon.id);
   let apptItems = [];
   if (withAppts) {
     const settings = await getSettings(req.salon.id);
@@ -1363,7 +1368,7 @@ router.get('/history', requireAdmin, wrap(async (req, res) => {
      FROM queue q LEFT JOIN services s ON s.id = q.service_id
      WHERE ${whereClause}
      ORDER BY q.checkin_at DESC, q.id DESC LIMIT ? OFFSET ?`,
-    withAppts ? [...params, 5000, 0] : [...params, perPage, offset]
+    postFilter ? [...params, 5000, 0] : [...params, perPage, offset]
   );
 
   const ids = rows.map((r) => r.id);
@@ -1393,18 +1398,25 @@ router.get('/history', requireAdmin, wrap(async (req, res) => {
     cancel_kind: r.status !== 'cancelled' ? null : (Number(r.appt_cancelled) ? (['client', 'salon'].includes(r.appt_cancelled_by) ? r.appt_cancelled_by : 'unknown') : 'absent'),
     cancelled_by_name: r.appt_cancelled_by_name || null
   }));
-  if (withAppts) {
-    // Passages + RDV annulés avant d'arriver, du plus récent au plus ancien, puis la page demandée.
-    items = items.concat(apptItems).sort((x, y) => String(y.checkin_at || '').localeCompare(String(x.checkin_at || '')))
-      .slice(offset, offset + perPage);
+  // Compte client de chaque ligne (pastille dans la liste, filtre « Compte »).
+  items = items.concat(apptItems).map((it) => Object.assign(it, { account_kind: clientAccount.resolve(accIdx, { email: it.email, phone: it.phone, name: it.client_name }).kind }));
+  let filteredTotal = null;
+  if (postFilter) {
+    if (accountFilter === 'with') items = items.filter((it) => it.account_kind === 'account' || it.account_kind === 'relative');
+    if (accountFilter === 'without') items = items.filter((it) => it.account_kind === 'none' || it.account_kind === 'unknown');
+    // Passages (+ RDV annulés avant d'arriver), du plus récent au plus ancien, puis la page demandée.
+    items.sort((x, y) => String(y.checkin_at || '').localeCompare(String(x.checkin_at || '')));
+    filteredTotal = items.length;
+    items = items.slice(offset, offset + perPage);
   }
+  const shownTotal = filteredTotal == null ? total : filteredTotal;
   res.json({
     ok: true,
     items,
-    total,
+    total: shownTotal,
     page,
     per_page: perPage,
-    total_pages: Math.max(1, Math.ceil(total / perPage))
+    total_pages: Math.max(1, Math.ceil(shownTotal / perPage))
   });
 }));
 
@@ -1535,6 +1547,15 @@ router.get('/:id/client-history', requireAdminOrBarber, wrap(async (req, res) =>
  * utilise pour un RDV pas encore promu en file (RDV futur), qui n'a
  * donc pas encore d'entree de file existante a interroger.
  */
+/**
+ * Le client du tiroir a-t-il un compte client dans ce salon ? (par email, sinon téléphone ; proche d'un compte ;
+ * « unknown » sans email ni téléphone) - voir lib/clientAccount.
+ */
+router.get('/client-account', requireAdminOrBarber, wrap(async (req, res) => {
+  const r = await clientAccount.accountForContact(req.salon.id, { email: req.query.email, phone: req.query.phone, name: req.query.name });
+  res.json(Object.assign({ ok: true }, r));
+}));
+
 router.get('/client-history-by-contact', requireAdminOrBarber, wrap(async (req, res) => {
   const key = clientKey({ email: req.query.email, phone: req.query.phone, client_name: req.query.name });
   if (!key) return res.json({ ok: true, items: [] });

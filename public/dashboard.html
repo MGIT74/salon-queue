@@ -56,7 +56,7 @@
 .cal-day.salon-closed::after{content:'Fermé';display:block;font-size:10px;font-weight:700;color:var(--red,#e65c5c);margin-top:2px}
 .salon-closure-banner{padding:10px 13px;border-radius:9px;margin:0 0 12px;background:rgba(160,100,100,.13);color:var(--red,#e65c5c);font-weight:650;font-size:13px}
 </style>
-<link rel="stylesheet" href="/app.css?v=61">
+<link rel="stylesheet" href="/app.css?v=62">
 <style>
   .wrap { max-width: none; margin: 0; padding: clamp(16px,1.8vw,28px); }
 
@@ -2676,6 +2676,13 @@
       <div class="fld" style="margin:0"><label for="client-filter-barber">Coiffeur</label>
         <select id="client-filter-barber" onchange="applyClientFilters()" style="min-width:180px"><option value="">Tous</option></select>
       </div>
+      <div class="fld" style="margin:0"><label for="client-filter-account">Compte</label>
+        <select id="client-filter-account" onchange="applyClientFilters()">
+          <option value="">Tous</option>
+          <option value="with">Avec compte</option>
+          <option value="without">Sans compte</option>
+        </select>
+      </div>
       <div class="fld" style="margin:0"><label for="client-date-from">Du</label><input id="client-date-from" type="date" data-range-to="client-date-to" onchange="applyClientDateFilter()"></div>
       <div class="fld" style="margin:0"><label for="client-date-to">Au</label><input id="client-date-to" type="date" onchange="applyClientDateFilter()"></div>
       <button class="btn btn-ghost" onclick="clearClientDateFilter()">Réinitialiser</button>
@@ -3271,6 +3278,7 @@
       <h2 id="drawer-client-name">—</h2>
       <button class="x" onclick="closeClientDrawer()">✕</button>
     </div>
+    <div id="drawer-account" class="acct-line"></div>
     <div id="drawer-badge"></div>
     <button class="link-btn-edit" id="drawer-edit-btn" title="Modifier ce client" onclick="toggleEditClientInfo()" style="display:flex;align-items:center;gap:6px;background:none;border:none;color:var(--blue);font-family:inherit;font-size:13.5px;font-weight:500;cursor:pointer;padding:0;margin:-10px 0 16px">
       <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
@@ -3315,7 +3323,7 @@
   </div>
 </div>
 
-<script src="/app.js?v=73"></script>
+<script src="/app.js?v=74"></script>
 <script src="/autorefresh.js?v=3"></script>
 <script src="/staff-group.js?v=7"></script>
 <script src="/daterange.js?v=4"></script>
@@ -4559,6 +4567,7 @@ function openClientDrawer(id, source, directData) {
   document.getElementById('drawer-info-section').style.display = 'block';
   document.getElementById('drawer-edit-btn').style.display = (drawerQueueId || (source === 'appointment' && c.status === 'confirmed')) ? 'flex' : 'none';
   document.getElementById('drawer-client-name').textContent = c.client_name;
+  loadClientAccount('drawer-account', c, api);   // compte client ou non
   document.getElementById('drawer-note').value = c.note || '';
 
   // Déplacer/Annuler un RDV : uniquement pour une entrée de type RDV
@@ -10242,6 +10251,8 @@ function loadClients() {
   var stEl = document.getElementById('client-filter-status'), bEl = document.getElementById('client-filter-barber');
   if (stEl && stEl.value) params += '&status=' + encodeURIComponent(stEl.value);
   if (bEl && bEl.value) params += '&barber_id=' + encodeURIComponent(bEl.value);
+  var acEl = document.getElementById('client-filter-account');
+  if (acEl && acEl.value) params += '&account=' + encodeURIComponent(acEl.value);
   if (clientsPastOnly) params += '&past_only=1';
   fillClientBarberFilter();
   return api('/api/queue/history?' + params).then(function (r) {
@@ -10286,6 +10297,7 @@ function clearClientDateFilter() {
   clientsPastOnly = false;
   document.getElementById('client-filter-status').value = '';
   document.getElementById('client-filter-barber').value = '';
+  document.getElementById('client-filter-account').value = '';
   document.getElementById('client-date-from').value = '';
   document.getElementById('client-date-to').value = '';
   clientsDateFrom = '';
@@ -10495,6 +10507,7 @@ function renderClients() {
           : ck === 'unknown' ? 'Annulé · origine inconnue' : (STATUS_LABEL[c.status] || c.status);
         var stColor = ck === 'client' ? 'var(--orange, #f97316)' : ck === 'salon' ? 'var(--blue)' : ck === 'unknown' ? 'var(--grey)' : (STATUS_COLOR[c.status] || 'var(--grey)');
         var nameCell = '<b>' + esc(c.client_name) + '</b>' +
+          (c.account_kind === 'account' || c.account_kind === 'relative' ? '<span class="acct-mini" title="' + (c.account_kind === 'relative' ? 'Proche d\'un compte client' : 'Compte client') + '">Compte</span>' : '') +
           ' <span style="margin-left:6px;font-size:12.5px;font-weight:500;color:' + stColor + '">' +
           '<span class="status-dot" style="background:' + stColor + '"></span>' +
           esc(stLabel) + '</span>' +

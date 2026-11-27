@@ -875,6 +875,34 @@ function apptCancelDetail(a) {
   if (k === 'salon') return 'Annulé par ' + (a.cancelled_by_name || 'le salon') + when + '. Le client a reçu l\'email d\'annulation s\'il a une adresse.';
   return 'Annulé avant le suivi des annulations : on ne sait pas qui a annulé.';
 }
+/** Compte client du tiroir : pastille (compte / proche / sans compte / pas de coordonnées) + une ligne de détail. */
+function clientAccountHtml(r) {
+  if (!r || !r.kind) return '';
+  var icon = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg>';
+  var d = r.created_at ? new Date(r.created_at) : null;
+  var since = d && !isNaN(d) ? 'Compte créé le ' + d.toLocaleDateString('fr-FR') : 'Compte client';
+  var map = {
+    account: { cls: 'acct-yes', label: 'Compte client', detail: since + (r.email_verified ? ' · email vérifié' : ' · email non vérifié') },
+    relative: { cls: 'acct-rel', label: 'Proche de ' + (r.holder_name || 'un client') + ' · compte client', detail: 'Réservé depuis le compte de ' + (r.holder_name || 'ce client') + ' (enfant / proche).' },
+    none: { cls: 'acct-no', label: 'Sans compte', detail: 'Aucun compte avec cet email ni ce téléphone.' },
+    unknown: { cls: 'acct-no', label: 'Sans compte · pas d\'email', detail: 'Ni email ni téléphone : impossible de savoir s\'il a un compte.' }
+  };
+  var m = map[r.kind];
+  if (!m) return '';
+  return '<span class="acct-pill ' + m.cls + '">' + icon + esc(m.label) + '</span><div class="acct-detail">' + esc(m.detail) + '</div>';
+}
+/** Remplit la ligne « compte client » d'un tiroir (apiFn : api ou barberApi). */
+function loadClientAccount(elId, c, apiFn) {
+  var el = document.getElementById(elId);
+  if (!el) return;
+  el.innerHTML = '';
+  var token = (c.email || '') + '|' + (c.phone || '') + '|' + (c.client_name || '');
+  el.setAttribute('data-for', token);
+  apiFn('/api/queue/client-account?email=' + encodeURIComponent(c.email || '') + '&phone=' + encodeURIComponent(c.phone || '') + '&name=' + encodeURIComponent(c.client_name || ''))
+    .then(function (r) { if (el.getAttribute('data-for') === token) el.innerHTML = clientAccountHtml(r); })
+    .catch(function () {});
+}
+
 /** Passage annulé (historique des passages, liste Clients) : libellé précis + couleur, sinon null. */
 function passageCancelLabel(v) {
   var k = v && v.cancel_kind;

@@ -948,3 +948,18 @@ body .tfx > button { transition: color .25s ease, transform .1s ease; }
 :root[data-theme="dark"] .ad-badge.ad-cancel-client { color: #ffb340; }
 :root[data-theme="dark"] .ad-badge.ad-cancel-salon { color: #64aaff; }
 .ad-cancel-detail { margin-top: 6px; font-size: 12.5px; line-height: 1.45; color: var(--grey); white-space: normal; }
+
+/* Compte client dans les tiroirs : pastille + une ligne de détail. */
+.acct-line { margin: -6px 0 14px; }
+.acct-line:empty { display: none; }
+.acct-pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; padding: 5px 11px 5px 9px; border-radius: 99px; }
+.acct-pill.acct-yes { background: rgba(52,199,89,.16); color: #1e7e34; }
+.acct-pill.acct-rel { background: rgba(10,132,255,.14); color: #0062c4; }
+.acct-pill.acct-no { background: var(--fill); color: var(--grey); }
+.acct-detail { margin-top: 5px; font-size: 12.5px; line-height: 1.45; color: var(--grey); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .acct-pill.acct-yes { color: #30d158; } :root:not([data-theme="light"]) .acct-pill.acct-rel { color: #64aaff; } }
+:root[data-theme="dark"] .acct-pill.acct-yes { color: #30d158; }
+:root[data-theme="dark"] .acct-pill.acct-rel { color: #64aaff; }
+.acct-mini { display: inline-block; margin-left: 6px; font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 99px; background: rgba(52,199,89,.16); color: #1e7e34; vertical-align: 1px; }
+:root[data-theme="dark"] .acct-mini { color: #30d158; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .acct-mini { color: #30d158; } }

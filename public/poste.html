@@ -98,7 +98,7 @@
 .cal-day.salon-closed::after{content:'Fermé';display:block;font-size:10px;font-weight:700;color:var(--red,#e65c5c);margin-top:2px}
 .salon-closure-banner{padding:10px 13px;border-radius:9px;margin:0 0 12px;background:rgba(160,100,100,.13);color:var(--red,#e65c5c);font-weight:650;font-size:13px}
 </style>
-<link rel="stylesheet" href="/app.css?v=61">
+<link rel="stylesheet" href="/app.css?v=62">
 <style>
   html, body { min-height: 100%; }
   .wrap { max-width: 480px; margin: 0 auto; padding: 20px 18px 40px; }
@@ -819,6 +819,7 @@
       <h2 id="ad-name">—</h2>
       <button class="x" onclick="closeApptDrawer()">✕</button>
     </div>
+    <div id="ad-account" class="acct-line"></div>
     <div id="ad-badge"></div>
     <button class="ad-link-edit" id="ad-edit-btn" style="display:none" onclick="adToggleEdit()">
       <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
@@ -907,7 +908,7 @@
   </button>
 </div>
 
-<script src="/app.js?v=73"></script>
+<script src="/app.js?v=74"></script>
 <script src="/queue-sim.js?v=1"></script>
 <script src="/autorefresh.js?v=3"></script>
 <script src="/staff-group.js?v=7"></script>
@@ -3430,6 +3431,7 @@ function adRenderVisits(items) {
 
 /** Charge fidélité/cadeaux + historique des passages du client du tiroir (comme dans le dashboard). */
 function adLoadDetails(a, queueId) {
+  loadClientAccount('ad-account', a, barberApi);   // compte client ou non
   var token = a.id;
   document.getElementById('ad-marketing-section').style.display = 'none';
   document.getElementById('ad-visit-count').textContent = '';
