@@ -4080,14 +4080,14 @@ function loadDashSalon() {
       cd.className = 'st-delta ' + (cp > 0 ? 'up' : cp < 0 ? 'down' : 'flat');
       cd.textContent = cp ? (cp > 0 ? '▲ +' : '▼ −') + Math.abs(cp) + ' % vs période préc.' : '= période préc.';
     }
-    // Manque à gagner global : temps libre de tous les coiffeurs actifs x leur prix moyen à la minute.
+    // Manque à gagner global : chaque trou libre (déjà passé) valorisé par ce qui pouvait y entrer, + RDV ratés.
     document.getElementById('dash-missed-total').textContent = eur(r.potential_revenue_cents);
     // Detail : creneaux libres deja passes + RDV annules / absents (a leur prix reserve).
     var nMiss = r.missed_appointments || 0;
     document.getElementById('dash-missed-detail').innerHTML =
       '<div><span>Créneaux libres</span><b>' + eur(r.free_revenue_cents || 0) + '</b></div>' +
       missedBreakdownHtml(r.missed_breakdown, nMiss, r.missed_revenue_cents) +
-      '<small>Temps déjà passé seulement, au prix moyen des prestations de chaque coiffeur.' +
+      '<small>Temps déjà passé seulement. Chaque trou compte pour ce qui pouvait vraiment y entrer (prestations, un supplément seul), déplacement magique de 5 min compris.' +
       (r.missed_breakdown && r.missed_breakdown.unknown && r.missed_breakdown.unknown.count ? ' « Origine inconnue » : RDV annulés avant le suivi, la ligne disparaît d\'elle-même avec le temps.' : '') + '</small>';
   }).catch(function (e) { toast(e.message, true); });
 }

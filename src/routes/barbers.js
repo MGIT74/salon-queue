@@ -1,4 +1,5 @@
 const express = require('express');
+const { bestFillTable, dayFreeValue } = require('../lib/freeGapValue');
 const { serviceNameSql } = require('../lib/extrasOnly');
 const crypto = require('crypto');
 const { pool, getSettings, parisLocalToUtcDate } = require('../db');
@@ -689,7 +690,7 @@ async function barberPeriodCore(salonId, barberId, startSql, endSql, start_date,
   // Créneaux libres : heures de travail prévues ÉCOULÉES (rien après maintenant ; ni congés, ni fermetures du salon,
   // ni pauses) moins le temps occupé, compté avec la durée PRÉVUE des prestations réalisées (pas le chrono, qui peut
   // être arrêté trop tôt) et moins le temps des RDV ratés (comptés à part, à leur vrai prix, jamais deux fois).
-  // Valorisés au prix moyen à la minute des prestations du coiffeur (ses tarifs et durées à lui).
+  // Valorisés par ce qui aurait vraiment pu entrer dans chaque trou (voir plus bas et lib/freeGapValue).
   const tz = settings.timezone || 'Europe/Paris';
   const np = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date());
   const gp = (t) => np.find((x) => x.type === t).value;
@@ -726,7 +727,7 @@ async function barberPeriodCore(salonId, barberId, startSql, endSql, start_date,
                LEFT JOIN barber_extra_prices bep ON bep.extra_id = e.id AND bep.barber_id = a.barber_id WHERE ae.appointment_id = a.id) AS ext_price,
             (SELECT COALESCE(SUM(COALESCE(bep.duration_min, e.duration_min)), 0) FROM appointment_extras ae JOIN extras e ON e.id = ae.extra_id
                LEFT JOIN barber_extra_prices bep ON bep.extra_id = e.id AND bep.barber_id = a.barber_id WHERE ae.appointment_id = a.id) AS ext_dur,
-            a.status AS appt_status, a.cancelled_by
+            a.status AS appt_status, a.cancelled_by, a.scheduled_at
      FROM appointments a JOIN services s ON s.id = a.service_id
      LEFT JOIN barber_service_prices bsp ON bsp.service_id = s.id AND bsp.barber_id = a.barber_id
      LEFT JOIN queue q ON q.id = a.promoted_queue_id
@@ -744,8 +745,11 @@ async function barberPeriodCore(salonId, barberId, startSql, endSql, start_date,
     missedBreakdown[k].cents += Number(x.svc_price || 0) + Number(x.ext_price || 0);
   });
   const missedMinutes = lost.reduce((t, x) => t + Number(x.svc_dur || 0) + Number(x.ext_dur || 0), 0);
-  const freeMinutes = Math.max(0, elapsedMinutes - occupiedMinutes - missedMinutes);
-
+  // ---- Créneaux libres : les VRAIS trous de la journée, valorisés par ce qui aurait pu y entrer ----
+  // Chaque trou (entre deux clients, ou contre le début / la fin de journée ou une pause), sur le temps déjà passé,
+  // est rempli avec la meilleure combinaison des prestations ET des suppléments seuls du coiffeur (ses prix, ses
+  // durées) ; le « déplacement magique » (un RDV avancé / reculé de 5 min) peut faire passer 5 min d'un trou à
+  // l'autre. Les RDV ratés bloquent leur plage (comptés à part, à leur vrai prix, jamais deux fois). Voir lib/freeGapValue.
   const [svc] = await pool.query(
     `SELECT COALESCE(p.price_cents, s.price_cents) AS price_cents, COALESCE(p.duration_min, s.duration_min) AS duration_min
      FROM services s
@@ -754,9 +758,67 @@ async function barberPeriodCore(salonId, barberId, startSql, endSql, start_date,
        AND s.id NOT IN (SELECT service_id FROM barber_service_exclusions WHERE barber_id = ?)`,
     [barberId, salonId, barberId]
   );
+  const [ext] = await pool.query(
+    `SELECT COALESCE(p.price_cents, e.price_cents) AS price_cents, COALESCE(p.duration_min, e.duration_min) AS duration_min
+     FROM extras e
+     LEFT JOIN barber_extra_prices p ON p.extra_id = e.id AND p.barber_id = ?
+     WHERE e.salon_id = ? AND e.active = 1 AND e.deleted_at IS NULL
+       AND e.id NOT IN (SELECT extra_id FROM barber_extra_exclusions WHERE barber_id = ?)`,
+    [barberId, salonId, barberId]
+  );
+  const sellable = svc.map((x) => ({ kind: 'service', price_cents: Number(x.price_cents) || 0, duration_min: Number(x.duration_min) || 0 }))
+    .concat(ext.map((x) => ({ kind: 'extra', price_cents: Number(x.price_cents) || 0, duration_min: Number(x.duration_min) || 0 })));
   const rates = svc.filter((x) => Number(x.duration_min) > 0 && Number(x.price_cents) > 0).map((x) => Number(x.price_cents) / Number(x.duration_min));
-  const avgRevenuePerMinute = rates.length ? rates.reduce((x, y) => x + y, 0) / rates.length : 0;
-  const freeCents = Math.round(freeMinutes * avgRevenuePerMinute);
+  const fillTable = bestFillTable(sellable, 16 * 60);
+
+  // Heure locale du salon d'un instant UTC (queue.start_at) : { date, min }.
+  const localFmt = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+  const toLocal = (utc) => {
+    const ps = localFmt.formatToParts(new Date(String(utc).replace(' ', 'T') + (String(utc).endsWith('Z') ? '' : 'Z')));
+    const g = (t) => ps.find((x) => x.type === t).value;
+    return { date: g('year') + '-' + g('month') + '-' + g('day'), min: Number(g('hour')) * 60 + Number(g('minute')) };
+  };
+  const busyByDay = {};
+  const addBusy = (date, start, dur, nudgeable) => { if (dur > 0) (busyByDay[date] = busyByDay[date] || []).push({ start, end: start + dur, nudgeable }); };
+  // Clients pris en charge : heure réelle de début, durée PRÉVUE (comme pour le temps occupé).
+  const [served] = await pool.query(
+    `SELECT start_at, is_appointment, COALESCE(NULLIF(total_duration_min, 0), TIMESTAMPDIFF(MINUTE, start_at, end_at), 0) AS dur
+     FROM queue WHERE barber_id = ? AND salon_id = ? AND start_at IS NOT NULL
+       AND (status = 'in_progress' OR (status = 'done' AND NOT (auto_unstarted = 1 AND paid_at IS NULL AND prepaid_at IS NULL)))
+       AND start_at >= ? AND start_at < ?`, [barberId, salonId, startSql, endSql]);
+  served.forEach((q) => { const l = toLocal(q.start_at); addBusy(l.date, l.min, Number(q.dur), Boolean(q.is_appointment)); });
+  // RDV ratés (plage bloquée, valeur comptée à part) et RDV dont l'heure est passée mais pas encore commencés.
+  lost.forEach((x) => { const hm = String(x.scheduled_at).slice(11, 16); addBusy(String(x.scheduled_at).slice(0, 10), timeToMin(hm), Number(x.svc_dur || 0) + Number(x.ext_dur || 0), false); });
+  const [pending] = await pool.query(
+    `SELECT a.scheduled_at, COALESCE(bsp.duration_min, s.duration_min) AS svc_dur,
+            (SELECT COALESCE(SUM(COALESCE(bep.duration_min, e.duration_min)), 0) FROM appointment_extras ae JOIN extras e ON e.id = ae.extra_id
+               LEFT JOIN barber_extra_prices bep ON bep.extra_id = e.id AND bep.barber_id = a.barber_id WHERE ae.appointment_id = a.id) AS ext_dur
+     FROM appointments a JOIN services s ON s.id = a.service_id
+     LEFT JOIN barber_service_prices bsp ON bsp.service_id = s.id AND bsp.barber_id = a.barber_id
+     LEFT JOIN queue q ON q.id = a.promoted_queue_id
+     WHERE a.salon_id = ? AND a.barber_id = ? AND a.status = 'confirmed' AND a.scheduled_at >= ? AND a.scheduled_at <= ?
+       AND (q.id IS NULL OR q.status = 'waiting')`,
+    [salonId, barberId, start_date + ' 00:00:00', nowLocal]);
+  pending.forEach((x) => { const hm = String(x.scheduled_at).slice(11, 16); addBusy(String(x.scheduled_at).slice(0, 10), timeToMin(hm), Number(x.svc_dur || 0) + Number(x.ext_dur || 0), true); });
+
+  let freeMinutes = 0, freeCents = 0;
+  for (const day = new Date(start_date + 'T00:00:00Z'); day <= endD; day.setUTCDate(day.getUTCDate() + 1)) {
+    const dateStr = day.toISOString().slice(0, 10);
+    if (dateStr > nowDate) break;
+    const sched = schedByDay[day.getUTCDay()];
+    if (!sched || isOnLeave(dateStr) || closureRanges.some((c) => dateStr >= c.start && dateStr <= c.end)) continue;
+    const ds = timeToMin(sched.start_time);
+    const de = dateStr === nowDate ? Math.min(timeToMin(sched.end_time), nowMin) : timeToMin(sched.end_time);
+    if (de <= ds) continue;
+    // Plages de travail du jour, coupées par les pauses.
+    let windows = [[ds, de]];
+    (breaksByDay[day.getUTCDay()] || []).forEach((x) => {
+      const bs = timeToMin(x.start_time), be = timeToMin(x.end_time);
+      windows = [].concat(...windows.map(([a, b]) => (be <= a || bs >= b ? [[a, b]] : [[a, Math.min(b, bs)], [Math.max(a, be), b]].filter(([p, q]) => q > p))));
+    });
+    const v = dayFreeValue(windows, busyByDay[dateStr] || [], fillTable);
+    freeMinutes += v.minutes; freeCents += v.cents;
+  }
 
   core.availability = {
     available_minutes: availableMinutes,
@@ -770,7 +832,7 @@ async function barberPeriodCore(salonId, barberId, startSql, endSql, start_date,
     missed_appointments: lost.length,
     missed_breakdown: missedBreakdown,      // { absent, client, salon, unknown } : { count, cents }
     potential_revenue_cents: freeCents + missedCents,
-    potential_basis: rates.length ? 'catalog' : 'none'
+    potential_basis: rates.length || sellable.some((x) => x.duration_min > 0 && x.price_cents > 0) ? 'catalog' : 'none'
   };
   // Productivité : encaissé (prestations + produits) par heure de travail PRÉVUE - compare justement temps plein et mi-temps.
   core.revenue_per_hour_cents = availableMinutes > 0 ? Math.round((totalCents * 60) / availableMinutes) : null;

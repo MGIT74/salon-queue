@@ -1,6 +1,6 @@
 // Manque à gagner (fiche coiffeur + tableau de bord) = créneaux libres DÉJÀ PASSÉS + RDV annulés / absents.
 //  - créneaux libres : heures prévues écoulées (sans congés, fermetures, pauses) - durée PRÉVUE des prestations
-//    réalisées (pas le chrono) - temps des RDV ratés, au prix moyen à la minute des prestations du coiffeur ;
+//    réalisées (pas le chrono) - temps des RDV ratés ; chaque trou valorisé par ce qui y rentre (voir test 187) ;
 //  - RDV annulés / absents dont l'heure est passée : à leur prix réservé (prestation + suppléments, tarif du coiffeur) ;
 //  - rien n'est compté après l'heure actuelle.
 const { execSync } = require('child_process');
@@ -54,8 +54,10 @@ const day = (n) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10
   check('RDV annulé à venir : pas compté', a.missed_appointments === 0 && a.potential_revenue_cents === 0, a);
 
   sql("INSERT INTO barber_service_exclusions (barber_id, service_id) VALUES ('b1','sv1')");
+  sql("INSERT IGNORE INTO barber_extra_exclusions (barber_id, extra_id) SELECT 'b1', id FROM extras WHERE salon_id='s1'");
   a = await stats(P);
-  check('aucune prestation proposée : créneaux libres non chiffrés, RDV ratés toujours comptés', a.free_revenue_cents === 0 && a.missed_revenue_cents === 5000 && a.potential_basis === 'none', a);
+  sql("DELETE FROM barber_extra_exclusions WHERE barber_id='b1'");
+  check('rien à vendre (ni prestation ni supplément) : créneaux libres non chiffrés, RDV ratés toujours comptés', a.free_revenue_cents === 0 && a.missed_revenue_cents === 5000 && a.potential_basis === 'none', a);
 
   // Tableau de bord : total + détail.
   const s = await fetch(BASE + '/api/barbers/salon-stats?start=' + P + 'T00:00:00Z&end=' + P + 'T23:59:59Z&start_date=' + P + '&end_date=' + P, { headers: ADMIN }).then((r) => r.json());
