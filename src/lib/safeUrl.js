@@ -41,4 +41,17 @@ function safeBaseUrl(req, raw) {
   return u.protocol + '//' + u.host + path;
 }
 
-module.exports = { safeBaseUrl, isAllowedHost };
+/**
+ * Lien vers le compte client du salon, pour les emails (fidélité, cadeau). Domaine officiel uniquement (jamais un
+ * Host forgé). signup : ouvre l'inscription ; email : pré-rempli dans le formulaire.
+ */
+function compteLink(req, opts) {
+  opts = opts || {};
+  const slug = (req && req.salon && req.salon.slug) || '';
+  let url = fallbackOrigin(req) + '/compte.html?salon=' + encodeURIComponent(slug);
+  if (opts.signup) url += '&signup=1';
+  if (opts.email) url += '&email=' + encodeURIComponent(String(opts.email).trim());
+  return url;
+}
+
+module.exports = { safeBaseUrl, isAllowedHost, compteLink };

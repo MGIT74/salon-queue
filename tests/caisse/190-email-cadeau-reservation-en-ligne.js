@@ -34,7 +34,7 @@ const KEYS = ['smtp_host', 'salon_name'];
   }
   const sales = fs.readFileSync(path.join(__dirname, '../../src/routes/sales.js'), 'utf8');
   const owner = fs.readFileSync(path.join(__dirname, '../../src/routes/owner.js'), 'utf8');
-  const link = "accountUrl: 'https://' + req.get('host') + '/compte.html?salon=' + encodeURIComponent(req.salon.slug || '')";
+  const link = "accountUrl: compteLink(req, { email: gift.recipient_email })";
   check('vente en caisse : lien du compte transmis', sales.includes(link));
   check('renvoi du cadeau (admin) : lien du compte transmis', owner.includes(link));
   await pool.end();

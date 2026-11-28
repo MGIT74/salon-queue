@@ -8,6 +8,7 @@ const requireAdminOrBarber = require('../middleware/barberAuth');
 const { hashPassword, verifyPassword } = require('../lib/password');
 const { sendLoyaltyActivation, sendGiftConfirmation, sendClientSecurityNotice, sendAdminEmailVerification } = require('../lib/mailer');
 const { clientKey } = require('../lib/queueMath');
+const { compteLink } = require('../lib/safeUrl');
 const { isValidEmail, isValidPhone } = require('../lib/contact');
 const { logActivity } = require('../lib/activityLog');
 const { wrap } = require('../lib/wrap');
@@ -490,7 +491,7 @@ router.post('/gift-cards/:id/resend', requireAdmin, wrap(async (req, res) => {
       amountEur: (gift.amount_cents / 100).toFixed(2).replace('.', ',') + ' €',
       items: giftItems,
       code: gift.code,
-      accountUrl: 'https://' + req.get('host') + '/compte.html?salon=' + encodeURIComponent(req.salon.slug || '')
+      accountUrl: compteLink(req, { email: gift.recipient_email })
     });
   } catch (err) {
     return res.status(502).json({ error: "Échec de l'envoi — vérifiez la configuration SMTP du salon (Réglages)." });
@@ -668,7 +669,12 @@ router.post('/loyalty-accounts/activate', requireAdminOrBarber, wrap(async (req,
   logActivity(req.salon.id, 'loyalty_activate', 'Carte(s) de fidélité activée(s) pour ' + clientName + ' : ' + activated.map((c) => c.name).join(', '));
 
   try {
-    await sendLoyaltyActivation(req.salon.id, email, { clientName, cards: activated.map((c) => ({ name: c.name, rule: LC.ruleText(c) })) });
+    // Le client a-t-il déjà un compte client avec cet email ? -> « Voir ma carte » ; sinon « Créer mon compte ».
+    const [[acct]] = await pool.query('SELECT id FROM clients WHERE salon_id = ? AND LOWER(TRIM(email)) = ? LIMIT 1', [req.salon.id, email.toLowerCase()]);
+    await sendLoyaltyActivation(req.salon.id, email, {
+      clientName, cards: activated.map((c) => ({ name: c.name, rule: LC.ruleText(c) })),
+      hasAccount: Boolean(acct), accountUrl: compteLink(req, { signup: !acct, email })
+    });
   } catch (err) {
     console.error('[fidélité] envoi email d\'activation échoué:', err.message);
   }

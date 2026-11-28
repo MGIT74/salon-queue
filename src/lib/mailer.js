@@ -143,22 +143,38 @@ function loyaltyRuleText(info) {
 async function sendLoyaltyActivation(salonId, to, info) {
   const { tx, from, salon } = await getTransport(salonId, { force: true });
   // Plusieurs cartes : info.cards = [{ name, rule }] (une ligne par carte activée) ; sinon l'ancienne règle à deux paliers.
+  // Les règles (paliers) sont relues sur la carte au moment de l'envoi : un palier ajouté par l'admin y figure d'office.
   const cards = Array.isArray(info.cards) && info.cards.length ? info.cards : null;
   const title = cards && cards.length > 1 ? 'Vos cartes de fidélité sont activées' : 'Votre carte de fidélité est activée';
   const intro = cards
     ? (cards.length > 1 ? `Vos cartes de fidélité chez ${salon} viennent d'être activées !` : `Votre ${cards[0].name} chez ${salon} vient d'être activée !`)
     : `Votre carte de fidélité chez ${salon} vient d'être activée !`;
   const rules = cards ? cards.map((c) => `${c.name} : ${c.rule}`) : [loyaltyRuleText(info)];
+  const plural = cards && cards.length > 1;
+  // Suivre ses points : la carte est liée à CET email ; le compte client du salon montre points et récompenses.
+  // Déjà un compte avec cet email -> « Voir ma carte » (connexion) ; sinon -> « Créer mon compte » (inscription).
+  const url = info.accountUrl || '';
+  const linked = `${plural ? 'Vos cartes sont liées' : 'Votre carte est liée'} à cette adresse email (${to}).`;
+  const follow = info.hasAccount
+    ? `Dans votre compte client, vous voyez vos points, vos récompenses disponibles, et vous pouvez réserver en ligne.`
+    : `Créez votre compte client avec cette même adresse email : vous y verrez vos points, vos récompenses disponibles, et vous pourrez réserver en ligne.`;
+  const btn = info.hasAccount ? (plural ? 'Voir mes cartes de fidélité' : 'Voir ma carte de fidélité') : 'Créer mon compte';
+  const rewards = `Dès qu'un palier est atteint, la récompense vous est proposée à l'encaissement au salon, à partir de votre passage suivant.`;
   await tx.sendMail({
     from,
     to,
     subject: title + ' — ' + salon,
     text: `Bonjour ${info.clientName},\n\n${intro}\n\n` +
-          `À chaque passage réglé, vous gagnez 1 point.\n${rules.join('\n')}\n\n${salon}`,
+          `À chaque passage réglé, vous gagnez 1 point.\n${rules.join('\n')}\n\n` +
+          `Suivre vos points\n${linked} ${follow}` + (url ? `\n${btn} : ${url}` : '') + `\n\n` +
+          `Vos récompenses\n${rewards}\n\n${salon}`,
     html: `<p>Bonjour ${h(info.clientName)},</p>` +
           `<p>${h(intro)}</p>` +
           `<p>À chaque passage réglé, vous gagnez 1 point.</p>` +
           (rules.length > 1 ? '<ul>' + rules.map((r) => `<li>${h(r)}</li>`).join('') + '</ul>' : `<p>${h(rules[0])}</p>`) +
+          `<p><strong>Suivre vos points</strong><br>${h(linked)} ${h(follow)}</p>` +
+          (url ? `<p><a href="${h(url)}" style="display:inline-block;background:#111;color:#fff;text-decoration:none;padding:10px 18px;border-radius:8px;font-weight:600">${h(btn)}</a></p>` : '') +
+          `<p><strong>Vos récompenses</strong><br>${h(rewards)}</p>` +
           `<p>${h(salon)}</p>`
   });
 }

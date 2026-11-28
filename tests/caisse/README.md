@@ -224,4 +224,5 @@ node tests/caisse/187-creneaux-libres-valeur-reelle.js  # Créneaux libres : cha
 node tests/caisse/188-tiroir-compte-client.js  # Tiroirs : compte client / proche / sans compte / pas de coordonnées ; filtre « Compte » des Clients
 node tests/caisse/189-ticket-code-carte-cadeau.js  # Carte cadeau vendue : code imprimé après le ticket (coupe, code en grand) ; vente normale inchangée
 node tests/caisse/190-email-cadeau-reservation-en-ligne.js  # Email « Votre cadeau » : réservation en ligne (compte -> Mes cadeaux, ou code) + bouton, et au salon
+node tests/caisse/191-email-fidelite-compte.js  # Email d'activation fidélité : carte liée à l'email, bouton Voir ma carte / Créer mon compte (email pré-rempli), récompenses
 ```

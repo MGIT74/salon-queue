@@ -2656,6 +2656,13 @@ function guardMissingSalon() {
   // page.
   // Venu de la prise de RDV avec « Créer un compte » : directement le formulaire d'inscription.
   show(params.get('signup') === '1' ? 'p-signup' : 'p-login');
+  // Venu d'un email (fidélité, cadeau) : l'adresse liée à la carte est pré-remplie, puis retirée de l'adresse de la page.
+  var mailParam = (params.get('email') || '').trim();
+  if (mailParam && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mailParam)) {
+    document.getElementById('li-email').value = mailParam;
+    document.getElementById('su-email').value = mailParam;
+    try { params.delete('email'); window.history.replaceState({}, '', window.location.pathname + (params.toString() ? '?' + params.toString() : '')); } catch (e) {}
+  }
 })();
 </script>
 <script>

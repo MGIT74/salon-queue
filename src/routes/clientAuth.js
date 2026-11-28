@@ -2,7 +2,7 @@ const express = require('express');
 const { serviceNameSql } = require('../lib/extrasOnly');
 const { contactError, isValidEmail, isValidPhone } = require('../lib/contact');
 const { thresholdsForSalon, rewardsFor } = require('../lib/loyaltyRules');
-const { safeBaseUrl } = require('../lib/safeUrl');
+const { safeBaseUrl, compteLink } = require('../lib/safeUrl');
 const crypto = require('crypto');
 const { pool, getSettings } = require('../db');
 const { hashPassword, verifyPassword } = require('../lib/password');
@@ -112,7 +112,7 @@ router.post('/signup', signupRateLimiter('client-signup'), wrap(async (req, res)
   // Carte de fidélité créée et activée d'office avec le compte (plus besoin de la
   // faire activer à la caisse). Une erreur ici ne doit jamais faire échouer l'inscription.
   try {
-    await activateOnAccountCreation(salonId, { client_name: name, email, phone });
+    await activateOnAccountCreation(salonId, { client_name: name, email, phone, accountUrl: compteLink(req, { email }) });
   } catch (err) {
     console.error('[fidélité] activation à la création du compte échouée:', err.message);
   }

@@ -5,6 +5,7 @@ const { getVatRates, rateForItem, TABLES: VAT_TABLES } = require('../lib/vat');
 const { clientKey, earnLoyaltyPoint } = require('../lib/queueMath');
 const { contactError } = require('../lib/contact');
 const { sendGiftConfirmation } = require('../lib/mailer');
+const { compteLink } = require('../lib/safeUrl');
 const requireAdmin = require('../middleware/auth');
 const requireAdminOrBarber = require('../middleware/barberAuth');
 const { wrap } = require('../lib/wrap');
@@ -419,7 +420,7 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
         amountEur: (outcome.sale.total_price_cents / 100).toFixed(2).replace('.', ',') + ' €',
         items: outcome.giftInfo.itemsSnapshot,
         code: outcome.giftInfo.code,
-        accountUrl: 'https://' + req.get('host') + '/compte.html?salon=' + encodeURIComponent(req.salon.slug || '')
+        accountUrl: compteLink(req, { email: gift.recipient_email })
       });
     } catch (err) {
       // N'empêche jamais la vente si l'email échoue (ex. SMTP salon pas

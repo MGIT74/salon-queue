@@ -17,7 +17,7 @@ const LC = require('./loyaltyCards');
 /**
  * @returns {Promise<boolean>} true si une carte vient d'être créée et activée.
  */
-async function activateOnAccountCreation(salonId, { client_name, email, phone }) {
+async function activateOnAccountCreation(salonId, { client_name, email, phone, accountUrl }) {
   const name = String(client_name || '').trim();
   const mail = String(email || '').trim();
   if (!name || !mail) return false;
@@ -52,7 +52,8 @@ async function activateOnAccountCreation(salonId, { client_name, email, phone })
   logActivity(salonId, 'loyalty_activate', 'Carte(s) de fidélité activée(s) automatiquement (création du compte client) : ' + name + ' — ' + created.map((c) => c.name).join(', '));
 
   try {
-    await sendLoyaltyActivation(salonId, mail, { clientName: name, cards: created.map((c) => ({ name: c.name, rule: LC.ruleText(c) })) });
+    // Le compte vient d'être créé avec cet email : « Voir ma carte » (connexion).
+    await sendLoyaltyActivation(salonId, mail, { clientName: name, cards: created.map((c) => ({ name: c.name, rule: LC.ruleText(c) })), hasAccount: true, accountUrl });
   } catch (err) {
     console.error('[fidélité] envoi email d\'activation échoué:', err.message);
   }
