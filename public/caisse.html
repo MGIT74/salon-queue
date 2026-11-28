@@ -1023,7 +1023,7 @@
     align-items: center; justify-content: center; padding: 20px;
   }
   .receipt-overlay.on { display: flex; }
-  .receipt-box { background: #fff; color: #111; border-radius: 14px; padding: 26px; max-width: 340px; width: 100%; font-family: 'Courier New', monospace; }
+  .receipt-box { background: #fff; color: #111; border-radius: 14px; padding: 26px; max-width: 340px; width: 100%; font-family: 'Courier New', monospace; max-height: calc(100vh - 40px); overflow-y: auto; }
   .receipt-box h2 { font-size: 16px; text-align: center; margin: 0 0 4px; }
   .receipt-box .sub { text-align: center; font-size: 12px; color: #666; margin-bottom: 16px; }
   .receipt-box .rline { display: flex; justify-content: space-between; font-size: 13px; padding: 3px 0; }
@@ -1031,6 +1031,8 @@
   .receipt-box .rsep { border-top: 1px dashed #999; margin: 6px 0; }
   .receipt-box .rlegal-line { font-size: 10.5px; color: #444; line-height: 1.5; }
   .receipt-box .rvathead { font-weight: 700; font-size: 11px; }
+  .receipt-box .rgift-cut { text-align: center; color: #888; font-size: 12px; margin: 14px 0 10px; }
+  .receipt-box .rgift-code { text-align: center; font-weight: 800; font-size: 26px; letter-spacing: 4px; margin: 6px 0; }
   .receipt-box .rline span { flex: 1; text-align: right; }
   .receipt-box .rline span:first-child { text-align: left; }
   /* Montants jamais coupes : le libelle passe a la ligne, pas le prix ni la devise */
@@ -6489,7 +6491,12 @@ function finalizeSale(saleCtx) {
     forgetChargedSale();
     document.getElementById('tpe-actions-save').style.display = 'none';
     document.getElementById('tpe-overlay').classList.remove('on');
-    showReceipt(saleCtx.soldTicket, saleCtx.total, saleCtx.method, { ticketNumber: r.sale && r.sale.ticket_number, cashCents: saleCtx.cashCents });
+    // Carte cadeau vendue : son code est imprimé à la suite du ticket (bon détachable).
+    var giftCoupon = (r.gift && r.gift.code) ? {
+      code: r.gift.code, recipient_name: saleCtx.gift && saleCtx.gift.recipient_name,
+      items: saleCtx.soldTicket, amount_cents: saleCtx.total
+    } : null;
+    showReceipt(saleCtx.soldTicket, saleCtx.total, saleCtx.method, { ticketNumber: r.sale && r.sale.ticket_number, cashCents: saleCtx.cashCents, gift: giftCoupon });
     // Si un cadeau a été créé, on avertit toujours le coiffeur si l'email
     // du code n'est pas parti (SMTP non configuré, panne...) - sans ça,
     // le client repart sans son code et personne ne s'en aperçoit avant
@@ -6760,6 +6767,7 @@ function showReceipt(lines, total, method, opts) {
 
   var html = headHtml + metaHtml + itemsHtml + summaryHtml + vatHtml + paymentHtml + footerHtml +
     '<div class="rlegal-line" style="text-align:center;margin-top:10px">Merci de votre visite</div>' +
+    (opts.gift ? giftCouponHtml(opts.gift, salonName, whenDate) : '') +
     '<div class="receipt-actions">' +
       '<button class="btn btn-soft" onclick="closeReceipt()">Fermer</button>' +
       '<button class="btn btn-primary" id="receipt-print-btn" onclick="printReceiptSilent()">Imprimer</button>' +
@@ -6780,8 +6788,34 @@ function showReceipt(lines, total, method, opts) {
   // navigateur, comportement historique).
   currentReceiptCtx = {
     lines: lines, total: total, method: method, cashCents: opts.cashCents,
-    whenDate: whenDate, ticketNumber: ticketNumber, barberName: barberName, salonName: salonName
+    whenDate: whenDate, ticketNumber: ticketNumber, barberName: barberName, salonName: salonName,
+    gift: opts.gift || null
   };
+}
+
+/** Prestations offertes par la carte cadeau, en une ligne (« Coupe + barbe »). */
+function giftCouponItemsLabel(items) {
+  return (items || []).map(function (l) {
+    return (l.quantity > 1 ? l.quantity + ' x ' : '') + receiptItemName(l);
+  }).join(' + ');
+}
+
+/** Aperçu à l'écran du bon cadeau imprimé sous le ticket. */
+function giftCouponHtml(g, salonName, whenDate) {
+  return '<div class="rgift-cut">- - - - - ✂ - - - - -</div>' +
+    '<h2>*** CARTE CADEAU ***</h2>' +
+    '<div class="rlegal-line" style="text-align:center">' + esc(salonName) + '</div>' +
+    '<div class="rsep"></div>' +
+    (g.recipient_name ? '<div class="rline"><span>Pour</span><span>' + esc(g.recipient_name) + '</span></div>' : '') +
+    '<div class="rline"><span>Offert</span><span style="text-align:right">' + esc(giftCouponItemsLabel(g.items)) + '</span></div>' +
+    '<div class="rline"><span>Valeur</span><span>' + eur(g.amount_cents) + '</span></div>' +
+    '<div class="rline"><span>Acheté le</span><span>' + whenDate.toLocaleDateString('fr-FR') + '</span></div>' +
+    '<div class="rsep"></div>' +
+    '<div class="rlegal-line" style="text-align:center">Votre code</div>' +
+    '<div class="rgift-code">' + esc(g.code) + '</div>' +
+    '<div class="rsep"></div>' +
+    '<div class="rlegal-line" style="text-align:center">Réservez en ligne ou à la borne du salon avec ce code.<br>Utilisable une seule fois.</div>' +
+    '<div class="rlegal-line" style="text-align:center;margin-top:8px">Bonne coupe !</div>';
 }
 
 // Contexte du reçu actuellement affiché, pour que le bouton "Imprimer"
@@ -6810,7 +6844,8 @@ function printReceiptSilent() {
     var ticketText = buildReceiptText(ctx.lines, ctx.total, ctx.method, {
       cashCents: ctx.cashCents,
       whenDate: ctx.whenDate, ticketNumber: ctx.ticketNumber,
-      barberName: ctx.barberName, salonName: ctx.salonName
+      barberName: ctx.barberName, salonName: ctx.salonName,
+      gift: ctx.gift, escpos: cfg.tpe_print_mode !== 'text'
     });
     return barberApi('/api/tpe/print', {
       method: 'POST',
@@ -6952,6 +6987,35 @@ function buildReceiptText(lines, total, method, o) {
   out.push(center('Merci de votre visite'));
   out.push('');
   out.push('');
+
+  // Carte cadeau vendue : bon détachable avec le code, à la suite du ticket.
+  // Thermique (ESC/POS) : coupe du papier entre les deux, code en double taille.
+  if (o.gift && o.gift.code) {
+    var ESC = o.escpos;
+    if (ESC) out.push('\n\x1D\x56\x42\x00');           // GS V 66 0 : coupe -> le bon se détache
+    else out.push(center('- - - - - - - - - - - - - -'), '');
+    out.push(center('*** CARTE CADEAU ***'));
+    if (o.salonName) out.push(center(o.salonName));
+    out.push(sep());
+    if (o.gift.recipient_name) out.push(twoCols('Pour', o.gift.recipient_name));
+    var offered = giftCouponItemsLabel(o.gift.items);
+    if (('Offert ' + offered).length <= COLS) out.push(twoCols('Offert', offered));
+    else { out.push('Offert'); wrapWords(offered, COLS - 2, COLS - 2).forEach(function (t) { out.push('  ' + t); }); }
+    out.push(twoCols('Valeur', money(o.gift.amount_cents)));
+    out.push(twoCols('Acheté le', o.whenDate.toLocaleDateString('fr-FR')));
+    out.push(sep());
+    out.push(center('Votre code'));
+    if (ESC) out.push('\x1B\x61\x01\x1D\x21\x11\x1B\x45\x01' + o.gift.code + '\x1B\x45\x00\x1D\x21\x00\x1B\x61\x00');
+    else out.push(center(o.gift.code.split('').join(' ')));
+    out.push(sep());
+    out.push(center('Réservez en ligne ou à la borne'));
+    out.push(center('du salon avec ce code.'));
+    out.push(center('Utilisable une seule fois.'));
+    out.push('');
+    out.push(center('Bonne coupe !'));
+    out.push('');
+    out.push('');
+  }
   return out.join('\n');
 }
 

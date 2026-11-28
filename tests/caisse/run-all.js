@@ -209,6 +209,7 @@ const suite = [
   ['186-annulations-origine.js', false, ['exit']],
   ['187-creneaux-libres-valeur-reelle.js', false, ['exit']],
   ['188-tiroir-compte-client.js', false, ['exit']],
+  ['189-ticket-code-carte-cadeau.js', false, ['exit']],
 ];
 
 let bad = 0;
