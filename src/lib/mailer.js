@@ -166,6 +166,9 @@ async function sendLoyaltyActivation(salonId, to, info) {
 async function sendGiftConfirmation(salonId, to, info) {
   const { tx, from, salon } = await getTransport(salonId, { force: true });
   const itemsList = info.items.map((it) => `${it.quantity} × ${it.item_name}`).join(', ');
+  // Deux façons d'en profiter : réserver en ligne (compte client ouvert avec CET email -> « Mes cadeaux »,
+  // ou le code saisi pendant la réservation en ligne), ou directement au salon (accueil / borne).
+  const url = info.accountUrl || '';
   await tx.sendMail({
     from,
     to,
@@ -174,14 +177,24 @@ async function sendGiftConfirmation(salonId, to, info) {
           `Un cadeau de ${info.amountEur} vous a été offert chez ${salon} !\n\n` +
           `Contenu : ${itemsList}\n\n` +
           `Votre code : ${info.code}\n\n` +
-          `Présentez-vous en salon et indiquez ce code à l'accueil ou saisissez-le sur la borne ` +
-          `("Utiliser un cadeau") pour en profiter.\n\n${salon}`,
+          `Pour en profiter :\n\n` +
+          `- En ligne : connectez-vous à votre compte client (ou créez-le) avec cette adresse email. ` +
+          `Votre cadeau apparaît dans « Mes cadeaux » : touchez « Utiliser ce cadeau » et choisissez votre créneau. ` +
+          `Vous pouvez aussi saisir ce code lors de votre réservation en ligne (« Utiliser un cadeau »).` +
+          (url ? `\n  ${url}` : '') + `\n\n` +
+          `- Au salon : indiquez ce code à l'accueil ou saisissez-le sur la borne (« Utiliser un cadeau »).\n\n` +
+          `Utilisable une seule fois.\n\n${salon}`,
     html: `<p>Bonjour ${h(info.recipientName)},</p>` +
           `<p>Un cadeau de <strong>${h(info.amountEur)}</strong> vous a été offert chez ${h(salon)} !</p>` +
           `<p>Contenu : ${h(itemsList)}</p>` +
           `<p style="font-size:20px;font-weight:700;letter-spacing:2px">${h(info.code)}</p>` +
-          `<p>Présentez-vous en salon et indiquez ce code à l'accueil, ou saisissez-le sur la borne ` +
-          `(« Utiliser un cadeau ») pour en profiter.</p>` +
+          `<p><strong>Pour en profiter :</strong></p>` +
+          `<p><strong>En ligne</strong> : connectez-vous à votre compte client (ou créez-le) avec cette adresse email. ` +
+          `Votre cadeau apparaît dans « Mes cadeaux » : touchez « Utiliser ce cadeau » et choisissez votre créneau. ` +
+          `Vous pouvez aussi saisir ce code lors de votre réservation en ligne (« Utiliser un cadeau »).</p>` +
+          (url ? `<p><a href="${h(url)}" style="display:inline-block;background:#111;color:#fff;text-decoration:none;padding:10px 18px;border-radius:8px;font-weight:600">Réserver en ligne avec mon cadeau</a></p>` : '') +
+          `<p><strong>Au salon</strong> : indiquez ce code à l'accueil, ou saisissez-le sur la borne (« Utiliser un cadeau »).</p>` +
+          `<p style="color:#666">Utilisable une seule fois.</p>` +
           `<p>${h(salon)}</p>`
   });
 }
