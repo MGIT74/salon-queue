@@ -418,7 +418,8 @@ router.post('/', requireAdminOrBarber, wrap(async (req, res) => {
         recipientName: gift.recipient_name,
         amountEur: (outcome.sale.total_price_cents / 100).toFixed(2).replace('.', ',') + ' €',
         items: outcome.giftInfo.itemsSnapshot,
-        code: outcome.giftInfo.code
+        code: outcome.giftInfo.code,
+        accountUrl: 'https://' + req.get('host') + '/compte.html?salon=' + encodeURIComponent(req.salon.slug || '')
       });
     } catch (err) {
       // N'empêche jamais la vente si l'email échoue (ex. SMTP salon pas

@@ -489,7 +489,8 @@ router.post('/gift-cards/:id/resend', requireAdmin, wrap(async (req, res) => {
       recipientName: gift.recipient_name,
       amountEur: (gift.amount_cents / 100).toFixed(2).replace('.', ',') + ' €',
       items: giftItems,
-      code: gift.code
+      code: gift.code,
+      accountUrl: 'https://' + req.get('host') + '/compte.html?salon=' + encodeURIComponent(req.salon.slug || '')
     });
   } catch (err) {
     return res.status(502).json({ error: "Échec de l'envoi — vérifiez la configuration SMTP du salon (Réglages)." });
