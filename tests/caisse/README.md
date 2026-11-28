@@ -222,4 +222,5 @@ node tests/caisse/185-creneau-libere-deplacement-magique.js  # Déplacement magi
 node tests/caisse/186-annulations-origine.js  # RDV annulés : par le client / par le salon / origine inconnue ; absents ; Manque à gagner en 4 lignes
 node tests/caisse/187-creneaux-libres-valeur-reelle.js  # Créneaux libres : chaque trou valorisé par ce qui y rentre (+ supplément seul, + déplacement magique)
 node tests/caisse/188-tiroir-compte-client.js  # Tiroirs : compte client / proche / sans compte / pas de coordonnées ; filtre « Compte » des Clients
+node tests/caisse/189-ticket-code-carte-cadeau.js  # Carte cadeau vendue : code imprimé après le ticket (coupe, code en grand) ; vente normale inchangée
 ```
